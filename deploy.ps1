@@ -22,7 +22,7 @@ foreach ($required in @(
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
     'gem.json',
-    'character-exclusives.json'
+    'gem.chara.json'
 )) {
     $requiredPath = Join-Path $source $required
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {

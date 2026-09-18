@@ -717,10 +717,13 @@ bool ResolveGameLayout()
 
    g_game_layout = layout;
    g_layout_ready.store(true, std::memory_order_release);
+   // 成功这一行只报"解析出来了"和"是哪个游戏构建"；四个 RVA 另起一行——只有查疑难
+   // session（钩子落到了别处）时才需要，平时扫日志不该被这串地址堵住眼睛。
    Log(std::format(
-      "Resolved and validated game layout from semantic anchors: PE timestamp=0x{:X}, "
-      "getter RVA=0x{:X}, SystemData RVA=0x{:X}, StatusManager RVA=0x{:X}, UiManager RVA=0x{:X}.",
-      layout.pe_timestamp,
+      "Layout resolved and validated from semantic anchors (PE 0x{:X}).",
+      layout.pe_timestamp));
+   Log(std::format(
+      "  getter=0x{:X} SystemData=0x{:X} StatusManager=0x{:X} UiManager=0x{:X}",
       layout.get_gem_data_by_index_rva,
       layout.system_data_global_rva,
       layout.status_manager_global_rva,

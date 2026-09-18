@@ -75,12 +75,15 @@ function ValueSlots({
   defaults,
   label,
   level,
+  valueLabel,
   onChange,
 }: {
   values: (number | null)[];
   defaults?: number[];
   label: string;
   level: number;
+  /** 这个槽在读屏里叫什么（"数值"/"value"/"数値"/"값"），随界面语言走。 */
+  valueLabel: string;
   onChange: (values: (number | null)[]) => void;
 }) {
   // 编辑中的框正在显示的文本，前提是它与已提交数字渲染出来的样子不同："-" 和 "0."
@@ -141,7 +144,7 @@ function ValueSlots({
           <Input
             type="text"
             inputMode="decimal"
-            aria-label={`${label} Lv${level} value ${i + 1}`}
+            aria-label={`${label} Lv${level} ${valueLabel} ${i + 1}`}
             placeholder={String(vanillaOf(i))}
             // 空就是"游戏的数值留着"：槽在有人输入之前是 null，所以这个框不需要和
             // 默认值比较就知道这一点——而手写进 sigiledits.json 的数字，会按它本来的值显示。
@@ -290,6 +293,7 @@ function LevelRow({
           defaults={valuesAt(row.info, level)}
           label={row.label}
           level={level}
+          valueLabel={ctx.t.valueLabel}
           onChange={(values) => ctx.updateLevel(row.key, level, { values: values })}
         />
       </TooltipTrigger>

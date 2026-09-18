@@ -3,7 +3,7 @@
 //	skill_status.json     哪几个等级带着哪些数值
 //	skill.<lang>.json     名字、简介、分段说明
 //
-// 读的是 gen\ 生成的共享数据 texts.json——各语言文本、等级与数值全在里面，
+// 读的是 gen\output\ 里那份共享数据 texts.json——各语言文本、等级与数值全在里面，
 // 所以这里不再自己解析 text.msg、也不再查库：读书的那半只有一份实现。
 // 先 cd gen && go run . texts，再在 docs\tool-gen-skill-assets 里 go run .；
 // 缺 texts.json 时本程序直接报错，不会偷偷回退去自己读一遍。
@@ -93,7 +93,7 @@ func main() {
 	// 而上一层还放着别的仓库，所以这些数据得待在一个有名字的目录里。
 	data := filepath.Join(filepath.Dir(repo), "gen")
 	assets := filepath.Join(repo, "Loadout", "assets")
-	shared := filepath.Join(data, "texts.json")
+	shared := filepath.Join(data, "output", "texts.json")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s\n", filepath.Base(os.Args[0]))

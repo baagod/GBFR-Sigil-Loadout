@@ -183,3 +183,35 @@ func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 	}
 	t.Fatal("the ja names are the en names: the files were not generated per language")
 }
+
+/*
+专属因子页的行标签来自另一份生成物（chara.lang.json，键是 PL 码），与 gem.chara.json
+同一次生成却不是一个文件：少的那个只是让整行退回 PL 码。这里把两边的键对一遍。
+*/
+func TestCharaNamesCoverTheExclusiveTableInEveryUILanguage(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("assets", "gem.chara.json"))
+	if err != nil {
+		t.Fatalf("reading assets/gem.chara.json: %v", err)
+	}
+	var rows []struct {
+		Player string     `json:"player"`
+		Gems   [][]string `json:"gems"`
+	}
+	if err := jsonv2.Unmarshal(raw, &rows); err != nil {
+		t.Fatalf("parsing assets/gem.chara.json: %v", err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("gem.chara.json lists no rows")
+	}
+	for _, lang := range []string{LangZH, "en", "ja", "ko"} {
+		names := (&LoadoutService{}).CharaNames(lang)
+		for _, row := range rows {
+			if row.Player == "" || len(row.Gems) != 3 {
+				t.Fatalf("gem.chara.json row %+v is not a 3-slot character entry", row)
+			}
+			if names[row.Player] == "" {
+				t.Fatalf("chara.lang.json[%s] has no name for %s", lang, row.Player)
+			}
+		}
+	}
+}

@@ -52,7 +52,7 @@ Write-Output "ModConfig.json version: $manifestVersion."
 # --- data freshness gates -----------------------------------------------------
 # 生成物必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
 #   gem.json             <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
-#   character-exclusives.json + kCharacterExclusives[]  <- docs\tool-gen-loadout.ps1 的 $chars
+#   gem.chara.json + kCharacterExclusives[]  <- docs\tool-gen-loadout.ps1 的 $chars
 # 所以这道门只比对本仓库里入库的两份，不需要游戏数据在场。
 $sigilsXlsx = Join-Path $root 'docs\gem.xlsx'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
@@ -70,7 +70,7 @@ try {
 }
 & pwsh -NoProfile -File (Join-Path $root 'docs\tool-gen-loadout.ps1') -Check
 if ($LASTEXITCODE -ne 0) {
-    throw 'character-exclusives.json / kCharacterExclusives[] 与 $chars 不一致：先跑 pwsh docs\tool-gen-loadout.ps1'
+    throw 'gem.chara.json / kCharacterExclusives[] 与 $chars 不一致：先跑 pwsh docs\tool-gen-loadout.ps1'
 }
 
 $msbuild = $null
@@ -167,15 +167,21 @@ try {
 
 # Keep the tool's dev-run data copies (git-ignored, next to the Go sources)
 # identical to the packaged ones, so a Loadout.exe run from Loadout/ can never
-# silently diverge from a release. gem.json's source is Loadout\assets\ itself
-# (the generator writes it there), so its dev copy lands beside the exe.
-foreach ($dataFile in @('character-exclusives.json')) {
-    Copy-Item -LiteralPath (Join-Path $root "GBFR.PreEquippedSigils\$dataFile") `
+# silently diverge from a release. Both sources are Loadout\assets\ itself
+# (the generators write them there), so their dev copies land beside the exe.
+foreach ($dataFile in @('gem.json', 'gem.chara.json')) {
+    Copy-Item -LiteralPath (Join-Path $root "Loadout\assets\$dataFile") `
         -Destination (Join-Path $toolDir $dataFile) -Force
 }
-Copy-Item -LiteralPath (Join-Path $root 'Loadout\assets\gem.json') `
-    -Destination (Join-Path $toolDir 'gem.json') -Force
-Write-Output 'Synced gem.json/character-exclusives.json into Loadout/.'
+Write-Output 'Synced gem.json/gem.chara.json into Loadout/.'
+
+# 唯一的工具产物是 Loadout.exe（上面用 -o 指定）。谁要是拿裸 `go build` 做编译检查，
+# Go 会按模块名在源码旁落一个 loadouttool.exe——它不参与打包，纯属残留，顺手清掉。
+$strayToolExe = Join-Path $toolDir 'loadouttool.exe'
+if (Test-Path -LiteralPath $strayToolExe) {
+    Remove-Item -LiteralPath $strayToolExe -Force
+    Write-Output 'Removed a stray loadouttool.exe (only Loadout.exe is a build product).'
+}
 
 $resolvedRoot = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
 $resolvedDist = [IO.Path]::GetFullPath($distRoot).TrimEnd('\') + '\'
@@ -229,7 +235,7 @@ foreach ($requiredFile in @(
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
     'gem.json',
-    'character-exclusives.json'
+    'gem.chara.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {

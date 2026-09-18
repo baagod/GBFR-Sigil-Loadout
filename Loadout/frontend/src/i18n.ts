@@ -21,14 +21,16 @@ export const LANGS = ["zh", "en", "ja", "ko"] as const;
 export type Lang = (typeof LANGS)[number];
 
 /*
-  Kept as short as it can be, and as text rather than flag emoji: Windows ships no
-  flag glyphs, so a flag renders as two letters there anyway.
+  Each language in the shape its own speakers recognise first — 中 / EN / 日 / 한 —
+  rather than four codes: a language switch is only useful if the person looking at
+  it can find their own. Text, not flag emoji: Windows ships no flag glyphs, so a
+  flag renders as two letters there anyway.
 */
 export const LANG_LABEL: Record<Lang, string> = {
   zh: "中",
   en: "EN",
-  ja: "JA",
-  ko: "KO",
+  ja: "日",
+  ko: "한",
 };
 
 export type Dict = {
@@ -37,6 +39,8 @@ export type Dict = {
   noMatch: string;
   ok: string;
   enable: (name: string) => string;
+  /** 一个数值槽在读屏里叫什么（如 "数值"），行名与等级之外那半句。 */
+  valueLabel: string;
   readFailed: string;
   writeFailed: string;
 };
@@ -48,6 +52,7 @@ export const MESSAGES: Record<Lang, Dict> = {
     noMatch: "没有匹配的因子",
     ok: "确定",
     enable: (name) => `启用 ${name}`,
+    valueLabel: "数值",
     readFailed: "读取失败",
     writeFailed: "写入失败",
   },
@@ -57,6 +62,7 @@ export const MESSAGES: Record<Lang, Dict> = {
     noMatch: "No matching sigil",
     ok: "OK",
     enable: (name) => `Enable ${name}`,
+    valueLabel: "value",
     readFailed: "Could not read",
     writeFailed: "Could not write",
   },
@@ -66,6 +72,7 @@ export const MESSAGES: Record<Lang, Dict> = {
     noMatch: "一致するジーンがありません",
     ok: "OK",
     enable: (name) => `${name} を有効にする`,
+    valueLabel: "数値",
     readFailed: "読み込みに失敗しました",
     writeFailed: "書き込みに失敗しました",
   },
@@ -75,6 +82,7 @@ export const MESSAGES: Record<Lang, Dict> = {
     noMatch: "일치하는 진이 없습니다",
     ok: "확인",
     enable: (name) => `${name} 활성화`,
+    valueLabel: "값",
     readFailed: "읽기에 실패했습니다",
     writeFailed: "쓰기에 실패했습니다",
   },

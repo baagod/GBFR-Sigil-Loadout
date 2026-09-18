@@ -52,6 +52,8 @@
 
 ## 审核流程
 
+**只有当明确收到用户发出审核指令时才进入，否则切勿擅自执行。**
+
 1. 当收到 `审核` 指令时执行 `git add .`。
 2. 执行 **自检** + `ponytail-review` 后调用 `receiving-code-review`，对接受项直接执行。
 3. 调用 `code-review-and-quality + ponytail-review`，对结果执行 `receiving-code-review`。

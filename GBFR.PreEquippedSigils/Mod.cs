@@ -74,7 +74,7 @@ public sealed class Mod : IMod
             {
                 _fileLog?.Dispose();
                 _fileLog = new StreamWriter(
-                    Path.Combine(modDirectory, "GBFR.PreEquippedSigils.Reloaded.log"),
+                    Path.Combine(modDirectory, "GBFR.PreEquippedSigils.log"),
                     append: false)
                 {
                     AutoFlush = true,

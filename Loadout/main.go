@@ -50,6 +50,14 @@ var embeddedGemLang []byte
 // gemNamesByLang 按界面语言索引那份名字表（解码一次，之后各语言共用）。
 var gemNamesByLang = decode[map[string]string](embeddedGemLang)
 
+// chara.lang.json 是角色名：{语言: {角色码: 名字}}，由 docs\tool-gen-texts.ps1 生成。
+//
+//go:embed assets/chara.lang.json
+var embeddedCharaLang []byte
+
+// charaNamesByLang 按界面语言索引那份角色名；键就是 gem.chara.json 的 player。
+var charaNamesByLang = decode[map[string]string](embeddedCharaLang)
+
 var app *application.App
 var win *application.WebviewWindow
 

@@ -12,8 +12,9 @@ frontend/dist/
 frontend/bindings/
 
 
-# Local runtime data copies (next to Loadout.exe for dev runs)
-gem.json
-character-exclusives.json
+# Dev-run data copies (next to Loadout.exe). 必须锚定到本目录：不带斜杠的 `gem.json`
+# 会连 assets\gem.json 一起忽略，而 assets\ 下的数据全部入库。
+/gem.json
+/gem.chara.json
 Loadout.exe~
 

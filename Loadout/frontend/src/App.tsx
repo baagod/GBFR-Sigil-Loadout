@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
-import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames } from "../bindings/loadouttool/loadoutservice"
+import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames } from "../bindings/loadouttool/loadoutservice"
 import { copy } from "./copy"
 import { LANGS, LANG_LABEL, initialLang, type Lang } from "./i18n"
-import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
+import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, parseExclusiveTable, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
 import { SlotRow, HEADER_ROW } from "./SlotEditor"
 import { ExclusivePanel } from "./ExclusivePanel"
 import { SigilEditPanel } from "./SigilEditPanel"
@@ -28,6 +28,8 @@ export default function App() {
   // 当前语言的显示名（gem.lang.json：{hash: 名字}）。名字按语言变，所以它只是标签，
   // 不是身份——身份是 hash。
   const [names, setNames] = useState<Record<string, string>>({})
+  // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页的行标签。
+  const [charaNames, setCharaNames] = useState<Record<string, string>>({})
   const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
   const [lang, setLang] = useState<Lang>(initialLang) // persisted in loadout.json
   // 一个开关管全部页面：配装那两页读 copy.ts，因子编辑页读 i18n.ts。
@@ -88,7 +90,7 @@ export default function App() {
       await reloadConfig(sigilsLoaded, traitsLoaded)
       try {
         const exclusiveJson = await exclusivesPromise
-        const table = (JSON.parse(exclusiveJson).exclusives ?? []) as Exclusive[]
+        const table = parseExclusiveTable(JSON.parse(exclusiveJson))
         setExclusiveTable(table)
         // Migrate legacy exclusive entries (character-hash keys + t1/t2/war)
         // to the player-keyed shape; otherwise they render as all-enabled and
@@ -106,9 +108,10 @@ export default function App() {
             }
             const merged = { ...(out[row.player] ?? {}) }
             const legacy = entry as Record<string, unknown>
-            merged[row.t1] = legacy.t1 !== false
-            merged[row.t2] = legacy.t2 !== false
-            merged[row.war] = legacy.war !== false
+            const [t1, t2, war] = row.gems.map(([, skill]) => skill)
+            merged[t1] = legacy.t1 !== false
+            merged[t2] = legacy.t2 !== false
+            merged[war] = legacy.war !== false
             out[row.player] = merged
             migrated = true
           }
@@ -122,16 +125,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 显示名按语言取（内嵌的 gem.lang.json）。换语言就重取一次，取不到名字的条目由
-  // hashLabels 回落成 hash——看得见但不好看，总比显示一个别的语言的名字强。
+  // 显示名按语言取（内嵌的 gem.lang.json / chara.lang.json）。换语言就重取一次，
+  // 取不到名字的条目由 hashLabels 回落成 hash——看得见但不好看，总比显示一个别的
+  // 语言的名字强。
   useEffect(() => {
     let cancelled = false
-    GemNames(lang)
-      .then((map) => {
-        if (!cancelled) setNames(map ?? {})
+    Promise.all([GemNames(lang), CharaNames(lang)])
+      .then(([gems, charas]) => {
+        if (cancelled) return
+        setNames(gems ?? {})
+        setCharaNames(charas ?? {})
       })
       .catch(() => {
-        if (!cancelled) setNames({})
+        if (cancelled) return
+        setNames({})
+        setCharaNames({})
       })
     return () => {
       cancelled = true
@@ -350,7 +358,7 @@ export default function App() {
       const current: ExclusiveState = prev ? { ...prev } : {}
       const entry = current[player]
         ? { ...current[player] }
-        : { [row.t1]: true, [row.t2]: true, [row.war]: true }
+        : Object.fromEntries(row.gems.map(([, skill]) => [skill, true]))
       entry[traitHash] = value
       current[player] = entry
       return current
@@ -502,7 +510,7 @@ export default function App() {
             table={exclusiveTable}
             state={exclusiveState}
             names={names}
-            lang={lang}
+            charaNames={charaNames}
             onChange={updateExclusive}
           />
         </TabsPanel>

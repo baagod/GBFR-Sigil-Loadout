@@ -16,10 +16,11 @@ namespace GBFR.PreEquippedSigils;
 ///                            hash == skill1 (trait entries only, no item).
 ///                            No display names here: they live in the tool's
 ///                            gem.lang.json, which the mod never reads.
-///   character-exclusives.json : { exclusives: [ { hash, player, name, zh,
-///                            t1, t2, war, t1Gem, t2Gem, warGem } ] }
+///   gem.chara.json         : [ { hash, player, gems: [ [gemHash, traitHash] x3 ] } ]
+///                            槽序即数组下标（0 = T1、1 = T2、2 = 战气）；
+///                            name/zh 不在这里——角色名走工具的 chara.lang.json。
 ///   loadout.json           : { lang, slots: [ { items: [
-///                            {gem, level, zh, en}, {hash, level, zh, en}? ],
+///                            {gem, level}, {hash, level}? ],
 ///                            enabled } ], exclusive: { player: { traitHash: bool } } }
 ///                            items[0] = sigil (item hash), items[1] = secondary
 ///                            trait (optional); a bare array is legacy-only.
@@ -38,8 +39,6 @@ internal static class LoadoutConfig
     {
         public required uint Hash { get; init; }
         public required string Player { get; init; } // PL code (e.g. PL1400)
-        public required string Name { get; init; }
-        public required string Zh { get; init; }
         public required uint T1 { get; init; }
         public required uint T2 { get; init; }
         public required uint War { get; init; }
@@ -48,7 +47,6 @@ internal static class LoadoutConfig
     private static readonly Dictionary<uint, uint> Sigils = new();
     private static readonly Dictionary<uint, int> Traits = new();
     private static readonly Dictionary<string, List<ExclusiveRow>> ExclusiveByPlayer = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, ExclusiveRow> ExclusiveByName = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<uint, ExclusiveRow> ExclusiveByHash = new();
     private static NativeCore.ExclusiveOverrideNative[]? _appliedOverrides;
     private static DateTime _lastAppliedUtc = DateTime.MinValue;
@@ -215,43 +213,54 @@ internal static class LoadoutConfig
     }
 
     /// <summary>
-    /// Loads character-exclusives.json (the tool's per-character exclusive
-    /// table) so "exclusive" keys can be PL codes / character names as well as
-    /// raw character hashes. Table missing or invalid only disables that
-    /// convenience: raw hashes and the legacy t1/t2/war shape still work.
+    /// Loads gem.chara.json (the tool's per-character exclusive table) so
+    /// "exclusive" keys can be PL codes as well as raw character hashes.
+    /// Table missing or invalid only disables that convenience: raw hashes and
+    /// the legacy t1/t2/war shape still work.
+    ///
+    /// 每条是 { hash, player, gems: [[因子 hash, 技能 hash] x3] }：槽序就是数组下标
+    /// （0 = T1、1 = T2、2 = 战气），名字不在这里——角色名走工具的 chara.lang.json。
     /// </summary>
     private static void LoadExclusiveTable(string modDirectory, Action<string> log)
     {
         try
         {
             using JsonDocument doc = JsonDocument.Parse(
-                File.ReadAllText(Path.Combine(modDirectory, "character-exclusives.json")));
+                File.ReadAllText(Path.Combine(modDirectory, "gem.chara.json")));
             int count = 0;
-            foreach (JsonElement entry in doc.RootElement.GetProperty("exclusives").EnumerateArray())
+            foreach (JsonElement entry in doc.RootElement.EnumerateArray())
             {
                 try
                 {
+                    uint[] traitHashes = new uint[3];
+                    int index = 0;
+                    foreach (JsonElement pair in entry.GetProperty("gems").EnumerateArray())
+                    {
+                        if (index >= traitHashes.Length)
+                            break;
+                        traitHashes[index++] = pair.GetArrayLength() == 2 ? PU(Hx(pair[1])) : 0;
+                    }
+
                     var row = new ExclusiveRow
                     {
                         Hash = PU(Hx(entry.GetProperty("hash"))),
                         Player = Hx(entry.GetProperty("player")),
-                        Name = Hx(entry.GetProperty("name")),
-                        Zh = Hx(entry.GetProperty("zh")),
-                        T1 = PU(Hx(entry.GetProperty("t1"))),
-                        T2 = PU(Hx(entry.GetProperty("t2"))),
-                        War = PU(Hx(entry.GetProperty("war"))),
+                        T1 = traitHashes[0],
+                        T2 = traitHashes[1],
+                        War = traitHashes[2],
                     };
-                    if (row.Hash == 0 || row.Player.Length == 0)
+                    // 三槽缺一、形状不对或解析出 0 的条目都不是可用的专属记录：宁可整条不要，
+                    // 也不要一条"只有 T1"的记录去改写玩家配置。零值槽尤其危险——
+                    // AddExclusiveOverride 用 PU(field.Name) 比对槽位，而它对手写文件里任何
+                    // 拼错的键都返回 0，于是那条键会静默变成 T1 的开关。
+                    if (row.Hash == 0 || row.Player.Length == 0 || index < traitHashes.Length ||
+                        traitHashes[0] == 0 || traitHashes[1] == 0 || traitHashes[2] == 0)
                         continue;
                     if (ExclusiveByPlayer.TryGetValue(row.Player, out var playerRows))
                         playerRows.Add(row);
                     else
                         ExclusiveByPlayer[row.Player] = new List<ExclusiveRow> { row };
                     ExclusiveByHash[row.Hash] = row;
-                    if (row.Name.Length > 0)
-                        ExclusiveByName[row.Name] = row;
-                    if (row.Zh.Length > 0)
-                        ExclusiveByName[row.Zh] = row;
                     count++;
                 }
                 catch
@@ -274,8 +283,6 @@ internal static class LoadoutConfig
         if (ExclusiveByPlayer.TryGetValue(key, out var playerRows))
             return playerRows;
         if (ExclusiveByHash.TryGetValue(PU(key), out ExclusiveRow? row))
-            return [row];
-        if (ExclusiveByName.TryGetValue(key, out row))
             return [row];
         return [];
     }
@@ -333,7 +340,7 @@ internal static class LoadoutConfig
 
     /// <summary>
     /// Parses the optional "exclusive" object
-    /// ({ PL码/name/hash: { 词条hash(T1/T2/War): bool } }) into native overrides
+    /// ({ PL码/角色hash: { 词条hash(T1/T2/War): bool } }) into native overrides
     /// (disable bits). Missing entries stay enabled; the legacy shape
     /// ({ characterHashHex: { t1, t2, war } }) is still accepted for unknown
     /// character hashes; absent "exclusive" yields null (all enabled).

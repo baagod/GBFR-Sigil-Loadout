@@ -25,7 +25,9 @@
     <None Include="..\Loadout\assets\gem.json"
           Link="gem.json"
           CopyToOutputDirectory="PreserveNewest" />
-    <None Include="character-exclusives.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Loadout\assets\gem.chara.json"
+          Link="gem.chara.json"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\GBFR.PreEquippedSigils.Native\bin\$(Configuration)\GBFR.PreEquippedSigils.Native.dll"
           Link="GBFR.PreEquippedSigils.Native.dll"
           CopyToOutputDirectory="PreserveNewest" />

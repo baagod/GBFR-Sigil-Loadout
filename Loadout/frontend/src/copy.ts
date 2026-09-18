@@ -14,7 +14,7 @@ const zh = {
   tabSigilEdit: "因子编辑",
   headerPrimary: "主因子",
   headerSecondary: "副因子",
-  selectAll: "全选/反选",
+  selectAll: "全选/全不选",
   pickTrait: "选择因子",
   none: "无",
   search: "搜索",
