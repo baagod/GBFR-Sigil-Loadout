@@ -14,7 +14,7 @@ const GRID_COLS =
   "grid grid-cols-[2.5rem_2rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"
 
 export const HEADER_ROW = `${GRID_COLS} mt-2 min-h-[44px] border-b text-sm font-medium text-foreground`
-const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm transition-colors last:border-b-0 hover:bg-muted/50`
+const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
 
 /** Clamped numeric level input with a grey "/ max" suffix. */
 function LevelInput({
@@ -89,8 +89,8 @@ function LevelInput({
 export const SlotRow = memo(function SlotRow({
   index,
   slot,
-  sigilNames,
-  sigilNameSet,
+  mainKeys,
+  mainKeySet,
   traitHashes,
   labels,
   legalOfMain,
@@ -101,8 +101,9 @@ export const SlotRow = memo(function SlotRow({
 }: {
   index: number
   slot: Slot
-  sigilNames: string[]
-  sigilNameSet: Set<string>
+  /** 主因子下拉的取值：每组的组键（该组变体共享的词条 hash）。 */
+  mainKeys: string[]
+  mainKeySet: Set<string>
   traitHashes: string[]
   labels: Record<string, string>
   legalOfMain: (name: string) => Set<string>
@@ -111,7 +112,7 @@ export const SlotRow = memo(function SlotRow({
   maxOfSec: (h: string) => number
   updateSlot: (i: number, patch: Partial<Slot>) => void
 }) {
-  const mainValid = slot.mainHash !== "" && sigilNameSet.has(slot.mainHash)
+  const mainValid = slot.mainHash !== "" && mainKeySet.has(slot.mainHash)
   const legal = mainValid ? legalOfMain(slot.mainHash) : new Set<string>()
   const secIllegal = mainValid && slot.secHash !== "" && !legal.has(slot.secHash)
   return (
@@ -129,7 +130,7 @@ export const SlotRow = memo(function SlotRow({
       <div className="flex min-w-0 items-center gap-1.5 pr-2">
         <TraitPicker
           value={slot.mainHash}
-          traits={sigilNames}
+          traits={mainKeys}
           labels={labels}
           placeholder={t.pickTrait}
           searchPlaceholder={t.search}

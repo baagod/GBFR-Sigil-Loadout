@@ -58,7 +58,7 @@ inline constexpr int kNativeInternalSlotCount = 13;
 // kBuiltinExclusiveSlotCount + config count.
 inline constexpr int kBuiltinExclusiveSlotCount = 3;
 inline constexpr int kVirtualSlotCapacity = 24;
-// Character restrictions are extracted from sigils.json (the "character"
+// Character restrictions are extracted from gem.json (the "character"
 // field on exclusive rows, produced by the extract pipeline):
 // 28 characters x 3 template exclusives (captain shares one entry) + 3
 // advanced exclusives (_74: 涯之七星＋/涯之二王＋/无态＋).

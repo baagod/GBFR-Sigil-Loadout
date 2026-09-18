@@ -52,11 +52,9 @@
 
 ## 审核流程
 
-
-
 1. 当收到 `审核` 指令时执行 `git add .`。
 2. 执行 **自检** + `ponytail-review` 后调用 `receiving-code-review`，对接受项直接执行。
-3. 再调用 `code-review-and-quality + ponytail-review`，对结果执行 `receiving-code-review`。
+3. 调用 `code-review-and-quality + ponytail-review`，对结果执行 `receiving-code-review`。
 4. 注意 **审核结果** 是否与本 `AGENTS.md` 声明的 `"2. 简洁优先"` 冲突，如有需权衡执行。 
 5. 检测到冗余、死代码和文件等，直接清理。
 

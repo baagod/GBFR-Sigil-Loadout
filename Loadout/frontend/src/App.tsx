@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
-import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives } from "../bindings/loadouttool/loadoutservice"
+import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames } from "../bindings/loadouttool/loadoutservice"
 import { copy } from "./copy"
 import { LANGS, LANG_LABEL, initialLang, type Lang } from "./i18n"
 import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
@@ -35,17 +25,13 @@ export default function App() {
   const [tab, setTab] = useState<TabKey>("general")
   const [exclusiveTable, setExclusiveTable] = useState<Exclusive[]>([])
   const [exclusiveState, setExclusiveState] = useState<ExclusiveState | undefined>(undefined)
-  const [resetOpen, setResetOpen] = useState(false)
+  // 当前语言的显示名（gem.lang.json：{hash: 名字}）。名字按语言变，所以它只是标签，
+  // 不是身份——身份是 hash。
+  const [names, setNames] = useState<Record<string, string>>({})
   const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
   const [lang, setLang] = useState<Lang>(initialLang) // persisted in loadout.json
-  const resetCancelRef = useRef<HTMLButtonElement | null>(null)
-  // 配装那两页只有中英两套文案，所以日语下它们显示英文——这比在同一个窗口里
-  // 放两个互不同步的语言开关要好（那一页的文案本身三种都齐，见 i18n.ts）。
-  const copyLang = lang === "ja" ? "en" : lang
-  const t = copy[copyLang]
-  // 一个开关管三个 Tab：中 → EN → JA → 中。
-  const nextLang = LANGS[(LANGS.indexOf(lang) + 1) % LANGS.length]
-  const toggleLang = () => setLang(nextLang)
+  // 一个开关管全部页面：配装那两页读 copy.ts，因子编辑页读 i18n.ts。
+  const t = copy[lang]
   // First render + first load must not write loadout.json: the preset stays
   // active until the user actually edits something.
   const skipSave = useRef(true)
@@ -74,8 +60,8 @@ export default function App() {
           if (s.player) continue // exclusive-slot sigils: traits never offered
           traitById.set(s.skill1, {
             hash: s.skill1,
-            zh: s.zh ?? "",
-            en: s.name || s.zh || "",
+            // 显示名来自命名它那一行的物品名，所以取名字时用那一行的 hash。
+            gem: s.hash ?? "",
             cap: s.cap ?? DEFAULT_LEVEL,
           })
         }
@@ -87,8 +73,6 @@ export default function App() {
           .filter((s) => s.hash !== s.skill1)
           .map((s) => ({
             hash: s.hash ?? "",
-            name: s.name ?? s.zh ?? s.hash ?? "",
-            zh: s.zh ?? "",
             skill1: s.skill1 ?? "",
             player: s.player ?? "",
             onlyone: s.onlyone ?? "",
@@ -100,6 +84,7 @@ export default function App() {
       } catch (e) {
         setStatus(t.sigilFail(e))
       }
+
       await reloadConfig(sigilsLoaded, traitsLoaded)
       try {
         const exclusiveJson = await exclusivesPromise
@@ -137,18 +122,35 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const traitByName = useMemo(() => new Map(traits.map((tr) => [tr.hash, tr])), [traits])
-  const sigilByHash = useMemo(() => new Map(sigils.map((s) => [s.hash, s])), [sigils])
-
-  // Variants grouped by display name: one entry per name (unique picker item).
-  const groupedByName = useMemo(() => {
-    const byName = new Map<string, Sigil[]>()
-    for (const s of sigils) {
-      const g = byName.get(s.name)
-      if (g) g.push(s)
-      else byName.set(s.name, [s])
+  // 显示名按语言取（内嵌的 gem.lang.json）。换语言就重取一次，取不到名字的条目由
+  // hashLabels 回落成 hash——看得见但不好看，总比显示一个别的语言的名字强。
+  useEffect(() => {
+    let cancelled = false
+    GemNames(lang)
+      .then((map) => {
+        if (!cancelled) setNames(map ?? {})
+      })
+      .catch(() => {
+        if (!cancelled) setNames({})
+      })
+    return () => {
+      cancelled = true
     }
-    return byName
+  }, [lang])
+
+  const traitByName = useMemo(() => new Map(traits.map((tr) => [tr.hash, tr])), [traits])
+
+  // 主因子的分组：同一词条的变体归一组，组键就是那条词条的 hash。以前按显示名分，
+  // 而名字现在按语言变、不能再当键；同一个名字的那些本来也共享一条词条。
+  const groupedByKey = useMemo(() => {
+    const byKey = new Map<string, Sigil[]>()
+    for (const s of sigils) {
+      const key = s.skill1 || s.hash
+      const g = byKey.get(key)
+      if (g) g.push(s)
+      else byKey.set(key, [s])
+    }
+    return byKey
   }, [sigils])
 
   // General mains: only item rows (hash != skill1) with no character
@@ -157,13 +159,14 @@ export default function App() {
   // hinted as fully illegal instead.
   const sigilGroups = useMemo(
     () =>
-      [...groupedByName.entries()]
+      [...groupedByKey.entries()]
         .filter(([, variants]) => variants.some((v) => v.player === ""))
-        .map(([name, variants]) => ({
-          name,
-          zh: variants[0]?.zh ?? name,
+        .map(([key, variants]) => ({
+          key,
+          // 显示名按 hash 取，所以这一组要带上代表行的 hash。
+          gem: variants[0]?.hash ?? "",
         })),
-    [groupedByName]
+    [groupedByKey]
   )
 
   const traitHashes = useMemo(() => traits.map((tr) => tr.hash), [traits])
@@ -172,13 +175,13 @@ export default function App() {
   // at save time (which variant hash a family resolves to).
   const poolByMain = useMemo(() => {
     const byName = new Map<string, { poolHash: string; lot: Set<string> }>()
-    for (const [name, variants] of groupedByName) {
+    for (const [name, variants] of groupedByKey) {
       const pool = variants.find((v) => v.lot && v.lot.length > 0)
       if (!pool) continue
       byName.set(name, { poolHash: pool.hash, lot: new Set(pool.lot) })
     }
     return byName
-  }, [groupedByName])
+  }, [groupedByKey])
 
   // Traits that can act as a secondary: provided by at least one ordinary
   // (mix=0, combinable) item row.
@@ -199,7 +202,7 @@ export default function App() {
   const legalByMain = useMemo(() => {
     const none: Set<string> = new Set()
     return (name: string) => {
-      const variants = (groupedByName.get(name) ?? []).filter(
+      const variants = (groupedByKey.get(name) ?? []).filter(
         (s) => s.onlyone !== "1" && s.hash !== s.skill1
       )
       if (variants.length === 0) return none
@@ -212,7 +215,7 @@ export default function App() {
       }
       return legal
     }
-  }, [groupedByName, ordinaryTraits])
+  }, [groupedByKey, ordinaryTraits])
 
   // Family item hash at save time: no secondary -> pool version (lot != []
   // variant, else first); secondary in the pool's lot -> pool version;
@@ -220,7 +223,7 @@ export default function App() {
   // anything else (illegal) still generates with the pool version (styles
   // only). lot match wins over sec match (currently no trait is in both).
   const hashFor = (name: string, secHash = ""): string => {
-    const variants = groupedByName.get(name)
+    const variants = groupedByKey.get(name)
     if (!variants || variants.length === 0) return ""
     const pool = poolByMain.get(name)
     if (pool && (secHash === "" || pool.lot.has(secHash))) return pool.poolHash
@@ -231,39 +234,40 @@ export default function App() {
   // Stable callbacks + memoized arrays keep SlotRow memoization effective:
   // editing one row no longer re-renders all 12.
   const maxOfMain = useCallback((name: string) => {
-    const variants = groupedByName.get(name)
+    const variants = groupedByKey.get(name)
     const tr = variants && variants.length > 0 ? traitByName.get(variants[0].skill1) : undefined
     return tr?.cap ?? DEFAULT_LEVEL
-  }, [groupedByName, traitByName])
+  }, [groupedByKey, traitByName])
   const maxOfSec = useCallback(
     (h: string) => traitByName.get(h)?.cap ?? DEFAULT_LEVEL,
     [traitByName]
   )
 
-  // Picker item values: main = unique display names; secondary = trait hashes
-  // (labels provided by hashLabels).
-  const sigilNames = useMemo(() => sigilGroups.map((g) => g.name), [sigilGroups])
-  const sigilNameSet = useMemo(() => new Set(sigilNames), [sigilNames])
+  // Picker item values: main = the group key (the trait hash its variants share),
+  // secondary = trait hashes. Labels come from hashLabels.
+  //
+  // 主因子以前拿显示名当值，那是它在表里的身份；名字现在按语言变，值必须换成与语言
+  // 无关的东西，而存档里记的本来就是 hash。
+  const mainKeys = useMemo(() => sigilGroups.map((g) => g.key), [sigilGroups])
+  const mainKeySet = useMemo(() => new Set(mainKeys), [mainKeys])
   const hashLabels = useMemo(
     () =>
       Object.fromEntries([
-        ...traits.map((tr) => [tr.hash, lang === "zh" ? tr.zh : tr.en] as const),
-        ...sigilGroups.map((g) => [g.name, lang === "zh" ? g.zh : g.name] as const),
+        ...traits.map((tr) => [tr.hash, names[tr.gem] ?? tr.hash] as const),
+        ...sigilGroups.map((g) => [g.key, names[g.gem] ?? g.key] as const),
       ]),
-    [traits, sigilGroups, lang]
+    [traits, sigilGroups, names]
   )
   const updateSlot = useCallback((index: number, patch: Partial<Slot>) => {
     setSlots((prev) => prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)))
   }, [])
 
-  // Reload the player config (falls back to the preset template). Used at mount
-  // and after a reset so the UI mirrors the fresh state without restarting the
-  // app. The tables are parameters: at mount time the sigils/traits state is
-  // still empty, so reading it here would resolve zero display names.
-  const reloadConfig = async (
-    sigilTable: Sigil[] = sigils,
-    traitTable: Trait[] = traits
-  ) => {
+  // Reload the player config (falls back to the preset template), so the UI
+  // mirrors what is on disk without restarting the app. The tables are
+  // parameters rather than read from state: the only caller is the mount load,
+  // which has just fetched them while the state still holds the empty first
+  // render.
+  const reloadConfig = async (sigilTable: Sigil[], traitTable: Trait[]) => {
     try {
       const configJson = await LoadConfig()
       applyConfig(JSON.parse(configJson), sigilTable, traitTable)
@@ -315,17 +319,10 @@ export default function App() {
       const main = {
         gem: hash, // loadout.json protocol: item id stays "gem" (mod reads it)
         level: s.mainLevel,
-        zh: sigilByHash.get(hash)?.zh ?? "",
-        en: sigilByHash.get(hash)?.name ?? "",
       }
       const items: SavedItem[] = [main]
       if (s.secHash !== "") {
-        items.push({
-          hash: s.secHash,
-          level: s.secLevel,
-          zh: traitByName.get(s.secHash)?.zh ?? "",
-          en: traitByName.get(s.secHash)?.en ?? "",
-        })
+        items.push({ hash: s.secHash, level: s.secLevel })
       }
       cfg.push({ items, enabled: s.enabled })
     }
@@ -438,50 +435,23 @@ export default function App() {
             <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
             <TabsTrigger value="sigilEdit">{t.tabSigilEdit}</TabsTrigger>
           </TabsList>
-          <div className="flex items-center">
-            <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
-              <AlertDialogTrigger
-                render={
-                  <Button variant="ghost" size="sm" aria-label={t.reset}>
-                    {t.reset}
-                  </Button>
-                }
-              />
-              <AlertDialogContent size="sm" initialFocus={resetCancelRef}>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t.reset}?</AlertDialogTitle>
-                  <AlertDialogDescription>{t.resetDesc}</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel ref={resetCancelRef}>{t.cancel}</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      // Cancel a pending debounced save: it would otherwise
-                      // write the pre-reset state right after this write.
-                      clearTimeout(saveTimer.current)
-                      // Reset = empty configuration; lang survives (it is a
-                      // tool-side setting, not part of the mod config).
-                      void SaveLoadout(JSON.stringify({ lang, slots: [] }, null, 2))
-                        .then(() => reloadConfig())
-                        .catch((e) => setStatus(t.saveFail(e)))
-                        .finally(() => setResetOpen(false))
-                    }}
-                  >
-                    {t.reset}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-1"
-              onClick={toggleLang}
-              aria-label={t.langSwitch}
-            >
-              {LANG_LABEL[nextLang]}
-            </Button>
-          </div>
+          {/*
+            四种语言各一个按钮、当前那个高亮：比一个要按几下才转回来的循环按钮好认，
+            而语言只有四种，放得下。
+          */}
+          <ButtonGroup aria-label={t.langSwitch}>
+            {LANGS.map((option) => (
+              <Button
+                key={option}
+                variant={option === lang ? "secondary" : "ghost"}
+                size="sm"
+                aria-pressed={option === lang}
+                onClick={() => setLang(option)}
+              >
+                {LANG_LABEL[option]}
+              </Button>
+            ))}
+          </ButtonGroup>
         </div>
         </div>
         {/*
@@ -515,8 +485,8 @@ export default function App() {
             key={index}
             index={index}
             slot={slot}
-            sigilNames={sigilNames}
-            sigilNameSet={sigilNameSet}
+            mainKeys={mainKeys}
+            mainKeySet={mainKeySet}
             traitHashes={traitHashes}
             labels={hashLabels}
             legalOfMain={legalByMain}
@@ -531,8 +501,8 @@ export default function App() {
           <ExclusivePanel
             table={exclusiveTable}
             state={exclusiveState}
-            sigilByHash={sigilByHash}
-            lang={copyLang}
+            names={names}
+            lang={lang}
             onChange={updateExclusive}
           />
         </TabsPanel>

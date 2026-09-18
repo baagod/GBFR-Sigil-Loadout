@@ -1,6 +1,7 @@
 package main
 
 import (
+	jsonv2 "encoding/json/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -127,4 +128,58 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
 	}
+}
+
+/*
+因子表与名字文件由同一次生成写出，但它们是不同的文件：谁都不会替对方发现漂移，
+运行时也看不出来——少的那个只是少一行名字，屏幕上照旧显示回落的数据。
+
+所以这里按 hash 把两边对一遍，顺带钉住"表里不再带名字"这件事：gem.json 是 mod 也在读的
+数据，多语言名字只属于 gem.lang.json。
+*/
+func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
+	// 入库的 gem.json 与四份名字文件都在 assets\ 里；测试的工作目录是包目录。
+	raw, err := os.ReadFile(filepath.Join("assets", "gem.json"))
+	if err != nil {
+		t.Fatalf("reading assets/gem.json: %v", err)
+	}
+	var table struct {
+		Sigils []map[string]any `json:"sigils"`
+	}
+	if err := jsonv2.Unmarshal(raw, &table); err != nil {
+		t.Fatalf("parsing assets/gem.json: %v", err)
+	}
+	if len(table.Sigils) == 0 {
+		t.Fatal("gem.json lists no rows")
+	}
+	for _, row := range table.Sigils {
+		for _, banned := range []string{"name", "zh"} {
+			if _, carried := row[banned]; carried {
+				t.Fatalf("gem.json row %v still carries %q; names belong in gem.lang.json", row["hash"], banned)
+			}
+		}
+	}
+
+	namesByLang := map[string]map[string]string{}
+	for _, lang := range []string{LangZH, "en", "ja", "ko"} {
+		names := (&LoadoutService{}).GemNames(lang)
+		if len(names) != len(table.Sigils) {
+			t.Fatalf("gem.lang.json[%s] has %d names for %d rows", lang, len(names), len(table.Sigils))
+		}
+		for _, row := range table.Sigils {
+			hash, _ := row["hash"].(string)
+			if names[hash] == "" {
+				t.Fatalf("gem.lang.json[%s] has no name for %s", lang, hash)
+			}
+		}
+		namesByLang[lang] = names
+	}
+
+	// 不是把英文抄了一遍：日文那一份至少有一条与英文不同。
+	for hash, ja := range namesByLang["ja"] {
+		if ja != namesByLang["en"][hash] {
+			return
+		}
+	}
+	t.Fatal("the ja names are the en names: the files were not generated per language")
 }

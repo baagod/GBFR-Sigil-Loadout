@@ -20,7 +20,11 @@
   <ItemGroup>
     <None Include="ModConfig.json" CopyToOutputDirectory="Always" />
     <None Include="README.md" CopyToOutputDirectory="Always" />
-    <None Include="sigils.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 因子表的源头在工具的 assets\ 里（工具也要读同一份），打包时按 gem.json 这个名字
+         发到 mod 目录——native 与 C# 都是按这个名字找它的。 -->
+    <None Include="..\Loadout\assets\gem.json"
+          Link="gem.json"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="character-exclusives.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\GBFR.PreEquippedSigils.Native\bin\$(Configuration)\GBFR.PreEquippedSigils.Native.dll"
           Link="GBFR.PreEquippedSigils.Native.dll"

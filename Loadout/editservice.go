@@ -110,6 +110,7 @@ var skillTables = map[string]map[string]SkillText{
 	LangZH: decode[SkillText](embeddedSkillZH),
 	"en":   decode[SkillText](embeddedSkillEN),
 	"ja":   decode[SkillText](embeddedSkillJA),
+	"ko":   decode[SkillText](embeddedSkillKO),
 }
 
 // SkillMap 返回某种语言的整张 哈希 -> 文案 表，好让前端在本地解析名称和说明，

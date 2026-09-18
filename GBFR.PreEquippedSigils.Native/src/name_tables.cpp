@@ -43,10 +43,10 @@ bool ReadHexField(const std::string& line, std::string_view prefix, uint32_t& va
 }
 }
 
-// Contract-based loader from the tool's merged table (sigils.json, produced by
-// the extract pipeline; field names follow sigils.xlsx headers).
+// Contract-based loader from the tool's merged table (gem.json, produced by
+// the extract pipeline; field names follow gem.xlsx headers).
 //
-// == FORMAT CONTRACT (change here in lockstep with gen\sigils.xlsx 生成文档.md) ==
+// == FORMAT CONTRACT (change here in lockstep with docs\gem.xlsx 生成文档.md) ==
 //  - field names: "hash" and "character", values are 8 hex digits (no 0x),
 //    quoted, on the same line as the field name
 //  - exclusive rows (player != "") carry "character"; regular rows do not
@@ -63,7 +63,7 @@ bool LoadCharacterRestrictions(const std::filesystem::path& path)
    if (!stream)
    {
       Log(std::format(
-         "sigils.json (character restrictions) is missing: {}", path.filename().string()));
+         "gem.json (character restrictions) is missing: {}", path.filename().string()));
       return false;
    }
 
@@ -120,7 +120,7 @@ bool LoadCharacterRestrictions(const std::filesystem::path& path)
    }
 
    Log(std::format(
-      "Loaded {} character-restricted sigil mappings from sigils.json.", loaded));
+      "Loaded {} character-restricted sigil mappings from gem.json.", loaded));
    return loaded == kExpectedCharacterRestrictionCount &&
       g_required_character_by_gem.size() == kExpectedCharacterRestrictionCount;
 }

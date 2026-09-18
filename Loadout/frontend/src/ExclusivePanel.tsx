@@ -1,18 +1,19 @@
 import { useMemo } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
-import type { Exclusive, ExclusiveState, Sigil } from "./model"
-import type { Lang } from "./copy"
+import type { Exclusive, ExclusiveState } from "./model"
+import type { Lang } from "./i18n"
 
 export function ExclusivePanel({
   table,
   state,
-  sigilByHash,
+  names,
   lang,
   onChange,
 }: {
   table: Exclusive[]
   state: ExclusiveState | undefined
-  sigilByHash: Map<string, Sigil>
+  /** 当前语言的 hash -> 名字（gem.lang.json）；缺条目的槽显示 hash。 */
+  names: Record<string, string>
   lang: Lang
   onChange: (player: string, row: Exclusive, traitHash: string, value: boolean) => void
 }) {
@@ -38,11 +39,9 @@ export function ExclusivePanel({
     return byPlayer
   }, [table, lang])
   if (table.length === 0) return null
-  const gemName = (gem: string) => {
-    const s = sigilByHash.get(gem)
-    if (!s) return gem
-    return lang === "zh" ? s.zh || s.name || gem : s.name || s.zh || gem
-  }
+  // 名字只有一处来源：当前语言的 gem.lang.json。缺条目的槽（新因子、旧数据）显示 hash，
+  // 而不是悄悄换一种语言的名字。
+  const gemName = (gem: string) => names[gem] ?? gem
   return (
     <div>
       {rows.map((e) => {

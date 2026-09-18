@@ -25,7 +25,7 @@ import (
 )
 
 // 工具要出的界面语言。中文表决定了工具提供哪些因子，所以它排第一。
-var uiLangs = []string{"zh", "en", "ja"}
+var uiLangs = []string{"zh", "en", "ja", "ko"}
 
 // 不提供这几个因子——残留行，碰巧带了个名字，但没有人会去改它。
 var excluded = map[string]bool{

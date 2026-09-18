@@ -13,12 +13,13 @@ import (
 // (LoadoutConfig.ParseAndValidate counts enabled slots only).
 const MaxSlots = 12
 
-// LoadoutService reads the mod-directory data files (sigils.json,
+// LoadoutService reads the mod-directory data files (gem.json,
 // character-exclusives.json, tool-hotkey.txt — all next to the exe) and
 // writes the player configuration (LOCALAPPDATA/GBFRPreEquippedSigils,
 // mirroring the mod's userCfgDir so mod updates never wipe it).
-// Protocol is shared with the mod: sigils.json (merged sigil/trait table:
-// item rows hash != skill1, non-item skill rows hash == skill1) and
+// Protocol is shared with the mod: gem.json (merged sigil/trait table:
+// item rows hash != skill1, non-item skill rows hash == skill1; display names
+// live in the embedded gem.lang.json instead) and
 // loadout.json (player configuration; array format: [ { items: [{hash,level,zh,en},
 // {hash,level,zh,en}?], enabled } ]).
 type LoadoutService struct{}
@@ -53,8 +54,6 @@ type loadoutItem struct {
 	Gem   string `json:"gem"`  // items[0]: gem (物品) hash
 	Hash  string `json:"hash"` // items[1]: trait (词条) hash
 	Level int    `json:"level"`
-	Zh    string `json:"zh"`
-	En    string `json:"en"`
 }
 
 type loadoutSlot struct {
@@ -99,10 +98,24 @@ func readModData(name string) (string, error) {
 	return string(data), nil
 }
 
-// LoadSigils returns the merged sigil/trait table (sigils.json): item rows
-// plus non-item skill rows (hash == skill1). All pickers read from it.
+// LoadSigils returns the merged sigil/trait table (gem.json, next to the exe):
+// item rows plus non-item skill rows (hash == skill1). All pickers read from it;
+// display names come separately from GemNames.
 func (s *LoadoutService) LoadSigils() (string, error) {
-	return readModData("sigils.json")
+	return readModData("gem.json")
+}
+
+// GemNames returns the display names for one language: {因子 hash: 名字}, sliced out
+// of the embedded gem.lang.json.
+//
+// 名字不挤进 gem.json（那份 mod 也在读），而是单独一份多语言文件；调用方只要当前那一种，
+// 与 EditService.SkillMap 同一个形状与理由。不认得的语言回落中文，单个词条缺名字时
+// 调用方回落成 hash——这里不猜。
+func (s *LoadoutService) GemNames(lang string) map[string]string {
+	if names, ok := gemNamesByLang[lang]; ok {
+		return names
+	}
+	return gemNamesByLang[LangZH]
 }
 
 // LoadConfig returns the player configuration from the user directory; an

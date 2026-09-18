@@ -21,7 +21,7 @@ foreach ($required in @(
     'GBFR.PreEquippedSigils.dll',
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
-    'sigils.json',
+    'gem.json',
     'character-exclusives.json'
 )) {
     $requiredPath = Join-Path $source $required

@@ -20,12 +20,12 @@ $zipPath = Join-Path $distRoot "GBFR-Pre-Equipped-Sigils-$Version.zip"
 
 # --- release consistency gates ------------------------------------------------
 # Native contract: the character-restriction loader fails closed unless
-# sigils.json carries exactly kExpectedCharacterRestrictionCount "character"
+# gem.json carries exactly kExpectedCharacterRestrictionCount "character"
 # rows. Check it here so a data regeneration cannot silently break startup.
-$sigilsPath = Join-Path $root 'GBFR.PreEquippedSigils\sigils.json'
+$sigilsPath = Join-Path $root 'Loadout\assets\gem.json'
 $nativeInternalPath = Join-Path $root 'GBFR.PreEquippedSigils.Native\native_internal.h'
 if (-not (Test-Path -LiteralPath $sigilsPath)) {
-    throw "sigils.json is missing: $sigilsPath"
+    throw "gem.json is missing: $sigilsPath"
 }
 $expectedMatch = [regex]::Match(
     (Get-Content -LiteralPath $nativeInternalPath -Raw),
@@ -37,9 +37,9 @@ $expectedMappings = [int]$expectedMatch.Groups[1].Value
 $characterRows = ([regex]::Matches(
     (Get-Content -LiteralPath $sigilsPath -Raw), '"character"\s*:')).Count
 if ($characterRows -ne $expectedMappings) {
-    throw "sigils.json has $characterRows 'character' rows; the native loader expects $expectedMappings."
+    throw "gem.json has $characterRows 'character' rows; the native loader expects $expectedMappings."
 }
-Write-Output "sigils.json character rows: $characterRows (native loader expects $expectedMappings)."
+Write-Output "gem.json character rows: $characterRows (native loader expects $expectedMappings)."
 
 # The release manifest version must match the packaged version.
 $manifestVersion = (Get-Content -LiteralPath (Join-Path $root 'GBFR.PreEquippedSigils\ModConfig.json') -Raw |
@@ -51,19 +51,19 @@ Write-Output "ModConfig.json version: $manifestVersion."
 
 # --- data freshness gates -----------------------------------------------------
 # 生成物必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   sigils.json          <- docs\sigils.xlsx（共享 gen 的 `go run . sigils-json`）
+#   gem.json             <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
 #   character-exclusives.json + kCharacterExclusives[]  <- docs\tool-gen-loadout.ps1 的 $chars
 # 所以这道门只比对本仓库里入库的两份，不需要游戏数据在场。
-$sigilsXlsx = Join-Path $root 'docs\sigils.xlsx'
+$sigilsXlsx = Join-Path $root 'docs\gem.xlsx'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
-    throw "sigils.json freshness source is missing: $sigilsXlsx（该文件由 git 跟踪，缺失即检出异常；不得跳过一致性检查）"
+    throw "gem.json freshness source is missing: $sigilsXlsx（该文件由 git 跟踪，缺失即检出异常；不得跳过一致性检查）"
 }
 Push-Location $genDir
 try {
     & go run . sigils-json $sigilsXlsx $sigilsPath --check
     if ($LASTEXITCODE -ne 0) {
-        throw 'sigils.json 与 docs\sigils.xlsx 不一致：先跑 pwsh docs\tool-gen-sigils.ps1'
+        throw 'gem.json 与 docs\gem.xlsx 不一致：先跑 pwsh docs\tool-gen-sigils.ps1'
     }
 } finally {
     Pop-Location
@@ -167,12 +167,15 @@ try {
 
 # Keep the tool's dev-run data copies (git-ignored, next to the Go sources)
 # identical to the packaged ones, so a Loadout.exe run from Loadout/ can never
-# silently diverge from a release.
-foreach ($dataFile in @('sigils.json', 'character-exclusives.json')) {
+# silently diverge from a release. gem.json's source is Loadout\assets\ itself
+# (the generator writes it there), so its dev copy lands beside the exe.
+foreach ($dataFile in @('character-exclusives.json')) {
     Copy-Item -LiteralPath (Join-Path $root "GBFR.PreEquippedSigils\$dataFile") `
         -Destination (Join-Path $toolDir $dataFile) -Force
 }
-Write-Output 'Synced sigils.json/character-exclusives.json into Loadout/.'
+Copy-Item -LiteralPath (Join-Path $root 'Loadout\assets\gem.json') `
+    -Destination (Join-Path $toolDir 'gem.json') -Force
+Write-Output 'Synced gem.json/character-exclusives.json into Loadout/.'
 
 $resolvedRoot = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
 $resolvedDist = [IO.Path]::GetFullPath($distRoot).TrimEnd('\') + '\'
@@ -220,12 +223,12 @@ if (-not (Test-Path -LiteralPath $toolExe -PathType Leaf)) {
 Copy-Item -Path $toolExe -Destination $packageDir -Force
 
 # Required release files — keep in sync with the deploy.ps1 completeness list
-# (sigils.json lands here via the csproj CopyToOutputDirectory).
+# (gem.json lands here via the csproj CopyToOutputDirectory).
 foreach ($requiredFile in @(
     'GBFR.PreEquippedSigils.dll',
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
-    'sigils.json',
+    'gem.json',
     'character-exclusives.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile

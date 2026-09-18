@@ -7,7 +7,7 @@ $checkFailed = $false
 # ============================================================================
 # 专属因子权威数据（改这里的 Hash/T1/T2/War 后重新生成）：
 #   T1/T2 = 两个独立专属词条；War = 战气词条。T1Gem/T2Gem/WarGem（独立因子与
-#   战气的物品 gem）由脚本从 sigils.json 推导（onlyone≠1 且 skill1 匹配）；
+#   战气的物品 gem）由脚本从 gem.json 推导（onlyone≠1 且 skill1 匹配）；
 #   PL 码由战气因子行（WarGem -> player）反查。
 # ============================================================================
 $chars = @(
@@ -45,9 +45,9 @@ $chars = @(
 # 仓库根、数据文件
 $root = Split-Path -Parent $PSScriptRoot
 
-# sigils.json (merged table)：只读一次；下面两次遍历分别用于
+# gem.json (merged table)：只读一次；下面两次遍历分别用于
 #   专属行 hash -> player (PL 码) 与 skill1 -> 独立因子 hash（onlyone≠1）
-$sigilsTable = Get-Content (Join-Path $root 'GBFR.PreEquippedSigils\sigils.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$sigilsTable = Get-Content (Join-Path $root 'Loadout\assets\gem.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $playerOfGem = @{}
 foreach ($s in $sigilsTable.sigils) {
     if ($s.player -and $s.hash) {

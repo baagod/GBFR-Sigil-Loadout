@@ -21,10 +21,10 @@ deploy.ps1                           部署 dist 到 Reloaded-II Mods（游戏�
 docs/
   MAINTENANCE.md                     本手册
   tool-gen-loadout.ps1               生成 kCharacterExclusives[] 表与 character-exclusives.json（§4）
-  tool-gen-sigils.ps1                一条命令：调共享 gen 的 Go 生成器 → docs\sigils.xlsx（入库）+ sigils.json
-  tool-gen-skill-assets\             生成 Loadout\assets\ 那四份内嵌资产（游戏更新后才跑，见该目录 main.go 开头）
-  sigils.xlsx                        入库的因子审阅表（生成器产出，勿手改）
-  sigils.xlsx 生成文档.md            因子表的生成规则说明书
+  tool-gen-sigils.ps1                一条命令：调共享 gen 的 Go 生成器 → docs\gem.xlsx（入库）+ Loadout\assets\gem.json + Loadout\assets\gem.lang.json
+  tool-gen-skill-assets\             生成 Loadout\assets\ 那五份内嵌资产（游戏更新后才跑，见该目录 main.go 开头）
+  gem.xlsx                           入库的因子审阅表（生成器产出，勿手改）
+  gem.xlsx 生成文档.md               因子表的生成规则说明书
 ..\..\gen\                           仓库级共享数据与生成器（D:\Games\Relink\gen\，两个 mod 共用）
   main.go                            Go 生成器入口：texts / sigils / sigils-json / find-value / scan-refs
   pkgs/                              各产出包：texts（各语言文本）、sigils（因子表）
@@ -46,7 +46,7 @@ GBFR.PreEquippedSigils/              C# 托管层（Reloaded-II 插件壳）。*
   Hotkey.cs                          系统热键：RegisterHotKey 优先、250ms 轮询兜底、热启动工具
   HotkeyConfig.cs                    热键配置页（Reloaded-II 启动器）
   ModConfig.json                     ModId/版本/描述（发布信息）
-  sigils.json                        运行时因子表（合并单表；见 §4.1）
+  gem.json                           运行时因子表（合并单表；源文件在 Loadout\assets\gem.json，打包时复制到 mod 目录；见 §4.1）
   character-exclusives.json          每角色专属因子表（生成器产物；工具"专属因子"页数据源）
 GBFR.PreEquippedSigils.Native/       C++ 原生核心
   native_api.h                       冻结的 C ABI（v17，8 个导出 + GemData 结构）
@@ -60,13 +60,14 @@ GBFR.PreEquippedSigils.Native/       C++ 原生核心
     safe_game_access.cpp             ★SEH 安全内存读写、状态重建、授权提交
     trait_hooks.cpp                  ★注入核心：getter detour、natural bind、hot-apply 触发
     selection_store.cpp              角色选择存储、hot-apply 队列（generation 机制）
-    name_tables.cpp                  兼容表加载（sigils.json 专属行 character 字段，缺失即 fail-closed）
+    name_tables.cpp                  兼容表加载（gem.json 专属行 character 字段，缺失即 fail-closed）
     template_loadout.cpp             ★★专属配装表（表段由生成器产出，勿手改；组装逻辑见 §4）
 Loadout/                            Wails v3 编辑器（Go 服务 + React 前端，打包进 Mod）
   main.go                            窗口/托盘/单实例/假隐藏与 0x8010 激活命令（陷阱见 §11）
-  loadoutservice.go                  配装数据读写（sigils/exclusives/loadout；原子写 + 结构校验）
+  loadoutservice.go                  配装数据读写（sigils/exclusives/loadout；原子写 + 结构校验）；GemNames(lang) 交内嵌的多语言名（gem.lang.json）
   editservice.go                     因子编辑：防抖落盘用户配置目录下的 sigiledits.json（mod 按 mtime 取走）
-  assets/skill*.json                 因子编辑页内嵌的行数据与三语文本（编译期 go:embed；由 docs\tool-gen-skill-assets 生成，勿手改）
+  assets/gem.lang.json             配装页显示用的多语言名（{语言: {因子 hash: 名字}}，编译期 go:embed；由 docs\tool-gen-sigils.ps1 生成，勿手改）
+  assets/skill*.json                 因子编辑页内嵌的行数据与四语文本（编译期 go:embed；由 docs\tool-gen-skill-assets 生成，勿手改）
   frontend/src/                      UI（App 三个 Tab / SlotEditor / TraitPicker / ExclusivePanel / SigilEditPanel）
 ```
 
@@ -79,7 +80,7 @@ Loadout/                            Wails v3 编辑器（Go 服务 + React 前�
   Reloaded-II：Mod.cs → NativeCore.Initialize → exports.GBFR20_Initialize
     → runtime.Initialize:
         executable-validation        必须 granblue_fantasy_relink.exe
-        character-restrictions       sigils.json 专属行 character 字段，失败即停
+        character-restrictions       gem.json 专属行 character 字段，失败即停
         semantic-layout-resolution   layout_resolver，失败即停
         template-selection-install   InstallDefaultTemplateSelections：以 0xFE000000+i 合成 id 写入角色选择
         native-hook-install          2 个 hook + 2 处循环上限 patch
@@ -107,8 +108,8 @@ Loadout/                            Wails v3 编辑器（Go 服务 + React 前�
 
 | 工具 | 作用 |
 |---|---|
-| `docs/tool-gen-loadout.ps1` | 内嵌每角色专属数据（Hash/T1/T2/War），从 sigils.json 推导变体 hash 与 player 码；**写回** `template_loadout.cpp` 的 `kCharacterExclusives[]` 段并生成 `character-exclusives.json`（内容不变则不重写，幂等）|
-| `docs/tool-gen-sigils-required.js` | **已删除，勿再寻找**（2026-09 字段对齐后失效；重跑会改坏 sigils.json）。需重新规范化时从 sigils.xlsx 重建 |
+| `docs/tool-gen-loadout.ps1` | 内嵌每角色专属数据（Hash/T1/T2/War），从 gem.json 推导变体 hash 与 player 码；**写回** `template_loadout.cpp` 的 `kCharacterExclusives[]` 段并生成 `character-exclusives.json`（内容不变则不重写，幂等）|
+| `docs/tool-gen-sigils-required.js` | **已删除，勿再寻找**（2026-09 字段对齐后失效；重跑会改坏 gem.json）。需重新规范化时从 gem.xlsx 重建 |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
 
 **改配装流程**：改 `tool-gen-loadout.ps1` 的 `$chars` 表 → 运行（替换 C++ 表段 `constexpr CharacterExclusiveLoadout kCharacterExclusives[] = {` … `};` 并同步 JSON，两者幂等）→ 编译 → 部署 → 验证（§6）。
@@ -144,21 +145,22 @@ TemplateGemSlot{
   合成 id = `kTemplateSlotIdBase(0xFE000000) + 槽序号`（不与真实库存冲突，`IsTemplateSlotId` 判定）。
 - **内置默认（无配置）**：专属 3 槽全开，通用槽全空；总虚拟槽 = 3 + 通用槽数。通用槽数由 `LoadoutConfig.MaxSlots` 限为 ≤12（总虚拟槽 ≤15）；
   原生 `kVirtualSlotCapacity = 24` 是更宽松的数组边界兜底，正常配置不会触及。
-- 专属物品受 `sigils.json` 专属行 `character` 字段限制：`TryCopyTemplateGem` 用 `GetRequiredCharacterHash(gem_id)` 校验，只能装给对应角色（古兰/姬塔互通，姬塔条目用古兰专属）。
-- 词条 hash 查询：`sigils.json`（hash/名/上限）或 `docs\sigils.xlsx`（Ctrl+F 搜名字）。
-- 角色 hash：`sigils.json` 专属行 `character` 字段；常用：古兰 `2A26B1B2`、姬塔 `A4ACBA76`、娜露梅 `E7053919`、芙劳 `646C3168`、菲迪埃 `74DD4C79`。
+- 专属物品受 `gem.json` 专属行 `character` 字段限制：`TryCopyTemplateGem` 用 `GetRequiredCharacterHash(gem_id)` 校验，只能装给对应角色（古兰/姬塔互通，姬塔条目用古兰专属）。
+- 词条 hash 查询：`gem.json`（hash/上限）或 `docs\gem.xlsx`（Ctrl+F 搜名字）；显示名在 `Loadout\assets\gem.lang.json`。
+- 角色 hash：`gem.json` 专属行 `character` 字段；常用：古兰 `2A26B1B2`、姬塔 `A4ACBA76`、娜露梅 `E7053919`、芙劳 `646C3168`、菲迪埃 `74DD4C79`。
 
-## 4.1 数据文件生成（mod 运行时表：sigils.json）
+## 4.1 数据文件生成（mod 运行时表：gem.json）
 
-`sigils.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出（生成器与数据源都不入本仓库；步骤见 `docs\sigils.xlsx 生成文档.md`，构建会校验一致性）。
-字段名与 sigils.xlsx 表头一致：`{ key, hash, name, zh, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`。
+`gem.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\gem.json`（生成器与数据源都不入本仓库；步骤见 `docs\gem.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录）。
+字段名与 `gem.xlsx` 表头一致（13 列）：`{ key, hash, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`（`character` 只在专属行出现）。
+显示名不在数据表里：`Loadout\assets\gem.lang.json` 一个文件按语言收着它们（`{语言: {因子 hash: 名字}}`，zh/en/ja/ko 各 203 条），工具经 `GemNames(lang)` 取当前语言那一份。
 
-- **物品行**（`hash != skill1`）：`skill1` 主词条 hash、`skill2` 固定第二词条 hash（无副 = ""）、`cap` 主词条属性、`lot` 池版合法副列表、`name`/`zh` 物品名；
+- **物品行**（`hash != skill1`）：`skill1` 主词条 hash、`skill2` 固定第二词条 hash（无副 = ""）、`cap` 主词条属性、`lot` 池版合法副列表；
   `player != ""` 为角色专属，`onlyone = "1"` 为唯一持有（钳蟹系等）。
 - **非物品技能行**（`hash == skill1`）：不作主、不作副，仅供词条字典（角色可持有该技能）。
 - **主下拉** = `player == ""`（含钳蟹系/相扑斗力等 `onlyone="1"` 行；非物品技能行天然不在物品集内；专属因子不作主，由"专属因子"页管理）。
-- **词条字典（副下拉）** = 按 `skill1` 去重派生（**取首行**，zh/name = 词条名）；前端另按 `player == ""` 过滤掉专属词条。
-- 主因子按 `name`（英文名）**分组**（同名变体一行，下拉只显示唯一名字）。name/zh 一律经 `shortName` 去后缀，**无例外**——3 条 `_74` 进阶专属（涯之七星／涯之二王／无态）在 `sigils.json` 中同样不带「＋」。
+- **词条字典（副下拉）** = 按 `skill1` 去重派生（**取首行**，词条名按该行 hash 取 `gem.lang.json`）；前端另按 `player == ""` 过滤掉专属词条。
+- 主因子按名字**分组**（同名变体一行，下拉只显示唯一名字）。名字一律经 `shortName` 去后缀，**无例外**——3 条 `_74` 进阶专属（涯之七星／涯之二王／无态）在 `gem.lang.json` 中同样不带「＋」。
 
 **组合规则**（2.0.5 实测：合成结果 = 两输入因子词条的任意组合；一切组合均允许，"非法"仅为 UI 提示样式，**不禁止**选择/保存/实装）：
 
@@ -172,7 +174,7 @@ TemplateGemSlot{
 - 装配 hash：pool 族（`lot != []`）各名字组只保留池版行 → 保存时按副因子选池版/固定版 hash（副命中池 `lot` → 池版；命中某变体 `skill2` → 该固定版；其余 → 池版，仅样式不阻断）；
   副词条随配置写入（mod 合成形态与 2.0.5 合成规则一致；无池版组 = plain/专属组原样）。工具界面就地重载预设，不重启进程。
 - **字段名不可改**：loadout.json 协议中物品 ID 叫 `gem`、词条 ID 叫 `hash`（mod 读取）。
-- §4 的 `kCharacterExclusives[]` 是**内置专属默认**（内嵌 C++，不走 JSON）；`sigils.json` 只是玩家配置解析用的 ID→名称/上限映射，两者独立。
+- §4 的 `kCharacterExclusives[]` 是**内置专属默认**（内嵌 C++，不走 JSON）；`gem.json` 只是玩家配置解析用的 ID→上限映射，两者独立。
 
 ## 5. 构建与部署
 
@@ -209,7 +211,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
 - `trait_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
-- 角色限制改判据：`sigils.json` 专属行 `character` 缺失或条目数 != 87 则启动失败。87 = 28 角色 × 3 专属 gem（古兰/姬塔共享合并）+ 3 条 `_74` 进阶；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
+- 角色限制改判据：`gem.json` 专属行 `character` 缺失或条目数 != 87 则启动失败。87 = 28 角色 × 3 专属 gem（古兰/姬塔共享合并）+ 3 条 `_74` 进阶；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=17`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = PL 码/角色名/角色 hash，内层 = 词条 hash→bool，兼容旧 `{t1,t2,war}`）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
@@ -233,7 +235,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 
 - **改专属数据（词条/因子/等级）**：改 `tool-gen-loadout.ps1` 的 `$chars` 表 → 运行（替换 C++ 表段 + JSON）→ 编译 → 部署 → 验证。脚本为无 BOM UTF-8，必须用 pwsh 7。
 - **改通用槽/前端规则**：工具与托管逻辑（无内置通用默认；副因子规则见 §4.1）。
-- **加角色**：生成器数据表加行（查该角色专属因子 hash：`sigils.json` 专属行 + 名字表）→ 同上。
+- **加角色**：生成器数据表加行（查该角色专属因子 hash：`gem.json` 专属行 + `gem.lang.json` 名字表）→ 同上。
 - **升版本**：§5 发布。
 - **提交**：`git -c user.name="baagod" -c user.email="780810441@qq.com" commit ...`（不要改全局 git config）；提交前 `git status` 确认无 bin/obj/dist 混入。
 - **推送**：`git -c credential.helper="!gh auth git-credential" push origin main`（已配本地代理 127.0.0.1:7890；403 则查 gh token 的 Contents: Read and write 权限）。
@@ -291,10 +293,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 | 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`sigiledits.json`（因子编辑列表）。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
 | 因子编辑列表缺失 | 工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把原版表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
 | 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
-| 界面语言 | 一套：zh/en/ja，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；配装两页只有中英，日语下回落英文 | TS App.tsx / copy.ts / i18n.ts |
+| 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；两页的文案都四种齐全（配装页 copy.ts、因子编辑页 i18n.ts）。名字也四种齐全：配装页按当前语言取内嵌的 `gem.lang.json`（经 Go 的 `GemNames(lang)` 服务方法），因子编辑页取 `skill.<lang>.json` | TS App.tsx / copy.ts / i18n.ts / Go loadoutservice.go / docs\tool-gen-sigils.ps1 |
 | 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |
 | 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48） | C# SigilEditFeature.cs（启动与热应用共用同一套偏移量） |
 | 原生 ABI 版本 | 17 | native_api.h / C# NativeCore.cs AbiVersion |
 | 原生结构尺寸 | TemplateSlot 0x18 / ExclusiveOverride 0x08 | native_api.h static_assert / C# native 侧 runtime 校验 |
 | 等级范围校验 | 前端 1..cap（空槽显示 0）；Go 结构校验 0..200；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
-| sigils.json character 行数 | 87（发布前由 build-release.ps1 与 native_internal.h 对拍） | native_internal.h / build-release.ps1 |
+| gem.json character 行数 | 87（发布前由 build-release.ps1 与 native_internal.h 对拍） | native_internal.h / build-release.ps1 |

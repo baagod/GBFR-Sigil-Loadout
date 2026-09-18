@@ -13,7 +13,7 @@ frontend/bindings/
 
 
 # Local runtime data copies (next to Loadout.exe for dev runs)
-sigils.json
+gem.json
 character-exclusives.json
 Loadout.exe~
 

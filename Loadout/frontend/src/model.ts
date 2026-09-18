@@ -13,20 +13,18 @@ export interface Slot {
 }
 
 /** One entry of a saved loadout.json slot item list (the file shape).
- * level stays optional: a hand-edited file may omit it (DEFAULT_LEVEL). */
+ * level stays optional: a hand-edited file may omit it (DEFAULT_LEVEL).
+ * Older builds also wrote zh/en here; the mod never read them and nothing
+ * writes them anymore — names are not part of the data. */
 export interface SavedItem {
   gem?: string
   hash?: string
   level?: number
-  zh?: string
-  en?: string
 }
 
 export interface Sigil {
   hash: string // gem hash (= item identity; skill entries use the trait hash)
-  name: string // display name (base, level suffix stripped); grouping key
-  zh: string
-  skill1: string // primary trait hash
+  skill1: string // primary trait hash — the main picker's group key
   player: string
   onlyone?: string // gem.CanOnlyHoldOne: "1" = 唯一持有
   mix?: string // gem.CanGemMix: "0" ordinary (free combination), "1" locked
@@ -37,8 +35,8 @@ export interface Sigil {
 
 export interface Trait {
   hash: string
-  zh: string
-  en: string
+  /** 命名这个词条的那一行物品的 hash：显示名按它去 gem.lang.json 里取。 */
+  gem: string
   cap: number
 }
 
@@ -82,10 +80,14 @@ export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined
 
 const emptySlot = (): Slot => ({ mainHash: "", mainLevel: 0, secHash: "", secLevel: 0, enabled: true })
 
-/** Normalize a saved config (new array format) into Slot[] (mainHash = name).
- * Stored gems are mapped to display names via the sigil table; unknown gems
- * keep their raw value. Levels are clamped to the cap the table knows about so
- * an out-of-range hand-edited value cannot make the mod reject the file. */
+/** Normalize a saved config (new array format) into Slot[].
+ *
+ * 存档里存的是 gem hash，而下拉的值是**组键**（该行所属的词条 hash，`skill1`），
+ * 所以这里把前者翻成后者；表里没有的 gem 保留原值（下一次保存会被丢弃，
+ * 编辑里也显示为空）。名字不参与：它按语言变，不能当身份。
+ *
+ * Levels are clamped to the cap the table knows about so an out-of-range
+ * hand-edited value cannot make the mod reject the file. */
 export function configToSlots(
   parsed: { slots?: unknown },
   sigils: Sigil[],
@@ -96,9 +98,9 @@ export function configToSlots(
     sigils.map((s) => [s.hash, capOfTrait.get(s.skill1)])
   )
   const fromCfg = slotsFromConfig(parsed?.slots, capOfGem, capOfTrait)
-  const nameOfHash = new Map(sigils.map((s) => [s.hash, s.name]))
+  const mainKeyOfGem = new Map(sigils.map((s) => [s.hash, s.skill1 || s.hash]))
   for (const s of fromCfg) {
-    if (nameOfHash.has(s.mainHash)) s.mainHash = nameOfHash.get(s.mainHash) as string
+    if (mainKeyOfGem.has(s.mainHash)) s.mainHash = mainKeyOfGem.get(s.mainHash) as string
   }
   return fromCfg
 }

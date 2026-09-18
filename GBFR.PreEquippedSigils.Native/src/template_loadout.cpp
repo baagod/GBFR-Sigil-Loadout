@@ -14,7 +14,7 @@ namespace
 // player's loadout.json only; no config means the exclusive slots with no
 // general sigils.
 //
-// Character-exclusive gems/traits follow sigils.json (the tool's source):
+// Character-exclusive gems/traits follow gem.json (the tool's source):
 // T1/T2/war gem values are derived from it by docs/tool-gen-loadout.ps1.
 //
 // IMPORTANT: a "no second trait" gem must use trait2 = kUnwornCharacterHash

@@ -315,11 +315,11 @@ func TestSkillTablesAgree(t *testing.T) {
 	if len(traitInfo) == 0 {
 		t.Fatal("skill_status.json did not load")
 	}
-	if len(skillTables) != 3 {
-		t.Fatalf("expected a table each for zh, en and ja, got %d", len(skillTables))
+	if len(skillTables) != 4 {
+		t.Fatalf("expected a table each for zh, en, ja and ko, got %d", len(skillTables))
 	}
 	var reference map[string]SkillText
-	for _, lang := range []string{"zh", "en", "ja"} {
+	for _, lang := range []string{"zh", "en", "ja", "ko"} {
 		texts, ok := skillTables[lang]
 		if !ok {
 			t.Fatalf("no text table for %s", lang)
@@ -397,21 +397,24 @@ func TestWireShapeStaysTuples(t *testing.T) {
 
 // 同一个技能在每种语言里都必须还是同一个技能——按哈希认，名字则是翻译过的。
 func TestSkillTablesAreTranslated(t *testing.T) {
-	zh := skillTables["zh"]["06719232"].Name
-	en := skillTables["en"]["06719232"].Name
-	ja := skillTables["ja"]["06719232"].Name
-	if zh == "" || en == "" || ja == "" {
-		t.Fatalf("06719232 is missing a name in some language: zh=%q en=%q ja=%q", zh, en, ja)
-	}
-	if zh == en || zh == ja || en == ja {
-		t.Fatalf("the tables are not actually translated: zh=%q en=%q ja=%q", zh, en, ja)
+	seen := map[string]string{}
+	for _, lang := range []string{"zh", "en", "ja", "ko"} {
+		name := skillTables[lang]["06719232"].Name
+		if name == "" {
+			t.Fatalf("06719232 has no name in %s", lang)
+		}
+		if other, duplicate := seen[name]; duplicate {
+			t.Fatalf("the tables are not actually translated: %s and %s both say %q", other, lang, name)
+		}
+		seen[name] = lang
 	}
 }
 
-// 未知语言会回退，而不是交回一个空列表。
+// 未知语言会回退，而不是交回一个空列表。探针必须是工具真的没有表的语言：
+// 游戏文本里有 de，而界面语言只有 zh/en/ja/ko。
 func TestSkillMapFallsBack(t *testing.T) {
 	service := &EditService{}
-	if got := len(service.SkillMap("ko")); got == 0 {
+	if got := len(service.SkillMap("de")); got == 0 {
 		t.Fatal("an unknown language produced an empty text map")
 	}
 	if got := len(service.SkillMap("en")); got == 0 {

@@ -9,11 +9,13 @@ namespace GBFR.PreEquippedSigils;
 /// reported and the last valid configuration stays active.
 ///
 /// Data model (mod parses only the fields it needs; field names follow
-/// sigils.xlsx headers for sigils.json):
-///   sigils.json            : { sigils: [ { key, hash, name, zh, skill1, skill2,
+/// gem.xlsx headers for gem.json):
+///   gem.json               : { sigils: [ { key, hash, skill1, skill2,
 ///                            mix, category, player, onlyone, cap, lot, character? } ] }
 ///                            item rows: hash != skill1; non-item skill rows:
 ///                            hash == skill1 (trait entries only, no item).
+///                            No display names here: they live in the tool's
+///                            gem.lang.json, which the mod never reads.
 ///   character-exclusives.json : { exclusives: [ { hash, player, name, zh,
 ///                            t1, t2, war, t1Gem, t2Gem, warGem } ] }
 ///   loadout.json           : { lang, slots: [ { items: [
@@ -62,7 +64,7 @@ internal static class LoadoutConfig
         // replace the mod folder) never wipe it. No config -> built-in template.
         _loadoutPath = UserConfig.FilePath("loadout.json");
         // Keep in sync with Native/src/runtime.cpp (sigils_path in Initialize()).
-        _sigilsPath = Path.Combine(modDirectory, "sigils.json");
+        _sigilsPath = Path.Combine(modDirectory, "gem.json");
         LoadExclusiveTable(modDirectory, log);
         if (LoadTables(log))
             TryApply(log);

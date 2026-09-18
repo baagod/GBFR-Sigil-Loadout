@@ -1,4 +1,4 @@
-# sigils.xlsx 生成文档
+# gem.xlsx 生成文档
 
 ## 1. 工具提取全表
 
@@ -18,7 +18,7 @@ $D = gen\extracted
 
 - `-f` 是路径前缀过滤；`-u` 含未知哈希文件；缺 `GBFRDataTools\unknown_hash_to_folder.txt` 时不出任何文件。
 
-## 2. 生成 sigils.xlsx 所需表
+## 2. 生成 gem.xlsx 所需表
 
 | 表 | 用途 |
 |---|---|
@@ -105,30 +105,31 @@ $D = gen\extracted
 | `SkillId` | ✅ | 子池包含的技能，一行一个 |
 | `Unk3` | ❌ | 未知 |
 
-## 4. sigils.xlsx 字段（14 列）
+## 4. gem.xlsx 字段（13 列）
 
 引用 = 来源表 · 字段。
 
-非物品技能追加在行末：`key` / `hash` / `name` / `zh` / `skill1-2` / `cap` 同规则，其余留空。
+`name` 列是**简体中文名**（审阅用）；英文名不在表里，仍留在生成器内部驱动分组、去重与排序。
+
+非物品技能追加在行末：`key` / `hash` / `name` / `skill1-2` / `cap` 同规则，其余留空。
 
 | 列 | 字段 | 引用 | 注释 |
 |---|---|---|---|
 | A | `key` | `gem.Key` | 因子逻辑名（`GEEN_*` / 明文 / hash）|
 | B | `hash` | `ids.txt`（`hash-string(key)`）| `key` 本身是 8 位 hex 时原样保留 |
-| C | `name` | `gem.Name` → 文本表 `en` | 英文名；en 无词条时回落中文名 |
-| D | `zh` | `gem.Name` → 文本表 `cs` | 中文名 |
-| E | `skill1` | `gem.SkillId1` | 经词典转为 hash；非物品技能条目 = 自身 hash |
-| F | `skill2` | `gem.SkillId2` | 固定副技能 hash（空 = 无）|
-| G | `player` | `gem.PlayerReq` | 角色限制（`PL0300` 等；空 = 非专属）|
-| H | `lot` | `gem.SkillTypeLotIdForRandom2ndSkill` → `skill_type_lot` + `skill_lot` | 池展开 = 技能 hash 列表（空格分隔）；`-1` 或无对应池 → 空 |
-| I | `category` | `gem.Category` | 类别 1–5 |
-| J | `rarity` | `gem.Rarity` | 稀有度 1–5 |
-| K | `mix` | `gem.CanGemMix` | 0 = 普通，1 = 锁定 |
-| L | `onlyone` | `gem.CanOnlyHoldOne` | 1 = 唯一持有 |
-| M | `cap` | `skill_status.Level` | 该因子主技能的等级表 `max(Level)`；单级或查无 → 15 |
-| N | `character` | `hash-string(gem.PlayerReq)` | 专属行有值，非专属空 |
+| C | `name` | `gem.Name` → 文本表 `cs` | 简体中文名（审阅用）；英文名不进表 |
+| D | `skill1` | `gem.SkillId1` | 经词典转为 hash；非物品技能条目 = 自身 hash |
+| E | `skill2` | `gem.SkillId2` | 固定副技能 hash（空 = 无）|
+| F | `player` | `gem.PlayerReq` | 角色限制（`PL0300` 等；空 = 非专属）|
+| G | `lot` | `gem.SkillTypeLotIdForRandom2ndSkill` → `skill_type_lot` + `skill_lot` | 池展开 = 技能 hash 列表（空格分隔）；`-1` 或无对应池 → 空 |
+| H | `category` | `gem.Category` | 类别 1–5 |
+| I | `rarity` | `gem.Rarity` | 稀有度 1–5 |
+| J | `mix` | `gem.CanGemMix` | 0 = 普通，1 = 锁定 |
+| K | `onlyone` | `gem.CanOnlyHoldOne` | 1 = 唯一持有 |
+| L | `cap` | `skill_status.Level` | 该因子主技能的等级表 `max(Level)`；单级或查无 → 15 |
+| M | `character` | `hash-string(gem.PlayerReq)` | 专属行有值，非专属空 |
 
-表格填充线框；表头 `#4472c4` 底色白字，**加粗**。按 `name` 排序行，并执行如下 **分组**（重名行在组内置顶）：
+表格填充线框；表头 `#4472c4` 底色白字，**加粗**。按英文名排序行，并执行如下 **分组**（重名行在组内置顶）：
 
 1. `mix=0`（白底黑字）；
 2. `onlyone=0 && player==""`（#9bc2e6 底）; 
@@ -143,14 +144,21 @@ pwsh docs\tool-gen-sigils.ps1
 ```
 
 包装脚本调共享 gen 的 Go 生成器（`go run . sigils`），一条命令同时生成
-**`docs\sigils.xlsx`**（入库）与 **`GBFR.PreEquippedSigils\sigils.json`**（mod 必须）。
+**`docs\gem.xlsx`**（入库）、**`Loadout\assets\gem.json`**（mod 必须）与
+**`Loadout\assets\gem.lang.json`**（工具显示用的名字：`{语言: {因子 hash: 名字}}`，
+`-texts-langs zh,en,ja,ko`，工具编译期内嵌）。
+
+第三份是刻意的"名字不进数据表"：`gem.json` 的每一行只有数据、不带任何语言的名字，
+其余语言各来一份名字串在每行上，会让 mod 也在读的那份文件白白变胖。哈希与
+`gem.json` 的行一一对应，两份由同一次生成写出——`Loadout` 的
+`TestGemNamesCoverTheTableInEveryUILanguage` 按 hash 对拍，漂了会红。
 
 ### 筛选规则
 
 删除 `mix = 0` 的 `lot` 值。以下只删除 **同名组**：
 
 1. 同名组只取最高等级的行，plus（带 `+` 后缀）优于非 plus 版。只有 **霸体** 例外，仅保留非 plus 版本。
-2. 删除 `name == "" && == 7net | 幸运甘露 | 修炼甘露 | 强健甘露` 的行。
+2. 删除英文名空、或中文名命中 `7net | 幸运甘露 | 修炼甘露 | 强健甘露` 的行。
 3. 删除 `onlyone = 1 && player != ""` 的行。
 4. 删除 `key` 后缀为 **_34**，且 **固定副（含空 `skill2`）**被 `lot` 包含的行（不删 `lot` 行）。
 5. 删除 `lot = "" && mix=0` 的行。

@@ -1,20 +1,23 @@
 /*
   The tool's own copy, in each language it ships.
 
-  Kept as a plain object rather than an i18n library: a handful of strings in three
+  Kept as a plain object rather than an i18n library: a handful of strings in four
   languages, so a dependency would be more machinery than the problem.
 
   Trait names are NOT here - those come from the game's own text tables, one per
   language, and are fetched from the Go side.
 
   The wording differs per language on purpose: the thing being edited is a trait a
-  sigil carries, which the game's own data calls a "skill" (table `skill_status`),
-  so Japanese calls it シジル and the asset names stay as the game spells them. The
-  search box's placeholder says what typing in it does, so the band above the list
-  needs no label of its own.
+  sigil carries, which the game's own data calls a "skill" (table `skill_status`).
+  Each language therefore uses the game's own word for the sigil itself - ジーン in
+  Japanese, 진 in Korean, sigil in English, 因子 in Chinese - rather than a
+  transliteration, and the asset names stay as the game spells them. The source is
+  the game's text (TXT_SKILL_SUMMARY_113_00: "장착한 모든 진의 스킬 레벨이 상승한다").
+  The search box's placeholder says what typing in it does, so the band above the
+  list needs no label of its own.
 */
 
-export const LANGS = ["zh", "en", "ja"] as const;
+export const LANGS = ["zh", "en", "ja", "ko"] as const;
 export type Lang = (typeof LANGS)[number];
 
 /*
@@ -25,6 +28,7 @@ export const LANG_LABEL: Record<Lang, string> = {
   zh: "中",
   en: "EN",
   ja: "JA",
+  ko: "KO",
 };
 
 export type Dict = {
@@ -57,13 +61,22 @@ export const MESSAGES: Record<Lang, Dict> = {
     writeFailed: "Could not write",
   },
   ja: {
-    searchTrait: "シジル | Hex で検索",
+    searchTrait: "ジーン | Hex で検索",
     clearSearch: "クリア",
-    noMatch: "一致するシジルがありません",
+    noMatch: "一致するジーンがありません",
     ok: "OK",
     enable: (name) => `${name} を有効にする`,
     readFailed: "読み込みに失敗しました",
     writeFailed: "書き込みに失敗しました",
+  },
+  ko: {
+    searchTrait: "진 | Hex 검색",
+    clearSearch: "지우기",
+    noMatch: "일치하는 진이 없습니다",
+    ok: "확인",
+    enable: (name) => `${name} 활성화`,
+    readFailed: "읽기에 실패했습니다",
+    writeFailed: "쓰기에 실패했습니다",
   },
 };
 
@@ -78,6 +91,7 @@ export const MESSAGES: Record<Lang, Dict> = {
 export function initialLang(): Lang {
   const preferred = navigator.language.toLowerCase();
   if (preferred.startsWith("ja")) return "ja";
+  if (preferred.startsWith("ko")) return "ko";
   if (preferred.startsWith("zh")) return "zh";
   return "en";
 }
