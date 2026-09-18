@@ -17,12 +17,15 @@ deploy.ps1                           部署 dist 到 Reloaded-II Mods（游戏�
 docs/
   MAINTENANCE.md                     本手册
   tool-gen-loadout.ps1               生成 kCharacterExclusives[] 表与 character-exclusives.json（§4）
-gen/                                 因子数据生成管线（说明书：gen/sigils.xlsx 生成文档.md）
-  build-sigils.ps1 / build-sigils.js 一条命令：库 + 文本 → sigils.xlsx（当前目录）+ sigils.json（无中间产物）
-  make-sigils-json.js                发布门用：按 sigils.xlsx 校验/重出 sigils.json
-  scan-refs.js find-value.js         全表引用扫描 / 查单值出现在哪些表
-  xlsx-lib.js                        公共库（只读：解包、读表、ids.txt、打包）
-  extracted/ GBFRDataTools/ sqlite/  游戏数据与工具（gen 下目录全部 gitignored）
+  tool-gen-sigils.ps1                一条命令：调共享 gen 的 Go 生成器 → docs\sigils.xlsx（入库）+ sigils.json
+  sigils.xlsx                        入库的因子审阅表（生成器产出，勿手改）
+  sigils.xlsx 生成文档.md            因子表的生成规则说明书
+..\..\gen\                           仓库级共享数据与生成器（D:\Games\Relink\gen\，两个 mod 共用）
+  main.go                            Go 生成器入口：texts / sigils / sigils-json / find-value / scan-refs
+  pkgs/                              各产出包：texts（各语言文本）、sigils（因子表）
+  extracted/                         system/table 全部 .tbl + text/<语言>/text.msg
+  GBFRDataTools/                     解包与 tbl↔sqlite 转换工具、Data/ids.txt
+  texts/                             各语言文本对照与因子等级数值（texts.json）
 GBFR.PreEquippedSigils/              C# 托管层（Reloaded-II 插件壳）
   Mod.cs                             生命周期、日志（时间戳）、250ms 维持 Tick
   NativeCore.cs                      原生门面：ABI 校验/日志回调/Tick/Shutdown/消息读取/阶段日志
@@ -128,12 +131,12 @@ TemplateGemSlot{
 - **内置默认（无配置）**：专属 3 槽全开，通用槽全空；总虚拟槽 = 3 + 通用槽数。通用槽数由 `LoadoutConfig.MaxSlots` 限为 ≤12（总虚拟槽 ≤15）；
   原生 `kVirtualSlotCapacity = 24` 是更宽松的数组边界兜底，正常配置不会触及。
 - 专属物品受 `sigils.json` 专属行 `character` 字段限制：`TryCopyTemplateGem` 用 `GetRequiredCharacterHash(gem_id)` 校验，只能装给对应角色（古兰/姬塔互通，姬塔条目用古兰专属）。
-- 词条 hash 查询：`sigils.json`（hash/名/上限）或 `gen\sigils.xlsx`（Ctrl+F 搜名字）。
+- 词条 hash 查询：`sigils.json`（hash/名/上限）或 `docs\sigils.xlsx`（Ctrl+F 搜名字）。
 - 角色 hash：`sigils.json` 专属行 `character` 字段；常用：古兰 `2A26B1B2`、姬塔 `A4ACBA76`、娜露梅 `E7053919`、芙劳 `646C3168`、菲迪埃 `74DD4C79`。
 
 ## 4.1 数据文件生成（mod 运行时表：sigils.json）
 
-`sigils.json`（**合并单表**）**不是手工维护的**，由 `gen\` 管线导出（脚本入库、数据源不入库；步骤见 `gen\sigils.xlsx 生成文档.md`，构建会校验一致性）。
+`sigils.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出（生成器与数据源都不入本仓库；步骤见 `docs\sigils.xlsx 生成文档.md`，构建会校验一致性）。
 字段名与 sigils.xlsx 表头一致：`{ key, hash, name, zh, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`。
 
 - **物品行**（`hash != skill1`）：`skill1` 主词条 hash、`skill2` 固定第二词条 hash（无副 = ""）、`cap` 主词条属性、`lot` 池版合法副列表、`name`/`zh` 物品名；

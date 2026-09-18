@@ -51,16 +51,22 @@ Write-Output "ModConfig.json version: $manifestVersion."
 
 # --- data freshness gates -----------------------------------------------------
 # 生成物必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   sigils.json          <- gen\sigils.xlsx（gen\make-sigils-json.js）
+#   sigils.json          <- docs\sigils.xlsx（共享 gen 的 `go run . sigils-json`）
 #   character-exclusives.json + kCharacterExclusives[]  <- docs\tool-gen-loadout.ps1 的 $chars
-$sigilsXlsx = Join-Path $root 'gen\sigils.xlsx'
-$makeSigilsJson = Join-Path $root 'gen\make-sigils-json.js'
+# 所以这道门只比对本仓库里入库的两份，不需要游戏数据在场。
+$sigilsXlsx = Join-Path $root 'docs\sigils.xlsx'
+$genDir = Join-Path (Split-Path $root -Parent) 'gen'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
     throw "sigils.json freshness source is missing: $sigilsXlsx（该文件由 git 跟踪，缺失即检出异常；不得跳过一致性检查）"
 }
-& node $makeSigilsJson $sigilsXlsx $sigilsPath --check
-if ($LASTEXITCODE -ne 0) {
-    throw 'sigils.json 与 gen\sigils.xlsx 不一致：先跑 node gen\make-sigils-json.js gen\sigils.xlsx GBFR.PreEquippedSigils\sigils.json'
+Push-Location $genDir
+try {
+    & go run . sigils-json $sigilsXlsx $sigilsPath --check
+    if ($LASTEXITCODE -ne 0) {
+        throw 'sigils.json 与 docs\sigils.xlsx 不一致：先跑 pwsh docs\tool-gen-sigils.ps1'
+    }
+} finally {
+    Pop-Location
 }
 & pwsh -NoProfile -File (Join-Path $root 'docs\tool-gen-loadout.ps1') -Check
 if ($LASTEXITCODE -ne 0) {

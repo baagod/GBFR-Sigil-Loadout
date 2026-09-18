@@ -2,6 +2,8 @@
 
 ## 1. 工具提取全表
 
+游戏数据与生成器是**仓库级共享资源**，住在 `D:\Games\Relink\gen\` 下——生成器是那里的 Go 工程，本仓库不再各存一份。下面的命令都在 `D:\Games\Relink` 下执行。
+
 ```powershell
 $T = gen\GBFRDataTools\GBFRDataTools.exe
 $D = gen\extracted
@@ -26,8 +28,9 @@ $D = gen\extracted
 | `skill_type_lot` | 池第一层：lot → 子池 + 概率 |
 | `skill_lot` | 池第二层：子池 → 技能 |
 
-- **引用判定不写死表**：`node gen\scan-refs.js <gbfr.db> <ids.txt> <out.json> [--exclude t1,t2]` 一次遍历整库所有表（默认排除 `gem` 自身），输出每个因子被哪些表·列引用。
-- 查单个值：`node gen\find-value.js <值...> [--db <sqlite>]`（字符串 + u32 hash，全表所有列）。
+- **引用判定不写死表**：`go run . scan-refs <out.json> [-exclude t1,t2]`（在共享的 `D:\Games\Relink\gen` 下执行）一次遍历整库所有表（默认排除 `gem` 自身），输出每个因子被哪些表·列引用。
+- 查单个值：`go run . find-value <值...>`（全表所有列，大小写不敏感；数据目录自动向上找到）。
+- 生成器是 Go 工程，住在共享 gen 里：`D:\Games\Relink\gen\main.go` 编排，实现在 `pkgs\sigils\`。
 - 文本：`text/en/text.msg`（英文名）、`text/cs/text.msg`（中文名）。词典：`GBFRDataTools/Data/ids.txt`（`hash|ID|name`）。
 
 ## 3. 所需表字段
@@ -136,10 +139,11 @@ $D = gen\extracted
 ### 生成命令
 
 ```powershell
-pwsh gen\build-sigils.ps1
+pwsh docs\tool-gen-sigils.ps1
 ```
 
-同时生成 **`GBFR.PreEquippedSigils\sigils.json`** ( mod 必须 )。
+包装脚本调共享 gen 的 Go 生成器（`go run . sigils`），一条命令同时生成
+**`docs\sigils.xlsx`**（入库）与 **`GBFR.PreEquippedSigils\sigils.json`**（mod 必须）。
 
 ### 筛选规则
 
