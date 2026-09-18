@@ -21,6 +21,23 @@ var assets embed.FS
 //go:embed icons/tray.png
 var trayIconBytes []byte
 
+// The sigil-edit page's data, embedded at compile time so that page needs no
+// external file: skill_status.json is the game's own rows for every trait -
+// which levels carry numbers, and the ten slots each of those levels has;
+// skill.<lang>.json is what one language calls those rows.
+//
+//go:embed assets/skill_status.json
+var embeddedSkillStatus []byte
+
+//go:embed assets/skill.zh.json
+var embeddedSkillZH []byte
+
+//go:embed assets/skill.en.json
+var embeddedSkillEN []byte
+
+//go:embed assets/skill.ja.json
+var embeddedSkillJA []byte
+
 var app *application.App
 var win *application.WebviewWindow
 
@@ -171,11 +188,16 @@ func main() {
 	releaseMutex := ensureSingleInstance()
 	defer releaseMutex()
 
+	// The edit list's debounce lives in the service, so the shutdown hook needs
+	// the same instance the frontend is talking to.
+	editService := &EditService{}
+
 	app = application.New(application.Options{
 		Name: "Loadout",
 		Icon: trayIconBytes,
 		Services: []application.Service{
 			application.NewService(&LoadoutService{}),
+			application.NewService(editService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -194,16 +216,26 @@ func main() {
 	win = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: toolWindowTitle,
 		// Wails v3 sizes are the full window frame (incl. title bar) in DIP.
-		// Fixed size: DisableResize removes the resize border, so the user
-		// cannot resize; the maximise button is disabled too.
-		Width:               760,
-		Height:              840,
-		DisableResize:       true,
-		MaximiseButtonState: application.ButtonDisabled,
-		URL:                 "/",
-		Hidden:              false,
-		BackgroundColour:    application.NewRGB(10, 10, 10),
+		// Resizable, and the minimum is the narrower page's, not the wider one's:
+		// pinning the floor at the sigil-edit page's 888 would leave the window
+		// unable to shrink at all, which is the fixed width this removes. Below
+		// 888 that page scrolls sideways instead of clipping its columns.
+		//
+		// 560 is a chosen floor rather than a measured one: every list in both
+		// pages scrolls, so a short window costs rows, not layout.
+		Width:            888 + 16,
+		Height:           840,
+		MinWidth:         760 + 16,
+		MinHeight:        560,
+		URL:              "/",
+		Hidden:           false,
+		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
+	// The sigil-edit page debounces its writes, so closing the window can race
+	// the timer: whatever the debounce still holds has to go out on the way
+	// down, or the edit the user just typed is lost.
+	app.OnShutdown(editService.flushNow)
+
 	// Force the WebView2 backing colour to the theme background so restoring
 	// a hidden window does not flash a white frame before content renders.
 	win.SetBackgroundColour(application.NewRGB(10, 10, 10))

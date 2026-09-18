@@ -180,27 +180,5 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 	if err := validateSlots(slots); err != nil {
 		return err
 	}
-	dir := userCfgDir()
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	path := filepath.Join(dir, "loadout.json")
-	// Unique temp name (the frontend debounce can fire two saves in flight):
-	// concurrent writers never share one tmp file, so a half-written file can
-	// never be renamed into place.
-	tmp, err := os.CreateTemp(dir, "loadout.json.*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	if _, err := tmp.WriteString(config); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return err
-	}
-	return os.Rename(tmpName, path)
+	return writeFileAtomic(filepath.Join(userCfgDir(), "loadout.json"), []byte(config))
 }

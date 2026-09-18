@@ -84,4 +84,49 @@
     @apply font-sans;
     color-scheme: dark;
   }
+  /*
+    外壳钉在窗口上，只有列表滚动。
+
+    不管它的话文档也会跟着滚：一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大
+    可滚动区域，于是窗口自己的滚动条从右边冒出来——而它要从视口里拿走宽度，
+    整个外壳就被推得向左一跳，等它消失才弹回来。在指针停在列表上快速上滚时能看到。
+  */
+  html,
+  body {
+    overflow: hidden;
+  }
+}
+
+/*
+  因子编辑那一页的行：勾选框是 `shadcn add` 放进 components/ui 的原样组件，
+  这些行需要它多出来的两件事写在下面，由列表上的 `.trait-rows` 限定作用范围。
+
+  用 class 而不是 data-slot：行的点击处理会把任何带 data-slot 的祖先当成控件
+  （勾选框与数值框上的点击就是靠这个保住自己的点击的），所以列表上挂 data-slot
+  会让点在行上的点击全被吞掉，因子就展不开了。
+*/
+@layer utilities {
+  /* 勾一下会让那一行移位，而组件自带的 transition 会在行已经跳走之后还在填充颜色，
+     看起来像是原地填的——那就是闪一下的来源。 */
+  .trait-rows [data-slot="checkbox"] {
+    transition: none;
+  }
+
+  /* 勾选框是行的第一个子元素，而 focus ring 是向外长的，会被容器边缘切掉。
+     行在左边留了 2px 给它，而 ring 正好是 2px。 */
+  .trait-rows [data-slot="checkbox"]:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+
+  /* 半选：盒子用选中态那套填充。那根横杠由行自己画——base-ui 只给 data-indeterminate，
+     而组件的 indicator 永远画的是对勾。 */
+  .trait-rows [data-slot="checkbox"][data-indeterminate] {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .trait-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
+    display: none;
+  }
 }

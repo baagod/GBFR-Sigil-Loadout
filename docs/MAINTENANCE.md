@@ -1,13 +1,17 @@
 # GBFR Pre-Equipped Sigils — 维护手册
 
 > 技术维护文档；用户向说明见 `README.md`。仓库根目录；源码 https://github.com/baagod/GBFR-Pre-Equipped-Sigils
-> 游戏版本 Granblue Fantasy: Relink Endless Ragnarok **2.0.5**；当前版本 **0.5.10**（ABI v17）；机制沿革见 §11。
+> 游戏版本 Granblue Fantasy: Relink Endless Ragnarok **2.0.5**；当前版本 **0.6.0**（ABI v17）；机制沿革见 §11。
 
 ## 1. 一句话说明
 
 游戏原生只计 12 个可见因子槽（内部 trait 循环上限 13）。本 mod 把上限扩到 `13 + 虚拟槽数`（= 3 内置专属 + 玩家通用槽），
 并 Hook 因子读取函数：游戏询问 13 号起的虚拟槽时，现场合成一份 GemData 交付——不写存档、不依赖库存、不占用库存
 （`GemData.WORN_BY` = 未装备）。战斗数值是真实本地效果（在线 = 作弊级，风险自负）。
+
+同一个 mod 还内置了**因子参数编辑器**（原独立 mod `GBFR.SigilEdit`）：从游戏归档读出 `skill_status.tbl`，
+按用户配置目录下的 `sigiledits.json` 改写其中的行；启动时经 `IDataManager` 交回，
+运行中则由宿主那条 250ms tick 按 mtime 门重写内存里那份表。两边互不相干：native 那半挂取值钩子，编辑器这半只动表。
 
 ## 2. 目录结构与文件职责
 
@@ -18,6 +22,7 @@ docs/
   MAINTENANCE.md                     本手册
   tool-gen-loadout.ps1               生成 kCharacterExclusives[] 表与 character-exclusives.json（§4）
   tool-gen-sigils.ps1                一条命令：调共享 gen 的 Go 生成器 → docs\sigils.xlsx（入库）+ sigils.json
+  tool-gen-skill-assets\             生成 Loadout\assets\ 那四份内嵌资产（游戏更新后才跑，见该目录 main.go 开头）
   sigils.xlsx                        入库的因子审阅表（生成器产出，勿手改）
   sigils.xlsx 生成文档.md            因子表的生成规则说明书
 ..\..\gen\                           仓库级共享数据与生成器（D:\Games\Relink\gen\，两个 mod 共用）
@@ -26,8 +31,15 @@ docs/
   extracted/                         system/table 全部 .tbl + text/<语言>/text.msg
   GBFRDataTools/                     解包与 tbl↔sqlite 转换工具、Data/ids.txt
   texts/                             各语言文本对照与因子等级数值（texts.json）
-GBFR.PreEquippedSigils/              C# 托管层（Reloaded-II 插件壳）
-  Mod.cs                             生命周期、日志（时间戳）、250ms 维持 Tick
+GBFR.PreEquippedSigils/              C# 托管层（Reloaded-II 插件壳）。**工程根是平铺的：放进去的每个 .cs 都会被编译**
+                                     （SDK 默认通配符，没有逐文件清单；要放生成代码得显式排除）
+  Mod.cs                             生命周期、日志（时间戳）、250ms 维持 Tick；并启动下面的因子编辑
+  SigilEditFeature.cs                因子编辑（原 GBFR.SigilEdit mod，已并入）：读 sigiledits.json → 改写 skill_status 行，启动交 IDataManager，运行中覆写内存
+  HotApply.cs                        按需把表写进内存：定位副本并覆写（内容锚点 + 全表比对），由 Tick 驱动
+  TableLocator.cs                    内存扫描：挑锚点、遍历私有可写区域、比对与写回
+  Native.cs                          kernel32 P/Invoke（VirtualQueryEx / Read|WriteProcessMemory / VirtualProtectEx）
+  Config.cs                          sigiledits.json 的形状（edits: enabled/key/level/values[10]）
+  UserConfig.cs                      用户配置目录（%LocalAppData%\GBFRPreEquippedSigils\）；与 Go 侧 userCfgDir() 算同一个字符串
   NativeCore.cs                      原生门面：ABI 校验/日志回调/Tick/Shutdown/消息读取/阶段日志
   NativeCore.Interop.cs              P/Invoke 声明（必须与 native_api.h 同步）
   LoadoutConfig.cs                   解析 loadout.json（通用槽 + exclusive 段）→ ABI
@@ -50,10 +62,12 @@ GBFR.PreEquippedSigils.Native/       C++ 原生核心
     selection_store.cpp              角色选择存储、hot-apply 队列（generation 机制）
     name_tables.cpp                  兼容表加载（sigils.json 专属行 character 字段，缺失即 fail-closed）
     template_loadout.cpp             ★★专属配装表（表段由生成器产出，勿手改；组装逻辑见 §4）
-Loadout/                            Wails v3 配装编辑器（Go 服务 + React 前端，打包进 Mod）
+Loadout/                            Wails v3 编辑器（Go 服务 + React 前端，打包进 Mod）
   main.go                            窗口/托盘/单实例/假隐藏与 0x8010 激活命令（陷阱见 §11）
-  loadoutservice.go                  数据读写（sigils/exclusives/loadout；原子写 + 结构校验）
-  frontend/src/                      编辑器 UI（App/SlotEditor/TraitPicker/ExclusivePanel/model）
+  loadoutservice.go                  配装数据读写（sigils/exclusives/loadout；原子写 + 结构校验）
+  editservice.go                     因子编辑：防抖落盘用户配置目录下的 sigiledits.json（mod 按 mtime 取走）
+  assets/skill*.json                 因子编辑页内嵌的行数据与三语文本（编译期 go:embed；由 docs\tool-gen-skill-assets 生成，勿手改）
+  frontend/src/                      UI（App 三个 Tab / SlotEditor / TraitPicker / ExclusivePanel / SigilEditPanel）
 ```
 
 `★` = 高风险区，除非明确任务需要，不要动。
@@ -176,8 +190,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 
 ### 发布（版本号同步）
 
-1. 同改 `ModConfig.json` 的 `ModVersion` 与 `build-release.ps1` 默认 `$Version`；
-2. 全文档旧版本号残留扫描：本手册头部、README×2；发布描述素材从 git log 提炼；
+1. 同改 `ModConfig.json` 的 `ModVersion`、`build-release.ps1` 默认 `$Version`，以及工具前端的 `Loadout\frontend\package.json`（连带 package-lock.json 的两处）；
+2. 全文档旧版本号残留扫描：本手册头部；发布描述素材从 git log 提炼；
 3. 重建（自动产出 zip）→ 部署 → 验证（§6）；Nexus 发布则同步描述。
 
 ## 6. 验证清单（每次改动后必须做）
@@ -228,7 +242,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 
 ### 当前状态
 
-- **版本** v0.5.10（ABI v17）。入口配装：每角色专属 3 独立槽（T1/T2/战气，默认全开）+ 玩家通用槽（固定 12 行编辑器，无内置通用默认）。
+- **版本** v0.6.0（ABI v17）。入口配装：每角色专属 3 独立槽（T1/T2/战气，默认全开）+ 玩家通用槽（固定 12 行编辑器，无内置通用默认）。
 - 主控 + AI 角色都吃注入（明镜止水的守护/HP 吸收/追击/迅捷）——卸主槽因子测试确认。
 - 槽位/版本/数据改动后需同步：本手册头部、README×2、ModConfig、build-release.ps1。
 
@@ -253,6 +267,14 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 9. 注入硬条件：仅当"工具由游戏内 F1 召唤"（`returnFocusTo != 0`）+ 交还成功 + `isGameWindow(target)`（`QueryFullProcessImageNameW` 确认属 `granblue_fantasy_relink.exe`）三者同时成立才注入；托盘 / 直接打开一律不注入。
 10. 诊断日志：exe 目录存在 `tool-debug.on` 时写 `tool-debug.log`。
 
+**Esc 归属**（`App.tsx` 的 `isInOverlay`）：因子编辑页的数值框把 Esc 定义成"放开这个框"（`TraitRow.tsx`），
+而外壳的全局监听把 Esc 定义成"隐藏窗口"。两者会**同时**发生——document 的捕获监听先于 React 根监听，
+`preventDefault` 也拦不住 blur。所以那个选择器必须把 `.trait-rows input` 也算成 Esc 的归属者；
+新增任何"自己处理 Esc"的页面时同样要加进去。
+
+**合并后的自我冲突**：`GBFR.SigilEdit` 已并入本 mod（`SigilEditFeature.cs` 等 5 个文件平铺在托管层工程根 + 工具的"因子编辑"页）。
+两个 mod 同时装会让同一个 `skill_status` 表被两份 `IDataManager` 注册互相覆盖，所以发布说明里必须写"不要同时装"。
+
 ## 12. 跨语言协议常量表（改动需同步，勿漂移）
 
 | 常量 | 值 | 位置 |
@@ -266,7 +288,12 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 | 内部显示消息 WM_APP+0x10 | 0x8010 | C# Hotkey.cs / Go main.go |
 | 单实例互斥体名 | Local\GBFRPreEquippedSigilsTool | Go main.go |
 | 工具热键发布文件 | tool-hotkey.txt（exe 同目录） | C# Hotkey.cs / Go loadoutservice.go |
-| 用户配置路径 | %LocalAppData%\GBFRPreEquippedSigils\loadout.json | C# LoadoutConfig.cs / Go loadoutservice.go |
+| 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`sigiledits.json`（因子编辑列表）。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
+| 因子编辑列表缺失 | 工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把原版表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
+| 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
+| 界面语言 | 一套：zh/en/ja，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；配装两页只有中英，日语下回落英文 | TS App.tsx / copy.ts / i18n.ts |
+| 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |
+| 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48） | C# SigilEditFeature.cs（启动与热应用共用同一套偏移量） |
 | 原生 ABI 版本 | 17 | native_api.h / C# NativeCore.cs AbiVersion |
 | 原生结构尺寸 | TemplateSlot 0x18 / ExclusiveOverride 0x08 | native_api.h static_assert / C# native 侧 runtime 校验 |
 | 等级范围校验 | 前端 1..cap（空槽显示 0）；Go 结构校验 0..200；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |

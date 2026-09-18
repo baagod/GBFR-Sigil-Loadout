@@ -35,6 +35,14 @@ if (Get-Process -Name 'granblue_fantasy_relink' -ErrorAction SilentlyContinue) {
     throw 'The game is running; close it first (its Reloaded-II mods are loaded from the Mods folder).'
 }
 
+# 2b. 独立版的 GBFR.SigilEdit 必须已经不在了。两边的编辑器都会把 skill_status 作为外部文件
+# 注册给 IDataManager，谁后加载谁说了算——同装两个的话，实际生效的是哪一份全看加载顺序，
+# 而这件事文档挡不住。旧 mod 的功能已经并入本 mod。
+$legacyMod = Join-Path (Split-Path -Parent $resolvedTarget) 'GBFR.SigilEdit'
+if (Test-Path -LiteralPath $legacyMod) {
+    throw "The standalone GBFR.SigilEdit is still installed at $legacyMod. Its editor is now part of this mod: remove that folder before deploying (both register the same skill_status table, and the last one loaded wins)."
+}
+
 # 3. Stop a running tool so the deployed files are not locked, and wait until it
 # is really gone: the tool holds a single-instance mutex, so a launch that races
 # the shutdown would only activate the dying window and then exit by itself.

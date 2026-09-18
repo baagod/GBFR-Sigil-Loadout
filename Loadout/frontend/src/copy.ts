@@ -4,6 +4,7 @@ export const copy = {
   zh: {
     tabGeneral: "通用配装",
     tabExclusive: "专属因子",
+    tabSigilEdit: "因子编辑",
     headerPrimary: "主因子",
     headerSecondary: "副因子",
     selectAll: "全选/反选",
@@ -25,6 +26,7 @@ export const copy = {
   en: {
     tabGeneral: "General",
     tabExclusive: "Exclusives",
+    tabSigilEdit: "Sigil edit",
     headerPrimary: "Primary Sigil",
     headerSecondary: "Secondary Sigil",
     selectAll: "Select all / none",

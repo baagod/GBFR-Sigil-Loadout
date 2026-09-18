@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <PackageReference Include="Reloaded.Mod.Interfaces" Version="2.5.0" ExcludeAssets="runtime" />
+    <!-- 因子编辑那一半从游戏归档里取 skill_status.tbl：没有这个管理器就没有表可改。 -->
+    <PackageReference Include="gbfrelink.utility.manager.Interfaces" Version="1.2.0" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>

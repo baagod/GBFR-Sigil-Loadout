@@ -60,9 +60,7 @@ internal static class LoadoutConfig
     {
         // Player config lives in the user directory so mod updates (which
         // replace the mod folder) never wipe it. No config -> built-in template.
-        _loadoutPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "GBFRPreEquippedSigils", "loadout.json");
+        _loadoutPath = UserConfig.FilePath("loadout.json");
         // Keep in sync with Native/src/runtime.cpp (sigils_path in Initialize()).
         _sigilsPath = Path.Combine(modDirectory, "sigils.json");
         LoadExclusiveTable(modDirectory, log);

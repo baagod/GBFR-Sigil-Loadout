@@ -14,12 +14,18 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
 import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives } from "../bindings/loadouttool/loadoutservice"
-import { copy, type Lang } from "./copy"
+import { copy } from "./copy"
+import { LANGS, LANG_LABEL, initialLang, type Lang } from "./i18n"
 import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
 import { SlotRow, HEADER_ROW } from "./SlotEditor"
 import { ExclusivePanel } from "./ExclusivePanel"
+import { SigilEditPanel } from "./SigilEditPanel"
 
-type TabKey = "general" | "exclusive"
+type TabKey = "general" | "exclusive" | "sigilEdit"
+
+// 配装那两页共用的滚动盒子：整个面板自己滚，所以每页各留一份滚动位置。
+// 因子编辑不套它——那一页自带内边距与滚动，套上就是两层滚动。
+const LOADOUT_PANEL = "min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-gutter:stable]"
 
 export default function App() {
   const [traits, setTraits] = useState<Trait[]>([])
@@ -31,12 +37,15 @@ export default function App() {
   const [exclusiveState, setExclusiveState] = useState<ExclusiveState | undefined>(undefined)
   const [resetOpen, setResetOpen] = useState(false)
   const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
-  const [lang, setLang] = useState<Lang>("zh") // default zh; persisted in loadout.json
+  const [lang, setLang] = useState<Lang>(initialLang) // persisted in loadout.json
   const resetCancelRef = useRef<HTMLButtonElement | null>(null)
-  const t = copy[lang]
-  const toggleLang = () => {
-    setLang((prev) => (prev === "zh" ? "en" : "zh"))
-  }
+  // 配装那两页只有中英两套文案，所以日语下它们显示英文——这比在同一个窗口里
+  // 放两个互不同步的语言开关要好（那一页的文案本身三种都齐，见 i18n.ts）。
+  const copyLang = lang === "ja" ? "en" : lang
+  const t = copy[copyLang]
+  // 一个开关管三个 Tab：中 → EN → JA → 中。
+  const nextLang = LANGS[(LANGS.indexOf(lang) + 1) % LANGS.length]
+  const toggleLang = () => setLang(nextLang)
   // First render + first load must not write loadout.json: the preset stays
   // active until the user actually edits something.
   const skipSave = useRef(true)
@@ -273,7 +282,7 @@ export default function App() {
       exclusive?: unknown
     }
     skipSave.current = true
-    if (cfg.lang === "zh" || cfg.lang === "en") setLang(cfg.lang)
+    if (LANGS.includes(cfg.lang as Lang)) setLang(cfg.lang as Lang)
     setSlots(pad12(configToSlots(cfg, sigilTable, traitTable)))
     setExclusiveState(sanitizeExclusiveState(cfg.exclusive))
   }
@@ -378,7 +387,9 @@ export default function App() {
     const hideKeyPressed = (e: KeyboardEvent) => e.keyCode === hideKey
     const isInOverlay = (e: KeyboardEvent) =>
       !!(e.target as HTMLElement | null)?.closest?.(
-        '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"]'
+        // Esc 归谁：打开的浮层，以及因子编辑页里的数值框——那一页把 Esc 定义成
+        // "放开这个框"（见 TraitRow），不该同时把整个窗口藏到托盘去。
+        '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .trait-rows input'
       )
     const onKeyDown = (e: KeyboardEvent) => {
       if (!hideKeyPressed(e) && e.key !== "Escape") return
@@ -425,6 +436,7 @@ export default function App() {
           <TabsList>
             <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
             <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
+            <TabsTrigger value="sigilEdit">{t.tabSigilEdit}</TabsTrigger>
           </TabsList>
           <div className="flex items-center">
             <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
@@ -467,21 +479,28 @@ export default function App() {
               onClick={toggleLang}
               aria-label={t.langSwitch}
             >
-              {lang === "zh" ? "EN" : "中"}
+              {LANG_LABEL[nextLang]}
             </Button>
           </div>
         </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-gutter:stable]">
+        {/*
+          状态条是外壳级的通知，不属于任何一个 Tab：它必须留在这一层，
+          否则切到因子编辑页时那两页的"没保存成功"会被静默吞掉。
+        */}
         {status && (
           <div
             aria-live="polite"
-            className="mb-2 rounded-md bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground"
+            className="mx-4 mt-2 rounded-md bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground"
           >
             {status}
           </div>
         )}
-        <TabsPanel value="general">
+        {/*
+          配装那两页各自是滚动盒子（见 LOADOUT_PANEL），所以这里没有共用容器、
+          也没有"不在这一页就整块不渲染"的分支：未激活的面板本来就不渲染。
+        */}
+        <TabsPanel value="general" className={LOADOUT_PANEL}>
         <div className={HEADER_ROW}>
           <div>
             <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
@@ -508,16 +527,23 @@ export default function App() {
           />
         ))}
         </TabsPanel>
-        <TabsPanel value="exclusive">
+        <TabsPanel value="exclusive" className={LOADOUT_PANEL}>
           <ExclusivePanel
             table={exclusiveTable}
             state={exclusiveState}
             sigilByHash={sigilByHash}
-            lang={lang}
+            lang={copyLang}
             onChange={updateExclusive}
           />
         </TabsPanel>
-      </div>
+        {/*
+          keepMounted：这一页的编辑状态活在组件里，而后端落盘要等 500ms 防抖
+          （见 editservice.go）。切走就卸载的话，在防抖窗口内切回来会读到还没写下的
+          旧文件——屏幕上刚敲的数字消失，随后那份旧列表还会把磁盘上的新值覆盖掉。
+        */}
+        <TabsPanel value="sigilEdit" keepMounted className="min-h-0 flex-1 overflow-auto">
+          <SigilEditPanel lang={lang} />
+        </TabsPanel>
       </Tabs>
     </div>
   )

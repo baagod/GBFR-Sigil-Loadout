@@ -5,7 +5,7 @@ param(
     [ValidateSet('x64')]
     [string]$Platform = 'x64',
     [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
-    [string]$Version = '0.5.10'
+    [string]$Version = '0.6.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -135,11 +135,29 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Wails bindings generation failed with exit code $LASTEXITCODE."
     }
+    # vite only strips types, so nothing below would notice a type error: run the
+    # compiler over the same sources first. The tests are a gate too - a release
+    # that ships with a red suite is a release nobody checked.
+    & npm --prefix (Join-Path $toolDir 'frontend') run typecheck
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tool frontend typecheck failed with exit code $LASTEXITCODE."
+    }
+    & npm --prefix (Join-Path $toolDir 'frontend') test
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tool frontend tests failed with exit code $LASTEXITCODE."
+    }
     & npm --prefix (Join-Path $toolDir 'frontend') run build
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend build failed with exit code $LASTEXITCODE."
     }
-    & go build -trimpath -ldflags "-H windowsgui -s -w" -o Loadout.exe .
+    # -buildvcs=false for the same reason the csproj turns SourceLink and the
+    # informational version off: Go otherwise stamps the commit sha and a
+    # "modified" flag into the binary.
+    & go test ./...
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tool Go tests failed with exit code $LASTEXITCODE."
+    }
+    & go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o Loadout.exe .
     if ($LASTEXITCODE -ne 0) {
         throw "Tool build failed with exit code $LASTEXITCODE."
     }

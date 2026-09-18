@@ -12,6 +12,11 @@ namespace GBFR.PreEquippedSigils;
 /// the native core installs its own hooks via SafetyHook and applies the
 /// built-in template loadout automatically. This shell only hosts the
 /// native module, forwards logs, and drives the upkeep tick.
+///
+/// It also hosts the sigil editor (originally the separate GBFR.SigilEdit
+/// mod): that half rewrites skill_status rows from the user's edit list, both
+/// at startup - through IDataManager - and inside the running game, where the
+/// upkeep tick below notices a changed file and re-applies it.
 /// </summary>
 public sealed class Mod : IMod
 {
@@ -23,6 +28,7 @@ public sealed class Mod : IMod
     private ILogger? _logger;
     private StreamWriter? _fileLog;
     private System.Threading.Timer? _tickTimer;
+    private SigilEditFeature? _sigilEdit;
     private bool _nativeCoreActive;
     private bool _disposed;
     private int _startRequested;
@@ -86,6 +92,16 @@ public sealed class Mod : IMod
             LoadoutConfig.Initialize(modDirectory, Log);
             InitializeHotkeyConfiguration(loader, modDirectory);
 
+            // The sigil editor is independent of the native core: it only reads
+            // the archive and rewrites skill_status rows, so it starts whatever
+            // the hooks did. It reads the whole table synchronously, so it gets
+            // its own phase line: that read is the one step here that can be
+            // slow enough to delay the upkeep tick below.
+            long sigilEditStarted = Stopwatch.GetTimestamp();
+            _sigilEdit = new SigilEditFeature(Log);
+            _sigilEdit.Start(loader);
+            CompleteStartupPhase("sigil-edit", sigilEditStarted);
+
             _nativeCoreActive = true;
             _tickTimer = new System.Threading.Timer(
                 _ =>
@@ -93,6 +109,7 @@ public sealed class Mod : IMod
                     try
                     {
                         LoadoutConfig.Tick(Log);
+                        _sigilEdit?.Tick();
                         Hotkey.Tick(Log);
                         NativeCore.Tick();
                     }
@@ -194,6 +211,8 @@ public sealed class Mod : IMod
 
         _tickTimer?.Dispose();
         _tickTimer = null;
+        _sigilEdit?.Dispose();
+        _sigilEdit = null;
         Hotkey.Shutdown();
         if (_nativeCoreActive)
         {

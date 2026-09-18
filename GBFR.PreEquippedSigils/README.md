@@ -16,6 +16,19 @@
 
 本体 12 槽位留给玩家自由发挥：通用槽由随附工具编辑（无内置默认）。
 
+## 因子编辑（原 GBFR.SigilEdit，已并入本 Mod）
+
+随附工具（`Loadout.exe`）的 **"因子编辑"页**用来改因子自身的等级数值：在列表或搜索框里按名称或 hash 筛选，
+改写指定参数并启用即可。改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\sigiledits.json`（与配装 loadout.json 同目录），无需重启，运行中的游戏随即把编辑
+应用到它已经读进内存的那张表上。
+
+- 它**不带 `.tbl` 文件**：表从游戏封包中读出、在内存里改写，所以能和其他**改表** mod 并存。
+- 改动时游戏内该因子的**说明**实时更新；**实际效果**在下一场战斗开始时生效。
+- 参数说明：**鼠标停在整行**会显示这个因子的说明；十个参槽按占位符编号，置空时会把游戏原值灰显为占位符。
+- 界面支持 **中文 / English / 日本語**。
+- **需要** [gbfrelink.utility.manager](https://github.com/WistfulHopes/gbfrelink.utility.manager) 才能用这一页：表就是从它那儿读的。它是**可选依赖**（`ModConfig.json` 的 `OptionalDependencies`），没装的话 mod 照常加载，只是编辑器没有表可改——日志里会说一句在等它。
+- **原来独立的 `GBFR.SigilEdit` mod 已并入本 Mod：不要同时装两个。**
+
 ## 安装
 
 1. 安装 [Reloaded-II](https://github.com/Reloaded-Project/Reloaded-II)，2. 把 zip 解压到 Reloaded-II 的 Mods 目录，3. 启用 Mod 后启动游戏。
