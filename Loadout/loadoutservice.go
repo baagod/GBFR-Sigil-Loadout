@@ -181,29 +181,21 @@ func validateSlots(slots []loadoutSlot) error {
 	return nil
 }
 
-// SaveLoadout writes the player configuration (same schema as the mod reads:
-// {lang, slots:[{items:[...],enabled}]}; a bare array is accepted too for
-// backwards compatibility). Atomic write (temp + rename) so the mod's 250ms
-// mtime tick never sees a half-written file.
+// SaveLoadout writes the player configuration (the shape the mod reads:
+// {lang, slots:[{items:[...],enabled}]}). Atomic write (temp + rename) so the
+// mod's 250ms mtime tick never sees a half-written file.
 func (s *LoadoutService) SaveLoadout(config string) error {
 	var c struct {
 		Lang      string                    `json:"lang"`
 		Slots     []loadoutSlot             `json:"slots"`
 		Exclusive map[string]exclusiveState `json:"exclusive"`
 	}
+	// 只认这一种形状：别的拼写（早期版本的裸数组）在这里就报错，而不是被翻译成
+	// "空配置"写下去。
 	if err := json.Unmarshal([]byte(config), &c); err != nil {
 		return err
 	}
-	slots := c.Slots
-	if slots == nil {
-		// legacy bare-array config
-		var arr []loadoutSlot
-		if err := json.Unmarshal([]byte(config), &arr); err != nil {
-			return err
-		}
-		slots = arr
-	}
-	if err := validateSlots(slots); err != nil {
+	if err := validateSlots(c.Slots); err != nil {
 		return err
 	}
 	return writeFileAtomic(filepath.Join(userCfgDir(), "loadout.json"), []byte(config))

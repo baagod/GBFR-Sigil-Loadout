@@ -131,6 +131,24 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 }
 
 /*
+只认当前形状：早期版本的裸数组（[ { items, enabled } ]）不再被翻译成"空配置"写下去，
+而是当场报错。翻译过的写法会把一份读不出来的旧文件静默变成"没有任何槽位"落盘，
+用户看到的是自己的配置被清空。
+*/
+func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	bare := `[{"items":[{"gem":"9A60FBF0","level":15}],"enabled":true}]`
+	if err := (&LoadoutService{}).SaveLoadout(bare); err == nil {
+		t.Fatal("expected the bare-array shape to be rejected")
+	}
+	path := filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json")
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
+	}
+}
+
+/*
 因子表与名字文件由同一次生成写出，但它们是不同的文件：谁都不会替对方发现漂移，
 运行时也看不出来——少的那个只是少一行名字，屏幕上照旧显示回落的数据。
 

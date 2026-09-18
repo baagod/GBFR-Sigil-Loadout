@@ -23,7 +23,7 @@ namespace GBFR.PreEquippedSigils;
 ///                            {gem, level}, {hash, level}? ],
 ///                            enabled } ], exclusive: { player: { traitHash: bool } } }
 ///                            items[0] = sigil (item hash), items[1] = secondary
-///                            trait (optional); a bare array is legacy-only.
+///                            trait (optional).
 /// Soft validation: any combination is accepted (no secondaries check yet);
 /// hard validation only: unknown hashes / bad levels / too many slots.
 /// </summary>
@@ -295,7 +295,7 @@ internal static class LoadoutConfig
     }
 
     private static void AddExclusiveOverride(
-        JsonElement fields, ExclusiveRow? row, uint hash,
+        JsonElement fields, ExclusiveRow row,
         List<NativeCore.ExclusiveOverrideNative> result)
     {
         bool t1 = true;
@@ -308,23 +308,16 @@ internal static class LoadoutConfig
                 continue;
             bool value = field.Value.GetBoolean();
             uint traitHash = PU(field.Name);
-            if (row != null && traitHash == row.T1)
+            if (traitHash == row.T1)
                 t1 = value;
-            else if (row != null && traitHash == row.T2)
+            else if (traitHash == row.T2)
                 t2 = value;
-            else if (row != null && traitHash == row.War)
+            else if (traitHash == row.War)
                 war = value;
-            else
-                switch (field.Name)
-                {
-                    case "t1": t1 = value; break;
-                    case "t2": t2 = value; break;
-                    case "war": war = value; break;
-                }
         }
         result.Add(new NativeCore.ExclusiveOverrideNative
         {
-            CharacterHash = hash,
+            CharacterHash = row.Hash,
             DisableT1 = t1 ? (byte)0 : (byte)1,
             DisableT2 = t2 ? (byte)0 : (byte)1,
             DisableWar = war ? (byte)0 : (byte)1,
@@ -332,25 +325,12 @@ internal static class LoadoutConfig
         });
     }
 
-    /// True when every field name is a legacy bit name (t1/t2/war); only then
-    /// can an unknown-key entry be applied to a raw character hash.
-    private static bool HasOnlyLegacyBitNames(JsonElement fields)
-    {
-        foreach (JsonProperty field in fields.EnumerateObject())
-        {
-            string name = field.Name;
-            if (name != "t1" && name != "t2" && name != "war")
-                return false;
-        }
-        return true;
-    }
-
     /// <summary>
     /// Parses the optional "exclusive" object
     /// ({ PL码/角色hash: { 词条hash(T1/T2/War): bool } }) into native overrides
-    /// (disable bits). Missing entries stay enabled; the legacy shape
-    /// ({ characterHashHex: { t1, t2, war } }) is still accepted for unknown
-    /// character hashes; absent "exclusive" yields null (all enabled).
+    /// (disable bits). Missing entries stay enabled; absent "exclusive" yields
+    /// null (all enabled). 只认这一种形状：键解析不出表里那行就跳过，不为早期版本的
+    /// { 角色hash: { t1, t2, war } } 位名形状兜底。
     /// </summary>
     private static NativeCore.ExclusiveOverrideNative[]? ParseExclusiveOverrides(JsonElement root)
     {
@@ -365,21 +345,14 @@ internal static class LoadoutConfig
             if (property.Value.ValueKind != JsonValueKind.Object)
                 continue;
             // A player key may match several rows (Gran/Djeeta share "PL0000"):
-            // emit one override per character. Unknown keys only fall back to a
-            // raw character hash for the legacy bit-name shape; new-shape
-            // entries (trait-hash keys) without a table row cannot be resolved
-            // to T1/T2/War bit names and are skipped (no-op, nothing enabled).
+            // emit one override per character. An unknown key has nowhere to
+            // land — the bit names are the row's own trait hashes — so it is
+            // skipped (no-op, nothing enabled).
             IReadOnlyList<ExclusiveRow> rows = ResolveCharacters(property.Name);
             if (rows.Count == 0)
-            {
-                uint bareHash = PU(property.Name);
-                if (bareHash == 0 || !HasOnlyLegacyBitNames(property.Value))
-                    continue;
-                AddExclusiveOverride(property.Value, null, bareHash, result);
                 continue;
-            }
             foreach (ExclusiveRow row in rows)
-                AddExclusiveOverride(property.Value, row, row.Hash, result);
+                AddExclusiveOverride(property.Value, row, result);
         }
         return result.Count == 0 ? null : result.ToArray();
     }
