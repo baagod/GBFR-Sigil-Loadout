@@ -20,8 +20,8 @@ const MaxSlots = 12
 // Protocol is shared with the mod: gem.json (merged sigil/trait table:
 // item rows hash != skill1, non-item skill rows hash == skill1; display names
 // live in the embedded gem.lang.json instead) and
-// loadout.json (player configuration; array format: [ { items: [{hash,level,zh,en},
-// {hash,level,zh,en}?], enabled } ]).
+// loadout.json (player configuration; array format: [ { items: [{gem,level},
+// {hash,level}?], enabled } ]; older builds also wrote zh/en, which nothing read).
 type LoadoutService struct{}
 
 // MinimiseApp fake-hides the window to the tray (alpha 0, the WebView stays
@@ -62,7 +62,7 @@ type loadoutSlot struct {
 }
 
 // exclusiveState mirrors the mod-side "exclusive" section: keyed by player
-// code (or name/hash), inner keys are the factor trait hashes, true = enabled
+// code (or character hash), inner keys are the factor trait hashes, true = enabled
 // (default when omitted). Parsed only to validate the config; the payload is
 // written verbatim.
 type exclusiveState map[string]bool
@@ -135,7 +135,10 @@ func (s *LoadoutService) LoadConfig() (string, error) {
 	data, err := os.ReadFile(filepath.Join(userCfgDir(), "loadout.json"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return `{"lang":"zh","slots":[]}`, nil
+			// lang 留空不是漏写：空串不在 LANGS 里，前端据此保留自己的 initialLang()
+			// 猜测（系统语言）。这里写死 "zh" 会把它覆盖掉，日/韩/英文系统的新用户
+			// 第一眼看到的就是中文。
+			return `{"lang":"","slots":[]}`, nil
 		}
 		return "", err
 	}

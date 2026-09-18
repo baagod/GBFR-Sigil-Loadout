@@ -6,6 +6,9 @@ export const DEFAULT_HIDE_KEY = 0x70
 
 export interface Slot {
   mainHash: string
+  /** 载入时存档里那个 gem hash（主下拉的值是组键，只有它能记住选的是组里的哪个变体）。
+   * 用户重新选主因子时由 SlotEditor 清空。空 = 没有可保留的变体。 */
+  mainGem: string
   mainLevel: number
   secHash: string
   secLevel: number
@@ -102,7 +105,14 @@ export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-const emptySlot = (): Slot => ({ mainHash: "", mainLevel: 0, secHash: "", secLevel: 0, enabled: true })
+const emptySlot = (): Slot => ({
+  mainHash: "",
+  mainGem: "",
+  mainLevel: 0,
+  secHash: "",
+  secLevel: 0,
+  enabled: true,
+})
 
 /** Normalize a saved config (new array format) into Slot[].
  *
@@ -127,6 +137,26 @@ export function configToSlots(
     if (mainKeyOfGem.has(s.mainHash)) s.mainHash = mainKeyOfGem.get(s.mainHash) as string
   }
   return fromCfg
+}
+
+/** 保存时这个主因子该写成哪个 gem hash（主下拉的值是组键，不是物品）。
+ *
+ * 顺序即优先级：存档已经指名的那一个变体（preferred，且仍与当前副因子相容）→
+ * 池版 → 固定副那版 → 组里第一行。第一档是必需的：一个组里可以有**名字不同**的
+ * 两个变体（钳蟹的共鸣 / 永恒钳蟹因子），丢了它，没被碰过的那一行也会被静默改写。
+ * 固定的副因子不写进 loadout.json（mod 从 gem 自己推），所以它对应的 secHash 是空。 */
+export function resolveMainGem(
+  variants: Sigil[],
+  pool: { poolHash: string; lot: Set<string> } | undefined,
+  secHash: string,
+  preferred: string
+): string {
+  if (variants.length === 0) return ""
+  const kept = preferred === "" ? undefined : variants.find((v) => v.hash === preferred)
+  if (kept && (secHash === "" || kept.skill2 === secHash)) return kept.hash
+  if (pool && (secHash === "" || pool.lot.has(secHash))) return pool.poolHash
+  const fixed = secHash !== "" ? variants.find((v) => v.skill2 === secHash) : undefined
+  return fixed?.hash ?? pool?.poolHash ?? variants[0].hash
 }
 
 /** Pad the editor to at least MAX_SLOTS rows so the user just fills them in.
@@ -166,6 +196,9 @@ function slotsFromConfig(
     const secLevel = sec && typeof sec.level === "number" ? sec.level : DEFAULT_LEVEL
     return {
       mainHash,
+      // 存档里的 gem hash 原样留着：configToSlots 随后把 mainHash 换成组键，
+      // 组里"名字不同的那两个变体"就只能靠这个字段区分（见 hashFor 的 preferred）。
+      mainGem: mainHash,
       mainLevel: clampLevel(mainLevel, capOfGem.get(mainHash)),
       secHash,
       secLevel: clampLevel(secLevel, capOfTrait.get(secHash)),

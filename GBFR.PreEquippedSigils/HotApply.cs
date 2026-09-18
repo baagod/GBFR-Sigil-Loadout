@@ -196,7 +196,9 @@ internal sealed class HotApply
                 alreadyCurrent++;
                 continue;
             }
-            if (TableLocator.WriteCopy(address, newTable))
+            // current 一并交出去：扫描可能已经跑了几秒，写入前必须由 TableLocator 再确认
+            // 那个地址仍是扫描时看到的这份表（见 WriteCopy）。
+            if (TableLocator.WriteCopy(address, newTable, current))
             {
                 _log($"  wrote 0x{address:X}");
                 updated++;

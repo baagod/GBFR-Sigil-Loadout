@@ -135,7 +135,13 @@ export const SlotRow = memo(function SlotRow({
           placeholder={t.pickTrait}
           searchPlaceholder={t.search}
           emptyLabel={t.empty}
-          onSelect={(v) => updateSlot(index, { mainHash: v, mainLevel: Math.min(DEFAULT_LEVEL, maxOfMain(v)) })}
+          onSelect={(v) =>
+            updateSlot(index, {
+              mainHash: v,
+              mainGem: "", // 换了主因子，存档里那个变体不再作数
+              mainLevel: Math.min(DEFAULT_LEVEL, maxOfMain(v)),
+            })
+          }
         />
         <LevelInput
           value={slot.mainHash ? slot.mainLevel : 0}

@@ -52,6 +52,9 @@ internal static class LoadoutConfig
     private static DateTime _lastAppliedUtc = DateTime.MinValue;
     private static DateTime _lastAttemptUtc = DateTime.MinValue;
     private static int _failsSinceChange;
+    // _failsSinceChange 属于哪一个 mtime。每拍都清零的话，catch 里的 ++ 永远是 1，
+    // 重试上限和那句诊断日志就永远到不了（坏文件会被以 4 Hz 反复解析且一声不响）。
+    private static DateTime _failsForUtc = DateTime.MinValue;
     private static bool _hadConfigFile;
     private static string _loadoutPath = "";
     private static string _sigilsPath = "";
@@ -153,7 +156,11 @@ internal static class LoadoutConfig
         DateTime mtime = File.GetLastWriteTimeUtc(_loadoutPath);
         if (mtime == _lastAppliedUtc || mtime == _lastAttemptUtc)
             return;
-        _failsSinceChange = 0;
+        if (mtime != _failsForUtc)
+        {
+            _failsForUtc = mtime;
+            _failsSinceChange = 0;
+        }
 
         try
         {

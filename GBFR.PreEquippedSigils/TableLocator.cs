@@ -243,9 +243,17 @@ internal static class TableLocator
     /// <summary>
     /// Writes <paramref name="data"/> over the buffer at <paramref name="baseAddress"/>
     /// and verifies the result by reading it back.
+    ///
+    /// 写之前必须再确认那里仍然是 <paramref name="expected"/>：候选是扫描那一刻校验的，
+    /// 而扫描跑完到真正写入之间有好几秒（见 FindCopies），地址可能已经被游戏释放或复用。
+    /// 少了这一读，整张表会盖到无关的已提交内存上，而写后校验只看新字节、照样返回 true，
+    /// 于是一次写错还会被当作成功发布出去（见 HotApply 的 "SUCCESS" 分支）。
     /// </summary>
-    public static bool WriteCopy(long baseAddress, byte[] data)
+    public static bool WriteCopy(long baseAddress, byte[] data, byte[] expected)
     {
+        if (!ContentsMatch(baseAddress, expected))
+            return false;
+
         if (Native.WriteProcessMemory(Native.ProcessHandle, (IntPtr)baseAddress, data,
                 (IntPtr)data.Length, out var written) && written.ToInt64() == data.Length)
             return ContentsMatch(baseAddress, data);

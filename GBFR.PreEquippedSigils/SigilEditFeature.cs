@@ -94,6 +94,14 @@ internal sealed class SigilEditFeature
         // 改动；认领"读之后"的，它就被这次启动悄悄吃掉了。
         DateTime readingUtc = LastWriteUtc();
 
+        // 就在这里认领，不能等到 finally：下面先建热应用（_hotApply 一旦非 null，tick 就会
+        // 走 Apply 那条路），再调管理器的慢写入。Timer 的回调是不串行的，这中间进来的一拍
+        // 会看到 _hotApply 已就绪而 _handledUtc 还是 default(0001-01-01)，于是当场引爆一次
+        // 5-6 秒的全内存扫描，并和这里的启动写撞在一起；它认领的 mtime 随后还会被 finally 覆盖。
+        // 门停在 default 会让第一个 tick 白跑一次（文件不存在时的时间戳是 1601-01-01，永不相等），
+        // 所以认领必须早于一切可能的提前 return —— 放在 try 之前即满足这点。
+        _handledUtc = readingUtc;
+
         try
         {
             Config config = LoadConfig(out _) ?? new Config();
@@ -131,16 +139,6 @@ internal sealed class SigilEditFeature
             _log(_hotApply is null
                 ? "sigil edit EXCEPTION - the hot apply was never created, so the editor is off for this run: " + ex
                 : "sigil edit EXCEPTION - the hot apply is running; only the boot write did not complete: " + ex);
-        }
-        finally
-        {
-            // 启动这次已经按 readingUtc 那一刻的文件做过了（或者根本没有列表），所以认领的就是
-            // 那一刻的时间戳：tick 只对"之后的改动"负责。放在 finally 是必须的——任何一条提前
-            // return（表读不出来、applied==0）若跳过了这一步，门就停在 default(0001-01-01)，
-            // 而文件不存在时的时间戳是 1601-01-01，两者永不相等：第一个 tick 必然白跑一次应用
-            // （全新玩家会看到一句误导的 "nothing to apply"，启动读表失败时更会提前引爆一次
-            // 5-6 秒的全内存扫描）。
-            _handledUtc = readingUtc;
         }
     }
 

@@ -253,7 +253,7 @@ func (s *EditService) LoadEdits() ([]SigilTrait, error) {
 // 状态可以回传。
 //
 // 只有“这份列表根本无法被接受”才会作为错误返回；定时器触发时失败的写入已经没有调用方
-// 可以返回，于是改为推给前端（见 publish）。
+// 可以返回，于是改为推给前端（见 publishLocked）。
 func (s *EditService) SaveEdits(edits []SigilTrait) error {
 	for i := range edits {
 		edits[i].Values = padValues(edits[i].Values)
@@ -281,19 +281,14 @@ func writeEdits(edits []SigilTrait) error {
 	return writeFileAtomic(configPath(), cfgBytes)
 }
 
-// flush 是防抖触发时执行的：编辑已经停止，所以列表发出去，并通知正在运行的游戏。
+// flush 是防抖触发时执行的：编辑已经停止，所以列表发出去（mod 自己的 250ms mtime 门会
+// 发现它，见 publishLocked）。
 // 列表是被取走而不是被读取，这样随后的关闭流程再取一次就什么也找不到、不会写第二遍——
 // 而在取走之后才触发的定时器也没有东西可发。
 func (s *EditService) flush() {
 	s.mu.Lock()
-	edits := s.pending
-	s.pending = nil
-	s.mu.Unlock()
-
-	if edits == nil {
-		return
-	}
-	s.publish(edits)
+	defer s.mu.Unlock()
+	s.publishLocked()
 }
 
 // flushNow 立即写出待写的列表，用于关闭流程：窗口可能在防抖窗口内就关掉，
@@ -301,29 +296,34 @@ func (s *EditService) flush() {
 // 防抖已经写过的列表不再处于待写状态，所以这里什么也找不到，也就什么都不会写。
 func (s *EditService) flushNow() {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.timer != nil {
 		s.timer.Stop()
 	}
-	edits := s.pending
-	s.pending = nil
-	s.mu.Unlock()
-
-	if edits == nil {
-		return
-	}
-	s.publish(edits)
+	s.publishLocked()
 }
 
-// publish 是列表离开这个工具的唯一出口。
+// publishLocked 是列表离开这个工具的唯一出口；调用方持有 s.mu。
 //
-// 这里的失败没有调用方可以回溯：交出列表的那次调用早已返回，而这段代码跑在定时器的
-// goroutine 上。所以它被记进日志——下一次编辑会用最新的列表重新给定时器上弦，那就是重试 ——
-// 同时推给前端，因为一份从未到达磁盘的列表，看起来和 mod 什么都不做一模一样。
+// 取走列表和写盘必须在同一个临界区里：分开的话，定时器的 flush 与退出时的 flushNow
+// 可以各取到一份并发地写，而决定磁盘内容的是最后完成的那个 rename，不是最后提交的
+// 那份状态——旧列表可能盖住新列表，且退出时再取一次已经什么都找不到。
+//
+// 写失败就把列表放回待写（锁在身上，待写必然是空的）：这里的失败没有调用方可以回溯，
+// 而一次瞬时 IO 失败（杀软、mod 正好在读这个文件）不该变成永久丢失——下一次防抖或
+// 退出时的 flushNow 就是重试。同时推给前端，因为一份从未到达磁盘的列表，看起来和
+// mod 什么都不做一模一样。
 //
 // 成功时什么都不用再做：mod 每 250ms 看一次这个文件的 mtime（SigilEditFeature.Tick），
 // 合并前那个用来叫醒它的具名事件已经没了。
-func (s *EditService) publish(edits []SigilTrait) {
+func (s *EditService) publishLocked() {
+	edits := s.pending
+	s.pending = nil
+	if edits == nil {
+		return
+	}
 	if err := writeEdits(edits); err != nil {
+		s.pending = edits
 		log.Printf("sigil edit: %v", err)
 		// Get 就是跑着本进程的这个 app；在测试里它是 nil，那里没有前端可通知。
 		if app := application.Get(); app != nil {

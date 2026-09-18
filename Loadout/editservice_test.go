@@ -155,6 +155,20 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	if !strings.Contains(logged.String(), "creating the config folder") {
 		t.Fatalf("a write that could not be made went unrecorded: %q", logged.String())
 	}
+
+	// 失败的这份列表必须还在待写里：不编辑而直接退出时，flushNow 是它唯一的机会。
+	// 把挡路的东西挪开，同一个 flushNow 就该把它写下去。
+	if err := os.Remove(blocked); err != nil {
+		t.Fatal(err)
+	}
+	service.flushNow()
+	written, err := os.ReadFile(localConfig(t, "sigiledits.json"))
+	if err != nil {
+		t.Fatalf("the list was dropped after a failed write: %v", err)
+	}
+	if !strings.Contains(string(written), "06719232") {
+		t.Fatalf("the retry wrote something else: %s", written)
+	}
 }
 
 // 工具编辑的那份列表就是 mod 读取的那份，所以它必须从同一个文件里读回来：

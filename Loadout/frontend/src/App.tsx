@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
 import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames } from "../bindings/loadouttool/loadoutservice"
 import { copy } from "./copy"
 import { LANGS, LANG_LABEL, initialLang, type Lang } from "./i18n"
-import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, parseExclusiveTable, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
+import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, parseExclusiveTable, resolveMainGem, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
 import { SlotRow, HEADER_ROW } from "./SlotEditor"
 import { ExclusivePanel } from "./ExclusivePanel"
 import { SigilEditPanel } from "./SigilEditPanel"
@@ -225,18 +225,15 @@ export default function App() {
     }
   }, [groupedByKey, ordinaryTraits])
 
-  // Family item hash at save time: no secondary -> pool version (lot != []
-  // variant, else first); secondary in the pool's lot -> pool version;
-  // secondary equal to a variant's fixed second (sec) -> that fixed version;
-  // anything else (illegal) still generates with the pool version (styles
-  // only). lot match wins over sec match (currently no trait is in both).
-  const hashFor = (name: string, secHash = ""): string => {
+  // Family item hash at save time; the rule itself lives in model.ts
+  // (resolveMainGem) so it can be tested against the real table. `preferred` is
+  // the gem hash the config named — without it a family whose variants have
+  // different names (钳蟹的共鸣 / 永恒钳蟹因子) rewrites its untouched row to
+  // variants[0].
+  const hashFor = (name: string, secHash = "", preferred = ""): string => {
     const variants = groupedByKey.get(name)
     if (!variants || variants.length === 0) return ""
-    const pool = poolByMain.get(name)
-    if (pool && (secHash === "" || pool.lot.has(secHash))) return pool.poolHash
-    const fixed = secHash !== "" ? variants.find((v) => v.skill2 === secHash) : undefined
-    return fixed?.hash ?? pool?.poolHash ?? variants[0].hash
+    return resolveMainGem(variants, poolByMain.get(name), secHash, preferred)
   }
 
   // Stable callbacks + memoized arrays keep SlotRow memoization effective:
@@ -319,7 +316,7 @@ export default function App() {
     const cfg: { items: SavedItem[]; enabled: boolean }[] = []
     for (const s of slots) {
       if (s.mainHash === "") continue
-      const hash = hashFor(s.mainHash, s.secHash)
+      const hash = hashFor(s.mainHash, s.secHash, s.mainGem)
       // A gem the current sigil table cannot resolve would be written as an
       // empty id and make the mod reject the whole file: skip the row (it
       // already renders as empty in the editor).
