@@ -90,7 +90,6 @@
     <ClCompile Include="src\dllmain.cpp" />
     <ClCompile Include="src\exports.cpp" />
     <ClCompile Include="src\layout_resolver.cpp" />
-    <ClCompile Include="src\name_tables.cpp" />
     <ClCompile Include="src\runtime.cpp" />
     <ClCompile Include="src\runtime_state.cpp" />
     <ClCompile Include="src\safe_game_access.cpp" />

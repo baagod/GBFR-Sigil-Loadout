@@ -49,27 +49,13 @@ $packageDir = Join-Path $distRoot 'GBFR.PreEquippedSigils'
 $zipPath = Join-Path $distRoot "GBFR-Pre-Equipped-Sigils-$Version.zip"
 
 # --- release consistency gates ------------------------------------------------
-# Native contract: the character-restriction loader fails closed unless
-# gem.json carries exactly kExpectedCharacterRestrictionCount "character"
-# rows. Check it here so a data regeneration cannot silently break startup.
+# gem.json 是工具读的数据源，随包发布——必须在场，否则工具起来就没有因子表。
+# 「character 行必须正好 87 条」那道门**已删**：mod 侧已经没有这个数字（不是常量、不是断言、
+# 不是日志、也不是门禁）——"gem → 角色"由编译进去的注入表派生，见 MAINTENANCE §6。
 $sigilsPath = Join-Path $root 'Loadout\assets\gem.json'
-$nativeInternalPath = Join-Path $root 'GBFR.PreEquippedSigils.Native\native_internal.h'
 if (-not (Test-Path -LiteralPath $sigilsPath)) {
     throw "gem.json is missing: $sigilsPath"
 }
-$expectedMatch = [regex]::Match(
-    (Get-Content -LiteralPath $nativeInternalPath -Raw),
-    'kExpectedCharacterRestrictionCount\s*=\s*(\d+)')
-if (-not $expectedMatch.Success) {
-    throw 'kExpectedCharacterRestrictionCount was not found in native_internal.h.'
-}
-$expectedMappings = [int]$expectedMatch.Groups[1].Value
-$characterRows = ([regex]::Matches(
-    (Get-Content -LiteralPath $sigilsPath -Raw), '"character"\s*:')).Count
-if ($characterRows -ne $expectedMappings) {
-    throw "gem.json has $characterRows 'character' rows; the native loader expects $expectedMappings."
-}
-Write-Output "gem.json character rows: $characterRows (native loader expects $expectedMappings)."
 
 # --- data freshness gate ------------------------------------------------------
 # gem.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。

@@ -356,7 +356,9 @@ export function buildLoadoutPayload(
     if (s.mainHash === "") continue
     const hash = index.gemOf(s.mainHash, s.secHash, s.mainGem)
     if (hash === "") continue
-    const items: SavedItem[] = [{ gem: hash, level: s.mainLevel }]
+    // items[0] 同时写物品 hash 与它给的主词条：mod 不再持有因子表（那张表的唯一实现就是
+    // 本文件建的索引），所以主词条必须随载荷走。
+    const items: SavedItem[] = [{ gem: hash, hash: s.mainHash, level: s.mainLevel }]
     if (s.secHash !== "") items.push({ hash: s.secHash, level: s.secLevel })
     saved.push({ items, enabled: s.enabled })
   }
@@ -383,7 +385,7 @@ function slotsFromConfig(
     const items = Array.isArray(s.items) ? s.items : []
     const main = items[0] ?? {}
     const sec = items[1]
-    const mainHash = typeof main.gem === "string" ? main.gem : "" // items[0] has no "hash" variant (never written)
+    const mainHash = typeof main.gem === "string" ? main.gem : "" // 主词条由 configToSlots 从索引还原
     const secHash = sec && typeof sec.hash === "string" ? sec.hash : ""
     const mainLevel = typeof main.level === "number" ? main.level : DEFAULT_LEVEL
     const secLevel = sec && typeof sec.level === "number" ? sec.level : DEFAULT_LEVEL

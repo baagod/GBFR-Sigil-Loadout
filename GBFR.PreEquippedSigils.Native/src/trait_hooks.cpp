@@ -266,6 +266,10 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
                injected == expected ? ApplyResultAppliedDuringNativeRebuild
                                     : ApplyResultVirtualCopyFailed,
                std::memory_order_release);
+            // 游戏真的跑了这一代的构建循环、而且全部复制成功 —— 这才是"到位"的回执
+            // （装备页看的是这一份）。只匹配授权不算数，见 ScheduleSelectedStatusRebind。
+            if (injected == expected)
+               g_rebind_pending_signature.store(0, std::memory_order_release);
          }
       }
    }
@@ -338,6 +342,9 @@ uint64_t BuildLifecycleSignature(
 }
 }
 
+// 同一状态没到位时的补排间隔。落地即停，所以这个退避只在"请求丢了 / 游戏还没重建"时生效。
+inline constexpr uint64_t kRebindRetryBackoffMs = 1000;
+
 void ScheduleSelectedStatusRebind()
 {
    uint32_t character_hash = 0;
@@ -360,14 +367,12 @@ void ScheduleSelectedStatusRebind()
       return;
    }
 
-   const uint32_t previous_character =
-      g_observed_character_hash.exchange(character_hash, std::memory_order_acq_rel);
-   const uint64_t previous_status =
-      g_observed_status_address.exchange(status, std::memory_order_acq_rel);
-   const int32_t previous_context =
-      g_observed_status_context.exchange(identity.context_mode, std::memory_order_acq_rel);
-   const bool identity_changed = previous_character != character_hash ||
-      previous_status != status || previous_context != identity.context_mode;
+   // 观测值照旧更新（诊断与其它路径读它们），但"身份变没变"**不再**是放行条件：那正是缺陷所在——
+   // 同一个 (角色, 状态, 上下文) 只给一次机会，而那一次可能被丢掉（见下面 queued/in_flight 闸），
+   // 丢掉之后就再也没有补排，只能等用户去切一次上下文（切角色/切界面）。
+   g_observed_character_hash.store(character_hash, std::memory_order_release);
+   g_observed_status_address.store(status, std::memory_order_release);
+   g_observed_status_context.store(identity.context_mode, std::memory_order_release);
 
    const auto selection = GetSelection(character_hash);
    if (std::none_of(selection.begin(), selection.end(), [](uint32_t slot_id) {
@@ -380,24 +385,43 @@ void ScheduleSelectedStatusRebind()
       EraseAuthorizedStatus(status);
       return;
    }
-   if (HasMatchingAuthorizedSelection(status, identity, selection))
+   // 终点有两个条件，缺一不可：
+   //   ① 授权已匹配（mod 自己的数据结构对上了），**且** ② 这一份副本真的复制进了游戏状态。
+   // 只用①就停会留下窗口：实测"状态建立 → 装备/测试副本"之间隔了 25 秒，期间打开装备页是空的
+   // （2026-09-19，0xE7053919）。所以还在等副本（pending != 0）时不能停，要继续轻推。
+   //
+   // **不许**退回下面两种写法（都试过，都会留下那次空窗）：
+   //   - "每个身份只给一次机会"（`if (!identity_changed) return;`）：那一次被下面的
+   //     queued/in_flight 挡掉之后就永远不补排，只能等用户去切一次上下文（切角色/切界面）；
+   //   - "授权匹配即停"：授权早就匹配、副本却还没落地，装备页照样是空的。
+   if (g_rebind_pending_signature.load(std::memory_order_acquire) == 0 &&
+       HasMatchingAuthorizedSelection(status, identity, selection))
       return;
 
-   if (!identity_changed)
-      return;
-
-   const uint64_t signature =
-      BuildLifecycleSignature(character_hash, status, identity.context_mode, selection);
-   // 同一个状态只排一次重建。这个签名是"已经为它排过一次"的唯一记忆：走到这里已经保证
-   // 身份确实变了（上面那道门），所以它命中的是"来回切回同一个状态"，再排一次只是重复。
-   if (g_lifecycle_rebind_signature.exchange(signature, std::memory_order_acq_rel) == signature)
-      return;
-   // 真正挡住高频重排的是这两个：本拍已经有排队或在飞的重建，就不必再排一个。
+   // 本拍已有重建在排队或在飞：不叠请求。注意这里是**不认领**这次机会——下一拍还会走到这里，
+   // 所以被丢掉的那一次会被补上。（v0.6.0 之前这里之后就把签名记下并返回，等于把补排的门关上：
+   // 那就是"第一次打开装备页看不到配装、动一下才有"的根因。）
    if (g_queued_apply_request.load(std::memory_order_acquire) != 0 ||
        g_apply_in_flight.load(std::memory_order_acquire))
       return;
 
+   // 签名不再当闸：它只用来"状态变了就清退避"，让新状态能立刻试一次。
+   const uint64_t signature =
+      BuildLifecycleSignature(character_hash, status, identity.context_mode, selection);
+   if (g_lifecycle_rebind_signature.exchange(signature, std::memory_order_acq_rel) != signature)
+      g_lifecycle_rebind_not_before_ms.store(0, std::memory_order_release);
+
+   // 没到位就补排，但每秒最多一次（不是每拍）。到位即停，所以不会空转。
+   const uint64_t now = GetTickCount64();
+   if (now < g_lifecycle_rebind_not_before_ms.load(std::memory_order_acquire))
+      return;
+
    RequestHotApply(character_hash);
+   // 记下"在等这个签名的副本"：只有复制成功那条路径会清它（见上面的 generation 认领处）。
+   // 请求被 queued/in_flight 挡掉时不会走到这里，所以那句 return 是真的"不认领"。
+   g_rebind_pending_signature.store(signature, std::memory_order_release);
+   g_lifecycle_rebind_not_before_ms.store(
+      now + kRebindRetryBackoffMs, std::memory_order_release);
 }
 
 namespace

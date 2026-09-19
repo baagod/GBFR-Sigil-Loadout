@@ -1,4 +1,4 @@
-# 一条命令生成 docs\gem.xlsx（入库）、Loadout\assets\gem.json（mod 运行时也在读）与
+# 一条命令生成 docs\gem.xlsx（入库）、Loadout\assets\gem.json（工具运行时读）与
 # Loadout\assets\gem.lang.json（工具显示用的名字）。规则见 docs\gem.xlsx 生成文档.md。
 # 实现是仓库级共享的 Go 工程 D:\Games\Relink\gen（go run . sigils），本仓库不再放生成器。
 # 前置：共享 gen\ 下的 extracted\gbfr.db（提取全表，见文档 §1）与 GBFRDataTools\Data\ids.txt；数据目录自动向上找到。

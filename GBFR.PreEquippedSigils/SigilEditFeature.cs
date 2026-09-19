@@ -63,6 +63,9 @@ internal sealed class SigilEditFeature
     // File.GetLastWriteTimeUtc 就退出（元数据缓存里的一次查询）。
     private DateTime _handledUtc;
 
+    // 1 = 一次应用正在进行。宿主那条定时器的回调会并发触发，而一次应用可能扫 5-6 秒。
+    private int _applying;
+
     public SigilEditFeature(Action<string> log) => _log = log;
 
     /// <summary>
@@ -189,10 +192,14 @@ internal sealed class SigilEditFeature
         if (mtime == _handledUtc)
             return;
 
-        // 宿主那条定时器是单飞的（见 Mod.RunUpkeepTick），所以这里不会再被重入，不需要
-        // 自己上锁。先认领、再应用，顺序不能颠倒：否则一次失败的 Apply（它可能扫 5-6 秒）
-        // 会在每一拍重试同一份改动。代价是一次失败的 Apply 要等文件再变一次才重试——刻意
-        // 的，因为要让 Apply 返回结果并重试，得先想清楚 in-flight 与重试上限。
+        // 上一次应用还没跑完（可能正在扫 5-6 秒）：这一拍让过去，而且**不认领**这次的改动，
+        // 好让它在下一拍被处理。排队没有意义——那只会把两次长扫描串起来。
+        if (Interlocked.CompareExchange(ref _applying, 1, 0) != 0)
+            return;
+
+        // 先认领、再应用：这一行也是防重入的第二道锁（第一道是上面的 _applying），
+        // 不能挪到 Apply 之后。（代价：一次失败的 Apply 不会自己重试，要等文件再变一次；
+        //   这是刻意的——要让 Apply 返回结果并重试，得先想清楚 in-flight 与重试上限。）
         _handledUtc = mtime;
 
         try
@@ -202,6 +209,10 @@ internal sealed class SigilEditFeature
         catch (Exception ex)
         {
             _log("sigil edit hot apply EXCEPTION: " + ex);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _applying, 0);
         }
     }
 

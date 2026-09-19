@@ -19,11 +19,12 @@ const MaxSlots = 12
 // tool-hotkey.txt — all next to the exe) and
 // writes the player configuration (LOCALAPPDATA/GBFRPreEquippedSigils,
 // mirroring the mod's userCfgDir so mod updates never wipe it).
-// Protocol is shared with the mod: gem.json (merged sigil/trait table:
-// item rows hash != skill1, non-item skill rows hash == skill1; display names
-// live in the embedded gem.lang.json instead) and
-// loadout.json (player configuration: { lang, slots: [ { items: [ {gem, level},
-// {hash, level}? ], enabled } ] }; one shape, no other spelling is accepted).
+// Data: gem.json (merged sigil/trait table: item rows hash != skill1, non-item
+// skill rows hash == skill1; display names live in the embedded gem.lang.json
+// instead) is read here — the tool is its only reader, the mod keeps no sigil
+// table of its own. Written out is loadout.json (player configuration:
+// { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] };
+// one shape, no other spelling is accepted — so items[0] must carry the trait hash).
 type LoadoutService struct {
 	// 写盘只有 SaveLoadout 这一个出口，而它可能被并发调用：前端的自动保存会防抖，
 	// 但一次慢写（杀软扫 %LOCALAPPDATA%）会让两次保存在飞，而磁盘上留哪一份取决于
@@ -61,8 +62,8 @@ func (s *LoadoutService) GetHotkey() int {
 }
 
 type loadoutItem struct {
-	Gem   string `json:"gem"`  // items[0]: gem (物品) hash
-	Hash  string `json:"hash"` // items[1]: trait (词条) hash
+	Gem   string `json:"gem"`   // items[0]: gem (物品) hash
+	Hash  string `json:"hash"`  // items[0]: 该物品给的主词条；items[1]: 副词条
 	Level int    `json:"level"`
 }
 
@@ -124,7 +125,7 @@ func (s *LoadoutService) LoadSigils() (string, error) {
 // GemNames returns the display names for one language: {因子 hash: 名字}, sliced out
 // of the embedded gem.lang.json.
 //
-// 名字不挤进 gem.json（那份 mod 也在读），而是单独一份多语言文件；调用方只要当前那一种，
+// 名字不挤进 gem.json（工具每次启动都要读它），而是单独一份多语言文件；调用方只要当前那一种，
 // 与 EditService.SkillMap 同一个形状与理由。不认得的语言回落中文，单个词条缺名字时
 // 调用方回落成 hash——这里不猜。
 func (s *LoadoutService) GemNames(lang string) map[string]string {

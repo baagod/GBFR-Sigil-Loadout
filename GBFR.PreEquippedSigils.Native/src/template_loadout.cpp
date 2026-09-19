@@ -14,8 +14,8 @@ namespace
 // player's loadout.json only; no config means the exclusive slots with no
 // general sigils.
 //
-// Character-exclusive gems/traits follow gem.json (the tool's source):
-// T1/T2/war gem values are derived from it by docs/tool-gen-loadout.ps1.
+// Character-exclusive gems/traits follow gem.json (the tool's source): the table below is
+// derived from it by docs/tool-gen-loadout.ps1 at build time, so nothing is read at runtime.
 //
 // IMPORTANT: a "no second trait" gem must use trait2 = kUnwornCharacterHash
 // (0x887AE0B0, the "not selected" sentinel the game understands), NOT 0.
@@ -45,9 +45,23 @@ struct CharacterExclusiveLoadout
    uint32_t war_trait = 0; // war trait hash
 };
 
-// 专属表（角色 → 三个专属槽的 gem 与词条）由 docs/tool-gen-loadout.ps1 从 $chars 生成：
-// vcxproj 每次编译前重跑那个脚本，所以 .inc 是构建中间产物、不入库——改数据去改脚本。
+// 这张表（角色 → 三个专属槽的 gem 与词条）由 docs/tool-gen-loadout.ps1 从 $chars 生成：vcxproj
+// 每次编译前重跑那个脚本，所以 .inc 是构建中间产物、不入库——改数据去改脚本，源码里没有表段。
 #include "exclusive_table.inc"
+
+// 这个 gem 属于哪个角色：直接在**已经编译进来的注入表**里找，不另存一张"限制表"。那道校验只
+// 可能看到注入表自己的 gem（唯一调用点是 TryCopyTemplateGem），所以"gem → 角色"在这里只有一份
+// 来源——生成时已核对它与 gem.json 的 character 列一致（84 个不重复 gem，0 处不一致）。
+// 古兰/姬塔共用同 3 个 gem：谁先出现返回谁，由 IsCharacterCompatible 认这一对。
+uint32_t RequiredCharacterForGem(uint32_t gem_hash) noexcept
+{
+   for (const CharacterExclusiveLoadout& row : kCharacterExclusives)
+   {
+      if (row.t1_gem == gem_hash || row.t2_gem == gem_hash || row.war_gem == gem_hash)
+         return row.character_hash;
+   }
+   return 0;
+}
 
 // character_hash -> index into g_runtime_templates (built once in
 // InitializeRuntimeTemplates; ApplyLoadout never reorders/removes
@@ -260,7 +274,7 @@ bool TryCopyTemplateGem(
    // must still honor the character restrictions. Unrestricted gems pass for
    // any character (required hash == 0).
    if (!IsCharacterCompatible(
-          GetRequiredCharacterHash(template_slot.gem_id), character_hash))
+          RequiredCharacterForGem(template_slot.gem_id), character_hash))
       return false;
 
    GemData gem{};

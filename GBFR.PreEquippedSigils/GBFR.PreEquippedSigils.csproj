@@ -30,7 +30,8 @@
     <None Include="ModConfig.json" CopyToOutputDirectory="Always" />
     <None Include="README.md" CopyToOutputDirectory="Always" />
     <!-- 随包数据住在 mod 目录的 assets\ 下（与源码树的 Loadout\assets\ 同一布局，
-         所以仓库里只有这一份，也没有"开发副本"）。native 与 C# 都按 assets\gem.json 找它。 -->
+         所以仓库里只有这一份，也没有"开发副本"）。**只有工具按 exeDir()\assets\ 读它**：
+         native 的限制表已编译进 DLL，C# 只映射载荷。复制这一步是因为打包用的就是本工程的输出目录。 -->
     <None Include="..\Loadout\assets\gem.json"
           Link="assets\gem.json"
           CopyToOutputDirectory="PreserveNewest" />

@@ -118,8 +118,8 @@ describe("落盘载荷", () => {
     )
     expect(payload.lang).toBe("ja")
     expect(payload.slots).toHaveLength(2)
-    expect(payload.slots[0].items).toEqual([{ gem: main, level: 12 }])
-    expect(payload.slots[1].items).toEqual([{ gem: main, level: 15 }])
+    expect(payload.slots[0].items).toEqual([{ gem: main, hash: key, level: 12 }])
+    expect(payload.slots[1].items).toEqual([{ gem: main, hash: key, level: 15 }])
   })
 
   it("副因子写 hash 并带上自己的等级，enabled 原样保留", () => {

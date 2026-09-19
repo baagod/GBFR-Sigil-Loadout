@@ -124,7 +124,7 @@ TemplateGemSlot{
 2. `mix=1` 只能组合其 `lot` 因子或固定副，不匹配则无法组合。
 3. 其余普通因子均能互相组合。
 
-- UI：非法副词条灰显（`opacity-45`）、选中非法时 trigger 红框；**仅提示**——选择、自动保存、C# 解析与原生注入均不拦截（Go 仍做结构/等级范围校验，C# 做最终 cap 兜底）；已选非法副值**不会被清空**。
+- UI：非法副词条灰显（`opacity-45`）、选中非法时 trigger 红框；**仅提示**——选择、自动保存、C# 解析与原生注入均不拦截（等级上限只由前端按 cap 夹住；Go 只查结构与非负；C# 已不持有表、也不判上界）；已选非法副值**不会被清空**。
 - 方向键（↑/↓）不从 trigger 打开下拉列表（Base UI 默认行为已在捕获层禁用），留给字段/数字输入导航。
 - Esc：焦点在下拉/对话框内时只关闭它们（判断在**捕获阶段** keydown——Base UI 在 React 处理键时即卸载弹层，冒泡阶段再查会拿到脱离 DOM 的目标而误判）；其余情况隐藏窗口。
 - 装配 hash：pool 族（`lot != []`）各名字组只保留池版行 → 保存时按副因子选池版/固定版 hash（副命中池 `lot` → 池版；命中某变体 `skill2` → 该固定版；其余 → 池版，仅样式不阻断）；
@@ -137,7 +137,7 @@ TemplateGemSlot{
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
 - `trait_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
-- 角色限制改判据：`gem.json` 专属行 `character` 缺失或条目数 != 87 则启动失败。87 = 28 角色 × 3 专属 gem（古兰/姬塔共享合并）+ 3 条 `_74` 进阶；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
+- **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=18`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 词条 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
   **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
@@ -174,7 +174,7 @@ TemplateGemSlot{
 | 内部显示消息 WM_APP+0x10 | 0x8010 | C# Hotkey.cs / Go main.go |
 | 单实例互斥体名 | Local\GBFRPreEquippedSigilsTool | Go main.go |
 | 工具热键发布文件 | tool-hotkey.txt（exe 同目录，**不入 `assets\`**：它是 mod 运行时写的握手文件，不是随包数据） | C# Hotkey.cs / Go loadoutservice.go |
-| 随包数据位置 | `assets\gem.json`、`assets\gem.chara.json`（mod 目录下）。工具按 `exeDir()\assets\`、C# `LoadoutConfig` 与原生 `runtime.cpp` 按 mod 目录的 `assets\` —— **三处必须是同一条路径**（源码树里同样是 `Loadout\assets\`，所以两种布局只有一种） | Go loadoutservice.go / C# LoadoutConfig.cs / C++ runtime.cpp |
+| 随包数据位置 | `assets\gem.json`、`assets\gem.chara.json`（mod 目录下），**只有工具读**（`exeDir()\assets\`）：native 的限制表已编译进 DLL，C# 只映射载荷。源码树里同样是 `Loadout\assets\`，所以两种布局只有一种 | Go loadoutservice.go |
 | 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`gemedits.json`（因子编辑列表）。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
 | 因子编辑列表缺失 | 工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把原版表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
 | 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
@@ -187,4 +187,3 @@ TemplateGemSlot{
 | 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条词条自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
 | `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的词条 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |
 | 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 gem.json 测） | TS model.ts |
-| gem.json character 行数 | 87（发布前由 build-release.ps1 与 native_internal.h 对拍） | native_internal.h / build-release.ps1 |

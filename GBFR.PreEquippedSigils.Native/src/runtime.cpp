@@ -12,24 +12,6 @@ void Initialize()
    };
 
    g_image_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-   std::vector<wchar_t> module_path(32768, L'\0');
-   const DWORD module_length = GetModuleFileNameW(
-      g_module, module_path.data(), static_cast<DWORD>(module_path.size()));
-   if (module_length == 0 || module_length >= module_path.size())
-   {
-      SetRuntimeMessage("Could not resolve the native core directory.");
-      finish_initialization(false);
-      return;
-   }
-
-   const std::filesystem::path module_directory =
-      std::filesystem::path(module_path.data()).parent_path();
-   // Character restrictions live in the merged tool table (gem.json):
-   // exclusive rows carry a "character" field; scanned via the stable contract.
-   // 随包数据住在 mod 目录的 assets\ 下（与源码树的 Loadout\assets\ 同一布局）。
-   // Keep this path in sync with managed LoadoutConfig.cs (_sigilsPath).
-   const std::filesystem::path sigils_path =
-      module_directory / L"assets" / L"gem.json";
 
    const uint64_t executable_started = BeginStartupPhase("executable-validation");
    std::vector<wchar_t> executable_path(32768, L'\0');
@@ -52,18 +34,6 @@ void Initialize()
       return;
    }
    CompleteStartupPhase("executable-validation", executable_started, true);
-
-   const uint64_t restrictions_started = BeginStartupPhase("character-restrictions");
-   const bool restrictions_loaded = LoadCharacterRestrictions(sigils_path);
-   CompleteStartupPhase(
-      "character-restrictions", restrictions_started, restrictions_loaded);
-   if (!restrictions_loaded)
-   {
-      SetRuntimeMessage(
-         "Character restrictions (gem.json) are missing or incomplete; gameplay hooks were not installed.");
-      finish_initialization(false);
-      return;
-   }
 
    const uint64_t layout_started = BeginStartupPhase("semantic-layout-resolution");
    const bool layout_ready = ResolveGameLayout();

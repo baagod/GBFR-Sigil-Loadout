@@ -31,9 +31,6 @@ public sealed class Mod : IMod
     private SigilEditFeature? _sigilEdit;
     private bool _disposed;
     private int _startRequested;
-    // 1 = 一次维持正在跑。宿主那条定时器的回调会并发触发（见 RunUpkeepTick）。
-    private int _tickRunning;
-    private string? _lastTickFailure;
 
     public Action Disposing => Dispose;
 
@@ -92,7 +89,7 @@ public sealed class Mod : IMod
             {
                 Log($"Native core loaded without hooks: {NativeCore.GetRuntimeMessage()}");
             }
-            LoadoutConfig.Initialize(modDirectory, Log);
+            LoadoutConfig.Initialize(Log);
             InitializeHotkeyConfiguration(loader, modDirectory);
 
             // The sigil editor is independent of the native core: it only reads
@@ -106,7 +103,20 @@ public sealed class Mod : IMod
             CompleteStartupPhase("sigil-edit", sigilEditStarted);
 
             _tickTimer = new System.Threading.Timer(
-                _ => RunUpkeepTick(),
+                _ =>
+                {
+                    try
+                    {
+                        LoadoutConfig.Tick(Log);
+                        _sigilEdit?.Tick();
+                        Hotkey.Tick(Log);
+                        NativeCore.Tick();
+                    }
+                    catch
+                    {
+                        // The upkeep tick must never tear down the process.
+                    }
+                },
                 null,
                 TickIntervalMilliseconds,
                 TickIntervalMilliseconds);
@@ -159,45 +169,6 @@ public sealed class Mod : IMod
     {
         if (configurable is HotkeyConfig configuration)
             Hotkey.UpdateHotkey(configuration.VirtualKey);
-    }
-
-    /// <summary>
-    /// One upkeep pass.
-    ///
-    /// Single-flight: <see cref="System.Threading.Timer"/> does not wait for the previous
-    /// callback, while <see cref="SigilEditFeature.Tick"/> can spend seconds inside
-    /// HotApply's memory scan. Without this guard the three steps after it would run
-    /// concurrently with each other and with the next callback, and neither
-    /// LoadoutConfig's mtime gate nor Hotkey's polling is written for that. A skipped
-    /// pass loses nothing: every gate here re-checks the same file time next time round.
-    /// </summary>
-    private void RunUpkeepTick()
-    {
-        if (System.Threading.Interlocked.CompareExchange(ref _tickRunning, 1, 0) != 0)
-            return;
-        try
-        {
-            LoadoutConfig.Tick(Log);
-            _sigilEdit?.Tick();
-            Hotkey.Tick(Log);
-            NativeCore.Tick();
-        }
-        catch (Exception exception)
-        {
-            // The upkeep tick must never tear down the process - but a phase that dies
-            // every tick *silently* is a mod that "sometimes does nothing" with nothing in
-            // the log to go on. Report each distinct failure once and stay quiet after it.
-            string failure = exception.GetType().Name + ": " + exception.Message;
-            if (failure != _lastTickFailure)
-            {
-                _lastTickFailure = failure;
-                Log($"Upkeep tick failed; identical failures are not logged again: {exception}");
-            }
-        }
-        finally
-        {
-            System.Threading.Interlocked.Exchange(ref _tickRunning, 0);
-        }
     }
 
     private void Log(string message)
