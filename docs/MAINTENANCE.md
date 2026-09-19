@@ -140,20 +140,23 @@ TemplateGemSlot{
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
 - **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=19`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"。
-- **因子热应用走的是"一个地址"，不是扫描**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**全内存扫描只是兜底**：锚点解析不出来（别的游戏版本）或上面任何一道闸不过时才跑一次，代价只在那一步付。所以别再把"扫描"当常态去优化——常态是零扫描。
+- **因子热应用走的是"一个地址"，没有第二条路**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**没有兜底**：拒写就是这一局内存里那份不变，但表此前已经重新注册，所以编辑在游戏下一次解析、或重启后照样生效，而原生那句 refusal 会说明是哪一闸拦的。曾经有一条全内存扫描兜底，**已删**——机制上线后它一次都没跑过（日志里从没出现 `located … copy/copies`），而它证明不了唯一重要的那件事："这块缓冲区就是游戏在用的那块"静态证不出来。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 词条 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
   **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
   槽位由**原生侧**按词条 hash 认（`ExclusiveBitForTrait`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务工具的专属页。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
 - 缩进：native 3 空格、托管 4 空格。
-- `Mod.cs` 的维持 Tick 是**单飞**的（`RunUpkeepTick` 里的 Interlocked 守卫）：`SigilEditFeature.Tick` 里那条**兜底**全内存扫描要 5–6 秒（常态路径是一次原地写，毫秒级），而 `System.Threading.Timer` 不等上一次回调结束。拿掉守卫，另外三个阶段（`LoadoutConfig` 的 mtime 门、`Hotkey` 的轮询、`NativeCore.Tick`）就会互相并发——那些状态都不是为此写的。因为宿主已经单飞，`SigilEditFeature` 自己不需要第二把重入锁。
+- **维持 Tick 没有全局单飞闸**（`Mod.cs` 的 `System.Threading.Timer` 回调直接顺序跑四个阶段：`LoadoutConfig.Tick` → `SigilEditFeature.Tick` → `Hotkey.Tick` → `NativeCore.Tick`），而 `Timer` **不等**上一次回调结束。所以每个阶段都必须自己扛得住"上一拍还没跑完、下一拍又进来"。
+  - 今天只有 `SigilEditFeature` 自己扛：`_applying`（Interlocked）+ **先认领 `_handledUtc` 再应用**（见其 Tick）。它不是可选的，删掉就变成可重入（试过，随即回退）。
+  - `LoadoutConfig` / `Hotkey` / `NativeCore.Tick` **没有自己的守卫**，它们只在"没有任何一拍超过 250ms"这个前提下安全。
+  - **别加回全局单飞**：曾经有过（`Mod.cs` 的 `RunUpkeepTick` Interlocked 闸），它把当时那条 5–14 秒的内存扫描和另外三个阶段串成一串、把它们饿死，7907c56 撤掉了它并换回 `_applying`。那次扫描现在已删（见上），所以"串成长队"这条反对理由已经不存在——但**加回去依然要先量**：真正要回答的是"有没有哪一拍会超过 250ms"（`ProcessPendingHotApply` 那次同步状态重建是当前最可疑的一个），而不是"看起来都很快"。
 - `loadout.json` 只有 `SaveLoadout` 一个写入口，且是"后提交者胜"：提交时取递增序号，写盘前比对，过期的那一份直接放弃。别改成无序号裸写——一次慢写（杀软扫 %LOCALAPPDATA%）会让两次保存在飞，而磁盘内容取决于最后完成的那个 rename。
 
 ## 7. 已知限制与未来方向
 
 - 后续方向：物品权威组合表。
 - 扩展新角色 = 生成器数据表加条目 + 查该角色专属因子 hash。
-- 游戏更新后需回归：`layout_resolver` 锚点可能失效；日志出现 layout failed 时等更新方案或重新逆向。`table_slot.cpp` 的锚点同理，但**失效只是退化**：它拒绝解析、热应用落回全内存扫描，不会写错地方——所以那类日志后面跟着 `falling back to the full-memory scan` 时功能仍然可用，只是慢回去。
+- 游戏更新后需回归：`layout_resolver` 锚点可能失效；日志出现 layout failed 时等更新方案或重新逆向。`table_slot.cpp` 的锚点同理，但**失效只是退化，不会写错地方**：它拒绝解析，热应用记一行 `hot apply: FAIL - the native slot write refused (code -2 …)`，于是这一局内存里那份表不变。编辑不会丢——表在写之前已经重新注册过，所以游戏下一次解析、或重启后照样生效。**没有慢路径可退**：那条全内存扫描兜底已删（见 §6）。
 - `GBFR.SigilEdit` 已并入本 mod（见 §1）：两个 mod 同时装会让同一个 `skill_status` 表被两份 `IDataManager` 互相注册覆盖，所以发布说明里必须写"不要同时装"。
 
 ## 8. 背景与现状

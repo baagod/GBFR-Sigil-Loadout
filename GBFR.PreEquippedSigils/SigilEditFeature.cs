@@ -63,7 +63,7 @@ internal sealed class SigilEditFeature
     // File.GetLastWriteTimeUtc 就退出（元数据缓存里的一次查询）。
     private DateTime _handledUtc;
 
-    // 1 = 一次应用正在进行。宿主那条定时器的回调会并发触发，而一次应用可能扫 5-6 秒。
+    // 1 = 一次应用正在进行。宿主那条定时器的回调会并发触发，而一次应用要走一遍原生写入。
     private int _applying;
 
     public SigilEditFeature(Action<string> log) => _log = log;
@@ -97,7 +97,7 @@ internal sealed class SigilEditFeature
         // 就在这里认领，不能等到 finally：下面先建热应用（_hotApply 一旦非 null，tick 就会
         // 走 Apply 那条路），再调管理器的慢写入。Timer 的回调是不串行的，这中间进来的一拍
         // 会看到 _hotApply 已就绪而 _handledUtc 还是 default(0001-01-01)，于是当场引爆一次
-        // 5-6 秒的全内存扫描，并和这里的启动写撞在一起；它认领的 mtime 随后还会被 finally 覆盖。
+        // 应用，并和这里的启动写撞在一起；它认领的 mtime 随后还会被 finally 覆盖。
         // 门停在 default 会让第一个 tick 白跑一次（文件不存在时的时间戳是 1601-01-01，永不相等），
         // 所以认领必须早于一切可能的提前 return —— 放在 try 之前即满足这点。
         _handledUtc = readingUtc;
@@ -191,8 +191,8 @@ internal sealed class SigilEditFeature
         if (mtime == _handledUtc)
             return;
 
-        // 上一次应用还没跑完（可能正在扫 5-6 秒）：这一拍让过去，而且**不认领**这次的改动，
-        // 好让它在下一拍被处理。排队没有意义——那只会把两次长扫描串起来。
+        // 上一次应用还没跑完：这一拍让过去，而且**不认领**这次的改动，
+        // 好让它在下一拍被处理。排队没有意义——那只会把两次应用串起来。
         if (Interlocked.CompareExchange(ref _applying, 1, 0) != 0)
             return;
 
@@ -244,7 +244,7 @@ internal sealed class SigilEditFeature
 
     /// <summary>
     /// 热应用一次调用要的两样东西：游戏手里那份字节，和配置要求的字节。启动写没发生时
-    /// 这两者就不同，而扫描要找的是前者：它定位的是游戏加载的那份副本，不是工具想放进去的那份。
+    /// 这两者就不同。
     ///
     /// 编辑列表在这里重新读，所以造出来的是此刻的文件——tick 已经确认过它的文件时间变了。
     /// </summary>
