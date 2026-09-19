@@ -6,8 +6,8 @@ import {
 } from "@/components/ui/input-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { TraitPicker } from "./TraitPicker"
-import { DEFAULT_LEVEL, type Slot } from "./model"
-import type { T } from "./copy"
+import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "./model"
+import type { Messages } from "./messages"
 
 /* Fixed side columns + factor columns that eat all remaining width. */
 const GRID_COLS =
@@ -87,93 +87,87 @@ function LevelInput({
 }
 
 export const SlotRow = memo(function SlotRow({
-  index,
+  row,
   slot,
-  mainKeys,
-  mainKeySet,
-  traitHashes,
-  labels,
-  legalOfMain,
+  sigils,
   t,
-  maxOfMain,
-  maxOfSec,
   updateSlot,
 }: {
-  index: number
+  row: number
   slot: Slot
-  /** 主因子下拉的取值：每组的组键（该组变体共享的词条 hash）。 */
-  mainKeys: string[]
-  mainKeySet: Set<string>
-  traitHashes: string[]
-  labels: Record<string, string>
-  legalOfMain: (name: string) => Set<string>
-  t: T
-  maxOfMain: (h: string) => number
-  maxOfSec: (h: string) => number
+  /** 因子表的派生索引（下拉取值、显示名、上限、合法副集合）——一个对象替代七个 prop。 */
+  sigils: SigilIndex
+  t: Messages
   updateSlot: (i: number, patch: Partial<Slot>) => void
 }) {
-  const mainValid = slot.mainHash !== "" && mainKeySet.has(slot.mainHash)
-  const legal = mainValid ? legalOfMain(slot.mainHash) : new Set<string>()
+  const mainValid = slot.mainHash !== "" && sigils.mainKeySet.has(slot.mainHash)
+  // 主因子不是合法的组键时 legalOf 给的就是空集合，副下拉整列灰显。
+  const legal = sigils.legalOf(slot.mainHash)
   const secIllegal = mainValid && slot.secHash !== "" && !legal.has(slot.secHash)
   return (
     <div className={DATA_ROW}>
       <div>
         <Checkbox
           checked={slot.enabled}
-          aria-label={`${t.rowEnable} ${index + 1}`}
-          onCheckedChange={(v) => updateSlot(index, { enabled: v === true })}
+          aria-label={`${t.rowEnable} ${row + 1}`}
+          onCheckedChange={(v) => updateSlot(row, { enabled: v === true })}
         />
       </div>
       <div>
-        <span className="text-muted-foreground tabular-nums">{index + 1}</span>
+        <span className="text-muted-foreground tabular-nums">{row + 1}</span>
       </div>
       <div className="flex min-w-0 items-center gap-1.5 pr-2">
         <TraitPicker
           value={slot.mainHash}
-          traits={mainKeys}
-          labels={labels}
+          traits={sigils.mainKeys}
+          labels={sigils.labels}
           placeholder={t.pickTrait}
-          searchPlaceholder={t.search}
-          emptyLabel={t.empty}
+          searchPlaceholder={t.searchTrait}
+          emptyLabel={t.noMatch}
           onSelect={(v) =>
-            updateSlot(index, {
+            updateSlot(row, {
               mainHash: v,
               mainGem: "", // 换了主因子，存档里那个变体不再作数
-              mainLevel: Math.min(DEFAULT_LEVEL, maxOfMain(v)),
+              mainLevel: Math.min(DEFAULT_LEVEL, sigils.capOfMain(v)),
             })
           }
         />
         <LevelInput
           value={slot.mainHash ? slot.mainLevel : 0}
-          max={maxOfMain(slot.mainHash)}
+          max={sigils.capOfMain(slot.mainHash)}
           min={slot.mainHash ? 1 : 0}
-          label={`${t.headerPrimary} ${index + 1}`}
+          label={`${t.headerPrimary} ${row + 1}`}
           disabled={!slot.mainHash}
-          onLevel={(n) => updateSlot(index, { mainLevel: n })}
+          onLevel={(n) => updateSlot(row, { mainLevel: n })}
         />
       </div>
       <div className="flex min-w-0 items-center gap-1.5 pl-2">
         <TraitPicker
           value={slot.secHash}
-          traits={traitHashes}
-          labels={labels}
+          traits={sigils.traitHashes}
+          labels={sigils.labels}
           legal={legal}
           invalid={secIllegal}
           placeholder={t.none}
           noneOption
           noneLabel={t.none}
-          searchPlaceholder={t.search}
-          emptyLabel={t.empty}
+          searchPlaceholder={t.searchTrait}
+          emptyLabel={t.noMatch}
           disabled={!mainValid}
-          onSelect={(v) => updateSlot(index, { secHash: v, secLevel: v ? Math.min(DEFAULT_LEVEL, maxOfSec(v)) : 0 })}
+          onSelect={(v) =>
+            updateSlot(row, {
+              secHash: v,
+              secLevel: v ? Math.min(DEFAULT_LEVEL, sigils.capOfTrait(v)) : 0,
+            })
+          }
         />
         <LevelInput
           value={slot.secHash ? slot.secLevel : 0}
-          max={maxOfSec(slot.secHash)}
+          max={sigils.capOfTrait(slot.secHash)}
           min={slot.secHash ? 1 : 0}
-          label={`${t.headerSecondary} ${index + 1}`}
+          label={`${t.headerSecondary} ${row + 1}`}
           disabled={!slot.secHash || !mainValid}
-          onLevel={(n) => updateSlot(index, { secLevel: n })}
+          onLevel={(n) => updateSlot(row, { secLevel: n })}
         />
       </div>
     </div>

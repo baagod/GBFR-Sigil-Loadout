@@ -48,7 +48,7 @@ var embeddedSkillKO []byte
 var embeddedGemLang []byte
 
 // gemNamesByLang 按界面语言索引那份名字表（解码一次，之后各语言共用）。
-var gemNamesByLang = decode[map[string]string](embeddedGemLang)
+var gemNamesByLang = mustDecode[map[string]string](embeddedGemLang)
 
 // chara.lang.json 是角色名：{语言: {角色码: 名字}}，由 docs\tool-gen-texts.ps1 生成。
 //
@@ -56,7 +56,7 @@ var gemNamesByLang = decode[map[string]string](embeddedGemLang)
 var embeddedCharaLang []byte
 
 // charaNamesByLang 按界面语言索引那份角色名；键就是 gem.chara.json 的 player。
-var charaNamesByLang = decode[map[string]string](embeddedCharaLang)
+var charaNamesByLang = mustDecode[map[string]string](embeddedCharaLang)
 
 var app *application.App
 var win *application.WebviewWindow
@@ -135,7 +135,6 @@ var (
 	procGetWindowThreadProcessId   = user32.NewProc("GetWindowThreadProcessId")
 	kernel32                       = syscall.NewLazyDLL("kernel32.dll")
 	procCreateMutexW               = kernel32.NewProc("CreateMutexW")
-	procReleaseMutex               = kernel32.NewProc("ReleaseMutex")
 	procOpenProcess                = kernel32.NewProc("OpenProcess")
 	procQueryFullProcessImageNameW = kernel32.NewProc("QueryFullProcessImageNameW")
 	procCloseHandle                = kernel32.NewProc("CloseHandle")
@@ -181,13 +180,18 @@ var toolHidden atomic.Bool
 var returnFocusTo atomic.Uintptr
 
 // ensureSingleInstance: second launches activate the existing window and exit.
-func ensureSingleInstance() (release func()) {
+//
+// 只创建、不持有：单实例判断用的是 CreateMutexW 的 ERROR_ALREADY_EXISTS，全程没有
+// WaitForSingleObject，所以没有"释放"这一步可做（对一个本线程不拥有的互斥体调
+// ReleaseMutex 只会以 ERROR_NOT_OWNER 失败）。句柄也故意不 Close——命名对象活到
+// 进程退出为止，而这正是单实例判断需要的时间窗。
+func ensureSingleInstance() {
 	name, _ := syscall.UTF16PtrFromString(mutexName)
 	namePtr := uintptr(unsafe.Pointer(name))
 	handle, _, cerr := procCreateMutexW.Call(0, 0, namePtr)
 	if handle == 0 {
 		log.Printf("single-instance: mutex create failed (handle=0), continuing without lock")
-		return func() {}
+		return
 	}
 	if cerr == syscall.ERROR_ALREADY_EXISTS {
 		log.Printf("single-instance: existing instance detected, activating its window")
@@ -199,14 +203,10 @@ func ensureSingleInstance() (release func()) {
 		}
 		os.Exit(0)
 	}
-	return func() {
-		procReleaseMutex.Call(handle)
-	}
 }
 
 func main() {
-	releaseMutex := ensureSingleInstance()
-	defer releaseMutex()
+	ensureSingleInstance()
 
 	// The edit list's debounce lives in the service, so the shutdown hook needs
 	// the same instance the frontend is talking to.

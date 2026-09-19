@@ -12,7 +12,7 @@ namespace GBFR.PreEquippedSigils;
 /// </summary>
 internal static unsafe partial class NativeCore
 {
-    internal const int AbiVersion = 17;
+    internal const int AbiVersion = 18;
 
     private const string LibraryName = "GBFR.PreEquippedSigils.Native.dll";
     private static readonly object ResolverLock = new();
@@ -65,6 +65,8 @@ internal static unsafe partial class NativeCore
                     $"Native ABI mismatch: managed {AbiVersion}, native {abiVersion}."
                 );
             }
+            // 版本号一致还不够：结构体的封送尺寸才是真正跨过 ABI 的东西。
+            EnsureAbiLayout();
             log(StartupPhaseLine("native-library-load", nativeLibraryStarted, true));
             nativeLibraryCompleted = true;
             return GBFR20_Initialize() != 0;
@@ -90,15 +92,21 @@ internal static unsafe partial class NativeCore
         $"elapsed_ms={(long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds}.";
 
     /// <summary>
-    /// Applies a custom loadout (null restores the built-in template).
+    /// Applies one whole player configuration in a single native call: the general
+    /// slots plus the per-character exclusive switches. A null/empty half means
+    /// "none of it" (no general slots = built-in exclusive template only; no
+    /// switches = every exclusive enabled).
     /// </summary>
-    internal static bool ApplyCustomLoadout(TemplateSlotNative[]? slots)
+    internal static bool ApplyLoadout(
+        TemplateSlotNative[]? slots,
+        ExclusiveOverrideNative[]? overrides)
     {
-        return GBFR20_SetCustomLoadout(slots, (uint)(slots?.Length ?? 0)) != 0;
+        return GBFR20_ApplyLoadout(
+            slots,
+            (uint)(slots?.Length ?? 0),
+            overrides,
+            (uint)(overrides?.Length ?? 0)) != 0;
     }
-
-    internal static bool ApplyExclusiveOverrides(ExclusiveOverrideNative[]? overrides) =>
-        GBFR20_SetExclusiveOverrides(overrides, (uint)(overrides?.Length ?? 0)) != 0;
 
     internal static void Shutdown()
     {

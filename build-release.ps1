@@ -5,12 +5,42 @@ param(
     [ValidateSet('x64')]
     [string]$Platform = 'x64',
     [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
-    [string]$Version = '0.6.0'
+    [string]$Version
 )
 
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
+
+# --- version: one authority ---------------------------------------------------
+# ModConfig.json 是版本号的唯一权威源。脚本以前自己也有一个默认字面量，于是"脚本里那份"
+# 和"清单里那份"是两个真相源；而前端的 package.json / package-lock.json 根本没人管，
+# 工具里显示的版本可以一直停在旧值上。现在 -Version 只是发布时的可选覆盖手段。
+$manifestVersion = (Get-Content -LiteralPath (
+    Join-Path $root 'GBFR.PreEquippedSigils\ModConfig.json') -Raw | ConvertFrom-Json).ModVersion
+if (-not $Version) {
+    $Version = $manifestVersion
+}
+elseif ($Version -ne $manifestVersion) {
+    throw "Version mismatch: -Version $Version but ModConfig.json declares $manifestVersion."
+}
+$npmPackage = Get-Content -LiteralPath (
+    Join-Path $root 'Loadout\frontend\package.json') -Raw | ConvertFrom-Json
+if ($npmPackage.version -ne $Version) {
+    throw "Loadout\frontend\package.json declares $($npmPackage.version) but the release is $Version; bump it too."
+}
+# package-lock.json 不能 ConvertFrom-Json：它的 packages\ 映射有一个空字符串键，PowerShell
+# 会为此报错（"名称为空字符串的属性"）。所以按文本数这个版本号出现几次——它要出现两处
+# （根 version 与 packages 里那个空键的条目）。
+$npmLockText = Get-Content -LiteralPath (
+    Join-Path $root 'Loadout\frontend\package-lock.json') -Raw
+$npmLockHits = ([regex]::Matches(
+        $npmLockText, '"version":\s*"' + [regex]::Escape($Version) + '"')).Count
+if ($npmLockHits -lt 2) {
+    throw "Loadout\frontend\package-lock.json carries version $Version $npmLockHits time(s); both the root entry and the root-package entry need it. Bump it together with package.json."
+}
+Write-Output "Release version: $Version (ModConfig.json; package.json + package-lock.json agree)."
+
 $nativeProject = Join-Path $root 'GBFR.PreEquippedSigils.Native\GBFR.PreEquippedSigils.Native.vcxproj'
 $managedProject = Join-Path $root 'GBFR.PreEquippedSigils\GBFR.PreEquippedSigils.csproj'
 $managedOutput = Join-Path $root "GBFR.PreEquippedSigils\bin\$Configuration"
@@ -41,14 +71,6 @@ if ($characterRows -ne $expectedMappings) {
 }
 Write-Output "gem.json character rows: $characterRows (native loader expects $expectedMappings)."
 
-# The release manifest version must match the packaged version.
-$manifestVersion = (Get-Content -LiteralPath (Join-Path $root 'GBFR.PreEquippedSigils\ModConfig.json') -Raw |
-    ConvertFrom-Json).ModVersion
-if ($manifestVersion -ne $Version) {
-    throw "Version mismatch: -Version $Version but ModConfig.json declares $manifestVersion."
-}
-Write-Output "ModConfig.json version: $manifestVersion."
-
 # --- data freshness gates -----------------------------------------------------
 # 生成物必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
 #   gem.json             <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
@@ -58,6 +80,11 @@ $sigilsXlsx = Join-Path $root 'docs\gem.xlsx'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
     throw "gem.json freshness source is missing: $sigilsXlsx（该文件由 git 跟踪，缺失即检出异常；不得跳过一致性检查）"
+}
+# 生成器住在仓库**外面**（..\gen，不入本仓库），所以这道门禁只有在本机才跑得起来。
+# 与其让 `go run` 报一句看不懂的错，不如在这里说清原因。
+if (-not (Test-Path -LiteralPath (Join-Path $genDir 'main.go'))) {
+    throw "共享生成器不在 $genDir（它不在本仓库里）。gem.json 的一致性门禁靠它运行，所以本仓库无法单独完成一次发布构建：把 gen\ 放回仓库旁，或在有它的机器上构建。"
 }
 Push-Location $genDir
 try {
@@ -150,9 +177,13 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend build failed with exit code $LASTEXITCODE."
     }
-    # -buildvcs=false for the same reason the csproj turns SourceLink and the
-    # informational version off: Go otherwise stamps the commit sha and a
-    # "modified" flag into the binary.
+    # -buildvcs=false for the same reason the csproj keeps SourceLink and the
+    # commit revision out of the managed metadata: Go otherwise stamps the
+    # commit sha and a "modified" flag into the binary.
+    & go vet ./...
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tool go vet failed with exit code $LASTEXITCODE."
+    }
     & go test ./...
     if ($LASTEXITCODE -ne 0) {
         throw "Tool Go tests failed with exit code $LASTEXITCODE."
@@ -165,15 +196,16 @@ try {
     Pop-Location
 }
 
-# Keep the tool's dev-run data copies (git-ignored, next to the Go sources)
-# identical to the packaged ones, so a Loadout.exe run from Loadout/ can never
-# silently diverge from a release. Both sources are Loadout\assets\ itself
-# (the generators write them there), so their dev copies land beside the exe.
-foreach ($dataFile in @('gem.json', 'gem.chara.json')) {
-    Copy-Item -LiteralPath (Join-Path $root "Loadout\assets\$dataFile") `
-        -Destination (Join-Path $toolDir $dataFile) -Force
+# 随包数据只有一份：Loadout\assets\。工具按 exeDir()\assets\ 找它，所以从源码目录直接跑
+# （wails3 dev / Loadout\Loadout.exe）与跑打包出来的那份用的是同一布局——这里不需要任何
+# "开发副本"，以前那一步同步已经删掉。
+foreach ($staleData in @('gem.json', 'gem.chara.json')) {
+    $staleCopy = Join-Path $toolDir $staleData
+    if (Test-Path -LiteralPath $staleCopy) {
+        Remove-Item -LiteralPath $staleCopy -Force
+        Write-Output "Removed a stale dev copy outside assets\: Loadout\$staleData"
+    }
 }
-Write-Output 'Synced gem.json/gem.chara.json into Loadout/.'
 
 # 唯一的工具产物是 Loadout.exe（上面用 -o 指定）。谁要是拿裸 `go build` 做编译检查，
 # Go 会按模块名在源码旁落一个 loadouttool.exe——它不参与打包，纯属残留，顺手清掉。
@@ -234,8 +266,8 @@ foreach ($requiredFile in @(
     'GBFR.PreEquippedSigils.dll',
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
-    'gem.json',
-    'gem.chara.json'
+    'assets\gem.json',
+    'assets\gem.chara.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {

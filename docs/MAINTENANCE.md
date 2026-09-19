@@ -1,7 +1,7 @@
 # GBFR Pre-Equipped Sigils — 维护手册
 
 > 技术维护文档；用户向说明见 `README.md`。仓库根目录；源码 https://github.com/baagod/GBFR-Pre-Equipped-Sigils
-> 游戏版本 Granblue Fantasy: Relink Endless Ragnarok **2.0.5**；当前版本 **0.6.0**（ABI v17）；机制沿革见 §11。
+> 游戏版本 Granblue Fantasy: Relink Endless Ragnarok **2.0.5**；当前版本 **0.6.0**（ABI v18）；机制沿革见 §11。
 
 ## 1. 一句话说明
 
@@ -10,7 +10,7 @@
 （`GemData.WORN_BY` = 未装备）。战斗数值是真实本地效果（在线 = 作弊级，风险自负）。
 
 同一个 mod 还内置了**因子参数编辑器**（原独立 mod `GBFR.SigilEdit`）：从游戏归档读出 `skill_status.tbl`，
-按用户配置目录下的 `sigiledits.json` 改写其中的行；启动时经 `IDataManager` 交回，
+按用户配置目录下的 `gemedits.json` 改写其中的行；启动时经 `IDataManager` 交回，
 运行中则由宿主那条 250ms tick 按 mtime 门重写内存里那份表。两边互不相干：native 那半挂取值钩子，编辑器这半只动表。
 
 ## 2. 目录结构与文件职责
@@ -35,29 +35,37 @@ docs/
 GBFR.PreEquippedSigils/              C# 托管层（Reloaded-II 插件壳）。**工程根是平铺的：放进去的每个 .cs 都会被编译**
                                      （SDK 默认通配符，没有逐文件清单；要放生成代码得显式排除）
   Mod.cs                             生命周期、日志（时间戳）、250ms 维持 Tick；并启动下面的因子编辑
-  SigilEditFeature.cs                因子编辑（原 GBFR.SigilEdit mod，已并入）：读 sigiledits.json → 改写 skill_status 行，启动交 IDataManager，运行中覆写内存
+  SigilEditFeature.cs                因子编辑（原 GBFR.SigilEdit mod，已并入）：读 gemedits.json → 改写 skill_status 行，启动交 IDataManager，运行中覆写内存
   HotApply.cs                        按需把表写进内存：定位副本并覆写（内容锚点 + 全表比对），由 Tick 驱动
   TableLocator.cs                    内存扫描：挑锚点、遍历私有可写区域、比对与写回
   Native.cs                          kernel32 P/Invoke（VirtualQueryEx / Read|WriteProcessMemory / VirtualProtectEx）
-  Config.cs                          sigiledits.json 的形状（edits: enabled/key/level/values[10]）
+  Config.cs                          gemedits.json 的形状（edits: enabled/key/level/values[10]）
   UserConfig.cs                      用户配置目录（%LocalAppData%\GBFRPreEquippedSigils\）；与 Go 侧 userCfgDir() 算同一个字符串
   NativeCore.cs                      原生门面：ABI 校验/日志回调/Tick/Shutdown/消息读取/阶段日志
   NativeCore.Interop.cs              P/Invoke 声明（必须与 native_api.h 同步）
   LoadoutConfig.cs                   解析 loadout.json（通用槽 + exclusive 段）→ ABI
   Hotkey.cs                          系统热键：RegisterHotKey 优先、250ms 轮询兜底、热启动工具
   HotkeyConfig.cs                    热键配置页（Reloaded-II 启动器）
+  Configuration/                     Reloaded-II 启动器配置页的那套模板（Configurable / Configurator /
+                                     ConfiguratorMixinBase / Utilities）；HotkeyConfig 继承它，热键因此
+                                     能在启动器里改。Config.cs 刻意**不**实现这套接口（见该文件注释）
   ModConfig.json                     ModId/版本/描述（发布信息）
-  gem.json                           运行时因子表（合并单表；源文件在 Loadout\assets\gem.json，打包时复制到 mod 目录；见 §4.1）
-  gem.chara.json                     每角色专属因子表（生成器产物；源文件在 Loadout\assets\gem.chara.json，打包时复制到 mod 目录）
+  gem.json                           运行时因子表（合并单表；**唯一一份**在 Loadout\assets\gem.json，
+                                     打包时复制到 mod 目录的 assets\；见 §4.1）
+  gem.chara.json                     每角色专属因子表（生成器产物，同样唯一一份在 Loadout\assets\；
+                                     打包时复制到 mod 目录的 assets\）。**只有工具的专属页读它**：
+                                     专属开关经 ABI 以词条 hash 转发，是哪个槽由原生侧认
 GBFR.PreEquippedSigils.Native/       C++ 原生核心
-  native_api.h                       冻结的 C ABI（v17，8 个导出 + GemData 结构）
-  native_internal.h                  内部状态声明/常量（模板槽常量、预检字节等）
+  native_api.h                       冻结的 C ABI（v18，7 个导出 + GemData 结构；结构体尺寸有
+                                     static_assert，托管侧有对应的 Marshal.SizeOf 自检）
+  native_internal.h                  内部状态声明/常量（模板槽常量、全局状态与函数门面）
   src/
     dllmain.cpp                      DLL 入口（仅存模块句柄，loader-lock-safe）
     exports.cpp                      8 个 C 导出实现
     runtime.cpp                      初始化顺序编排 + 阶段日志
     runtime_state.cpp                全局原子/Log（带时间戳）/phase 机制/消息缓冲
-    layout_resolver.cpp              ★语义布局解析（2.0.5 锚点）
+    layout_resolver.cpp              ★语义布局解析（2.0.5 锚点 + 10 张预检字节表；那些表只本文件用，
+                                     所以住在这里的匿名命名空间，不进共享内部头）
     safe_game_access.cpp             ★SEH 安全内存读写、状态重建、授权提交
     trait_hooks.cpp                  ★注入核心：getter detour、natural bind、hot-apply 触发
     selection_store.cpp              角色选择存储、hot-apply 队列（generation 机制）
@@ -66,11 +74,15 @@ GBFR.PreEquippedSigils.Native/       C++ 原生核心
 Loadout/                            Wails v3 编辑器（Go 服务 + React 前端，打包进 Mod）
   main.go                            窗口/托盘/单实例/假隐藏与 0x8010 激活命令（陷阱见 §11）
   loadoutservice.go                  配装数据读写（sigils/exclusives/loadout；原子写 + 结构校验）；GemNames(lang)/CharaNames(lang) 交内嵌的多语言名（gem.lang.json / chara.lang.json）
-  editservice.go                     因子编辑：防抖落盘用户配置目录下的 sigiledits.json（mod 按 mtime 取走）
+  editservice.go                     因子编辑：防抖落盘用户配置目录下的 gemedits.json（mod 按 mtime 取走）
   assets/gem.lang.json             配装页显示用的多语言名（{语言: {因子 hash: 名字}}，编译期 go:embed；由 docs\tool-gen-sigils.ps1 生成，勿手改）
   assets/chara.lang.json           专属因子页的角色名（{语言: {PL 码: 名字}}，编译期 go:embed；由 docs\tool-gen-texts.ps1 生成，勿手改）
   assets/skill*.json                 因子编辑页内嵌的行数据与四语文本（编译期 go:embed；由 docs\tool-gen-skill-assets 生成，勿手改）
   frontend/src/                      UI（App 三个 Tab / SlotEditor / TraitPicker / ExclusivePanel / SigilEditPanel）
+  frontend/src/model.ts              loadout.json 与 gem.json 的信任边界，以及一张因子表的全部派生索引
+                                     （buildSigilIndex / buildLoadoutPayload）——纯函数、脱离 React 可测
+  frontend/src/messages.ts           全工具唯一的文案表（zh/en/ja/ko）；语言身份（LANGS / Lang / 切换键
+                                     标签 / 系统语言猜测）在 lang.ts
 ```
 
 `★` = 高风险区，除非明确任务需要，不要动。
@@ -111,7 +123,6 @@ Loadout/                            Wails v3 编辑器（Go 服务 + React 前�
 | 工具 | 作用 |
 |---|---|
 | `docs/tool-gen-loadout.ps1` | 内嵌每角色专属数据（Hash/T1/T2/War），从 gem.json 推导变体 hash 与 player 码；**写回** `template_loadout.cpp` 的 `kCharacterExclusives[]` 段并生成 `Loadout\assets\gem.chara.json`（内容不变则不重写，幂等）|
-| `docs/tool-gen-sigils-required.js` | **已删除，勿再寻找**（2026-09 字段对齐后失效；重跑会改坏 gem.json）。需重新规范化时从 gem.xlsx 重建 |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
 
 **改配装流程**：改 `tool-gen-loadout.ps1` 的 `$chars` 表 → 运行（替换 C++ 表段 `constexpr CharacterExclusiveLoadout kCharacterExclusives[] = {` … `};` 并同步 JSON，两者幂等）→ 编译 → 部署 → 验证（§6）。
@@ -153,7 +164,8 @@ TemplateGemSlot{
 
 ## 4.1 数据文件生成（mod 运行时表：gem.json）
 
-`gem.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\gem.json`（生成器与数据源都不入本仓库；步骤见 `docs\gem.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录）。
+`gem.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\gem.json`（生成器与数据源都不入本仓库；步骤见 `docs\gem.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录的 `assets\`）。
+**全仓库只有这一份**：工具按 `exeDir()\assets\` 找它，所以从源码目录直接跑（`Loadout\assets\` 就在 exe 旁边）与跑打包出来的那份用的是**同一布局**——不需要"开发副本"，也不需要回落查找。
 字段名与 `gem.xlsx` 表头一致（13 列）：`{ key, hash, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`（`character` 只在专属行出现）。
 显示名不在数据表里：`Loadout\assets\gem.lang.json` 一个文件按语言收着它们（`{语言: {因子 hash: 名字}}`，zh/en/ja/ko 各 203 条），工具经 `GemNames(lang)` 取当前语言那一份。
 
@@ -195,7 +207,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 
 ### 发布（版本号同步）
 
-1. 同改 `ModConfig.json` 的 `ModVersion`、`build-release.ps1` 默认 `$Version`，以及工具前端的 `Loadout\frontend\package.json`（连带 package-lock.json 的两处）；
+1. 改 `ModConfig.json` 的 `ModVersion`（**唯一权威源**），以及工具前端的 `Loadout\frontend\package.json` 与 `package-lock.json` 的两处（`version` 和 `packages[""].version`）；`build-release.ps1` 不再自带默认版本号，它从 ModConfig.json 读，并在这三份之间对拍，不一致直接失败；
 2. 全文档旧版本号残留扫描：本手册头部；发布描述素材从 git log 提炼；
 3. 重建（自动产出 zip）→ 部署 → 验证（§6）；Nexus 发布则同步描述。
 
@@ -215,10 +227,14 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 - `trait_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
 - 角色限制改判据：`gem.json` 专属行 `character` 缺失或条目数 != 87 则启动失败。87 = 28 角色 × 3 专属 gem（古兰/姬塔共享合并）+ 3 条 `_74` 进阶；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
-- ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=17`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。
-- **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = PL 码/角色 hash，内层 = 词条 hash→bool，兼容旧 `{t1,t2,war}`）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。PL 码要能认出来靠打包进 mod 目录的 `gem.chara.json`（`LoadExclusiveTable`）：这份表缺失时只有角色 hash 键生效。
+- ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=18`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"。
+- **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 词条 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
+  **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
+  槽位由**原生侧**按词条 hash 认（`ExclusiveBitForTrait`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务工具的专属页。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
 - 缩进：native 3 空格、托管 4 空格。
+- `Mod.cs` 的维持 Tick 是**单飞**的（`RunUpkeepTick` 里的 Interlocked 守卫）：`SigilEditFeature.Tick` 里那次全内存扫描要 5–6 秒，而 `System.Threading.Timer` 不等上一次回调结束。拿掉守卫，另外三个阶段（`LoadoutConfig` 的 mtime 门、`Hotkey` 的轮询、`NativeCore.Tick`）就会互相并发——那些状态都不是为此写的。因为宿主已经单飞，`SigilEditFeature` 自己不需要第二把重入锁。
+- `loadout.json` 只有 `SaveLoadout` 一个写入口，且是"后提交者胜"：提交时取递增序号，写盘前比对，过期的那一份直接放弃。别改成无序号裸写——一次慢写（杀软扫 %LOCALAPPDATA%）会让两次保存在飞，而磁盘内容取决于最后完成的那个 rename。
 
 ## 8. 保留但易被误判为"死代码"的机制
 
@@ -247,7 +263,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 
 ### 当前状态
 
-- **版本** v0.6.0（ABI v17）。入口配装：每角色专属 3 独立槽（T1/T2/战气，默认全开）+ 玩家通用槽（固定 12 行编辑器，无内置通用默认）。
+- **版本** v0.6.0（ABI v18）。入口配装：每角色专属 3 独立槽（T1/T2/战气，默认全开）+ 玩家通用槽（固定 12 行编辑器，无内置通用默认）。
 - 主控 + AI 角色都吃注入（明镜止水的守护/HP 吸收/追击/迅捷）——卸主槽因子测试确认。
 - 槽位/版本/数据改动后需同步：本手册头部、README×2、ModConfig、build-release.ps1。
 
@@ -256,6 +272,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 - WebView2 白闪的旧修法（托盘淡入 0.4.0、激活尺寸 nudge 0.5.3）已由**假隐藏**取代：X / 工具内热键 / Esc 不真隐藏窗口
   （`alpha=0` + `EnableWindow(FALSE)` + `WS_EX_TOOLWINDOW` 并清掉 Wails 强制的 `WS_EX_APPWINDOW`）；托盘 / 游戏热键 / 二次启动统一走 `0x8010 revealTool`；窗口尺寸只在创建时设一次。
 - status-owner 遥测 mid-hook（5 个只写原子量）0.5.2 已删（无消费者），勿恢复。
+- `g_lifecycle_signature_attempts` / `g_lifecycle_rebind_not_before_ms`（"重试 3 次 + 退避 1 秒"）已删：
+  `BuildLifecycleSignature` 的种子就是身份三元组 `status ^ (char<<32) ^ context_mode`，而身份没变时
+  `ScheduleSelectedStatusRebind` 在更早的地方就返回了——所以能走到那两个判据的调用必然已经把计数清零，
+  它们永远不成立。`g_lifecycle_rebind_signature` **留着**：它是"已经为这个状态排过一次"的唯一记忆，
+  现在直接用作判据（命中即返回），删了会变成每次状态变化都重排一次重建。
 - 古兰/姬塔共享 PL0000：面板合并一行，mod 按 PL 键扇出到两个角色（两者专属因子完全相同）。
 - 逐版变更明细见 git log，本节不再双份维护（发布描述素材同样从 git log 提炼，不落盘成仓库文件）。
 
@@ -292,14 +313,18 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 默认 Rel
 | 工具窗口标题 | GBFR Pre-Equipped Sigils | C# Hotkey.cs / Go main.go |
 | 内部显示消息 WM_APP+0x10 | 0x8010 | C# Hotkey.cs / Go main.go |
 | 单实例互斥体名 | Local\GBFRPreEquippedSigilsTool | Go main.go |
-| 工具热键发布文件 | tool-hotkey.txt（exe 同目录） | C# Hotkey.cs / Go loadoutservice.go |
-| 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`sigiledits.json`（因子编辑列表）。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
+| 工具热键发布文件 | tool-hotkey.txt（exe 同目录，**不入 `assets\`**：它是 mod 运行时写的握手文件，不是随包数据） | C# Hotkey.cs / Go loadoutservice.go |
+| 随包数据位置 | `assets\gem.json`、`assets\gem.chara.json`（mod 目录下）。工具按 `exeDir()\assets\`、C# `LoadoutConfig` 与原生 `runtime.cpp` 按 mod 目录的 `assets\` —— **三处必须是同一条路径**（源码树里同样是 `Loadout\assets\`，所以两种布局只有一种） | Go loadoutservice.go / C# LoadoutConfig.cs / C++ runtime.cpp |
+| 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`gemedits.json`（因子编辑列表）。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
 | 因子编辑列表缺失 | 工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把原版表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
 | 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
-| 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；两页的文案都四种齐全（配装页 copy.ts、因子编辑页 i18n.ts）。名字也四种齐全：配装页按当前语言取内嵌的 `gem.lang.json`（经 Go 的 `GemNames(lang)`），专属因子页的角色名取 `chara.lang.json`（`CharaNames(lang)`），因子编辑页取 `skill.<lang>.json` | TS App.tsx / copy.ts / i18n.ts / Go loadoutservice.go / docs\tool-gen-sigils.ps1 / docs\tool-gen-texts.ps1 |
+| 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；文案只有**一份** `messages.ts`（`Record<Lang, Messages>`，漏一种语言 tsc 就报错），语言身份（有哪些语言 / 切换键标签 / 系统语言猜测）在 `lang.ts`。名字也四种齐全：配装页按当前语言取内嵌的 `gem.lang.json`（经 Go 的 `GemNames(lang)`），专属因子页的角色名取 `chara.lang.json`（`CharaNames(lang)`），因子编辑页取 `skill.<lang>.json` | TS App.tsx / messages.ts / lang.ts / Go loadoutservice.go / docs\tool-gen-sigils.ps1 / docs\tool-gen-texts.ps1 |
 | 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |
 | 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48） | C# SigilEditFeature.cs（启动与热应用共用同一套偏移量） |
-| 原生 ABI 版本 | 17 | native_api.h / C# NativeCore.cs AbiVersion |
-| 原生结构尺寸 | TemplateSlot 0x18 / ExclusiveOverride 0x08 | native_api.h static_assert / C# native 侧 runtime 校验 |
-| 等级范围校验 | 前端 1..cap（空槽显示 0）；Go 结构校验 0..200；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
+| 原生 ABI 版本 | 18 | native_api.h / C# NativeCore.cs AbiVersion |
+| 原生结构尺寸 | TemplateSlot 0x18 / ExclusiveOverride 0x0C | native_api.h static_assert / C# EnsureAbiLayout（Marshal.SizeOf，加载后即对拍） |
+| 原生导出口 | 7 个：GetAbiVersion / SetLogCallback / Initialize / Tick / Shutdown / CopyRuntimeMessage / ApplyLoadout | native_api.h |
+| 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条词条自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
+| `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的词条 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |
+| 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 gem.json 测） | TS model.ts |
 | gem.json character 行数 | 87（发布前由 build-release.ps1 与 native_internal.h 对拍） | native_internal.h / build-release.ps1 |

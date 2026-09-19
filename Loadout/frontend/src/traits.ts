@@ -2,7 +2,7 @@
   工具的纯逻辑半边：一条记录里凡是由值单独决定的部分都在这，不碰 React，也不碰 DOM，
   所以能独立阅读、独立测试。
 
-  行列表的形状也留在这里（地址、槽、一个因子各等级的排序），因为 sigiledits.json 和 mod 的
+  行列表的形状也留在这里（地址、槽、一个因子各等级的排序），因为 gemedits.json 和 mod 的
   表行正是按这个形状索引的——见 dedupe 的说明，那是整个列表赖以为生的不变量。
 */
 
@@ -46,7 +46,7 @@ export const addressOf = (key: string, level: number) => `${key}#${level}`;
  * 一条记录到底算不算编辑，这决定了它会不会被保存。
  *
  * 两件事就能让它算：被勾选，或者带着数字。两者都没有的记录，是用户勾了又取消的那一行，
- * sigiledits.json 里不会有这样的行。
+ * gemedits.json 里不会有这样的行。
  */
 export const isEdit = (record: SigilTrait) =>
   record.enabled || record.values.some((value) => value !== null);
@@ -66,7 +66,7 @@ export const trimGameValues = (
 
 /**
  * 把记录变成编辑：只放着游戏数值的槽清空，之后完全不算编辑的记录丢掉。进出这个列表的
- * 每条路径都经过这里，所以列表、sigiledits.json 和游戏对"什么算编辑"的看法一致。
+ * 每条路径都经过这里，所以列表、gemedits.json 和游戏对"什么算编辑"的看法一致。
  */
 export const asEdits = (records: SigilTrait[], info: Record<string, TraitInfo>) =>
   records
@@ -84,7 +84,7 @@ export const pad = (values: (number | null)[]) =>
 
   mod 按顺序遍历编辑列表，把每条已启用的编辑写进它 (因子哈希, 等级) 指定的表行，所以
   两条共享同一地址时，游戏最终拿到的是最后一条已启用的（PatchRows，SigilEditFeature.cs）。文件里
-  仍可能同时留着两条——旧版本工具写的，或者有人手改了 sigiledits.json——而列表只能显示其中
+  仍可能同时留着两条——旧版本工具写的，或者有人手改了 gemedits.json——而列表只能显示其中
   一条，于是保留最后一条已启用的（该地址一条已启用的都没有时，保留最后一条，不论启用
   与否）。
 */
@@ -236,7 +236,7 @@ export function parentState(
 }
 
 /**
- * 名字搜索：输入的内容出现在名字里，或者就是表和 sigiledits.json 索引该因子用的哈希时，
+ * 名字搜索：输入的内容出现在名字里，或者就是表和 gemedits.json 索引该因子用的哈希时，
  * 这个因子就留下（手工把某一行弄上屏幕靠的就是后者）。
  */
 export const matches = (label: string, key: string, needle: string) =>
@@ -250,7 +250,7 @@ export type ExplainBand = [level: number, text: string];
  *
  * 这些分段由游戏自己的行折叠而来：多数技能每一级的说法相同，有些中途会变——一个 30 级的
  * 抗性到 29 级都写"受到的伤害-{0}%"，30 级写"…免疫"——还有一个技能有六个分段。最后一个
- * 分段之后的等级（只有手改 sigiledits.json 才能指名）用的还是同一条规则，没有额外处理：没有
+ * 分段之后的等级（只有手改 gemedits.json 才能指名）用的还是同一条规则，没有额外处理：没有
  * 分段匹配，就由最后一个分段回答。
  */
 export const explainAt = (bands: ExplainBand[] | undefined, level: number) =>

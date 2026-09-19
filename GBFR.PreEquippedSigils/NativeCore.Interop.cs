@@ -33,21 +33,51 @@ internal static unsafe partial class NativeCore
         public int SigilLevel;
     }
 
-    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-    private static extern int GBFR20_SetCustomLoadout(TemplateSlotNative[]? slots, uint count);
-
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     internal struct ExclusiveOverrideNative
     {
         public uint CharacterHash;
-        public byte DisableT1;
-        public byte DisableT2;
-        public byte DisableWar;
-        public byte Reserved;
+        /// <summary>
+        /// 被切换的那个词条 hash。它的**身份**就是槽位：原生侧拿它去专属表里认这是
+        /// T1、T2 还是战气，所以托管侧不必知道这个映射，也不必读 gem.chara.json。
+        /// </summary>
+        public uint TraitHash;
+        public byte Disabled;
+        // 3 个保留字节把步长补到 4 的倍数（native_api.h 的 static_assert 是 0x0C）。
+        public byte Reserved0;
+        public byte Reserved1;
+        public byte Reserved2;
     }
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-    private static extern int GBFR20_SetExclusiveOverrides(
+    private static extern int GBFR20_ApplyLoadout(
+        TemplateSlotNative[]? slots,
+        uint slotCount,
         ExclusiveOverrideNative[]? overrides,
-        uint count);
+        uint overrideCount);
+
+    /// <summary>
+    /// 托管侧的 ABI 布局自检，与 native_api.h 的 static_assert 一一对应。
+    ///
+    /// 版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"——而后者才是结构体错位最
+    /// 可能发生的方式（native_api.h 一直有 static_assert，C# 这边此前只有版本号）。
+    /// 尺寸不符与版本不符同样处理：抛异常 → 整套 hook 不装（fail-closed）。
+    ///
+    /// 用 Marshal.SizeOf 而不是 sizeof：这里要验证的是**封送器实际会写多少字节**，
+    /// 那正是跨过 ABI 的东西。
+    /// </summary>
+    internal static void EnsureAbiLayout()
+    {
+        AssertSize("TemplateSlot", 0x18, Marshal.SizeOf<TemplateSlotNative>());
+        AssertSize("ExclusiveOverride", 0x0C, Marshal.SizeOf<ExclusiveOverrideNative>());
+    }
+
+    private static void AssertSize(string name, int expected, int actual)
+    {
+        if (actual != expected)
+            throw new InvalidOperationException(
+                $"ABI layout mismatch: {name} marshals as {actual} bytes but native_api.h "
+                + $"declares {expected}."
+            );
+    }
 }

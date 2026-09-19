@@ -17,7 +17,7 @@
 ## 因子编辑（原 GBFR.SigilEdit）
 
 同一个 mod 内置了**因子参数编辑器**：工具（`Loadout.exe`）的 **"因子编辑"页**改的是因子的等级数值，
-改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\sigiledits.json`（与配装 loadout.json 同一个目录），运行中的游戏随即重写内存里那张 `skill_status` 表，不用重启。
+改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\gemedits.json`（与配装 loadout.json 同一个目录），运行中的游戏随即重写内存里那张 `skill_status` 表，不用重启。
 
 - 它**不带 `.tbl` 文件**：表从游戏归档里读、在内存里改，所以能和其他改表 mod 并存。
 - 改动时游戏内该因子的**说明**即时更新；**实际效果**在下一场战斗开始时生效。

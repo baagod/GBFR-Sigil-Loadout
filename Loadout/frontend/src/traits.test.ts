@@ -1,5 +1,5 @@
 /*
-  列表赖以为生的规则，直接驱动而不是过浏览器：决定 sigiledits.json 最终内容的正是这些规则，
+  列表赖以为生的规则，直接驱动而不是过浏览器：决定 gemedits.json 最终内容的正是这些规则，
   所以这里的一张表比再来一张截图值钱。
 
   第一块是促使写下这个文件的那次回归：输入 0.5 曾经以 5 写进表里，因为 "0." 被当成数字，
@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addressOf,
+  asEdits,
   dedupe,
   explainAt,
   HALF_TYPED,
@@ -242,8 +243,28 @@ describe("what counts as an edit", () => {
 
   it("drops a record that is neither switched on nor carrying a number", () => {
     // 勾了又取消的等级，或者数值又被清空的等级：没有东西可写，
-    // sigiledits.json 不会为它保留任何行。
+    // gemedits.json 不会为它保留任何行。
     expect(isEdit(record("A1", 15, false))).toBe(false);
+  });
+
+  /*
+    上面三条说的是规则，下面两条说的是"清空输入框"这件事**只能**按那条规则走。
+
+    asEdits 是唯一的闸口（见 traits.ts 的注释），而这正好是它此前没有测试的一个情形：
+    面板里曾经另有一条只按"还有没有数字"判断的规则，于是清空输入框会顺手把用户勾上的
+    那一下也撤销掉——勾选同时也是置顶排序的键，所以那一行还会当场掉下去。
+  */
+  it("清空最后一个数值不会撤销用户勾上的那一下", () => {
+    // 勾选是"把它送进游戏"的那个动作；清空输入框只是把数值还给游戏自己的值。
+    // 所以这条记录仍然是编辑：它留在列表里、勾选框仍然勾着、也仍然在置顶区。
+    const tickedThenCleared = { ...record("A1", 15, true), values: pad([]) };
+    expect(asEdits([tickedThenCleared], {})).toEqual([tickedThenCleared]);
+  });
+
+  it("只输入过、又清空了的记录会被丢掉", () => {
+    // 没有勾选、也没有数字：什么都没有留下，所以它（连同那个输入框）回到游戏自己的数值。
+    const typedThenCleared = { ...record("A1", 15, false), values: pad([]) };
+    expect(asEdits([typedThenCleared], {})).toEqual([]);
   });
 });
 
@@ -374,7 +395,7 @@ describe("the explanation a level shows", () => {
   });
 
   it("reads the last band for a level past the end, and the first below the start", () => {
-    // 只有手改 sigiledits.json 才能指名这两种情况，而同一条规则覆盖了它们。
+    // 只有手改 gemedits.json 才能指名这两种情况，而同一条规则覆盖了它们。
     expect(explainAt(resistance, 99)).toBe("灼热免疫");
     expect(explainAt([[15, "Lv15 起"]], 3)).toBe("Lv15 起");
   });

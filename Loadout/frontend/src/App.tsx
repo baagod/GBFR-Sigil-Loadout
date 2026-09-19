@@ -4,14 +4,32 @@ import { ButtonGroup } from "@/components/ui/button-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
 import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames } from "../bindings/loadouttool/loadoutservice"
-import { copy } from "./copy"
-import { LANGS, LANG_LABEL, initialLang, type Lang } from "./i18n"
-import { DEFAULT_HIDE_KEY, DEFAULT_LEVEL, configToSlots, pad12, parseExclusiveTable, resolveMainGem, sanitizeExclusiveState, type Exclusive, type ExclusiveState, type SavedItem, type Sigil, type Slot, type Trait } from "./model"
+import { messages, type Messages } from "./messages"
+import { LANGS, LANG_LABEL, initialLang, type Lang } from "./lang"
+import { DEFAULT_HIDE_KEY, buildLoadoutPayload, buildSigilIndex, configToSlots, itemRowsOf, pad12, parseExclusiveTable, parseSigilRows, sanitizeExclusiveState, traitTableOf, type Exclusive, type ExclusiveState, type Sigil, type Slot, type Trait } from "./model"
 import { SlotRow, HEADER_ROW } from "./SlotEditor"
 import { ExclusivePanel } from "./ExclusivePanel"
 import { SigilEditPanel } from "./SigilEditPanel"
 
 type TabKey = "general" | "exclusive" | "sigilEdit"
+
+/** 外壳唯一的一条失败通道：谁失败都只是把它写进这里，屏幕上只可能显示一条。 */
+type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }
+
+function failureText(failure: Failure, t: Messages): string {
+  switch (failure.kind) {
+    case "sigil":
+      return t.sigilFail(failure.error)
+    case "config":
+      return t.configFail(failure.error)
+    case "exclusive":
+      return t.exclFail(failure.error)
+    case "save":
+      return t.saveFail(failure.error)
+    case "tables":
+      return t.tablesNotReady
+  }
+}
 
 // 配装那两页共用的滚动盒子：整个面板自己滚，所以每页各留一份滚动位置。
 // 因子编辑不套它——那一页自带内边距与滚动，套上就是两层滚动。
@@ -21,7 +39,7 @@ export default function App() {
   const [traits, setTraits] = useState<Trait[]>([])
   const [sigils, setSigils] = useState<Sigil[]>([])
   const [slots, setSlots] = useState<Slot[]>([])
-  const [status, setStatus] = useState("")
+  const [failure, setFailure] = useState<Failure | null>(null)
   const [tab, setTab] = useState<TabKey>("general")
   const [exclusiveTable, setExclusiveTable] = useState<Exclusive[]>([])
   const [exclusiveState, setExclusiveState] = useState<ExclusiveState | undefined>(undefined)
@@ -32,101 +50,96 @@ export default function App() {
   const [charaNames, setCharaNames] = useState<Record<string, string>>({})
   const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
   const [lang, setLang] = useState<Lang>(initialLang) // persisted in loadout.json
-  // 一个开关管全部页面：配装那两页读 copy.ts，因子编辑页读 i18n.ts。
-  const t = copy[lang]
-  // First render + first load must not write loadout.json: the preset stays
-  // active until the user actually edits something.
-  const skipSave = useRef(true)
+  // 整个工具一份文案（messages.ts）；换成别的语言只是换一个索引。
+  const t = messages[lang]
+
+  // 因子表的一切派生关系构造一次（可脱离 React 测试）。
+  const index = useMemo(() => buildSigilIndex(sigils, traits, names), [sigils, traits, names])
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  // Set when loadout.json could not be read: autosave must never overwrite a
-  // configuration the editor never managed to load.
-  const configLoadError = useRef<unknown>(null)
+  // 落盘要读"当前"状态，而定时器是在某一次渲染里排的，所以状态从 ref 取而不是让
+  // 闭包捕获。
+  const latest = useRef({ slots, index, lang, exclusiveState })
+  latest.current = { slots, index, lang, exclusiveState }
+
+  /*
+    自动保存只由**编辑**触发，不由状态变化触发。
+
+    以前它挂在 [slots, lang, exclusiveState] 上，于是"首次加载不写盘"只能靠一个一次性
+    旗标去赌"哪一次状态更新先把它消费掉"——加载过程中任何一次额外的 setState 都会让
+    启动变成一次写盘（旧版本那次 exclusive 迁移就是这么把用户配置改坏的）。现在没有
+    旗标：加载不调用任何编辑处理器，所以它根本排不出保存。
+  */
+  // 落盘：状态全部从 latest.current 读，所以这个回调没有任何响应式依赖，也不会读到旧值。
+  const saveNow = useCallback(async () => {
+    const current = latest.current
+    if (current.index.mainKeys.length === 0 || current.index.traitHashes.length === 0) {
+      setFailure({ kind: "tables" })
+      return
+    }
+    try {
+      const payload = buildLoadoutPayload(
+        current.slots,
+        current.index,
+        current.lang,
+        current.exclusiveState
+      )
+      await SaveLoadout(JSON.stringify(payload, null, 2))
+      // 只清掉"保存失败"这一条：加载期别的失败跟这次保存没有关系。
+      setFailure((prev) => (prev?.kind === "save" ? null : prev))
+    } catch (e) {
+      setFailure({ kind: "save", error: e })
+    }
+  }, [])
+
+  const scheduleSave = useCallback(() => {
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => void saveNow(), 300)
+  }, [saveNow])
 
   useEffect(() => {
-    ;(async () => {
-      // Merged single table: item rows (hash != skill1) + non-item skill rows.
-      let sigilsLoaded: Sigil[] = []
-      let traitsLoaded: Trait[] = []
-      // Independent reads start together; LoadConfig needs the sigil table.
-      const exclusivesPromise = LoadExclusives()
-      exclusivesPromise.catch(() => {}) // handled below; avoid an unhandled rejection
-      const hotkeyPromise = GetHotkey().catch(() => DEFAULT_HIDE_KEY)
+    void (async () => {
+      // 三份独立读取一起发出；只有 LoadConfig 要先拿到因子表（它要把存档里的
+      // gem 翻译成组键、并按 cap 夹等级）。
+      const exclusives = LoadExclusives()
+      exclusives.catch(() => {}) // 稍后才 await 它；先挂上处理，免得出现未处理拒绝
+      const hotkey = GetHotkey().catch(() => DEFAULT_HIDE_KEY)
+
+      let sigilTable: Sigil[] = []
+      let traitTable: Trait[] = []
       try {
-        const sigilJson = await LoadSigils()
-        const rows = (JSON.parse(sigilJson).sigils as Partial<Sigil>[]) ?? []
-        // Trait list = one row per trait hash (first row wins: the item named
-        // after the trait); EN label uses the item EN name when present.
-        const traitById = new Map<string, Trait>()
-        for (const s of rows) {
-          if (!s.skill1 || traitById.has(s.skill1)) continue
-          if (s.player) continue // exclusive-slot sigils: traits never offered
-          traitById.set(s.skill1, {
-            hash: s.skill1,
-            // 显示名来自命名它那一行的物品名，所以取名字时用那一行的 hash。
-            gem: s.hash ?? "",
-            cap: s.cap ?? DEFAULT_LEVEL,
-          })
-        }
-        traitsLoaded = [...traitById.values()]
-        setTraits(traitsLoaded)
-        // Item rows only (hash != skill1): non-item skill rows stay in the
-        // trait list above but never appear as pickable sigils.
-        sigilsLoaded = rows
-          .filter((s) => s.hash !== s.skill1)
-          .map((s) => ({
-            hash: s.hash ?? "",
-            skill1: s.skill1 ?? "",
-            player: s.player ?? "",
-            onlyone: s.onlyone ?? "",
-            mix: s.mix ?? "",
-            lot: s.lot?.length ? s.lot : undefined,
-            skill2: s.skill2 || undefined,
-          }))
-        setSigils(sigilsLoaded)
+        const rows = parseSigilRows(await LoadSigils())
+        traitTable = traitTableOf(rows)
+        sigilTable = itemRowsOf(rows)
+        setTraits(traitTable)
+        setSigils(sigilTable)
       } catch (e) {
-        setStatus(t.sigilFail(e))
+        setFailure({ kind: "sigil", error: e })
       }
 
-      await reloadConfig(sigilsLoaded, traitsLoaded)
       try {
-        const exclusiveJson = await exclusivesPromise
-        const table = parseExclusiveTable(JSON.parse(exclusiveJson))
-        setExclusiveTable(table)
-        // Migrate legacy exclusive entries (character-hash keys + t1/t2/war)
-        // to the player-keyed shape; otherwise they render as all-enabled and
-        // the first toggle would silently re-enable the disabled factors.
-        setExclusiveState((prev) => {
-          if (!prev) return prev
-          const byHash = new Map(table.map((e) => [e.hash, e]))
-          const out: ExclusiveState = {}
-          let migrated = false
-          for (const [key, entry] of Object.entries(prev)) {
-            const row = byHash.get(key)
-            if (!row) {
-              out[key] = entry
-              continue
-            }
-            const merged = { ...(out[row.player] ?? {}) }
-            const legacy = entry as Record<string, unknown>
-            const [t1, t2, war] = row.gems.map(([, skill]) => skill)
-            merged[t1] = legacy.t1 !== false
-            merged[t2] = legacy.t2 !== false
-            merged[war] = legacy.war !== false
-            out[row.player] = merged
-            migrated = true
-          }
-          return migrated ? out : prev
-        })
+        applyConfig(JSON.parse(await LoadConfig()), sigilTable, traitTable)
       } catch (e) {
-        setStatus(t.exclFail(e))
+        setFailure({ kind: "config", error: e })
+        // 读不出来也要铺满行：空表和"读失败"是两件事，而屏幕上 0 行看起来像后者
+        // 什么都没发生。
+        setSlots(pad12([]))
       }
-      setHideKey(await hotkeyPromise)
+
+      try {
+        setExclusiveTable(parseExclusiveTable(JSON.parse(await exclusives)))
+      } catch (e) {
+        setFailure({ kind: "exclusive", error: e })
+      }
+
+      setHideKey(await hotkey)
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态，重跑没有意义。这里也刻意不
+    // 读 t——文案在渲染时由 failureText 取，所以没有语言依赖会把这一跑重新触发。
   }, [])
 
   // 显示名按语言取（内嵌的 gem.lang.json / chara.lang.json）。换语言就重取一次，
-  // 取不到名字的条目由 hashLabels 回落成 hash——看得见但不好看，总比显示一个别的
+  // 取不到名字的条目由 TraitPicker 回落成 hash——看得见但不好看，总比显示一个别的
   // 语言的名字强。
   useEffect(() => {
     let cancelled = false
@@ -146,151 +159,27 @@ export default function App() {
     }
   }, [lang])
 
-  const traitByName = useMemo(() => new Map(traits.map((tr) => [tr.hash, tr])), [traits])
-
-  // 主因子的分组：同一词条的变体归一组，组键就是那条词条的 hash。以前按显示名分，
-  // 而名字现在按语言变、不能再当键；同一个名字的那些本来也共享一条词条。
-  const groupedByKey = useMemo(() => {
-    const byKey = new Map<string, Sigil[]>()
-    for (const s of sigils) {
-      const key = s.skill1 || s.hash
-      const g = byKey.get(key)
-      if (g) g.push(s)
-      else byKey.set(key, [s])
-    }
-    return byKey
-  }, [sigils])
-
-  // General mains: only item rows (hash != skill1) with no character
-  // exclusivity (player == "") qualify. Rows that cannot take part in a
-  // combination (onlyone / non-item) stay selectable — their secondary list is
-  // hinted as fully illegal instead.
-  const sigilGroups = useMemo(
-    () =>
-      [...groupedByKey.entries()]
-        .filter(([, variants]) => variants.some((v) => v.player === ""))
-        .map(([key, variants]) => ({
-          key,
-          // 显示名按 hash 取，所以这一组要带上代表行的 hash。
-          gem: variants[0]?.hash ?? "",
-        })),
-    [groupedByKey]
+  const updateSlot = useCallback(
+    (row: number, patch: Partial<Slot>) => {
+      setSlots((prev) => prev.map((slot, i) => (i === row ? { ...slot, ...patch } : slot)))
+      scheduleSave()
+    },
+    [scheduleSave]
   )
 
-  const traitHashes = useMemo(() => traits.map((tr) => tr.hash), [traits])
-
-  // Pool families: the pool version (lot != []) and its pool, read by hashFor
-  // at save time (which variant hash a family resolves to).
-  const poolByMain = useMemo(() => {
-    const byName = new Map<string, { poolHash: string; lot: Set<string> }>()
-    for (const [name, variants] of groupedByKey) {
-      const pool = variants.find((v) => v.lot && v.lot.length > 0)
-      if (!pool) continue
-      byName.set(name, { poolHash: pool.hash, lot: new Set(pool.lot) })
-    }
-    return byName
-  }, [groupedByKey])
-
-  // Traits that can act as a secondary: provided by at least one ordinary
-  // (mix=0, combinable) item row.
-  const ordinaryTraits = useMemo(() => {
-    const set = new Set<string>()
-    for (const s of sigils) {
-      if (s.onlyone !== "1" && s.hash !== s.skill1 && s.mix === "0") set.add(s.skill1)
-    }
-    return set
-  }, [sigils])
-
-  // Combination rules (hint only: nothing is blocked, no input is changed):
-  //   1. rows that cannot take part — special (onlyone) or non-item
-  //      (hash == skill1);
-  //   2. a mix=1 row only pairs with its own lot pool or its fixed second;
-  //   3. every other (ordinary, mix=0) row pairs freely.
-  // Both roles are checked, so a secondary must itself be an ordinary trait.
-  const legalByMain = useMemo(() => {
-    const none: Set<string> = new Set()
-    return (name: string) => {
-      const variants = (groupedByKey.get(name) ?? []).filter(
-        (s) => s.onlyone !== "1" && s.hash !== s.skill1
-      )
-      if (variants.length === 0) return none
-      if (variants.some((v) => v.mix === "0")) return ordinaryTraits
-      const legal = new Set<string>()
-      for (const v of variants) {
-        if (v.mix !== "1") continue
-        if (v.skill2 && ordinaryTraits.has(v.skill2)) legal.add(v.skill2)
-        for (const h of v.lot ?? []) if (ordinaryTraits.has(h)) legal.add(h)
-      }
-      return legal
-    }
-  }, [groupedByKey, ordinaryTraits])
-
-  // Family item hash at save time; the rule itself lives in model.ts
-  // (resolveMainGem) so it can be tested against the real table. `preferred` is
-  // the gem hash the config named — without it a family whose variants have
-  // different names (钳蟹的共鸣 / 永恒钳蟹因子) rewrites its untouched row to
-  // variants[0].
-  const hashFor = (name: string, secHash = "", preferred = ""): string => {
-    const variants = groupedByKey.get(name)
-    if (!variants || variants.length === 0) return ""
-    return resolveMainGem(variants, poolByMain.get(name), secHash, preferred)
-  }
-
-  // Stable callbacks + memoized arrays keep SlotRow memoization effective:
-  // editing one row no longer re-renders all 12.
-  const maxOfMain = useCallback((name: string) => {
-    const variants = groupedByKey.get(name)
-    const tr = variants && variants.length > 0 ? traitByName.get(variants[0].skill1) : undefined
-    return tr?.cap ?? DEFAULT_LEVEL
-  }, [groupedByKey, traitByName])
-  const maxOfSec = useCallback(
-    (h: string) => traitByName.get(h)?.cap ?? DEFAULT_LEVEL,
-    [traitByName]
-  )
-
-  // Picker item values: main = the group key (the trait hash its variants share),
-  // secondary = trait hashes. Labels come from hashLabels.
-  //
-  // 主因子以前拿显示名当值，那是它在表里的身份；名字现在按语言变，值必须换成与语言
-  // 无关的东西，而存档里记的本来就是 hash。
-  const mainKeys = useMemo(() => sigilGroups.map((g) => g.key), [sigilGroups])
-  const mainKeySet = useMemo(() => new Set(mainKeys), [mainKeys])
-  const hashLabels = useMemo(
-    () =>
-      Object.fromEntries([
-        ...traits.map((tr) => [tr.hash, names[tr.gem] ?? tr.hash] as const),
-        ...sigilGroups.map((g) => [g.key, names[g.gem] ?? g.key] as const),
-      ]),
-    [traits, sigilGroups, names]
-  )
-  const updateSlot = useCallback((index: number, patch: Partial<Slot>) => {
-    setSlots((prev) => prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)))
-  }, [])
-
-  // Reload the player config (falls back to the preset template), so the UI
-  // mirrors what is on disk without restarting the app. The tables are
-  // parameters rather than read from state: the only caller is the mount load,
-  // which has just fetched them while the state still holds the empty first
-  // render.
-  const reloadConfig = async (sigilTable: Sigil[], traitTable: Trait[]) => {
-    try {
-      const configJson = await LoadConfig()
-      applyConfig(JSON.parse(configJson), sigilTable, traitTable)
-      configLoadError.current = null
-    } catch (e) {
-      configLoadError.current = e
-      setStatus(t.configFail(e))
-    }
-  }
-
-  /** Load a saved config into the editor state (first render skips saving). */
+  /**
+   * Load a saved config into the editor state.
+   *
+   * 键就是文件里的键：编辑器不再把 exclusive 翻译成别的形状。旧版本那一步迁移只读
+   * legacy.t1/t2/war，于是"角色 hash 作键 + 当前形状"的条目会被整条改写成全开
+   * （false 静默变 true），随后自动保存把它写回磁盘——用户的开关状态就这么没了。
+   */
   const applyConfig = (parsed: unknown, sigilTable: Sigil[], traitTable: Trait[]) => {
     const cfg = (parsed ?? {}) as {
       lang?: unknown
       slots?: unknown
       exclusive?: unknown
     }
-    skipSave.current = true
     if (LANGS.includes(cfg.lang as Lang)) setLang(cfg.lang as Lang)
     setSlots(pad12(configToSlots(cfg, sigilTable, traitTable)))
     setExclusiveState(sanitizeExclusiveState(cfg.exclusive))
@@ -301,78 +190,27 @@ export default function App() {
   const allEnabled = slots.every((s) => s.enabled)
   const toggleAll = () => {
     setSlots((prev) => prev.map((slot) => ({ ...slot, enabled: !allEnabled })))
+    scheduleSave()
   }
 
-  const save = async () => {
-    if (sigils.length === 0 || traits.length === 0) {
-      setStatus(t.tablesNotReady)
-      return
-    }
-    if (configLoadError.current !== null) {
-      // Never overwrite a configuration the editor could not read.
-      setStatus(t.configFail(configLoadError.current))
-      return
-    }
-    const cfg: { items: SavedItem[]; enabled: boolean }[] = []
-    for (const s of slots) {
-      if (s.mainHash === "") continue
-      const hash = hashFor(s.mainHash, s.secHash, s.mainGem)
-      // A gem the current sigil table cannot resolve would be written as an
-      // empty id and make the mod reject the whole file: skip the row (it
-      // already renders as empty in the editor).
-      if (hash === "") continue
-      const main = {
-        gem: hash, // loadout.json protocol: item id stays "gem" (mod reads it)
-        level: s.mainLevel,
-      }
-      const items: SavedItem[] = [main]
-      if (s.secHash !== "") {
-        items.push({ hash: s.secHash, level: s.secLevel })
-      }
-      cfg.push({ items, enabled: s.enabled })
-    }
-    try {
-      const exclusive =
-        exclusiveState && Object.keys(exclusiveState).length > 0
-          ? exclusiveState
-          : undefined
-      await SaveLoadout(JSON.stringify({ lang, slots: cfg, exclusive }, null, 2))
-      setStatus("")
-    } catch (e) {
-      setStatus(t.saveFail(e))
-    }
-  }
-
-  // Exclusive toggle update (per character, per trait hash; a character's
-  // first toggle writes all three factors so the file always shows the state).
-  const updateExclusive = (
-    player: string,
-    row: Exclusive,
-    traitHash: string,
-    value: boolean
-  ) => {
+  // Exclusive toggle update. 落到文件里的键是**角色 hash**（身份），不是 PL 码：PL 码只是
+  // 显示用的标签，而古兰/姬塔共享 PL0000——所以一次点击要写到共享这个 PL 码的每个角色上，
+  // 面板才继续是一行。第一次碰某个角色时把三个槽都写下来，文件里就看得出完整状态。
+  const updateExclusive = (player: string, traitHash: string, value: boolean) => {
     setExclusiveState((prev) => {
       const current: ExclusiveState = prev ? { ...prev } : {}
-      const entry = current[player]
-        ? { ...current[player] }
-        : Object.fromEntries(row.gems.map(([, skill]) => [skill, true]))
-      entry[traitHash] = value
-      current[player] = entry
+      for (const target of exclusiveTable) {
+        if (target.player !== player) continue
+        const entry: Record<string, boolean> = current[target.hash]
+          ? { ...current[target.hash] }
+          : Object.fromEntries(target.gems.map(([, skill]) => [skill, true]))
+        entry[traitHash] = value
+        current[target.hash] = entry
+      }
       return current
     })
+    scheduleSave()
   }
-
-  // Auto-save on edits (300 ms debounce; first load skips writing once).
-  useEffect(() => {
-    if (skipSave.current) {
-      skipSave.current = false
-      return
-    }
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => void save(), 300)
-    return () => clearTimeout(saveTimer.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots, lang, exclusiveState])
 
   // The hide key is the SAME key as the mod's menu hotkey (default F1,
   // configurable; the mod publishes it in tool-hotkey.txt). Pressed here it
@@ -451,7 +289,10 @@ export default function App() {
                 variant={option === lang ? "secondary" : "ghost"}
                 size="sm"
                 aria-pressed={option === lang}
-                onClick={() => setLang(option)}
+                onClick={() => {
+                  setLang(option) // 语言也存在 loadout.json 里，所以这也是一次编辑
+                  scheduleSave()
+                }}
               >
                 {LANG_LABEL[option]}
               </Button>
@@ -461,14 +302,15 @@ export default function App() {
         </div>
         {/*
           状态条是外壳级的通知，不属于任何一个 Tab：它必须留在这一层，
-          否则切到因子编辑页时那两页的"没保存成功"会被静默吞掉。
+          否则切到因子编辑页时那两页的"没保存成功"会被静默吞掉。全部失败都走
+          这一条通道，所以屏幕上不可能出现两条互相矛盾的提示。
         */}
-        {status && (
+        {failure && (
           <div
             aria-live="polite"
             className="mx-4 mt-2 rounded-md bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground"
           >
-            {status}
+            {failureText(failure, t)}
           </div>
         )}
         {/*
@@ -485,21 +327,8 @@ export default function App() {
           <div className="pl-[21px]">{t.headerSecondary}</div>
         </div>
 
-        {slots.map((slot, index) => (
-          <SlotRow
-            key={index}
-            index={index}
-            slot={slot}
-            mainKeys={mainKeys}
-            mainKeySet={mainKeySet}
-            traitHashes={traitHashes}
-            labels={hashLabels}
-            legalOfMain={legalByMain}
-            t={t}
-            maxOfMain={maxOfMain}
-            maxOfSec={maxOfSec}
-            updateSlot={updateSlot}
-          />
+        {slots.map((slot, row) => (
+          <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
         ))}
         </TabsPanel>
         <TabsPanel value="exclusive" className={LOADOUT_PANEL}>

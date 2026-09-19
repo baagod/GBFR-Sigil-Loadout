@@ -40,7 +40,7 @@ public class SigilTrait
 }
 
 /// <summary>
-/// The mod's sigiledits.json. Written by the editor tool (Loadout.exe), read here at
+/// The mod's gemedits.json. Written by the editor tool (Loadout.exe), read here at
 /// startup.
 ///
 /// This type deliberately implements NO Reloaded configuration interface: doing so
@@ -77,7 +77,7 @@ public class Config
         // runaway one should be a logged error, not a multi-gigabyte read.
         var info = new FileInfo(path);
         if (info.Length > MaxBytes)
-            throw new InvalidDataException($"sigiledits.json exceeds {MaxBytes} bytes");
+            throw new InvalidDataException($"gemedits.json exceeds {MaxBytes} bytes");
 
         var config = JsonSerializer.Deserialize<Config>(File.ReadAllText(path), Options);
         if (config?.Edits is not { Count: > 0 } edits)

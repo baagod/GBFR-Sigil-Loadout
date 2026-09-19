@@ -47,22 +47,22 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	}
 	service.flushNow()
 
-	wantCfg := localConfig(t, "sigiledits.json")
+	wantCfg := localConfig(t, "gemedits.json")
 	raw, err := os.ReadFile(wantCfg)
 	if err != nil {
-		t.Fatalf("sigiledits.json is not where the mod looks for it: %v", err)
+		t.Fatalf("gemedits.json is not where the mod looks for it: %v", err)
 	}
 	var cfg Config
 	if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-		t.Fatalf("sigiledits.json is not valid JSON: %v", err)
+		t.Fatalf("gemedits.json is not valid JSON: %v", err)
 	}
 	if len(cfg.Edits) != 1 || cfg.Edits[0].Key != "06719232" || *cfg.Edits[0].Values[0] != 30 {
-		t.Fatalf("sigiledits.json round-trip lost data: %+v", cfg.Edits)
+		t.Fatalf("gemedits.json round-trip lost data: %+v", cfg.Edits)
 	}
 	// 没人输入过的槽位在文件里是 null 这个词，而正是它告诉 mod 那一部分保持原样。
 	// 这条记录设置了十个槽位里的三个。
 	if len(cfg.Edits[0].Values) < LevelValueCount {
-		t.Fatalf("sigiledits.json came back with %d slots, want %d", len(cfg.Edits[0].Values), LevelValueCount)
+		t.Fatalf("gemedits.json came back with %d slots, want %d", len(cfg.Edits[0].Values), LevelValueCount)
 	}
 	if cfg.Edits[0].Values[3] != nil {
 		t.Fatalf("an untouched slot came back as %v, want nil", cfg.Edits[0].Values)
@@ -85,7 +85,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		service := &EditService{}
-		cfgPath := localConfig(t, "sigiledits.json")
+		cfgPath := localConfig(t, "gemedits.json")
 
 		first := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
 		if err := service.SaveEdits(first); err != nil {
@@ -93,7 +93,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 		}
 		time.Sleep(debounceDelay / 4)
 		if _, err := os.Stat(cfgPath); err == nil {
-			t.Fatal("sigiledits.json was written while the debounce window was still open")
+			t.Fatal("gemedits.json was written while the debounce window was still open")
 		}
 
 		// 第二次按键重启了那段窗口：第一次不能已经留下一次写入，这一次同样还不能。
@@ -112,11 +112,11 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 
 		raw, err := os.ReadFile(cfgPath)
 		if err != nil {
-			t.Fatalf("the debounce never wrote sigiledits.json: %v", err)
+			t.Fatalf("the debounce never wrote gemedits.json: %v", err)
 		}
 		var cfg Config
 		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-			t.Fatalf("sigiledits.json is not valid JSON: %v", err)
+			t.Fatalf("gemedits.json is not valid JSON: %v", err)
 		}
 		if len(cfg.Edits) != 1 || *cfg.Edits[0].Values[0] != 300 {
 			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
@@ -162,7 +162,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 		t.Fatal(err)
 	}
 	service.flushNow()
-	written, err := os.ReadFile(localConfig(t, "sigiledits.json"))
+	written, err := os.ReadFile(localConfig(t, "gemedits.json"))
 	if err != nil {
 		t.Fatalf("the list was dropped after a failed write: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 	hermeticHome(t)
 
-	writeFile(t, localConfig(t, "sigiledits.json"),
+	writeFile(t, localConfig(t, "gemedits.json"),
 		`{"edits":[{"enabled":true,"key":"B064A634","level":14,"values":[300,10,300,10]}]}`)
 
 	loaded, err := (&EditService{}).LoadEdits()
@@ -184,7 +184,7 @@ func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 		t.Fatalf("LoadEdits: %v", err)
 	}
 	if len(loaded) != 1 || loaded[0].Key != "B064A634" || *loaded[0].Values[0] != 300 {
-		t.Fatalf("sigiledits.json was not read back: %+v", loaded)
+		t.Fatalf("gemedits.json was not read back: %+v", loaded)
 	}
 	if len(loaded[0].Values) != LevelValueCount {
 		t.Fatalf("loaded values were not padded: %v", loaded[0].Values)
@@ -208,8 +208,8 @@ func TestLoadEditsStartsWithNothing(t *testing.T) {
 	if len(loaded) != 0 {
 		t.Fatalf("a first run produced edits nobody made: %+v", loaded)
 	}
-	if _, err := os.Stat(localConfig(t, "sigiledits.json")); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatal("reading the list created sigiledits.json")
+	if _, err := os.Stat(localConfig(t, "gemedits.json")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatal("reading the list created gemedits.json")
 	}
 }
 
@@ -222,14 +222,14 @@ func TestLoadEditsStartsWithNothing(t *testing.T) {
 func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 	hermeticHome(t)
 
-	current := localConfig(t, "sigiledits.json")
+	current := localConfig(t, "gemedits.json")
 	writeFile(t, current, "not json")
 
 	loaded, err := (&EditService{}).LoadEdits()
 	if err == nil {
 		t.Fatalf("a file that cannot be parsed was accepted as %+v", loaded)
 	}
-	if !strings.Contains(err.Error(), "sigiledits.json") {
+	if !strings.Contains(err.Error(), "gemedits.json") {
 		t.Fatalf("the error does not say which file: %v", err)
 	}
 }
@@ -239,7 +239,7 @@ func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
 	hermeticHome(t)
 
-	current := localConfig(t, "sigiledits.json")
+	current := localConfig(t, "gemedits.json")
 	writeFile(t, current, `{"edits":[]}`)
 
 	loaded, err := (&EditService{}).LoadEdits()
@@ -255,7 +255,7 @@ func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
 // 同一个状态两种拼写，就是每个调用方都得自己记着写 `?? []` 的那种事。
 func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 	hermeticHome(t)
-	writeFile(t, localConfig(t, "sigiledits.json"), `{}`)
+	writeFile(t, localConfig(t, "gemedits.json"), `{}`)
 
 	loaded, err := (&EditService{}).LoadEdits()
 	if err != nil {
@@ -278,7 +278,7 @@ func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 func TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling(t *testing.T) {
 	hermeticHome(t)
 
-	current := localConfig(t, "sigiledits.json")
+	current := localConfig(t, "gemedits.json")
 	old := `{"Edits":[{"Enabled":true,"Key":"B064A634","Level":14,"Values":[300]}]}`
 	writeFile(t, current, old)
 
@@ -534,7 +534,7 @@ func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
 	}
 	service.flushNow()
 
-	path := localConfig(t, "sigiledits.json")
+	path := localConfig(t, "gemedits.json")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("the list was not written: %v", err)
 	}

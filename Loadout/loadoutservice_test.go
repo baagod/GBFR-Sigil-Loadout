@@ -2,8 +2,10 @@ package main
 
 import (
 	jsonv2 "encoding/json/v2"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -60,8 +62,10 @@ func TestValidateSlots(t *testing.T) {
 		{"13 rows one disabled", oneDisabled, true},
 		{"empty items", []loadoutSlot{{}}, false},
 		{"missing gem", []loadoutSlot{slot("", "", 15, 0)}, false},
-		{"bad main level", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", 201, 15)}, false},
-		{"bad sec level", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", 15, 201)}, false},
+		// 上限不属于这一层：cap 是每条词条自己的值，只有前端（读 gem.json）与 mod
+		// （LoadoutConfig）知道它。这里写死一个数就会变成同一规则的第三份副本，
+		// 所以超过 cap 的等级在这一层是合法的，由 mod 侧判定。
+		{"level above cap", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", 201, 15)}, true},
 	}
 	for _, c := range cases {
 		if err := validateSlots(c.cfg); (err == nil) != c.ok {
@@ -128,6 +132,76 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
 	}
+}
+
+/*
+写盘只有 SaveLoadout 一个出口，而它会被并发调用：前端的防抖挡不住"一次写盘比防抖窗口
+还慢"（杀软扫 %LOCALAPPDATA% 就是这样），那时两次保存同时在飞，而磁盘上留哪一份取决于
+最后完成的那个 rename。所以序号在提交时取、写盘前比一次，过期的那份直接放弃。
+*/
+func TestSaveLoadoutDropsASupersededSave(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	svc := &LoadoutService{}
+	stale := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","level":15}],"enabled":true}]}`
+	current := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","level":10}],"enabled":true}]}`
+	// 第 7 号已经提交（比如那一次正卡在慢写里），第 3 号就已经过期。
+	svc.submitted.Store(7)
+	if err := svc.writeSubmitted(3, stale); err != nil {
+		t.Fatalf("a superseded save is not an error: %v", err)
+	}
+	path := filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json")
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a superseded save must not reach the disk (stat err=%v)", err)
+	}
+	// 最新的那一次照常落盘。
+	if err := svc.writeSubmitted(7, current); err != nil {
+		t.Fatalf("the current save must land: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if string(raw) != current {
+		t.Errorf("stored config = %q, want %q", raw, current)
+	}
+}
+
+/*
+并发保存不能撕开文件：唯一临时名 + 原子 rename 保证磁盘上最后只会是某一次完整保存的
+内容，而不会是两次保存的混合。
+*/
+func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	svc := &LoadoutService{}
+	payloads := make([]string, 16)
+	for i := range payloads {
+		payloads[i] = fmt.Sprintf(
+			`{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","level":%d}],"enabled":true}]}`, i)
+	}
+	var wg sync.WaitGroup
+	for _, payload := range payloads {
+		wg.Add(1)
+		go func(payload string) {
+			defer wg.Done()
+			if err := svc.SaveLoadout(payload); err != nil {
+				t.Errorf("SaveLoadout: %v", err)
+			}
+		}(payload)
+	}
+	wg.Wait()
+
+	raw, err := os.ReadFile(filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json"))
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	for _, want := range payloads {
+		if string(raw) == want {
+			return
+		}
+	}
+	t.Fatalf("the stored config is not any single save: %q", raw)
 }
 
 /*

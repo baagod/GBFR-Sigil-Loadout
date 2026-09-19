@@ -26,7 +26,8 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { MESSAGES, type Lang } from "./i18n";
+import { messages } from "./messages";
+import type { Lang } from "./lang";
 import { TraitRow, type RowContext } from "./TraitRow";
 import {
   asEdits,
@@ -119,7 +120,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
   // 搜索框本身，好让它的清除按钮能把光标交还给它。
   const searchBox = useRef<HTMLInputElement>(null);
 
-  const t = MESSAGES[lang];
+  const t = messages[lang];
 
   /*
     显示一次失败既记下它，也打开对话框。关闭只是关闭：消息留在 state 里，
@@ -152,7 +153,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
       Call.ByName(`${SERVICE}.TraitMap`) as Promise<Record<string, TraitInfo>>,
     ]);
     // 根本不是十六进制的 key 也不是模组能应用的编辑，但它仍然是用户的一行：它被保留，
-    // 用自己的 hash 当名字，而不是被过滤掉——在这里丢掉它，下一次写入就会把它从sigiledits.json 中删除，
+    // 用自己的 hash 当名字，而不是被过滤掉——在这里丢掉它，下一次写入就会把它从gemedits.json 中删除，
     // 而一个谁都看不见的编辑，比一个名字只是 hash 的更糟。
     // 文件里有什么就照原样拿什么：同一个地址可以同时有两条编辑，key 也可能是小写。
     // 清理是"读取"这一步做的事，所以原始列表被留着，用来判断文件是否已经说出了工具即将显示的内容。
@@ -160,7 +161,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
       .filter((e) => String(e.key ?? "").trim() !== "")
       .map((e) => ({
         ...e,
-        // 工具所提供的每张表都以大写 hash 为键，而手写进 sigiledits.json 的 key 可能是小写。
+        // 工具所提供的每张表都以大写 hash 为键，而手写进 gemedits.json 的 key 可能是小写。
         // 在这里归一化，下面的每一次查找才能直接用 key 本身，
         // 而不是靠过去那半打各自把它转成大写的调用点。
         //
@@ -184,7 +185,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     setTraits(traitMap ?? {});
     if (!sameRecords(records, raw)) {
       Call.ByName(`${SERVICE}.SaveEdits`, records).catch((err) =>
-        showError({ title: MESSAGES[lang].writeFailed, detail: String(err) }),
+        showError({ title: messages[lang].writeFailed, detail: String(err) }),
       );
     }
   }
@@ -224,7 +225,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
       打开的内容就是游戏正在生效的东西，所以它必须最先被找到。
     */
     const keys = [...Object.keys(texts)];
-    // 表里没有的 hash——手写的 sigiledits.json、别的版本留下的编辑——保留而不是丢掉，
+    // 表里没有的 hash——手写的 gemedits.json、别的版本留下的编辑——保留而不是丢掉，
     // 因为列表显示不出来的编辑，就是谁都不知道正在生效的编辑。它和其他因子一起排序。
     for (const key of byKey.keys()) {
       if (!(key in texts)) keys.push(key);
@@ -253,7 +254,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
           levels: levelsOf(info, records),
         };
       })
-      // 搜索按名字，或按表和 sigiledits.json 给因子编键的 hash——手动把某一行调出来靠的就是后者。
+      // 搜索按名字，或按表和 gemedits.json 给因子编键的 hash——手动把某一行调出来靠的就是后者。
       .filter((row) => matches(row.label, row.key, needle))
       .sort(
         (a, b) =>
@@ -384,17 +385,15 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
       commit([...edits, { ...newRecord(key, level, false), ...patch }]);
       return;
     }
-    commit(
-      edits.map((e, i) => {
-        if (i !== at) return e;
-        const next = { ...e, ...patch };
-        // 清空最后一个数值会把整条编辑带走：让它成为编辑的就是那个数值，所以这个框回到游戏自己的数值，
-        // commit 也会丢掉这条记录（这是唯一会自行把编辑关掉的事）。
-        return next.values.some((value) => value !== null)
-          ? next
-          : { ...next, enabled: false };
-      }),
-    );
+    /*
+      只打补丁，绝不在这里碰 enabled——它是用户勾选出来的。
+
+      清空最后一个数值之后这条记录还算不算编辑，由 traits.ts 的 isEdit（"勾选了，或者带着
+      数字"）说了算，而 commit 的每条路径都经过 asEdits。在这里再写一遍那条规则，就等于只
+      按后半句判断：勾选着的记录会因为输入框被清空而丢掉勾选，于是也掉出置顶区——用户明确
+      按下的那一下被一次输入框操作撤销了。
+    */
+    commit(edits.map((e, i) => (i === at ? { ...e, ...patch } : e)));
   }
 
   function toggleOpen(key: string) {
@@ -421,14 +420,14 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     而清空一条编辑的所有框，会把整条编辑带走。
 
     前端对"何时写入"刻意保持无知。它在每次变化时把整份列表交出去，不等答复；
-    后端的尾随防抖把一串敲键变成一次 sigiledits.json 写入和一次在线应用，
+    后端的尾随防抖把一串敲键变成一次 gemedits.json 写入和一次在线应用，
     只有完全无法被接受的列表才会作为值得打断用户的失败回来。
   */
   function commit(next: SigilTrait[]) {
     const kept = asEdits(next, traits);
     setEdits(kept);
     Call.ByName(`${SERVICE}.SaveEdits`, kept).catch((err) =>
-      showError({ title: MESSAGES[lang].writeFailed, detail: String(err) }),
+      showError({ title: messages[lang].writeFailed, detail: String(err) }),
     );
   }
 
@@ -560,7 +559,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
 
       {/*
         写入失败值得打断用户——编辑没有落到磁盘上，
-        而原因通常是用户必须处理的事（sigiledits.json 被别的程序锁住、文件夹不可写）。
+        而原因通常是用户必须处理的事（gemedits.json 被别的程序锁住、文件夹不可写）。
         两种失败都落到这里：立即失败，以及后端推送的防抖失败。
         关闭只是关闭：消息一直留到下一条失败把它替换掉，这样淡出时仍然有东西可画。
       */}

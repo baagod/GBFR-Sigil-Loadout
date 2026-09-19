@@ -17,11 +17,12 @@ namespace GBFR.PreEquippedSigils;
 ///                            No display names here: they live in the tool's
 ///                            gem.lang.json, which the mod never reads.
 ///   gem.chara.json         : [ { hash, player, gems: [ [gemHash, traitHash] x3 ] } ]
-///                            槽序即数组下标（0 = T1、1 = T2、2 = 战气）；
-///                            name/zh 不在这里——角色名走工具的 chara.lang.json。
+///                            工具的专属页读它（角色名走 chara.lang.json）。**本类不读它**：
+///                            专属开关经 ABI 以词条 hash 转发，是哪个槽由原生侧认。
 ///   loadout.json           : { lang, slots: [ { items: [
 ///                            {gem, level}, {hash, level}? ],
-///                            enabled } ], exclusive: { player: { traitHash: bool } } }
+///                            enabled } ], exclusive: { 角色hash: { 词条hash: bool } } }
+///                            exclusive 只写 false 的那些：没提到的角色就是三槽全开。
 ///                            items[0] = sigil (item hash), items[1] = secondary
 ///                            trait (optional).
 /// Soft validation: any combination is accepted (no secondaries check yet);
@@ -35,27 +36,16 @@ internal static class LoadoutConfig
     private const int MaxSlots = 12; // conservative cap (more slots risk instability)
     private const int DefaultLevel = 15;
 
-    private sealed class ExclusiveRow
-    {
-        public required uint Hash { get; init; }
-        public required string Player { get; init; } // PL code (e.g. PL1400)
-        public required uint T1 { get; init; }
-        public required uint T2 { get; init; }
-        public required uint War { get; init; }
-    }
-
     private static readonly Dictionary<uint, uint> Sigils = new();
     private static readonly Dictionary<uint, int> Traits = new();
-    private static readonly Dictionary<string, List<ExclusiveRow>> ExclusiveByPlayer = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<uint, ExclusiveRow> ExclusiveByHash = new();
-    private static NativeCore.ExclusiveOverrideNative[]? _appliedOverrides;
-    private static DateTime _lastAppliedUtc = DateTime.MinValue;
-    private static DateTime _lastAttemptUtc = DateTime.MinValue;
-    private static int _failsSinceChange;
-    // _failsSinceChange 属于哪一个 mtime。每拍都清零的话，catch 里的 ++ 永远是 1，
-    // 重试上限和那句诊断日志就永远到不了（坏文件会被以 4 Hz 反复解析且一声不响）。
-    private static DateTime _failsForUtc = DateTime.MinValue;
-    private static bool _hadConfigFile;
+    // 配置文件唯一的状态：**已经处理过**的那份内容的 mtime。应用成功是它，读不出来或被
+    // 原生拒掉也是它——写下这一条就是认领，所以同一份内容不会被解析第二次，坏文件也不会
+    // 每 250ms 刷一次日志。
+    //
+    // DateTime.MinValue 代表"没有配置"：File.GetLastWriteTimeUtc 对不存在的文件给的正是
+    // 这个值（与 SigilEditFeature.LastWriteUtc 同一个约定），所以"配置被删了"也是一次
+    // 正常的 mtime 变化，不需要额外字段去记住"以前有过文件"。
+    private static DateTime _handledUtc = DateTime.MinValue;
     private static string _loadoutPath = "";
     private static string _sigilsPath = "";
 
@@ -64,9 +54,9 @@ internal static class LoadoutConfig
         // Player config lives in the user directory so mod updates (which
         // replace the mod folder) never wipe it. No config -> built-in template.
         _loadoutPath = UserConfig.FilePath("loadout.json");
+        // 随包数据住在 mod 目录的 assets\ 下（与源码树的 Loadout\assets\ 同一布局）。
         // Keep in sync with Native/src/runtime.cpp (sigils_path in Initialize()).
-        _sigilsPath = Path.Combine(modDirectory, "gem.json");
-        LoadExclusiveTable(modDirectory, log);
+        _sigilsPath = Path.Combine(modDirectory, "assets", "gem.json");
         if (LoadTables(log))
             TryApply(log);
         else
@@ -103,14 +93,22 @@ internal static class LoadoutConfig
                     uint traitHash = PU(Hx(entry.GetProperty("skill1")));
                     if (traitHash == 0)
                         continue;
-                    int maxLevel = entry.TryGetProperty("cap", out JsonElement ml) &&
-                                   ml.TryGetInt32(out int m)
-                        ? m
-                        : DefaultLevel;
-                    // First row wins for a repeated skill hash (mirrors the
-                    // tool's first-row trait dictionary).
-                    if (Traits.TryAdd(traitHash, maxLevel))
-                        traitCount++;
+                    // 专属行不作词条：专属因子的词条只经由 exclusive 段生效，界面的
+                    // 词条下拉也从不提供它们。这条规则与工具侧同一份实现（model.ts
+                    // traitTableOf）——两边各写一条正是它们能悄悄分叉的原因。
+                    bool exclusiveRow = entry.TryGetProperty("player", out JsonElement player) &&
+                        player.ValueKind == JsonValueKind.String &&
+                        (player.GetString() ?? "").Length > 0;
+                    if (!exclusiveRow)
+                    {
+                        int maxLevel = entry.TryGetProperty("cap", out JsonElement ml) &&
+                                       ml.TryGetInt32(out int m)
+                            ? m
+                            : DefaultLevel;
+                        // First row wins for a repeated skill hash.
+                        if (Traits.TryAdd(traitHash, maxLevel))
+                            traitCount++;
+                    }
                     uint itemHash = PU(Hx(entry.GetProperty("hash")));
                     if (itemHash == traitHash) // non-item skill rows: trait only
                         continue;
@@ -134,32 +132,22 @@ internal static class LoadoutConfig
 
     private static void TryApply(Action<string> log)
     {
-        if (!File.Exists(_loadoutPath))
-        {
-            if (_hadConfigFile)
-            {
-                _hadConfigFile = false;
-                _lastAppliedUtc = DateTime.MinValue;
-                _lastAttemptUtc = DateTime.MinValue;
-                if (_appliedOverrides is not null)
-                {
-                    NativeCore.ApplyExclusiveOverrides(null); // everything enabled again
-                    _appliedOverrides = null;
-                }
-                if (NativeCore.ApplyCustomLoadout(null))
-                    log("loadout.json removed; restored the built-in exclusive template.");
-            }
+        // 文件不存在时 GetLastWriteTimeUtc 给的是 DateTime.MinValue，那是一个与任何真实
+        // mtime 都不相等的、可认领的状态，所以"删掉配置"和"改过配置"走同一条门。
+        DateTime mtime = File.Exists(_loadoutPath)
+            ? File.GetLastWriteTimeUtc(_loadoutPath)
+            : DateTime.MinValue;
+        if (mtime == _handledUtc)
             return;
-        }
-        _hadConfigFile = true;
 
-        DateTime mtime = File.GetLastWriteTimeUtc(_loadoutPath);
-        if (mtime == _lastAppliedUtc || mtime == _lastAttemptUtc)
-            return;
-        if (mtime != _failsForUtc)
+        if (mtime == DateTime.MinValue)
         {
-            _failsForUtc = mtime;
-            _failsSinceChange = 0;
+            _handledUtc = mtime;
+            // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。这就是原来的
+            // "先清 overrides、再恢复内置模板"两步合成的同一件事。
+            if (NativeCore.ApplyLoadout(null, null))
+                log("loadout.json removed; restored the built-in exclusive template.");
+            return;
         }
 
         try
@@ -170,169 +158,56 @@ internal static class LoadoutConfig
                 throw new InvalidDataException("loadout.json exceeds 1 MB");
             string json = File.ReadAllText(_loadoutPath);
             using JsonDocument doc = JsonDocument.Parse(json);
-            var overrides = ParseExclusiveOverrides(doc.RootElement);
+            var overrides = ParseExclusiveOverrides(doc.RootElement, log);
             var slots = ParseAndValidate(doc.RootElement);
+            // 一次调用交两半：通用槽 + 专属开关。两半都落在原生同一个"重新发布"步骤上，
+            // 所以分成两次（v17 的形状）只会让同一张表被发布、被打印两遍。
             bool ok;
             if (slots.Count == 0)
             {
                 // An existing (even empty) config means "no built-in general
                 // slots": only the per-character exclusives stay active.
                 log("loadout.json has no general slots; built-in exclusive template active.");
-                ok = NativeCore.ApplyCustomLoadout(null);
+                ok = NativeCore.ApplyLoadout(null, overrides);
             }
             else
             {
-                ok = NativeCore.ApplyCustomLoadout(slots.ToArray());
+                ok = NativeCore.ApplyLoadout(slots.ToArray(), overrides);
                 if (ok)
                     log($"Applied custom loadout with {slots.Count} slot(s).");
             }
             if (!ok)
             {
                 log("Native rejected the custom loadout; kept previous configuration.");
-                _lastAttemptUtc = mtime;
+                _handledUtc = mtime;
                 return;
             }
-            // Apply the exclusive overrides after the loadout: the native path
-            // only fails while the runtime is shutting down, so rejecting a
-            // loadout above leaves the previous exclusive state untouched
-            // instead of a mixed new/old state. ApplyCustomLoadout already
-            // re-applies the stored exclusive state, so an unchanged set needs
-            // no second full rebuild (and no duplicate log line).
-            if (OverridesChanged(overrides))
-            {
-                if (!NativeCore.ApplyExclusiveOverrides(overrides))
-                    throw new InvalidDataException("native rejected the exclusive overrides");
-                _appliedOverrides = overrides;
-            }
-            _lastAppliedUtc = mtime;
-            _lastAttemptUtc = DateTime.MinValue;
+            _handledUtc = mtime;
         }
         catch (Exception exception)
         {
-            // Transient failures (half-written file, AV lock, native not ready
-            // yet) get a few 250ms-tick retries before the mtime is treated as
-            // permanently rejected; a later save resets the counter above.
-            if (++_failsSinceChange < 3)
-                return;
+            // 这份内容只报一次，然后就不再碰它：写入方是原子写（temp + rename），所以
+            // "读到半截文件"不存在；而一个被杀软锁住或被人改坏的文件，再解析三次也同样
+            // 读不出来——那 750ms 只推迟了诊断，没有换来别的。下一次保存会改 mtime，
+            // 那时它自然会被重新处理。
+            _handledUtc = mtime;
             log($"Invalid loadout.json; kept previous configuration: {exception.Message}");
-            _lastAttemptUtc = mtime;
         }
     }
 
     /// <summary>
-    /// Loads gem.chara.json (the tool's per-character exclusive table) so
-    /// "exclusive" keys can be PL codes as well as raw character hashes.
-    /// Table missing or invalid only disables that convenience: raw hashes and
-    /// the legacy t1/t2/war shape still work.
+    /// Parses the optional "exclusive" object into native overrides.
     ///
-    /// 每条是 { hash, player, gems: [[因子 hash, 技能 hash] x3] }：槽序就是数组下标
-    /// （0 = T1、1 = T2、2 = 战气），名字不在这里——角色名走工具的 chara.lang.json。
+    /// 形状：{ 角色hash: { 词条hash: bool } }。只把 **false**（= 关掉）变成一条
+    /// override，因为"没说"和"说开着"是同一件事：原生侧对没被提到的角色一律三槽全开。
+    /// 槽位由词条 hash 决定，而那张专属表在原生侧，所以这里只做转发——不需要 gem.chara.json，
+    /// 也不需要知道哪个 hash 是 T1。
+    ///
+    /// 只认这一种形状：外层键必须是角色 hash（十六进制），解析不出就记一行日志并忽略；
+    /// 内层键必须是这个词条 hash，认不出的由原生侧忽略。没有兼容形状。
     /// </summary>
-    private static void LoadExclusiveTable(string modDirectory, Action<string> log)
-    {
-        try
-        {
-            using JsonDocument doc = JsonDocument.Parse(
-                File.ReadAllText(Path.Combine(modDirectory, "gem.chara.json")));
-            int count = 0;
-            foreach (JsonElement entry in doc.RootElement.EnumerateArray())
-            {
-                try
-                {
-                    uint[] traitHashes = new uint[3];
-                    int index = 0;
-                    foreach (JsonElement pair in entry.GetProperty("gems").EnumerateArray())
-                    {
-                        if (index >= traitHashes.Length)
-                            break;
-                        traitHashes[index++] = pair.GetArrayLength() == 2 ? PU(Hx(pair[1])) : 0;
-                    }
-
-                    var row = new ExclusiveRow
-                    {
-                        Hash = PU(Hx(entry.GetProperty("hash"))),
-                        Player = Hx(entry.GetProperty("player")),
-                        T1 = traitHashes[0],
-                        T2 = traitHashes[1],
-                        War = traitHashes[2],
-                    };
-                    // 三槽缺一、形状不对或解析出 0 的条目都不是可用的专属记录：宁可整条不要，
-                    // 也不要一条"只有 T1"的记录去改写玩家配置。零值槽尤其危险——
-                    // AddExclusiveOverride 用 PU(field.Name) 比对槽位，而它对手写文件里任何
-                    // 拼错的键都返回 0，于是那条键会静默变成 T1 的开关。
-                    if (row.Hash == 0 || row.Player.Length == 0 || index < traitHashes.Length ||
-                        traitHashes[0] == 0 || traitHashes[1] == 0 || traitHashes[2] == 0)
-                        continue;
-                    if (ExclusiveByPlayer.TryGetValue(row.Player, out var playerRows))
-                        playerRows.Add(row);
-                    else
-                        ExclusiveByPlayer[row.Player] = new List<ExclusiveRow> { row };
-                    ExclusiveByHash[row.Hash] = row;
-                    count++;
-                }
-                catch
-                {
-                    // one bad entry must not disable the whole table
-                }
-            }
-            log($"Loaded {count} character exclusive entries.");
-        }
-        catch (Exception exception)
-        {
-            log($"Failed to load character-exclusive table: {exception.Message}");
-        }
-    }
-
-    /// Returns every row matching the key; player codes may be shared
-    /// (Gran/Djeeta are both "PL0000"). Empty = key not in the table.
-    private static IReadOnlyList<ExclusiveRow> ResolveCharacters(string key)
-    {
-        if (ExclusiveByPlayer.TryGetValue(key, out var playerRows))
-            return playerRows;
-        if (ExclusiveByHash.TryGetValue(PU(key), out ExclusiveRow? row))
-            return [row];
-        return [];
-    }
-
-    private static void AddExclusiveOverride(
-        JsonElement fields, ExclusiveRow row,
-        List<NativeCore.ExclusiveOverrideNative> result)
-    {
-        bool t1 = true;
-        bool t2 = true;
-        bool war = true;
-        foreach (JsonProperty field in fields.EnumerateObject())
-        {
-            if (field.Value.ValueKind != JsonValueKind.True &&
-                field.Value.ValueKind != JsonValueKind.False)
-                continue;
-            bool value = field.Value.GetBoolean();
-            uint traitHash = PU(field.Name);
-            if (traitHash == row.T1)
-                t1 = value;
-            else if (traitHash == row.T2)
-                t2 = value;
-            else if (traitHash == row.War)
-                war = value;
-        }
-        result.Add(new NativeCore.ExclusiveOverrideNative
-        {
-            CharacterHash = row.Hash,
-            DisableT1 = t1 ? (byte)0 : (byte)1,
-            DisableT2 = t2 ? (byte)0 : (byte)1,
-            DisableWar = war ? (byte)0 : (byte)1,
-            Reserved = 0,
-        });
-    }
-
-    /// <summary>
-    /// Parses the optional "exclusive" object
-    /// ({ PL码/角色hash: { 词条hash(T1/T2/War): bool } }) into native overrides
-    /// (disable bits). Missing entries stay enabled; absent "exclusive" yields
-    /// null (all enabled). 只认这一种形状：键解析不出表里那行就跳过，不为早期版本的
-    /// { 角色hash: { t1, t2, war } } 位名形状兜底。
-    /// </summary>
-    private static NativeCore.ExclusiveOverrideNative[]? ParseExclusiveOverrides(JsonElement root)
+    private static NativeCore.ExclusiveOverrideNative[]? ParseExclusiveOverrides(
+        JsonElement root, Action<string> log)
     {
         if (root.ValueKind != JsonValueKind.Object ||
             !root.TryGetProperty("exclusive", out JsonElement exclusive) ||
@@ -344,58 +219,48 @@ internal static class LoadoutConfig
         {
             if (property.Value.ValueKind != JsonValueKind.Object)
                 continue;
-            // A player key may match several rows (Gran/Djeeta share "PL0000"):
-            // emit one override per character. An unknown key has nowhere to
-            // land — the bit names are the row's own trait hashes — so it is
-            // skipped (no-op, nothing enabled).
-            IReadOnlyList<ExclusiveRow> rows = ResolveCharacters(property.Name);
-            if (rows.Count == 0)
+            uint characterHash = PU(property.Name);
+            if (characterHash == 0)
+            {
+                // PL 码是工具显示用的标签，不是这里的身份（也不兼容）：说出来，
+                // 否则"开关点了没用"在日志里没有任何线索。
+                log($"exclusive: '{property.Name}' is not a character hash; ignored.");
                 continue;
-            foreach (ExclusiveRow row in rows)
-                AddExclusiveOverride(property.Value, row, result);
+            }
+            foreach (JsonProperty field in property.Value.EnumerateObject())
+            {
+                if (field.Value.ValueKind != JsonValueKind.False)
+                    continue;
+                uint traitHash = PU(field.Name);
+                if (traitHash == 0)
+                {
+                    log($"exclusive: '{property.Name}' has a non-hash trait key '{field.Name}'; ignored.");
+                    continue;
+                }
+                result.Add(new NativeCore.ExclusiveOverrideNative
+                {
+                    CharacterHash = characterHash,
+                    TraitHash = traitHash,
+                    Disabled = 1,
+                });
+            }
         }
         return result.Count == 0 ? null : result.ToArray();
     }
 
-    /// <summary>
-    /// True when the parsed overrides differ from the last successfully applied
-    /// set (null = everything enabled).
-    /// </summary>
-    private static bool OverridesChanged(NativeCore.ExclusiveOverrideNative[]? overrides)
-    {
-        if (overrides is null || _appliedOverrides is null)
-            return !ReferenceEquals(overrides, _appliedOverrides);
-        if (overrides.Length != _appliedOverrides.Length)
-            return true;
-        for (int index = 0; index < overrides.Length; index++)
-        {
-            if (overrides[index].CharacterHash != _appliedOverrides[index].CharacterHash ||
-                overrides[index].DisableT1 != _appliedOverrides[index].DisableT1 ||
-                overrides[index].DisableT2 != _appliedOverrides[index].DisableT2 ||
-                overrides[index].DisableWar != _appliedOverrides[index].DisableWar)
-                return true;
-        }
-        return false;
-    }
-
     private static List<NativeCore.TemplateSlotNative> ParseAndValidate(JsonElement root)
     {
-        var result = new List<NativeCore.TemplateSlotNative>();
-        if (root.ValueKind == JsonValueKind.Object)
-        {
-            // new config shape: { lang, slots: [...] } — lang is tool-side only
-            if (!root.TryGetProperty("slots", out JsonElement slotsEl) ||
-                slotsEl.ValueKind != JsonValueKind.Array)
-                throw new InvalidDataException("missing 'slots' array");
-            root = slotsEl;
-        }
-        else if (root.ValueKind != JsonValueKind.Array)
-        {
-            throw new InvalidDataException("expected an array of slots");
-        }
+        // 只认这一种形状：{ lang, slots: [...] }（lang 只有工具在意）。工具侧写的就是它，
+        // Go 的 SaveLoadout 也会把别的拼写当场拒掉——所以这里没有第二种读法。
+        if (root.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("expected an object with a 'slots' array");
+        if (!root.TryGetProperty("slots", out JsonElement slots) ||
+            slots.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("missing 'slots' array");
 
+        var result = new List<NativeCore.TemplateSlotNative>();
         int index = 0;
-        foreach (JsonElement slot in root.EnumerateArray())
+        foreach (JsonElement slot in slots.EnumerateArray())
         {
             index++;
             bool enabled = !slot.TryGetProperty("enabled", out JsonElement enabledElement) ||

@@ -381,33 +381,23 @@ void ScheduleSelectedStatusRebind()
       return;
    }
    if (HasMatchingAuthorizedSelection(status, identity, selection))
-   {
-      g_lifecycle_signature_attempts.store(0, std::memory_order_release);
       return;
-   }
 
    if (!identity_changed)
       return;
 
    const uint64_t signature =
       BuildLifecycleSignature(character_hash, status, identity.context_mode, selection);
-   const uint64_t previous_signature =
-      g_lifecycle_rebind_signature.exchange(signature, std::memory_order_acq_rel);
-   if (previous_signature != signature)
-   {
-      g_lifecycle_signature_attempts.store(0, std::memory_order_release);
-      g_lifecycle_rebind_not_before_ms.store(0, std::memory_order_release);
-   }
-   if (g_lifecycle_signature_attempts.load(std::memory_order_acquire) >= 3 ||
-       g_queued_apply_request.load(std::memory_order_acquire) != 0 ||
-       g_apply_in_flight.load(std::memory_order_acquire) ||
-       GetTickCount64() < g_lifecycle_rebind_not_before_ms.load(std::memory_order_acquire))
+   // 同一个状态只排一次重建。这个签名是"已经为它排过一次"的唯一记忆：走到这里已经保证
+   // 身份确实变了（上面那道门），所以它命中的是"来回切回同一个状态"，再排一次只是重复。
+   if (g_lifecycle_rebind_signature.exchange(signature, std::memory_order_acq_rel) == signature)
+      return;
+   // 真正挡住高频重排的是这两个：本拍已经有排队或在飞的重建，就不必再排一个。
+   if (g_queued_apply_request.load(std::memory_order_acquire) != 0 ||
+       g_apply_in_flight.load(std::memory_order_acquire))
       return;
 
    RequestHotApply(character_hash);
-   g_lifecycle_signature_attempts.fetch_add(1, std::memory_order_acq_rel);
-   g_lifecycle_rebind_not_before_ms.store(
-      GetTickCount64() + 1000, std::memory_order_release);
 }
 
 namespace

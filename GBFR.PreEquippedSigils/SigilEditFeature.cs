@@ -4,7 +4,7 @@ using Reloaded.Mod.Interfaces;
 namespace GBFR.PreEquippedSigils;
 
 /// <summary>
-/// 按用户编辑的 sigiledits.json 改写 skill_status.tbl 的行：启动时改一份表交给
+/// 按用户编辑的 gemedits.json 改写 skill_status.tbl 的行：启动时改一份表交给
 /// IDataManager，运行中则直接覆写游戏内存里已经有的那份表。
 ///
 /// 这套东西原本是独立的 GBFR.SigilEdit mod，合并后成为本 mod 的一项功能：它自己的配置
@@ -42,7 +42,7 @@ internal sealed class SigilEditFeature
     private const int KeyOffset = 40;
     private const int LevelOffset = 48;
 
-    private const string ConfigFileName = "sigiledits.json";
+    private const string ConfigFileName = "gemedits.json";
 
     // 编辑列表住在 mod 自己的用户配置目录里（见 UserConfig），和配装 loadout.json 挨着：
     // 工具写、这里读。改动由下面 Tick() 的 mtime 门发现。
@@ -62,9 +62,6 @@ internal sealed class SigilEditFeature
     // 已经被 tick 认领的那一份文件的 mtime。宿主每 250ms 调一次 Tick()，所以这里只做一次
     // File.GetLastWriteTimeUtc 就退出（元数据缓存里的一次查询）。
     private DateTime _handledUtc;
-
-    // 1 = 一次应用正在进行。宿主那条定时器的回调会并发触发，而一次应用可能扫 5-6 秒。
-    private int _applying;
 
     public SigilEditFeature(Action<string> log) => _log = log;
 
@@ -192,14 +189,10 @@ internal sealed class SigilEditFeature
         if (mtime == _handledUtc)
             return;
 
-        // 上一次应用还没跑完（可能正在扫 5-6 秒）：这一拍让过去，而且**不认领**这次的改动，
-        // 好让它在下一拍被处理。排队没有意义——那只会把两次长扫描串起来。
-        if (Interlocked.CompareExchange(ref _applying, 1, 0) != 0)
-            return;
-
-        // 先认领、再应用：这一行也是防重入的第二道锁（第一道是上面的 _applying），
-        // 不能挪到 Apply 之后。（代价：一次失败的 Apply 不会自己重试，要等文件再变一次；
-        //   这是刻意的——要让 Apply 返回结果并重试，得先想清楚 in-flight 与重试上限。）
+        // 宿主那条定时器是单飞的（见 Mod.RunUpkeepTick），所以这里不会再被重入，不需要
+        // 自己上锁。先认领、再应用，顺序不能颠倒：否则一次失败的 Apply（它可能扫 5-6 秒）
+        // 会在每一拍重试同一份改动。代价是一次失败的 Apply 要等文件再变一次才重试——刻意
+        // 的，因为要让 Apply 返回结果并重试，得先想清楚 in-flight 与重试上限。
         _handledUtc = mtime;
 
         try
@@ -209,10 +202,6 @@ internal sealed class SigilEditFeature
         catch (Exception ex)
         {
             _log("sigil edit hot apply EXCEPTION: " + ex);
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _applying, 0);
         }
     }
 
@@ -424,7 +413,7 @@ internal sealed class SigilEditFeature
             {
                 if (values[i] is not { } value)
                     continue;
-                // 手改的 sigiledits.json 能写出 float 装不下的数（1e39）：System.Text.Json 不报错，
+                // 手改的 gemedits.json 能写出 float 装不下的数（1e39）：System.Text.Json 不报错，
                 // 给的是一个 ±Infinity，写进去就是游戏拿着无穷大去做它自己的算术。
                 if (!float.IsFinite(value))
                 {

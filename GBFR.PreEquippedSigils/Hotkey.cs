@@ -133,8 +133,11 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Re-arms the hotkey on the message window with the current virtual key
-    /// (shared by Configure's re-entry path and UpdateHotkey).
+    /// Re-arms the hotkey on the message window with the current virtual key.
+    /// Called by <see cref="UpdateHotkey"/> only: <see cref="Configure"/> runs once per
+    /// mod lifetime, and <see cref="HotkeyLoop"/> registers the key itself while creating
+    /// the window (with the virtual key it was started with, which the re-arm path must
+    /// not race).
     /// </summary>
     private static bool ReregisterHotkey(IntPtr window)
     {

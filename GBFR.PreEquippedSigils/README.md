@@ -19,7 +19,7 @@
 ## 因子编辑（原 GBFR.SigilEdit，已并入本 Mod）
 
 随附工具（`Loadout.exe`）的 **"因子编辑"页**用来改因子自身的等级数值：在列表或搜索框里按名称或 hash 筛选，
-改写指定参数并启用即可。改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\sigiledits.json`（与配装 loadout.json 同目录），无需重启，运行中的游戏随即把编辑
+改写指定参数并启用即可。改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\gemedits.json`（与配装 loadout.json 同目录），无需重启，运行中的游戏随即把编辑
 应用到它已经读进内存的那张表上。
 
 - 它**不带 `.tbl` 文件**：表从游戏封包中读出、在内存里改写，所以能和其他**改表** mod 并存。

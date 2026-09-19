@@ -37,14 +37,14 @@ type Config struct {
 // editListName 是编辑列表的文件名。它住在 mod 的用户目录里（loadoutservice.go 的
 // userCfgDir），和配装 loadout.json 挨着。只有这一个位置：合并前那套
 // （%APPDATA%\GBFR.SigilEdit\Config.json）不读、不搬、不兼容。
-const editListName = "sigiledits.json"
+const editListName = "gemedits.json"
 
 // debounceDelay 是编辑列表必须静止多久才会被写入：一串连续按键最终只换来一次
-// sigiledits.json 写入和一次实时应用，而不是每按一次键就写一次。
+// gemedits.json 写入和一次实时应用，而不是每按一次键就写一次。
 const debounceDelay = 500 * time.Millisecond
 
 // saveFailedEvent 把写入失败送到前端，前端用与即时失败相同的对话框显示它。
-// 这个名字在 App.tsx 里有镜像；两者之间没有任何关联，所以要改名就得同时改两个文件。
+// 这个名字在 SigilEditPanel.tsx 里有镜像；两者之间没有任何关联，所以要改名就得同时改两个文件。
 const saveFailedEvent = "GBFR.SigilEdit.SaveFailed"
 
 // EditService 是 Wails 暴露给前端的后端。
@@ -60,11 +60,16 @@ type EditService struct {
 // LangZH 是工具被问到一个它没有对应表的语言时回退使用的语言。
 const LangZH = "zh"
 
-// decode 把一张内嵌表变成以因子哈希为 Key 的 map。没有空表这种情形要处理：
-// 表缺失或格式不对时 Unmarshal 会留下一个空 map，而两种情况要的都是这个答案。
-func decode[T any](raw []byte) map[string]T {
+// mustDecode 把一张内嵌表变成以因子哈希为 Key 的 map。
+//
+// 内嵌资产是编译期产物：解不出来说明生成器写出了坏文件。旧版本在这里丢掉错误、
+// 留下一个空 map——界面于是回落成裸 hash、日志里一个字都没有，看起来像"游戏没给
+// 名字"。启动即 panic：坏资产不可能装到用户机器上还能悄悄跑起来。
+func mustDecode[T any](raw []byte) map[string]T {
 	decoded := make(map[string]T)
-	_ = jsonv2.Unmarshal(raw, &decoded)
+	if err := jsonv2.Unmarshal(raw, &decoded); err != nil {
+		panic(fmt.Errorf("embedded asset is not valid JSON: %w", err))
+	}
 	return decoded
 }
 
@@ -107,10 +112,10 @@ type SkillText struct {
 // skillTables 把 UI 语言映射到它的文案表。每种语言里的 Key 都是同一批 8 位十六进制
 // 哈希；不同的只是词语。
 var skillTables = map[string]map[string]SkillText{
-	LangZH: decode[SkillText](embeddedSkillZH),
-	"en":   decode[SkillText](embeddedSkillEN),
-	"ja":   decode[SkillText](embeddedSkillJA),
-	"ko":   decode[SkillText](embeddedSkillKO),
+	LangZH: mustDecode[SkillText](embeddedSkillZH),
+	"en":   mustDecode[SkillText](embeddedSkillEN),
+	"ja":   mustDecode[SkillText](embeddedSkillJA),
+	"ko":   mustDecode[SkillText](embeddedSkillKO),
 }
 
 // SkillMap 返回某种语言的整张 哈希 -> 文案 表，好让前端在本地解析名称和说明，
@@ -158,7 +163,7 @@ type TraitInfo struct {
 
 // traitInfo 把技能哈希——游戏管这些行叫 skills——映射到该因子自己的数字和等级。
 // 从内嵌的 skill_status.json 填充一次。
-var traitInfo = decode[TraitInfo](embeddedSkillStatus)
+var traitInfo = mustDecode[TraitInfo](embeddedSkillStatus)
 
 // TraitMap 返回整张 哈希 -> 因子 表，好让前端在本地解析某个等级的起始数值，
 // 而不是每行发一次调用。
@@ -188,7 +193,7 @@ func padValues(values []*float64) []*float64 {
 	return out
 }
 
-// configPath 是 mod 加载编辑列表用的文件：mod 的用户目录下的 sigiledits.json。
+// configPath 是 mod 加载编辑列表用的文件：mod 的用户目录下的 gemedits.json。
 //
 // 用 userCfgDir 而不是 os.UserConfigDir：那是 Windows 的 %APPDATA%（Roaming），
 // 配装 loadout.json 那边已经在 %LOCALAPPDATA% 下，而 C# 那半也从 LocalApplicationData
@@ -197,7 +202,7 @@ func configPath() string {
 	return filepath.Join(userCfgDir(), editListName)
 }
 
-// LoadEdits 从 sigiledits.json 读取当前的编辑列表。只有这一个位置：合并前那套
+// LoadEdits 从 gemedits.json 读取当前的编辑列表。只有这一个位置：合并前那套
 // （%APPDATA%\GBFR.SigilEdit\Config.json）不读、不搬、不兼容。
 //
 // 文件不存在就是空列表：没有内置的起始编辑，这一页上的每一条都必须是用户自己点出来的。
@@ -270,7 +275,7 @@ func (s *EditService) SaveEdits(edits []SigilTrait) error {
 	return nil
 }
 
-// writeEdits 把列表写到 mod 读它的地方：用户目录下的 sigiledits.json。
+// writeEdits 把列表写到 mod 读它的地方：用户目录下的 gemedits.json。
 // 两边都不必询问对方就知道那个目录，所以这里没有"解析不出路径"这种失败分支。
 func writeEdits(edits []SigilTrait) error {
 	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))

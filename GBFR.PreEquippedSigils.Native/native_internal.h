@@ -106,7 +106,7 @@ struct CharacterTemplate
 };
 
 // Runtime template table: initialized from the built-in loadout and replaced
-// by GBFR20_SetCustomLoadout at runtime. Readers copy values under the shared
+// by GBFR20_ApplyLoadout at runtime. Readers copy values under the shared
 // mutex (same pattern as GetSelection) so detour paths stay lock-safe.
 inline constexpr size_t kRuntimeTemplateCapacity = 32;
 extern std::shared_mutex g_template_mutex;
@@ -133,29 +133,8 @@ static_assert(IsCharacterCompatible(kDjeetaCharacterHash, kGranCharacterHash));
 static_assert(!IsCharacterCompatible(kGranCharacterHash, 0x18E2F9F9));
 static_assert(!IsCharacterCompatible(0x18E2F9F9, kDjeetaCharacterHash));
 
-inline constexpr std::array<uint8_t, 16> kTraitApplyLoopPreflight = {
-   0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0xB7,
-   0x00, 0x00, 0x00, 0xC5, 0xF8, 0x11, 0x75, 0xF0};
-inline constexpr std::array<uint8_t, 12> kTraitApplyGetterReturnPreflight = {
-   0x84, 0xC0, 0x74, 0xD3, 0xF6, 0x45, 0x00, 0x10, 0x75, 0xCD, 0x44, 0x8B};
-inline constexpr std::array<uint8_t, 13> kTraitCategoryLoopPreflight = {
-   0x49, 0xFF, 0xC5, 0x49, 0x83, 0xFD, 0x0D, 0x0F, 0x84, 0xE4, 0x00, 0x00, 0x00};
-inline constexpr std::array<uint8_t, 11> kTraitFetchPreflight = {
-   0x84, 0xDB, 0x74, 0x3E, 0x49, 0x8B, 0x87, 0x80, 0x5E, 0x00, 0x00};
-inline constexpr std::array<uint8_t, 14> kTraitFetchCallPathPreflight = {
-   0x4C, 0x89, 0xF9, 0x44, 0x89, 0xEA, 0x4D, 0x89, 0xE0, 0xE8, 0x12, 0x65, 0x00, 0x00};
-inline constexpr std::array<uint8_t, 12> kTraitCategoryGetterReturnPreflight = {
-   0x84, 0xC0, 0x74, 0x8E, 0xF6, 0x45, 0xD8, 0x10, 0x75, 0x88, 0x8B, 0x55};
-inline constexpr std::array<uint8_t, 12> kGetterPreflight = {
-   0x55, 0x41, 0x57, 0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x28};
-inline constexpr std::array<uint8_t, 12> kStatusRebuildPreflight = {
-   0x55, 0x56, 0x57, 0x48, 0x83, 0xEC, 0x50, 0x48, 0x8D, 0x6C, 0x24, 0x50};
-inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
-   0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x38, 0x44, 0x89, 0xC6};
-inline constexpr std::array<uint8_t, 24> kStatusOwnerTickPreflight = {
-   0x55, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41,
-   0x54, 0x56, 0x57, 0x53, 0x48, 0x81, 0xEC, 0x98,
-   0x05, 0x00, 0x00, 0x48, 0x8D, 0xAC, 0x24, 0x80};
+// 布局预检字节表住在 layout_resolver.cpp 的匿名命名空间里：只有那一个翻译单元用它们，
+// 放进共享内部头等于把实现细节当成模块接口发布。
 
 using GemData = GBFR20_GemData;
 static_assert(sizeof(GemData) == 0x24);
@@ -258,8 +237,6 @@ extern std::atomic_uint32_t g_observed_character_hash;
 extern std::atomic_uint64_t g_observed_status_address;
 extern std::atomic_int32_t g_observed_status_context;
 extern std::atomic_uint64_t g_lifecycle_rebind_signature;
-extern std::atomic_uint32_t g_lifecycle_signature_attempts;
-extern std::atomic_uint64_t g_lifecycle_rebind_not_before_ms;
 
 extern std::atomic_bool g_pending_refresh;
 extern std::atomic<uint32_t> g_pending_character_hash;
@@ -324,10 +301,12 @@ void ProcessPendingHotApply();
 
 bool TryGetRuntimeSlot(uint32_t character_hash, int virtual_slot, TemplateGemSlot& out) noexcept;
 void InitializeRuntimeTemplates();
-bool ApplyCustomLoadout(const TemplateGemSlot* slots, int32_t count) noexcept;
-bool ApplyExclusiveOverrides(
-   const GBFR20_ExclusiveOverride* overrides, int32_t count) noexcept;
+bool ApplyLoadout(
+   const TemplateGemSlot* slots, int32_t slot_count,
+   const GBFR20_ExclusiveOverride* overrides, int32_t override_count) noexcept;
 void InstallDefaultTemplateSelections();
+// 模板表变过之后必须做的事，只有这一个入口（发布选择 + 排一次状态重建）。
+void PublishTemplateSelections() noexcept;
 bool TryCopyTemplateGem(uint32_t character_hash, uint32_t selected_slot_id, void* output) noexcept;
 bool ApplyTraitLoopLimits(int32_t virtual_slot_count) noexcept;
 

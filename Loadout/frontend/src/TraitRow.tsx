@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { Dict } from "./i18n";
+import type { Messages } from "./messages";
 import {
   addressOf,
   pad,
@@ -48,7 +48,7 @@ export type Row = {
  * 上面的标记就不必背着十来个 props 走来走去。
  */
 export type RowContext = {
-  t: Dict;
+  t: Messages;
   notationOf: (key: string, level: number) => string;
   rest: (id: string, e: PointerEvent<HTMLElement>) => void;
   leave: (id: string) => void;
@@ -147,7 +147,7 @@ function ValueSlots({
             aria-label={`${label} Lv${level} ${valueLabel} ${i + 1}`}
             placeholder={String(vanillaOf(i))}
             // 空就是"游戏的数值留着"：槽在有人输入之前是 null，所以这个框不需要和
-            // 默认值比较就知道这一点——而手写进 sigiledits.json 的数字，会按它本来的值显示。
+            // 默认值比较就知道这一点——而手写进 gemedits.json 的数字，会按它本来的值显示。
             value={halfTyped[i] ?? (values[i] === null ? "" : String(values[i]))}
             onChange={(e) => {
               // 一次敲键意味着什么——丢弃、半输入状态，还是一个要提交的数字——

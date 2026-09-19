@@ -9,6 +9,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 发布 DLL 的元数据里不留 VCS 信息（与 build-release.ps1 给 Go 加的 -buildvcs=false 同一个
+         理由）。默认两者都是 true：SourceLink 会往 PDB 里写源链接，而 commit sha 会被追加到
+         informational version 上（实测 ProductVersion 曾是 "1.0.0+<sha>"）。
+         这个 mod 不发 PDB（build-release.ps1 会把 .pdb 删掉），所以源链接毫无用处——关掉零成本，
+         换来的是"同一份源码编出同一份元数据"。
+         刻意**不**加 <Version>：那会再造一处需要与 ModConfig.json 同步的版本号，而 ModConfig.json
+         是唯一的权威源（build-release.ps1 会对拍）。 -->
+    <EnableSourceLink>false</EnableSourceLink>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,13 +29,13 @@
   <ItemGroup>
     <None Include="ModConfig.json" CopyToOutputDirectory="Always" />
     <None Include="README.md" CopyToOutputDirectory="Always" />
-    <!-- 因子表的源头在工具的 assets\ 里（工具也要读同一份），打包时按 gem.json 这个名字
-         发到 mod 目录——native 与 C# 都是按这个名字找它的。 -->
+    <!-- 随包数据住在 mod 目录的 assets\ 下（与源码树的 Loadout\assets\ 同一布局，
+         所以仓库里只有这一份，也没有"开发副本"）。native 与 C# 都按 assets\gem.json 找它。 -->
     <None Include="..\Loadout\assets\gem.json"
-          Link="gem.json"
+          Link="assets\gem.json"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Loadout\assets\gem.chara.json"
-          Link="gem.chara.json"
+          Link="assets\gem.chara.json"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\GBFR.PreEquippedSigils.Native\bin\$(Configuration)\GBFR.PreEquippedSigils.Native.dll"
           Link="GBFR.PreEquippedSigils.Native.dll"

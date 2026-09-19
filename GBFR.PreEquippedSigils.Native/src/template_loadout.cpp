@@ -195,11 +195,11 @@ constexpr CharacterExclusiveLoadout kCharacterExclusives[] = {
 };
 
 // character_hash -> index into g_runtime_templates (built once in
-// InitializeRuntimeTemplates; ApplyCustomLoadout never reorders/removes
+// InitializeRuntimeTemplates; ApplyLoadout never reorders/removes
 // entries, only rewrites their slots), so the hot getter path is O(1).
 std::unordered_map<uint32_t, size_t> g_character_template_index;
 // Per-character exclusive overrides (absent entry = ExclusiveAll), guarded by
-// g_template_mutex and written by GBFR20_SetExclusiveOverrides.
+// g_template_mutex and written by GBFR20_ApplyLoadout.
 std::unordered_map<uint32_t, uint8_t> g_exclusive_state;
 
 TemplateGemSlot MakeSingleTraitSlot(uint32_t gem_id, uint32_t trait) noexcept
@@ -224,7 +224,7 @@ uint8_t ReadExclusiveStateLocked(uint32_t character_hash) noexcept
 
 // One independent factor per virtual slot (0 = T1, 1 = T2, 2 = war spirit);
 // disabled factors leave their slot empty. Other slots stay empty (they are
-// filled by the player loadout in ApplyCustomLoadout).
+// filled by the player loadout in ApplyLoadout).
 // Requires g_template_mutex held by the caller, with the character already
 // registered in g_character_template_index.
 void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept
@@ -243,6 +243,53 @@ void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept
       character.slots[1] = MakeSingleTraitSlot(exclusive.t2_gem, exclusive.t2_trait);
    if ((state & ExclusiveWar) != 0)
       character.slots[2] = MakeSingleTraitSlot(exclusive.war_gem, exclusive.war_trait);
+}
+
+// 这个词条 hash 是这个角色的哪一个专属槽（0 = 不是它的三个槽之一）。
+uint8_t ExclusiveBitForTrait(
+   const CharacterExclusiveLoadout& exclusive, uint32_t trait_hash) noexcept
+{
+   if (trait_hash == exclusive.t1_trait)
+      return ExclusiveT1;
+   if (trait_hash == exclusive.t2_trait)
+      return ExclusiveT2;
+   if (trait_hash == exclusive.war_trait)
+      return ExclusiveWar;
+   return 0;
+}
+
+// 把这次调用带来的专属开关**整体替换**进 g_exclusive_state。
+//
+// 只有"被关掉的槽"会留下条目，所以没被提到的角色就是三槽全开
+// （ReadExclusiveStateLocked 对缺失条目返回 ExclusiveAll）。槽位由 trait hash 认——
+// 那张专属表就在本文件里，所以托管侧不必知道哪个 hash 是 T1、哪个是战气，也不必再读
+// gem.chara.json。认不出的 (角色, 词条) 对直接忽略：没有别的兼容形状。
+//
+// Requires g_template_mutex held by the caller.
+void ApplyExclusiveSwitchesLocked(
+   const GBFR20_ExclusiveOverride* overrides, int32_t count) noexcept
+{
+   g_exclusive_state.clear();
+   if (overrides == nullptr || count <= 0)
+      return;
+   for (int32_t index = 0; index < count; ++index)
+   {
+      const GBFR20_ExclusiveOverride& override = overrides[index];
+      if (override.character_hash == 0 || override.disabled == 0)
+         continue;
+      const auto row = g_character_template_index.find(override.character_hash);
+      if (row == g_character_template_index.end())
+         continue; // 不属于任何角色：没有槽位可以关
+      const uint8_t bit =
+         ExclusiveBitForTrait(kCharacterExclusives[row->second], override.trait_hash);
+      if (bit == 0)
+         continue; // 不是这个角色的三个槽之一
+      const auto existing = g_exclusive_state.find(override.character_hash);
+      const uint8_t state = existing == g_exclusive_state.end()
+         ? ExclusiveAll
+         : existing->second;
+      g_exclusive_state[override.character_hash] = static_cast<uint8_t>(state & ~bit);
+   }
 }
 
 }
@@ -299,7 +346,7 @@ void InstallDefaultTemplateSelections()
       // under only the selection mutex would be a data race.
       std::unique_lock template_lock(g_template_mutex);
       std::unique_lock lock(g_selection_mutex);
-      // g_virtual_slot_count is published by ApplyCustomLoadout clamped to
+      // g_virtual_slot_count is published by ApplyLoadout clamped to
       // kVirtualSlotCapacity; clamp again so the slot index stays in range.
       const int slot_limit = std::min(
          g_virtual_slot_count.load(std::memory_order_acquire), kVirtualSlotCapacity);
@@ -322,10 +369,8 @@ void InstallDefaultTemplateSelections()
    const std::string layout = total_virtual > kBuiltinExclusiveSlotCount
       ? std::format("exclusive slots 1-3 (T1/T2/war), general slots 4-{}", total_virtual)
       : "exclusive slots 1-3 (T1/T2/war)";
-   // ApplyCustomLoadout and ApplyExclusiveOverrides each republish the selections
-   // (the second one picks up the overrides applied just before it), so a config
-   // that also carries an exclusive section would otherwise log this summary
-   // twice with the same count. Log only when the installed count changes.
+   // 这一行是 §6 的验证门禁，所以只在数量真的变了时打印：同一份配置被反复应用（比如用户
+   // 只改了某个因子的等级，mtime 变了、槽位数量没变）不该每次都刷一行同样的摘要。
    static std::atomic<size_t> last_installed{static_cast<size_t>(-1)};
    if (last_installed.exchange(installed, std::memory_order_acq_rel) == installed)
       return;
@@ -333,6 +378,15 @@ void InstallDefaultTemplateSelections()
       "Installed {} built-in template loadout selection(s). {}; inventory-independent.",
       installed,
       layout));
+}
+
+// 模板表变过之后必须做的事，只有这一个入口。以前三个调用点各拼一遍同一序列，而
+// "钩子还没装好就不排重建"这个条件只写在其中两个里。
+void PublishTemplateSelections() noexcept
+{
+   InstallDefaultTemplateSelections();
+   if (g_hooks_ready.load(std::memory_order_acquire))
+      ScheduleSelectedStatusRebind();
 }
 
 bool TryCopyTemplateGem(
@@ -367,13 +421,19 @@ bool TryCopyTemplateGem(
    return SafeCopyToOutput(gem, output);
 }
 
-bool ApplyCustomLoadout(const TemplateGemSlot* slots, int32_t count) noexcept
+bool ApplyLoadout(
+   const TemplateGemSlot* slots, int32_t slot_count,
+   const GBFR20_ExclusiveOverride* overrides, int32_t override_count) noexcept
 {
    // Player configuration only fills general slots kBuiltinExclusiveSlotCount+;
-   // slots 0/1/2 are assembled per character from the exclusives + overrides.
+   // slots 0/1/2 are assembled per character from the exclusives + their switches.
    // nullptr = no player config -> built-in template: zero player rows, so
    // effective_count is 0 and the general-slot loop below wipes rather than fills.
-   const int32_t requested = slots == nullptr ? 0 : std::max(count, 0);
+   //
+   // 两半一起来，是因为它们落在同一个"重新发布"步骤上：先整体替换专属开关，再逐个角色
+   // 组装，最后只发布一次。v17 把它们分成两个导出，代价是每份配置把同一张表发布（并打印）
+   // 两遍。
+   const int32_t requested = slots == nullptr ? 0 : std::max(slot_count, 0);
    const int32_t effective_count =
       std::min(requested, kVirtualSlotCapacity - kBuiltinExclusiveSlotCount);
    const int32_t total_slot_count = kBuiltinExclusiveSlotCount + effective_count;
@@ -397,6 +457,7 @@ bool ApplyCustomLoadout(const TemplateGemSlot* slots, int32_t count) noexcept
 
    {
       std::unique_lock lock(g_template_mutex);
+      ApplyExclusiveSwitchesLocked(overrides, override_count);
       for (CharacterTemplate& character : g_runtime_templates)
       {
          if (character.character_hash == 0)
@@ -430,41 +491,7 @@ bool ApplyCustomLoadout(const TemplateGemSlot* slots, int32_t count) noexcept
       }
    }
 
-   InstallDefaultTemplateSelections();
-   if (g_hooks_ready.load(std::memory_order_acquire))
-      ScheduleSelectedStatusRebind();
-   return true;
-}
-
-bool ApplyExclusiveOverrides(
-   const GBFR20_ExclusiveOverride* overrides, int32_t count) noexcept
-{
-   {
-      std::unique_lock lock(g_template_mutex);
-      g_exclusive_state.clear();
-      for (int32_t index = 0; index < count && overrides != nullptr; ++index)
-      {
-         const GBFR20_ExclusiveOverride& override = overrides[index];
-         if (override.character_hash == 0)
-            continue;
-         uint8_t state = ExclusiveAll;
-         if (override.disable_t1)
-            state &= ~ExclusiveT1;
-         if (override.disable_t2)
-            state &= ~ExclusiveT2;
-         if (override.disable_war)
-            state &= ~ExclusiveWar;
-         g_exclusive_state[override.character_hash] = state;
-      }
-      for (CharacterTemplate& character : g_runtime_templates)
-      {
-         if (character.character_hash != 0)
-            ApplyExclusiveStateLocked(character);
-      }
-   }
-   InstallDefaultTemplateSelections();
-   if (g_hooks_ready.load(std::memory_order_acquire))
-      ScheduleSelectedStatusRebind();
+   PublishTemplateSelections();
    return true;
 }
 }

@@ -29,9 +29,11 @@ public sealed class Mod : IMod
     private StreamWriter? _fileLog;
     private System.Threading.Timer? _tickTimer;
     private SigilEditFeature? _sigilEdit;
-    private bool _nativeCoreActive;
     private bool _disposed;
     private int _startRequested;
+    // 1 = 一次维持正在跑。宿主那条定时器的回调会并发触发（见 RunUpkeepTick）。
+    private int _tickRunning;
+    private string? _lastTickFailure;
 
     public Action Disposing => Dispose;
 
@@ -41,19 +43,20 @@ public sealed class Mod : IMod
 
     public void Suspend()
     {
-        // No frontend to suspend; the native core keeps running.
+        // 不会被调：CanSuspend() 说 false。原生钩子没法安全地"暂停"，所以这里不能假装
+        // 能暂停——说 true 只是向启动器承诺一个不存在的能力。
     }
 
     public void Resume()
     {
-        // No frontend to resume.
+        // 同 Suspend()。
     }
 
     public void Unload() => Dispose();
 
     public bool CanUnload() => false;
 
-    public bool CanSuspend() => true;
+    public bool CanSuspend() => false;
 
     private void QueueStart(IModLoaderV1 loaderApi)
     {
@@ -102,22 +105,8 @@ public sealed class Mod : IMod
             _sigilEdit.Start(loader);
             CompleteStartupPhase("sigil-edit", sigilEditStarted);
 
-            _nativeCoreActive = true;
             _tickTimer = new System.Threading.Timer(
-                _ =>
-                {
-                    try
-                    {
-                        LoadoutConfig.Tick(Log);
-                        _sigilEdit?.Tick();
-                        Hotkey.Tick(Log);
-                        NativeCore.Tick();
-                    }
-                    catch
-                    {
-                        // The upkeep tick must never tear down the process.
-                    }
-                },
+                _ => RunUpkeepTick(),
                 null,
                 TickIntervalMilliseconds,
                 TickIntervalMilliseconds);
@@ -172,6 +161,45 @@ public sealed class Mod : IMod
             Hotkey.UpdateHotkey(configuration.VirtualKey);
     }
 
+    /// <summary>
+    /// One upkeep pass.
+    ///
+    /// Single-flight: <see cref="System.Threading.Timer"/> does not wait for the previous
+    /// callback, while <see cref="SigilEditFeature.Tick"/> can spend seconds inside
+    /// HotApply's memory scan. Without this guard the three steps after it would run
+    /// concurrently with each other and with the next callback, and neither
+    /// LoadoutConfig's mtime gate nor Hotkey's polling is written for that. A skipped
+    /// pass loses nothing: every gate here re-checks the same file time next time round.
+    /// </summary>
+    private void RunUpkeepTick()
+    {
+        if (System.Threading.Interlocked.CompareExchange(ref _tickRunning, 1, 0) != 0)
+            return;
+        try
+        {
+            LoadoutConfig.Tick(Log);
+            _sigilEdit?.Tick();
+            Hotkey.Tick(Log);
+            NativeCore.Tick();
+        }
+        catch (Exception exception)
+        {
+            // The upkeep tick must never tear down the process - but a phase that dies
+            // every tick *silently* is a mod that "sometimes does nothing" with nothing in
+            // the log to go on. Report each distinct failure once and stay quiet after it.
+            string failure = exception.GetType().Name + ": " + exception.Message;
+            if (failure != _lastTickFailure)
+            {
+                _lastTickFailure = failure;
+                Log($"Upkeep tick failed; identical failures are not logged again: {exception}");
+            }
+        }
+        finally
+        {
+            System.Threading.Interlocked.Exchange(ref _tickRunning, 0);
+        }
+    }
+
     private void Log(string message)
     {
         string line = $"[{DateTime.Now:HH:mm:ss.fff}] [{LogTag}] {message}";
@@ -214,17 +242,17 @@ public sealed class Mod : IMod
         _sigilEdit?.Dispose();
         _sigilEdit = null;
         Hotkey.Shutdown();
-        if (_nativeCoreActive)
+        // 无条件关停。NativeCore.Initialize 一旦返回，原生 DLL 就已经加载、日志回调已经
+        // 挂上、钩子可能已经装好，而它之后的每一步都可能抛异常把控制权交到这里。以前这个
+        // 调用被一个"全都成功之后才置位"的标志门着，于是失败路径会让原生钩子一直留在游戏
+        // 里，同时托管侧已经宣称 Dispose 完成。Shutdown 自身是异常安全的。
+        try
         {
-            _nativeCoreActive = false;
-            try
-            {
-                NativeCore.Shutdown();
-            }
-            catch
-            {
-                // Preserve the original shutdown path.
-            }
+            NativeCore.Shutdown();
+        }
+        catch
+        {
+            // Preserve the original shutdown path.
         }
 
         lock (_logLock)

@@ -12,6 +12,7 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "lib": ["ESNext", "DOM"],
+    "types": ["node"],
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {

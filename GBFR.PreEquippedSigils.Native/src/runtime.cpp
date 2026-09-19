@@ -26,8 +26,10 @@ void Initialize()
       std::filesystem::path(module_path.data()).parent_path();
    // Character restrictions live in the merged tool table (gem.json):
    // exclusive rows carry a "character" field; scanned via the stable contract.
-   // Keep the file name in sync with managed LoadoutConfig.cs (_sigilsPath).
-   const std::filesystem::path sigils_path = module_directory / L"gem.json";
+   // 随包数据住在 mod 目录的 assets\ 下（与源码树的 Loadout\assets\ 同一布局）。
+   // Keep this path in sync with managed LoadoutConfig.cs (_sigilsPath).
+   const std::filesystem::path sigils_path =
+      module_directory / L"assets" / L"gem.json";
 
    const uint64_t executable_started = BeginStartupPhase("executable-validation");
    std::vector<wchar_t> executable_path(32768, L'\0');
@@ -75,7 +77,8 @@ void Initialize()
    const uint64_t activation_started =
       BeginStartupPhase("template-selection-install");
    InitializeRuntimeTemplates();
-   InstallDefaultTemplateSelections();
+   // 钩子还没装好，所以这一步只发布选择、不排重建（PublishTemplateSelections 自己判）。
+   PublishTemplateSelections();
    CompleteStartupPhase(
       "template-selection-install", activation_started, true);
 

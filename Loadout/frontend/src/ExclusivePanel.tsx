@@ -15,7 +15,8 @@ export function ExclusivePanel({
   names: Record<string, string>
   /** 当前语言的 PL 码 -> 角色名（chara.lang.json）；缺条目的行显示 PL 码。 */
   charaNames: Record<string, string>
-  onChange: (player: string, row: Exclusive, traitHash: string, value: boolean) => void
+  /** 只报"哪个角色码的哪个词条被切成了什么"；落到文件里的键由 App 决定。 */
+  onChange: (player: string, traitHash: string, value: boolean) => void
 }) {
   // One row per shared player code (Gran/Djeeta both PL0000 with the same
   // exclusives): the toggle is linked for both in-game characters.
@@ -31,7 +32,9 @@ export function ExclusivePanel({
   return (
     <div>
       {rows.map((e) => {
-          const st = state?.[e.player]
+          // 状态按**角色 hash** 存（那是身份）。合并成一行的那两个角色由 App 一起写，
+          // 所以读这一行的 hash 就代表了这一行。
+          const st = state?.[e.hash]
           return (
           <div
             key={e.player}
@@ -43,7 +46,7 @@ export function ExclusivePanel({
                 <label key={traitHash} className="flex min-w-0 items-center gap-1.5">
                   <Checkbox
                     checked={st?.[traitHash] ?? true}
-                    onCheckedChange={(v) => onChange(e.player, e, traitHash, v === true)}
+                    onCheckedChange={(v) => onChange(e.player, traitHash, v === true)}
                   />
                   <span className="truncate">{label}</span>
                 </label>
