@@ -566,6 +566,20 @@ bool FailResolution(std::string_view stage)
 }
 }
 
+bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept
+{
+   if (g_image_base == 0 || size == 0)
+      return false;
+   ImageView image{};
+   return TryBuildImageView(image) &&
+      IsRvaInSection(
+         image,
+         rva,
+         size,
+         IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE,
+         IMAGE_SCN_MEM_EXECUTE);
+}
+
 void ResetGameLayout() noexcept
 {
    // Initialization is process-wide and guarded by g_initialize_once. Once a

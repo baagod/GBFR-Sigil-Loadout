@@ -1,7 +1,7 @@
 # GBFR Pre-Equipped Sigils — 维护手册
 
 > 技术维护文档；用户向说明见 `README.md`。仓库根目录；源码 https://github.com/baagod/GBFR-Pre-Equipped-Sigils
-> 游戏版本 Granblue Fantasy: Relink Endless Ragnarok **2.0.5**；当前版本 **0.6.0**（ABI v18）。
+> 游戏版本 Granblue Fantasy: Relink Endless Ragnarok **2.0.5**；当前版本 **0.6.0**（ABI v19）。
 
 ## 1. 一句话说明
 
@@ -11,7 +11,8 @@
 
 同一个 mod 还内置了**因子参数编辑器**（原独立 mod `GBFR.SigilEdit`）：从游戏归档读出 `skill_status.tbl`，
 按用户配置目录下的 `gemedits.json` 改写其中的行；启动时经 `IDataManager` 交回，
-运行中则由宿主那条 250ms tick 按 mtime 门重写内存里那份表。两边互不相干：native 那半挂取值钩子，编辑器这半只动表。
+运行中则由宿主那条 250ms tick 按 mtime 门把改过的行原地写进游戏**已经解析好的那一份**表
+（地址由原生从语义锚点解析，见 §9）。两边互不相干：native 那半挂取值钩子，编辑器这半只动表。
 
 ## 2. 部件与边界
 
@@ -138,25 +139,26 @@ TemplateGemSlot{
 - `trait_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
 - **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
-- ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=18`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"。
+- ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=19`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"。
+- **因子热应用走的是"一个地址"，不是扫描**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**全内存扫描只是兜底**：锚点解析不出来（别的游戏版本）或上面任何一道闸不过时才跑一次，代价只在那一步付。所以别再把"扫描"当常态去优化——常态是零扫描。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 词条 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
   **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
   槽位由**原生侧**按词条 hash 认（`ExclusiveBitForTrait`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务工具的专属页。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
 - 缩进：native 3 空格、托管 4 空格。
-- `Mod.cs` 的维持 Tick 是**单飞**的（`RunUpkeepTick` 里的 Interlocked 守卫）：`SigilEditFeature.Tick` 里那次全内存扫描要 5–6 秒，而 `System.Threading.Timer` 不等上一次回调结束。拿掉守卫，另外三个阶段（`LoadoutConfig` 的 mtime 门、`Hotkey` 的轮询、`NativeCore.Tick`）就会互相并发——那些状态都不是为此写的。因为宿主已经单飞，`SigilEditFeature` 自己不需要第二把重入锁。
+- `Mod.cs` 的维持 Tick 是**单飞**的（`RunUpkeepTick` 里的 Interlocked 守卫）：`SigilEditFeature.Tick` 里那条**兜底**全内存扫描要 5–6 秒（常态路径是一次原地写，毫秒级），而 `System.Threading.Timer` 不等上一次回调结束。拿掉守卫，另外三个阶段（`LoadoutConfig` 的 mtime 门、`Hotkey` 的轮询、`NativeCore.Tick`）就会互相并发——那些状态都不是为此写的。因为宿主已经单飞，`SigilEditFeature` 自己不需要第二把重入锁。
 - `loadout.json` 只有 `SaveLoadout` 一个写入口，且是"后提交者胜"：提交时取递增序号，写盘前比对，过期的那一份直接放弃。别改成无序号裸写——一次慢写（杀软扫 %LOCALAPPDATA%）会让两次保存在飞，而磁盘内容取决于最后完成的那个 rename。
 
 ## 7. 已知限制与未来方向
 
 - 后续方向：物品权威组合表。
 - 扩展新角色 = 生成器数据表加条目 + 查该角色专属因子 hash。
-- 游戏更新后需回归：`layout_resolver` 锚点可能失效；日志出现 layout failed 时等更新方案或重新逆向。
+- 游戏更新后需回归：`layout_resolver` 锚点可能失效；日志出现 layout failed 时等更新方案或重新逆向。`table_slot.cpp` 的锚点同理，但**失效只是退化**：它拒绝解析、热应用落回全内存扫描，不会写错地方——所以那类日志后面跟着 `falling back to the full-memory scan` 时功能仍然可用，只是慢回去。
 - `GBFR.SigilEdit` 已并入本 mod（见 §1）：两个 mod 同时装会让同一个 `skill_status` 表被两份 `IDataManager` 互相注册覆盖，所以发布说明里必须写"不要同时装"。
 
 ## 8. 背景与现状
 
-- 版本 v0.6.0（ABI v18）。入口配装：每角色专属 3 独立槽（T1/T2/战气，默认全开）+ 玩家通用槽（固定 12 行编辑器，无内置通用默认）。
+- 版本 v0.6.0（ABI v19）。入口配装：每角色专属 3 独立槽（T1/T2/战气，默认全开）+ 玩家通用槽（固定 12 行编辑器，无内置通用默认）。
 - 主控与 AI 角色都吃注入（明镜止水的守护 / HP 吸收 / 追击 / 迅捷）——卸主槽因子实测确认。
 - 槽位 / 版本 / 数据改动后需同步：本手册头部、`README.md`、`ModConfig.json`、`build-release.ps1`（版本号唯一权威源是 `ModConfig.json`）。
 - 逐版变更明细见 git log，本手册不再重复维护。
@@ -186,10 +188,11 @@ TemplateGemSlot{
 | 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
 | 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；文案只有**一份** `messages.ts`（`Record<Lang, Messages>`，漏一种语言 tsc 就报错），语言身份（有哪些语言 / 切换键标签 / 系统语言猜测）在 `lang.ts`。名字也四种齐全：配装页按当前语言取内嵌的 `gem.lang.json`（经 Go 的 `GemNames(lang)`），专属因子页的角色名取 `chara.lang.json`（`CharaNames(lang)`），因子编辑页取 `skill.<lang>.json` | TS App.tsx / messages.ts / lang.ts / Go loadoutservice.go / docs\tool-gen-sigils.ps1 / docs\tool-gen-texts.ps1 |
 | 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |
-| 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48） | C# SigilEditFeature.cs（启动与热应用共用同一套偏移量） |
-| 原生 ABI 版本 | 18 | native_api.h / C# NativeCore.cs AbiVersion |
+| 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48）。**行数不写死在任何一边**：托管侧从归档读出的表自己定义形状，原生只检查游戏那份与它一致 | C# SigilEditFeature.cs（启动与热应用共用同一套偏移量） |
+| skill_status 活表地址 | 游戏把已解析的表发布在一个固定槽里；槽的地址由原生从**语义锚点**（唯一的"行数×52 + 表首"行循环锚点，加上锚点前 0x800 字节里那一对发布指令）解析，不写死 RVA、失败即拒写。锚点字节与实测数字的唯一持有者是代码注释 | Native src/table_slot.cpp |
+| 原生 ABI 版本 | 19 | native_api.h / C# NativeCore.cs AbiVersion |
 | 原生结构尺寸 | TemplateSlot 0x18 / ExclusiveOverride 0x0C | native_api.h static_assert / C# EnsureAbiLayout（Marshal.SizeOf，加载后即对拍） |
-| 原生导出口 | 7 个：GetAbiVersion / SetLogCallback / Initialize / Tick / Shutdown / CopyRuntimeMessage / ApplyLoadout | native_api.h |
+| 原生导出口 | 8 个：GetAbiVersion / SetLogCallback / Initialize / Tick / Shutdown / CopyRuntimeMessage / ApplyLoadout / WriteSkillStatusTable | native_api.h |
 | 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条词条自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
 | `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的词条 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |
 | 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 gem.json 测） | TS model.ts |

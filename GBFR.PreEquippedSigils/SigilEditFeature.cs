@@ -115,7 +115,6 @@ internal sealed class SigilEditFeature
             // 每次应用前由 BuildTablePair 重新读编辑列表，所以它交上去的就是此刻的文件，
             // 也就是工具刚写下的那份。构造器本身只记下这几个委托，不读文件。
             _hotApply = new HotApply(_log, file, BuildTablePair, RegisterWithManager);
-            _hotApply.Start();
 
             if (file is null)
                 return;
@@ -217,8 +216,7 @@ internal sealed class SigilEditFeature
     }
 
     /// <summary>
-    /// 停掉热应用的定位线程，并把引用清掉——否则卸载之后 tick 仍可能叫起一次全内存扫描。
-    /// 定位线程是后台线程，进程退出时本来就会没，这里管的是"游戏还开着、mod 被重载"。
+    /// 置上停止标志并把引用清掉——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。
     /// </summary>
     public void Dispose()
     {

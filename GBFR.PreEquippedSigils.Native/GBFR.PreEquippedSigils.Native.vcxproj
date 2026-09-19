@@ -94,6 +94,7 @@
     <ClCompile Include="src\runtime_state.cpp" />
     <ClCompile Include="src\safe_game_access.cpp" />
     <ClCompile Include="src\selection_store.cpp" />
+    <ClCompile Include="src\table_slot.cpp" />
     <ClCompile Include="src\template_loadout.cpp" />
     <ClCompile Include="src\trait_hooks.cpp" />
     <ClCompile Include="third_party\safetyhook.cpp">

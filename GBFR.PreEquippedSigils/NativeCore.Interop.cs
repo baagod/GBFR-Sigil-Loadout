@@ -57,6 +57,23 @@ internal static unsafe partial class NativeCore
         uint overrideCount);
 
     /// <summary>
+    /// 把整张编辑后的表交给原生，写进**游戏自己已经解析好的那一份**。那一份的地址由原生从语义
+    /// 锚点解析出来（见原生 src/table_slot.cpp），托管侧既不持有地址、也不扫描内存——这就是
+    /// "唯一那张表、零扫描"。
+    ///
+    /// 返回 >= 0 是这次真正改写的 52 字节行数（0 = 内存里已经是一样的）；< 0 是拒绝码，且一个
+    /// 字节都没写，原因由原生落一行日志（码的含义与那行日志都在 native_api.h / exports.cpp）。
+    /// </summary>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int GBFR20_WriteSkillStatusTable(byte* table, uint length);
+
+    internal static int WriteSkillStatusTable(byte[] table)
+    {
+        fixed (byte* pointer = table)
+            return GBFR20_WriteSkillStatusTable(pointer, (uint)table.Length);
+    }
+
+    /// <summary>
     /// 托管侧的 ABI 布局自检，与 native_api.h 的 static_assert 一一对应。
     ///
     /// 版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"——而后者才是结构体错位最

@@ -263,6 +263,7 @@ extern thread_local NaturalContributionFrame g_tls_natural_contribution;
 
 int GetVirtualSlotCount() noexcept;
 int GetExpandedInternalSlotCount() noexcept;
+bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept;
 void Log(const std::string& message);
 // Phases are timed with GetTickCount64 at the call site and log once on
 // completion (with elapsed time); failures are still reported explicitly, so a
@@ -316,5 +317,12 @@ void ShutdownHooks();
 bool InstallHooks();
 void Initialize();
 void EnsureInitialized();
+// 从语义锚点解析游戏发布 skill_status 表的那个固定槽，并把两个 RVA 缓存在
+// src/table_slot.cpp 里：WriteSkillStatusTable 每次调用都从它取地址。
+// 解析失败只记日志，不影响其余任何初始化（热应用随后落回托管层的扫描）。
+void ResolveTableSlot();
+// GBFR20_WriteSkillStatusTable 的实现：校验后把整表按行差异写进游戏那份活表。
+// 返回 >= 0 是改写的行数，< 0 是 native_api.h 里的拒绝码（一个字节都没写）。
+int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept;
 void ConsumeApplyResult();
 }

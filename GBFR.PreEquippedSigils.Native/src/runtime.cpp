@@ -51,6 +51,11 @@ void Initialize()
    CompleteStartupPhase(
       "template-selection-install", activation_started, true);
 
+   // 热应用要用的那个槽必须在 InstallHooks() 之前解析——我们自己装的 safetyhook 会改写
+   // .text，锚点要在没被改写的字节上匹配。它与钩子装没装成也无关，所以不拿 hooks_installed
+   // 当门。
+   ResolveTableSlot();
+
    const uint64_t hooks_started = GetTickCount64();
    const bool hooks_installed = InstallHooks();
    CompleteStartupPhase("native-hook-install", hooks_started, hooks_installed);

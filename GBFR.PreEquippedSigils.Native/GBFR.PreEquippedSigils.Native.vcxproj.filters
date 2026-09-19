@@ -43,6 +43,9 @@
     <ClCompile Include="src\selection_store.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\table_slot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\template_loadout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
