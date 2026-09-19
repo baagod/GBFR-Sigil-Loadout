@@ -294,7 +294,7 @@ std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash)
 // Bumps the shared apply generation; never returns 0 (0 means "no generation"
 // in the detour's pending-apply checks).
 uint32_t NextApplyGeneration();
-uint32_t RequestHotApply(uint32_t character_hash);
+void RequestHotApply(uint32_t character_hash);
 void ProcessPendingHotApply();
 
 bool TryGetRuntimeSlot(uint32_t character_hash, int virtual_slot, TemplateGemSlot& out) noexcept;

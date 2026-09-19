@@ -72,19 +72,20 @@ uint32_t NextApplyGeneration()
    return generation;
 }
 
-uint32_t RequestHotApply(uint32_t character_hash)
+// 返回值没有调用者使用（唯一调用点 trait_hooks.cpp 直接丢弃它），所以不返回：
+// 需要代号的路径（日志、重排）都在函数内部各自记录。
+void RequestHotApply(uint32_t character_hash)
 {
    if (character_hash == 0)
    {
       g_apply_result.store(ApplyResultSavedNoStatus, std::memory_order_release);
-      return 0;
+      return;
    }
    const uint32_t generation = NextApplyGeneration();
    const uint64_t request =
       (static_cast<uint64_t>(generation) << 32) | static_cast<uint64_t>(character_hash);
    g_apply_retry_not_before_ms.store(0, std::memory_order_release);
    g_queued_apply_request.store(request, std::memory_order_release);
-   return generation;
 }
 
 void ProcessPendingHotApply()
