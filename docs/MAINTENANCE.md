@@ -163,6 +163,12 @@ TemplateGemSlot{
 
 ## 9. 跨语言协议常量表（改动需同步，勿漂移）
 
+> **能断言的那部分已经断言了**：`Loadout\sharedconstants_test.go` 会读 C# / Go / TS / C++ 的源码，
+> 把**同一份事实的多处声明**对拍（MaxSlots、DefaultLevel、UnwornCharacterHash、隐藏键回落值、
+> 工具窗口标题、激活消息 0x8010、`tool-hotkey.txt` 文件名）——任何一边漂了 `go test` 就红。
+> 下面剩下的每一行都是**断言不了**的：要么是语义约定（"只写 false"、"空列表 = 撤销"），要么是
+> 第三方行为（依赖是否可选、表布局），要么只有实机才看得见。改它们时请顺手说清"为什么"。
+
 | 常量 | 值 | 位置 |
 |---|---|---|
 | 通用槽上限 MaxSlots | 12（三方均只计启用槽） | C# LoadoutConfig.cs / Go loadoutservice.go / TS model.ts |
