@@ -8,34 +8,6 @@ function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
 }
 
-function AlertDialogTrigger({ ...props }: AlertDialogPrimitive.Trigger.Props) {
-  return (
-    <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
-  )
-}
-
-function AlertDialogPortal({ ...props }: AlertDialogPrimitive.Portal.Props) {
-  return (
-    <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />
-  )
-}
-
-function AlertDialogOverlay({
-  className,
-  ...props
-}: AlertDialogPrimitive.Backdrop.Props) {
-  return (
-    <AlertDialogPrimitive.Backdrop
-      data-slot="alert-dialog-overlay"
-      className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
 function AlertDialogContent({
   className,
   size = "default",
@@ -44,8 +16,11 @@ function AlertDialogContent({
   size?: "default" | "sm"
 }) {
   return (
-    <AlertDialogPortal>
-      <AlertDialogOverlay />
+    <AlertDialogPrimitive.Portal>
+      <AlertDialogPrimitive.Backdrop
+        data-slot="alert-dialog-overlay"
+        className="fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+      />
       <AlertDialogPrimitive.Popup
         data-slot="alert-dialog-content"
         data-size={size}
@@ -55,7 +30,7 @@ function AlertDialogContent({
         )}
         {...props}
       />
-    </AlertDialogPortal>
+    </AlertDialogPrimitive.Portal>
   )
 }
 
@@ -84,22 +59,6 @@ function AlertDialogFooter({
       data-slot="alert-dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end bg-muted/50 -mx-4 -mb-4 rounded-b-xl border-t p-4",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function AlertDialogMedia({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-dialog-media"
-      className={cn(
-        "mb-2 inline-flex size-16 items-center justify-center rounded-md bg-muted sm:group-data-[size=default]/alert-dialog-content:row-span-2 *:[svg:not([class*='size-'])]:size-8",
         className
       )}
       {...props}
@@ -152,36 +111,12 @@ function AlertDialogAction({
   )
 }
 
-function AlertDialogCancel({
-  className,
-  variant = "outline",
-  size = "default",
-  ...props
-}: AlertDialogPrimitive.Close.Props &
-  Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
-  return (
-    <AlertDialogPrimitive.Close
-      data-slot="alert-dialog-cancel"
-      // Programmatic initial focus (base-ui initialFocus) only matches :focus,
-      // not :focus-visible — show the ring on plain focus too.
-      className={cn("focus:ring-3 focus:ring-ring/50", className)}
-      render={<Button variant={variant} size={size} />}
-      {...props}
-    />
-  )
-}
-
 export {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogOverlay,
-  AlertDialogPortal,
   AlertDialogTitle,
-  AlertDialogTrigger,
 }

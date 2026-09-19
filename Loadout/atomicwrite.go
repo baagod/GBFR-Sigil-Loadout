@@ -24,17 +24,18 @@ func writeFileAtomic(path string, data []byte) error {
 		return fmt.Errorf("creating a temporary file next to %s: %w", path, err)
 	}
 	tmpName := tmp.Name()
+	// 中转文件只有两个结局：rename 到位，或者被删掉。成功的路径上它已经不在，
+	// 这一次 Remove 什么也找不到，于是每一条路径都只需要写一遍清理。
+	defer os.Remove(tmpName)
+
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		os.Remove(tmpName)
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		os.Remove(tmpName)
 		return fmt.Errorf("replacing %s: %w", path, err)
 	}
 	return nil

@@ -5,7 +5,7 @@
   如何排序、如何保存——它们要的东西以 props 的形式到达：行数据、指针是否在这一行上、
   这个因子是否展开，以及装着 App 那几个回调的 context。
 */
-import { Fragment, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { Fragment, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +28,7 @@ import {
   type SigilTrait,
   type TraitInfo,
 } from "./traits";
+import { useWheelStep } from "./useWheelStep";
 
 /** 一个因子的行和它的各个等级，由列表这样构建出来。 */
 export type Row = {
@@ -36,7 +37,6 @@ export type Row = {
   /** 游戏对这个因子本身的一句话，父行读的就是它。 */
   summary: string;
   info?: TraitInfo;
-  records: SigilTrait[];
   byLevel: Map<number, SigilTrait>;
   enabled: boolean;
   levels: number[];
@@ -94,36 +94,29 @@ function ValueSlots({
   const vanillaOf = (i: number) => defaults?.[i] ?? 0;
 
   /*
-    滚轮让聚焦的框步进，而列表不能跟着一起滚。
+    滚轮让聚焦的框步进，而列表不能跟着一起滚——监听器为什么必须是原生的、
+    passive: false 的，以及最新数值从哪来，见 useWheelStep。
 
-    React 把 wheel 监听器注册为 passive，所以写在 onWheel prop 里的 preventDefault
-    毫无作用：浏览器照旧警告并滚动列表，而框同时也在步进。因此监听器必须是原生的，
-    并以 passive: false 添加——这就是那个 ref 的由来，还有让这一个监听器读到最新
-    数值的 latest-props ref。
+    是哪个框，按位置判断：这一行里正好只有这些槽，没有别的东西，所以不必为此把索引带进 DOM。
   */
   const host = useRef<HTMLDivElement>(null);
-  const latest = useRef({ values, defaults, onChange });
-  latest.current = { values, defaults, onChange };
-
-  useEffect(() => {
-    const element = host.current;
-    if (!element) return;
-    const onWheel = (event: WheelEvent) => {
-      const target = event.target as HTMLInputElement | null;
-      if (!target || document.activeElement !== target) return;
-      // 是哪个框，按位置判断：这一行里正好只有这些槽，没有别的东西，所以不必为此把索引带进 DOM。
-      const index = Array.prototype.indexOf.call(element.querySelectorAll("input"), target);
+  useWheelStep(
+    host,
+    (target) => document.activeElement === target,
+    (target, delta) => {
+      const element = host.current;
+      if (!element) return;
+      const index = Array.prototype.indexOf.call(
+        element.querySelectorAll("input"),
+        target,
+      );
       if (index < 0) return;
-      event.preventDefault();
-      const { values, defaults, onChange } = latest.current;
       // 没碰过的槽从游戏自己的数值步进，那正是框里显示的东西。
       const from = values[index] ?? defaults?.[index] ?? 0;
       setHalfTyped(({ [index]: _dropped, ...rest }) => rest);
-      onChange(withSlot(values, index, stepValue(from, event.deltaY < 0 ? 1 : -1)));
-    };
-    element.addEventListener("wheel", onWheel, { passive: false });
-    return () => element.removeEventListener("wheel", onWheel);
-  }, []);
+      onChange(withSlot(values, index, stepValue(from, delta)));
+    },
+  );
 
   return (
     // 行里唯一有弹性的部分：名字和等级用不完的都归数值，它们平分这点空间。

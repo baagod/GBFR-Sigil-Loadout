@@ -247,7 +247,6 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
           // 不是针对其中某个等级的。
           summary: texts[key]?.summary ?? "",
           info,
-          records,
           byLevel,
           enabled: records.some((record) => record.enabled),
           // 因子显示哪些等级、按什么顺序，是 traits.ts 的事。

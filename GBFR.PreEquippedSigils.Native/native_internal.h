@@ -48,7 +48,6 @@ struct ResolvedGameLayout
    uintptr_t status_context_mode_offset = 0;
    uint8_t trait_apply_original_limit = 0;
    uint8_t trait_category_original_limit = 0;
-   uint32_t pe_timestamp = 0;
 };
 
 inline constexpr int kNativeInternalSlotCount = 13;
@@ -230,9 +229,6 @@ extern std::shared_mutex g_authorization_mutex;
 extern std::unordered_map<uintptr_t, AuthorizedStatus> g_authorized_statuses;
 
 extern std::atomic_int32_t g_edit_session_state;
-extern std::atomic_uint32_t g_observed_character_hash;
-extern std::atomic_uint64_t g_observed_status_address;
-extern std::atomic_int32_t g_observed_status_context;
 extern std::atomic_uint64_t g_lifecycle_rebind_signature;
 // 同一状态没到位时的下一次补排时间点（GetTickCount64 口径）。见 trait_hooks.cpp 的
 // ScheduleSelectedStatusRebind：没到位就补排、到位即停，这个值只是节流。
@@ -268,7 +264,9 @@ extern thread_local NaturalContributionFrame g_tls_natural_contribution;
 int GetVirtualSlotCount() noexcept;
 int GetExpandedInternalSlotCount() noexcept;
 void Log(const std::string& message);
-uint64_t BeginStartupPhase(std::string_view phase);
+// Phases are timed with GetTickCount64 at the call site and log once on
+// completion (with elapsed time); failures are still reported explicitly, so a
+// stuck startup is identifiable by the last completed phase.
 void CompleteStartupPhase(std::string_view phase, uint64_t started_at_ms, bool succeeded);
 void SetRuntimeMessage(std::string message);
 

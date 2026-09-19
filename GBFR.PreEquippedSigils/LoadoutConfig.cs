@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace GBFR.PreEquippedSigils;
@@ -253,9 +254,6 @@ internal static class LoadoutConfig
     private static string Hx(JsonElement e) =>
         e.ValueKind == JsonValueKind.String ? (e.GetString() ?? "").Trim().ToUpperInvariant() : "";
 
-    private static uint PU(string hex)
-    {
-        try { return Convert.ToUInt32(hex, 16); }
-        catch { return 0; }
-    }
+    private static uint PU(string hex) =>
+        uint.TryParse(hex, NumberStyles.HexNumber, null, out uint value) ? value : 0;
 }

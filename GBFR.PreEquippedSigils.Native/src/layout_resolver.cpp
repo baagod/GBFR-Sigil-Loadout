@@ -584,7 +584,6 @@ bool ResolveGameLayout()
       return FailResolution("PE image validation");
 
    ResolvedGameLayout layout{};
-   layout.pe_timestamp = image.nt->FileHeader.TimeDateStamp;
 
    uintptr_t apply_loop = 0;
    uintptr_t category_loop = 0;
@@ -747,7 +746,7 @@ bool ResolveGameLayout()
    // session（钩子落到了别处）时才需要，平时扫日志不该被这串地址堵住眼睛。
    Log(std::format(
       "Layout resolved and validated from semantic anchors (PE 0x{:X}).",
-      layout.pe_timestamp));
+      image.nt->FileHeader.TimeDateStamp));
    Log(std::format(
       "  getter=0x{:X} SystemData=0x{:X} StatusManager=0x{:X} UiManager=0x{:X}",
       layout.get_gem_data_by_index_rva,

@@ -129,20 +129,14 @@ func (s *LoadoutService) LoadSigils() (string, error) {
 // 与 EditService.SkillMap 同一个形状与理由。不认得的语言回落中文，单个词条缺名字时
 // 调用方回落成 hash——这里不猜。
 func (s *LoadoutService) GemNames(lang string) map[string]string {
-	if names, ok := gemNamesByLang[lang]; ok {
-		return names
-	}
-	return gemNamesByLang[LangZH]
+	return pick(lang, gemNamesByLang)
 }
 
 // CharaNames returns the character display names for one language: {角色码: 名字},
 // sliced out of the embedded chara.lang.json. 键就是 gem.chara.json 的 player，
 // 不认得的语言与 GemNames 一样回落中文。
 func (s *LoadoutService) CharaNames(lang string) map[string]string {
-	if names, ok := charaNamesByLang[lang]; ok {
-		return names
-	}
-	return charaNamesByLang[LangZH]
+	return pick(lang, charaNamesByLang)
 }
 
 // LoadConfig returns the player configuration from the user directory; an

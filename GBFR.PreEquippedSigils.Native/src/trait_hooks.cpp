@@ -350,9 +350,6 @@ void ScheduleSelectedStatusRebind()
    uint32_t character_hash = 0;
    if (!SafeReadUiSelectedCharacterHash(character_hash))
    {
-      g_observed_character_hash.store(0, std::memory_order_release);
-      g_observed_status_address.store(0, std::memory_order_release);
-      g_observed_status_context.store(-1, std::memory_order_release);
       return;
    }
 
@@ -361,19 +358,12 @@ void ScheduleSelectedStatusRebind()
    StatusIdentity identity{};
    if (!SafeResolveSelectedCharacterStatus(character_hash, manager, status, identity))
    {
-      g_observed_character_hash.store(character_hash, std::memory_order_release);
-      g_observed_status_address.store(0, std::memory_order_release);
-      g_observed_status_context.store(-1, std::memory_order_release);
       return;
    }
 
-   // 观测值照旧更新（诊断与其它路径读它们），但"身份变没变"**不再**是放行条件：那正是缺陷所在——
+   // "身份变没变"**不是**放行条件：那正是缺陷所在——
    // 同一个 (角色, 状态, 上下文) 只给一次机会，而那一次可能被丢掉（见下面 queued/in_flight 闸），
    // 丢掉之后就再也没有补排，只能等用户去切一次上下文（切角色/切界面）。
-   g_observed_character_hash.store(character_hash, std::memory_order_release);
-   g_observed_status_address.store(status, std::memory_order_release);
-   g_observed_status_context.store(identity.context_mode, std::memory_order_release);
-
    const auto selection = GetSelection(character_hash);
    if (std::none_of(selection.begin(), selection.end(), [](uint32_t slot_id) {
           return slot_id != 0;
@@ -498,9 +488,6 @@ void ShutdownHooks()
    g_queued_apply_request.store(0, std::memory_order_release);
    g_apply_retry_not_before_ms.store(0, std::memory_order_release);
    g_active_apply_generation.store(0, std::memory_order_release);
-   g_observed_character_hash.store(0, std::memory_order_release);
-   g_observed_status_address.store(0, std::memory_order_release);
-   g_observed_status_context.store(-1, std::memory_order_release);
 
    DisableGameplayHooksAndRestore();
 }
@@ -526,7 +513,7 @@ bool ApplyTraitLoopLimits(int32_t virtual_slot_count) noexcept
 
 bool InstallHooks()
 {
-   const uint64_t preflight_started = BeginStartupPhase("required-byte-rva-preflight");
+   const uint64_t preflight_started = GetTickCount64();
    const bool preflight_ready = RevalidateGameLayout();
    CompleteStartupPhase(
       "required-byte-rva-preflight", preflight_started, preflight_ready);
@@ -538,7 +525,7 @@ bool InstallHooks()
       return false;
    }
 
-   const uint64_t gem_hook_started = BeginStartupPhase("gem-data-getter-hook");
+   const uint64_t gem_hook_started = GetTickCount64();
    g_get_gem_hook = safetyhook::create_inline(
       reinterpret_cast<void*>(
          g_image_base + g_game_layout.get_gem_data_by_index_rva),
@@ -552,7 +539,7 @@ bool InstallHooks()
       return false;
    }
 
-   const uint64_t trait_hook_started = BeginStartupPhase("trait-fetch-hook");
+   const uint64_t trait_hook_started = GetTickCount64();
    g_trait_fetch_hook = safetyhook::create_mid(
       reinterpret_cast<void*>(
          g_image_base + g_game_layout.trait_fetch_path_rva),
@@ -566,7 +553,7 @@ bool InstallHooks()
       return false;
    }
 
-   const uint64_t loop_patch_started = BeginStartupPhase("trait-loop-limit-patches");
+   const uint64_t loop_patch_started = GetTickCount64();
    const bool loop_patches_ready = ApplyTraitLoopLimits(GetVirtualSlotCount());
    CompleteStartupPhase(
       "trait-loop-limit-patches", loop_patch_started, loop_patches_ready);

@@ -60,6 +60,15 @@ type EditService struct {
 // LangZH 是工具被问到一个它没有对应表的语言时回退使用的语言。
 const LangZH = "zh"
 
+// pick 从一张按语言分好的表里取出某种语言，不认得的语言回落到 LangZH。
+// 三条查表路径（SkillMap、GemNames、CharaNames）除此之外没有任何共同点。
+func pick[T any](lang string, tables map[string]T) T {
+	if table, ok := tables[lang]; ok {
+		return table
+	}
+	return tables[LangZH]
+}
+
 // mustDecode 把一张内嵌表变成以因子哈希为 Key 的 map。
 //
 // 内嵌资产是编译期产物：解不出来说明生成器写出了坏文件。旧版本在这里丢掉错误、
@@ -121,10 +130,7 @@ var skillTables = map[string]map[string]SkillText{
 // SkillMap 返回某种语言的整张 哈希 -> 文案 表，好让前端在本地解析名称和说明，
 // 而不是每行发一次调用。未知语言会拿到回退语言，而不是一个空列表。
 func (s *EditService) SkillMap(lang string) map[string]SkillText {
-	if texts, ok := skillTables[lang]; ok {
-		return texts
-	}
-	return skillTables[LangZH]
+	return pick(lang, skillTables)
 }
 
 // TraitRow 是一个带数字的因子的某一行 skill_status：等级，以及那一行的十个

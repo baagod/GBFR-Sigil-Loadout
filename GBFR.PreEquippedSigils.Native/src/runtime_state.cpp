@@ -17,9 +17,6 @@ std::mutex g_message_mutex;
 std::string g_runtime_message = "Waiting for initialization.";
 
 std::atomic_int32_t g_edit_session_state{EditSessionUnknownLocked};
-std::atomic_uint32_t g_observed_character_hash{0};
-std::atomic_uint64_t g_observed_status_address{0};
-std::atomic_int32_t g_observed_status_context{-1};
 std::atomic_uint64_t g_lifecycle_rebind_signature{0};
 std::atomic_uint64_t g_lifecycle_rebind_not_before_ms{0};
 std::atomic_uint64_t g_rebind_pending_signature{0};
@@ -53,14 +50,6 @@ void Log(const std::string& message)
    {
       callback(message.c_str());
    }
-}
-
-uint64_t BeginStartupPhase(std::string_view)
-{
-   // Phases log once on completion (with elapsed time); failures are still
-   // reported explicitly by CompleteStartupPhase, so a stuck startup is
-   // identifiable by the last completed phase.
-   return GetTickCount64();
 }
 
 void CompleteStartupPhase(

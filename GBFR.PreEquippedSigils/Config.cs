@@ -62,7 +62,6 @@ public class Config
         // nothing is folded, nothing is guessed. A file from an older build (the keys were
         // capitalised then) reads as an empty list, which is the documented "nothing to do
         // this launch" - SigilEditFeature.LoadConfig logs the count it got.
-        PropertyNameCaseInsensitive = false,
     };
 
     /// <summary>

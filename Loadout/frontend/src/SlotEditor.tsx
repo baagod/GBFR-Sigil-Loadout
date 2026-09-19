@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react"
+import { memo, useRef } from "react"
 import {
   InputGroup,
   InputGroupAddon,
@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { TraitPicker } from "./TraitPicker"
 import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "./model"
 import type { Messages } from "./messages"
+import { useWheelStep } from "./useWheelStep"
 
 /* Fixed side columns + factor columns that eat all remaining width. */
 const GRID_COLS =
@@ -34,30 +35,17 @@ function LevelInput({
 }) {
   const groupRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
-  // Latest props for the native wheel listener, so changing the level never
-  // re-registers the listener.
-  const levelRef = useRef({ value, min, max, onLevel })
-  levelRef.current = { value, min, max, onLevel }
 
   // Wheel adjusts the level over the WHOLE input group (suffix "/ max"
   // included), but only while the number input is focused — otherwise the
-  // wheel is left alone and scrolls the page. Native listener with
-  // passive: false so preventDefault can suppress the scroll (React's
-  // synthetic onWheel is passive and cannot be prevented).
-  useEffect(() => {
-    const el = groupRef.current
-    const input = inputRef.current
-    if (!el || disabled) return
-    const onWheel = (e: WheelEvent) => {
-      if (input === null || document.activeElement !== input) return
-      e.preventDefault()
-      const step = e.deltaY < 0 ? 1 : -1
-      const current = levelRef.current
-      onLevel(Math.max(current.min, Math.min(current.max, current.value + step)))
-    }
-    el.addEventListener("wheel", onWheel, { passive: false })
-    return () => el.removeEventListener("wheel", onWheel)
-  }, [disabled])
+  // wheel is left alone and scrolls the page. Why the listener is native and
+  // passive: false lives in useWheelStep.
+  useWheelStep(
+    groupRef,
+    () => document.activeElement === inputRef.current,
+    (_target, delta) => onLevel(Math.max(min, Math.min(max, value + delta))),
+    !disabled,
+  )
 
   return (
     <InputGroup ref={groupRef} className="w-20 shrink-0">

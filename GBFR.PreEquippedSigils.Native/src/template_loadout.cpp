@@ -332,21 +332,8 @@ bool ApplyLoadout(
          if (character.character_hash == 0)
             continue;
          ApplyExclusiveStateLocked(character);
-         // Kept as an explicit branch even though the fill loop below would
-         // write TemplateGemSlot{} for every slot when effective_count is 0:
-         // it makes the null `slots` provably unable to reach slots[...], and
-         // that deref writes into game process memory.
-         if (effective_count <= 0)
-         {
-            // Built-in mode owns only the exclusive slots: wipe the general
-            // slots so the table never keeps stale gems from a removed player
-            // config (they are unreachable at runtime, but the table should
-            // still reflect the reachable state).
-            for (int32_t slot_index = kBuiltinExclusiveSlotCount;
-                 slot_index < kVirtualSlotCapacity; ++slot_index)
-               character.slots[static_cast<size_t>(slot_index)] = TemplateGemSlot{};
-            continue;
-         }
+         // effective_count == 0 (no general slots) makes every iteration take the
+         // TemplateGemSlot{} arm, so the wipe and the fill are the same loop.
          for (int32_t slot_index = kBuiltinExclusiveSlotCount;
               slot_index < kVirtualSlotCapacity; ++slot_index)
          {

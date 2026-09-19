@@ -6,14 +6,14 @@ namespace gbfr::native
 {
 void Initialize()
 {
-   const uint64_t initialization_started = BeginStartupPhase("native-initialize");
+   const uint64_t initialization_started = GetTickCount64();
    const auto finish_initialization = [initialization_started](bool succeeded) {
       CompleteStartupPhase("native-initialize", initialization_started, succeeded);
    };
 
    g_image_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 
-   const uint64_t executable_started = BeginStartupPhase("executable-validation");
+   const uint64_t executable_started = GetTickCount64();
    std::vector<wchar_t> executable_path(32768, L'\0');
    const DWORD executable_length = GetModuleFileNameW(
       nullptr, executable_path.data(), static_cast<DWORD>(executable_path.size()));
@@ -35,7 +35,7 @@ void Initialize()
    }
    CompleteStartupPhase("executable-validation", executable_started, true);
 
-   const uint64_t layout_started = BeginStartupPhase("semantic-layout-resolution");
+   const uint64_t layout_started = GetTickCount64();
    const bool layout_ready = ResolveGameLayout();
    CompleteStartupPhase("semantic-layout-resolution", layout_started, layout_ready);
    if (!layout_ready)
@@ -44,15 +44,14 @@ void Initialize()
       return;
    }
 
-   const uint64_t activation_started =
-      BeginStartupPhase("template-selection-install");
+   const uint64_t activation_started = GetTickCount64();
    InitializeRuntimeTemplates();
    // 钩子还没装好，所以这一步只发布选择、不排重建（PublishTemplateSelections 自己判）。
    PublishTemplateSelections();
    CompleteStartupPhase(
       "template-selection-install", activation_started, true);
 
-   const uint64_t hooks_started = BeginStartupPhase("native-hook-install");
+   const uint64_t hooks_started = GetTickCount64();
    const bool hooks_installed = InstallHooks();
    CompleteStartupPhase("native-hook-install", hooks_started, hooks_installed);
    finish_initialization(hooks_installed);
@@ -109,8 +108,6 @@ void ConsumeApplyResult()
       break;
    case ApplyResultNotifierFailed:
       body = "traits rebuilt, but the post-rebuild native UI notifier failed.";
-      break;
-   default:
       break;
    }
    if (!body.empty())
