@@ -1,8 +1,7 @@
 [CmdletBinding()]
-param([switch]$Check)   # -Check：只比对生成物与 $chars 是否一致，不写任何文件
+param()
 
 $ErrorActionPreference = 'Stop'
-$checkFailed = $false
 
 # ============================================================================
 # 专属因子权威数据（改这里的 Hash/T1/T2/War 后重新生成）：
@@ -92,10 +91,13 @@ foreach ($c in $chars) {
     }
 }
 
-# ---- 输出 1：直接写回 template_loadout.cpp 的 kCharacterExclusives[] 段 ----
-# 生成块不含“勿手改”注释：那段注释已存在于 .cpp 中该段上方，下面只替换
-# “constexpr … { … };” 本体，因此结果字节稳定（同内容重跑不产生 diff）。
+# ---- 输出 1：exclusive_table.inc（native 编译时 #include 的那张表） ----
+# 它是**构建中间产物**：vcxproj 每次编译前重跑本脚本，所以它不入库（见 .gitignore），
+# 也就不存在"入库的副本是否过期"这个问题——原来的 -Check 门禁就是为这件事养的。
+$incPath = Join-Path $root 'GBFR.PreEquippedSigils.Native\src\exclusive_table.inc'
 $sb = [System.Text.StringBuilder]::new()
+[void]$sb.AppendLine('// 由 docs/tool-gen-loadout.ps1 从 $chars 生成（唯一数据源）；勿手改')
+
 [void]$sb.AppendLine('constexpr CharacterExclusiveLoadout kCharacterExclusives[] = {')
 foreach ($r in $resolved) {
     [void]$sb.AppendLine("   { 0x$($r.Hash), // character")
@@ -105,22 +107,14 @@ foreach ($r in $resolved) {
     [void]$sb.AppendLine('   },')
 }
 [void]$sb.AppendLine('};')
-$block = ($sb.ToString().TrimEnd() -split "`r?`n") -join "`n"
-
-# 只替换 “constexpr … { … };” 这一段（其上方已有的“勿手改”注释与空行保持原样，
-# 生成结果字节稳定：同内容重跑不产生 diff；源码是 LF，写入前把 CRLF 转成 LF）。
-$cppPath = Join-Path $root 'GBFR.PreEquippedSigils.Native\src\template_loadout.cpp'
-$cpp = [System.IO.File]::ReadAllText($cppPath)
-$pattern = '(?ms)^constexpr CharacterExclusiveLoadout kCharacterExclusives\[\] = \{.*?^\};'
-$match = [regex]::Match($cpp, $pattern)
-if (-not $match.Success) { throw "kCharacterExclusives[] block not found in $cppPath" }
-if ($Check) {
-    if ($match.Value.Trim() -ne $block.Trim()) { $checkFailed = $true; Write-Warning "template_loadout.cpp 的 kCharacterExclusives[] 与 $chars 不一致" }
-    else { Write-Output "check ok: kCharacterExclusives[] 一致（$($resolved.Count) 条）" }
+$incText = ((($sb.ToString().TrimEnd() -split "`r?`n") -join "`n") + "`n")
+# 内容不变就不重写：MSBuild 按 mtime 判定，重写会让 template_loadout.cpp 每次构建都重编。
+$incOld = if (Test-Path -LiteralPath $incPath) { [System.IO.File]::ReadAllText($incPath) } else { '' }
+if ($incOld -eq $incText) {
+    Write-Output "exclusive_table.inc unchanged (kept as is) -> $incPath"
 } else {
-    $updated = $cpp.Substring(0, $match.Index) + $block + $cpp.Substring($match.Index + $match.Length)
-    [System.IO.File]::WriteAllText($cppPath, $updated, [System.Text.UTF8Encoding]::new($false))
-    Write-Output "patched kCharacterExclusives[] ($($resolved.Count) entries) -> $cppPath"
+    [System.IO.File]::WriteAllText($incPath, $incText, [System.Text.UTF8Encoding]::new($false))
+    Write-Output "wrote exclusive_table.inc ($($resolved.Count) entries) -> $incPath"
 }
 
 # ---- 输出 2：gem.chara.json（工具读的那份：角色 -> 三个 [因子 hash, 技能 hash]） ----
@@ -142,13 +136,9 @@ $charaList = @($resolved | ForEach-Object {
 $charaText = ($charaList | ConvertTo-Json -Depth 6 -AsArray) -replace ([string][char]13 + [string][char]10), [string][char]10
 $charaOld = if (Test-Path -LiteralPath $charaOut) { [System.IO.File]::ReadAllText($charaOut) } else { '' }
 $charaSame = (($charaOld -replace '\s', '') -eq ($charaText -replace '\s', ''))
-if ($Check) {
-    if (-not $charaSame) { $checkFailed = $true; Write-Warning "gem.chara.json 与 $chars 不一致" }
-    else { Write-Output "check ok: gem.chara.json 一致（$($resolved.Count) 条）" }
-} elseif ($charaSame) {
+if ($charaSame) {
     Write-Output "gem.chara.json unchanged (kept as is) -> $charaOut"
 } else {
     [System.IO.File]::WriteAllText($charaOut, $charaText, [System.Text.UTF8Encoding]::new($false))
     Write-Output "wrote gem.chara.json -> $charaOut"
 }
-if ($Check -and $checkFailed) { exit 1 }

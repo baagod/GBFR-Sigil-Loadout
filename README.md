@@ -29,7 +29,8 @@
 | 文档 | 对象 | 内容 |
 |---|---|---|
 | [GBFR.PreEquippedSigils/README.md](GBFR.PreEquippedSigils/README.md) | 用户 | 功能简介、配装表、安装、注意事项 |
-| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | **AI 接手者** | 架构、数据流、雷区、构建部署、操作速查 |
+| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | **AI 接手者** | 架构、部件边界、数据流、雷区、协议常量 |
+| [docs/BUILD.md](docs/BUILD.md) | 改这个仓库的人 | 构建、部署、发布、验证清单、常用操作 |
 
 ## 参考（GBFR Modding 生态）
 
@@ -83,4 +84,4 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1
 # 本机路径示例：C:\Users\baago\Desktop\Reloaded-II\Mods\GBFR.PreEquippedSigils
 ```
 
-改配装、加槽位、加角色的具体步骤见 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) 第 4、10 节。
+改配装、加槽位、加角色的具体步骤见 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) 第 4、5 节；构建、部署、验证见 [docs/BUILD.md](docs/BUILD.md)。

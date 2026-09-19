@@ -71,11 +71,11 @@ if ($characterRows -ne $expectedMappings) {
 }
 Write-Output "gem.json character rows: $characterRows (native loader expects $expectedMappings)."
 
-# --- data freshness gates -----------------------------------------------------
-# 生成物必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   gem.json             <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
-#   gem.chara.json + kCharacterExclusives[]  <- docs\tool-gen-loadout.ps1 的 $chars
-# 所以这道门只比对本仓库里入库的两份，不需要游戏数据在场。
+# --- data freshness gate ------------------------------------------------------
+# gem.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
+#   gem.json  <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
+# 专属表没有这道门：它是构建中间产物，vcxproj 编译前必定重生成（docs\tool-gen-loadout.ps1）。
+# 所以这道门只比对本仓库里入库的那一份，不需要游戏数据在场。
 $sigilsXlsx = Join-Path $root 'docs\gem.xlsx'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
@@ -94,10 +94,6 @@ try {
     }
 } finally {
     Pop-Location
-}
-& pwsh -NoProfile -File (Join-Path $root 'docs\tool-gen-loadout.ps1') -Check
-if ($LASTEXITCODE -ne 0) {
-    throw 'gem.chara.json / kCharacterExclusives[] 与 $chars 不一致：先跑 pwsh docs\tool-gen-loadout.ps1'
 }
 
 $msbuild = $null

@@ -13,3 +13,6 @@ dist/
 *.ilk
 *.zip
 tools-test/
+
+# 构建中间产物：专属表由 docs/tool-gen-loadout.ps1 生成，vcxproj 每次编译前重跑它
+GBFR.PreEquippedSigils.Native/src/exclusive_table.inc
