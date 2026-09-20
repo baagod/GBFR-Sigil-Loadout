@@ -275,16 +275,19 @@ export default function App() {
             <TabsTrigger value="sigilEdit">{t.tabSigilEdit}</TabsTrigger>
           </TabsList>
           {/*
-            四种语言各一个按钮、当前那个高亮：比一个要按几下才转回来的循环按钮好认，
-            而语言只有四种，放得下。
+            一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。
+            size 用 stock 的 icon-sm（正方形单元格，四格等宽）；
+            行内 translate 抵掉 stock 按钮按下时的位移（行内样式优先于 class，不必 !important）；
+            lang 让每个标签按自己的语言选字体，否则字体会跟着文档语言换，切语言时粗细就变了。
           */}
           <ButtonGroup aria-label={t.langSwitch}>
             {LANGS.map((option) => (
               <Button
                 key={option}
-                variant={option === lang ? "secondary" : "ghost"}
-                size="sm"
-                aria-pressed={option === lang}
+                size="icon-sm"
+                style={{ translate: "none" }}
+                variant={option === lang ? "default" : "outline"}
+                lang={option}
                 onClick={() => {
                   setLang(option) // 语言也存在 loadout.json 里，所以这也是一次编辑
                   scheduleSave()
@@ -348,5 +351,3 @@ export default function App() {
     </div>
   )
 }
-
-
