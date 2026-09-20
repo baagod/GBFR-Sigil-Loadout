@@ -13,7 +13,7 @@ import {
   DEFAULT_LEVEL,
   itemRowsOf,
   parseSigilRows,
-  traitTableOf,
+  skillTableOf,
   type Slot,
 } from "./model"
 
@@ -21,11 +21,11 @@ const rows = parseSigilRows(
   readFileSync(new URL("../../assets/gem.json", import.meta.url), "utf8")
 )
 const sigils = itemRowsOf(rows)
-const traits = traitTableOf(rows)
+const skills = skillTableOf(rows)
 // 名字在这里只用来判断"有没有回落"，所以直接拿 hash 当名字。
 const names: Record<string, string> = {}
 for (const row of rows) if (row.hash) names[row.hash] = `名:${row.hash}`
-const index = buildSigilIndex(sigils, traits, names)
+const index = buildSigilIndex(sigils, skills, names)
 
 const slot = (patch: Partial<Slot> = {}): Slot => ({
   mainHash: "",
@@ -41,7 +41,7 @@ describe("真实 gem.json 上的派生索引", () => {
   it("表不是空的，且每个主下拉取值都有显示名", () => {
     expect(sigils.length).toBeGreaterThan(0)
     expect(index.mainKeys.length).toBeGreaterThan(0)
-    expect(index.traitHashes.length).toBeGreaterThan(0)
+    expect(index.skillHashes.length).toBeGreaterThan(0)
     for (const key of index.mainKeys) {
       expect(index.labels[key], `mainKey ${key} 没有名字`).toBeTruthy()
     }
@@ -72,8 +72,8 @@ describe("真实 gem.json 上的派生索引", () => {
   })
 
   it("上限来自技能，缺失时回落 DEFAULT_LEVEL", () => {
-    for (const tr of traits) expect(index.capOfTrait(tr.hash)).toBe(tr.cap)
-    expect(index.capOfTrait("这个 hash 不在表里")).toBe(DEFAULT_LEVEL)
+    for (const tr of skills) expect(index.capOfSkill(tr.hash)).toBe(tr.cap)
+    expect(index.capOfSkill("这个 hash 不在表里")).toBe(DEFAULT_LEVEL)
     expect(index.capOfMain("这个键不在表里")).toBe(DEFAULT_LEVEL)
   })
 
@@ -124,7 +124,7 @@ describe("落盘载荷", () => {
 
   it("副技能写 hash 并带上自己的等级，enabled 原样保留", () => {
     const key = index.mainKeys[0]
-    const sec = index.traitHashes[0]
+    const sec = index.skillHashes[0]
     const payload = buildLoadoutPayload(
       [slot({ mainHash: key, mainLevel: 15, secHash: sec, secLevel: 7, enabled: false })],
       index,

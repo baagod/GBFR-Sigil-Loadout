@@ -6,7 +6,7 @@
   表行正是按这个形状索引的——见 dedupe 的说明，那是整个列表赖以为生的不变量。
 */
 
-export type SigilTrait = {
+export type SigilSkill = {
   enabled: boolean;
   key: string;
   level: number;
@@ -25,10 +25,10 @@ export type SigilTrait = {
  *
  * 万能药就是例子：只有 15、30 两级有值，中间什么都没有。
  */
-export type TraitInfo = { rows: [number, number[]][] };
+export type SkillInfo = { rows: [number, number[]][] };
 
 /** 一个因子某一等级上的十个值；表里没有这一级时是 undefined。 */
-export const valuesAt = (info: TraitInfo | undefined, level: number) =>
+export const valuesAt = (info: SkillInfo | undefined, level: number) =>
   info?.rows.find((row) => row[0] === level)?.[1];
 
 /**
@@ -48,7 +48,7 @@ export const addressOf = (key: string, level: number) => `${key}#${level}`;
  * 两件事就能让它算：被勾选，或者带着数字。两者都没有的记录，是用户勾了又取消的那一行，
  * gemedits.json 里不会有这样的行。
  */
-export const isEdit = (record: SigilTrait) =>
+export const isEdit = (record: SigilSkill) =>
   record.enabled || record.values.some((value) => value !== null);
 
 /**
@@ -68,7 +68,7 @@ export const trimGameValues = (
  * 把记录变成编辑：只放着游戏数值的槽清空，之后完全不算编辑的记录丢掉。进出这个列表的
  * 每条路径都经过这里，所以列表、gemedits.json 和游戏对"什么算编辑"的看法一致。
  */
-export const asEdits = (records: SigilTrait[], info: Record<string, TraitInfo>) =>
+export const asEdits = (records: SigilSkill[], info: Record<string, SkillInfo>) =>
   records
     .map((record) => ({
       ...record,
@@ -88,7 +88,7 @@ export const pad = (values: (number | null)[]) =>
   一条，于是保留最后一条已启用的（该地址一条已启用的都没有时，保留最后一条，不论启用
   与否）。
 */
-export function dedupe(records: SigilTrait[]): SigilTrait[] {
+export function dedupe(records: SigilSkill[]): SigilSkill[] {
   const lastEnabled = new Map<string, number>();
   const lastAny = new Map<string, number>();
   records.forEach((record, i) => {
@@ -162,7 +162,7 @@ export function slotEdit(
   if (!HALF_TYPED.test(tidied)) return { kind: "drop" };
   if (tidied === "") {
     // 清空：该槽回到游戏自己的数值，输入框从这里起把它显示成占位符——null 就是它，
-    // 而游戏数值是从表里读的，不会写回文件（见 SigilTrait.values）。
+    // 而游戏数值是从表里读的，不会写回文件（见 SigilSkill.values）。
     return { kind: "commit", values: withSlot(values, i, null) };
   }
   if (!NUMBER.test(tidied)) return { kind: "half", text: tidied };
@@ -199,14 +199,14 @@ export const stepValue = (value: number, direction: 1 | -1) => {
   一个因子显示的等级：游戏那些带值的行，加上编辑已经指名过的等级，被勾选的排到最前。
 
   取的是行，不是它们之间的跨度：表里每个等级都有行，但进入资产的只有带值的行（原因和
-  实测数字见 TraitInfo），所以一个因子的等级不能读成首行到尾行的整段。
+  实测数字见 SkillInfo），所以一个因子的等级不能读成首行到尾行的整段。
 
   只有记录知道的等级（手工改出来的，或者表已经不再收录的某个等级留下的）同样会得到一行，
   这样它保持可见，而不是被无声地应用上去。
 */
 export function levelsOf(
-  info: TraitInfo | undefined,
-  records: SigilTrait[],
+  info: SkillInfo | undefined,
+  records: SigilSkill[],
 ): number[] {
   const on = new Set(records.filter((record) => record.enabled).map((r) => r.level));
   const levels = new Set<number>((info?.rows ?? []).map((row) => row[0]));
@@ -228,7 +228,7 @@ export type ParentState = "all" | "some" | "none";
  */
 export function parentState(
   levels: number[],
-  byLevel: Map<number, SigilTrait>,
+  byLevel: Map<number, SigilSkill>,
 ): ParentState {
   const on = levels.filter((level) => byLevel.get(level)?.enabled).length;
   if (on === 0) return "none";

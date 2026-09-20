@@ -6,7 +6,7 @@
 namespace gbfr::native
 {
 SafetyHookInline g_get_gem_hook;
-SafetyHookMid g_trait_fetch_hook;
+SafetyHookMid g_skill_fetch_hook;
 
 std::atomic_uint32_t g_active_getter_calls{0};
 std::atomic_uint32_t g_active_mid_calls{0};
@@ -100,7 +100,7 @@ void TrackNaturalContributionResult(
       // below still report N/M on every occurrence.
       if (!g_live_confirmation_reported.exchange(true, std::memory_order_acq_rel))
          SetRuntimeMessage(std::format(
-            "Trait contribution confirmed for 0x{:08X}: {}/{} virtual sigils reached the "
+            "Skill contribution confirmed for 0x{:08X}: {}/{} virtual sigils reached the "
             "context-1 status.",
             identity.character_hash,
             injected,
@@ -109,7 +109,7 @@ void TrackNaturalContributionResult(
    else if (expected != 0)
    {
       SetRuntimeMessage(std::format(
-         "Trait contribution incomplete for 0x{:08X}: {}/{} virtual sigils reached the "
+         "Skill contribution incomplete for 0x{:08X}: {}/{} virtual sigils reached the "
          "context-1 status.",
          identity.character_hash,
          injected,
@@ -118,10 +118,10 @@ void TrackNaturalContributionResult(
    g_tls_natural_contribution = {};
 }
 
-bool TryLoadVirtualTraitSelection(
+bool TryLoadVirtualSkillSelection(
    uintptr_t status,
    const StatusIdentity& identity,
-   bool from_trait_data_loop,
+   bool from_skill_data_loop,
    uint64_t& active_generation,
    bool& tracks_pending_apply,
    std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept
@@ -130,7 +130,7 @@ bool TryLoadVirtualTraitSelection(
    {
       active_generation = g_active_apply_generation.load(std::memory_order_acquire);
       tracks_pending_apply =
-         from_trait_data_loop && active_generation != 0 &&
+         from_skill_data_loop && active_generation != 0 &&
          g_tls_apply_generation == active_generation &&
          g_pending_refresh.load(std::memory_order_acquire) &&
          g_native_apply_call_active.load(std::memory_order_acquire) &&
@@ -146,7 +146,7 @@ bool TryLoadVirtualTraitSelection(
 
       if (TryGetAuthorizedSelection(status, identity, selection))
          return true;
-      if (!from_trait_data_loop)
+      if (!from_skill_data_loop)
          return false;
 
       selection = GetSelection(identity.character_hash);
@@ -188,14 +188,14 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
 {
    ActiveCallGuard active_call(g_active_getter_calls);
    const uintptr_t return_address = reinterpret_cast<uintptr_t>(_ReturnAddress());
-   const bool from_trait_apply_loop =
+   const bool from_skill_apply_loop =
       return_address ==
-      g_image_base + g_game_layout.trait_apply_getter_return_rva;
-   const bool from_trait_category_loop =
+      g_image_base + g_game_layout.skill_apply_getter_return_rva;
+   const bool from_skill_category_loop =
       return_address ==
-      g_image_base + g_game_layout.trait_category_getter_return_rva;
-   const bool from_trait_data_loop =
-      from_trait_apply_loop || from_trait_category_loop;
+      g_image_base + g_game_layout.skill_category_getter_return_rva;
+   const bool from_skill_data_loop =
+      from_skill_apply_loop || from_skill_category_loop;
    StatusIdentity identity{};
    const bool valid_identity =
       SafeReadStatusIdentity(reinterpret_cast<uintptr_t>(status), identity) &&
@@ -216,27 +216,27 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
    uint64_t active_generation = 0;
    bool tracks_pending_apply = false;
    std::array<uint32_t, kVirtualSlotCapacity> selection{};
-   if (!TryLoadVirtualTraitSelection(
+   if (!TryLoadVirtualSkillSelection(
           reinterpret_cast<uintptr_t>(status),
           identity,
-          from_trait_data_loop,
+          from_skill_data_loop,
           active_generation,
           tracks_pending_apply,
           selection))
       return 0;
    const int virtual_index = slot_index - kNativeInternalSlotCount;
    uint32_t selected_slot_id = 0;
-   if (tracks_pending_apply && from_trait_apply_loop &&
+   if (tracks_pending_apply && from_skill_apply_loop &&
        slot_index == kNativeInternalSlotCount)
    {
       g_pending_injected_count.store(0, std::memory_order_release);
       g_claimed_apply_generation.store(active_generation, std::memory_order_release);
    }
    const bool generation_claimed =
-      tracks_pending_apply && from_trait_apply_loop &&
+      tracks_pending_apply && from_skill_apply_loop &&
       g_claimed_apply_generation.load(std::memory_order_acquire) == active_generation;
 
-   if (from_trait_apply_loop && slot_index == kNativeInternalSlotCount &&
+   if (from_skill_apply_loop && slot_index == kNativeInternalSlotCount &&
        identity.context_mode == 1)
       BeginNaturalContributionTracking(
          reinterpret_cast<uintptr_t>(status), identity, selection);
@@ -274,7 +274,7 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
       }
    }
 
-   if (from_trait_apply_loop)
+   if (from_skill_apply_loop)
       TrackNaturalContributionResult(
          reinterpret_cast<uintptr_t>(status),
          identity,
@@ -285,7 +285,7 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
    return copied ? 1 : 0;
 }
 
-void OnTraitFetch(safetyhook::Context& context)
+void OnSkillFetch(safetyhook::Context& context)
 {
    ActiveCallGuard active_call(g_active_mid_calls);
    if (context.r13 < static_cast<uintptr_t>(kNativeInternalSlotCount) ||
@@ -302,7 +302,7 @@ void OnTraitFetch(safetyhook::Context& context)
       uint64_t active_generation = 0;
       bool tracks_pending_apply = false;
       std::array<uint32_t, kVirtualSlotCapacity> selection{};
-      if (TryLoadVirtualTraitSelection(
+      if (TryLoadVirtualSkillSelection(
              status,
              identity,
              true,
@@ -323,7 +323,7 @@ void OnTraitFetch(safetyhook::Context& context)
    // Resume after the native getter call so the game still performs its own
    // invalid-flag check, gem-master lookup, category count, cap, and effect math.
    context.rax = copied ? 1 : 0;
-   context.rip = g_image_base + g_game_layout.trait_category_getter_return_rva;
+   context.rip = g_image_base + g_game_layout.skill_category_getter_return_rva;
 }
 
 uint64_t BuildLifecycleSignature(
@@ -438,17 +438,17 @@ void DisableGameplayHooksAndRestore() noexcept
                Log(failure);
          };
       restore_limit(
-         g_image_base + g_game_layout.trait_apply_loop_limit_immediate_rva,
-         g_game_layout.trait_apply_original_limit,
-         "Hook rollback: failed to restore the trait-apply loop limit.");
+         g_image_base + g_game_layout.skill_apply_loop_limit_immediate_rva,
+         g_game_layout.skill_apply_original_limit,
+         "Hook rollback: failed to restore the skill-apply loop limit.");
       restore_limit(
-         g_image_base + g_game_layout.trait_category_loop_limit_immediate_rva,
-         g_game_layout.trait_category_original_limit,
-         "Hook rollback: failed to restore the trait-category loop limit.");
+         g_image_base + g_game_layout.skill_category_loop_limit_immediate_rva,
+         g_game_layout.skill_category_original_limit,
+         "Hook rollback: failed to restore the skill-category loop limit.");
    }
 
-   if (g_trait_fetch_hook)
-      (void)g_trait_fetch_hook.disable();
+   if (g_skill_fetch_hook)
+      (void)g_skill_fetch_hook.disable();
    if (g_get_gem_hook)
       (void)g_get_gem_hook.disable();
 
@@ -468,7 +468,7 @@ void DisableGameplayHooksAndRestore() noexcept
       SwitchToThread();
    }
 
-   g_trait_fetch_hook.reset();
+   g_skill_fetch_hook.reset();
    g_get_gem_hook.reset();
    {
       std::unique_lock lock(g_authorization_mutex);
@@ -492,12 +492,12 @@ void ShutdownHooks()
    DisableGameplayHooksAndRestore();
 }
 
-bool ApplyTraitLoopLimits(int32_t virtual_slot_count) noexcept
+bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
 {
    const uint8_t expanded_slot_count =
       static_cast<uint8_t>(kNativeInternalSlotCount + virtual_slot_count);
-   const uintptr_t apply_limit_rva = g_game_layout.trait_apply_loop_limit_immediate_rva;
-   const uintptr_t category_limit_rva = g_game_layout.trait_category_loop_limit_immediate_rva;
+   const uintptr_t apply_limit_rva = g_game_layout.skill_apply_loop_limit_immediate_rva;
+   const uintptr_t category_limit_rva = g_game_layout.skill_category_loop_limit_immediate_rva;
    if (!WriteByte(g_image_base + apply_limit_rva, expanded_slot_count))
       return false;
    if (!WriteByte(g_image_base + category_limit_rva, expanded_slot_count))
@@ -505,7 +505,7 @@ bool ApplyTraitLoopLimits(int32_t virtual_slot_count) noexcept
       // Roll the first byte back: diverging limits would let one loop run past
       // its gate (out-of-bounds reads on the 13-slot gem array).
       (void)WriteByte(
-         g_image_base + apply_limit_rva, g_game_layout.trait_apply_original_limit);
+         g_image_base + apply_limit_rva, g_game_layout.skill_apply_original_limit);
       return false;
    }
    return true;
@@ -539,29 +539,29 @@ bool InstallHooks()
       return false;
    }
 
-   const uint64_t trait_hook_started = GetTickCount64();
-   g_trait_fetch_hook = safetyhook::create_mid(
+   const uint64_t skill_hook_started = GetTickCount64();
+   g_skill_fetch_hook = safetyhook::create_mid(
       reinterpret_cast<void*>(
-         g_image_base + g_game_layout.trait_fetch_path_rva),
-      &OnTraitFetch);
+         g_image_base + g_game_layout.skill_fetch_path_rva),
+      &OnSkillFetch);
    CompleteStartupPhase(
-      "trait-fetch-hook", trait_hook_started, static_cast<bool>(g_trait_fetch_hook));
-   if (!g_trait_fetch_hook)
+      "skill-fetch-hook", skill_hook_started, static_cast<bool>(g_skill_fetch_hook));
+   if (!g_skill_fetch_hook)
    {
       DisableGameplayHooksAndRestore();
-      SetRuntimeMessage("Failed to install the trait fetch-path hook.");
+      SetRuntimeMessage("Failed to install the skill fetch-path hook.");
       return false;
    }
 
    const uint64_t loop_patch_started = GetTickCount64();
-   const bool loop_patches_ready = ApplyTraitLoopLimits(GetVirtualSlotCount());
+   const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
    CompleteStartupPhase(
-      "trait-loop-limit-patches", loop_patch_started, loop_patches_ready);
+      "skill-loop-limit-patches", loop_patch_started, loop_patches_ready);
    if (!loop_patches_ready)
    {
       DisableGameplayHooksAndRestore();
       SetRuntimeMessage(
-         "Failed to patch both native trait loop limits; changes were rolled back.");
+         "Failed to patch both native skill loop limits; changes were rolled back.");
       return false;
    }
 

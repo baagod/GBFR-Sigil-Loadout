@@ -302,7 +302,7 @@ internal sealed class SigilEditFeature
     private int PatchRows(byte[] file, Config config)
     {
         int applied = 0;
-        foreach (SigilTrait edit in config.Edits)
+        foreach (SigilSkill edit in config.Edits)
         {
             if (!edit.Enabled)
             {
@@ -420,7 +420,7 @@ internal sealed class SigilEditFeature
 
             string before = RowValues(data, row);
 
-            for (int i = 0; i < SigilTrait.LevelValueCount && i < values.Length; i++)
+            for (int i = 0; i < SigilSkill.LevelValueCount && i < values.Length; i++)
             {
                 if (values[i] is not { } value)
                     continue;
@@ -445,6 +445,6 @@ internal sealed class SigilEditFeature
 
     /// <summary>一行那十个 LevelValue 槽位，给上面那两行日志用。</summary>
     private static string RowValues(byte[] data, int row) =>
-        string.Join(" / ", Enumerable.Range(0, SigilTrait.LevelValueCount)
+        string.Join(" / ", Enumerable.Range(0, SigilSkill.LevelValueCount)
             .Select(i => BitConverter.ToSingle(data, row + i * 4)));
 }

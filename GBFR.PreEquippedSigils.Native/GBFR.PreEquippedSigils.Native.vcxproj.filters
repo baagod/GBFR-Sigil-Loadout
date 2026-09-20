@@ -46,7 +46,7 @@
     <ClCompile Include="src\template_loadout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\trait_hooks.cpp">
+    <ClCompile Include="src\skill_hooks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="third_party\safetyhook.cpp">

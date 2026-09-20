@@ -14,14 +14,14 @@ namespace
 // player's loadout.json only; no config means the exclusive slots with no
 // general sigils.
 //
-// Character-exclusive gems/traits follow gem.json (the tool's source): the table below is
+// Character-exclusive gems/skills follow gem.json (the tool's source): the table below is
 // derived from it by docs/tool-gen-loadout.ps1 at build time, so nothing is read at runtime.
 //
-// IMPORTANT: a "no second trait" gem must use trait2 = kUnwornCharacterHash
+// IMPORTANT: a "no second skill" gem must use skill2 = kUnwornCharacterHash
 // (0x887AE0B0, the "not selected" sentinel the game understands), NOT 0.
-// trait2 = 0 renders an extra empty Lv1 entry in the game's full-sigil list
-// (observed 2026-09-02 on ER 2.0.5). trait1_level and sigil_level are
-// independent: the former is the trait effect level, the latter the sigil's
+// skill2 = 0 renders an extra empty Lv1 entry in the game's full-sigil list
+// (observed 2026-09-02 on ER 2.0.5). skill1_level and sigil_level are
+// independent: the former is the skill effect level, the latter the sigil's
 // list display level.
 //
 // Djeeta (姬塔) shares Gran's captain exclusives (captain compatibility).
@@ -38,11 +38,11 @@ struct CharacterExclusiveLoadout
 {
    uint32_t character_hash = 0;
    uint32_t t1_gem = 0;   // independent T1 factor gem
-   uint32_t t1_trait = 0; // T1 trait hash
+   uint32_t t1_skill = 0; // T1 skill hash
    uint32_t t2_gem = 0;   // independent T2 factor gem
-   uint32_t t2_trait = 0; // T2 trait hash
+   uint32_t t2_skill = 0; // T2 skill hash
    uint32_t war_gem = 0;  // war spirit gem
-   uint32_t war_trait = 0; // war trait hash
+   uint32_t war_skill = 0; // war skill hash
 };
 
 // 这张表（角色 → 三个专属槽的 gem 与技能）由 docs/tool-gen-loadout.ps1 从 $chars 生成：vcxproj
@@ -71,14 +71,14 @@ std::unordered_map<uint32_t, size_t> g_character_template_index;
 // g_template_mutex and written by GBFR20_ApplyLoadout.
 std::unordered_map<uint32_t, uint8_t> g_exclusive_state;
 
-TemplateGemSlot MakeSingleTraitSlot(uint32_t gem_id, uint32_t trait) noexcept
+TemplateGemSlot MakeSingleSkillSlot(uint32_t gem_id, uint32_t skill) noexcept
 {
    return TemplateGemSlot{
       .gem_id = gem_id,
-      .trait1 = trait,
-      .trait1_level = 15,
-      .trait2 = kUnwornCharacterHash,
-      .trait2_level = 0,
+      .skill1 = skill,
+      .skill1_level = 15,
+      .skill2 = kUnwornCharacterHash,
+      .skill2_level = 0,
       .sigil_level = 15};
 }
 
@@ -107,22 +107,22 @@ void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept
    character.slots[1] = TemplateGemSlot{};
    character.slots[2] = TemplateGemSlot{};
    if ((state & ExclusiveT1) != 0)
-      character.slots[0] = MakeSingleTraitSlot(exclusive.t1_gem, exclusive.t1_trait);
+      character.slots[0] = MakeSingleSkillSlot(exclusive.t1_gem, exclusive.t1_skill);
    if ((state & ExclusiveT2) != 0)
-      character.slots[1] = MakeSingleTraitSlot(exclusive.t2_gem, exclusive.t2_trait);
+      character.slots[1] = MakeSingleSkillSlot(exclusive.t2_gem, exclusive.t2_skill);
    if ((state & ExclusiveWar) != 0)
-      character.slots[2] = MakeSingleTraitSlot(exclusive.war_gem, exclusive.war_trait);
+      character.slots[2] = MakeSingleSkillSlot(exclusive.war_gem, exclusive.war_skill);
 }
 
 // 这个技能 hash 是这个角色的哪一个专属槽（0 = 不是它的三个槽之一）。
-uint8_t ExclusiveBitForTrait(
-   const CharacterExclusiveLoadout& exclusive, uint32_t trait_hash) noexcept
+uint8_t ExclusiveBitForSkill(
+   const CharacterExclusiveLoadout& exclusive, uint32_t skill_hash) noexcept
 {
-   if (trait_hash == exclusive.t1_trait)
+   if (skill_hash == exclusive.t1_skill)
       return ExclusiveT1;
-   if (trait_hash == exclusive.t2_trait)
+   if (skill_hash == exclusive.t2_skill)
       return ExclusiveT2;
-   if (trait_hash == exclusive.war_trait)
+   if (skill_hash == exclusive.war_skill)
       return ExclusiveWar;
    return 0;
 }
@@ -130,7 +130,7 @@ uint8_t ExclusiveBitForTrait(
 // 把这次调用带来的专属开关**整体替换**进 g_exclusive_state。
 //
 // 只有"被关掉的槽"会留下条目，所以没被提到的角色就是三槽全开
-// （ReadExclusiveStateLocked 对缺失条目返回 ExclusiveAll）。槽位由 trait hash 认——
+// （ReadExclusiveStateLocked 对缺失条目返回 ExclusiveAll）。槽位由 skill hash 认——
 // 那张专属表就在本文件里，所以托管侧不必知道哪个 hash 是 T1、哪个是战气，也不必再读
 // gem.chara.json。认不出的 (角色, 技能) 对直接忽略：没有别的兼容形状。
 //
@@ -150,7 +150,7 @@ void ApplyExclusiveSwitchesLocked(
       if (row == g_character_template_index.end())
          continue; // 不属于任何角色：没有槽位可以关
       const uint8_t bit =
-         ExclusiveBitForTrait(kCharacterExclusives[row->second], override.trait_hash);
+         ExclusiveBitForSkill(kCharacterExclusives[row->second], override.skill_hash);
       if (bit == 0)
          continue; // 不是这个角色的三个槽之一
       const auto existing = g_exclusive_state.find(override.character_hash);
@@ -278,10 +278,10 @@ bool TryCopyTemplateGem(
       return false;
 
    GemData gem{};
-   gem.trait1 = template_slot.trait1;
-   gem.trait1_level = template_slot.trait1_level;
-   gem.trait2 = template_slot.trait2;
-   gem.trait2_level = template_slot.trait2_level;
+   gem.skill1 = template_slot.skill1;
+   gem.skill1_level = template_slot.skill1_level;
+   gem.skill2 = template_slot.skill2;
+   gem.skill2_level = template_slot.skill2_level;
    gem.gem_id = template_slot.gem_id;
    gem.worn_by = kUnwornCharacterHash;
    gem.sigil_level = template_slot.sigil_level;
@@ -309,14 +309,14 @@ bool ApplyLoadout(
    const int32_t previous_count = g_virtual_slot_count.load(std::memory_order_acquire);
    if (total_slot_count != previous_count)
    {
-      // Publish the new count before widening/narrowing the game's trait loop
+      // Publish the new count before widening/narrowing the game's skill loop
       // limit: the detour gates virtual slots on the count, so it must already
       // match the patch game threads observe on their next loop iteration.
       g_virtual_slot_count.store(total_slot_count, std::memory_order_release);
       if (g_hooks_ready.load(std::memory_order_acquire) &&
           g_layout_ready.load(std::memory_order_acquire))
       {
-         if (!ApplyTraitLoopLimits(total_slot_count))
+         if (!ApplySkillLoopLimits(total_slot_count))
          {
             g_virtual_slot_count.store(previous_count, std::memory_order_release);
             return false;

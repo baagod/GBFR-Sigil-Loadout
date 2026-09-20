@@ -21,7 +21,7 @@ namespace GBFR.PreEquippedSigils;
 ///                  items[0] = sigil（gem = 物品 hash，hash = 它给的主技能）；
 ///                  items[1] = 副技能（可选，没有就不写这一项）。
 ///                  exclusive 只写 false 的那些：没提到的角色就是三槽全开。
-/// Shape validation only: malformed JSON, a missing trait hash, a bad level,
+/// Shape validation only: malformed JSON, a missing skill hash, a bad level,
 /// or too many enabled slots.
 /// </summary>
 internal static class LoadoutConfig
@@ -157,16 +157,16 @@ internal static class LoadoutConfig
             {
                 if (field.Value.ValueKind != JsonValueKind.False)
                     continue;
-                uint traitHash = PU(field.Name);
-                if (traitHash == 0)
+                uint skillHash = PU(field.Name);
+                if (skillHash == 0)
                 {
-                    log($"exclusive: '{property.Name}' has a non-hash trait key '{field.Name}'; ignored.");
+                    log($"exclusive: '{property.Name}' has a non-hash skill key '{field.Name}'; ignored.");
                     continue;
                 }
                 result.Add(new NativeCore.ExclusiveOverrideNative
                 {
                     CharacterHash = characterHash,
-                    TraitHash = traitHash,
+                    SkillHash = skillHash,
                     Disabled = 1,
                 });
             }
@@ -206,31 +206,31 @@ internal static class LoadoutConfig
             if (mainGemHash == 0)
                 throw new InvalidDataException($"slot {index}: bad sigil hash '{mainGem}'");
             // 主技能由可视工具写进来（唯一读 gem.json 的一方），这一层不查表、也不猜。
-            if (!main.TryGetProperty("hash", out JsonElement mainTrait))
-                throw new InvalidDataException($"slot {index}: main item carries no trait hash");
-            uint mainSkill = PU(Hx(mainTrait));
+            if (!main.TryGetProperty("hash", out JsonElement mainHash))
+                throw new InvalidDataException($"slot {index}: main item carries no skill hash");
+            uint mainSkill = PU(Hx(mainHash));
             if (mainSkill == 0)
-                throw new InvalidDataException($"slot {index}: bad main trait hash");
+                throw new InvalidDataException($"slot {index}: bad main skill hash");
             int level1 = GetLevel(main, "level", index);
 
-            uint trait2Hash = UnwornCharacterHash; // "not selected" sentinel, never 0
-            int trait2Level = 0;
+            uint skill2Hash = UnwornCharacterHash; // "not selected" sentinel, never 0
+            int skill2Level = 0;
             if (items.GetArrayLength() >= 2)
             {
                 JsonElement sec = items[1];
                 string secHash = Hx(sec.GetProperty("hash"));
-                trait2Hash = PU(secHash);
-                if (trait2Hash == 0)
-                    throw new InvalidDataException($"slot {index}: bad secondary trait hash '{secHash}'");
-                trait2Level = GetLevel(sec, "level", index);
+                skill2Hash = PU(secHash);
+                if (skill2Hash == 0)
+                    throw new InvalidDataException($"slot {index}: bad secondary skill hash '{secHash}'");
+                skill2Level = GetLevel(sec, "level", index);
             }
             result.Add(new NativeCore.TemplateSlotNative
             {
                 GemId = mainGemHash,
-                Trait1 = mainSkill,
-                Trait1Level = level1,
-                Trait2 = trait2Hash,
-                Trait2Level = trait2Level,
+                Skill1 = mainSkill,
+                Skill1Level = level1,
+                Skill2 = skill2Hash,
+                Skill2Level = skill2Level,
                 SigilLevel = level1,
             });
         }

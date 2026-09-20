@@ -25,12 +25,12 @@ namespace gbfr::native
 {
 struct ResolvedGameLayout
 {
-   uintptr_t trait_apply_loop_limit_immediate_rva = 0;
-   uintptr_t trait_apply_getter_return_rva = 0;
-   uintptr_t trait_category_loop_limit_immediate_rva = 0;
-   uintptr_t trait_fetch_path_rva = 0;
-   uintptr_t trait_fetch_call_path_rva = 0;
-   uintptr_t trait_category_getter_return_rva = 0;
+   uintptr_t skill_apply_loop_limit_immediate_rva = 0;
+   uintptr_t skill_apply_getter_return_rva = 0;
+   uintptr_t skill_category_loop_limit_immediate_rva = 0;
+   uintptr_t skill_fetch_path_rva = 0;
+   uintptr_t skill_fetch_call_path_rva = 0;
+   uintptr_t skill_category_getter_return_rva = 0;
    uintptr_t get_gem_data_by_index_rva = 0;
    uintptr_t status_rebuild_rva = 0;
    uintptr_t status_notifier_rva = 0;
@@ -46,8 +46,8 @@ struct ResolvedGameLayout
    uintptr_t status_map_mask_offset = 0;
    uintptr_t status_character_hash_offset = 0;
    uintptr_t status_context_mode_offset = 0;
-   uint8_t trait_apply_original_limit = 0;
-   uint8_t trait_category_original_limit = 0;
+   uint8_t skill_apply_original_limit = 0;
+   uint8_t skill_category_original_limit = 0;
 };
 
 inline constexpr int kNativeInternalSlotCount = 13;
@@ -82,12 +82,12 @@ inline constexpr uint32_t MakeTemplateSlotId(int virtual_slot) noexcept
 struct TemplateGemSlot
 {
    uint32_t gem_id = 0; // real gem hash for the gem-master lookup; 0 = empty slot
-   uint32_t trait1 = 0;
-   int32_t trait1_level = 0;
-   // Single-trait slots must use kUnwornCharacterHash (0x887AE0B0): 0 makes the
+   uint32_t skill1 = 0;
+   int32_t skill1_level = 0;
+   // Single-skill slots must use kUnwornCharacterHash (0x887AE0B0): 0 makes the
    // game render an extra empty Lv1 entry in the full-sigil list.
-   uint32_t trait2 = 0;
-   int32_t trait2_level = 0;
+   uint32_t skill2 = 0;
+   int32_t skill2_level = 0;
    int32_t sigil_level = 0; // displayed sigil level (V+ = 15)
 };
 
@@ -95,7 +95,7 @@ struct TemplateGemSlot
 // and packing; the ABI path only ever reads through a reinterpret_cast.
 static_assert(sizeof(TemplateGemSlot) == sizeof(GBFR20_TemplateSlot));
 static_assert(offsetof(TemplateGemSlot, gem_id) == offsetof(GBFR20_TemplateSlot, gem_id));
-static_assert(offsetof(TemplateGemSlot, trait1) == offsetof(GBFR20_TemplateSlot, trait1));
+static_assert(offsetof(TemplateGemSlot, skill1) == offsetof(GBFR20_TemplateSlot, skill1));
 
 struct CharacterTemplate
 {
@@ -185,7 +185,7 @@ enum ApplyResult : int
    ApplyResultVirtualCopyFailed = -2,
    ApplyResultStatusLookupFailed = -4,
    ApplyResultNativeRebuildFailed = -5,
-   ApplyResultNativeTraitLoopMissing = -6,
+   ApplyResultNativeSkillLoopMissing = -6,
    ApplyResultNotifierFailed = -7,
 };
 
@@ -227,7 +227,7 @@ extern std::mutex g_message_mutex;
 extern std::string g_runtime_message;
 
 extern SafetyHookInline g_get_gem_hook;
-extern SafetyHookMid g_trait_fetch_hook;
+extern SafetyHookMid g_skill_fetch_hook;
 
 extern std::shared_mutex g_selection_mutex;
 extern std::unordered_map<uint32_t, std::array<uint32_t, kVirtualSlotCapacity>> g_character_selections;
@@ -236,11 +236,11 @@ extern std::unordered_map<uintptr_t, AuthorizedStatus> g_authorized_statuses;
 
 extern std::atomic_int32_t g_edit_session_state;
 extern std::atomic_uint64_t g_lifecycle_rebind_signature;
-// 同一状态没到位时的下一次补排时间点（GetTickCount64 口径）。见 trait_hooks.cpp 的
+// 同一状态没到位时的下一次补排时间点（GetTickCount64 口径）。见 skill_hooks.cpp 的
 // ScheduleSelectedStatusRebind：没到位就补排、到位即停，这个值只是节流。
 extern std::atomic_uint64_t g_lifecycle_rebind_not_before_ms;
 // 正在等副本的签名：排了重建、但游戏那份"装备/测试"副本还没真的复制出来。只有复制成功
-// （trait 循环跑完且全部复制）才清回 0。授权匹配**不算**到位——装备页看的是副本。
+// （skill 循环跑完且全部复制）才清回 0。授权匹配**不算**到位——装备页看的是副本。
 extern std::atomic_uint64_t g_rebind_pending_signature;
 
 extern std::atomic_bool g_pending_refresh;
@@ -334,7 +334,7 @@ void InstallDefaultTemplateSelections();
 // 模板表变过之后必须做的事，只有这一个入口（发布选择 + 排一次状态重建）。
 void PublishTemplateSelections() noexcept;
 bool TryCopyTemplateGem(uint32_t character_hash, uint32_t selected_slot_id, void* output) noexcept;
-bool ApplyTraitLoopLimits(int32_t virtual_slot_count) noexcept;
+bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept;
 
 void ScheduleSelectedStatusRebind();
 bool ResolveGameLayout();

@@ -26,10 +26,10 @@ internal static unsafe partial class NativeCore
     internal struct TemplateSlotNative
     {
         public uint GemId;
-        public uint Trait1;
-        public int Trait1Level;
-        public uint Trait2;
-        public int Trait2Level;
+        public uint Skill1;
+        public int Skill1Level;
+        public uint Skill2;
+        public int Skill2Level;
         public int SigilLevel;
     }
 
@@ -41,7 +41,7 @@ internal static unsafe partial class NativeCore
         /// 被切换的那个技能 hash。它的**身份**就是槽位：原生侧拿它去专属表里认这是
         /// T1、T2 还是战气，所以托管侧不必知道这个映射，也不必读 gem.chara.json。
         /// </summary>
-        public uint TraitHash;
+        public uint SkillHash;
         public byte Disabled;
         // 3 个保留字节把步长补到 4 的倍数（native_api.h 的 static_assert 是 0x0C）。
         public byte Reserved0;
@@ -88,18 +88,18 @@ internal static unsafe partial class NativeCore
         AssertSize("TemplateSlot", 0x18, Marshal.SizeOf<TemplateSlotNative>());
         AssertSize("ExclusiveOverride", 0x0C, Marshal.SizeOf<ExclusiveOverrideNative>());
 
-        // 尺寸挡不住字段互换：TemplateSlot 是六个 32 位字段，gem_id 与 trait1 对调之后
+        // 尺寸挡不住字段互换：TemplateSlot 是六个 32 位字段，gem_id 与 skill1 对调之后
         // 照样是 0x18。而"字段按这个次序对应"才是这份 ABI 的全部内容，所以偏移量也得对拍
         // （native_api.h 那边是同样的字段次序 + #pragma pack(1)）。字段名用 nameof：改名的
         // 时候这里跟着改，不会变成一句"这个字段不存在"的 ArgumentException。
         AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.GemId), 0x00);
-        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait1), 0x04);
-        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait1Level), 0x08);
-        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait2), 0x0C);
-        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait2Level), 0x10);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Skill1), 0x04);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Skill1Level), 0x08);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Skill2), 0x0C);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Skill2Level), 0x10);
         AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.SigilLevel), 0x14);
         AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.CharacterHash), 0x00);
-        AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.TraitHash), 0x04);
+        AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.SkillHash), 0x04);
         AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.Disabled), 0x08);
     }
 

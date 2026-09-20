@@ -64,7 +64,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1          # 部署到 
 2. `GBFR.PreEquippedSigils.log`（mod 目录）里出现：
    - `Installed N built-in template loadout selection(s). exclusive slots 1-3 (T1/T2/war), general slots 4-M; inventory-independent.`（`N` 由 `docs\tool-gen-loadout.ps1` 的 `$chars` 条目数决定：无配置 = 条目数 × 3，有配置 = 条目数 × (3+通用槽数)）
    - `Native hooks installed: N virtual slots.`
-   - `Trait contribution confirmed for 0xE7053919: N/N ...`（首次；未满应为 `incomplete: N/M`）
+   - `Skill contribution confirmed for 0xE7053919: N/N ...`（首次；未满应为 `incomplete: N/M`）
 3. 训练场实测技能效果（如豪胆濒死不死、自动复活自起）+ 血条下 buff 图标。
 
 ## 数据生成（`docs\`）

@@ -87,7 +87,7 @@ void ConsumeApplyResult()
    case ApplyResultAppliedDuringNativeRebuild:
       body = std::format(
          "equipment/test rebuild copied {}/{} selected virtual sigils. Combat reads the same "
-         "saved selection directly from the native Trait loop.",
+         "saved selection directly from the native Skill loop.",
          injected,
          expected);
       break;
@@ -96,7 +96,7 @@ void ConsumeApplyResult()
       break;
    case ApplyResultVirtualCopyFailed:
       body = std::format(
-         "native trait build ran, but only {}/{} sigils were valid, unequipped, and copied.",
+         "native skill build ran, but only {}/{} sigils were valid, unequipped, and copied.",
          injected,
          expected);
       break;
@@ -106,13 +106,13 @@ void ConsumeApplyResult()
    case ApplyResultNativeRebuildFailed:
       body = "the synchronous native status rebuild failed.";
       break;
-   case ApplyResultNativeTraitLoopMissing:
+   case ApplyResultNativeSkillLoopMissing:
       body = std::format(
-         "the native status rebuild returned without completing virtual trait slots 13 through {}.",
+         "the native status rebuild returned without completing virtual skill slots 13 through {}.",
          GetExpandedInternalSlotCount() - 1);
       break;
    case ApplyResultNotifierFailed:
-      body = "traits rebuilt, but the post-rebuild native UI notifier failed.";
+      body = "skills rebuilt, but the post-rebuild native UI notifier failed.";
       break;
    }
    if (!body.empty())

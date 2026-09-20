@@ -22,7 +22,7 @@ var assets embed.FS
 var trayIconBytes []byte
 
 // The sigil-edit page's data, embedded at compile time so that page needs no
-// external file: skill_status.json is the game's own rows for every trait -
+// external file: skill_status.json is the game's own rows for every skill -
 // which levels carry numbers, and the ten slots each of those levels has;
 // skill.<lang>.json is what one language calls those rows.
 //

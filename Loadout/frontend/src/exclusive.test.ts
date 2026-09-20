@@ -26,9 +26,9 @@ const names = { B143DAE6: "斩姬梦幻" };
 describe("exclusiveSlots", () => {
   it("标签取物品 hash 的名字，状态键取技能 hash", () => {
     expect(exclusiveSlots(row, names)).toEqual([
-      { traitHash: "29B07BEB", label: "斩姬梦幻" },
-      { traitHash: "A63B89CD", label: "A879208F" },
-      { traitHash: "FDD1AD24", label: "CEF31894" },
+      { skillHash: "29B07BEB", label: "斩姬梦幻" },
+      { skillHash: "A63B89CD", label: "A879208F" },
+      { skillHash: "FDD1AD24", label: "CEF31894" },
     ]);
   });
 

@@ -25,18 +25,18 @@ constexpr PatternView MakePattern(
 
 // 布局预检字节表：解析出的每个 RVA 都必须以这些字节开头，否则整套 gameplay hook 不装
 // （fail-closed，见 §7）。只有本文件用它们，所以它们住在这里而不是共享内部头。
-inline constexpr std::array<uint8_t, 16> kTraitApplyLoopPreflight = {
+inline constexpr std::array<uint8_t, 16> kSkillApplyLoopPreflight = {
    0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0xB7,
    0x00, 0x00, 0x00, 0xC5, 0xF8, 0x11, 0x75, 0xF0};
-inline constexpr std::array<uint8_t, 12> kTraitApplyGetterReturnPreflight = {
+inline constexpr std::array<uint8_t, 12> kSkillApplyGetterReturnPreflight = {
    0x84, 0xC0, 0x74, 0xD3, 0xF6, 0x45, 0x00, 0x10, 0x75, 0xCD, 0x44, 0x8B};
-inline constexpr std::array<uint8_t, 13> kTraitCategoryLoopPreflight = {
+inline constexpr std::array<uint8_t, 13> kSkillCategoryLoopPreflight = {
    0x49, 0xFF, 0xC5, 0x49, 0x83, 0xFD, 0x0D, 0x0F, 0x84, 0xE4, 0x00, 0x00, 0x00};
-inline constexpr std::array<uint8_t, 11> kTraitFetchPreflight = {
+inline constexpr std::array<uint8_t, 11> kSkillFetchPreflight = {
    0x84, 0xDB, 0x74, 0x3E, 0x49, 0x8B, 0x87, 0x80, 0x5E, 0x00, 0x00};
-inline constexpr std::array<uint8_t, 14> kTraitFetchCallPathPreflight = {
+inline constexpr std::array<uint8_t, 14> kSkillFetchCallPathPreflight = {
    0x4C, 0x89, 0xF9, 0x44, 0x89, 0xEA, 0x4D, 0x89, 0xE0, 0xE8, 0x12, 0x65, 0x00, 0x00};
-inline constexpr std::array<uint8_t, 12> kTraitCategoryGetterReturnPreflight = {
+inline constexpr std::array<uint8_t, 12> kSkillCategoryGetterReturnPreflight = {
    0x84, 0xC0, 0x74, 0x8E, 0xF6, 0x45, 0xD8, 0x10, 0x75, 0x88, 0x8B, 0x55};
 inline constexpr std::array<uint8_t, 12> kGetterPreflight = {
    0x55, 0x41, 0x57, 0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x28};
@@ -478,29 +478,29 @@ bool ValidateResolvedGameLayout(
    const ImageView& image,
    const ResolvedGameLayout& layout) noexcept
 {
-   if (layout.trait_apply_loop_limit_immediate_rva < 4 ||
-       layout.trait_category_loop_limit_immediate_rva < 6 ||
+   if (layout.skill_apply_loop_limit_immediate_rva < 4 ||
+       layout.skill_category_loop_limit_immediate_rva < 6 ||
        !MatchesBytesAtRva(
           image,
-          layout.trait_apply_loop_limit_immediate_rva - 4,
-          kTraitApplyLoopPreflight) ||
+          layout.skill_apply_loop_limit_immediate_rva - 4,
+          kSkillApplyLoopPreflight) ||
        !MatchesBytesAtRva(
           image,
-          layout.trait_apply_getter_return_rva,
-          kTraitApplyGetterReturnPreflight) ||
+          layout.skill_apply_getter_return_rva,
+          kSkillApplyGetterReturnPreflight) ||
        !MatchesBytesAtRva(
           image,
-          layout.trait_category_loop_limit_immediate_rva - 6,
-          kTraitCategoryLoopPreflight) ||
-       !MatchesBytesAtRva(image, layout.trait_fetch_path_rva, kTraitFetchPreflight) ||
+          layout.skill_category_loop_limit_immediate_rva - 6,
+          kSkillCategoryLoopPreflight) ||
+       !MatchesBytesAtRva(image, layout.skill_fetch_path_rva, kSkillFetchPreflight) ||
        !MatchesBytesAtRva(
           image,
-          layout.trait_fetch_call_path_rva,
-          kTraitFetchCallPathPreflight) ||
+          layout.skill_fetch_call_path_rva,
+          kSkillFetchCallPathPreflight) ||
        !MatchesBytesAtRva(
           image,
-          layout.trait_category_getter_return_rva,
-          kTraitCategoryGetterReturnPreflight) ||
+          layout.skill_category_getter_return_rva,
+          kSkillCategoryGetterReturnPreflight) ||
        !MatchesBytesAtRva(
           image,
           layout.get_gem_data_by_index_rva,
@@ -545,14 +545,14 @@ bool ValidateResolvedGameLayout(
    uint8_t category_limit = 0;
    return ReadValue(
              image,
-             layout.trait_apply_loop_limit_immediate_rva,
+             layout.skill_apply_loop_limit_immediate_rva,
              apply_limit) &&
       ReadValue(
          image,
-         layout.trait_category_loop_limit_immediate_rva,
+         layout.skill_category_loop_limit_immediate_rva,
          category_limit) &&
-      apply_limit == layout.trait_apply_original_limit &&
-      category_limit == layout.trait_category_original_limit;
+      apply_limit == layout.skill_apply_original_limit &&
+      category_limit == layout.skill_category_original_limit;
 }
 
 bool FailResolution(std::string_view stage)
@@ -633,12 +633,12 @@ bool ResolveGameLayout()
           image, image.code_rva, image.code_size, kUiCharacterPattern, ui_character))
       return FailResolution("unique semantic anchors");
 
-   layout.trait_apply_loop_limit_immediate_rva = apply_loop + 4;
-   layout.trait_apply_getter_return_rva = apply_loop + 0x29;
-   layout.trait_category_loop_limit_immediate_rva = category_loop + 6;
-   layout.trait_fetch_path_rva = category_loop + 0x1E;
-   layout.trait_fetch_call_path_rva = category_loop + 0x60;
-   layout.trait_category_getter_return_rva = category_loop + 0x6E;
+   layout.skill_apply_loop_limit_immediate_rva = apply_loop + 4;
+   layout.skill_apply_getter_return_rva = apply_loop + 0x29;
+   layout.skill_category_loop_limit_immediate_rva = category_loop + 6;
+   layout.skill_fetch_path_rva = category_loop + 0x1E;
+   layout.skill_fetch_call_path_rva = category_loop + 0x60;
+   layout.skill_category_getter_return_rva = category_loop + 0x6E;
    layout.status_notifier_rva = notifier;
 
    uint8_t apply_limit = 0;
@@ -646,16 +646,16 @@ bool ResolveGameLayout()
    uintptr_t apply_getter = 0;
    uintptr_t category_getter = 0;
    if (!ReadValue(
-          image, layout.trait_apply_loop_limit_immediate_rva, apply_limit) ||
+          image, layout.skill_apply_loop_limit_immediate_rva, apply_limit) ||
        !ReadValue(
-          image, layout.trait_category_loop_limit_immediate_rva, category_limit) ||
+          image, layout.skill_category_loop_limit_immediate_rva, category_limit) ||
        apply_limit != kNativeInternalSlotCount || category_limit != apply_limit ||
        !DecodeRel32Call(image, apply_loop + 0x24, apply_getter) ||
        !DecodeRel32Call(image, category_loop + 0x69, category_getter) ||
        apply_getter != category_getter)
-      return FailResolution("trait loop/getter contract");
-   layout.trait_apply_original_limit = apply_limit;
-   layout.trait_category_original_limit = category_limit;
+      return FailResolution("skill loop/getter contract");
+   layout.skill_apply_original_limit = apply_limit;
+   layout.skill_category_original_limit = category_limit;
    layout.get_gem_data_by_index_rva = apply_getter;
 
    FunctionRange getter_function{};

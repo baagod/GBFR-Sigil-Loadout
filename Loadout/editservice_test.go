@@ -41,7 +41,7 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	hermeticHome(t)
 
 	service := &EditService{}
-	edits := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0), new(1.0), new(20.0)})}}
+	edits := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0), new(1.0), new(20.0)})}}
 	if err := service.SaveEdits(edits); err != nil {
 		t.Fatalf("SaveEdits: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 		service := &EditService{}
 		cfgPath := localConfig(t, editListName)
 
-		first := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
+		first := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
 		if err := service.SaveEdits(first); err != nil {
 			t.Fatalf("SaveEdits: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 		}
 
 		// 第二次按键重启了那段窗口：第一次不能已经留下一次写入，这一次同样还不能。
-		last := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(300.0)})}}
+		last := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(300.0)})}}
 		if err := service.SaveEdits(last); err != nil {
 			t.Fatalf("SaveEdits: %v", err)
 		}
@@ -138,7 +138,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	writeFile(t, blocked, "not a folder")
 
 	service := &EditService{}
-	edits := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
+	edits := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
 	if err := service.SaveEdits(edits); err != nil {
 		t.Fatalf("SaveEdits: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestPadValuesAlwaysGivesTenSlots(t *testing.T) {
 // 发生漂移，新增一个技能会悄悄产出一个空名字（或一行没有数值的行），
 // 所以这里断言每种语言描述的技能集合与数值一致——并且互相之间也一致。
 func TestSkillTablesAgree(t *testing.T) {
-	if len(traitInfo) == 0 {
+	if len(skillInfo) == 0 {
 		t.Fatal("skill_status.json did not load")
 	}
 	if len(skillTables) != 4 {
@@ -341,12 +341,12 @@ func TestSkillTablesAgree(t *testing.T) {
 		if len(texts) == 0 {
 			t.Fatalf("the %s text table is empty", lang)
 		}
-		if len(texts) != len(traitInfo) {
+		if len(texts) != len(skillInfo) {
 			t.Fatalf("%s: key count differs from the values table: texts %d, skills %d",
-				lang, len(texts), len(traitInfo))
+				lang, len(texts), len(skillInfo))
 		}
 		for key := range texts {
-			if _, ok := traitInfo[key]; !ok {
+			if _, ok := skillInfo[key]; !ok {
 				t.Fatalf("%s: skill %s has text but no values", lang, key)
 			}
 		}
@@ -360,7 +360,7 @@ func TestSkillTablesAgree(t *testing.T) {
 			}
 		}
 	}
-	for hash, info := range traitInfo {
+	for hash, info := range skillInfo {
 		// 一次编辑可能点到的每个等级都有自己的一行，且带齐十个参槽：
 		// 否则一个参槽的占位符（以及清空输入框后写回的值）就会来自另一个等级。
 		if len(info.Rows) == 0 {
@@ -381,10 +381,10 @@ func TestSkillTablesAgree(t *testing.T) {
 // 前端 tsc 都会全绿，而 App.tsx 里 `as Record<string, SkillText>` 会静默收下
 // {Level, Text}，用户看到的只是空 tooltip 与 0 占位。所以这里按字节把它钉住。
 func TestWireShapeStaysTuples(t *testing.T) {
-	status, err := jsonv2.Marshal(map[string]TraitInfo{
+	status, err := jsonv2.Marshal(map[string]SkillInfo{
 		"06719232": {
 			Key:  "SKILL_156_00",
-			Rows: []TraitRow{{Level: 15, Values: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}},
+			Rows: []SkillRow{{Level: 15, Values: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}},
 		},
 	})
 	if err != nil {
@@ -441,7 +441,7 @@ func TestSkillMapFallsBack(t *testing.T) {
 // 它也是说明为什么只有带数字的等级会进资产的例子：
 // 这个技能的等级 1 到 14 全是零，所以它们根本不在资产里——编辑只能点到一个游戏真正会读到值的行。
 func TestKnownSkillRows(t *testing.T) {
-	info, ok := traitInfo["06719232"]
+	info, ok := skillInfo["06719232"]
 	if !ok {
 		t.Fatal("06719232 (黑龙的咒印) missing from skill_status.json")
 	}
@@ -471,10 +471,10 @@ func TestKnownSkillRows(t *testing.T) {
 
 // 一个因子提供的每个等级都带数字，一个都不漏，而且按顺序排列。
 func TestLevelRangesAreUsable(t *testing.T) {
-	if len(traitInfo) == 0 {
+	if len(skillInfo) == 0 {
 		t.Fatal("skill_status.json did not load")
 	}
-	for hash, info := range traitInfo {
+	for hash, info := range skillInfo {
 		if len(info.Rows) == 0 {
 			t.Fatalf("%s offers no level at all", hash)
 		}
@@ -501,7 +501,7 @@ func TestLevelRangesAreUsable(t *testing.T) {
 // 那些并非真正技能的行必须从每张表里都不见。
 func TestExcludedRowsAreGone(t *testing.T) {
 	for _, hash := range []string{"9AD8B5E6", "0FBA47E8", "A4D6B880", "CDEB73F6"} {
-		if _, ok := traitInfo[hash]; ok {
+		if _, ok := skillInfo[hash]; ok {
 			t.Fatalf("%s should not be offered", hash)
 		}
 		for lang, texts := range skillTables {
@@ -528,7 +528,7 @@ func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
 	hermeticHome(t)
 
 	service := &EditService{}
-	edits := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
+	edits := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
 	if err := service.SaveEdits(edits); err != nil {
 		t.Fatalf("SaveEdits: %v", err)
 	}

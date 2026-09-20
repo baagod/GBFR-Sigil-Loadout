@@ -25,9 +25,9 @@ import {
   stepValue,
   valuesAt,
   withSlot,
-  type SigilTrait,
-  type TraitInfo,
-} from "./traits";
+  type SigilSkill,
+  type SkillInfo,
+} from "./skills";
 import { useWheelStep } from "./useWheelStep";
 
 /** 一个因子的行和它的各个等级，由列表这样构建出来。 */
@@ -36,8 +36,8 @@ export type Row = {
   label: string;
   /** 游戏对这个因子本身的一句话，父行读的就是它。 */
   summary: string;
-  info?: TraitInfo;
-  byLevel: Map<number, SigilTrait>;
+  info?: SkillInfo;
+  byLevel: Map<number, SigilSkill>;
   enabled: boolean;
   levels: number[];
 };
@@ -53,9 +53,9 @@ export type RowContext = {
   rest: (id: string, e: PointerEvent<HTMLElement>) => void;
   leave: (id: string) => void;
   toggleLevel: (key: string, level: number) => void;
-  toggleTrait: (key: string, nextChecked: boolean) => void;
+  toggleSkill: (key: string, nextChecked: boolean) => void;
   toggleOpen: (key: string) => void;
-  updateLevel: (key: string, level: number, patch: Partial<SigilTrait>) => void;
+  updateLevel: (key: string, level: number, patch: Partial<SigilSkill>) => void;
   isControl: (e: MouseEvent<HTMLElement>) => boolean;
 };
 
@@ -66,7 +66,7 @@ export type RowContext = {
  * 数值留着"；而一个框是否为空由记录本身决定：槽在有人输入之前一直是 null，
  * 从不靠把数字和默认值比较来判断。默认值是 20 的槽里输入一个 20，仍然是用户的 20。
  *
- * 一次敲键意味着什么、正在输入时框里显示什么，由 traits.ts（slotEdit）决定——
+ * 一次敲键意味着什么、正在输入时框里显示什么，由 skills.ts（slotEdit）决定——
  * 包括为什么输入过的数字会一直显示自己那串文本，直到离开这个框。
  * 改这里之前先读那条规则。
  */
@@ -144,7 +144,7 @@ function ValueSlots({
             value={halfTyped[i] ?? (values[i] === null ? "" : String(values[i]))}
             onChange={(e) => {
               // 一次敲键意味着什么——丢弃、半输入状态，还是一个要提交的数字——
-              // 由 traits.ts 决定，那里可以用测试逐个按键驱动它。
+              // 由 skills.ts 决定，那里可以用测试逐个按键驱动它。
               const edit = slotEdit(e.target.value, i, values);
               if (edit.kind === "drop") return;
               if (edit.kind === "half") {
@@ -311,7 +311,7 @@ function LevelRow({
  * 已编辑的等级在前、升序，没动过的排在后面。它的勾选框此时代表所有等级：
  * 全开时勾选，部分开时半选，全关时为空。
  */
-export function TraitRow({
+export function SkillRow({
   row,
   hoveredId,
   isOpen,
@@ -322,7 +322,7 @@ export function TraitRow({
   isOpen: boolean;
   ctx: RowContext;
 }) {
-  // 父行说的是 "这一整行显示的等级"，不是 "碰巧存在几条记录" —— 规则本身在 traits.ts 里，
+  // 父行说的是 "这一整行显示的等级"，不是 "碰巧存在几条记录" —— 规则本身在 skills.ts 里，
   // 半选态才因此可能出现（11 个等级只开 1 个 = 半选）。
   const state = parentState(row.levels, row.byLevel);
 
@@ -374,7 +374,7 @@ export function TraitRow({
               checked={state === "all"}
               indeterminate={state === "some"}
               aria-label={ctx.t.enable(row.label)}
-              onCheckedChange={() => ctx.toggleTrait(row.key, state !== "all")}
+              onCheckedChange={() => ctx.toggleSkill(row.key, state !== "all")}
             />
             {state === "some" && (
               /*

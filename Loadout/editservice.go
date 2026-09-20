@@ -19,10 +19,10 @@ import (
 // 也就是描述一次编辑需要多少个数字。
 const LevelValueCount = 10
 
-// SigilTrait 对应 mod 的 Config.cs 里的 SigilTrait：对 skill_status 一行的覆写。
+// SigilSkill 对应 mod 的 Config.cs 里的 SigilSkill：对 skill_status 一行的覆写。
 // Values 按位置对应 LevelValue1..10，也就是技能自身描述里当作 {0}、{1}、{2}…… 用的那些参槽。
-// 每个参槽要么是数字，要么是 nil；nil 表示那一处保留游戏原本的值（由 traits.ts 决定它是什么）。
-type SigilTrait struct {
+// 每个参槽要么是数字，要么是 nil；nil 表示那一处保留游戏原本的值（由 skills.ts 决定它是什么）。
+type SigilSkill struct {
 	Enabled bool       `json:"enabled"`
 	Key     string     `json:"key"`
 	Level   int        `json:"level"`
@@ -31,7 +31,7 @@ type SigilTrait struct {
 
 // Config 对应 mod 的 Config.cs。mod 反序列化的正是这个形状。
 type Config struct {
-	Edits []SigilTrait `json:"edits"`
+	Edits []SigilSkill `json:"edits"`
 }
 
 // editListName 是编辑列表的文件名。它住在 mod 的用户目录里（loadoutservice.go 的
@@ -53,7 +53,7 @@ const saveFailedEvent = "GBFR.SigilEdit.SaveFailed"
 // 所以最终落盘的永远是屏幕上最后的状态，绝不会是若干次按键的混合。
 type EditService struct {
 	mu      sync.Mutex
-	pending []SigilTrait
+	pending []SigilSkill
 	timer   *time.Timer
 }
 
@@ -133,14 +133,14 @@ func (s *EditService) SkillMap(lang string) map[string]SkillText {
 	return pick(lang, skillTables)
 }
 
-// TraitRow 是一个带数字的因子的某一行 skill_status：等级，以及那一行的十个
+// SkillRow 是一个带数字的因子的某一行 skill_status：等级，以及那一行的十个
 // LevelValue 参槽。资产把它写成 [等级, [数值]] 这样的一对。
-type TraitRow struct {
+type SkillRow struct {
 	Level  int
 	Values []float64
 }
 
-func (r *TraitRow) UnmarshalJSON(data []byte) error {
+func (r *SkillRow) UnmarshalJSON(data []byte) error {
 	pair, err := pairOf(data, "skill_status row")
 	if err != nil {
 		return err
@@ -152,29 +152,29 @@ func (r *TraitRow) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON 把这一对按资产原本的样子写回去：前端按 [等级, [数值]] 读取行。
-func (r TraitRow) MarshalJSON() ([]byte, error) {
+func (r SkillRow) MarshalJSON() ([]byte, error) {
 	return jsonv2.Marshal([2]any{r.Level, r.Values})
 }
 
-// TraitInfo 是生成的 skill_status.json 里的一行：
+// SkillInfo 是生成的 skill_status.json 里的一行：
 // 游戏自己给某个因子记下的数字，只在真正带数字的那些等级上。
 //
 // 这里只有带数字的等级。每个等级在表里都有一行，但大多数行全是零——万能药在它的 30 行里
 // 只有 15 和 30 带数值——而一个指向零行的编辑写下的值，游戏在那里根本不会读。Key 是游戏的
 // 其他表拼写这个因子时用的短 id（SKILL_156_00），用于到那些表里查它。
-type TraitInfo struct {
+type SkillInfo struct {
 	Key  string     `json:"key"`
-	Rows []TraitRow `json:"rows"`
+	Rows []SkillRow `json:"rows"`
 }
 
-// traitInfo 把技能哈希——游戏管这些行叫 skills——映射到该因子自己的数字和等级。
+// skillInfo 把技能哈希——游戏管这些行叫 skills——映射到该因子自己的数字和等级。
 // 从内嵌的 skill_status.json 填充一次。
-var traitInfo = mustDecode[TraitInfo](embeddedSkillStatus)
+var skillInfo = mustDecode[SkillInfo](embeddedSkillStatus)
 
-// TraitMap 返回整张 哈希 -> 因子 表，好让前端在本地解析某个等级的起始数值，
+// SkillTable 返回整张 哈希 -> 因子 表，好让前端在本地解析某个等级的起始数值，
 // 而不是每行发一次调用。
-func (s *EditService) TraitMap() map[string]TraitInfo {
-	return traitInfo
+func (s *EditService) SkillTable() map[string]SkillInfo {
+	return skillInfo
 }
 
 // pairOf 从资产里读出一个 [a, b] 对，好让形状错误能点出它来自哪一行，
@@ -218,12 +218,12 @@ func configPath() string {
 // “没东西可读”只指首次运行、文件根本不存在的情形。存在但读不出或解析不了的
 // 文件是错误，而不是空列表：空列表是一个真实状态——所有编辑都关掉了——而把坏文件
 // 显示成空列表，正是某次误触按键把这份空覆盖回用户自己编辑内容的方式。
-func (s *EditService) LoadEdits() ([]SigilTrait, error) {
+func (s *EditService) LoadEdits() ([]SigilSkill, error) {
 	path := configPath()
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return []SigilTrait{}, nil
+			return []SigilSkill{}, nil
 		}
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
@@ -241,14 +241,14 @@ func (s *EditService) LoadEdits() ([]SigilTrait, error) {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
 
-	// 这里不做任何过滤：哪些记录算编辑由前端决定（见 traits.ts 里的 asEdits），
+	// 这里不做任何过滤：哪些记录算编辑由前端决定（见 skills.ts 里的 asEdits），
 	// Go 只负责补齐。被清空的列表也保持为空。
 	//
 	// nil 归一成空切片：没有 edits 成员（或它是 null）的文件读出来就是 nil，而 nil 在线格式上
 	// 写作 null 而不是 []，那会让同一个“空列表”在这一个 RPC 上有两种拼写。
 	edits := cfg.Edits
 	if edits == nil {
-		edits = []SigilTrait{}
+		edits = []SigilSkill{}
 	}
 	for i := range edits {
 		edits[i].Values = padValues(edits[i].Values)
@@ -268,7 +268,7 @@ func (s *EditService) LoadEdits() ([]SigilTrait, error) {
 //
 // nil（前端传 null）与空列表不是同一件事：nil = 这次什么都没交（不写盘），空列表 =
 // 写出一份"所有编辑都关掉了"的文件（对 mod 而言就是撤销全部编辑）。
-func (s *EditService) SaveEdits(edits []SigilTrait) error {
+func (s *EditService) SaveEdits(edits []SigilSkill) error {
 	for i := range edits {
 		edits[i].Values = padValues(edits[i].Values)
 	}
@@ -287,7 +287,7 @@ func (s *EditService) SaveEdits(edits []SigilTrait) error {
 // writeEdits 把列表写到 mod 读它的地方：用户目录下的 gemedits.json。
 // 两边都不必询问对方就知道那个目录，所以这里没有"解析不出路径"这种失败分支。
 // edits 一定非 nil：唯一调用方 publishLocked 在 nil 时就已经返回（那里是"没有待写的东西"）。
-func writeEdits(edits []SigilTrait) error {
+func writeEdits(edits []SigilSkill) error {
 	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))
 	if err != nil {
 		return fmt.Errorf("serialising the edit list: %w", err)

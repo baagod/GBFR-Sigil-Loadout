@@ -53,14 +53,14 @@ type Row struct {
 
 func (r Row) MarshalJSON() ([]byte, error) { return jsonv2.Marshal([]any{r.Level, r.Values}) }
 
-// traitRows 是 skill_status.json 里的一条，按因子哈希索引。
-type traitRows struct {
+// skillRows 是 skill_status.json 里的一条，按因子哈希索引。
+type skillRows struct {
 	Key  string `json:"key"`
 	Rows []Row  `json:"rows"`
 }
 
-// traitText 是 skill.<lang>.json 里的一条，按因子哈希索引。
-type traitText struct {
+// skillText 是 skill.<lang>.json 里的一条，按因子哈希索引。
+type skillText struct {
 	Name    string `json:"name"`
 	Summary string `json:"summary"`
 	Explain []Band `json:"explain"`
@@ -69,18 +69,18 @@ type traitText struct {
 // textsJSON 是 gen\texts 产出的共享数据，只声明用得到的字段。
 type textsJSON struct {
 	Text   map[string]map[string]string `json:"text"`
-	Traits []traitJSON                  `json:"traits"`
+	Skills []skillJSON                  `json:"skills"`
 }
 
-type traitJSON struct {
+type skillJSON struct {
 	Hash    string         `json:"hash"`
 	Key     string         `json:"key"`
 	Name    string         `json:"name"`
 	Summary string         `json:"summary"`
-	Rows    []traitRowJSON `json:"rows"`
+	Rows    []skillRowJSON `json:"rows"`
 }
 
-type traitRowJSON struct {
+type skillRowJSON struct {
 	Level  int       `json:"level"`
 	Desc   string    `json:"desc"`
 	Values []float64 `json:"values"`
@@ -115,13 +115,13 @@ func main() {
 
 	// values 只留"带着数值"的等级：绝大多数因子的绝大多数等级都是零，
 	// 而指向全零行的编辑，写进去的值游戏根本不会读。
-	status := make(map[string]traitRows, len(in.Traits))
-	perLang := make(map[string]map[string]traitText, len(uiLangs))
+	status := make(map[string]skillRows, len(in.Skills))
+	perLang := make(map[string]map[string]skillText, len(uiLangs))
 	for _, l := range uiLangs {
-		perLang[l] = make(map[string]traitText, len(in.Traits))
+		perLang[l] = make(map[string]skillText, len(in.Skills))
 	}
 
-	for _, t := range in.Traits {
+	for _, t := range in.Skills {
 		// 工具提供哪些因子，只在一个地方决定——工具回退到的那种语言（中文）。这样每个
 		// 资产带的是同一批因子，任何语言都不会各自跑偏。
 		if texts["zh"][t.Name] == "" {
@@ -141,7 +141,7 @@ func main() {
 			continue
 		}
 
-		status[t.Hash] = traitRows{Key: t.Key, Rows: carrying}
+		status[t.Hash] = skillRows{Key: t.Key, Rows: carrying}
 
 		for _, l := range uiLangs {
 			// 只有措辞变了才开一段新说明；与上一段相同的，并进上一段。
@@ -162,7 +162,7 @@ func main() {
 			if len(bands) == 0 {
 				continue
 			}
-			perLang[l][t.Hash] = traitText{
+			perLang[l][t.Hash] = skillText{
 				Name:    texts[l][t.Name],
 				Summary: texts[l][t.Summary],
 				Explain: bands,
@@ -182,13 +182,13 @@ func main() {
 	if err := writeJSON(out, status); err != nil {
 		fail(err)
 	}
-	fmt.Printf("skill_status.json: %d traits\n", len(status))
+	fmt.Printf("skill_status.json: %d skills\n", len(status))
 	for _, l := range uiLangs {
 		out := filepath.Join(assets, "skill."+l+".json")
 		if err := writeJSON(out, perLang[l]); err != nil {
 			fail(err)
 		}
-		fmt.Printf("skill.%s.json: %d traits\n", l, len(perLang[l]))
+		fmt.Printf("skill.%s.json: %d skills\n", l, len(perLang[l]))
 	}
 }
 

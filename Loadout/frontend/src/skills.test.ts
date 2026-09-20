@@ -24,16 +24,16 @@ import {
   stepValue,
   trimGameValues,
   type ExplainBand,
-  type SigilTrait,
-  type TraitInfo,
-} from "./traits";
+  type SigilSkill,
+  type SkillInfo,
+} from "./skills";
 
 const record = (
   key: string,
   level: number,
   enabled: boolean,
   values: (number | null)[] = [],
-): SigilTrait => ({
+): SigilSkill => ({
   enabled,
   key,
   level,
@@ -250,7 +250,7 @@ describe("what counts as an edit", () => {
   /*
     上面三条说的是规则，下面两条说的是"清空输入框"这件事**只能**按那条规则走。
 
-    asEdits 是唯一的闸口（见 traits.ts 的注释），而这正好是它此前没有测试的一个情形：
+    asEdits 是唯一的闸口（见 skills.ts 的注释），而这正好是它此前没有测试的一个情形：
     面板里曾经另有一条只按"还有没有数字"判断的规则，于是清空输入框会顺手把用户勾上的
     那一下也撤销掉——勾选同时也是置顶排序的键，所以那一行还会当场掉下去。
   */
@@ -289,8 +289,8 @@ describe("the game's own numbers are not inputs", () => {
   });
 });
 
-describe("the levels a trait shows", () => {
-  const info: TraitInfo = {
+describe("the levels a skill shows", () => {
+  const info: SkillInfo = {
     rows: [
       [1, []],
       [2, []],
@@ -302,7 +302,7 @@ describe("the levels a trait shows", () => {
   it("shows the game's real rows, not the span between them", () => {
     // 万能药只有 15、30 两级有值；它其它行全是零，
     // 在那些行上编辑会在游戏根本不读的地方写值——所以那些行根本不在资产里。
-    const cure: TraitInfo = {
+    const cure: SkillInfo = {
       rows: [
         [15, []],
         [30, []],
@@ -324,7 +324,7 @@ describe("the levels a trait shows", () => {
     ]);
     expect(levels).toEqual([1, 2, 3, 4]);
 
-    const wide: TraitInfo = {
+    const wide: SkillInfo = {
       rows: [
         [1, []],
         [2, []],
@@ -347,7 +347,7 @@ describe("the levels a trait shows", () => {
     expect(levels).toContain(9);
   });
 
-  it("shows nothing for a trait with no levels and no records", () => {
+  it("shows nothing for a skill with no levels and no records", () => {
     expect(levelsOf(undefined, [])).toEqual([]);
   });
 });

@@ -12,19 +12,19 @@ import {
 } from "@/components/ui/combobox"
 import { ChevronDown } from "lucide-react"
 
-interface TraitItem {
+interface SkillItem {
   value: string
   label: string
 }
 
-interface TraitPickerProps {
+interface SkillPickerProps {
   value: string
-  traits: string[]
+  skills: string[]
   /** Display name map (value -> localized label). Falls back to value. */
   labels?: Record<string, string>
-  /** Text shown on the trigger when value is empty (t.pickTrait / t.none). */
+  /** Text shown on the trigger when value is empty (t.pickSkill / t.none). */
   placeholder: string
-  /** Prepend a "无" (empty value) option - used for the second trait. */
+  /** Prepend a "无" (empty value) option - used for the second skill. */
   noneOption?: boolean
   /** Label of the empty option ("无" / "None"); only used with noneOption. */
   noneLabel?: string
@@ -41,9 +41,9 @@ interface TraitPickerProps {
   onSelect: (value: string) => void
 }
 
-export function TraitPicker({
+export function SkillPicker({
   value,
-  traits,
+  skills,
   labels,
   placeholder,
   noneOption = false,
@@ -54,15 +54,15 @@ export function TraitPicker({
   legal,
   invalid = false,
   onSelect,
-}: TraitPickerProps) {
-  const items: TraitItem[] = useMemo(() => {
-    const mapped = traits.map((trait) => ({ value: trait, label: labels?.[trait] ?? trait }))
+}: SkillPickerProps) {
+  const items: SkillItem[] = useMemo(() => {
+    const mapped = skills.map((skill) => ({ value: skill, label: labels?.[skill] ?? skill }))
     return noneOption ? [{ value: "", label: noneLabel }, ...mapped] : mapped
-  }, [traits, labels, noneOption, noneLabel])
+  }, [skills, labels, noneOption, noneLabel])
 
-  // An unrecognised value (a stored trait the picker no longer offers) stays
+  // An unrecognised value (a stored skill the picker no longer offers) stays
   // visible by its label/raw hash instead of masquerading as "none".
-  const selected: TraitItem =
+  const selected: SkillItem =
     items.find((item) => item.value === value) ??
     (value !== ""
       ? { value, label: labels?.[value] ?? value }

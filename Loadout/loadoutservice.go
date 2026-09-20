@@ -19,12 +19,12 @@ const MaxSlots = 12
 // tool-hotkey.txt — all next to the exe) and
 // writes the player configuration (LOCALAPPDATA/GBFRPreEquippedSigils,
 // mirroring the mod's userCfgDir so mod updates never wipe it).
-// Data: gem.json (merged sigil/trait table: item rows hash != skill1, non-item
+// Data: gem.json (merged sigil/skill table: item rows hash != skill1, non-item
 // skill rows hash == skill1; display names live in the embedded gem.lang.json
 // instead) is read here — the tool is its only reader, the mod keeps no sigil
 // table of its own. Written out is loadout.json (player configuration:
 // { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] };
-// one shape, no other spelling is accepted — so items[0] must carry the trait hash).
+// one shape, no other spelling is accepted — so items[0] must carry the skill hash).
 type LoadoutService struct {
 	// 写盘只有 SaveLoadout 这一个出口，而它可能被并发调用：前端的自动保存会防抖，
 	// 但一次慢写（杀软扫 %LOCALAPPDATA%）会让两次保存在飞，而磁盘上留哪一份取决于
@@ -71,7 +71,7 @@ type loadoutSlot struct {
 }
 
 // exclusiveState mirrors the mod-side "exclusive" section: keyed by character
-// hash, inner keys are the trait hashes, false = that exclusive slot is off
+// hash, inner keys are the skill hashes, false = that exclusive slot is off
 // (an absent character is a character with all three slots on). Parsed only to
 // validate the config; the payload is written verbatim.
 type exclusiveState map[string]bool
@@ -121,7 +121,7 @@ func readModFile(relative string) (string, error) {
 	return string(data), nil
 }
 
-// LoadSigils returns the merged sigil/trait table (assets/gem.json): item rows
+// LoadSigils returns the merged sigil/skill table (assets/gem.json): item rows
 // plus non-item skill rows (hash == skill1). All pickers read from it; display
 // names come separately from GemNames.
 func (s *LoadoutService) LoadSigils() (string, error) {

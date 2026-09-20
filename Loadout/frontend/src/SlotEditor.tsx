@@ -5,7 +5,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Checkbox } from "@/components/ui/checkbox"
-import { TraitPicker } from "./TraitPicker"
+import { SkillPicker } from "./SkillPicker"
 import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "./model"
 import type { Messages } from "./messages"
 import { useWheelStep } from "./useWheelStep"
@@ -106,11 +106,11 @@ export const SlotRow = memo(function SlotRow({
         <span className="text-muted-foreground tabular-nums">{row + 1}</span>
       </div>
       <div className="flex min-w-0 items-center gap-1.5 pr-2">
-        <TraitPicker
+        <SkillPicker
           value={slot.mainHash}
-          traits={sigils.mainKeys}
+          skills={sigils.mainKeys}
           labels={sigils.labels}
-          placeholder={t.pickTrait}
+          placeholder={t.pickSkill}
           searchPlaceholder={t.searchSigil}
           emptyLabel={t.noMatch}
           onSelect={(v) =>
@@ -131,9 +131,9 @@ export const SlotRow = memo(function SlotRow({
         />
       </div>
       <div className="flex min-w-0 items-center gap-1.5 pl-2">
-        <TraitPicker
+        <SkillPicker
           value={slot.secHash}
-          traits={sigils.traitHashes}
+          skills={sigils.skillHashes}
           labels={sigils.labels}
           legal={legal}
           invalid={secIllegal}
@@ -146,13 +146,13 @@ export const SlotRow = memo(function SlotRow({
           onSelect={(v) =>
             updateSlot(row, {
               secHash: v,
-              secLevel: v ? Math.min(DEFAULT_LEVEL, sigils.capOfTrait(v)) : 0,
+              secLevel: v ? Math.min(DEFAULT_LEVEL, sigils.capOfSkill(v)) : 0,
             })
           }
         />
         <LevelInput
           value={slot.secHash ? slot.secLevel : 0}
-          max={sigils.capOfTrait(slot.secHash)}
+          max={sigils.capOfSkill(slot.secHash)}
           min={slot.secHash ? 1 : 0}
           label={`${t.headerSecondary} ${row + 1}`}
           disabled={!slot.secHash || !mainValid}

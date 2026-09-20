@@ -15,7 +15,7 @@
 // into the game's own parsed copy - whose address the native side resolves from
 // a semantic anchor, so the managed side never holds an address and never scans
 // for one (see GBFR.PreEquippedSigils.Native/src/table_slot.cpp). The exclusive
-// switches travel as **trait hashes**, so the native side decides which of a
+// switches travel as **skill hashes**, so the native side decides which of a
 // character's three slots each switch means (it owns that table) and the managed
 // side needs no per-character table of its own. All
 // selector/inventory/preset/input/present/state APIs of the derived original
@@ -37,10 +37,10 @@ using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 #pragma pack(push, 1)
 struct GBFR20_GemData
 {
-   uint32_t trait1;
-   int32_t trait1_level;
-   uint32_t trait2;
-   int32_t trait2_level;
+   uint32_t skill1;
+   int32_t skill1_level;
+   uint32_t skill2;
+   int32_t skill2_level;
    uint32_t gem_id;
    uint32_t worn_by;
    int32_t sigil_level;
@@ -52,22 +52,22 @@ struct GBFR20_GemData
 struct GBFR20_TemplateSlot
 {
    uint32_t gem_id;
-   uint32_t trait1;
-   int32_t trait1_level;
-   uint32_t trait2;
-   int32_t trait2_level;
+   uint32_t skill1;
+   int32_t skill1_level;
+   uint32_t skill2;
+   int32_t skill2_level;
    int32_t sigil_level;
 };
 
-// One exclusive switch: which character, which trait, and whether it is off.
-// Nothing here names T1 / T2 / war spirit — the trait hash *is* the name, and
+// One exclusive switch: which character, which skill, and whether it is off.
+// Nothing here names T1 / T2 / war spirit — the skill hash *is* the name, and
 // the native exclusive table says which slot it belongs to. `disabled` is 0/1;
 // an entry with disabled == 0 means nothing and the caller does not send it,
 // so an absent character is a character with all three exclusive slots on.
 struct GBFR20_ExclusiveOverride
 {
    uint32_t character_hash;
-   uint32_t trait_hash;
+   uint32_t skill_hash;
    uint8_t disabled;
    uint8_t reserved[3];
 };

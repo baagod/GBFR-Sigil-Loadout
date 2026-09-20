@@ -6,7 +6,7 @@
 
 ## 1. 一句话说明
 
-游戏原生只计 12 个可见因子槽（内部 trait 循环上限 13）。本 mod 把上限扩到 `13 + 虚拟槽数`（= 3 内置专属 + 玩家通用槽），
+游戏原生只计 12 个可见因子槽（内部 skill 循环上限 13）。本 mod 把上限扩到 `13 + 虚拟槽数`（= 3 内置专属 + 玩家通用槽），
 并 Hook 因子读取函数：游戏询问 13 号起的虚拟槽时，现场合成一份 GemData 交付——不写存档、不依赖库存、不占用库存
 （`GemData.WORN_BY` = 未装备）。战斗数值是真实本地效果（在线 = 作弊级，风险自负）。
 
@@ -45,12 +45,12 @@
 
 运行:
   游戏状态重建：GetGemDataByIndexDetour（slot 13 起共 count 个）
-    → TryLoadVirtualTraitSelection → TryCopySelectedVirtualGem
+    → TryLoadVirtualSkillSelection → TryCopySelectedVirtualGem
         → IsTemplateSlotId(0xFE000000+) → TryCopyTemplateGem
             → kCharacterExclusives（按 exclusive 状态组装三个专属槽，见 §4）
             → 组装 GemData（worn_by=0x887AE0B0 未装备，flags=0）→ SafeCopyToOutput
     → natural bind 追踪：injected==expected 且 identity 一致 → CommitAuthorizedStatus
-    → 日志 "Trait contribution confirmed for 0x...: N/N"（会话内首次状态重建报一次；未满每次报 incomplete N/M）
+    → 日志 "Skill contribution confirmed for 0x...: N/N"（会话内首次状态重建报一次；未满每次报 incomplete N/M）
 
 维持（Mod.cs 250ms Tick → GBFR20_Tick）:
   UpdateEditSessionState / ValidateAuthorizedStatuses /
@@ -71,7 +71,7 @@
 
 **改配装流程**：改 `tool-gen-loadout.ps1` 的 `$chars` 表 → 编译（vcxproj 编译前自动重跑生成器，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
 
-行结构（`*_gem` = 物品 hash 由脚本推导，trait = 技能 hash）：
+行结构（`*_gem` = 物品 hash 由脚本推导，skill = 技能 hash）：
 
 ```cpp
 { 0x079DF0CC,             // character_hash
@@ -81,20 +81,20 @@
 },
 ```
 
-每槽由 `MakeSingleTraitSlot` 组装为单技能 `TemplateGemSlot`：
+每槽由 `MakeSingleSkillSlot` 组装为单技能 `TemplateGemSlot`：
 
 ```cpp
 TemplateGemSlot{
    gem_id,        // 物品 hash：游戏按它查 master 表拿显示名；技能效果吃下面两个 hash
-   trait1,        // 主技能 hash
-   15,            // trait1_level：Ⅴ＋ = 15（漆黑钳蟹 = 20）
-   0x887AE0B0,    // trait2：单技能必须用 0x887AE0B0（"不选择"哨兵），不能用 0
-   0,             // trait2_level
+   skill1,        // 主技能 hash
+   15,            // skill1_level：Ⅴ＋ = 15（漆黑钳蟹 = 20）
+   0x887AE0B0,    // skill2：单技能必须用 0x887AE0B0（"不选择"哨兵），不能用 0
+   0,             // skill2_level
    15,            // sigil_level：物品显示等级（漆黑钳蟹 = 20）
 }
 ```
 
-- 单技能把 `trait2` 写成 `0` 会在游戏"全部因子列表"中多渲染一个空的 Lv1 条目（2.0.5 实测），覆盖所有单技能槽位（战气/激昂/钳蟹）。
+- 单技能把 `skill2` 写成 `0` 会在游戏"全部因子列表"中多渲染一个空的 Lv1 条目（2.0.5 实测），覆盖所有单技能槽位（战气/激昂/钳蟹）。
 
 **规则**：
 - 每角色固定槽位：slot0=T1、slot1=T2、slot2=战气；禁用的槽留空（**槽位不连续**——`InstallDefaultTemplateSelections` 跳过空槽继续，`TryGetRuntimeSlot` 对空槽返回 false）。
@@ -137,14 +137,14 @@ TemplateGemSlot{
 ## 6. 雷区（fail-closed 与安全边界，禁止削弱）
 
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
-- `trait_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
+- `skill_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
 - **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=19`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` **与逐字段 `Marshal.OffsetOf`** 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，尺寸只挡得住"长度改了"，字段次序只有偏移断言挡得住。
 - **因子热应用走的是"一个地址"，没有第二条路**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**没有兜底**：拒写就是这一局内存里那份不变，但表此前已经重新注册，所以编辑在游戏下一次解析、或重启后照样生效，而原生那句 refusal 会说明是哪一闸拦的。曾经有一条全内存扫描兜底，**已删**——机制上线后它一次都没跑过（日志里从没出现 `located … copy/copies`），而它证明不了唯一重要的那件事："这块缓冲区就是游戏在用的那块"静态证不出来。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 技能 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
   **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是可视工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
-  槽位由**原生侧**按技能 hash 认（`ExclusiveBitForTrait`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务可视工具的专属页。
+  槽位由**原生侧**按技能 hash 认（`ExclusiveBitForSkill`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务可视工具的专属页。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
 - 缩进：native 3 空格、托管 4 空格。
 - **维持 Tick 没有全局单飞闸**（`Mod.cs` 的 `System.Threading.Timer` 回调直接顺序跑四个阶段：`LoadoutConfig.Tick` → `SigilEditFeature.Tick` → `Hotkey.Tick` → `NativeCore.Tick`），而 `Timer` **不等**上一次回调结束。所以每个阶段都必须自己扛得住"上一拍还没跑完、下一拍又进来"。
@@ -186,7 +186,7 @@ TemplateGemSlot{
 |---|---|---|
 | 通用槽上限 MaxSlots | 12（三方均只计启用槽） | C# LoadoutConfig.cs / Go loadoutservice.go / TS model.ts |
 | 默认等级 DefaultLevel | 15 | C# LoadoutConfig.cs / TS model.ts |
-| 未穿戴哨兵 UnwornCharacterHash | 0x887AE0B0 | C# LoadoutConfig.cs / C++ native_internal.h（单技能 trait2 必须用它，不能用 0） |
+| 未穿戴哨兵 UnwornCharacterHash | 0x887AE0B0 | C# LoadoutConfig.cs / C++ native_internal.h（单技能 skill2 必须用它，不能用 0） |
 | 模板槽 ID 基址 | 0xFE000000 | C++ native_internal.h |
 | 热键默认 / 可视工具隐藏键 | F1 (0x70) | C# HotkeyConfig.cs / Go loadoutservice.go / TS model.ts（三处已由断言对拍） |
 | 可视工具窗口标题 | GBFR Pre-Equipped Sigils | C# Hotkey.cs / Go main.go |
@@ -202,7 +202,7 @@ TemplateGemSlot{
 | 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48）。**行数不写死在任何一边**：托管侧从归档读出的表自己定义形状，原生只检查游戏那份与它一致 | C# SigilEditFeature.cs（改表）与 Native src/table_slot.cpp（验形状、逐行 Key 比对）各存一份——它们是两个二进制，天然如此；三处数字由 `Loadout\sharedconstants_test.go` 对拍 |
 | skill_status 活表地址 | 游戏把已解析的表发布在一个固定槽里；槽的地址由原生从**语义锚点**（唯一的"行数×52 + 表首"行循环锚点，加上锚点前 0x800 字节里那一对发布指令）解析，不写死 RVA、失败即拒写。锚点字节与实测数字的唯一持有者是代码注释 | Native src/table_slot.cpp |
 | 原生 ABI 版本 | 19 | native_api.h / C# NativeCore.cs AbiVersion |
-| 原生结构尺寸与字段次序 | TemplateSlot 0x18（GemId@0 / Trait1@4 / Trait1Level@8 / Trait2@0xC / Trait2Level@0x10 / SigilLevel@0x14）、ExclusiveOverride 0x0C | native_api.h static_assert / C# EnsureAbiLayout（`Marshal.SizeOf` + `Marshal.OffsetOf`，加载后即对拍：尺寸拦不住字段互换，偏移才是"按这个次序对应"的证明） |
+| 原生结构尺寸与字段次序 | TemplateSlot 0x18（GemId@0 / Skill1@4 / Skill1Level@8 / Skill2@0xC / Skill2Level@0x10 / SigilLevel@0x14）、ExclusiveOverride 0x0C | native_api.h static_assert / C# EnsureAbiLayout（`Marshal.SizeOf` + `Marshal.OffsetOf`，加载后即对拍：尺寸拦不住字段互换，偏移才是"按这个次序对应"的证明） |
 | 原生导出口 | 8 个：GetAbiVersion / SetLogCallback / Initialize / Tick / Shutdown / CopyRuntimeMessage / ApplyLoadout / WriteSkillStatusTable | native_api.h |
 | 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条技能自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 只**拒负数**（负数直接抛 `InvalidDataException`），**不判上界**——上界归可视工具（唯一写者） | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
 | `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的技能 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |

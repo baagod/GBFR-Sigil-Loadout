@@ -28,7 +28,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { messages } from "./messages";
 import type { Lang } from "./lang";
-import { TraitRow, type RowContext } from "./TraitRow";
+import { SkillRow, type RowContext } from "./SkillRow";
 import {
   asEdits,
   dedupe,
@@ -37,10 +37,10 @@ import {
   matches,
   pad,
   slotLabel,
-  type SigilTrait,
+  type SigilSkill,
   type SkillText,
-  type TraitInfo,
-} from "./traits";
+  type SkillInfo,
+} from "./skills";
 
 const SERVICE = "main.EditService";
 /*
@@ -50,7 +50,7 @@ const SERVICE = "main.EditService";
 const SAVE_FAILED = "GBFR.SigilEdit.SaveFailed";
 
 /** 可视工具准备写入的列表是否就是它读到的那个：同样的编辑，同样的数值。 */
-const sameRecords = (a: SigilTrait[], b: SigilTrait[]) =>
+const sameRecords = (a: SigilSkill[], b: SigilSkill[]) =>
   a.length === b.length &&
   a.every((record, i) =>
     record.values.every((value, slot) => value === b[i].values[slot]),
@@ -74,11 +74,11 @@ function useDebounced<T>(value: T, delay = 150): T {
   所以窗口缩到比这更窄时，列是被滚动条推到视野外，而不是被裁掉。
 */
 export function SigilEditPanel({ lang }: { lang: Lang }) {
-  const [edits, setEdits] = useState<SigilTrait[]>([]);
+  const [edits, setEdits] = useState<SigilSkill[]>([]);
   // 所选语言对每个因子的说法：名字、概要，以及共享同一段说明的那些连续等级——
   // 大多数只有一段，少数会在中途换措辞（见 explainAt）。
   const [texts, setTexts] = useState<Record<string, SkillText>>({});
-  const [traits, setTraits] = useState<Record<string, TraitInfo>>({});
+  const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
   const [error, setError] = useState<{ title: string; detail: string } | null>(null);
   const [errorOpen, setErrorOpen] = useState(false);
   // 哪些因子是展开的。数值只落在一个等级上的因子没有可展开的东西，
@@ -148,9 +148,9 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
   }, [lang]);
 
   async function loadAll() {
-    const [list, traitMap] = await Promise.all([
-      Call.ByName(`${SERVICE}.LoadEdits`) as Promise<SigilTrait[]>,
-      Call.ByName(`${SERVICE}.TraitMap`) as Promise<Record<string, TraitInfo>>,
+    const [list, skillTable] = await Promise.all([
+      Call.ByName(`${SERVICE}.LoadEdits`) as Promise<SigilSkill[]>,
+      Call.ByName(`${SERVICE}.SkillTable`) as Promise<Record<string, SkillInfo>>,
     ]);
     // 根本不是十六进制的 key 也不是模组能应用的编辑，但它仍然是用户的一行：它被保留，
     // 用自己的 hash 当名字，而不是被过滤掉——在这里丢掉它，下一次写入就会把它从gemedits.json 中删除，
@@ -180,9 +180,9 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
 
     // 一个地址一条编辑，且只留编辑（见 asEdits）。结果与文件不同时立刻写回：
     // 旧文件在第一次打开时就被理顺，而不是等到下一次敲键。
-    const records = dedupe(asEdits(raw, traitMap ?? {}));
+    const records = dedupe(asEdits(raw, skillTable ?? {}));
     setEdits(records);
-    setTraits(traitMap ?? {});
+    setSkills(skillTable ?? {});
     if (!sameRecords(records, raw)) {
       Call.ByName(`${SERVICE}.SaveEdits`, records).catch((err) =>
         showError({ title: messages[lang].writeFailed, detail: String(err) }),
@@ -212,7 +212,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     被编辑的等级。找到某个因子是搜索框的活，所以这份列表是总目录，而不是一份新增清单。
   */
   const rows = useMemo(() => {
-    const byKey = new Map<string, SigilTrait[]>();
+    const byKey = new Map<string, SigilSkill[]>();
     for (const record of edits) {
       const held = byKey.get(record.key);
       if (held) held.push(record);
@@ -235,7 +235,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
 
     return keys
       .map((key) => {
-        const info: TraitInfo | undefined = traits[key];
+        const info: SkillInfo | undefined = skills[key];
         const records = byKey.get(key) ?? [];
         const byLevel = new Map(records.map((record) => [record.level, record]));
         const label = texts[key]?.name ?? key;
@@ -249,7 +249,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
           info,
           byLevel,
           enabled: records.some((record) => record.enabled),
-          // 因子显示哪些等级、按什么顺序，是 traits.ts 的事。
+          // 因子显示哪些等级、按什么顺序，是 skills.ts 的事。
           levels: levelsOf(info, records),
         };
       })
@@ -260,7 +260,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
           Number(b.enabled) - Number(a.enabled) ||
           a.label.localeCompare(b.label, lang === "zh" ? "zh-Hans-CN" : lang),
       );
-  }, [edits, texts, traits, search, lang]);
+  }, [edits, texts, skills, search, lang]);
 
   /**
    * 一个等级的勾选框所开启的编辑：没有任何输入，所以每个槽都是游戏自己的数值。
@@ -268,7 +268,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
    * `enabled` 是调用方"开启一条编辑"的意思：勾选一个等级会把它打开，往里面输入则
    * 不会（见 updateLevel）。
    */
-  function newRecord(key: string, level: number, enabled: boolean): SigilTrait {
+  function newRecord(key: string, level: number, enabled: boolean): SigilSkill {
     return {
       enabled,
       key: key,
@@ -299,7 +299,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     表头勾选框代表整个因子：它把该因子显示的所有等级一并打开，也一并关闭。第一次
     点击还会让这些等级诞生——没人编辑过的因子还没有任何行，而勾选表头就是关于它们全体的一句话。
   */
-  function toggleTrait(key: string, nextChecked: boolean) {
+  function toggleSkill(key: string, nextChecked: boolean) {
     beginTick();
     const mine = edits.filter((e) => e.key === key);
     if (!nextChecked) {
@@ -308,7 +308,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     }
 
     const have = new Set(mine.map((e) => e.level));
-    const added = levelsOf(traits[key], mine)
+    const added = levelsOf(skills[key], mine)
       .filter((level) => !have.has(level))
       .map((level) => newRecord(key, level, true));
     commit([...edits.map((e) => (e.key === key ? { ...e, enabled: true } : e)), ...added]);
@@ -377,7 +377,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
 
     只有第一次敲键会保持滚动：创建记录可能让光标所在的那一行重排。之后每一次敲键都只是在原地改数值。
   */
-  function updateLevel(key: string, level: number, patch: Partial<SigilTrait>) {
+  function updateLevel(key: string, level: number, patch: Partial<SigilSkill>) {
     const at = edits.findIndex((e) => e.key === key && e.level === level);
     if (at < 0) {
       beginTick();
@@ -387,7 +387,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     /*
       只打补丁，绝不在这里碰 enabled——它是用户勾选出来的。
 
-      清空最后一个数值之后这条记录还算不算编辑，由 traits.ts 的 isEdit（"勾选了，或者带着
+      清空最后一个数值之后这条记录还算不算编辑，由 skills.ts 的 isEdit（"勾选了，或者带着
       数字"）说了算，而 commit 的每条路径都经过 asEdits。在这里再写一遍那条规则，就等于只
       按后半句判断：勾选着的记录会因为输入框被清空而丢掉勾选，于是也掉出置顶区——用户明确
       按下的那一下被一次输入框操作撤销了。
@@ -422,8 +422,8 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     后端的尾随防抖把一串敲键变成一次 gemedits.json 写入和一次在线应用，
     只有完全无法被接受的列表才会作为值得打断用户的失败回来。
   */
-  function commit(next: SigilTrait[]) {
-    const kept = asEdits(next, traits);
+  function commit(next: SigilSkill[]) {
+    const kept = asEdits(next, skills);
     setEdits(kept);
     Call.ByName(`${SERVICE}.SaveEdits`, kept).catch((err) =>
       showError({ title: messages[lang].writeFailed, detail: String(err) }),
@@ -442,7 +442,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
 
   /*
     一行需要从这里拿的一切，装在一个对象里：文案、说明文本、tooltip 依赖的两个指针处理函数，
-    以及一行可以请求的编辑。行本身住在 TraitRow.tsx —— 它们不该知道的是列表如何过滤、如何排序、如何保存。
+    以及一行可以请求的编辑。行本身住在 SkillRow.tsx —— 它们不该知道的是列表如何过滤、如何排序、如何保存。
   */
   const rowCtx: RowContext = {
     t,
@@ -450,7 +450,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     rest: restInRow,
     leave: leaveRow,
     toggleLevel,
-    toggleTrait,
+    toggleSkill,
     toggleOpen,
     updateLevel,
     isControl,
@@ -524,7 +524,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
       */}
       <div
         ref={listBox}
-        className="trait-rows mt-6 min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]"
+        className="skill-rows mt-6 min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]"
         onPointerMove={(e) => {
           lastMove.current = { x: e.clientX, y: e.clientY };
         }}
@@ -539,7 +539,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
               指针下的那一行决定哪个 tooltip 显示，
               所以每一行都会拿到那个 id 并与自己的比较——指针而不是 hover 事件为什么说了算，见 tipRow。
             */
-            <TraitRow
+            <SkillRow
               key={row.key}
               row={row}
               hoveredId={tipRow}

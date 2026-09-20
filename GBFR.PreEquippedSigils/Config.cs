@@ -18,7 +18,7 @@ namespace GBFR.PreEquippedSigils;
 /// spellings ARE the file format, and a property left without an attribute would depend on
 /// case folding that is deliberately off (Config.Options).
 /// </summary>
-public class SigilTrait
+public class SigilSkill
 {
     /// <summary>How many LevelValue slots the table has.</summary>
     public const int LevelValueCount = 10;
@@ -54,13 +54,13 @@ public class Config
     /// The tool's edit list, under the key the tool writes.
     /// </summary>
     [JsonPropertyName("edits")]
-    public List<SigilTrait> Edits { get; set; } = [];
+    public List<SigilSkill> Edits { get; set; } = [];
 
     private static readonly JsonSerializerOptions Options = new()
     {
         // The file is written by the tool and read here, so the names are the contract:
         // nothing is folded, nothing is guessed. 只有**外层**形状算错误：edits 里每条记录的
-        // 成员名由 SigilTrait 的四个 [JsonPropertyName] 决定，认不出的成员读成默认值，
+        // 成员名由 SigilSkill 的四个 [JsonPropertyName] 决定，认不出的成员读成默认值，
         // 由 PatchRows 逐条报"跳过"——那是一个看得见的结果，不是"整份文件读不出来"。
     };
 
@@ -101,7 +101,7 @@ public class Config
         // reader of Values then has to cope with null. Normalise it here instead, the
         // way the tool's padValues does on its side: ten slots, every one untouched.
         foreach (var edit in config.Edits)
-            edit.Values ??= new float?[SigilTrait.LevelValueCount];
+            edit.Values ??= new float?[SigilSkill.LevelValueCount];
 
         return config;
     }

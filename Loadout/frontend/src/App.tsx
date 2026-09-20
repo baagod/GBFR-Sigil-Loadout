@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
 import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames } from "../bindings/loadouttool/loadoutservice"
 import { messages, type Messages } from "./messages"
 import { LANGS, LANG_LABEL, initialLang, type Lang } from "./lang"
-import { DEFAULT_HIDE_KEY, buildLoadoutPayload, buildSigilIndex, configToSlots, itemRowsOf, pad12, parseExclusiveTable, parseSigilRows, sanitizeExclusiveState, traitTableOf, withExclusiveToggle, type Exclusive, type ExclusiveState, type Sigil, type Slot, type Trait } from "./model"
+import { DEFAULT_HIDE_KEY, buildLoadoutPayload, buildSigilIndex, configToSlots, itemRowsOf, pad12, parseExclusiveTable, parseSigilRows, sanitizeExclusiveState, skillTableOf, withExclusiveToggle, type Exclusive, type ExclusiveState, type Sigil, type Slot, type Skill } from "./model"
 import { SlotRow, HEADER_ROW } from "./SlotEditor"
 import { ExclusivePanel } from "./ExclusivePanel"
 import { SigilEditPanel } from "./SigilEditPanel"
@@ -36,7 +36,7 @@ function failureText(failure: Failure, t: Messages): string {
 const LOADOUT_PANEL = "min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-gutter:stable]"
 
 export default function App() {
-  const [traits, setTraits] = useState<Trait[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
   const [sigils, setSigils] = useState<Sigil[]>([])
   const [slots, setSlots] = useState<Slot[]>([])
   const [failure, setFailure] = useState<Failure | null>(null)
@@ -54,7 +54,7 @@ export default function App() {
   const t = messages[lang]
 
   // 因子表的一切派生关系构造一次（可脱离 React 测试）。
-  const index = useMemo(() => buildSigilIndex(sigils, traits, names), [sigils, traits, names])
+  const index = useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // 落盘要读"当前"状态，而定时器是在某一次渲染里排的，所以状态从 ref 取而不是让
@@ -73,7 +73,7 @@ export default function App() {
   // 落盘：状态全部从 latest.current 读，所以这个回调没有任何响应式依赖，也不会读到旧值。
   const saveNow = useCallback(async () => {
     const current = latest.current
-    if (current.index.mainKeys.length === 0 || current.index.traitHashes.length === 0) {
+    if (current.index.mainKeys.length === 0 || current.index.skillHashes.length === 0) {
       setFailure({ kind: "tables" })
       return
     }
@@ -106,19 +106,19 @@ export default function App() {
       const hotkey = GetHotkey().catch(() => DEFAULT_HIDE_KEY)
 
       let sigilTable: Sigil[] = []
-      let traitTable: Trait[] = []
+      let skillTable: Skill[] = []
       try {
         const rows = parseSigilRows(await LoadSigils())
-        traitTable = traitTableOf(rows)
+        skillTable = skillTableOf(rows)
         sigilTable = itemRowsOf(rows)
-        setTraits(traitTable)
+        setSkills(skillTable)
         setSigils(sigilTable)
       } catch (e) {
         setFailure({ kind: "sigil", error: e })
       }
 
       try {
-        applyConfig(JSON.parse(await LoadConfig()), sigilTable, traitTable)
+        applyConfig(JSON.parse(await LoadConfig()), sigilTable, skillTable)
       } catch (e) {
         setFailure({ kind: "config", error: e })
         // 读不出来也要铺满行：空表和"读失败"是两件事，而屏幕上 0 行看起来像后者
@@ -144,7 +144,7 @@ export default function App() {
   }, [lang])
 
   // 显示名按语言取（内嵌的 gem.lang.json / chara.lang.json）。换语言就重取一次，
-  // 取不到名字的条目由 TraitPicker 回落成 hash——看得见但不好看，总比显示一个别的
+  // 取不到名字的条目由 SkillPicker 回落成 hash——看得见但不好看，总比显示一个别的
   // 语言的名字强。
   useEffect(() => {
     let cancelled = false
@@ -179,14 +179,14 @@ export default function App() {
    * legacy.t1/t2/war，于是"角色 hash 作键 + 当前形状"的条目会被整条改写成全开
    * （false 静默变 true），随后自动保存把它写回磁盘——用户的开关状态就这么没了。
    */
-  const applyConfig = (parsed: unknown, sigilTable: Sigil[], traitTable: Trait[]) => {
+  const applyConfig = (parsed: unknown, sigilTable: Sigil[], skillTable: Skill[]) => {
     const cfg = (parsed ?? {}) as {
       lang?: unknown
       slots?: unknown
       exclusive?: unknown
     }
     if (LANGS.includes(cfg.lang as Lang)) setLang(cfg.lang as Lang)
-    setSlots(pad12(configToSlots(cfg, sigilTable, traitTable)))
+    setSlots(pad12(configToSlots(cfg, sigilTable, skillTable)))
     setExclusiveState(sanitizeExclusiveState(cfg.exclusive))
   }
 
@@ -202,9 +202,9 @@ export default function App() {
   // 显示用的标签，而古兰/姬塔共享 PL0000——所以一次点击要写到共享这个 PL 码的每个角色上，
   // 面板才继续是一行。规则（只写 `false`、打开就删键）在 model.ts 的 withExclusiveToggle 里，
   // 那里能单独测。
-  const updateExclusive = (player: string, traitHash: string, value: boolean) => {
+  const updateExclusive = (player: string, skillHash: string, value: boolean) => {
     const charaHashes = exclusiveTable.filter((e) => e.player === player).map((e) => e.hash)
-    setExclusiveState((prev) => withExclusiveToggle(prev, charaHashes, traitHash, value))
+    setExclusiveState((prev) => withExclusiveToggle(prev, charaHashes, skillHash, value))
     scheduleSave()
   }
 
@@ -224,8 +224,8 @@ export default function App() {
     const isInOverlay = (e: KeyboardEvent) =>
       !!(e.target as HTMLElement | null)?.closest?.(
         // Esc 归谁：打开的浮层，以及因子编辑页里的数值框——那一页把 Esc 定义成
-        // "放开这个框"（见 TraitRow），不该同时把整个窗口藏到托盘去。
-        '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .trait-rows input'
+        // "放开这个框"（见 SkillRow），不该同时把整个窗口藏到托盘去。
+        '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .skill-rows input'
       )
     const onKeyDown = (e: KeyboardEvent) => {
       if (!hideKeyPressed(e) && e.key !== "Escape") return

@@ -72,7 +72,7 @@ uint32_t NextApplyGeneration()
    return generation;
 }
 
-// 返回值没有调用者使用（唯一调用点 trait_hooks.cpp 直接丢弃它），所以不返回：
+// 返回值没有调用者使用（唯一调用点 skill_hooks.cpp 直接丢弃它），所以不返回：
 // 需要代号的路径（日志、重排）都在函数内部各自记录。
 void RequestHotApply(uint32_t character_hash)
 {
@@ -173,7 +173,7 @@ void ProcessPendingHotApply()
    g_active_apply_status.store(0, std::memory_order_release);
    const uint64_t active_after_rebuild =
       g_active_apply_generation.load(std::memory_order_acquire);
-   const bool trait_loop_claimed =
+   const bool skill_loop_claimed =
       g_claimed_apply_generation.load(std::memory_order_acquire) == generation;
    const uint32_t injected = g_pending_injected_count.load(std::memory_order_acquire);
    g_last_apply_injected_count.store(injected, std::memory_order_release);
@@ -187,10 +187,10 @@ void ProcessPendingHotApply()
       g_apply_result.store(ApplyResultNativeRebuildFailed, std::memory_order_release);
       return;
    }
-   if (!trait_loop_claimed || active_after_rebuild == generation)
+   if (!skill_loop_claimed || active_after_rebuild == generation)
    {
       EraseAuthorizedStatus(status);
-      g_apply_result.store(ApplyResultNativeTraitLoopMissing, std::memory_order_release);
+      g_apply_result.store(ApplyResultNativeSkillLoopMissing, std::memory_order_release);
       return;
    }
 

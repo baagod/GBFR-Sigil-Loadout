@@ -53,7 +53,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			},
 		},
 		{
-			name: "UnwornCharacterHash（trait2 的\"不选择\"哨兵）",
+			name: "UnwornCharacterHash（skill2 的\"不选择\"哨兵）",
 			decls: []decl{
 				{"C#", "../GBFR.PreEquippedSigils/LoadoutConfig.cs", regexp.MustCompile(`UnwornCharacterHash = (0x[0-9A-Fa-f]+)`)},
 				{"C++", "../GBFR.PreEquippedSigils.Native/native_internal.h", regexp.MustCompile(`kUnwornCharacterHash = (0x[0-9A-Fa-f]+)`)},
@@ -72,7 +72,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			decls: []decl{
 				{"C#", "../GBFR.PreEquippedSigils/Config.cs", regexp.MustCompile(`LevelValueCount = (\d+)`)},
 				{"Go", "editservice.go", regexp.MustCompile(`LevelValueCount = (\d+)`)},
-				{"TS", "frontend/src/traits.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
+				{"TS", "frontend/src/skills.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
 			},
 		},
 		// 用户配置目录与两个文件名：两者各自算出同一个字符串，中间没有任何协商（mod 目录

@@ -1,5 +1,5 @@
 export const MAX_SLOTS = 12 // fixed rows shown in the editor
-/** Fallback sigil/trait level when no cap is known (mirrors C# DefaultLevel). */
+/** Fallback sigil/skill level when no cap is known (mirrors C# DefaultLevel). */
 export const DEFAULT_LEVEL = 15
 /** Menu hotkey fallback when tool-hotkey.txt is unavailable (F1). */
 export const DEFAULT_HIDE_KEY = 0x70
@@ -26,17 +26,17 @@ export interface SavedItem {
 }
 
 export interface Sigil {
-  hash: string // gem hash (= item identity; skill entries use the trait hash)
-  skill1: string // primary trait hash — the main picker's group key
+  hash: string // gem hash (= item identity; skill entries use the skill hash)
+  skill1: string // primary skill hash — the main picker's group key
   player: string
   onlyone?: string // gem.CanOnlyHoldOne: "1" = 唯一持有
   mix?: string // gem.CanGemMix: "0" ordinary (free combination), "1" locked
-  cap?: number // trait level cap (row data, feeds the trait dictionary only)
-  lot?: string[] // pool versions: legal secondary trait hashes (empty = no pool)
-  skill2?: string // fixed-second versions: the fixed secondary trait hash
+  cap?: number // skill level cap (row data, feeds the skill dictionary only)
+  lot?: string[] // pool versions: legal secondary skill hashes (empty = no pool)
+  skill2?: string // fixed-second versions: the fixed secondary skill hash
 }
 
-export interface Trait {
+export interface Skill {
   hash: string
   /** 命名这个技能的那一行物品的 hash：显示名按它去 gem.lang.json 里取。 */
   gem: string
@@ -60,8 +60,8 @@ export interface Exclusive {
 export function exclusiveSlots(
   row: Exclusive,
   names: Record<string, string>
-): { traitHash: string; label: string }[] {
-  return row.gems.map(([gem, skill]) => ({ traitHash: skill, label: names[gem] ?? gem }))
+): { skillHash: string; label: string }[] {
+  return row.gems.map(([gem, skill]) => ({ skillHash: skill, label: names[gem] ?? gem }))
 }
 
 /** The trust boundary for gem.chara.json: 形状不完整的记录整条丢掉。非数组直接抛，
@@ -99,9 +99,9 @@ export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined
     if (BLOCKED_KEYS.has(player)) continue
     if (!value || typeof value !== "object" || Array.isArray(value)) continue
     const inner: Record<string, boolean> = {}
-    for (const [trait, enabled] of Object.entries(value as Record<string, unknown>)) {
-      if (BLOCKED_KEYS.has(trait)) continue
-      if (enabled === false) inner[trait] = false
+    for (const [skill, enabled] of Object.entries(value as Record<string, unknown>)) {
+      if (BLOCKED_KEYS.has(skill)) continue
+      if (enabled === false) inner[skill] = false
     }
     out[player] = inner
   }
@@ -118,14 +118,14 @@ export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined
 export function withExclusiveToggle(
   state: ExclusiveState | undefined,
   charaHashes: string[],
-  traitHash: string,
+  skillHash: string,
   value: boolean
 ): ExclusiveState {
   const next: ExclusiveState = { ...state }
   for (const hash of charaHashes) {
     const entry: Record<string, boolean> = { ...next[hash] }
-    if (value) delete entry[traitHash]
-    else entry[traitHash] = false
+    if (value) delete entry[skillHash]
+    else entry[skillHash] = false
     if (Object.keys(entry).length > 0) next[hash] = entry
     else delete next[hash]
   }
@@ -152,13 +152,13 @@ const emptySlot = (): Slot => ({
 export function configToSlots(
   parsed: { slots?: unknown },
   sigils: Sigil[],
-  traits: Trait[] = []
+  skills: Skill[] = []
 ): Slot[] {
-  const capOfTrait = new Map(traits.map((tr) => [tr.hash, tr.cap]))
+  const capOfSkill = new Map(skills.map((tr) => [tr.hash, tr.cap]))
   const capOfGem = new Map<string, number | undefined>(
-    sigils.map((s) => [s.hash, capOfTrait.get(s.skill1)])
+    sigils.map((s) => [s.hash, capOfSkill.get(s.skill1)])
   )
-  const fromCfg = slotsFromConfig(parsed?.slots, capOfGem, capOfTrait)
+  const fromCfg = slotsFromConfig(parsed?.slots, capOfGem, capOfSkill)
   const mainKeyOfGem = new Map(sigils.map((s) => [s.hash, s.skill1 || s.hash]))
   for (const s of fromCfg) {
     if (mainKeyOfGem.has(s.mainHash)) s.mainHash = mainKeyOfGem.get(s.mainHash) as string
@@ -209,8 +209,8 @@ export function parseSigilRows(json: string): SigilRow[] {
 }
 
 /** 技能字典：每个技能 hash 一行（首行胜出），专属行不作副技能候选。 */
-export function traitTableOf(rows: SigilRow[]): Trait[] {
-  const byHash = new Map<string, Trait>()
+export function skillTableOf(rows: SigilRow[]): Skill[] {
+  const byHash = new Map<string, Skill>()
   for (const s of rows) {
     if (!s.skill1 || byHash.has(s.skill1)) continue
     if (s.player) continue // 专属因子的技能永不出现在技能下拉里
@@ -240,7 +240,7 @@ export function itemRowsOf(rows: SigilRow[]): Sigil[] {
 }
 
 /** 没有合法副技能时共用的空集合：`legalOf` 每次返回同一个对象，调用方就不必再造一个。 */
-const NO_LEGAL_TRAITS: Set<string> = new Set()
+const NO_LEGAL_SKILLS: Set<string> = new Set()
 
 /**
  * 一张因子表的**全部**派生关系，构造一次。主/副下拉的取值集合、显示名、等级上限、
@@ -255,7 +255,7 @@ export interface SigilIndex {
   mainKeys: string[]
   mainKeySet: Set<string>
   /** 副下拉的取值：每个技能 hash。 */
-  traitHashes: string[]
+  skillHashes: string[]
   /** value -> 当前语言的显示名。取不到名字的键根本不在表里，调用方回落成原值。 */
   labels: Record<string, string>
   /** 合法的副技能集合；参不来（唯一持有/非物品行组）就是一个空集合。 */
@@ -263,15 +263,15 @@ export interface SigilIndex {
   /** 保存时这个主因子该写成哪个物品 hash（规则见 resolveMainGem）。 */
   gemOf(mainKey: string, secHash?: string, preferred?: string): string
   capOfMain(mainKey: string): number
-  capOfTrait(traitHash: string): number
+  capOfSkill(skillHash: string): number
 }
 
 export function buildSigilIndex(
   sigils: Sigil[],
-  traits: Trait[],
+  skills: Skill[],
   names: Record<string, string>
 ): SigilIndex {
-  const traitByName = new Map(traits.map((tr) => [tr.hash, tr]))
+  const skillByName = new Map(skills.map((tr) => [tr.hash, tr]))
 
   // 主因子按技能分组：名字按语言变、不能当键，而同一名字的那些本来也共享一条技能。
   const grouped = new Map<string, Sigil[]>()
@@ -287,10 +287,10 @@ export function buildSigilIndex(
     .filter(([, variants]) => variants.some((v) => v.player === ""))
     .map(([key]) => key)
 
-  // 显示名来自命名该技能的那一行物品：技能字典是首行胜出，而 App 建 traits 时已经
+  // 显示名来自命名该技能的那一行物品：技能字典是首行胜出，而 App 建 skills 时已经
   // 剔除了专属行，所以这里一份就够——主下拉的每个键都是某个非专属行的 skill1。
   const labels: Record<string, string> = {}
-  for (const tr of traits) labels[tr.hash] = names[tr.gem] ?? tr.hash
+  for (const tr of skills) labels[tr.hash] = names[tr.gem] ?? tr.hash
 
   // 池族：池版那一行 + 它声明的合法副列表（lot）。gemOf 用它决定写池版还是固定版。
   const poolOf = new Map<string, { poolHash: string; lot: Set<string> }>()
@@ -313,7 +313,7 @@ export function buildSigilIndex(
     const variants = (grouped.get(mainKey) ?? []).filter(
       (s) => s.onlyone !== "1" && s.hash !== s.skill1
     )
-    if (variants.length === 0) return NO_LEGAL_TRAITS
+    if (variants.length === 0) return NO_LEGAL_SKILLS
     if (variants.some((v) => v.mix === "0")) return ordinary
     const legal = new Set<string>()
     for (const v of variants) {
@@ -324,12 +324,12 @@ export function buildSigilIndex(
     return legal
   }
 
-  const capOfTrait = (traitHash: string): number =>
-    traitByName.get(traitHash)?.cap ?? DEFAULT_LEVEL
+  const capOfSkill = (skillHash: string): number =>
+    skillByName.get(skillHash)?.cap ?? DEFAULT_LEVEL
 
   const capOfMain = (mainKey: string): number => {
     const variants = grouped.get(mainKey)
-    return variants && variants.length > 0 ? capOfTrait(variants[0].skill1) : DEFAULT_LEVEL
+    return variants && variants.length > 0 ? capOfSkill(variants[0].skill1) : DEFAULT_LEVEL
   }
 
   const gemOf = (mainKey: string, secHash = "", preferred = ""): string => {
@@ -341,12 +341,12 @@ export function buildSigilIndex(
   return {
     mainKeys,
     mainKeySet: new Set(mainKeys),
-    traitHashes: traits.map((tr) => tr.hash),
+    skillHashes: skills.map((tr) => tr.hash),
     labels,
     legalOf,
     gemOf,
     capOfMain,
-    capOfTrait,
+    capOfSkill,
   }
 }
 
@@ -399,7 +399,7 @@ export function buildLoadoutPayload(
 function slotsFromConfig(
   raw: unknown,
   capOfGem: Map<string, number | undefined>,
-  capOfTrait: Map<string, number>
+  capOfSkill: Map<string, number>
 ): Slot[] {
   const arr = Array.isArray(raw) ? raw : []
   return arr.map((slot) => {
@@ -421,7 +421,7 @@ function slotsFromConfig(
       mainGem: mainHash,
       mainLevel: clampLevel(mainLevel, capOfGem.get(mainHash)),
       secHash,
-      secLevel: clampLevel(secLevel, capOfTrait.get(secHash)),
+      secLevel: clampLevel(secLevel, capOfSkill.get(secHash)),
       enabled: s.enabled !== false,
     }
   })
