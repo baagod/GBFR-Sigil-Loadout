@@ -86,7 +86,7 @@ internal static class Hotkey
     private static volatile IntPtr _messageWindow;
     private static volatile bool _hotKeyRegistered;
     private static volatile bool _threadExit;
-    private static int _virtualKey = -1;
+    private static volatile int _virtualKey = -1;
     private static string _modDirectory = "";
     private static bool _wasDown;
     private static Action<string>? _log;
@@ -108,7 +108,7 @@ internal static class Hotkey
         PublishHotkey(virtualKey);
 
         _threadExit = false;
-        var thread = new Thread(() => HotkeyLoop(virtualKey))
+        var thread = new Thread(HotkeyLoop)
         {
             IsBackground = true,
             Name = "GBFR-Hotkey",
@@ -135,9 +135,11 @@ internal static class Hotkey
     /// <summary>
     /// Re-arms the hotkey on the message window with the current virtual key.
     /// Called by <see cref="UpdateHotkey"/> only: <see cref="Configure"/> runs once per
-    /// mod lifetime, and <see cref="HotkeyLoop"/> registers the key itself while creating
-    /// the window (with the virtual key it was started with, which the re-arm path must
-    /// not race).
+    /// mod lifetime, and the loop registers the key itself while creating the window.
+    /// Both read <c>_virtualKey</c> rather than a captured copy, so a key changed at any
+    /// point is the one that ends up registered: whichever of the two runs second sees
+    /// the new value (the loop picks it up if the window did not exist yet, and the
+    /// re-arm below covers the other order).
     /// </summary>
     private static bool ReregisterHotkey(IntPtr window)
     {
@@ -185,7 +187,7 @@ internal static class Hotkey
         _hotkeyThread = null;
     }
 
-    private static void HotkeyLoop(int virtualKey)
+    private static void HotkeyLoop()
     {
         IntPtr hwnd = CreateWindowEx(
             0, "STATIC", "GBFRHotkey", 0,
@@ -196,11 +198,14 @@ internal static class Hotkey
             _log?.Invoke("Hotkey message window creation failed; fallback polling active.");
             return;
         }
+        _hotKeyRegistered = RegisterHotKey(hwnd, HotkeyId, ModNoRepeat, (uint)_virtualKey);
+        // 句柄要排在注册之后发布：UpdateHotkey 一旦看见非零句柄就会自己再注册一次，抢在注册
+        // 之前发布会让同一对 (窗口, id) 被注册两次——后到的那次失败，把 _hotKeyRegistered 置成
+        // false，于是日志说回退轮询生效（键其实是好的），而且同一个按键会走两条路径各启动一次。
         _messageWindow = hwnd;
-        _hotKeyRegistered = RegisterHotKey(hwnd, HotkeyId, ModNoRepeat, (uint)virtualKey);
         _log?.Invoke(
             _hotKeyRegistered
-                ? $"Hotkey registered: {HotkeyName(virtualKey)} (0x{virtualKey:X2}) via RegisterHotKey."
+                ? $"Hotkey registered: {HotkeyName(_virtualKey)} (0x{_virtualKey:X2}) via RegisterHotKey."
                 : "RegisterHotKey unavailable (key may be taken); fallback polling active.");
 
         while (!_threadExit)

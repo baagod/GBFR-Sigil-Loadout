@@ -89,8 +89,9 @@ export type ExclusiveState = Record<string, Record<string, boolean>>
 /** Keys that must never be written into the plain exclusive state object. */
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"])
 
-/** Sanitize a loaded "exclusive" object: drop prototype keys and non-boolean
- * values so a hand-written file cannot pollute the editor state. */
+/** Sanitize a loaded "exclusive" object: drop prototype keys and everything that is
+ * not `false`, so a hand-written file cannot pollute the editor state. 这个形状只记录
+ * **被关掉的槽**：`true` 与"没提到"是同一件事，收下它就会在下一次自动保存时被原样写回文件。 */
 export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined
   const out: ExclusiveState = {}
@@ -100,11 +101,35 @@ export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined
     const inner: Record<string, boolean> = {}
     for (const [trait, enabled] of Object.entries(value as Record<string, unknown>)) {
       if (BLOCKED_KEYS.has(trait)) continue
-      if (typeof enabled === "boolean") inner[trait] = enabled
+      if (enabled === false) inner[trait] = false
     }
     out[player] = inner
   }
   return Object.keys(out).length > 0 ? out : undefined
+}
+
+/** 一次专属开关落到状态上的结果。`charaHashes` 是这次点击要一起改的角色（同一个 PL 码下的
+ * 每个角色：古兰/姬塔共享 PL0000，所以只改一个会让面板多出一行）。
+ *
+ * 文件里**只出现被关掉的槽**，这是这个形状的全部约定：没提到的角色 = 三槽全开，没提到的槽 = 开着。
+ * 所以打开是"删掉那个键"，而不是写一个 `true`（后者是同一份事实的第二份拼写，读方一律忽略），
+ * 而一个没剩下任何关闭项的条目也整个删掉。
+ */
+export function withExclusiveToggle(
+  state: ExclusiveState | undefined,
+  charaHashes: string[],
+  traitHash: string,
+  value: boolean
+): ExclusiveState {
+  const next: ExclusiveState = { ...state }
+  for (const hash of charaHashes) {
+    const entry: Record<string, boolean> = { ...next[hash] }
+    if (value) delete entry[traitHash]
+    else entry[traitHash] = false
+    if (Object.keys(entry).length > 0) next[hash] = entry
+    else delete next[hash]
+  }
+  return next
 }
 
 const emptySlot = (): Slot => ({

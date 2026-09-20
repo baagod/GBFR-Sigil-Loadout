@@ -265,6 +265,9 @@ func (s *EditService) LoadEdits() ([]SigilTrait, error) {
 //
 // 只有“这份列表根本无法被接受”才会作为错误返回；定时器触发时失败的写入已经没有调用方
 // 可以返回，于是改为推给前端（见 publishLocked）。
+//
+// nil（前端传 null）与空列表不是同一件事：nil = 这次什么都没交（不写盘），空列表 =
+// 写出一份"所有编辑都关掉了"的文件（对 mod 而言就是撤销全部编辑）。
 func (s *EditService) SaveEdits(edits []SigilTrait) error {
 	for i := range edits {
 		edits[i].Values = padValues(edits[i].Values)
@@ -283,6 +286,7 @@ func (s *EditService) SaveEdits(edits []SigilTrait) error {
 
 // writeEdits 把列表写到 mod 读它的地方：用户目录下的 gemedits.json。
 // 两边都不必询问对方就知道那个目录，所以这里没有"解析不出路径"这种失败分支。
+// edits 一定非 nil：唯一调用方 publishLocked 在 nil 时就已经返回（那里是"没有待写的东西"）。
 func writeEdits(edits []SigilTrait) error {
 	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))
 	if err != nil {

@@ -60,8 +60,10 @@ if (-not (Test-Path -LiteralPath $sigilsPath)) {
 # --- data freshness gate ------------------------------------------------------
 # gem.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
 #   gem.json  <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
-# 专属表没有这道门：它是构建中间产物，vcxproj 编译前必定重生成（docs\tool-gen-loadout.ps1）。
-# 所以这道门只比对本仓库里入库的那一份，不需要游戏数据在场。
+# 这个生成器的两份产物待遇不同：`src\exclusive_table.inc` 不入库（.gitignore），是构建中间产物；
+# `Loadout\assets\gem.chara.json` **入库、随包**，却由同一次构建重写。所以入库的那一份另有一道
+# 收尾门禁（见文件末尾的 generated-asset gate）——"构建中间产物"这句话对它不成立。
+# 这道门只比对本仓库里 gem.json 入库的那一份，不需要游戏数据在场。
 $sigilsXlsx = Join-Path $root 'docs\gem.xlsx'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
@@ -242,8 +244,9 @@ if (-not (Test-Path -LiteralPath $toolExe -PathType Leaf)) {
 }
 Copy-Item -Path $toolExe -Destination $packageDir -Force
 
-# Required release files — keep in sync with the deploy.ps1 completeness list
-# (gem.json lands here via the csproj CopyToOutputDirectory).
+# Required release files — this list is the ONLY holder of "which files a package must
+# have"; deploy.ps1 不再抄一份（它只问"这到底是不是一个包"）。
+# (gem.json lands here via the csproj CopyToOutputDirectory.)
 foreach ($requiredFile in @(
     'GBFR.PreEquippedSigils.dll',
     'GBFR.PreEquippedSigils.Native.dll',
@@ -292,6 +295,23 @@ $packagedConfig = $packagedFiles |
     Select-Object -First 1
 if ($packagedConfig) {
     throw "Mutable config state must be runtime-created and was packaged unexpectedly: $($packagedConfig.FullName)"
+}
+
+# --- generated-asset gate -----------------------------------------------------
+# 上面那些门禁跑完之后，构建还会在 native 编译前重跑生成器（vcxproj 的 GenerateExclusiveTable），
+# 而它重写的是**入库**的 gem.chara.json。改写本身不是错误（说明 $chars 变了），但那份改动必须在
+# 仓库里，否则随包发布的就是一份没进仓库的数据——而这个问题现在是不可见的（文件既是生成物，
+# 又是入库数据）。只查这一处，别把开发中的其它改动也算进来。
+$gitDir = Join-Path $root '.git'
+if (Test-Path -LiteralPath $gitDir) {
+    $generatedDiff = & git -C $root status --porcelain -- 'Loadout/assets/gem.chara.json'
+    if ($generatedDiff) {
+        throw "gem.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 docs\tool-gen-loadout.ps1 里引起改写的改动。"
+    }
+}
+else {
+    # 不装作跑过了：没有 .git 的检出（比如解压出来的源码包）查不出"入库的那份"是什么。
+    Write-Output "generated-asset gate: skipped (no .git in $root, so 'uncommitted' has no meaning here)."
 }
 
 Compress-Archive -LiteralPath $packageDir -DestinationPath $zipPath -CompressionLevel Optimal

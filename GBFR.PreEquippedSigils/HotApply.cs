@@ -120,9 +120,9 @@ internal sealed class HotApply
         int written = NativeCore.WriteSkillStatusTable(newTable);
         if (written < 0)
         {
-            // 拒写就是真的没写。上面已经重新注册过表，所以编辑没丢，
-            // 只是要等游戏下一次解析（或重启）；原生日志里那句 refusal 说明了是哪一道闸拦的。
-            _log($"hot apply: FAIL - the native slot write refused (code {written}; the reason is in the line above); the table is re-registered, so the edit applies at the game's next parse, but this session's loaded copy keeps the old values");
+            // 拒写：-7 是"行写崩了"，那意味着表可能已经被改了一部分——说清楚，别把它和
+            // "一个字节都没写"混成一句。其余每个码都发生在写之前，内存原样。
+            _log($"hot apply: FAIL - the native slot write refused (code {written}; the reason is in the line above); the table is re-registered, so the edit applies at the game's next parse. Every code but -7 refused before writing anything; -7 means the row writes faulted part-way and this session's table may already hold some of the new values");
             return;
         }
 

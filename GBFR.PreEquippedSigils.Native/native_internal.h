@@ -143,6 +143,12 @@ struct StatusIdentity
    int32_t context_mode = -1;
 };
 
+// 上下文模式只有三个取值。这条判断在好几条"读状态身份"的路径上各要一次，所以边界只写在这里。
+constexpr bool IsValidContextMode(int32_t context_mode)
+{
+   return context_mode >= 0 && context_mode <= 2;
+}
+
 struct AuthorizedStatus
 {
    uintptr_t status = 0;
@@ -338,12 +344,12 @@ void ShutdownHooks();
 bool InstallHooks();
 void Initialize();
 void EnsureInitialized();
-// 从语义锚点解析游戏发布 skill_status 表的那个固定槽，并把两个 RVA 缓存在
-// src/table_slot.cpp 里：WriteSkillStatusTable 每次调用都从它取地址。
-// 解析失败只记日志，不影响其余任何初始化（热应用随后落回托管层的扫描）。
+// 从语义锚点解析游戏发布 skill_status 表的那个固定槽，并把**槽首** RVA 缓存在
+// src/table_slot.cpp 里：WriteSkillStatusTable 每次调用都从它取地址（缓冲区指针字段在槽首 +8，
+// 现算，不另存一份）。解析失败只记日志，不影响其余任何初始化——热应用没有第二条路，只会拒写。
 void ResolveTableSlot();
 // GBFR20_WriteSkillStatusTable 的实现：校验后把整表按行差异写进游戏那份活表。
-// 返回 >= 0 是改写的行数，< 0 是 native_api.h 里的拒绝码（一个字节都没写）。
+// 返回 >= 0 是改写的行数；< 0 是 native_api.h 里的拒绝码（写之前的每一道闸都不动内存）。
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept;
 void ConsumeApplyResult();
 }

@@ -10,7 +10,9 @@ import (
 )
 
 func slot(gem, sec string, lvl, secLvl int) loadoutSlot {
-	items := []loadoutItem{{Gem: gem, Level: lvl}}
+	// items[0] 带着物品 hash 与它给的主技能 hash——mod 两个都要（LoadoutConfig），
+	// 所以这里两个都写；主技能用同一个占位值，这些用例只关心形状。
+	items := []loadoutItem{{Gem: gem, Hash: gem, Level: lvl}}
 	if sec != "" {
 		items = append(items, loadoutItem{Hash: sec, Level: secLvl})
 	}
@@ -29,7 +31,7 @@ func manySlots(n int) []loadoutSlot {
 func TestUserCfgDirMatchesModPath(t *testing.T) {
 	base := filepath.Join("C:", "Users", "someone", "AppData", "Local")
 	t.Setenv("LOCALAPPDATA", base)
-	want := filepath.Join(base, "GBFRPreEquippedSigils")
+	want := filepath.Join(base, userCfgDirName)
 	if got := userCfgDir(); got != want {
 		t.Errorf("userCfgDir() = %q, want %q", got, want)
 	}
@@ -62,6 +64,9 @@ func TestValidateSlots(t *testing.T) {
 		{"13 rows one disabled", oneDisabled, true},
 		{"empty items", []loadoutSlot{{}}, false},
 		{"missing gem", []loadoutSlot{slot("", "", 15, 0)}, false},
+		{"missing main hash", []loadoutSlot{{
+			Items: []loadoutItem{{Gem: "9A60FBF0", Level: 15}},
+		}}, false},
 		// 上限不属于这一层：cap 是每条技能自己的值，只有前端（读 gem.json）与 mod
 		// （LoadoutConfig）知道它。这里写死一个数就会变成同一规则的第三份副本，
 		// 所以超过 cap 的等级在这一层是合法的，由 mod 侧判定。
@@ -77,11 +82,11 @@ func TestValidateSlots(t *testing.T) {
 func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
-	cfg := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","level":15}],"enabled":true}]}`
+	cfg := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
 	if err := (&LoadoutService{}).SaveLoadout(cfg); err != nil {
 		t.Fatalf("SaveLoadout: %v", err)
 	}
-	path := filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json")
+	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read back: %v", err)
@@ -94,7 +99,7 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read dir: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Name() != "loadout.json" {
+	if len(entries) != 1 || entries[0].Name() != loadoutFileName {
 		t.Errorf("unexpected files beside loadout.json: %v", entries)
 	}
 }
@@ -103,15 +108,15 @@ func TestSaveLoadoutOverwritesExisting(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
 	svc := &LoadoutService{}
-	first := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","level":15}],"enabled":true}]}`
-	second := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","level":10}],"enabled":false}]}`
+	first := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
+	second := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","hash":"9A60FBF0","level":10}],"enabled":false}]}`
 	if err := svc.SaveLoadout(first); err != nil {
 		t.Fatalf("first save: %v", err)
 	}
 	if err := svc.SaveLoadout(second); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json"))
+	data, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
 	}
@@ -128,7 +133,7 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	if err := (&LoadoutService{}).SaveLoadout(`{"slots":[{"items":[],"enabled":true}]}`); err == nil {
 		t.Fatal("expected a validation error")
 	}
-	path := filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json")
+	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
 	}
@@ -143,14 +148,14 @@ func TestSaveLoadoutDropsASupersededSave(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
 	svc := &LoadoutService{}
-	stale := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","level":15}],"enabled":true}]}`
-	current := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","level":10}],"enabled":true}]}`
+	stale := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
+	current := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","hash":"9A60FBF0","level":10}],"enabled":true}]}`
 	// 第 7 号已经提交（比如那一次正卡在慢写里），第 3 号就已经过期。
 	svc.submitted.Store(7)
 	if err := svc.writeSubmitted(3, stale); err != nil {
 		t.Fatalf("a superseded save is not an error: %v", err)
 	}
-	path := filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json")
+	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("a superseded save must not reach the disk (stat err=%v)", err)
 	}
@@ -178,7 +183,7 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 	payloads := make([]string, 16)
 	for i := range payloads {
 		payloads[i] = fmt.Sprintf(
-			`{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","level":%d}],"enabled":true}]}`, i)
+			`{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":%d}],"enabled":true}]}`, i)
 	}
 	var wg sync.WaitGroup
 	for _, payload := range payloads {
@@ -192,7 +197,7 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 	}
 	wg.Wait()
 
-	raw, err := os.ReadFile(filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json"))
+	raw, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
 	}
@@ -216,9 +221,31 @@ func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {
 	if err := (&LoadoutService{}).SaveLoadout(bare); err == nil {
 		t.Fatal("expected the bare-array shape to be rejected")
 	}
-	path := filepath.Join(dir, "GBFRPreEquippedSigils", "loadout.json")
+	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
+	}
+}
+
+/*
+"缺 slots 成员"要和"裸数组"一样被拒：mod 那边会抛 `missing 'slots' array` 并保留内存里的旧
+配置，所以放过去的后果是"可视工具说保存成功、游戏里什么都没变"。空数组仍然是合法的——
+它就是"没有通用槽"。
+*/
+func TestSaveLoadoutRejectsAnObjectWithoutSlots(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+
+	if err := (&LoadoutService{}).SaveLoadout(`{"lang":"zh"}`); err == nil {
+		t.Fatal("expected a missing 'slots' member to be rejected")
+	}
+	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
+	}
+
+	if err := (&LoadoutService{}).SaveLoadout(`{"lang":"zh","slots":[]}`); err != nil {
+		t.Fatalf("an empty slots array must stay valid: %v", err)
 	}
 }
 

@@ -59,16 +59,19 @@ public class Config
     private static readonly JsonSerializerOptions Options = new()
     {
         // The file is written by the tool and read here, so the names are the contract:
-        // nothing is folded, nothing is guessed. A file from an older build (the keys were
-        // capitalised then) reads as an empty list, which is the documented "nothing to do
-        // this launch" - SigilEditFeature.LoadConfig logs the count it got.
+        // nothing is folded, nothing is guessed. 只有**外层**形状算错误：edits 里每条记录的
+        // 成员名由 SigilTrait 的四个 [JsonPropertyName] 决定，认不出的成员读成默认值，
+        // 由 PatchRows 逐条报"跳过"——那是一个看得见的结果，不是"整份文件读不出来"。
     };
 
     /// <summary>
-    /// The edit list in <paramref name="path"/>, or an empty one when the file
-    /// holds nothing usable. A missing, unreadable or malformed file is left to
-    /// throw: the only caller is <c>SigilEditFeature.LoadConfig</c>, which is
-    /// where the reason can actually be logged.
+    /// The edit list in <paramref name="path"/>.
+    ///
+    /// An empty <c>edits</c> array is a real answer and comes back as an empty list.
+    /// Everything else that is not this shape - no file, no <c>edits</c> member, a
+    /// member that is not an array, a member that is null - throws: the only caller is
+    /// <c>SigilEditFeature.LoadConfig</c>, which logs the reason and then writes nothing
+    /// at all, rather than wiping the edits that are live in this session.
     /// </summary>
     public static Config Load(string path)
     {
@@ -78,14 +81,26 @@ public class Config
         if (info.Length > MaxBytes)
             throw new InvalidDataException($"gemedits.json exceeds {MaxBytes} bytes");
 
-        var config = JsonSerializer.Deserialize<Config>(File.ReadAllText(path), Options);
-        if (config?.Edits is not { Count: > 0 } edits)
-            return new Config();
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
+        // 三种坏形状各说各的：这条错误是排查的起点，"got 1234 bytes" 对定位毫无帮助
+        // （大小在 8 行之前的那道闸里已经报过了）。
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException(
+                $"gemedits.json must be a JSON object, got {doc.RootElement.ValueKind}");
+        if (!doc.RootElement.TryGetProperty("edits", out JsonElement editsElement))
+            throw new InvalidDataException(
+                "gemedits.json has no 'edits' member; an empty array is how the list is emptied");
+        if (editsElement.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException(
+                $"gemedits.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'undo every edit')");
+
+        var config = doc.RootElement.Deserialize<Config>(Options)
+            ?? throw new InvalidDataException("gemedits.json is not a JSON object");
 
         // An explicit "values": null overwrites the property's initialiser, and every
         // reader of Values then has to cope with null. Normalise it here instead, the
         // way the tool's padValues does on its side: ten slots, every one untouched.
-        foreach (var edit in edits)
+        foreach (var edit in config.Edits)
             edit.Values ??= new float?[SigilTrait.LevelValueCount];
 
         return config;

@@ -1,9 +1,7 @@
 # Wails build output
 bin/
 Loadout.exe
-# `go build ./...` writes the module-named binary next to the sources.
-# 根 .gitignore 曾经也有一条 `loadouttool/*.exe`（目录形式，永远匹配不到这个文件），
-# 已删除——这条才是生效的那一条。
+# `go build ./...` 会把以模块名命名的二进制写在源码旁边。
 loadouttool.exe
 
 # Frontend

@@ -87,6 +87,20 @@ internal static unsafe partial class NativeCore
     {
         AssertSize("TemplateSlot", 0x18, Marshal.SizeOf<TemplateSlotNative>());
         AssertSize("ExclusiveOverride", 0x0C, Marshal.SizeOf<ExclusiveOverrideNative>());
+
+        // 尺寸挡不住字段互换：TemplateSlot 是六个 32 位字段，gem_id 与 trait1 对调之后
+        // 照样是 0x18。而"字段按这个次序对应"才是这份 ABI 的全部内容，所以偏移量也得对拍
+        // （native_api.h 那边是同样的字段次序 + #pragma pack(1)）。字段名用 nameof：改名的
+        // 时候这里跟着改，不会变成一句"这个字段不存在"的 ArgumentException。
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.GemId), 0x00);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait1), 0x04);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait1Level), 0x08);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait2), 0x0C);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Trait2Level), 0x10);
+        AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.SigilLevel), 0x14);
+        AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.CharacterHash), 0x00);
+        AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.TraitHash), 0x04);
+        AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.Disabled), 0x08);
     }
 
     private static void AssertSize(string name, int expected, int actual)
@@ -95,6 +109,16 @@ internal static unsafe partial class NativeCore
             throw new InvalidOperationException(
                 $"ABI layout mismatch: {name} marshals as {actual} bytes but native_api.h "
                 + $"declares {expected}."
+            );
+    }
+
+    private static void AssertOffset<T>(string field, int expected)
+    {
+        int actual = (int)Marshal.OffsetOf<T>(field);
+        if (actual != expected)
+            throw new InvalidOperationException(
+                $"ABI layout mismatch: {typeof(T).Name}.{field} sits at +0x{actual:X} but "
+                + $"native_api.h declares +0x{expected:X}."
             );
     }
 }

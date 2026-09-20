@@ -199,7 +199,7 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
    StatusIdentity identity{};
    const bool valid_identity =
       SafeReadStatusIdentity(reinterpret_cast<uintptr_t>(status), identity) &&
-      identity.context_mode >= 0 && identity.context_mode <= 2;
+      IsValidContextMode(identity.context_mode);
 
    const int expanded_slot_count = GetExpandedInternalSlotCount();
    if (slot_index < kNativeInternalSlotCount)
@@ -297,7 +297,7 @@ void OnTraitFetch(safetyhook::Context& context)
    StatusIdentity identity{};
    if (!g_shutting_down.load(std::memory_order_acquire) && context.r12 != 0 &&
        SafeReadStatusIdentity(status, identity) &&
-       identity.context_mode >= 0 && identity.context_mode <= 2)
+       IsValidContextMode(identity.context_mode))
    {
       uint64_t active_generation = 0;
       bool tracks_pending_apply = false;

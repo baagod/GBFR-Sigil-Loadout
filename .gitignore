@@ -3,6 +3,7 @@
 **/publish/
 dist/
 .codegraph/
+.omo/
 .idea/
 .tmp-*/
 .vs/

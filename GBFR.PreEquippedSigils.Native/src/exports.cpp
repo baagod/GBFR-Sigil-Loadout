@@ -65,11 +65,20 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    const GBFR20_TemplateSlot* slots, uint32_t slot_count,
    const GBFR20_ExclusiveOverride* overrides, uint32_t override_count)
 {
-   // 一个调用带两张调用方持有的表，所以守卫在这里：关机中拒绝、计数放不进 int32_t
+   // 一个调用带两张调用方持有的表，所以守卫在这里：关机中拒绝、计数超出这张表可能有的条目数
    // 拒绝、然后懒初始化并要求钩子已装。任一条不成立都以 0 报告失败。
-   if (slot_count > INT32_MAX || override_count > INT32_MAX)
+   //
+   // 上界不是形式：下面会按调用方给的计数逐个读它那两块内存。槽数由 ApplyLoadout 自己截断，
+   // 但专属开关没有自己的容器大小可依——一个凭空来的计数会一路读到调用方数组之外。
+   // 上界取"专属表里的角色数 × 每角色三个专属槽"。
+   constexpr int32_t kMaxTemplateSlots = static_cast<int32_t>(kVirtualSlotCapacity);
+   constexpr int32_t kMaxExclusiveOverrides =
+      static_cast<int32_t>(kRuntimeTemplateCapacity) * 3;
+   if (slot_count > kMaxTemplateSlots || override_count > kMaxExclusiveOverrides)
    {
-      Log("ApplyLoadout: count exceeds INT32_MAX; rejected.");
+      Log(std::format(
+         "ApplyLoadout: counts out of range (slots {} > {}, overrides {} > {}); rejected.",
+         slot_count, kMaxTemplateSlots, override_count, kMaxExclusiveOverrides));
       return 0;
    }
    if (g_shutting_down.load(std::memory_order_acquire))
@@ -87,11 +96,14 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    return applied ? 1 : 0;
 }
 
-// 拒绝码的人话解释只有这一处：托管层那边只记"被拒 + 码"。
+// 拒绝码的人话解释只有这一处：托管层那边只记"被拒 + 码"。每一个码都要在这里有一句，
+// 否则 default 会把一个具体的失败说成另一件事。
 static const char* SkillStatusRefusalReason(int32_t code)
 {
    switch (code)
    {
+   case GBFR20_TABLE_NOT_READY:
+      return "the native core is not initialized yet, or is shutting down.";
    case GBFR20_TABLE_SLOT_UNRESOLVED:
       return "the skill_status slot was not resolved from its anchor at startup.";
    case GBFR20_TABLE_BUFFER_UNREADABLE:
@@ -102,8 +114,10 @@ static const char* SkillStatusRefusalReason(int32_t code)
       return "the supplied table is not a whole number of 52-byte rows after its 8-byte header.";
    case GBFR20_TABLE_IDENTITY_MISMATCH:
       return "the buffer's row keys do not match the supplied table; not the same table.";
+   case GBFR20_TABLE_WRITE_FAILED:
+      return "the row writes faulted after every gate passed; the table may be partially updated.";
    default:
-      return "writing the rows faulted.";
+      return "unknown refusal code; see native_api.h for the list.";
    }
 }
 
@@ -112,13 +126,14 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
    if (g_shutting_down.load(std::memory_order_acquire))
       return GBFR20_TABLE_NOT_READY;
    // 刻意**不**要求 g_hooks_ready：写的是数据管理器供给的那张表，和钩子装没装成无关，而槽的
-   // 解析（ResolveTableSlot）本来就排在装钩子之前、只要语义布局解析成功就会跑。槽没解析出来
-   // 时下面返回 SLOT_UNRESOLVED，调用方落回自己的扫描。
+   // 解析（ResolveTableSlot）本来就排在装钩子之前、只要语义布局解析成功就会跑。槽没解析出来时
+   // 下面返回 SLOT_UNRESOLVED：拒写，一个字节都不动——编辑没丢（表已经重新注册过），只是要等
+   // 游戏下一次解析或重启。没有第二条写路径。
    EnsureInitialized();
    const int32_t result = WriteSkillStatusTable(table, length);
    if (result < 0)
       Log(std::format(
-         "WriteSkillStatusTable: refused ({}); nothing was written. {}",
+         "WriteSkillStatusTable: refused ({}): {}",
          result,
          SkillStatusRefusalReason(result)));
    return result;

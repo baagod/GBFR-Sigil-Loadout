@@ -51,10 +51,8 @@ const defaultHotkeyVK = 0x70
 // handoff from the mod, not shipped data, so it does not live in assets/);
 // a missing or unreadable file falls back to F1 (0x70).
 func (s *LoadoutService) GetHotkey() int {
-	data, err := readModFile("tool-hotkey.txt")
-	if err != nil {
-		return defaultHotkeyVK
-	}
+	// 读不出来时 data 是空串，Atoi 也失败——两条路本来就汇到同一个回落值，不必分开写。
+	data, _ := readModFile("tool-hotkey.txt")
 	if vk, err := strconv.Atoi(strings.TrimSpace(data)); err == nil && vk > 0 {
 		return vk
 	}
@@ -91,12 +89,20 @@ func exeDir() string {
 // the C# side (Environment.SpecialFolder.LocalApplicationData): do NOT fall
 // back to os.UserConfigDir() here — on Windows that returns %AppData%
 // (Roaming), which would diverge from the mod's LocalAppData path.
+//
+// 目录名与文件名是协议的一部分（mod 那边算的是同一个字符串，中间没有任何协商），
+// 所以各只有这一处声明——sharedconstants_test.go 把它们和 C# 那份对拍。
+const (
+	userCfgDirName  = "GBFRPreEquippedSigils"
+	loadoutFileName = "loadout.json"
+)
+
 func userCfgDir() string {
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
 		base = exeDir()
 	}
-	return filepath.Join(base, "GBFRPreEquippedSigils")
+	return filepath.Join(base, userCfgDirName)
 }
 
 // assetsDir 是随包发布的数据文件所在的那一级目录名。
@@ -143,7 +149,7 @@ func (s *LoadoutService) CharaNames(lang string) map[string]string {
 // empty config is returned when none exists yet (the editor starts from
 // zero - there is no built-in preset anymore).
 func (s *LoadoutService) LoadConfig() (string, error) {
-	data, err := os.ReadFile(filepath.Join(userCfgDir(), "loadout.json"))
+	data, err := os.ReadFile(filepath.Join(userCfgDir(), loadoutFileName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			// lang 留空不是漏写：空串不在 LANGS 里，前端据此保留自己的 initialLang()
@@ -182,6 +188,12 @@ func validateSlots(slots []loadoutSlot) error {
 		if slot.Items[0].Gem == "" {
 			return fmt.Errorf("slot %d: item gem is empty", i+1)
 		}
+		// items[0] 的主技能 hash 与物品 hash 一样是必需的：mod 不再持有因子表，主技能
+		// 只能随载荷走，而它读不到就拒掉整份文件（LoadoutConfig）。缺了它在前端是
+		// 不可能发生的（buildLoadoutPayload 两个都写），所以这里拒绝的是手改坏的文件。
+		if slot.Items[0].Hash == "" {
+			return fmt.Errorf("slot %d: main item hash is empty", i+1)
+		}
 		if len(slot.Items) == 2 && slot.Items[1].Hash == "" {
 			return fmt.Errorf("slot %d: second item hash is empty", i+1)
 		}
@@ -213,6 +225,12 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 	if err := json.Unmarshal([]byte(config), &c); err != nil {
 		return err
 	}
+	// 缺了 slots 成员也要拒：mod 那边只认这一种形状（缺了就抛 "missing 'slots' array"），
+	// 而放过去的后果是"可视工具说保存成功、游戏里什么都没变"，还要等下一次启动才看得出来。
+	// `"slots": []` 仍然合法（= 没有通用槽）。
+	if c.Slots == nil {
+		return fmt.Errorf("loadout.json needs a 'slots' array (an empty array means no general slots)")
+	}
 	if err := validateSlots(c.Slots); err != nil {
 		return err
 	}
@@ -232,5 +250,5 @@ func (s *LoadoutService) writeSubmitted(sequence uint64, config string) error {
 		// 更新的一次保存已经提交：这次写的是过期状态，磁盘上让新的那份说了算。
 		return nil
 	}
-	return writeFileAtomic(filepath.Join(userCfgDir(), "loadout.json"), []byte(config))
+	return writeFileAtomic(filepath.Join(userCfgDir(), loadoutFileName), []byte(config))
 }

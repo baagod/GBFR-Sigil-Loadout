@@ -256,10 +256,6 @@ func main() {
 	// down, or the edit the user just typed is lost.
 	app.OnShutdown(editService.flushNow)
 
-	// Force the WebView2 backing colour to the theme background so restoring
-	// a hidden window does not flash a white frame before content renders.
-	win.SetBackgroundColour(application.NewRGB(10, 10, 10))
-
 	// System tray: single click toggles the window; menu offers quit.
 	tray := app.SystemTray.New()
 	tray.SetIcon(trayIconBytes)

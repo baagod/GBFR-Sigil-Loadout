@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
 import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames } from "../bindings/loadouttool/loadoutservice"
 import { messages, type Messages } from "./messages"
 import { LANGS, LANG_LABEL, initialLang, type Lang } from "./lang"
-import { DEFAULT_HIDE_KEY, buildLoadoutPayload, buildSigilIndex, configToSlots, itemRowsOf, pad12, parseExclusiveTable, parseSigilRows, sanitizeExclusiveState, traitTableOf, type Exclusive, type ExclusiveState, type Sigil, type Slot, type Trait } from "./model"
+import { DEFAULT_HIDE_KEY, buildLoadoutPayload, buildSigilIndex, configToSlots, itemRowsOf, pad12, parseExclusiveTable, parseSigilRows, sanitizeExclusiveState, traitTableOf, withExclusiveToggle, type Exclusive, type ExclusiveState, type Sigil, type Slot, type Trait } from "./model"
 import { SlotRow, HEADER_ROW } from "./SlotEditor"
 import { ExclusivePanel } from "./ExclusivePanel"
 import { SigilEditPanel } from "./SigilEditPanel"
@@ -138,6 +138,11 @@ export default function App() {
     // 读 t——文案在渲染时由 failureText 取，所以没有语言依赖会把这一跑重新触发。
   }, [])
 
+  // 文档语言跟着界面语言走：index.html 里写死的那一个只够第一次渲染，读屏软件看的是这个属性。
+  useEffect(() => {
+    document.documentElement.lang = lang
+  }, [lang])
+
   // 显示名按语言取（内嵌的 gem.lang.json / chara.lang.json）。换语言就重取一次，
   // 取不到名字的条目由 TraitPicker 回落成 hash——看得见但不好看，总比显示一个别的
   // 语言的名字强。
@@ -195,20 +200,11 @@ export default function App() {
 
   // Exclusive toggle update. 落到文件里的键是**角色 hash**（身份），不是 PL 码：PL 码只是
   // 显示用的标签，而古兰/姬塔共享 PL0000——所以一次点击要写到共享这个 PL 码的每个角色上，
-  // 面板才继续是一行。第一次碰某个角色时把三个槽都写下来，文件里就看得出完整状态。
+  // 面板才继续是一行。规则（只写 `false`、打开就删键）在 model.ts 的 withExclusiveToggle 里，
+  // 那里能单独测。
   const updateExclusive = (player: string, traitHash: string, value: boolean) => {
-    setExclusiveState((prev) => {
-      const current: ExclusiveState = prev ? { ...prev } : {}
-      for (const target of exclusiveTable) {
-        if (target.player !== player) continue
-        const entry: Record<string, boolean> = current[target.hash]
-          ? { ...current[target.hash] }
-          : Object.fromEntries(target.gems.map(([, skill]) => [skill, true]))
-        entry[traitHash] = value
-        current[target.hash] = entry
-      }
-      return current
-    })
+    const charaHashes = exclusiveTable.filter((e) => e.player === player).map((e) => e.hash)
+    setExclusiveState((prev) => withExclusiveToggle(prev, charaHashes, traitHash, value))
     scheduleSave()
   }
 

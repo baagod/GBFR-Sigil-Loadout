@@ -15,15 +15,15 @@ import (
 )
 
 // localConfig 是 mod 读取的路径：用户配置目录（%LOCALAPPDATA%\GBFRPreEquippedSigils）
-// 下的一个文件，配装 loadout.json 也在那里。这里直接写出来而不是走 configPath，
-// 是为了让测试陈述这个位置，而不是把实现原样背回去。
+// 下的一个文件，配装 loadout.json 也在那里。这里走的是与实现同一批常量，位置本身由
+// sharedconstants_test.go 对着 C# 那份断言——测试不该是同一份事实的第三份手抄。
 func localConfig(t *testing.T, name string) string {
 	t.Helper()
 	local := os.Getenv("LOCALAPPDATA")
 	if local == "" {
 		t.Fatal("LOCALAPPDATA is unset")
 	}
-	return filepath.Join(local, "GBFRPreEquippedSigils", name)
+	return filepath.Join(local, userCfgDirName, name)
 }
 
 // hermeticHome 把这个根指向一个一次性文件夹，这样测试永远不会写进真实的那个。
@@ -47,7 +47,7 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	}
 	service.flushNow()
 
-	wantCfg := localConfig(t, "gemedits.json")
+	wantCfg := localConfig(t, editListName)
 	raw, err := os.ReadFile(wantCfg)
 	if err != nil {
 		t.Fatalf("gemedits.json is not where the mod looks for it: %v", err)
@@ -85,7 +85,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		service := &EditService{}
-		cfgPath := localConfig(t, "gemedits.json")
+		cfgPath := localConfig(t, editListName)
 
 		first := []SigilTrait{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
 		if err := service.SaveEdits(first); err != nil {
@@ -134,7 +134,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 
 	// 一个占着配置文件夹位置的普通文件：它下面每一次 mkdir 和写入都必然失败，
 	// 这正是一个被锁住或只读的用户配置目录的真实模样。
-	blocked := filepath.Join(home, "AppData", "Local", "GBFRPreEquippedSigils")
+	blocked := filepath.Join(home, "AppData", "Local", userCfgDirName)
 	writeFile(t, blocked, "not a folder")
 
 	service := &EditService{}
@@ -162,7 +162,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 		t.Fatal(err)
 	}
 	service.flushNow()
-	written, err := os.ReadFile(localConfig(t, "gemedits.json"))
+	written, err := os.ReadFile(localConfig(t, editListName))
 	if err != nil {
 		t.Fatalf("the list was dropped after a failed write: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 	hermeticHome(t)
 
-	writeFile(t, localConfig(t, "gemedits.json"),
+	writeFile(t, localConfig(t, editListName),
 		`{"edits":[{"enabled":true,"key":"B064A634","level":14,"values":[300,10,300,10]}]}`)
 
 	loaded, err := (&EditService{}).LoadEdits()
@@ -208,7 +208,7 @@ func TestLoadEditsStartsWithNothing(t *testing.T) {
 	if len(loaded) != 0 {
 		t.Fatalf("a first run produced edits nobody made: %+v", loaded)
 	}
-	if _, err := os.Stat(localConfig(t, "gemedits.json")); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(localConfig(t, editListName)); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("reading the list created gemedits.json")
 	}
 }
@@ -222,14 +222,14 @@ func TestLoadEditsStartsWithNothing(t *testing.T) {
 func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 	hermeticHome(t)
 
-	current := localConfig(t, "gemedits.json")
+	current := localConfig(t, editListName)
 	writeFile(t, current, "not json")
 
 	loaded, err := (&EditService{}).LoadEdits()
 	if err == nil {
 		t.Fatalf("a file that cannot be parsed was accepted as %+v", loaded)
 	}
-	if !strings.Contains(err.Error(), "gemedits.json") {
+	if !strings.Contains(err.Error(), editListName) {
 		t.Fatalf("the error does not say which file: %v", err)
 	}
 }
@@ -239,7 +239,7 @@ func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
 	hermeticHome(t)
 
-	current := localConfig(t, "gemedits.json")
+	current := localConfig(t, editListName)
 	writeFile(t, current, `{"edits":[]}`)
 
 	loaded, err := (&EditService{}).LoadEdits()
@@ -255,7 +255,7 @@ func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
 // 同一个状态两种拼写，就是每个调用方都得自己记着写 `?? []` 的那种事。
 func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 	hermeticHome(t)
-	writeFile(t, localConfig(t, "gemedits.json"), `{}`)
+	writeFile(t, localConfig(t, editListName), `{}`)
 
 	loaded, err := (&EditService{}).LoadEdits()
 	if err != nil {
@@ -278,7 +278,7 @@ func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 func TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling(t *testing.T) {
 	hermeticHome(t)
 
-	current := localConfig(t, "gemedits.json")
+	current := localConfig(t, editListName)
 	old := `{"Edits":[{"Enabled":true,"Key":"B064A634","Level":14,"Values":[300]}]}`
 	writeFile(t, current, old)
 
@@ -534,7 +534,7 @@ func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
 	}
 	service.flushNow()
 
-	path := localConfig(t, "gemedits.json")
+	path := localConfig(t, editListName)
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("the list was not written: %v", err)
 	}

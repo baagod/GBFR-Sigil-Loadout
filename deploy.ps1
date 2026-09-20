@@ -15,18 +15,15 @@ if (-not $resolvedTarget.EndsWith('\GBFR.PreEquippedSigils', [StringComparison]:
     throw "Refusing to deploy to a path that is not the mod folder: $Target"
 }
 
-# 1. Verify the built package exists (run build-release.ps1 first).
-# Keep in sync with the build-release.ps1 required-file list.
-foreach ($required in @(
-    'GBFR.PreEquippedSigils.dll',
-    'GBFR.PreEquippedSigils.Native.dll',
-    'Loadout.exe',
-    'assets\gem.json',
-    'assets\gem.chara.json'
-)) {
-    $requiredPath = Join-Path $source $required
-    if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
-        throw "Built package is incomplete: $source (missing $required). Run build-release.ps1 first."
+# 1. The built package must exist. "该有哪些文件"由 build-release.ps1 的清单把关（那份清单只有
+#    一个持有者）；这里只问**它是不是一个包**——构建中途失败会在 dist 留下一个半成品目录，
+#    那种目录装上去就是坏的。
+if (-not (Test-Path -LiteralPath $source -PathType Container)) {
+    throw "No built package at $source. Run build-release.ps1 first."
+}
+foreach ($sanity in @('GBFR.PreEquippedSigils.dll', 'Loadout.exe')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $source $sanity) -PathType Leaf)) {
+        throw "Built package is incomplete: $source (missing $sanity). Run build-release.ps1 again."
     }
 }
 

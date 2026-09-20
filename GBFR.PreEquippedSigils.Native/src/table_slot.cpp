@@ -109,6 +109,9 @@ struct AnchorSearch
    uintptr_t buffer_load_rva = 0;
    size_t slot_store_matches = 0;
    uintptr_t slot_store_rva = 0;
+   // 实际扫过的窗口：min(kAnchorWindowBytes, 锚点之前的字节数)。失败日志要报它而不是那个常量，
+   // 否则锚点靠段首时会报一个从没扫过的宽度，排查时会被引到错的方向。
+   size_t window_bytes = 0;
 };
 
 // .text 扫描单独一个函数：它必须待在 SEH 帧里，而 SEH 帧不能和"需要栈展开的对象"同处
@@ -129,6 +132,7 @@ AnchorSearch SearchAnchorWindow(uintptr_t code_rva, size_t code_size) noexcept
       const size_t window_size = std::min(kAnchorWindowBytes, offset_of_anchor);
       if (window_size < kSlotBaseStore.size())
          return result;
+      result.window_bytes = window_size;
       const uintptr_t window_rva = result.row_loop_rva - window_size;
       const uint8_t* window = code + (window_rva - code_rva);
       result.buffer_load_matches = CountMatches(
@@ -236,7 +240,7 @@ void ResolveTableSlot()
          "matched {} time(s); expected exactly one of each. This game build is not the one the "
          "mod was written for; no slot was resolved.",
          anchor.row_loop_matches,
-         kAnchorWindowBytes,
+         anchor.window_bytes,
          anchor.buffer_load_matches,
          anchor.slot_store_matches));
       return;

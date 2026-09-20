@@ -28,9 +28,6 @@
     <ClCompile Include="src\layout_resolver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\name_tables.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\runtime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -14,6 +14,9 @@ import (
 // 这些值写错**不会编译失败**，只会在游戏里表现成错值（最难查的一类），所以值得钉住。
 // 只收录真的有多处声明的常量：只有一处的没有可漂移的对象，不必进这里。
 //
+// 这道门是**对拍**，不是那份文档表的替代品：文档那张表还写着改不该改、为什么是这个值，
+// 这里只管"两边的字面量是不是同一个"。所以两边都得维护，别把绿当成"边界已证明"。
+//
 // 测试的工作目录是包目录（Loadout\），所以路径都是相对它的。
 func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 	read := func(name string) string {
@@ -59,8 +62,41 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 		{
 			name: "可视工具隐藏键的回落值",
 			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/HotkeyConfig.cs", regexp.MustCompile(`\bF1 = (0x[0-9A-Fa-f]+)`)},
 				{"Go", "loadoutservice.go", regexp.MustCompile(`defaultHotkeyVK = (0x[0-9A-Fa-f]+)`)},
 				{"TS", "frontend/src/model.ts", regexp.MustCompile(`DEFAULT_HIDE_KEY = (0x[0-9A-Fa-f]+)`)},
+			},
+		},
+		{
+			name: "LevelValue 参槽数",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/Config.cs", regexp.MustCompile(`LevelValueCount = (\d+)`)},
+				{"Go", "editservice.go", regexp.MustCompile(`LevelValueCount = (\d+)`)},
+				{"TS", "frontend/src/traits.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
+			},
+		},
+		// 用户配置目录与两个文件名：两者各自算出同一个字符串，中间没有任何协商（mod 目录
+		// 每次更新都被替换，所以配置不能放在那里）。漂了不会报错，只会表现成"配置完全没
+		// 生效 / 编辑永远不落地"。
+		{
+			name: "用户配置目录名",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/UserConfig.cs", regexp.MustCompile(`,\s*"([A-Za-z]+)",`)},
+				{"Go", "loadoutservice.go", regexp.MustCompile(`userCfgDirName\s*=\s*"([^"]+)"`)},
+			},
+		},
+		{
+			name: "配装文件名",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/LoadoutConfig.cs", regexp.MustCompile(`FilePath\("([^"]+)"\)`)},
+				{"Go", "loadoutservice.go", regexp.MustCompile(`loadoutFileName = "([^"]+)"`)},
+			},
+		},
+		{
+			name: "因子编辑列表文件名",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/SigilEditFeature.cs", regexp.MustCompile(`ConfigFileName = "([^"]+)"`)},
+				{"Go", "editservice.go", regexp.MustCompile(`editListName = "([^"]+)"`)},
 			},
 		},
 		{
@@ -113,11 +149,14 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 	for _, group := range groups {
 		want, first := "", ""
 		for _, d := range group.decls {
-			match := d.re.FindStringSubmatch(read(d.file))
-			if match == nil {
-				t.Errorf("%s: %s（%s）里找不到声明，正则 %s", group.name, d.file, d.who, d.re)
+			// 每条声明必须**正好**匹配一次：正则写松了（比如只匹配一个裸的字符串字面量），
+			// 就会对着文件里第一个碰巧像它的东西比，比出来还是绿的——那是假绿。
+			matches := d.re.FindAllStringSubmatch(read(d.file), -1)
+			if len(matches) != 1 {
+				t.Errorf("%s: %s（%s）里这条声明匹配到 %d 次，正则 %s", group.name, d.file, d.who, len(matches), d.re)
 				continue
 			}
+			match := matches[0]
 			if want == "" {
 				want, first = match[1], d.who
 				continue

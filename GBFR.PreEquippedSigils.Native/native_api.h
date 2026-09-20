@@ -105,8 +105,12 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_ApplyLoadout(
 //
 //   >= 0  success; the value is how many 52-byte rows actually differed and were
 //         rewritten (0 = memory already held those bytes).
-//   < 0   refused and NOTHING was written; the native side logs the reason. The
-//         caller is expected to fall back to its own scan.
+//   < 0   refused. The pre-write gates refuse without touching the buffer; the one
+//         code that can come from after them (GBFR20_TABLE_WRITE_FAILED) means the
+//         row writes faulted, so the table may be partially updated. The native
+//         side logs which code it was and what it means. There is no second way to
+//         reach the table: the caller has already re-registered the table it built,
+//         so the edit lands at the game's next parse (or after a restart).
 //
 // Guarded in this order, each one fail-closed: the anchor resolved a slot at
 // startup -> the slot holds a non-null pointer -> the whole range is committed

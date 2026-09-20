@@ -36,10 +36,10 @@ internal static class LoadoutConfig
     // 原生拒掉也是它——写下这一条就是认领，所以同一份内容不会被解析第二次，坏文件也不会
     // 每 250ms 刷一次日志。
     //
-    // DateTime.MinValue 代表"没有配置"：File.GetLastWriteTimeUtc 对不存在的文件给的正是
-    // 这个值（与 SigilEditFeature.LastWriteUtc 同一个约定），所以"配置被删了"也是一次
-    // 正常的 mtime 变化，不需要额外字段去记住"以前有过文件"。
-    private static DateTime _handledUtc = DateTime.MinValue;
+    // 初值就是"没有这个文件"那个时间戳，所以"配置被删了"是一次正常的 mtime 变化，不需要
+    // 额外字段去记住"以前有过文件"。这份约定只有一处实现：UserConfig.Stamp（SigilEditFeature
+    // 那条同样用它）。
+    private static DateTime _handledUtc = UserConfig.NoFile;
     private static string _loadoutPath = "";
 
     internal static void Initialize(Action<string> log)
@@ -60,15 +60,13 @@ internal static class LoadoutConfig
 
     private static void TryApply(Action<string> log)
     {
-        // 文件不存在时 GetLastWriteTimeUtc 给的是 DateTime.MinValue，那是一个与任何真实
-        // mtime 都不相等的、可认领的状态，所以"删掉配置"和"改过配置"走同一条门。
-        DateTime mtime = File.Exists(_loadoutPath)
-            ? File.GetLastWriteTimeUtc(_loadoutPath)
-            : DateTime.MinValue;
+        // 文件不存在时 Stamp 给的是 UserConfig.NoFile，那是一个与任何真实 mtime 都不相等的、
+        // 可认领的状态，所以"删掉配置"和"改过配置"走同一条门。
+        DateTime mtime = UserConfig.Stamp(_loadoutPath);
         if (mtime == _handledUtc)
             return;
 
-        if (mtime == DateTime.MinValue)
+        if (mtime == UserConfig.NoFile)
         {
             _handledUtc = mtime;
             // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。这就是原来的

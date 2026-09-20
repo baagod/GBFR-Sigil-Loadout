@@ -76,11 +76,6 @@ uint32_t NextApplyGeneration()
 // 需要代号的路径（日志、重排）都在函数内部各自记录。
 void RequestHotApply(uint32_t character_hash)
 {
-   if (character_hash == 0)
-   {
-      g_apply_result.store(ApplyResultSavedNoStatus, std::memory_order_release);
-      return;
-   }
    const uint32_t generation = NextApplyGeneration();
    const uint64_t request =
       (static_cast<uint64_t>(generation) << 32) | static_cast<uint64_t>(character_hash);
@@ -110,9 +105,9 @@ void ProcessPendingHotApply()
    g_last_apply_character_hash.store(character_hash, std::memory_order_release);
    g_last_apply_expected_count.store(0, std::memory_order_release);
    g_last_apply_injected_count.store(0, std::memory_order_release);
-   // character_hash == 0 is unreachable from the callers; the hooks-not-ready
-   // case reuses ApplyResultSavedNoStatus, whose log text already fits it
-   // (ApplyResult is internal to the native core, not part of the C ABI).
+   // 唯一的调用方（ScheduleSelectedStatusRebind）要求角色 hash 非零；这里的 0 只是不让一个
+   // 空身份走进下面的 apply 路径。hooks-not-ready 复用 ApplyResultSavedNoStatus，它的日志文案
+   // 本来也贴合（ApplyResult 是原生内部的，不属于 C ABI）。
    if (!g_hooks_ready.load(std::memory_order_acquire) || character_hash == 0)
    {
       g_apply_result.store(ApplyResultSavedNoStatus, std::memory_order_release);
@@ -143,7 +138,7 @@ void ProcessPendingHotApply()
    StatusIdentity original_identity{};
    if (!SafeReadStatusIdentity(status, original_identity) ||
        original_identity.character_hash != character_hash ||
-       original_identity.context_mode < 0 || original_identity.context_mode > 2)
+       !IsValidContextMode(original_identity.context_mode))
    {
       g_apply_result.store(ApplyResultStatusLookupFailed, std::memory_order_release);
       RequeueHotApply(request, 100);
@@ -202,10 +197,7 @@ void ProcessPendingHotApply()
    if (injected == expected)
    {
       if (expected == 0)
-      {
-         std::unique_lock lock(g_authorization_mutex);
-         g_authorized_statuses.erase(status);
-      }
+         EraseAuthorizedStatus(status);
       else if (restored_identity.character_hash == character_hash &&
                restored_identity.context_mode == original_identity.context_mode)
       {

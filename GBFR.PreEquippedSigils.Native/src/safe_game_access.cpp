@@ -267,7 +267,7 @@ bool SafeResolveSelectedCharacterStatus(
       SafeResolveCharacterStatus(character_hash, manager, status) &&
       SafeReadStatusIdentity(status, identity) &&
       identity.character_hash == character_hash &&
-      identity.context_mode >= 0 && identity.context_mode <= 2;
+      IsValidContextMode(identity.context_mode);
 }
 
 void CommitAuthorizedStatus(
@@ -304,7 +304,7 @@ bool TryGetAuthorizedSelection(
        iterator->second.character_hash != identity.character_hash ||
        iterator->second.status != status ||
        iterator->second.context_mode != identity.context_mode ||
-       identity.context_mode < 0 || identity.context_mode > 2)
+       !IsValidContextMode(identity.context_mode))
       return false;
    slots = iterator->second.slots;
    return true;
@@ -382,7 +382,7 @@ void ValidateAuthorizedStatuses()
          SafeReadStatusIdentity(current_status, identity) &&
          identity.character_hash == authorization.character_hash &&
          identity.context_mode == authorization.context_mode &&
-         identity.context_mode >= 0 && identity.context_mode <= 2;
+         IsValidContextMode(identity.context_mode);
       if (valid)
          continue;
       // Erase only the exact entry that was validated: a concurrent commit
@@ -427,7 +427,7 @@ bool SafeInvokeStatusRebuild(
    StatusIdentity original_identity{};
    if (!SafeReadStatusIdentity(status, original_identity) ||
        original_identity.character_hash != character_hash ||
-       original_identity.context_mode < 0 || original_identity.context_mode > 2)
+       !IsValidContextMode(original_identity.context_mode))
       return false;
 
    bool rebuild_succeeded = false;

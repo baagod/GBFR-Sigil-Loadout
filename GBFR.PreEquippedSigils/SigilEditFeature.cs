@@ -104,7 +104,8 @@ internal sealed class SigilEditFeature
 
         try
         {
-            Config config = LoadConfig(out _) ?? new Config();
+            Config? loaded = LoadConfig(out _);
+            Config config = loaded ?? new Config();
             byte[]? file = BuildEditedTable(config, out int applied);
 
             // 先接热应用、再看启动写有没有产出，而且不管有没有产出都接：一个从没建起来的
@@ -120,7 +121,11 @@ internal sealed class SigilEditFeature
 
             if (applied == 0)
             {
-                _log($"sigil edit: no edits applied (list held {config.Edits.Count} edit(s)); not writing the table back");
+                // 两份空列表要分开说：一份"读不出来"的空列表和一份"用户清空了"的空列表，
+                // 在这一行之前各有一句日志说明是哪种，这里不该把前者说成"列表里 0 条编辑"。
+                _log(loaded is null
+                    ? "sigil edit: there is no edit list yet, or it could not be read (see the line above); nothing applied and the table was not written back"
+                    : $"sigil edit: no edits applied (list held {config.Edits.Count} edit(s)); not writing the table back");
                 return;
             }
 
@@ -165,10 +170,10 @@ internal sealed class SigilEditFeature
     }
 
     /// <summary>
-    /// 编辑列表的文件时间。文件不存在时是 1601-01-01，与 default(0001-01-01) 不同，
-    /// 所以"列表被删掉"这件事同样会被 tick 看见。
+    /// 编辑列表的文件时间。文件不存在时是 <see cref="UserConfig.NoFile"/>（1601-01-01），与
+    /// <c>default(0001-01-01)</c> 不同，所以"列表被删掉"这件事同样会被 tick 看见。
     /// </summary>
-    private static DateTime LastWriteUtc() => File.GetLastWriteTimeUtc(ConfigFile);
+    private static DateTime LastWriteUtc() => UserConfig.Stamp(ConfigFile);
 
     /// <summary>
     /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试一次接；接上了就看编辑列表的文件时间
@@ -392,7 +397,11 @@ internal sealed class SigilEditFeature
     private static bool HasPatchableLayout(byte[] data, out long declaredRows)
     {
         declaredRows = data.Length >= FileHeaderSize ? BitConverter.ToInt64(data, 0) : 0;
-        return declaredRows > 0 && FileHeaderSize + (long)RowSize * declaredRows == data.Length;
+        // 用整除而不是 8 + 52*行数 == 长度：文件头那 8 个字节是任意值，乘法会在 long 上回绕，
+        // 构造一个回绕后刚好相等的行数就能过这道预检。整除同时说明最后一行是完整的。
+        long body = data.Length - FileHeaderSize;
+        return declaredRows > 0 && body >= 0 &&
+               declaredRows == body / RowSize && body % RowSize == 0;
     }
 
     /// <summary>
