@@ -84,6 +84,30 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 				{"Go", "loadoutservice.go", regexp.MustCompile(`readModFile\("(tool-hotkey\.txt)"\)`)},
 			},
 		},
+		// skill_status 的行布局：托管侧（改表）与原生（验形状、逐行 Key 比对）各自都需要这三个数，
+		// 而它们是两个二进制，天然各存一份。拷错一个的后果是"行错位/认成别的表"，所以钉住。
+		// Level 偏移（48）只有托管侧用，没有第二个声明可漂，故不收。
+		{
+			name: "skill_status 表头字节",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/SigilEditFeature.cs", regexp.MustCompile(`FileHeaderSize = (\d+)`)},
+				{"C++", "../GBFR.PreEquippedSigils.Native/src/table_slot.cpp", regexp.MustCompile(`kTableHeaderBytes = (\d+)`)},
+			},
+		},
+		{
+			name: "skill_status 行字节",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/SigilEditFeature.cs", regexp.MustCompile(`\bRowSize = (\d+)`)},
+				{"C++", "../GBFR.PreEquippedSigils.Native/src/table_slot.cpp", regexp.MustCompile(`kTableRowBytes = (\d+)`)},
+			},
+		},
+		{
+			name: "skill_status 行内 Key 偏移",
+			decls: []decl{
+				{"C#", "../GBFR.PreEquippedSigils/SigilEditFeature.cs", regexp.MustCompile(`\bKeyOffset = (\d+)`)},
+				{"C++", "../GBFR.PreEquippedSigils.Native/src/table_slot.cpp", regexp.MustCompile(`kRowKeyOffset = (\d+)`)},
+			},
+		},
 	}
 
 	for _, group := range groups {
