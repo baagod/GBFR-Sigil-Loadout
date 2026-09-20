@@ -37,18 +37,7 @@
 - 数据核实参考社区工具链：[Nenkai/relink-modding](https://nenkai.github.io/relink-modding/)（官方 ID 表）与 [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools)（解包/导出）。
 ---
 
-## Build (for review)
+## Building
 
-Source: https://github.com/baagod/GBFR-Pre-Equipped-Sigils
-
-Requirements: Windows x64, Visual Studio 2022 Build Tools (MSVC v143 + Windows SDK), .NET 8 SDK, Go, Node.js.
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # requires pwsh 7 (BOM-less UTF-8)
-# outputs dist\GBFR-Pre-Equipped-Sigils-<version>.zip
-```
-
-The release package contains:
-- `GBFR.PreEquippedSigils.dll` — C# (Reloaded-II mod hook, built by build-release.ps1),
-- `GBFR.PreEquippedSigils.Native.dll` — C++ (game hook, same script),
-- `Loadout.exe` — Wails v3 (Go) GUI tool (its frontend is also built by the script; no external assets are downloaded at build time).
+Source, build, deploy and verification: https://github.com/baagod/GBFR-Pre-Equipped-Sigils
+（本文件随包进 mod 目录，只讲玩家要用的东西；构建命令与验证清单在仓库根的 `README.md`。）

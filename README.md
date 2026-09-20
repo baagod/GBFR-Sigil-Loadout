@@ -24,40 +24,59 @@
 - 原来独立的 `GBFR.SigilEdit` mod 已并入本 mod，**不要同时装两个**。
 - **需要** [gbfrelink.utility.manager](https://github.com/WistfulHopes/gbfrelink.utility.manager) 才能用这一页（表就是向它取的）；它是**可选依赖**，没装时 mod 照常加载，只是编辑器没有表可改。
 
-## 文档入口
+## 四个单元
+
+| 单元 | 宿主 |
+|---|---|
+| `GBFR.PreEquippedSigils/` | Reloaded-II（.NET 程序集） |
+| `GBFR.PreEquippedSigils.Native/` | 注入进游戏（C++） |
+| `Loadout/`（Go → `Loadout.exe`） | 独立进程 |
+| `Loadout/frontend/`（React） | WebView2 |
+
+每个单元独占什么事实、跨层那两个半契约（ABI / 玩家配置 / 热键播报）是什么 → [docs/MAINTENANCE.md](docs/MAINTENANCE.md) §2。同一份事实有两个持有者就是缺陷——要新增"两边都得知道"的东西，先找出它的唯一拥有者。
+
+## 文档
 
 | 文档 | 对象 | 内容 |
 |---|---|---|
+| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | **改代码的人** | 架构、部件边界、数据流、雷区、协议常量（**动手前先读它**） |
+| [CONTEXT.md](CONTEXT.md) | 同上 | 术语表（术语的**唯一来源**） |
 | [GBFR.PreEquippedSigils/README.md](GBFR.PreEquippedSigils/README.md) | 用户 | 功能简介、配装表、安装、注意事项 |
-| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | **AI 接手者** | 架构、部件边界、数据流、雷区、协议常量 |
-| [docs/BUILD.md](docs/BUILD.md) | 改这个仓库的人 | 构建、部署、发布、验证清单、常用操作 |
 
-## 参考（GBFR Modding 生态）
+## 构建与部署
 
-社区教程与外部工具（2026-09 调研，开发期参考；**运行时不依赖**）：
+环境：Windows x64、VS2022 Build Tools（MSVC v143 + Windows SDK）、.NET 8 SDK、Go、Node、wails3。
 
-| 类别 | 名称 | 用途 | 链接 |
-|---|---|---|---|
-| 教程站 | Relink Modding Site | 安装/FSM/表编辑/推荐 mod 总入口 | https://nenkai.github.io/relink-modding/ |
-| 教程 | FSM（有限状态机） | 任务/动作/AI 行为脚本（`system/fsm/*_fsm_ingame`），用 RelinkToolkit2 预览 | https://nenkai.github.io/relink-modding/resources/fsm/ |
-| 教程 | 安装 Mod | Reloaded-II + GBFR Mod Manager 配置 | https://nenkai.github.io/relink-modding/modding/installing_mods/ |
-| 教程 | 技能编辑入门 | GBFRDataTools 解包 → 改 `skill_status.tbl` → 重打包流程 | https://gist.github.com/TehChozinOne/a01081e8e4f70f048a54d2de368eaef7 |
-| 外部工具 | GBFRDataTools | `data.i` 解包/重打包、`tbl↔sqlite` 转换、纹理、FSM/Entities 读取库、存档处理 | https://github.com/Nenkai/GBFRDataTools |
-| 外部工具 | RelinkToolkit2 | FSM 可视化预览/编辑 | 见教程站 FSM 页 |
-| 外部工具 | GBFR Mod Manager | Reloaded-II 插件：文件级 mod 自动覆盖/安装 | https://github.com/WistfulHopes/gbfrelink.utility.manager |
-| 外部工具 | GBFRSkillEditor | `skill_status.tbl` 技能参数可视化编辑（Nexus 174） | https://github.com/yy556023/GBFRSkillEditor |
-| 外部工具 | Reloaded-II / SafetyHook | 运行时 mod 管线（本项目现行路线） | https://github.com/Reloaded-Project/Reloaded-II |
+```powershell
+# 必须用 pwsh 7：脚本是无 BOM UTF-8，Windows PowerShell 5.1 按 GBK 解析，门禁的中文提示会变乱码
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1   # 产物 dist\GBFR-Pre-Equipped-Sigils-<version>.zip
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1          # 部署到 Mods（游戏必须已退出）
+```
 
-**两条技术路线**：
+- **不要用 `msbuild` 构建整个 `.sln`**：Build Tools 的 `MSBuild\Sdks\` 下没有 .NET SDK，托管项目会报 `MSB4236`（与源码无关）。两段式：MSBuild 构 `.vcxproj`、`dotnet build` 构 `.csproj`。
+- **可视工具的编译检查用 `go vet ./...`**（或 `go build -o <临时路径>`）：模块名是 `loadouttool`，裸跑会在 `Loadout\` 落一个 18 MB 的 `loadouttool.exe`，而唯一产物是 `Loadout.exe`。
+- 版本号的唯一权威源是 `ModConfig.json`（脚本从它读，并与前端 `package.json` / `package-lock.json` 对拍，不一致直接失败）。
+- `deploy.ps1` = 确认游戏已退出、旧的独立 `GBFR.SigilEdit` 已卸载 → 停 `Loadout.exe` → 覆盖 Mods 目标（默认 `C:\Users\baago\Desktop\Reloaded-II\Mods\GBFR.PreEquippedSigils`，`-Target` 可覆盖）→ 重开可视工具。
 
-- 文件级（GBFRDataTools 外置表/纹理/FSM 覆盖）：改掉落率、因子数值、技能参数、专精（Master Trait）、Boss 数据；版本更新几乎不坏。
-- 运行时 hook（本项目）：动态合成、不依赖游戏文件；但版本锚点随游戏更新失效（当前锚定 ER 2.0.5）。
+## 验证清单（每次改动后必须做）
 
-**常用数据表**（Table List：https://nenkai.github.io/relink-modding/tables/table_list/ ）：
-`skill`（技能定义）、`skill_status`（技能等级数值）、`limit_bonus` / `limit_bonus_param` / `limit_bonus_type`（角色专精/Mastery）、`status`（状态/图标）。
+1. 编译 **0 警告 0 错误**（third_party 的 C4834 已在 vcxproj 单独压制）。
+2. `GBFR.PreEquippedSigils.log`（mod 目录）里出现：
+   - `Installed N built-in template loadout selection(s). exclusive slots 1-3 (T1/T2/war), general slots 4-M; inventory-independent.`（`N` 由 `docs\tool-gen-loadout.ps1` 的 `$chars` 条目数决定：无配置 = 条目数 × 3，有配置 = 条目数 × (3+通用槽数)）
+   - `Native hooks installed: N virtual slots.`
+   - `Trait contribution confirmed for 0xE7053919: N/N ...`（首次；未满应为 `incomplete: N/M`）
+3. 训练场实测技能效果（如豪胆濒死不死、自动复活自起）+ 血条下 buff 图标。
 
-**参考实例**：[455 Midnight's Overhaul](https://www.nexusmods.com/granbluefantasyrelink/mods/455)（玩法大修）、25 Sigil Rebalance（因子重平衡）、[819 Master Traits Super](https://www.nexusmods.com/granbluefantasyrelink/mods/819)（专精超强）、[657 Extra Sigil Slots](https://www.nexusmods.com/granbluefantasyrelink/mods/657)（本项目派生来源）。
-社区：Relink Modding Discord（教程站主页有邀请；#modding-chat）。
+## 数据生成（`docs\`）
+
+| 脚本 | 作用 |
+|---|---|
+| `tool-gen-loadout.ps1` | 从 `$chars` 生成 `src\exclusive_table.inc`（native 编译时 `#include`，**不入库**：vcxproj 每次编译前重跑它）与 `Loadout\assets\gem.chara.json`（**入库、随包**，只有可视工具读） |
+| `tool-gen-sigils.ps1` | 调共享 gen 的 Go 生成器 → `docs\gem.xlsx`（入库）+ `Loadout\assets\gem.json` + `gem.lang.json` |
+| `tool-gen-texts.ps1` | 调共享 gen 的 Go 生成器 → `gen\output\texts.xlsx` + `texts.json`，并生成 `Loadout\assets\chara.lang.json` |
+| `tool-gen-skill-assets\` | 生成 `Loadout\assets\` 那五份内嵌资产（游戏更新后才跑） |
+
+生成器与数据源不在本仓库里（`..\gen\`，两个 mod 共用）；因子表的生成规则见 `docs\gem.xlsx 生成文档.md`。
 
 ## 仓库结构
 
@@ -70,18 +89,9 @@ dist/                            构建产物（zip，git 忽略）
 build-release.ps1                一键构建脚本
 ```
 
-## 快速上手（维护）
+## 常用操作速查
 
-```powershell
-# 必须用 pwsh 7：脚本为无 BOM UTF-8，Windows PowerShell 5.1 会按 GBK 解析，中文提示变乱码
-# 构建（需 VS2022 Build Tools + .NET 8 SDK）
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\build-release.ps1
-
-# 一键部署（自动停可视工具 -> 覆盖 Mods -> 自动重开可视工具；游戏必须已退出）：
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1
-
-# 手动部署：游戏退出后，把 dist\GBFR.PreEquippedSigils 复制到 Reloaded-II 的 Mods\
-# 本机路径示例：C:\Users\baago\Desktop\Reloaded-II\Mods\GBFR.PreEquippedSigils
-```
-
-改配装、加槽位、加角色的具体步骤见 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) 第 4、5 节；构建、部署、验证见 [docs/BUILD.md](docs/BUILD.md)。
+- **改专属数据（技能 / 因子 / 等级）**：改 `docs\tool-gen-loadout.ps1` 的 `$chars` 表 → 编译（vcxproj 编译前自动重跑生成器）→ 部署 → 验证。**加角色**走同一条路（查该角色专属因子 hash：`gem.json` 的专属行 + `gem.lang.json` 的名字表）。
+- **改通用槽 / 前端规则**：可视工具与托管逻辑（无内置通用默认；副技能规则见 `MAINTENANCE.md` §5）；配装的增删改步骤见 §4、§5。
+- **手动部署**：游戏退出后，把 `dist\GBFR.PreEquippedSigils` 复制到 Reloaded-II 的 `Mods\`。
+- **提交 / 推送**：`git -c user.name="baagod" -c user.email="780810441@qq.com" commit ...`（不要改全局 git config），提交前 `git status` 确认无 bin/obj/dist 混入；推送用 `git -c credential.helper="!gh auth git-credential" push origin main`（本地代理 127.0.0.1:7890）。
