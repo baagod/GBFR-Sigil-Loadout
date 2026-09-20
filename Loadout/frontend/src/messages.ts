@@ -28,7 +28,7 @@ const zh = {
 
   // 配装页
   headerPrimary: "主因子",
-  headerSecondary: "副技能",
+  headerSecondary: "副因子",
   selectAll: "全选/全不选",
   pickTrait: "选择因子",
   none: "无",

@@ -144,7 +144,7 @@ export function configToSlots(
 /** 保存时这个主因子该写成哪个 gem hash（主下拉的值是组键，不是物品）。
  *
  * 顺序即优先级：存档已经指名的那一个变体（preferred，且仍与当前副技能相容）→
- * 池版 → 固定副那版 → 组里第一行。第一档是必需的：一个组里可以有**名字不同**的
+ * 池版 → 固定副技能那版 → 组里第一行。第一档是必需的：一个组里可以有**名字不同**的
  * 两个变体（钳蟹的共鸣 / 永恒钳蟹因子），丢了它，没被碰过的那一行也会被静默改写。
  * 固定的副技能不写进 loadout.json（mod 从 gem 自己推），所以它对应的 secHash 是空。 */
 export function resolveMainGem(
@@ -282,7 +282,7 @@ export function buildSigilIndex(
 
   // 组合规则（仅提示：不阻断选择、保存或实装）：
   //   1. 唯一持有 / 非物品行组没有合法副；
-  //   2. mix=1 只配自己的池或固定副；
+  //   2. mix=1 只配自己的池或固定副技能；
   //   3. 其余普通（mix=0）行自由组合。
   const legalOf = (mainKey: string): Set<string> => {
     const variants = (grouped.get(mainKey) ?? []).filter(
