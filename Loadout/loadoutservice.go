@@ -63,7 +63,7 @@ func (s *LoadoutService) GetHotkey() int {
 
 type loadoutItem struct {
 	Gem   string `json:"gem"`   // items[0]: gem (物品) hash
-	Hash  string `json:"hash"`  // items[0]: 该物品给的主词条；items[1]: 副词条
+	Hash  string `json:"hash"`  // items[0]: 该物品给的主技能；items[1]: 副技能
 	Level int    `json:"level"`
 }
 
@@ -125,8 +125,8 @@ func (s *LoadoutService) LoadSigils() (string, error) {
 // GemNames returns the display names for one language: {因子 hash: 名字}, sliced out
 // of the embedded gem.lang.json.
 //
-// 名字不挤进 gem.json（工具每次启动都要读它），而是单独一份多语言文件；调用方只要当前那一种，
-// 与 EditService.SkillMap 同一个形状与理由。不认得的语言回落中文，单个词条缺名字时
+// 名字不挤进 gem.json（可视工具每次启动都要读它），而是单独一份多语言文件；调用方只要当前那一种，
+// 与 EditService.SkillMap 同一个形状与理由。不认得的语言回落中文，单个技能缺名字时
 // 调用方回落成 hash——这里不猜。
 func (s *LoadoutService) GemNames(lang string) map[string]string {
 	return pick(lang, gemNamesByLang)
@@ -166,7 +166,7 @@ func (s *LoadoutService) LoadExclusives() (string, error) {
 // structurally valid, but only enabled rows count against MaxSlots (disabled
 // rows are ignored by the mod).
 //
-// 这里**不**校验等级上限：上限是每条词条自己的 cap，而唯一持有那张表的是前端
+// 这里**不**校验等级上限：上限是每条技能自己的 cap，而唯一持有那张表的是前端
 // （它读 gem.json 并把值夹在 cap 内）。再写一个固定上限只会成为同一规则的第三份
 // 副本，而那份副本校验的又不是真正的不变量。最终 cap 由 mod 侧（LoadoutConfig）判定。
 // 负等级则与 cap 无关，是任何情况下都无意义的值，所以仍然拒绝。

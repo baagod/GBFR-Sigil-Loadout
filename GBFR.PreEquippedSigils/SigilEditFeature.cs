@@ -11,12 +11,12 @@ namespace GBFR.PreEquippedSigils;
 /// 目录、配置文件名、以及那个用来叫醒它的 win32 具名事件都撤掉了，日志走宿主的日志
 /// （<see cref="Mod"/> 注入进来的），生命周期与"什么时候该重新应用"也跟着宿主走。
 ///
-/// 运行中改写由宿主每隔 250ms 的 tick 驱动（见 <see cref="Tick"/>）：工具每存一次编辑列表，
+/// 运行中改写由宿主每隔 250ms 的 tick 驱动（见 <see cref="Tick"/>）：可视工具每存一次编辑列表，
 /// 文件时间就变一次，HotApply 随即覆写游戏内存里的表——不重启、不挂钩子。
 ///
 /// 不带静态 .tbl：表从游戏归档里读出来、在内存里改、再写回去。
 ///
-/// 行的布局。对着文件和读这张表的工具箱的表定义都核对过——GBFRDataTools 的
+/// 行的布局。对着文件和读这张表的外部工具的表定义都核对过——GBFRDataTools 的
 /// skill_status.headers，以及 GameTable.cs 里那句断言 8 + RowSize * rowCount == file.Length：
 ///   - 8 字节头：行数，int64。
 ///   - 每行 52 字节：
@@ -45,7 +45,7 @@ internal sealed class SigilEditFeature
     private const string ConfigFileName = "gemedits.json";
 
     // 编辑列表住在 mod 自己的用户配置目录里（见 UserConfig），和配装 loadout.json 挨着：
-    // 工具写、这里读。改动由下面 Tick() 的 mtime 门发现。
+    // 可视工具写、这里读。改动由下面 Tick() 的 mtime 门发现。
     //
     // 只认这一个位置：合并前那套（%APPDATA%\GBFR.SigilEdit\Config.json）不读、不搬、不兼容。
     private static readonly string ConfigFile = UserConfig.FilePath(ConfigFileName);
@@ -89,7 +89,7 @@ internal sealed class SigilEditFeature
             return;
         _started = true;
 
-        // 读之前先记下这份文件的版本：下面那次读只保证读到了"某一刻"的内容，而工具随时可能
+        // 读之前先记下这份文件的版本：下面那次读只保证读到了"某一刻"的内容，而可视工具随时可能
         // 在读完与结束之间写一次。认领**读之前**的时间戳，那次写入就仍然是一次 tick 看得见的
         // 改动；认领"读之后"的，它就被这次启动悄悄吃掉了。
         DateTime readingUtc = LastWriteUtc();
@@ -112,7 +112,7 @@ internal sealed class SigilEditFeature
             // 表——归档还读不出来，或者这是本构建不认识的布局——第一次应用会重新读表。
             //
             // 每次应用前由 BuildCurrentTable 重新读编辑列表，所以它交上去的就是此刻的文件，
-            // 也就是工具刚写下的那份。构造器本身只记下这几个委托，不读文件。
+            // 也就是可视工具刚写下的那份。构造器本身只记下这几个委托，不读文件。
             _hotApply = new HotApply(_log, file, BuildCurrentTable, RegisterWithManager);
 
             if (file is null)
@@ -385,7 +385,7 @@ internal sealed class SigilEditFeature
 
     /// <summary>
     /// 表就是上面那些偏移量写来对付的那一张时返回 true：8 字节头里声明的行数，
-    /// 正好按 52 字节一行把剩下的文件算完——和生成这张表的工具箱读它时断言的是同一个恒等式。
+    /// 正好按 52 字节一行把剩下的文件算完——和生成这张表的外部工具读它时断言的是同一个恒等式。
     /// 2.0 之前的表（36 字节一行）与将来任何一次列变动都过不了这一关，这正是重点：
     /// 调用方于是什么都不改，而不是写进错误的行。
     /// </summary>

@@ -15,7 +15,7 @@ export function ExclusivePanel({
   names: Record<string, string>
   /** 当前语言的 PL 码 -> 角色名（chara.lang.json）；缺条目的行显示 PL 码。 */
   charaNames: Record<string, string>
-  /** 只报"哪个角色码的哪个词条被切成了什么"；落到文件里的键由 App 决定。 */
+  /** 只报"哪个角色码的哪个技能被切成了什么"；落到文件里的键由 App 决定。 */
   onChange: (player: string, traitHash: string, value: boolean) => void
 }) {
   // One row per shared player code (Gran/Djeeta both PL0000 with the same

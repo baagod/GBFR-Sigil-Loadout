@@ -110,7 +110,7 @@ export const SlotRow = memo(function SlotRow({
           traits={sigils.mainKeys}
           labels={sigils.labels}
           placeholder={t.pickTrait}
-          searchPlaceholder={t.searchTrait}
+          searchPlaceholder={t.searchSigil}
           emptyLabel={t.noMatch}
           onSelect={(v) =>
             updateSlot(row, {
@@ -139,7 +139,7 @@ export const SlotRow = memo(function SlotRow({
           placeholder={t.none}
           noneOption
           noneLabel={t.none}
-          searchPlaceholder={t.searchTrait}
+          searchPlaceholder={t.searchSigil}
           emptyLabel={t.noMatch}
           disabled={!mainValid}
           onSelect={(v) =>

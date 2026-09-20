@@ -38,7 +38,7 @@ export interface Sigil {
 
 export interface Trait {
   hash: string
-  /** 命名这个词条的那一行物品的 hash：显示名按它去 gem.lang.json 里取。 */
+  /** 命名这个技能的那一行物品的 hash：显示名按它去 gem.lang.json 里取。 */
   gem: string
   cap: number
 }
@@ -65,8 +65,8 @@ export function exclusiveSlots(
 }
 
 /** The trust boundary for gem.chara.json: 形状不完整的记录整条丢掉。非数组直接抛，
- * 交给调用方的错误提示。这张表只有**工具**在读（mod 侧不读它：专属开关经 ABI 以
- * 词条 hash 转发，是哪个槽由原生侧认）。 */
+ * 交给调用方的错误提示。这张表只有**可视工具**在读（mod 侧不读它：专属开关经 ABI 以
+ * 技能 hash 转发，是哪个槽由原生侧认）。 */
 export function parseExclusiveTable(raw: unknown): Exclusive[] {
   if (!Array.isArray(raw)) throw new Error("gem.chara.json is not an array")
   return raw.filter(
@@ -82,7 +82,7 @@ export function parseExclusiveTable(raw: unknown): Exclusive[] {
   )
 }
 
-/** Exclusive overlay written to loadout.json: 角色 hash -> 词条 hash -> 是否启用。
+/** Exclusive overlay written to loadout.json: 角色 hash -> 技能 hash -> 是否启用。
  * 只有被关掉的槽需要出现——没提到的角色就是三槽全开。 */
 export type ExclusiveState = Record<string, Record<string, boolean>>
 
@@ -118,7 +118,7 @@ const emptySlot = (): Slot => ({
 
 /** Normalize a saved config (new array format) into Slot[].
  *
- * 存档里存的是 gem hash，而下拉的值是**组键**（该行所属的词条 hash，`skill1`），
+ * 存档里存的是 gem hash，而下拉的值是**组键**（该行所属的技能 hash，`skill1`），
  * 所以这里把前者翻成后者；表里没有的 gem 保留原值（下一次保存会被丢弃，
  * 编辑里也显示为空）。名字不参与：它按语言变，不能当身份。
  *
@@ -143,10 +143,10 @@ export function configToSlots(
 
 /** 保存时这个主因子该写成哪个 gem hash（主下拉的值是组键，不是物品）。
  *
- * 顺序即优先级：存档已经指名的那一个变体（preferred，且仍与当前副因子相容）→
+ * 顺序即优先级：存档已经指名的那一个变体（preferred，且仍与当前副技能相容）→
  * 池版 → 固定副那版 → 组里第一行。第一档是必需的：一个组里可以有**名字不同**的
  * 两个变体（钳蟹的共鸣 / 永恒钳蟹因子），丢了它，没被碰过的那一行也会被静默改写。
- * 固定的副因子不写进 loadout.json（mod 从 gem 自己推），所以它对应的 secHash 是空。 */
+ * 固定的副技能不写进 loadout.json（mod 从 gem 自己推），所以它对应的 secHash 是空。 */
 export function resolveMainGem(
   variants: Sigil[],
   pool: { poolHash: string; lot: Set<string> } | undefined,
@@ -183,12 +183,12 @@ export function parseSigilRows(json: string): SigilRow[] {
   return parsed.sigils ?? []
 }
 
-/** 词条字典：每个词条 hash 一行（首行胜出），专属行不作副因子候选。 */
+/** 技能字典：每个技能 hash 一行（首行胜出），专属行不作副技能候选。 */
 export function traitTableOf(rows: SigilRow[]): Trait[] {
   const byHash = new Map<string, Trait>()
   for (const s of rows) {
     if (!s.skill1 || byHash.has(s.skill1)) continue
-    if (s.player) continue // 专属因子的词条永不出现在词条下拉里
+    if (s.player) continue // 专属因子的技能永不出现在技能下拉里
     byHash.set(s.skill1, {
       hash: s.skill1,
       // 显示名来自命名它那一行的物品名，所以取名字时用那一行的 hash。
@@ -214,26 +214,26 @@ export function itemRowsOf(rows: SigilRow[]): Sigil[] {
     }))
 }
 
-/** 没有合法副因子时共用的空集合：`legalOf` 每次返回同一个对象，调用方就不必再造一个。 */
+/** 没有合法副技能时共用的空集合：`legalOf` 每次返回同一个对象，调用方就不必再造一个。 */
 const NO_LEGAL_TRAITS: Set<string> = new Set()
 
 /**
  * 一张因子表的**全部**派生关系，构造一次。主/副下拉的取值集合、显示名、等级上限、
  * 合法副集合，以及"这个主因子该写成哪个物品 hash"。
  *
- * 以前这些散在 App.tsx 的 10 个 useMemo + 3 个 useCallback 里，而"合法副因子"与
+ * 以前这些散在 App.tsx 的 10 个 useMemo + 3 个 useCallback 里，而"合法副技能"与
  * "该写哪个变体"这两个其实同源的关系被各写了一遍。现在只有这一处构造，而且它不需要
  * React 就能被测试。
  */
 export interface SigilIndex {
-  /** 主下拉的取值：每组的组键（该组变体共享的词条 hash）。 */
+  /** 主下拉的取值：每组的组键（该组变体共享的技能 hash）。 */
   mainKeys: string[]
   mainKeySet: Set<string>
-  /** 副下拉的取值：每个词条 hash。 */
+  /** 副下拉的取值：每个技能 hash。 */
   traitHashes: string[]
   /** value -> 当前语言的显示名。取不到名字的键根本不在表里，调用方回落成原值。 */
   labels: Record<string, string>
-  /** 合法的副因子集合；参不来（唯一持有/非物品行组）就是一个空集合。 */
+  /** 合法的副技能集合；参不来（唯一持有/非物品行组）就是一个空集合。 */
   legalOf(mainKey: string): Set<string>
   /** 保存时这个主因子该写成哪个物品 hash（规则见 resolveMainGem）。 */
   gemOf(mainKey: string, secHash?: string, preferred?: string): string
@@ -248,7 +248,7 @@ export function buildSigilIndex(
 ): SigilIndex {
   const traitByName = new Map(traits.map((tr) => [tr.hash, tr]))
 
-  // 主因子按词条分组：名字按语言变、不能当键，而同一名字的那些本来也共享一条词条。
+  // 主因子按技能分组：名字按语言变、不能当键，而同一名字的那些本来也共享一条技能。
   const grouped = new Map<string, Sigil[]>()
   for (const s of sigils) {
     const key = s.skill1 || s.hash
@@ -262,7 +262,7 @@ export function buildSigilIndex(
     .filter(([, variants]) => variants.some((v) => v.player === ""))
     .map(([key]) => key)
 
-  // 显示名来自命名该词条的那一行物品：词条字典是首行胜出，而 App 建 traits 时已经
+  // 显示名来自命名该技能的那一行物品：技能字典是首行胜出，而 App 建 traits 时已经
   // 剔除了专属行，所以这里一份就够——主下拉的每个键都是某个非专属行的 skill1。
   const labels: Record<string, string> = {}
   for (const tr of traits) labels[tr.hash] = names[tr.gem] ?? tr.hash
@@ -274,7 +274,7 @@ export function buildSigilIndex(
     if (pool) poolOf.set(key, { poolHash: pool.hash, lot: new Set(pool.lot) })
   }
 
-  // 能当副因子的词条：至少有一个普通（mix=0、可组合）物品行提供它。
+  // 能当副技能的技能：至少有一个普通（mix=0、可组合）物品行提供它。
   const ordinary = new Set<string>()
   for (const s of sigils) {
     if (s.onlyone !== "1" && s.hash !== s.skill1 && s.mix === "0") ordinary.add(s.skill1)
@@ -342,7 +342,7 @@ export interface LoadoutPayload {
  * 把编辑器状态拼成落盘载荷。
  *
  * 这段拼装此前**零覆盖**，而它决定了用户配置的内容：主因子按当前表解析成物品 hash、
- * 解析不出就整行跳过（空 id 会让 mod 拒掉整份文件）、副因子有就写没有就不写、
+ * 解析不出就整行跳过（空 id 会让 mod 拒掉整份文件）、副技能有就写没有就不写、
  * exclusive 全空时不写这个成员。抽成纯函数是为了能对真实 gem.json 测它。
  */
 export function buildLoadoutPayload(
@@ -356,8 +356,8 @@ export function buildLoadoutPayload(
     if (s.mainHash === "") continue
     const hash = index.gemOf(s.mainHash, s.secHash, s.mainGem)
     if (hash === "") continue
-    // items[0] 同时写物品 hash 与它给的主词条：mod 不再持有因子表（那张表的唯一实现就是
-    // 本文件建的索引），所以主词条必须随载荷走。
+    // items[0] 同时写物品 hash 与它给的主技能：mod 不再持有因子表（那张表的唯一实现就是
+    // 本文件建的索引），所以主技能必须随载荷走。
     const items: SavedItem[] = [{ gem: hash, hash: s.mainHash, level: s.mainLevel }]
     if (s.secHash !== "") items.push({ hash: s.secHash, level: s.secLevel })
     saved.push({ items, enabled: s.enabled })
@@ -385,7 +385,7 @@ function slotsFromConfig(
     const items = Array.isArray(s.items) ? s.items : []
     const main = items[0] ?? {}
     const sec = items[1]
-    const mainHash = typeof main.gem === "string" ? main.gem : "" // 主词条由 configToSlots 从索引还原
+    const mainHash = typeof main.gem === "string" ? main.gem : "" // 主技能由 configToSlots 从索引还原
     const secHash = sec && typeof sec.hash === "string" ? sec.hash : ""
     const mainLevel = typeof main.level === "number" ? main.level : DEFAULT_LEVEL
     const secLevel = sec && typeof sec.level === "number" ? sec.level : DEFAULT_LEVEL

@@ -38,7 +38,7 @@ internal static unsafe partial class NativeCore
     {
         public uint CharacterHash;
         /// <summary>
-        /// 被切换的那个词条 hash。它的**身份**就是槽位：原生侧拿它去专属表里认这是
+        /// 被切换的那个技能 hash。它的**身份**就是槽位：原生侧拿它去专属表里认这是
         /// T1、T2 还是战气，所以托管侧不必知道这个映射，也不必读 gem.chara.json。
         /// </summary>
         public uint TraitHash;

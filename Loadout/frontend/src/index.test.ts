@@ -47,19 +47,19 @@ describe("真实 gem.json 上的派生索引", () => {
     }
   })
 
-  it("lot 里的每个词条都是普通（可作副）词条——数据不变量，此前无人断言", () => {
+  it("lot 里的每个技能都是普通（可作副）技能——数据不变量，此前无人断言", () => {
     const ordinary = new Set<string>()
     for (const s of sigils) {
       if (s.onlyone !== "1" && s.hash !== s.skill1 && s.mix === "0") ordinary.add(s.skill1)
     }
     for (const s of sigils) {
       for (const h of s.lot ?? []) {
-        expect(ordinary.has(h), `${s.hash} 的 lot 里有非普通词条 ${h}`).toBe(true)
+        expect(ordinary.has(h), `${s.hash} 的 lot 里有非普通技能 ${h}`).toBe(true)
       }
     }
   })
 
-  it("唯一持有的组没有合法副因子", () => {
+  it("唯一持有的组没有合法副技能", () => {
     const onlyone = sigils.find((s) => s.onlyone === "1")
     if (!onlyone) throw new Error("表里没有唯一持有的行")
     expect(index.legalOf(onlyone.skill1).size).toBe(0)
@@ -71,7 +71,7 @@ describe("真实 gem.json 上的派生索引", () => {
     expect(index.legalOf(free.skill1).size).toBeGreaterThan(0)
   })
 
-  it("上限来自词条，缺失时回落 DEFAULT_LEVEL", () => {
+  it("上限来自技能，缺失时回落 DEFAULT_LEVEL", () => {
     for (const tr of traits) expect(index.capOfTrait(tr.hash)).toBe(tr.cap)
     expect(index.capOfTrait("这个 hash 不在表里")).toBe(DEFAULT_LEVEL)
     expect(index.capOfMain("这个键不在表里")).toBe(DEFAULT_LEVEL)
@@ -83,7 +83,7 @@ describe("真实 gem.json 上的派生索引", () => {
     expect(sigils.some((s) => s.hash === hash && (s.skill1 || s.hash) === key)).toBe(true)
   })
 
-  it("池族的副因子在池里时写池版 hash", () => {
+  it("池族的副技能在池里时写池版 hash", () => {
     const pool = sigils.find((s) => s.lot && s.lot.length > 0)
     if (!pool?.lot) return // 表里没有池族时这一条无从谈起
     expect(index.gemOf(pool.skill1 || pool.hash, pool.lot[0])).toBe(pool.hash)
@@ -107,7 +107,7 @@ describe("落盘载荷", () => {
     expect(payload.slots).toEqual([])
   })
 
-  it("主因子写 gem、没有副因子就不写第二项", () => {
+  it("主因子写 gem、没有副技能就不写第二项", () => {
     const key = index.mainKeys[0]
     const main = index.gemOf(key)
     const payload = buildLoadoutPayload(
@@ -122,7 +122,7 @@ describe("落盘载荷", () => {
     expect(payload.slots[1].items).toEqual([{ gem: main, hash: key, level: 15 }])
   })
 
-  it("副因子写 hash 并带上自己的等级，enabled 原样保留", () => {
+  it("副技能写 hash 并带上自己的等级，enabled 原样保留", () => {
     const key = index.mainKeys[0]
     const sec = index.traitHashes[0]
     const payload = buildLoadoutPayload(

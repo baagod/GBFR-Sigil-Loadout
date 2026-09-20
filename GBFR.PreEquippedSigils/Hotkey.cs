@@ -16,7 +16,7 @@ internal static class Hotkey
     private const int HotkeyId = 0x47B1;
     private const uint ModNoRepeat = 0x4000;
     private const int WmQuit = 0x0012;
-    // Keep in sync with the tool (MAINTENANCE §9, 工具窗口标题).
+    // Keep in sync with the tool (MAINTENANCE §9, 可视工具窗口标题).
     private const string ToolWindowTitle = "GBFR Pre-Equipped Sigils";
 
     [DllImport("user32.dll")]

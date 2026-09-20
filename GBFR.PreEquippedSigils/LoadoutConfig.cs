@@ -9,17 +9,17 @@ namespace GBFR.PreEquippedSigils;
 /// No config file keeps the built-in exclusive template; invalid files are
 /// reported and the last valid configuration stays active.
 ///
-/// **本类只做一件事：把工具写下的载荷映射成 ABI 结构。它不读任何数据文件、不持有任何表。**
-/// "物品 → 主词条 / 上限"的语义只属于唯一写者（工具，它读 assets\gem.json），所以载荷自带
-/// items[0].hash（主词条）。选得对不对、有没有超上限，在这一层都不再判：工具是唯一写者，
+/// **本类只做一件事：把可视工具写下的载荷映射成 ABI 结构。它不读任何数据文件、不持有任何表。**
+/// "物品 → 主技能 / 上限"的语义只属于唯一写者（可视工具，它读 assets\gem.json），所以载荷自带
+/// items[0].hash（主技能）。选得对不对、有没有超上限，在这一层都不再判：可视工具是唯一写者，
 /// 手写歪了的载荷它不认。
 ///
 /// Data model (mod reads only the fields it maps):
 ///   loadout.json : { lang, slots: [ { items: [ {gem, hash, level},
 ///                    {hash, level}? ], enabled } ],
-///                    exclusive: { 角色hash: { 词条hash: bool } } }
-///                  items[0] = sigil（gem = 物品 hash，hash = 它给的主词条）；
-///                  items[1] = 副词条（可选，没有就不写这一项）。
+///                    exclusive: { 角色hash: { 技能hash: bool } } }
+///                  items[0] = sigil（gem = 物品 hash，hash = 它给的主技能）；
+///                  items[1] = 副技能（可选，没有就不写这一项）。
 ///                  exclusive 只写 false 的那些：没提到的角色就是三槽全开。
 /// Shape validation only: malformed JSON, a missing trait hash, a bad level,
 /// or too many enabled slots.
@@ -126,13 +126,13 @@ internal static class LoadoutConfig
     /// <summary>
     /// Parses the optional "exclusive" object into native overrides.
     ///
-    /// 形状：{ 角色hash: { 词条hash: bool } }。只把 **false**（= 关掉）变成一条
+    /// 形状：{ 角色hash: { 技能hash: bool } }。只把 **false**（= 关掉）变成一条
     /// override，因为"没说"和"说开着"是同一件事：原生侧对没被提到的角色一律三槽全开。
-    /// 槽位由词条 hash 决定，而那张专属表在原生侧，所以这里只做转发——不需要 gem.chara.json，
+    /// 槽位由技能 hash 决定，而那张专属表在原生侧，所以这里只做转发——不需要 gem.chara.json，
     /// 也不需要知道哪个 hash 是 T1。
     ///
     /// 只认这一种形状：外层键必须是角色 hash（十六进制），解析不出就记一行日志并忽略；
-    /// 内层键必须是这个词条 hash，认不出的由原生侧忽略。没有兼容形状。
+    /// 内层键必须是这个技能 hash，认不出的由原生侧忽略。没有兼容形状。
     /// </summary>
     private static NativeCore.ExclusiveOverrideNative[]? ParseExclusiveOverrides(
         JsonElement root, Action<string> log)
@@ -150,7 +150,7 @@ internal static class LoadoutConfig
             uint characterHash = PU(property.Name);
             if (characterHash == 0)
             {
-                // PL 码是工具显示用的标签，不是这里的身份（也不兼容）：说出来，
+                // PL 码是可视工具显示用的标签，不是这里的身份（也不兼容）：说出来，
                 // 否则"开关点了没用"在日志里没有任何线索。
                 log($"exclusive: '{property.Name}' is not a character hash; ignored.");
                 continue;
@@ -178,7 +178,7 @@ internal static class LoadoutConfig
 
     private static List<NativeCore.TemplateSlotNative> ParseAndValidate(JsonElement root)
     {
-        // 只认这一种形状：{ lang, slots: [...] }（lang 只有工具在意）。工具侧写的就是它，
+        // 只认这一种形状：{ lang, slots: [...] }（lang 只有可视工具在意）。可视工具侧写的就是它，
         // Go 的 SaveLoadout 也会把别的拼写当场拒掉——所以这里没有第二种读法。
         if (root.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("expected an object with a 'slots' array");
@@ -207,7 +207,7 @@ internal static class LoadoutConfig
             uint mainGemHash = PU(mainGem);
             if (mainGemHash == 0)
                 throw new InvalidDataException($"slot {index}: bad sigil hash '{mainGem}'");
-            // 主词条由工具写进来（唯一读 gem.json 的一方），这一层不查表、也不猜。
+            // 主技能由可视工具写进来（唯一读 gem.json 的一方），这一层不查表、也不猜。
             if (!main.TryGetProperty("hash", out JsonElement mainTrait))
                 throw new InvalidDataException($"slot {index}: main item carries no trait hash");
             uint mainSkill = PU(Hx(mainTrait));
@@ -239,7 +239,7 @@ internal static class LoadoutConfig
         return result;
     }
 
-    // 等级只要求非负：上界是每条词条自己的 cap，而唯一持有那张表的是工具（它写之前已经夹在
+    // 等级只要求非负：上界是每条技能自己的 cap，而唯一持有那张表的是可视工具（它写之前已经夹在
     // cap 内）。在这一层再判一次上界就是同一规则的第三份副本，判的还不是真正的不变量。
     private static int GetLevel(JsonElement item, string propertyName, int index)
     {

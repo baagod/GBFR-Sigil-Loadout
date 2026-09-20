@@ -15,13 +15,13 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// LevelValueCount 是 skill_status 一行所带的 LevelValue 槽位数量，
+// LevelValueCount 是 skill_status 一行所带的 LevelValue 参槽数量，
 // 也就是描述一次编辑需要多少个数字。
 const LevelValueCount = 10
 
 // SigilTrait 对应 mod 的 Config.cs 里的 SigilTrait：对 skill_status 一行的覆写。
-// Values 按位置对应 LevelValue1..10，也就是技能自身描述里当作 {0}、{1}、{2}…… 用的那些槽位。
-// 每个槽位要么是数字，要么是 nil；nil 表示那一处保留游戏原本的值（由 traits.ts 决定它是什么）。
+// Values 按位置对应 LevelValue1..10，也就是技能自身描述里当作 {0}、{1}、{2}…… 用的那些参槽。
+// 每个参槽要么是数字，要么是 nil；nil 表示那一处保留游戏原本的值（由 traits.ts 决定它是什么）。
 type SigilTrait struct {
 	Enabled bool       `json:"enabled"`
 	Key     string     `json:"key"`
@@ -57,7 +57,7 @@ type EditService struct {
 	timer   *time.Timer
 }
 
-// LangZH 是工具被问到一个它没有对应表的语言时回退使用的语言。
+// LangZH 是可视工具被问到一个它没有对应表的语言时回退使用的语言。
 const LangZH = "zh"
 
 // pick 从一张按语言分好的表里取出某种语言，不认得的语言回落到 LangZH。
@@ -110,8 +110,8 @@ func (b ExplainBand) MarshalJSON() ([]byte, error) {
 }
 
 // SkillText 是一种语言对一个因子的说法：它叫什么、做什么，以及游戏自己对它按等级分段
-// 给出的说明。说明里的 {N} 代表 LevelValue(N+1)，也就是这个工具所编辑的那些数字，
-// 这正是槽位的含义得以被知晓的原因。
+// 给出的说明。说明里的 {N} 代表 LevelValue(N+1)，也就是这个可视工具所编辑的那些数字，
+// 这正是参槽的含义得以被知晓的原因。
 type SkillText struct {
 	Name    string        `json:"name"`
 	Summary string        `json:"summary"`
@@ -134,7 +134,7 @@ func (s *EditService) SkillMap(lang string) map[string]SkillText {
 }
 
 // TraitRow 是一个带数字的因子的某一行 skill_status：等级，以及那一行的十个
-// LevelValue 槽位。资产把它写成 [等级, [数值]] 这样的一对。
+// LevelValue 参槽。资产把它写成 [等级, [数值]] 这样的一对。
 type TraitRow struct {
 	Level  int
 	Values []float64
@@ -191,7 +191,7 @@ func pairOf(data []byte, what string) ([]jsontext.Value, error) {
 }
 
 // padValues 把 Values 切片补齐到正好 LevelValueCount 长，这样无论手工编辑过的文件里
-// 有什么，JSON 形状都保持稳定。缺失的槽位留作 nil —— nil 就是 “游戏自己的值”，
+// 有什么，JSON 形状都保持稳定。缺失的参槽留作 nil —— nil 就是 “游戏自己的值”，
 // 用 nil 补齐等于什么都没说，而不是说错什么。
 func padValues(values []*float64) []*float64 {
 	out := make([]*float64, LevelValueCount)
@@ -212,7 +212,7 @@ func configPath() string {
 // （%APPDATA%\GBFR.SigilEdit\Config.json）不读、不搬、不兼容。
 //
 // 文件不存在就是空列表：没有内置的起始编辑，这一页上的每一条都必须是用户自己点出来的。
-// 起始编辑会让"打开工具"本身就是一次对游戏的改动——面板在应用启动时就挂载（见 App.tsx 的
+// 起始编辑会让"打开可视工具"本身就是一次对游戏的改动——面板在应用启动时就挂载（见 App.tsx 的
 // keepMounted），所以它甚至不需要用户切到这一页。
 //
 // “没东西可读”只指首次运行、文件根本不存在的情形。存在但读不出或解析不了的
@@ -314,7 +314,7 @@ func (s *EditService) flushNow() {
 	s.publishLocked()
 }
 
-// publishLocked 是列表离开这个工具的唯一出口；调用方持有 s.mu。
+// publishLocked 是列表离开这个可视工具的唯一出口；调用方持有 s.mu。
 //
 // 取走列表和写盘必须在同一个临界区里：分开的话，定时器的 flush 与退出时的 flushNow
 // 可以各取到一份并发地写，而决定磁盘内容的是最后完成的那个 rename，不是最后提交的

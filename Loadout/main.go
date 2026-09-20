@@ -42,7 +42,7 @@ var embeddedSkillJA []byte
 var embeddedSkillKO []byte
 
 // gem.lang.json 是配装页显示用的名字：{语言: {因子 hash: 名字}}，由 docs\tool-gen-sigils.ps1
-// 生成。内嵌而不是与 gem.json 并排放：那份数据 mod 也要读，这份只有工具显示用。
+// 生成。内嵌而不是与 gem.json 并排放：那份数据 mod 也要读，这份只有可视工具显示用。
 //
 //go:embed assets/gem.lang.json
 var embeddedGemLang []byte

@@ -45,7 +45,7 @@ struct CharacterExclusiveLoadout
    uint32_t war_trait = 0; // war trait hash
 };
 
-// 这张表（角色 → 三个专属槽的 gem 与词条）由 docs/tool-gen-loadout.ps1 从 $chars 生成：vcxproj
+// 这张表（角色 → 三个专属槽的 gem 与技能）由 docs/tool-gen-loadout.ps1 从 $chars 生成：vcxproj
 // 每次编译前重跑那个脚本，所以 .inc 是构建中间产物、不入库——改数据去改脚本，源码里没有表段。
 #include "exclusive_table.inc"
 
@@ -114,7 +114,7 @@ void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept
       character.slots[2] = MakeSingleTraitSlot(exclusive.war_gem, exclusive.war_trait);
 }
 
-// 这个词条 hash 是这个角色的哪一个专属槽（0 = 不是它的三个槽之一）。
+// 这个技能 hash 是这个角色的哪一个专属槽（0 = 不是它的三个槽之一）。
 uint8_t ExclusiveBitForTrait(
    const CharacterExclusiveLoadout& exclusive, uint32_t trait_hash) noexcept
 {
@@ -132,7 +132,7 @@ uint8_t ExclusiveBitForTrait(
 // 只有"被关掉的槽"会留下条目，所以没被提到的角色就是三槽全开
 // （ReadExclusiveStateLocked 对缺失条目返回 ExclusiveAll）。槽位由 trait hash 认——
 // 那张专属表就在本文件里，所以托管侧不必知道哪个 hash 是 T1、哪个是战气，也不必再读
-// gem.chara.json。认不出的 (角色, 词条) 对直接忽略：没有别的兼容形状。
+// gem.chara.json。认不出的 (角色, 技能) 对直接忽略：没有别的兼容形状。
 //
 // Requires g_template_mutex held by the caller.
 void ApplyExclusiveSwitchesLocked(

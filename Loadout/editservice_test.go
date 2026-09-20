@@ -59,8 +59,8 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	if len(cfg.Edits) != 1 || cfg.Edits[0].Key != "06719232" || *cfg.Edits[0].Values[0] != 30 {
 		t.Fatalf("gemedits.json round-trip lost data: %+v", cfg.Edits)
 	}
-	// 没人输入过的槽位在文件里是 null 这个词，而正是它告诉 mod 那一部分保持原样。
-	// 这条记录设置了十个槽位里的三个。
+	// 没人输入过的参槽在文件里是 null 这个词，而正是它告诉 mod 那一部分保持原样。
+	// 这条记录设置了十个参槽里的三个。
 	if len(cfg.Edits[0].Values) < LevelValueCount {
 		t.Fatalf("gemedits.json came back with %d slots, want %d", len(cfg.Edits[0].Values), LevelValueCount)
 	}
@@ -125,7 +125,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 }
 
 /*
-做不成的写入会被记进日志并推给前端，而这两件事都不能把工具一起带走：失败发生在防抖
+做不成的写入会被记进日志并推给前端，而这两件事都不能把可视工具一起带走：失败发生在防抖
 定时器的 goroutine 上，那里没有调用方可以接住 panic。测试里没有窗口，
 所以这里也覆盖了 “没有 app 可通知” 那条分支。
 */
@@ -171,7 +171,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	}
 }
 
-// 工具编辑的那份列表就是 mod 读取的那份，所以它必须从同一个文件里读回来：
+// 可视工具编辑的那份列表就是 mod 读取的那份，所以它必须从同一个文件里读回来：
 // 读别处的实现会给用户看一份并非正在部署的列表。
 func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 	hermeticHome(t)
@@ -195,7 +195,7 @@ func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 没有文件时是一份空列表，而不是一份内置的起始编辑。
 
 这不是"还没想好显示什么"，是一条关于谁在动游戏的界线：面板在应用启动时就挂载（App.tsx 的
-keepMounted），所以一份起始编辑会让"打开工具"本身变成一次对游戏的改动——用户什么都没点。
+keepMounted），所以一份起始编辑会让"打开可视工具"本身变成一次对游戏的改动——用户什么都没点。
 一条编辑要被应用，得先是用户自己点出来的。
 */
 func TestLoadEditsStartsWithNothing(t *testing.T) {
@@ -300,9 +300,9 @@ func TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling(t *testing.T) {
 }
 
 /*
-padValues 是“正好十个槽位”这条不变量的守门人，无论文件里装的是什么：短列表用 nil 补齐，
-长列表被截断，因为它喂的那张表只有十个 LevelValue 槽位，而 mod 按顺序读取它们。nil 就是
-没人输入过的那个槽位——游戏自己的值——所以用它补齐等于什么都没写，而不是写一个零。
+padValues 是“正好十个参槽”这条不变量的守门人，无论文件里装的是什么：短列表用 nil 补齐，
+长列表被截断，因为它喂的那张表只有十个 LevelValue 参槽，而 mod 按顺序读取它们。nil 就是
+没人输入过的那个参槽——游戏自己的值——所以用它补齐等于什么都没写，而不是写一个零。
 */
 func TestPadValuesAlwaysGivesTenSlots(t *testing.T) {
 	short := padValues([]*float64{new(1.0), new(2.0), new(3.0)})
@@ -361,8 +361,8 @@ func TestSkillTablesAgree(t *testing.T) {
 		}
 	}
 	for hash, info := range traitInfo {
-		// 一次编辑可能点到的每个等级都有自己的一行，且带齐十个槽位：
-		// 否则一个槽位的占位符（以及清空输入框后写回的值）就会来自另一个等级。
+		// 一次编辑可能点到的每个等级都有自己的一行，且带齐十个参槽：
+		// 否则一个参槽的占位符（以及清空输入框后写回的值）就会来自另一个等级。
 		if len(info.Rows) == 0 {
 			t.Fatalf("skill %s has no level rows", hash)
 		}
@@ -424,7 +424,7 @@ func TestSkillTablesAreTranslated(t *testing.T) {
 	}
 }
 
-// 未知语言会回退，而不是交回一个空列表。探针必须是工具真的没有表的语言：
+// 未知语言会回退，而不是交回一个空列表。探针必须是可视工具真的没有表的语言：
 // 游戏文本里有 de，而界面语言只有 zh/en/ja/ko。
 func TestSkillMapFallsBack(t *testing.T) {
 	service := &EditService{}

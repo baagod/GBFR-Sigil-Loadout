@@ -50,7 +50,7 @@ export default function App() {
   const [charaNames, setCharaNames] = useState<Record<string, string>>({})
   const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
   const [lang, setLang] = useState<Lang>(initialLang) // persisted in loadout.json
-  // 整个工具一份文案（messages.ts）；换成别的语言只是换一个索引。
+  // 整个可视工具一份文案（messages.ts）；换成别的语言只是换一个索引。
   const t = messages[lang]
 
   // 因子表的一切派生关系构造一次（可脱离 React 测试）。

@@ -1,6 +1,6 @@
 # gem.xlsx 生成文档
 
-## 1. 工具提取全表
+## 1. 外部工具提取全表
 
 游戏数据与生成器是**仓库级共享资源**，住在 `D:\Games\Relink\gen\` 下——生成器是那里的 Go 工程，本仓库不再各存一份。下面的命令都在 `D:\Games\Relink` 下执行。
 
@@ -144,12 +144,12 @@ pwsh docs\tool-gen-sigils.ps1
 ```
 
 包装脚本调共享 gen 的 Go 生成器（`go run . sigils`），一条命令同时生成
-**`docs\gem.xlsx`**（入库）、**`Loadout\assets\gem.json`**（工具必须）与
-**`Loadout\assets\gem.lang.json`**（工具显示用的名字：`{语言: {因子 hash: 名字}}`，
-`-texts-langs zh,en,ja,ko`，工具编译期内嵌）。
+**`docs\gem.xlsx`**（入库）、**`Loadout\assets\gem.json`**（可视工具必须）与
+**`Loadout\assets\gem.lang.json`**（可视工具显示用的名字：`{语言: {因子 hash: 名字}}`，
+`-texts-langs zh,en,ja,ko`，可视工具编译期内嵌）。
 
 第三份是刻意的"名字不进数据表"：`gem.json` 的每一行只有数据、不带任何语言的名字，
-其余语言各来一份名字串在每行上，会让工具也在读的那份文件白白变胖。哈希与
+其余语言各来一份名字串在每行上，会让可视工具也在读的那份文件白白变胖。哈希与
 `gem.json` 的行一一对应，两份由同一次生成写出——`Loadout` 的
 `TestGemNamesCoverTheTableInEveryUILanguage` 按 hash 对拍，漂了会红。
 

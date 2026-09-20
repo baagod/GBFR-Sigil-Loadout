@@ -62,7 +62,7 @@ func TestValidateSlots(t *testing.T) {
 		{"13 rows one disabled", oneDisabled, true},
 		{"empty items", []loadoutSlot{{}}, false},
 		{"missing gem", []loadoutSlot{slot("", "", 15, 0)}, false},
-		// 上限不属于这一层：cap 是每条词条自己的值，只有前端（读 gem.json）与 mod
+		// 上限不属于这一层：cap 是每条技能自己的值，只有前端（读 gem.json）与 mod
 		// （LoadoutConfig）知道它。这里写死一个数就会变成同一规则的第三份副本，
 		// 所以超过 cap 的等级在这一层是合法的，由 mod 侧判定。
 		{"level above cap", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", 201, 15)}, true},
@@ -206,7 +206,7 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 
 /*
 只认当前形状：早期版本的裸数组（[ { items, enabled } ]）不再被翻译成"空配置"写下去，
-而是当场报错。翻译过的写法会把一份读不出来的旧文件静默变成"没有任何槽位"落盘，
+而是当场报错。翻译过的写法会把一份读不出来的旧文件静默变成"没有任何参槽"落盘，
 用户看到的是自己的配置被清空。
 */
 func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {

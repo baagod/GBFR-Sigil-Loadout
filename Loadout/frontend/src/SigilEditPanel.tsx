@@ -49,7 +49,7 @@ const SERVICE = "main.EditService";
 */
 const SAVE_FAILED = "GBFR.SigilEdit.SaveFailed";
 
-/** 工具准备写入的列表是否就是它读到的那个：同样的编辑，同样的数值。 */
+/** 可视工具准备写入的列表是否就是它读到的那个：同样的编辑，同样的数值。 */
 const sameRecords = (a: SigilTrait[], b: SigilTrait[]) =>
   a.length === b.length &&
   a.every((record, i) =>
@@ -156,12 +156,12 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
     // 用自己的 hash 当名字，而不是被过滤掉——在这里丢掉它，下一次写入就会把它从gemedits.json 中删除，
     // 而一个谁都看不见的编辑，比一个名字只是 hash 的更糟。
     // 文件里有什么就照原样拿什么：同一个地址可以同时有两条编辑，key 也可能是小写。
-    // 清理是"读取"这一步做的事，所以原始列表被留着，用来判断文件是否已经说出了工具即将显示的内容。
+    // 清理是"读取"这一步做的事，所以原始列表被留着，用来判断文件是否已经说出了可视工具即将显示的内容。
     const raw = (list ?? [])
       .filter((e) => String(e.key ?? "").trim() !== "")
       .map((e) => ({
         ...e,
-        // 工具所提供的每张表都以大写 hash 为键，而手写进 gemedits.json 的 key 可能是小写。
+        // 可视工具所提供的每张表都以大写 hash 为键，而手写进 gemedits.json 的 key 可能是小写。
         // 在这里归一化，下面的每一次查找才能直接用 key 本身，
         // 而不是靠过去那半打各自把它转成大写的调用点。
         //
@@ -170,7 +170,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
         key: String(e.key ?? "").toUpperCase(),
         // 十个槽，数字或 null：短了一截或者一个值都没有的文件用 null 补齐 ——
         // null 就是游戏自己的数值，什么都不写入。同理，values 不是数组时要当作空，
-        // 否则 pad 会把字符串按字符铺进槽位，看起来就像"用户在这些槽里填过值"。
+        // 否则 pad 会把字符串按字符铺进参槽，看起来就像"用户在这些槽里填过值"。
         values: pad(
           Array.isArray(e.values)
             ? e.values.map((v) => (typeof v === "number" && Number.isFinite(v) ? v : null))
@@ -474,8 +474,8 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
               ref={searchBox}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t.searchTrait}
-              aria-label={t.searchTrait}
+              placeholder={t.searchSigil}
+              aria-label={t.searchSigil}
             />
             {/*
               一个清除按钮，只在有东西可清时出现，而且光标要回到框里：
@@ -499,7 +499,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
         </div>
 
         {/*
-          语言开关不在这里：整个工具只有外壳右上角那一组（中 / EN / JA / KO 四个按钮，
+          语言开关不在这里：整个可视工具只有外壳右上角那一组（中 / EN / JA / KO 四个按钮，
           当前那个高亮）。
           这一页原来带着自己的三个按钮，合并成"因子编辑" Tab 之后，同一个窗口里放
           两套互不同步的语言状态只会让人困惑，所以那一组连同它自己的 localStorage

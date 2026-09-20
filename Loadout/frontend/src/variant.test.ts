@@ -1,8 +1,8 @@
 /*
-  主因子下拉的值是**组键**（同一词条的变体共享），而 loadout.json 里记的是**物品**
+  主因子下拉的值是**组键**（同一技能的变体共享），而 loadout.json 里记的是**物品**
   hash。载入时把前者翻成后者，若不留住后者，一个组里"名字不同的两个变体"就分不出来了：
   钳蟹的共鸣（1C4D37E4，无固定副）与永恒钳蟹因子（426AD20E，固定副 D3B8C21F）共享
-  词条 082033CB，是当前表里唯一这样的一族。这里钉住 载入 → 保存 的往返。
+  技能 082033CB，是当前表里唯一这样的一族。这里钉住 载入 → 保存 的往返。
 */
 import { describe, expect, it } from "vitest";
 import { configToSlots, resolveMainGem, type Sigil } from "./model";
@@ -33,8 +33,8 @@ describe("载入 → 保存的变体往返", () => {
     expect(resolveMainGem(crabNets, undefined, "", "")).toBe("1C4D37E4");
   });
 
-  it("保留的变体与副因子冲突时，交回给固定副规则", () => {
-    // 存档说 1C4D37E4（无固定副），但副因子换成了 426AD20E 的固定副。
+  it("保留的变体与副技能冲突时，交回给固定副规则", () => {
+    // 存档说 1C4D37E4（无固定副），但副技能换成了 426AD20E 的固定副。
     expect(resolveMainGem(crabNets, undefined, "D3B8C21F", "1C4D37E4")).toBe("426AD20E");
   });
 });
@@ -43,15 +43,15 @@ describe("resolveMainGem 的池/固定副优先级", () => {
   const pool = [sigil("AAA", "S1", { lot: ["X", "Y"] }), sigil("BBB", "S1", {})];
   const poolByMain = { poolHash: "AAA", lot: new Set(["X", "Y"]) };
 
-  it("副因子在池里就用池版", () => {
+  it("副技能在池里就用池版", () => {
     expect(resolveMainGem(pool, poolByMain, "Y", "")).toBe("AAA");
   });
 
-  it("没有副因子时也用池版", () => {
+  it("没有副技能时也用池版", () => {
     expect(resolveMainGem(pool, poolByMain, "", "")).toBe("AAA");
   });
 
-  it("副因子是某变体的固定副时用那一版", () => {
+  it("副技能是某变体的固定副时用那一版", () => {
     const fixed = [sigil("AAA", "S1", { lot: ["X"] }), sigil("BBB", "S1", { skill2: "Z" })];
     expect(resolveMainGem(fixed, { poolHash: "AAA", lot: new Set(["X"]) }, "Z", "")).toBe("BBB");
   });

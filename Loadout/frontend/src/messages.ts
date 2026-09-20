@@ -1,5 +1,5 @@
 /*
-  整个工具唯一的文案表。
+  整个可视工具唯一的文案表。
 
   以前它按**页面**分成两份：配装那两页在 copy.ts、因子编辑页在 i18n.ts。于是同一个窗口里
   有两套机制、两个 `t`，以及同一句话的两种措辞（两个文件各写一遍"没有匹配的因子"）。分法现在
@@ -10,7 +10,7 @@
 
   "因子"在游戏自己的文本里是有译名的：英文 sigil、日文 ジーン、韩文 진
   （见 TXT_SKILL_SUMMARY_113_00），所以那三种语言用游戏的说法，不是音译。其余标签与动词是
-  工具自己的话，没有游戏原文可抄。因子的名字不在这里：它们来自游戏文本表，按当前语言从 Go
+  可视工具自己的话，没有游戏原文可抄。因子的名字不在这里：它们来自游戏文本表，按当前语言从 Go
   侧取（gem.lang.json / chara.lang.json / skill.<lang>.json）。
 */
 import type { Lang } from "./lang";
@@ -22,13 +22,13 @@ const zh = {
   tabSigilEdit: "因子编辑",
   langSwitch: "切换语言",
   /** 两个因子下拉的搜索框：写 Hex 也能搜，所以提示里说清这件事。 */
-  searchTrait: "搜索因子 | Hex",
+  searchSigil: "搜索因子 | Hex",
   /** 两个因子下拉的"筛不出来"。 */
   noMatch: "无匹配因子",
 
   // 配装页
   headerPrimary: "主因子",
-  headerSecondary: "副因子",
+  headerSecondary: "副技能",
   selectAll: "全选/全不选",
   pickTrait: "选择因子",
   none: "无",
@@ -58,7 +58,7 @@ export const messages: Record<Lang, Messages> = {
     tabExclusive: "Exclusives",
     tabSigilEdit: "Sigil edit",
     langSwitch: "Switch language",
-    searchTrait: "Search sigil | Hex",
+    searchSigil: "Search sigil | Hex",
     noMatch: "No matching sigils",
 
     headerPrimary: "Primary Sigil",
@@ -85,7 +85,7 @@ export const messages: Record<Lang, Messages> = {
     tabExclusive: "専用ジーン",
     tabSigilEdit: "ジーン編集",
     langSwitch: "言語を切り替え",
-    searchTrait: "ジーン | Hex で検索",
+    searchSigil: "ジーン | Hex で検索",
     noMatch: "一致するジーンがありません",
 
     headerPrimary: "メインジーン",
@@ -112,7 +112,7 @@ export const messages: Record<Lang, Messages> = {
     tabExclusive: "전용 진",
     tabSigilEdit: "진 편집",
     langSwitch: "언어 전환",
-    searchTrait: "진 | Hex 검색",
+    searchSigil: "진 | Hex 검색",
     noMatch: "일치하는 진이 없습니다",
 
     headerPrimary: "메인 진",

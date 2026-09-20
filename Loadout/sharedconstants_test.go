@@ -57,14 +57,14 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			},
 		},
 		{
-			name: "工具隐藏键的回落值",
+			name: "可视工具隐藏键的回落值",
 			decls: []decl{
 				{"Go", "loadoutservice.go", regexp.MustCompile(`defaultHotkeyVK = (0x[0-9A-Fa-f]+)`)},
 				{"TS", "frontend/src/model.ts", regexp.MustCompile(`DEFAULT_HIDE_KEY = (0x[0-9A-Fa-f]+)`)},
 			},
 		},
 		{
-			name: "工具窗口标题（mod 靠它找窗口）",
+			name: "可视工具窗口标题（mod 靠它找窗口）",
 			decls: []decl{
 				{"C#", "../GBFR.PreEquippedSigils/Hotkey.cs", regexp.MustCompile(`ToolWindowTitle = "([^"]+)"`)},
 				{"Go", "main.go", regexp.MustCompile(`const toolWindowTitle = "([^"]+)"`)},
@@ -78,7 +78,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			},
 		},
 		{
-			name: "热键播报文件名（mod 写、工具读）",
+			name: "热键播报文件名（mod 写、可视工具读）",
 			decls: []decl{
 				{"C#", "../GBFR.PreEquippedSigils/Hotkey.cs", regexp.MustCompile(`Path\.Combine\(_modDirectory, "(tool-hotkey\.txt)"\)`)},
 				{"Go", "loadoutservice.go", regexp.MustCompile(`readModFile\("(tool-hotkey\.txt)"\)`)},
