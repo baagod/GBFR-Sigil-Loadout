@@ -199,6 +199,6 @@ TemplateGemSlot{
 | 原生 ABI 版本 | 19 | native_api.h / C# NativeCore.cs AbiVersion |
 | 原生结构尺寸 | TemplateSlot 0x18 / ExclusiveOverride 0x0C | native_api.h static_assert / C# EnsureAbiLayout（Marshal.SizeOf，加载后即对拍） |
 | 原生导出口 | 8 个：GetAbiVersion / SetLogCallback / Initialize / Tick / Shutdown / CopyRuntimeMessage / ApplyLoadout / WriteSkillStatusTable | native_api.h |
-| 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条技能自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 最终 0..cap | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
+| 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条技能自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 只**拒负数**（负数直接抛 `InvalidDataException`），**不判上界**——上界归可视工具（唯一写者） | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
 | `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的技能 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |
 | 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 gem.json 测） | TS model.ts |
