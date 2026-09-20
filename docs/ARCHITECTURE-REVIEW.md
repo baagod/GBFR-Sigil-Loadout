@@ -352,7 +352,7 @@ issue tracker）本项目没有，所以**不直接调用、也不安装**。
 3. grilling 的格式                        → 把 §六 P0–P6 呈现给你，你批
 4. 执行每条：ponytail 的 ladder + principle-boundary-discipline 的边界纪律
 5. 每条之后：thermo-nuclear 验收；P3 之后 ponytail-audit 交叉验证
-6. domain-modeling                        → 推迟到新架构落地（你的判断）
+6. domain-modeling                        → 前置不存在（它要 CONTEXT.md + docs/adr/，本仓没有），故不做
 ```
 
 ### `principle-boundary-discipline` 对实施计划的影响：**不需要重新计划**
