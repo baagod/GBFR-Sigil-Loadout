@@ -138,7 +138,7 @@ TemplateGemSlot{
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
 - `trait_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
-- **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏原版专属物品 199 条，其余 115 条配装路径不可达，不校验。
+- **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=19`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"。
 - **因子热应用走的是"一个地址"，没有第二条路**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**没有兜底**：拒写就是这一局内存里那份不变，但表此前已经重新注册，所以编辑在游戏下一次解析、或重启后照样生效，而原生那句 refusal 会说明是哪一闸拦的。曾经有一条全内存扫描兜底，**已删**——机制上线后它一次都没跑过（日志里从没出现 `located … copy/copies`），而它证明不了唯一重要的那件事："这块缓冲区就是游戏在用的那块"静态证不出来。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 词条 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
@@ -190,7 +190,7 @@ TemplateGemSlot{
 | 工具热键发布文件 | tool-hotkey.txt（exe 同目录，**不入 `assets\`**：它是 mod 运行时写的握手文件，不是随包数据） | C# Hotkey.cs / Go loadoutservice.go |
 | 随包数据位置 | `assets\gem.json`、`assets\gem.chara.json`（mod 目录下），**只有工具读**（`exeDir()\assets\`）：native 的限制表已编译进 DLL，C# 只映射载荷。源码树里同样是 `Loadout\assets\`，所以两种布局只有一种 | Go loadoutservice.go |
 | 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`gemedits.json`（因子编辑列表）。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
-| 因子编辑列表缺失 | 工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把原版表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
+| 因子编辑列表缺失 | 工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把未编辑的技能表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
 | 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
 | 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；文案只有**一份** `messages.ts`（`Record<Lang, Messages>`，漏一种语言 tsc 就报错），语言身份（有哪些语言 / 切换键标签 / 系统语言猜测）在 `lang.ts`。名字也四种齐全：配装页按当前语言取内嵌的 `gem.lang.json`（经 Go 的 `GemNames(lang)`），专属因子页的角色名取 `chara.lang.json`（`CharaNames(lang)`），因子编辑页取 `skill.<lang>.json` | TS App.tsx / messages.ts / lang.ts / Go loadoutservice.go / docs\tool-gen-sigils.ps1 / docs\tool-gen-texts.ps1 |
 | 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |

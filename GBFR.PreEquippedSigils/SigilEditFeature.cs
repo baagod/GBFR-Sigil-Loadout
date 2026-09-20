@@ -252,7 +252,7 @@ internal sealed class SigilEditFeature
         Config? config = LoadConfig(out bool missing);
         if (config is null && !missing)
             return null; // 读不出来 → 什么都不写，别把一份不完整的表盖进游戏
-        config ??= new Config(); // 列表被删掉 → 空列表 → 把原版表写回去（与 loadout.json 同一种反应）
+        config ??= new Config(); // 列表被删掉 → 空列表 → 把未编辑的技能表写回去（与 loadout.json 同一种反应）
 
         return BuildEditedTable(config, out _);
     }
@@ -351,7 +351,7 @@ internal sealed class SigilEditFeature
     /// 磁盘上此刻的编辑列表。
     ///
     /// <paramref name="missing"/> 只在"文件不存在"时为 true，别的失败（没权限、被占用、
-    /// 手改坏了 JSON）都不是它：删掉文件是一个真实的答案（空列表，产出原版表），读不出来是
+    /// 手改坏了 JSON）都不是它：删掉文件是一个真实的答案（空列表，产出未编辑的技能表），读不出来是
     /// 另一个（什么都不写）。两者折成同一个 null，删除就会变成"什么都不做"——而隔壁同目录的
     /// loadout.json 遇到删除是会恢复内置模板的。
     /// </summary>
