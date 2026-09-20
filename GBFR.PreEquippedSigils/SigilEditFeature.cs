@@ -109,12 +109,11 @@ internal sealed class SigilEditFeature
 
             // 先接热应用、再看启动写有没有产出，而且不管有没有产出都接：一个从没建起来的
             // 热应用，就是"编辑存进了文件、却永远到不了游戏"，而且哪儿都不会说。启动时拿不到
-            // 表——归档还读不出来，或者这是本构建不认识的布局——第一次应用会重新读表，
-            // 并把游戏自己的字节当作内存里已有的那份。
+            // 表——归档还读不出来，或者这是本构建不认识的布局——第一次应用会重新读表。
             //
-            // 每次应用前由 BuildTablePair 重新读编辑列表，所以它交上去的就是此刻的文件，
+            // 每次应用前由 BuildCurrentTable 重新读编辑列表，所以它交上去的就是此刻的文件，
             // 也就是工具刚写下的那份。构造器本身只记下这几个委托，不读文件。
-            _hotApply = new HotApply(_log, file, BuildTablePair, RegisterWithManager);
+            _hotApply = new HotApply(_log, file, BuildCurrentTable, RegisterWithManager);
 
             if (file is null)
                 return;
@@ -243,25 +242,19 @@ internal sealed class SigilEditFeature
     }
 
     /// <summary>
-    /// 热应用一次调用要的两样东西：游戏手里那份字节，和配置要求的字节。启动写没发生时
-    /// 这两者就不同。
+    /// 热应用要的那张表：按此刻磁盘上的编辑列表改出来的字节；改不出来就 null（并已说明原因）。
     ///
     /// 编辑列表在这里重新读，所以造出来的是此刻的文件——tick 已经确认过它的文件时间变了。
+    /// 启动那条路走 <see cref="BuildEditedTable"/>，同一套偏移量与同一套日志，只是配置已经拿在手里。
     /// </summary>
-    private (byte[]? Raw, byte[]? Edited) BuildTablePair()
+    private byte[]? BuildCurrentTable()
     {
         Config? config = LoadConfig(out bool missing);
         if (config is null && !missing)
-            return (null, null); // 读不出来 → 什么都不写，别把一份不完整的表盖进游戏
+            return null; // 读不出来 → 什么都不写，别把一份不完整的表盖进游戏
         config ??= new Config(); // 列表被删掉 → 空列表 → 把原版表写回去（与 loadout.json 同一种反应）
 
-        byte[]? raw = TryReadTable();
-        if (raw is null)
-            return (null, null);
-
-        byte[] edited = (byte[])raw.Clone();
-        PatchRows(edited, config);
-        return (raw, edited);
+        return BuildEditedTable(config, out _);
     }
 
     /// <summary>

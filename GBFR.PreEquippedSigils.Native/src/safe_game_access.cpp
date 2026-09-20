@@ -16,6 +16,44 @@ bool SafeReadPointer(uintptr_t address, uintptr_t& value) noexcept
    }
 }
 
+bool SafeReadUint64(uintptr_t address, uint64_t& value) noexcept
+{
+   __try
+   {
+      value = *reinterpret_cast<const uint64_t*>(address);
+      return true;
+   }
+   __except (EXCEPTION_EXECUTE_HANDLER)
+   {
+      value = 0;
+      return false;
+   }
+}
+
+bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noexcept
+{
+   // 一次 VirtualQuery 只答一个区域，而"整表"可能跨好几个（328,648 字节实测就跨了），
+   // 所以一个区域一个区域往前走。可读与可写的差别只是 required_protect。
+   uintptr_t current = address;
+   size_t remaining = size;
+   while (remaining > 0)
+   {
+      MEMORY_BASIC_INFORMATION info{};
+      if (current == 0 ||
+          VirtualQuery(reinterpret_cast<const void*>(current), &info, sizeof(info)) != sizeof(info) ||
+          info.State != MEM_COMMIT || (info.Protect & PAGE_GUARD) != 0 ||
+          (info.Protect & required_protect) == 0)
+         return false;
+      const size_t available = info.RegionSize -
+         static_cast<size_t>(current - reinterpret_cast<uintptr_t>(info.BaseAddress));
+      if (available == 0)
+         return false;
+      current += available;
+      remaining = available >= remaining ? 0 : remaining - available;
+   }
+   return true;
+}
+
 bool SafeReadUiSelectedCharacterHash(uint32_t& character_hash) noexcept
 {
    character_hash = 0;

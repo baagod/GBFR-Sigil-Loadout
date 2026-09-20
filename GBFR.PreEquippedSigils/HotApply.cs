@@ -31,11 +31,10 @@ internal sealed class HotApply
     private readonly Action<string> _log;
 
     /// <summary>
-    /// Reads the table and builds what the config asks for: the first is the bytes the game
-    /// holds, the second is what they are replaced with. Either is null, after a log line saying
-    /// why, when the table cannot be read or its layout is not the one this build patches.
+    /// Builds the table the config asks for. Null, after a log line saying why, when the table
+    /// cannot be read or its layout is not the one this build patches.
     /// </summary>
-    private readonly Func<(byte[]? Raw, byte[]? Edited)> _build;
+    private readonly Func<byte[]?> _build;
 
     /// <summary>
     /// Registers the produced table with the data manager, so every parse the
@@ -45,9 +44,10 @@ internal sealed class HotApply
     private readonly Action<byte[]> _register;
 
     /// <summary>
-    /// The bytes the game was last known to hold - the boot-time table, then whatever the last
-    /// apply wrote. Null until something is known: the boot write cannot always read the table,
-    /// and the first apply then takes the game's own bytes as what memory holds.
+    /// The table this mod last put in front of the game - the boot-time one, then whatever the
+    /// last apply wrote. Used for one thing only: a save that changes nothing must not make us
+    /// re-register the served file and rebuild the manager's index. Null until the boot write has
+    /// produced one, and "unknown" just means the next apply does the work once.
     /// </summary>
     private byte[]? _currentTable;
 
@@ -56,7 +56,7 @@ internal sealed class HotApply
     public HotApply(
         Action<string> log,
         byte[]? bootTable,
-        Func<(byte[]? Raw, byte[]? Edited)> build,
+        Func<byte[]?> build,
         Action<byte[]> register)
     {
         _log = log;
@@ -84,25 +84,17 @@ internal sealed class HotApply
             return;
         }
 
-        var (raw, newTable) = _build();
+        byte[]? newTable = _build();
         if (newTable is null)
         {
             _log("hot apply: nothing to apply - the table could not be read, or its layout is not the one this build patches (see the lines above)");
             return;
         }
 
-        /*
-          启动那次没能读出表时，内存里是什么无从知晓：
-          游戏加载了它自己那份，所以下面只能把游戏自己的字节（raw）当成 "内存里现有的那份"。
-          判据只剩 "和上次以为的一样吗"，一样就没有要写的东西。
-        */
-        // raw 在这里必然不是 null：_build 让 raw 与 newTable 同时为 null，而 newTable 为 null
-        // 在上面已经返回。
-        if (_currentTable is null || _currentTable.Length == 0)
-            _currentTable = raw!;
-        var current = _currentTable;
-
-        if (newTable.AsSpan().SequenceEqual(current))
+        // 只是捷径：这次保存和上次交上去的那份逐字节一样就什么都不做。基线未知（启动那次没能
+        // 产出表）就不比，让这一拍照常做一遍——代价是一次原生写入，换来的是这里不用再维护
+        // "游戏手里那份"这个第二份事实。
+        if (_currentTable is not null && newTable.AsSpan().SequenceEqual(_currentTable))
         {
             _log("hot apply: the edit list matches what is already in memory; nothing to do");
             return;

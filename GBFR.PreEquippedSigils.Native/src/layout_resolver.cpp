@@ -580,6 +580,20 @@ bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept
          IMAGE_SCN_MEM_EXECUTE);
 }
 
+bool TryGetCodeSection(CodeSectionView& view) noexcept
+{
+   view = {};
+   ImageView image{};
+   if (!TryBuildImageView(image) || image.code_rva == 0 || image.code_size == 0 ||
+       image.nt == nullptr)
+      return false;
+   view.rva = image.code_rva;
+   view.size = image.code_size;
+   view.image_size = image.size;
+   view.timestamp = image.nt->FileHeader.TimeDateStamp;
+   return true;
+}
+
 void ResetGameLayout() noexcept
 {
    // Initialization is process-wide and guarded by g_initialize_once. Once a

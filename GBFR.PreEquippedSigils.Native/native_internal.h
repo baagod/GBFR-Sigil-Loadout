@@ -264,6 +264,17 @@ extern thread_local NaturalContributionFrame g_tls_natural_contribution;
 int GetVirtualSlotCount() noexcept;
 int GetExpandedInternalSlotCount() noexcept;
 bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept;
+// 游戏自己的代码段（PE 视图的唯一持有者仍是 layout_resolver.cpp：先按名字找 `.text`，
+// 找不到才取最大的可执行段）。锚点扫描要的三个量就是它 + 映像大小 + PE 指纹。
+struct CodeSectionView
+{
+   uintptr_t rva = 0;
+   size_t size = 0;
+   uintptr_t image_size = 0;
+   uint32_t timestamp = 0;
+};
+
+bool TryGetCodeSection(CodeSectionView& view) noexcept;
 void Log(const std::string& message);
 // Phases are timed with GetTickCount64 at the call site and log once on
 // completion (with elapsed time); failures are still reported explicitly, so a
@@ -272,6 +283,16 @@ void CompleteStartupPhase(std::string_view phase, uint64_t started_at_ms, bool s
 void SetRuntimeMessage(std::string message);
 
 bool SafeReadPointer(uintptr_t address, uintptr_t& value) noexcept;
+bool SafeReadUint64(uintptr_t address, uint64_t& value) noexcept;
+// 游戏内存的范围闸：整段（可跨多个区域）都必须已提交、非 PAGE_GUARD、且保护位满足要求。
+// 游戏内存的读取与范围判断都归 safe_game_access.cpp（见 §6 的边界），别在别处再写一份。
+// 这两种掩码就是仅有的两种用法：读一个指针字段 / 写整张表。
+inline constexpr uint32_t kReadableProtect =
+   PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
+   PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+inline constexpr uint32_t kWritableProtect =
+   PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noexcept;
 bool SafeReadUiSelectedCharacterHash(uint32_t& character_hash) noexcept;
 void SafeReadUiModes(int32_t& ui_mode, int32_t& source_mode) noexcept;
 void UpdateEditSessionState() noexcept;

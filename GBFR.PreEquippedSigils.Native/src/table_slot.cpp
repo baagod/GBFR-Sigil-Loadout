@@ -47,69 +47,9 @@ inline constexpr uint64_t kTableRowBytes = 52;
 // 所以 Key 序列是这张表的**身份**，可以逐行比对且与编辑无关。
 inline constexpr uint64_t kRowKeyOffset = 40;
 
-// 解析成功后要记住的全部东西：槽首的 RVA。缓冲区指针字段就是槽 +8，不必另存一份。
-struct TableSlot
-{
-   bool installed = false;
-   uintptr_t slot_rva = 0;
-};
-
-TableSlot g_table_slot;
-std::mutex g_slot_mutex;
-
-bool IsReadableGameRange(uintptr_t address, size_t size) noexcept
-{
-   MEMORY_BASIC_INFORMATION info{};
-   if (address == 0 || size == 0 || size > ~uintptr_t{0} - address ||
-       VirtualQuery(reinterpret_cast<const void*>(address), &info, sizeof(info)) != sizeof(info) ||
-       info.State != MEM_COMMIT || (info.Protect & PAGE_GUARD) != 0 ||
-       (info.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
-                       PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE |
-                       PAGE_EXECUTE_WRITECOPY)) == 0)
-      return false;
-   const size_t available = info.RegionSize -
-      static_cast<size_t>(address - reinterpret_cast<uintptr_t>(info.BaseAddress));
-   return available >= size;
-}
-
-bool ReadGameUint64(uintptr_t address, uint64_t& value) noexcept
-{
-   __try
-   {
-      value = *reinterpret_cast<const uint64_t*>(address);
-      return true;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
-      value = 0;
-      return false;
-   }
-}
-
-// 整表范围必须每一页都已提交且可写才算"能写"：一次 VirtualQuery 只答一个区域，而
-// 328,648 字节可能跨好几个，所以一个区域一个区域往前走，而不是假设它是一整块。
-bool IsWritableGameRange(uintptr_t address, size_t size) noexcept
-{
-   uintptr_t current = address;
-   size_t remaining = size;
-   while (remaining > 0)
-   {
-      MEMORY_BASIC_INFORMATION info{};
-      if (current == 0 ||
-          VirtualQuery(reinterpret_cast<const void*>(current), &info, sizeof(info)) != sizeof(info) ||
-          info.State != MEM_COMMIT || (info.Protect & PAGE_GUARD) != 0 ||
-          (info.Protect & (PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE |
-                           PAGE_EXECUTE_WRITECOPY)) == 0)
-         return false;
-      const size_t available = info.RegionSize -
-         static_cast<size_t>(current - reinterpret_cast<uintptr_t>(info.BaseAddress));
-      if (available == 0)
-         return false;
-      current += available;
-      remaining = available >= remaining ? 0 : remaining - available;
-   }
-   return true;
-}
+// 解析成功后要记住的全部东西：槽首的 RVA（0 = 还没解析出来）。缓冲区指针字段就是槽 +8，
+// 不必另存一份；单写者、读者只 load，所以一个原子量就够，不需要锁和那个结构体。
+std::atomic_uintptr_t g_slot_rva{0};
 
 // 从槽里取出游戏那份活表的缓冲区地址：0 表示取到了，负数表示拒绝码。
 //
@@ -117,18 +57,14 @@ bool IsWritableGameRange(uintptr_t address, size_t size) noexcept
 // 调用就跟上了，所以这里不存在"缓存失效"这个概念。
 int32_t TryGetLiveTableBuffer(uintptr_t& buffer) noexcept
 {
-   uintptr_t slot_rva = 0;
-   {
-      std::scoped_lock lock(g_slot_mutex);
-      if (!g_table_slot.installed)
-         return GBFR20_TABLE_SLOT_UNRESOLVED;
-      slot_rva = g_table_slot.slot_rva;
-   }
+   const uintptr_t slot_rva = g_slot_rva.load(std::memory_order_acquire);
+   if (slot_rva == 0)
+      return GBFR20_TABLE_SLOT_UNRESOLVED;
    const uintptr_t pointer_address = g_image_base + slot_rva + 8;
-   if (!IsReadableGameRange(pointer_address, sizeof(uintptr_t)))
+   if (!IsGameRange(pointer_address, sizeof(uintptr_t), kReadableProtect))
       return GBFR20_TABLE_BUFFER_UNREADABLE;
    uint64_t pointer = 0;
-   if (!ReadGameUint64(pointer_address, pointer) || pointer == 0)
+   if (!SafeReadUint64(pointer_address, pointer) || pointer == 0)
       return GBFR20_TABLE_BUFFER_UNREADABLE;
    buffer = static_cast<uintptr_t>(pointer);
    return 0;
@@ -207,63 +143,27 @@ AnchorSearch SearchAnchorWindow(uintptr_t code_rva, size_t code_size) noexcept
    return result;
 }
 
-// 读映像头也单独一个函数：理由同上，SEH 帧里只能有平凡类型。
-struct ImageHeaders
-{
-   IMAGE_NT_HEADERS64 nt{};
-   std::array<IMAGE_SECTION_HEADER, 32> sections{};
-   uint16_t section_count = 0;
-};
-
-// 这里只是 mov + disp32 的算术：4 个字节落在已验证过的 .text 里，不会出错，所以不需要
-// SEH。目标仍然要落在映像内。
+// 这里只是 mov + disp32 的算术：4 个字节落在已验证过的代码段里，不会出错，所以不需要
+// SEH。目标仍然要落在映像内。两个锚点都是 `mov r,[rip+d]` / `mov [rip+d],r`：位移都在
+// 指令 +3，指令都长 7 字节。
 bool DecodeRipTarget(
    uintptr_t instruction_rva,
    uintptr_t image_size,
-   size_t displacement_offset,
-   size_t instruction_size,
    uintptr_t& target_rva) noexcept
 {
+   constexpr size_t kDisplacementOffset = 3;
+   constexpr size_t kInstructionSize = 7;
    int32_t displacement = 0;
    std::memcpy(
       &displacement,
-      reinterpret_cast<const void*>(g_image_base + instruction_rva + displacement_offset),
+      reinterpret_cast<const void*>(g_image_base + instruction_rva + kDisplacementOffset),
       sizeof(displacement));
    const int64_t target =
-      static_cast<int64_t>(instruction_rva) + static_cast<int64_t>(instruction_size) + displacement;
+      static_cast<int64_t>(instruction_rva) + static_cast<int64_t>(kInstructionSize) + displacement;
    if (target < 0 || static_cast<uint64_t>(target) >= image_size)
       return false;
    target_rva = static_cast<uintptr_t>(target);
    return true;
-}
-
-bool ReadImageHeaders(ImageHeaders& headers) noexcept
-{
-   __try
-   {
-      const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(g_image_base);
-      if (dos->e_magic != IMAGE_DOS_SIGNATURE)
-         return false;
-      const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
-         g_image_base + static_cast<uintptr_t>(dos->e_lfanew));
-      if (nt->Signature != IMAGE_NT_SIGNATURE ||
-          nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
-          nt->OptionalHeader.SizeOfImage < 0x1000 ||
-          nt->OptionalHeader.SizeOfImage > 0x20000000)
-         return false;
-      headers.nt = *nt;
-      const IMAGE_SECTION_HEADER* image_sections = IMAGE_FIRST_SECTION(nt);
-      headers.section_count = nt->FileHeader.NumberOfSections;
-      if (headers.section_count > headers.sections.size())
-         headers.section_count = static_cast<uint16_t>(headers.sections.size());
-      for (uint16_t index = 0; index < headers.section_count; ++index)
-         headers.sections[index] = image_sections[index];
-      return true;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
-      return false;
-   }
 }
 
 // 逐行 Key 比对：Key 是这张表的**身份**（编辑只动 LevelValue1..10 与 Level，从不碰 Key），
@@ -314,45 +214,25 @@ int32_t WriteChangedRows(uint8_t* live, const uint8_t* table, uint64_t row_count
 
 void ResolveTableSlot()
 {
-   {
-      std::scoped_lock lock(g_slot_mutex);
-      if (g_table_slot.installed || g_image_base == 0)
-         return;
-   }
-
-   ImageHeaders headers{};
-   if (!ReadImageHeaders(headers))
-   {
-      Log("Table slot: the game image headers could not be read as a sane PE32+ image; "
-          "nothing resolved.");
+   if (g_slot_rva.load(std::memory_order_acquire) != 0 || g_image_base == 0)
       return;
-   }
-   const IMAGE_NT_HEADERS64& nt = headers.nt;
 
-   uintptr_t code_rva = 0;
-   size_t code_size = 0;
-   for (uint16_t index = 0; index < headers.section_count; ++index)
+   // 代码段来自 layout_resolver 的 PE 视图——它才是"映像里哪一段是代码"的唯一持有者
+   // （先按名字找 `.text`，找不到才取最大的可执行段）。这里不再自己解析一遍 PE 头。
+   CodeSectionView code{};
+   if (!TryGetCodeSection(code))
    {
-      if (std::memcmp(headers.sections[index].Name, ".text", 5) != 0)
-         continue;
-      code_rva = headers.sections[index].VirtualAddress;
-      code_size = headers.sections[index].Misc.VirtualSize;
-      break;
-   }
-   if (code_rva == 0 || code_size == 0 || code_size > nt.OptionalHeader.SizeOfImage ||
-       code_rva > nt.OptionalHeader.SizeOfImage - code_size)
-   {
-      Log("Table slot: no usable .text section; nothing resolved.");
+      Log("Table slot: the game image's code section could not be resolved; nothing resolved.");
       return;
    }
 
-   const AnchorSearch anchor = SearchAnchorWindow(code_rva, code_size);
+   const AnchorSearch anchor = SearchAnchorWindow(code.rva, code.size);
    if (anchor.row_loop_matches != 1 || anchor.buffer_load_matches != 1 ||
        anchor.slot_store_matches != 1)
    {
       Log(std::format(
-         "Table slot: in .text the skill_status row-loop anchor matched {} time(s) and, in "
-         "the {} bytes before it, the buffer-pointer load matched {} time(s) while the slot store "
+         "Table slot: in the code section the skill_status row-loop anchor matched {} time(s) and, "
+         "in the {} bytes before it, the buffer-pointer load matched {} time(s) while the slot store "
          "matched {} time(s); expected exactly one of each. This game build is not the one the "
          "mod was written for; no slot was resolved.",
          anchor.row_loop_matches,
@@ -367,9 +247,8 @@ void ResolveTableSlot()
    // 对就不认。
    uintptr_t slot_rva = 0;
    uintptr_t buffer_pointer_rva = 0;
-   if (!DecodeRipTarget(anchor.slot_store_rva, nt.OptionalHeader.SizeOfImage, 3, 7, slot_rva) ||
-       !DecodeRipTarget(
-          anchor.buffer_load_rva, nt.OptionalHeader.SizeOfImage, 3, 7, buffer_pointer_rva) ||
+   if (!DecodeRipTarget(anchor.slot_store_rva, code.image_size, slot_rva) ||
+       !DecodeRipTarget(anchor.buffer_load_rva, code.image_size, buffer_pointer_rva) ||
        buffer_pointer_rva != slot_rva + 8)
    {
       Log("Table slot: the publish anchors' displacements do not decode to a slot and its +8 "
@@ -384,18 +263,14 @@ void ResolveTableSlot()
       return;
    }
 
-   {
-      std::scoped_lock lock(g_slot_mutex);
-      g_table_slot.installed = true;
-      g_table_slot.slot_rva = slot_rva;
-   }
+   g_slot_rva.store(slot_rva, std::memory_order_release);
    Log(std::format(
       "Table slot: row-loop anchor at RVA 0x{:X}, publish anchors at 0x{:X} / 0x{:X} "
       "(PE 0x{:X}) resolve slot=0x{:X} (loaded 0x{:X}), buffer pointer=0x{:X} (loaded 0x{:X}).",
       anchor.row_loop_rva,
       anchor.slot_store_rva,
       anchor.buffer_load_rva,
-      nt.FileHeader.TimeDateStamp,
+      code.timestamp,
       slot_rva,
       g_image_base + slot_rva,
       buffer_pointer_rva,
@@ -417,12 +292,12 @@ int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept
    if (refusal != 0)
       return refusal;
 
-   // 三道闸全在写之前，任何一条不成立都是一个字节都不写，让调用方落回它自己的扫描。
-   if (!IsWritableGameRange(buffer, length))
+   // 三道闸全在写之前，任何一条不成立都是一个字节都不写。
+   if (!IsGameRange(buffer, length, kWritableProtect))
       return GBFR20_TABLE_BUFFER_UNREADABLE;
 
    uint64_t row_count = 0;
-   if (!ReadGameUint64(buffer, row_count) || row_count != supplied_rows)
+   if (!SafeReadUint64(buffer, row_count) || row_count != supplied_rows)
       return GBFR20_TABLE_ROW_COUNT_INCONSISTENT;
 
    auto* live = reinterpret_cast<uint8_t*>(buffer);
