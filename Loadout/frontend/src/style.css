@@ -77,8 +77,16 @@
     @apply border-border outline-ring/50;
   }
 
+  /*
+    cursor：可选中文字默认给 I 形光标（cursor: auto 在文字上解析成 text）。整棵树收回箭头，
+    只给输入框显式要回 I 形光标——页面上的文字标签因此不必一个个加 cursor-default。
+  */
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground cursor-default;
+  }
+  input,
+  textarea {
+    cursor: text;
   }
   html {
     @apply font-sans;

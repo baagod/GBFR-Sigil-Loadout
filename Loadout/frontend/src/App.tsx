@@ -285,8 +285,11 @@ export default function App() {
               <Button
                 key={option}
                 size="icon-sm"
-                style={{ translate: "none" }}
+                // 关掉 stock 的按下位移，以及选中格 150ms 的淡出淡入（行内样式优先于 class）。
+                style={{ translate: "none", transition: "none" }}
                 variant={option === lang ? "default" : "outline"}
+                // default 变体不带边框色（组的外框会断一截），补上 outline 同款。
+                className={option === lang ? "border-input" : undefined}
                 lang={option}
                 onClick={() => {
                   setLang(option) // 语言也存在 loadout.json 里，所以这也是一次编辑
@@ -318,8 +321,11 @@ export default function App() {
         */}
         <TabsPanel value="general" className={LOADOUT_PANEL}>
         <div className={HEADER_ROW}>
-          <div>
-            <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
+          <div className="pl-0.5 pr-3">
+            {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
+            {slots.length > 0 && (
+              <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
+            )}
           </div>
           <div>#</div>
           <div className="pr-2 pl-[11px]">{t.headerPrimary}</div>

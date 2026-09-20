@@ -10,9 +10,10 @@ import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "./model"
 import type { Messages } from "./messages"
 import { useWheelStep } from "./useWheelStep"
 
-/* Fixed side columns + factor columns that eat all remaining width. */
+/* Fixed side columns + factor columns that eat all remaining width.
+   启用列按内容自适应（勾选框 16px）左右留 2 / 12px；序号列固定 28px、单元格不带内间距。 */
 const GRID_COLS =
-  "grid grid-cols-[2.5rem_2rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"
+  "grid grid-cols-[auto_1.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"
 
 export const HEADER_ROW = `${GRID_COLS} mt-2 min-h-[44px] border-b text-sm font-medium text-foreground`
 const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
@@ -94,11 +95,11 @@ export const SlotRow = memo(function SlotRow({
   const secIllegal = mainValid && slot.secHash !== "" && !legal.has(slot.secHash)
   return (
     <div className={DATA_ROW}>
-      <div>
+      <div className="pl-0.5 pr-3">
         <Checkbox
           checked={slot.enabled}
           aria-label={`${t.rowEnable} ${row + 1}`}
-          onCheckedChange={(v) => updateSlot(row, { enabled: v === true })}
+          onCheckedChange={(v) => updateSlot(row, { enabled: v })}
         />
       </div>
       <div>
