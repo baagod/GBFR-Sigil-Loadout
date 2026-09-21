@@ -1,6 +1,10 @@
 # Wails build output
 bin/
 Loadout.exe
+# 程序图标：仓库里只入库 icon.png（主图）；.ico 是构建中间产物（exe 的 .syso 用它，
+# 托盘那份由应用启动时用同一个包现编），所以放在被忽略的 build\ 里。
+build/
+rsrc_windows_amd64.syso
 # `go build ./...` 会把以模块名命名的二进制写在源码旁边。
 loadouttool.exe
 

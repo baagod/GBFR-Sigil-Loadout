@@ -163,6 +163,27 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend build failed with exit code $LASTEXITCODE."
     }
+    # Loadout.exe 的程序图标。Windows 只认链接期资源（.syso），而 .syso 要 .ico；
+    # 源图 icon.png 是 256px（由游戏原生 137px 的技能图标格子 cmn_icskill_05_12
+    # 用 hqx 边缘导向放大而来）。.ico 交给 tools/mkico 生成，不用 wails3 generate icons：
+    # 后者只会把一张图等比缩小，小档因此带一圈半透明辉光外溢、边缘也被插值糊掉——
+    # 任务栏里就是"又小又糊"。mkico 负责：裁掉外溢让方块铺满画布、每档轻锐化、
+    # 除 256 外写 DIB，并补齐 20/24/40/96 这些任务栏与资源管理器的精确档位。
+    # 这份 .ico 只是构建中间产物（托盘那份由应用启动时用同一个包现编），所以放 build\ 里不入库。
+    $iconPng = Join-Path $toolDir 'icon.png'
+    if (-not (Test-Path -LiteralPath $iconPng)) {
+        throw "Tool icon is missing: $iconPng"
+    }
+    $iconIco = Join-Path $toolDir 'build\windows\icon.ico'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $iconIco) -Force | Out-Null
+    & go run ./tools/mkico -in $iconPng -out $iconIco
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tool icon (.ico) generation failed with exit code $LASTEXITCODE."
+    }
+    & wails3 generate syso -arch amd64 -icon $iconIco -manifest (Join-Path $toolDir 'app.manifest') -out (Join-Path $toolDir 'rsrc_windows_amd64.syso')
+    if ($LASTEXITCODE -ne 0) {
+        throw "Windows resource (.syso) generation failed with exit code $LASTEXITCODE."
+    }
     # -buildvcs=false for the same reason the csproj keeps SourceLink and the
     # commit revision out of the managed metadata: Go otherwise stamps the
     # commit sha and a "modified" flag into the binary.
@@ -246,6 +267,10 @@ if (-not (Test-Path -LiteralPath $toolExe -PathType Leaf)) {
 }
 Copy-Item -Path $toolExe -Destination $packageDir -Force
 
+# mod 列表里的图标（ModConfig.json 的 ModIcon）：Reloaded 从 mod 根读，所以随包一份。
+# 与工具窗口/托盘/exe 是同一张图（工具那份是编译进 Loadout.exe 的）。
+Copy-Item -Path (Join-Path $toolDir 'icon.png') -Destination $packageDir -Force
+
 # Required release files — this list is the ONLY holder of "which files a package must
 # have"; deploy.ps1 不再抄一份（它只问"这到底是不是一个包"）。
 # (sigils.json lands here via the csproj CopyToOutputDirectory.)
@@ -253,6 +278,7 @@ foreach ($requiredFile in @(
     'GBFR.PreEquippedSigils.dll',
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
+    'icon.png',
     'assets\sigils.json',
     'assets\sigils.chara.json'
 )) {

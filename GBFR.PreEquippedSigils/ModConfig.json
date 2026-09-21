@@ -5,7 +5,7 @@
   "ModVersion": "0.6.0",
   "ModDescription": "为全角色预配扩展因子，不占用本体 12 槽位，无需库存、不写存档；并内置因子参数编辑器（原 GBFR.SigilEdit），可在工具里改写因子的等级数值。Pre-equips extra sigils for all characters, using none of the base 12 slots. No inventory required, no save-file changes. Includes the sigil parameter editor (formerly GBFR.SigilEdit).",
   "ModDll": "GBFR.PreEquippedSigils.dll",
-  "ModIcon": "",
+  "ModIcon": "icon.png",
   "ModR2RManagedDll32": "",
   "ModR2RManagedDll64": "",
   "ModNativeDll32": "",

@@ -6,11 +6,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"loadouttool/internal/iconico"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -18,8 +21,32 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed icons/tray.png
-var trayIconBytes []byte
+// icon.png 是程序图标主图（256px），也是仓库里唯一入库的图标资产：macOS/Linux 的应用图标、
+// 下面托盘图标的源，以及 exe 链接期资源（build-release.ps1 调 tools/mkico 由它生成 .syso）。
+// 放在模块里而不是仓库根，是因为 go:embed 只能嵌模块内的文件。
+//
+// Windows 上它并不喂标题栏：Wails 那边的 setIcon 是空实现（实测运行中的窗口 GCLP_HICON 与
+// GWLP_HICONSM 都是 0），标题栏那格是 Windows 自己回退到 exe 资源画的，走的是 .ico 的 16 档
+// ——和托盘同一档（都按 SM_CXSMICON 取），所以两处观感本来就一致。
+//
+//go:embed icon.png
+var appIconBytes []byte
+
+// trayIcon 返回托盘要用的图。Windows 必须给 .ico：Wails 的托盘对 PNG 输入会把原图直接交给
+// Windows 的 CreateIconFromResourceEx（alpha 在那条路上被处理坏，实测渲染暗一半、没有白），
+// 对 ICO 输入才会按 SM_CXSMICON 挑出精确档位的 DIB。ICO 由 iconico 从同一张 icon.png 现场编，
+// 所以托盘/标题栏/exe 永远是同一套档位，不会有第二份资产漂移。别的平台仍用 PNG。
+func trayIcon() []byte {
+	if runtime.GOOS != "windows" {
+		return appIconBytes
+	}
+	ico, err := iconico.ICO(appIconBytes)
+	if err != nil {
+		log.Printf("tray icon: 编 ICO 失败，退回 PNG: %v", err)
+		return appIconBytes
+	}
+	return ico
+}
 
 // The sigil-edit page's data, embedded at compile time so that page needs no
 // external file: skill_status.json is the game's own rows for every skill -
@@ -214,7 +241,7 @@ func main() {
 
 	app = application.New(application.Options{
 		Name: "Loadout",
-		Icon: trayIconBytes,
+		Icon: appIconBytes,
 		Services: []application.Service{
 			application.NewService(&LoadoutService{}),
 			application.NewService(editService),
@@ -258,7 +285,7 @@ func main() {
 
 	// System tray: single click toggles the window; menu offers quit.
 	tray := app.SystemTray.New()
-	tray.SetIcon(trayIconBytes)
+	tray.SetIcon(trayIcon())
 	tray.SetTooltip(toolWindowTitle)
 	tray.AttachWindow(win)
 

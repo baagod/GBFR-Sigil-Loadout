@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Windows 清单：只为了让 Loadout.exe 带上程序图标（图标与清单一起由
+  tools\build-release.ps1 里的 `wails3 generate syso` 打进链接期资源）。
+
+  刻意**不写** dpiAware / dpiAwareness：DPI 感知一直由 Wails 运行时自己设置
+  （pkg/application/application_windows.go 的 setupDPIAwareness），这里再声明一份
+  就等于顺手改了行为——图标这件事不该带这种副作用。
+-->
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity type="win32" name="Loadout" version="1.0.0.0" processorArchitecture="*"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>
