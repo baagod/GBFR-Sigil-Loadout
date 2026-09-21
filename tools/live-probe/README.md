@@ -4,7 +4,8 @@
 
 ```
 build3.cmd                                  编出 probe3.dll（cl，需要 VS2022 Build Tools）
-inject.exe granblue_fantasy_relink.exe <probe3.dll 全路径>   注入（inject.cpp 编出来的注入器）
+cl /nologo /O2 /utf-8 /EHsc /Fe:inject.exe inject.cpp    编出注入器（同样要 cl）
+inject.exe granblue_fantasy_relink.exe <probe3.dll 全路径>   注入
 ```
 
 **用法**
