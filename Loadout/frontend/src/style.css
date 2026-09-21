@@ -137,4 +137,16 @@
   .skill-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
     display: none;
   }
+
+  /*
+    窗口失活时伪类会被判掉（指示灭），而 DOM 焦点还在框里。App 在那一刻给该元素挂上
+    data-focus-hold，这里把那套指示补齐；值必须与 components/ui 里的聚焦类一致。
+  */
+  [data-slot="input-group"]:has([data-focus-hold]) {
+    @apply border-ring ring-3 ring-ring/50;
+  }
+
+  .skill-rows input[data-focus-hold] {
+    @apply bg-muted/50;
+  }
 }

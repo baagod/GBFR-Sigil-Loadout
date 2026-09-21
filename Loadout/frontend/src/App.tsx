@@ -260,6 +260,27 @@ export default function App() {
     }
   }, [hideKey])
 
+  /*
+    窗口失活时 :focus / :focus-visible 会被判掉，而 DOM 焦点还在框里：切到游戏改完再回来接着
+    输靠的就是它。所以失活那一刻给仍持有焦点的元素挂上 data-focus-hold，由 style.css 把那套
+    指示补齐，视觉就不随窗口的激活状态变（回来时伪类重新匹配的也是同一套值）。
+  */
+  useEffect(() => {
+    const hold = () => {
+      const active = document.activeElement
+      if (active instanceof HTMLElement) active.setAttribute("data-focus-hold", "")
+    }
+    const release = () =>
+      document.querySelector("[data-focus-hold]")?.removeAttribute("data-focus-hold")
+    window.addEventListener("blur", hold)
+    window.addEventListener("focus", release)
+    return () => {
+      window.removeEventListener("blur", hold)
+      window.removeEventListener("focus", release)
+      release()
+    }
+  }, [])
+
   return (
     <div className="fixed inset-0 flex flex-col">
       <Tabs
