@@ -88,12 +88,7 @@ void TrackNaturalContributionResult(
       final_identity.context_mode == identity.context_mode;
    if (final_valid)
    {
-      const uint64_t generation = NextApplyGeneration();
-      CommitAuthorizedStatus(
-         status,
-         identity,
-         generation,
-         g_tls_natural_contribution.slots);
+      CommitAuthorizedStatus(status, identity, g_tls_natural_contribution.slots);
       // Log the live-battle confirmation only once per session: a healthy
       // loadout confirms 9/9 every battle, identical every time. Failures
       // below still report N/M on every occurrence.

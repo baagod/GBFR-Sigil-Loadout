@@ -142,10 +142,8 @@ constexpr bool IsValidContextMode(int32_t context_mode)
 
 struct AuthorizedStatus
 {
-   uintptr_t status = 0;
    uint32_t character_hash = 0;
    int32_t context_mode = -1;
-   uint64_t generation = 0;
    std::array<uint32_t, kVirtualSlotCapacity> slots{};
 };
 
@@ -205,7 +203,6 @@ extern std::unordered_map<uint32_t, std::array<uint32_t, kVirtualSlotCapacity>> 
 extern std::shared_mutex g_authorization_mutex;
 extern std::unordered_map<uintptr_t, AuthorizedStatus> g_authorized_statuses;
 
-extern std::atomic_uint32_t g_next_apply_generation;
 extern std::atomic_uint32_t g_active_getter_calls;
 extern std::atomic_uint32_t g_active_mid_calls;
 extern thread_local NaturalContributionFrame g_tls_natural_contribution;
@@ -243,9 +240,8 @@ inline constexpr uint32_t kWritableProtect =
    PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
 bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noexcept;
 bool SafeReadStatusIdentity(uintptr_t status, StatusIdentity& identity) noexcept;
-void CommitAuthorizedStatus(uintptr_t status, const StatusIdentity& identity, uint64_t generation, const std::array<uint32_t, kVirtualSlotCapacity>& slots);
+void CommitAuthorizedStatus(uintptr_t status, const StatusIdentity& identity, const std::array<uint32_t, kVirtualSlotCapacity>& slots);
 bool TryGetAuthorizedSelection(uintptr_t status, const StatusIdentity& identity, std::array<uint32_t, kVirtualSlotCapacity>& slots);
-bool TryGetAuthorizedContext1Status(uint32_t character_hash, AuthorizedStatus& authorization);
 void EraseAuthorizedStatus(uintptr_t status);
 // 一次构建开始时调用：store 里的选择与这条授权不一致（或身份/context 变了）就把它丢掉。
 // 授权只该保证"同一次构建内槽位一致"，不该让下一次构建继续吃上一轮的旧槽位——那正是
@@ -254,15 +250,11 @@ void DropAuthorizedSelectionIfStale(
    uintptr_t status,
    const StatusIdentity& identity,
    const std::array<uint32_t, kVirtualSlotCapacity>& current_slots);
-// 出战队伍：从"游戏自己发起的 context-1 构建"里学出来（不需要逆向队伍表）。
-// RememberPartyCharacter 在 detour 里调用；SnapshotPartyCharacters 给热重建用。
-inline constexpr size_t kMaxPartyCharacters = 8;
 // 每次**游戏自己**建 context-1（在场那份）时调用：记下"这个角色现在这份 status 是哪个对象"、
-// 它属于哪一轮队伍装配（pass），并把它计入出战队伍候选。
+// 它属于哪一轮队伍装配（pass）。出战队伍就是这张表的键集，没有第二份名单。
 void RememberContext1Status(uint32_t character_hash, uintptr_t status);
 // 游戏刚自己建过一次状态（detour 里记）：热重建据此避让，别和游戏同时碰一份 status。
 void RememberGameBuild();
-size_t SnapshotPartyCharacters(std::array<uint32_t, kMaxPartyCharacters>& out);
 // 最近一次 context-1 构建的记录：status 对象 + 它属于哪一轮队伍装配。热重建只重建
 // pass_id == 当前轮的记录——上一轮的对象在换人/切场景时已经被游戏拆掉了，拿它去重建
 // 就是在戳内存垃圾（2026-09-21 那次崩溃：移出队友后仍用旧指针调游戏重建，ok=0，28 秒后崩）。
@@ -280,9 +272,6 @@ bool ReadByte(uintptr_t address, uint8_t& value) noexcept;
 bool WriteByte(uintptr_t address, uint8_t value);
 
 std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash);
-// Bumps the shared apply generation; never returns 0 (0 means "no generation"
-// in the authorization table, which is the only place a 0 generation is rejected).
-uint32_t NextApplyGeneration();
 
 bool TryGetRuntimeSlot(uint32_t character_hash, int virtual_slot, TemplateGemSlot& out) noexcept;
 void InitializeRuntimeTemplates();

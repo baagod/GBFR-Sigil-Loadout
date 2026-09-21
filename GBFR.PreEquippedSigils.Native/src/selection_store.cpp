@@ -7,18 +7,14 @@ std::unordered_map<uint32_t, std::array<uint32_t, kVirtualSlotCapacity>> g_chara
 std::shared_mutex g_authorization_mutex;
 std::unordered_map<uintptr_t, AuthorizedStatus> g_authorized_statuses;
 
-std::atomic_uint32_t g_next_apply_generation{0};
-
 namespace
 {
-// 出战队伍：从游戏自己发起的 context-1 构建里学出来（出战 4 人，留余量给换人）。
+// 每个角色 **最近一次** context-1 构建用的 status 对象，以及它属于哪一轮队伍装配。
+// 这张表同时就是 "见过哪些角色" 的名单（键集），没有第二份名单。
+// 换人/切场景时游戏会重装队伍：它把在场成员的状态重新建一遍（新对象），
+// 被移出的人不再建 —— 那一份对象就被拆掉了。所以 "最近观察到的对象" 必须连同 "它属于哪一轮" 一起记：
+// 只有当前轮的对象才敢拿去重建（旧轮的对象可能是内存垃圾，2026-09-21 的崩溃就是这么来的）。
 std::mutex g_party_mutex;
-std::array<uint32_t, kMaxPartyCharacters> g_party_characters{};
-size_t g_party_count = 0;
-// 每个角色**最近一次** context-1 构建用的 status 对象，以及它属于哪一轮队伍装配。
-// 换人/切场景时游戏会重装队伍：它把在场成员的状态重新建一遍（新对象），被移出的人不再建——
-// 那一份对象就被拆掉了。所以"最近观察到的对象"必须连同"它属于哪一轮"一起记：只有当前轮的
-// 对象才敢拿去重建（旧轮的对象可能是内存垃圾，2026-09-21 的崩溃就是这么来的）。
 struct Context1Record
 {
    uintptr_t status = 0;
@@ -66,6 +62,7 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status)
       g_last_game_context1_ms.store(now, std::memory_order_release);
 
    bool learned_party_member = false;
+   size_t known_characters = 0;
    uintptr_t previous_status = 0;
    {
       std::scoped_lock lock(g_party_mutex);
@@ -73,47 +70,23 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status)
       previous_status = record.status;
       record.status = status;
       record.pass_id = pass_id;
-      bool known = false;
-      for (size_t index = 0; index < g_party_count; ++index)
-      {
-         if (g_party_characters[index] == character_hash)
-         {
-            known = true;
-            break;
-         }
-      }
-      // 注意：这里的每一个分支都必须走到函数末尾的那行日志——早期版本在这里直接 return，
-      // 于是"已知角色的构建"全都不留痕迹，诊断直接瞎掉（2026-09-21 踩过）。
-      if (!known && g_party_count < kMaxPartyCharacters)
-      {
-         g_party_characters[g_party_count++] = character_hash;
-         learned_party_member = true;
-      }
+      learned_party_member = previous_status == 0;
+      known_characters = g_latest_context1_status.size();
    }
    // 每一次 context-1 构建都记一行：谁、哪个对象、第几轮装配。这是唯一能看出
    // "游戏在什么时候重建了谁"的证据（`(via our rebuild)` 是我们自己那次调用引发的）。
    Log(std::format(
       "ctx1 build: char=0x{:08X} status=0x{:X} pass={}{}{}{}",
-      character_hash,
-      status,
-      pass_id,
+      character_hash, status, pass_id,
       previous_status != 0 && previous_status != status ? " (new object)" : "",
       ours ? " (via our rebuild)" : "",
       learned_party_member ? " (new party member)" : ""));
    if (learned_party_member)
    {
-      Log(std::format("party+ char=0x{:08X} ({} known)", character_hash, g_party_count));
+      Log(std::format("party+ char=0x{:08X} ({} known)", character_hash, known_characters));
       // 队伍刚变过：接下来两秒内不许热重建（2026-09-21 三次崩溃都发生在换队友/切场景之后）。
       g_party_changed_ms.store(now, std::memory_order_release);
    }
-}
-
-size_t SnapshotPartyCharacters(std::array<uint32_t, kMaxPartyCharacters>& out)
-{
-   std::scoped_lock lock(g_party_mutex);
-   for (size_t index = 0; index < g_party_count; ++index)
-      out[index] = g_party_characters[index];
-   return g_party_count;
 }
 
 bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& pass_id)
@@ -152,9 +125,14 @@ void RebuildPartyStatusesOnce()
           expected, now + 500, std::memory_order_acq_rel))
       return;
 
-   std::array<uint32_t, kMaxPartyCharacters> party{};
-   const size_t count = SnapshotPartyCharacters(party);
-   if (count == 0)
+   std::vector<uint32_t> party;
+   {
+      std::scoped_lock lock(g_party_mutex);
+      party.reserve(g_latest_context1_status.size());
+      for (const auto& [character_hash, record] : g_latest_context1_status)
+         party.push_back(character_hash);
+   }
+   if (party.empty())
    {
       Log("hot rebuild: no party known yet; skipped");
       return;
@@ -167,35 +145,35 @@ void RebuildPartyStatusesOnce()
 
    // 只重建**当前这轮队伍装配里建出来的对象**：
    //   - 没有记录 = 这个人从没被观察到在场上；
-   //   - 记录的轮次 ≠ 当前轮 = 游戏已经重装过队伍，而这个人不在新队伍里（被移出/换掉），
-   //     那一份 status 已经被游戏拆掉了——身份残留还在，身份校验照样通过，去重建它就是在
-   //     戳内存垃圾（2026-09-21：移出队友后仍拿旧指针调游戏重建，ok=0，28 秒后崩）。
+   // - 记录的轮次 ≠ 当前轮 = 游戏已经重装过队伍，而这个人不在新队伍里（被移出/换掉），
+   //   那一份 status 已经被游戏拆掉了——身份残留还在，身份校验照样通过，去重建它就是在
+   //   戳内存垃圾（2026-09-21：移出队友后仍拿旧指针调游戏重建，ok=0，28 秒后崩）。
    const uint32_t current_pass = g_context1_pass_id.load(std::memory_order_acquire);
-   for (size_t index = 0; index < count; ++index)
+   for (const uint32_t character_hash : party)
    {
       uintptr_t latest_status = 0;
       uint32_t record_pass = 0;
-      if (!LatestContext1Status(party[index], latest_status, record_pass))
+      if (!LatestContext1Status(character_hash, latest_status, record_pass))
       {
          Log(std::format(
-            "hot rebuild: char=0x{:08X} skipped (no context-1 status seen)", party[index]));
+            "hot rebuild: char=0x{:08X} skipped (no context-1 status seen)", character_hash));
          continue;
       }
       if (record_pass != current_pass)
       {
          Log(std::format(
             "hot rebuild: char=0x{:08X} skipped (left the party: assembly {} < {})",
-            party[index],
+            character_hash,
             record_pass,
             current_pass));
          // 这条授权指向的对象已经不在场上了：留着它只会在指针被复用时被 detour 误当成有效选择。
          EraseAuthorizedStatus(latest_status);
          continue;
       }
-      const bool rebuilt = SafeInvokeStatusRebuild(latest_status, party[index]);
+      const bool rebuilt = SafeInvokeStatusRebuild(latest_status, character_hash);
       Log(std::format(
          "hot rebuild: char=0x{:08X} status=0x{:X} pass={} ok={}",
-         party[index],
+         character_hash,
          latest_status,
          record_pass,
          rebuilt ? 1 : 0));
@@ -220,14 +198,5 @@ std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash)
    return iterator == g_character_selections.end()
       ? std::array<uint32_t, kVirtualSlotCapacity>{}
       : iterator->second;
-}
-
-uint32_t NextApplyGeneration()
-{
-   uint32_t generation =
-      g_next_apply_generation.fetch_add(1, std::memory_order_acq_rel) + 1;
-   if (generation == 0)
-      generation = g_next_apply_generation.fetch_add(1, std::memory_order_acq_rel) + 1;
-   return generation;
 }
 }

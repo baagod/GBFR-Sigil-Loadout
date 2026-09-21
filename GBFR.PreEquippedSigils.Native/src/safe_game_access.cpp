@@ -86,7 +86,6 @@ bool SafeReadStatusIdentity(uintptr_t status, StatusIdentity& identity) noexcept
 void CommitAuthorizedStatus(
    uintptr_t status,
    const StatusIdentity& identity,
-   uint64_t generation,
    const std::array<uint32_t, kVirtualSlotCapacity>& slots)
 {
    if (status == 0 || identity.character_hash == 0)
@@ -98,10 +97,8 @@ void CommitAuthorizedStatus(
          entry.first == status;
    });
    AuthorizedStatus authorization{};
-   authorization.status = status;
    authorization.character_hash = identity.character_hash;
    authorization.context_mode = identity.context_mode;
-   authorization.generation = generation;
    authorization.slots = slots;
    g_authorized_statuses.emplace(status, authorization);
 }
@@ -115,7 +112,6 @@ bool TryGetAuthorizedSelection(
    const auto iterator = g_authorized_statuses.find(status);
    if (iterator == g_authorized_statuses.end() ||
        iterator->second.character_hash != identity.character_hash ||
-       iterator->second.status != status ||
        iterator->second.context_mode != identity.context_mode ||
        !IsValidContextMode(identity.context_mode))
       return false;
@@ -136,24 +132,6 @@ void DropAuthorizedSelectionIfStale(
        iterator->second.context_mode != identity.context_mode ||
        iterator->second.slots != current_slots)
       g_authorized_statuses.erase(iterator);
-}
-
-bool TryGetAuthorizedContext1Status(
-   uint32_t character_hash,
-   AuthorizedStatus& authorization)
-{
-   authorization = {};
-   std::shared_lock lock(g_authorization_mutex);
-   for (const auto& [status, candidate] : g_authorized_statuses)
-   {
-      if (candidate.character_hash == character_hash &&
-          candidate.context_mode == 1 && candidate.status == status)
-      {
-         authorization = candidate;
-         return true;
-      }
-   }
-   return false;
 }
 
 void EraseAuthorizedStatus(uintptr_t status)
