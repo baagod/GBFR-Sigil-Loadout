@@ -80,9 +80,9 @@
 | 生成器（在 gen 里） | 作用 |
 |---|---|
 | `go run . exclusive` | 本 mod 的策展表（`pkgs/sigils` 里的 `exclusiveSources`：每角色 Hash/T1/T2/War），从 mod 仓库的 `sigils.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\sigils.chara.json`（可视工具读；内容不变则不重写） |
-| `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\sigils.json` + `sigils.lang.json` |
-| `go run . texts` | → `gen\output\texts.xlsx` / `texts.json` + mod 仓库的 `Loadout\assets\chara.lang.json` |
-| `go run . skills` | 由 `gen\output\texts.json` 出工具内嵌的 `skill_status.json` + `skill.<lang>.json`（写进 mod 仓库；游戏更新后才跑） |
+| `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\sigils.json` |
+| `go run . texts` | → `gen\output\texts.xlsx` / `texts.json`；**lang 系列全在这里**：mod 仓库的 `sigils.lang.json` + `skill.<lang>.json` + `chara.lang.json` |
+| `go run . skills` | 由 `gen\output\texts.json` 出 `skill_status.json`（写进 mod 仓库；游戏更新后才跑） |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
 
 **改配装流程**：改 gen 的 `pkgs/sigils/exclusive.go` 里的 `exclusiveSources` → 编译（vcxproj 编译前自动重跑它，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。

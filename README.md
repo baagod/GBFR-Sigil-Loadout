@@ -73,9 +73,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1          # 部�
 | 生成器（在共享工程 `gen` 里） | 作用 |
 |---|---|
 | `go run . exclusive` | 从 `pkgs/sigils` 里那张策展表生成 `src\exclusive_table.inc`（native 编译时 `#include`，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\sigils.chara.json`（**入库、随包**，只有可视工具读） |
-| `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，不入库）+ `Loadout\assets\sigils.json` + `sigils.lang.json` |
-| `go run . texts` | → `gen\output\texts.xlsx` + `texts.json`，并生成 `Loadout\assets\chara.lang.json` |
-| `go run . skills` | 由 `gen\output\texts.json` 出 `Loadout\assets\` 那五份内嵌资产（游戏更新后才跑） |
+| `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，不入库）+ `Loadout\assets\sigils.json` |
+| `go run . texts` | → `gen\output\texts.xlsx` + `texts.json`；**lang 系列全在这里**：`Loadout\assets\` 的 `sigils.lang.json` + `skill.<lang>.json` + `chara.lang.json` |
+| `go run . skills` | 由 `gen\output\texts.json` 出 `Loadout\assets\skill_status.json`（游戏更新后才跑） |
 
 `gen` 是与本仓库**平级的独立仓库**（两个 mod 共用，自带 git；解包归档/GBFRDataTools/sqlite 那些大数据在它的 `.gitignore` 里）。因子表的生成规则见 gen 仓库的 `docs\sigils.xlsx 生成文档.md`。
 

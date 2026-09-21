@@ -41,7 +41,7 @@ var embeddedSkillJA []byte
 //go:embed assets/skill.ko.json
 var embeddedSkillKO []byte
 
-// sigils.lang.json 是配装页显示用的名字：{语言: {因子 hash: 名字}}，由 gen 的 go run . sigils
+// sigils.lang.json 是配装页显示用的名字：{语言: {因子 hash: 名字}}，由 gen 的 go run . texts
 // 生成。内嵌而不是与 sigils.json 并排放：那份数据 mod 也要读，这份只有可视工具显示用。
 //
 //go:embed assets/sigils.lang.json
