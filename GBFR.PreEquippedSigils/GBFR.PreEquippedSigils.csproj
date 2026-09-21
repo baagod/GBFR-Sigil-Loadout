@@ -32,11 +32,11 @@
     <!-- 随包数据住在 mod 目录的 assets\ 下（与源码树的 Loadout\assets\ 同一布局，
          所以仓库里只有这一份，也没有"开发副本"）。**只有工具按 exeDir()\assets\ 读它**：
          native 的限制表已编译进 DLL，C# 只映射载荷。复制这一步是因为打包用的就是本工程的输出目录。 -->
-    <None Include="..\Loadout\assets\gem.json"
-          Link="assets\gem.json"
+    <None Include="..\Loadout\assets\sigils.json"
+          Link="assets\sigils.json"
           CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\Loadout\assets\gem.chara.json"
-          Link="assets\gem.chara.json"
+    <None Include="..\Loadout\assets\sigils.chara.json"
+          Link="assets\sigils.chara.json"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\GBFR.PreEquippedSigils.Native\bin\$(Configuration)\GBFR.PreEquippedSigils.Native.dll"
           Link="GBFR.PreEquippedSigils.Native.dll"

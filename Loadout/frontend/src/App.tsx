@@ -43,7 +43,7 @@ export default function App() {
   const [tab, setTab] = useState<TabKey>("general")
   const [exclusiveTable, setExclusiveTable] = useState<Exclusive[]>([])
   const [exclusiveState, setExclusiveState] = useState<ExclusiveState | undefined>(undefined)
-  // 当前语言的显示名（gem.lang.json：{hash: 名字}）。名字按语言变，所以它只是标签，
+  // 当前语言的显示名（sigils.lang.json：{hash: 名字}）。名字按语言变，所以它只是标签，
   // 不是身份——身份是 hash。
   const [names, setNames] = useState<Record<string, string>>({})
   // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页的行标签。
@@ -143,7 +143,7 @@ export default function App() {
     document.documentElement.lang = lang
   }, [lang])
 
-  // 显示名按语言取（内嵌的 gem.lang.json / chara.lang.json）。换语言就重取一次，
+  // 显示名按语言取（内嵌的 sigils.lang.json / chara.lang.json）。换语言就重取一次，
   // 取不到名字的条目由 SkillPicker 回落成 hash——看得见但不好看，总比显示一个别的
   // 语言的名字强。
   useEffect(() => {

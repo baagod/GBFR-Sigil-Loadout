@@ -11,7 +11,7 @@
   "因子"在游戏自己的文本里是有译名的：英文 sigil、日文 ジーン、韩文 진
   （见 TXT_SKILL_SUMMARY_113_00），所以那三种语言用游戏的说法，不是音译。其余标签与动词是
   可视工具自己的话，没有游戏原文可抄。因子的名字不在这里：它们来自游戏文本表，按当前语言从 Go
-  侧取（gem.lang.json / chara.lang.json / skill.<lang>.json）。
+  侧取（sigils.lang.json / chara.lang.json / skill.<lang>.json）。
 */
 import type { Lang } from "./lang";
 

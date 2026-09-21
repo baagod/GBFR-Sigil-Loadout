@@ -10,7 +10,7 @@ namespace GBFR.PreEquippedSigils;
 /// reported and the last valid configuration stays active.
 ///
 /// **本类只做一件事：把可视工具写下的载荷映射成 ABI 结构。它不读任何数据文件、不持有任何表。**
-/// "物品 → 主技能 / 上限"的语义只属于唯一写者（可视工具，它读 assets\gem.json），所以载荷自带
+/// "物品 → 主技能 / 上限"的语义只属于唯一写者（可视工具，它读 assets\sigils.json），所以载荷自带
 /// items[0].hash（主技能）。选得对不对、有没有超上限，在这一层都不再判：可视工具是唯一写者，
 /// 手写歪了的载荷它不认。
 ///
@@ -126,7 +126,7 @@ internal static class LoadoutConfig
     ///
     /// 形状：{ 角色hash: { 技能hash: bool } }。只把 **false**（= 关掉）变成一条
     /// override，因为"没说"和"说开着"是同一件事：原生侧对没被提到的角色一律三槽全开。
-    /// 槽位由技能 hash 决定，而那张专属表在原生侧，所以这里只做转发——不需要 gem.chara.json，
+    /// 槽位由技能 hash 决定，而那张专属表在原生侧，所以这里只做转发——不需要 sigils.chara.json，
     /// 也不需要知道哪个 hash 是 T1。
     ///
     /// 只认这一种形状：外层键必须是角色 hash（十六进制），解析不出就记一行日志并忽略；
@@ -205,7 +205,7 @@ internal static class LoadoutConfig
             uint mainGemHash = PU(mainGem);
             if (mainGemHash == 0)
                 throw new InvalidDataException($"slot {index}: bad sigil hash '{mainGem}'");
-            // 主技能由可视工具写进来（唯一读 gem.json 的一方），这一层不查表、也不猜。
+            // 主技能由可视工具写进来（唯一读 sigils.json 的一方），这一层不查表、也不猜。
             if (!main.TryGetProperty("hash", out JsonElement mainHash))
                 throw new InvalidDataException($"slot {index}: main item carries no skill hash");
             uint mainSkill = PU(Hx(mainHash));

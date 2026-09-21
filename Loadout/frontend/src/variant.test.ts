@@ -14,7 +14,7 @@ const sigil = (hash: string, skill1: string, extra: Partial<Sigil> = {}): Sigil 
   ...extra,
 });
 
-// 真实表里的那一族（gem.json）。
+// 真实表里的那一族（sigils.json）。
 const crabNets = [
   sigil("1C4D37E4", "082033CB", { onlyone: "1", mix: "1" }),
   sigil("426AD20E", "082033CB", { onlyone: "1", mix: "1", skill2: "D3B8C21F" }),

@@ -28,7 +28,7 @@
 
 - 跨层只有两个半契约：**ABI**（`native_api.h`，冻结、有版本与结构尺寸断言）、**玩家配置**（`loadout.json` / `gemedits.json`，单向：可视工具写、mod 读）、**热键播报**（`tool-hotkey.txt`，反向一行）。其余任何"两边都得知道"的事实，都必须先找到唯一拥有者——同一份事实有两个持有者就是缺陷。
 - 托管工程根是**平铺**的：放进去的每个 `.cs` 都会被编译（SDK 默认通配符，没有逐文件清单），要放生成代码得显式排除。
-- `docs\`：构建 / 部署 / 验证在仓库根 `README.md`；因子表生成规则在 gen 仓库的 `docs\gem.xlsx 生成文档.md`。
+- `docs\`：构建 / 部署 / 验证在仓库根 `README.md`；因子表生成规则在 gen 仓库的 `docs\sigils.xlsx 生成文档.md`。
 - `docs\adr\`：决策记录（"为什么这么干"；操作与数据流仍在本手册）——`0001` 热应用只写表槽那一个地址、`0002` 表槽地址由语义锚点解析不写死 RVA、`0003` 战斗内实时生效靠发布时主动重建一次且只碰当前轮的对象、`0004` 生成器全部住在 `..\gen`。
 - 每个文件的职责写在那个文件里；跨语言协议常量清单见 §9。
 
@@ -39,7 +39,7 @@
   Reloaded-II：Mod.cs → NativeCore.Initialize → exports.GBFR20_Initialize
     → runtime.Initialize:
         executable-validation        必须 granblue_fantasy_relink.exe
-        character-restrictions       gem.json 专属行 character 字段，失败即停
+        character-restrictions       sigils.json 专属行 character 字段，失败即停
         semantic-layout-resolution   layout_resolver，失败即停
         template-selection-install   InstallDefaultTemplateSelections：以 0xFE000000+i 合成 id 写入角色选择
         native-hook-install          2 个 hook + 2 处循环上限 patch
@@ -79,8 +79,8 @@
 
 | 生成器（在 gen 里） | 作用 |
 |---|---|
-| `go run . exclusive` | 本 mod 的策展表（`pkgs/sigils` 里的 `exclusiveSources`：每角色 Hash/T1/T2/War），从 mod 仓库的 `gem.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\gem.chara.json`（可视工具读；内容不变则不重写） |
-| `go run . sigils` | → `gen\output\gem.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\gem.json` + `gem.lang.json` |
+| `go run . exclusive` | 本 mod 的策展表（`pkgs/sigils` 里的 `exclusiveSources`：每角色 Hash/T1/T2/War），从 mod 仓库的 `sigils.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\sigils.chara.json`（可视工具读；内容不变则不重写） |
+| `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\sigils.json` + `sigils.lang.json` |
 | `go run . texts` | → `gen\output\texts.xlsx` / `texts.json` + mod 仓库的 `Loadout\assets\chara.lang.json` |
 | `go run . skills` | 由 `gen\output\texts.json` 出工具内嵌的 `skill_status.json` + `skill.<lang>.json`（写进 mod 仓库；游戏更新后才跑） |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
@@ -118,23 +118,23 @@ TemplateGemSlot{
   合成 id = `kTemplateSlotIdBase(0xFE000000) + 槽序号`（不与真实库存冲突，`IsTemplateSlotId` 判定）。
 - **内置默认（无配置）**：专属 3 槽全开，通用槽全空；总虚拟槽 = 3 + 通用槽数。通用槽数由 `LoadoutConfig.MaxSlots` 限为 ≤12（总虚拟槽 ≤15）；
   原生 `kVirtualSlotCapacity = 24` 是更宽松的数组边界兜底，正常配置不会触及。
-- 专属物品受 `gem.json` 专属行 `character` 字段限制：`TryCopyTemplateGem` 用 `GetRequiredCharacterHash(gem_id)` 校验，只能装给对应角色（古兰/姬塔互通，姬塔条目用古兰专属）。
-- 技能 hash 查询：`gem.json`（hash/上限）或 `gen\output\gem.xlsx`（Ctrl+F 搜名字）；显示名在 `Loadout\assets\gem.lang.json`。
-- 角色 hash：`gem.json` 专属行 `character` 字段；常用：古兰 `2A26B1B2`、姬塔 `A4ACBA76`、娜露梅 `E7053919`、芙劳 `646C3168`、菲迪埃 `74DD4C79`。
+- 专属物品受 `sigils.json` 专属行 `character` 字段限制：`TryCopyTemplateGem` 用 `GetRequiredCharacterHash(gem_id)` 校验，只能装给对应角色（古兰/姬塔互通，姬塔条目用古兰专属）。
+- 技能 hash 查询：`sigils.json`（hash/上限）或 `gen\output\sigils.xlsx`（Ctrl+F 搜名字）；显示名在 `Loadout\assets\sigils.lang.json`。
+- 角色 hash：`sigils.json` 专属行 `character` 字段；常用：古兰 `2A26B1B2`、姬塔 `A4ACBA76`、娜露梅 `E7053919`、芙劳 `646C3168`、菲迪埃 `74DD4C79`。
 
-## 5. 数据文件生成（mod 运行时表：gem.json）
+## 5. 数据文件生成（mod 运行时表：sigils.json）
 
-`gem.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\gem.json`（生成器与数据源都不入本仓库；步骤见 gen 仓库的 `docs\gem.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录的 `assets\`）。
+`sigils.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\sigils.json`（生成器与数据源都不入本仓库；步骤见 gen 仓库的 `docs\sigils.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录的 `assets\`）。
 **全仓库只有这一份**：可视工具按 `exeDir()\assets\` 找它，所以从源码目录直接跑（`Loadout\assets\` 就在 exe 旁边）与跑打包出来的那份用的是**同一布局**——不需要"开发副本"，也不需要回落查找。
-字段名与 `gem.xlsx` 表头一致（13 列）：`{ key, hash, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`（`character` 只在专属行出现）。
-显示名不在数据表里：`Loadout\assets\gem.lang.json` 一个文件按语言收着它们（`{语言: {因子 hash: 名字}}`，zh/en/ja/ko 各 203 条），可视工具经 `GemNames(lang)` 取当前语言那一份。
+字段名与 `sigils.xlsx` 表头一致（13 列）：`{ key, hash, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`（`character` 只在专属行出现）。
+显示名不在数据表里：`Loadout\assets\sigils.lang.json` 一个文件按语言收着它们（`{语言: {因子 hash: 名字}}`，zh/en/ja/ko 各 203 条），可视工具经 `GemNames(lang)` 取当前语言那一份。
 
 - **物品行**（`hash != skill1`）：`skill1` 主技能 hash、`skill2` 固定第二技能 hash（无副 = ""）、`cap` 主技能属性、`lot` 池版合法副列表；
   `player != ""` 为角色专属，`onlyone = "1"` 为唯一持有（钳蟹系等）。
 - **非物品技能行**（`hash == skill1`）：不作主、不作副，仅供技能字典（角色可持有该技能）。
 - **主下拉** = `player == ""`（含钳蟹系/相扑斗力等 `onlyone="1"` 行；非物品技能行天然不在物品集内；专属因子不作主，由"专属因子"页管理）。
-- **技能字典（副下拉）** = 按 `skill1` 去重派生（**取首行**，技能名按该行 hash 取 `gem.lang.json`）；前端另按 `player == ""` 过滤掉专属技能。
-- 主因子按名字**分组**（同名变体一行，下拉只显示唯一名字）。名字一律经 `shortName` 去后缀，**无例外**——3 条 `_74` 进阶专属（涯之七星／涯之二王／无态）在 `gem.lang.json` 中同样不带「＋」。
+- **技能字典（副下拉）** = 按 `skill1` 去重派生（**取首行**，技能名按该行 hash 取 `sigils.lang.json`）；前端另按 `player == ""` 过滤掉专属技能。
+- 主因子按名字**分组**（同名变体一行，下拉只显示唯一名字）。名字一律经 `shortName` 去后缀，**无例外**——3 条 `_74` 进阶专属（涯之七星／涯之二王／无态）在 `sigils.lang.json` 中同样不带「＋」。
 
 **组合规则**（2.0.5 实测：合成结果 = 两输入因子技能的任意组合；一切组合均允许，"非法"仅为 UI 提示样式，**不禁止**选择/保存/实装）：
 
@@ -148,7 +148,7 @@ TemplateGemSlot{
 - 装配 hash：pool 族（`lot != []`）各名字组只保留池版行 → 保存时按副技能选池版/固定版 hash（副命中池 `lot` → 池版；命中某变体 `skill2` → 该固定版；其余 → 池版，仅样式不阻断）；
   副技能随配置写入（mod 合成形态与 2.0.5 合成规则一致；无池版组 = plain/专属组原样）。可视工具界面就地重载预设，不重启进程。
 - **字段名不可改**：loadout.json 协议中物品 ID 叫 `gem`、技能 ID 叫 `hash`（mod 读取）。
-- §4 的 `kCharacterExclusives[]` 是**内置专属默认**（内嵌 C++，不走 JSON）；`gem.json` 只是玩家配置解析用的 ID→上限映射，两者独立。
+- §4 的 `kCharacterExclusives[]` 是**内置专属默认**（内嵌 C++，不走 JSON）；`sigils.json` 只是玩家配置解析用的 ID→上限映射，两者独立。
 
 ## 6. 雷区（fail-closed 与安全边界，禁止削弱）
 
@@ -156,12 +156,12 @@ TemplateGemSlot{
 - **需要现场弄明白"游戏现在把什么放在哪"时**（锚点失效、要确认某份状态对象在哪）：用 `tools/live-probe/`——往运行中的游戏注入只读探针，按命令文件读/扫内存（不重启游戏）。用法见该目录的 `README.md`。`rva=` / `offset=` 这类值是**某一次游戏构建的实测值**，只当现场参数用，别写进产品代码。
 - `skill_hooks.cpp`：detour 的 TLS/identity/context/expected/injected 校验顺序、构建开始时的**槽位快照**（thread_local，构建内所有槽位共用一份）、natural bind 的计数与 N/M 报告。**别把快照改回"一张以 status 指针为键的授权表"**：那张表要提交/过期/清理，而且"残留授权命中被复用的地址"会注入旧槽位——游戏的两份 status 对象是轮换 + 地址跨角色复用的（§7）。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；**只做一件事**：调游戏的重建函数，然后校验重建后身份没变（变了就当失败）。**不许**再往它里面加"先把 `context_mode` 改成 0"这类字段改写——那条路指向的是装备页那份对象，不是在场那份（2026-09-21 崩溃的写法）。
-- **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
+- **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `sigils.json` 的 `character` 列 **0 处不一致**；而 sigils.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=20`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` **与逐字段 `Marshal.OffsetOf`** 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，尺寸只挡得住"长度改了"，字段次序只有偏移断言挡得住。
 - **因子热应用走的是"一个地址"，没有第二条路**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**没有兜底**：拒写就是这一局内存里那份不变，但表此前已经重新注册，所以编辑在游戏下一次解析、或重启后照样生效，而原生那句 refusal 会说明是哪一闸拦的。曾经有一条全内存扫描兜底，**已删**——机制上线后它一次都没跑过（日志里从没出现 `located … copy/copies`），而它证明不了唯一重要的那件事："这块缓冲区就是游戏在用的那块"静态证不出来。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 技能 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
   **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是可视工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
-  槽位由**原生侧**按技能 hash 认（`ExclusiveBitForSkill`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务可视工具的专属页。
+  槽位由**原生侧**按技能 hash 认（`ExclusiveBitForSkill`，表就在 `template_loadout.cpp`），所以 mod 不再读 `sigils.chara.json`；那个文件现在只服务可视工具的专属页。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
 - 缩进：native 3 空格、托管 4 空格。
 - **维持 Tick 没有全局单飞闸**（`Mod.cs` 的 `System.Threading.Timer` 回调直接顺序跑三个阶段：`LoadoutConfig.Tick` → `SigilEditFeature.Tick` → `Hotkey.Tick`），而 `Timer` **不等**上一次回调结束。所以每个阶段都必须自己扛得住"上一拍还没跑完、下一拍又进来"。
@@ -230,11 +230,11 @@ TemplateGemSlot{
 | 内部显示消息 WM_APP+0x10 | 0x8010 | C# Hotkey.cs / Go main.go |
 | 单实例互斥体名 | Local\GBFRPreEquippedSigilsTool | Go main.go |
 | 可视工具热键发布文件 | tool-hotkey.txt（mod 目录 = 部署后工具 exe 所在目录；**不入 `assets\`**：它是 mod 运行时写的握手文件，不是随包数据）。工具在挂载时读**一次**，之后不重读——mod 改键后要重启工具才跟上。另外：mod 活着时这个键被 `RegisterHotKey` 全局收走，工具窗口收不到它自己的 keydown，所以"按同一个键把工具藏回去"只在 mod 没拿到这个键（或被卸载）时才真的可用（Esc 不受影响） | C# Hotkey.cs / Go loadoutservice.go / TS App.tsx |
-| 随包数据位置 | `assets\` 下九份，两种待遇：**可替换的两份**（`gem.json`、`gem.chara.json`，mod 目录下）**只有可视工具读**，且**不内嵌**——`go:embed` 会让它们变死，而"换一份 assets 配置照样能用"才是要保住的性质；其余七份（`skill_status.json`、`skill.<lang>.json` ×4、`gem.lang.json`、`chara.lang.json`）是编译期嵌进 exe 的生成物，随包换没有意义。native 的限制表已编译进 DLL，C# 只映射载荷。源码树里同样是 `Loadout\assets\`，所以两种布局只有一种 | Go loadoutservice.go / main.go |
+| 随包数据位置 | `assets\` 下九份，两种待遇：**可替换的两份**（`sigils.json`、`sigils.chara.json`，mod 目录下）**只有可视工具读**，且**不内嵌**——`go:embed` 会让它们变死，而"换一份 assets 配置照样能用"才是要保住的性质；其余七份（`skill_status.json`、`skill.<lang>.json` ×4、`sigils.lang.json`、`chara.lang.json`）是编译期嵌进 exe 的生成物，随包换没有意义。native 的限制表已编译进 DLL，C# 只映射载荷。源码树里同样是 `Loadout\assets\`，所以两种布局只有一种 | Go loadoutservice.go / main.go |
 | 用户配置目录 | %LocalAppData%\GBFRPreEquippedSigils\ — `loadout.json`（配装）、`gemedits.json`（因子编辑列表）。目录名与两个文件名在 C# / Go 各有一份算出同一个字符串的实现（中间没有任何协商），由上面那道断言对拍。编辑列表**只有这一个位置**：合并前那份 %AppData%\GBFR.SigilEdit\Config.json 不读、不搬、不兼容 | C# UserConfig.cs / Go loadoutservice.go userCfgDir() |
 | 因子编辑列表缺失 | 可视工具：空列表（一条编辑都不写、游戏也不改）；mod：空列表 → 把未编辑的技能表写回去（删除即撤销）。读不出来（坏 JSON/权限）则 mod 什么都不写 | Go editservice.go / C# SigilEditFeature.cs |
 | 编辑器依赖 | gbfrelink.utility.manager 是**可选**依赖（`OptionalDependencies`）：没装时 mod 照常加载，编辑器等它加载（Tick 里重试） | ModConfig.json / C# SigilEditFeature.cs |
-| 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；文案只有**一份** `messages.ts`（`Record<Lang, Messages>`，漏一种语言 tsc 就报错），语言身份（有哪些语言 / 切换键标签 / 系统语言猜测）在 `lang.ts`。名字也四种齐全：配装页按当前语言取内嵌的 `gem.lang.json`（经 Go 的 `GemNames(lang)`），专属因子页的角色名取 `chara.lang.json`（`CharaNames(lang)`），因子编辑页取 `skill.<lang>.json` | TS App.tsx / messages.ts / lang.ts / Go loadoutservice.go / gen（`go run . sigils` / `. texts`） |
+| 界面语言 | 一套：zh/en/ja/ko，存在 loadout.json 的 `lang`（C# 只读 slots，不管它）；文案只有**一份** `messages.ts`（`Record<Lang, Messages>`，漏一种语言 tsc 就报错），语言身份（有哪些语言 / 切换键标签 / 系统语言猜测）在 `lang.ts`。名字也四种齐全：配装页按当前语言取内嵌的 `sigils.lang.json`（经 Go 的 `GemNames(lang)`），专属因子页的角色名取 `chara.lang.json`（`CharaNames(lang)`），因子编辑页取 `skill.<lang>.json` | TS App.tsx / messages.ts / lang.ts / Go loadoutservice.go / gen（`go run . sigils` / `. texts`） |
 | 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |
 | 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48）。**行数不写死在任何一边**：托管侧从归档读出的表自己定义形状，原生只检查游戏那份与它一致 | C# SigilEditFeature.cs（改表）与 Native src/table_slot.cpp（验形状、逐行 Key 比对）各存一份——它们是两个二进制，天然如此；三处数字由 `Loadout\sharedconstants_test.go` 对拍 |
 | skill_status 活表地址 | 游戏把已解析的表发布在一个固定槽里；槽的地址由原生从**语义锚点**（唯一的"行数×52 + 表首"行循环锚点，加上锚点前 0x800 字节里那一对发布指令）解析，不写死 RVA、失败即拒写。锚点字节与实测数字的唯一持有者是代码注释 | Native src/table_slot.cpp |
@@ -243,4 +243,4 @@ TemplateGemSlot{
 | 原生导出口 | 7 个：GetAbiVersion / SetLogCallback / Initialize / Shutdown / CopyRuntimeMessage / ApplyLoadout / WriteSkillStatusTable（原 Tick 已删） | native_api.h |
 | 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条技能自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 只**拒负数**（负数直接抛 `InvalidDataException`），**不判上界**——上界归可视工具（唯一写者） | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
 | `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的技能 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |
-| 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 gem.json 测） | TS model.ts |
+| 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 sigils.json 测） | TS model.ts |

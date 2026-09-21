@@ -72,12 +72,12 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1          # 部�
 
 | 生成器（在共享工程 `gen` 里） | 作用 |
 |---|---|
-| `go run . exclusive` | 从 `pkgs/sigils` 里那张策展表生成 `src\exclusive_table.inc`（native 编译时 `#include`，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\gem.chara.json`（**入库、随包**，只有可视工具读） |
-| `go run . sigils` | → `gen\output\gem.xlsx`（审阅表，不入库）+ `Loadout\assets\gem.json` + `gem.lang.json` |
+| `go run . exclusive` | 从 `pkgs/sigils` 里那张策展表生成 `src\exclusive_table.inc`（native 编译时 `#include`，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\sigils.chara.json`（**入库、随包**，只有可视工具读） |
+| `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，不入库）+ `Loadout\assets\sigils.json` + `sigils.lang.json` |
 | `go run . texts` | → `gen\output\texts.xlsx` + `texts.json`，并生成 `Loadout\assets\chara.lang.json` |
 | `go run . skills` | 由 `gen\output\texts.json` 出 `Loadout\assets\` 那五份内嵌资产（游戏更新后才跑） |
 
-`gen` 是与本仓库**平级的独立仓库**（两个 mod 共用，自带 git；解包归档/GBFRDataTools/sqlite 那些大数据在它的 `.gitignore` 里）。因子表的生成规则见 gen 仓库的 `docs\gem.xlsx 生成文档.md`。
+`gen` 是与本仓库**平级的独立仓库**（两个 mod 共用，自带 git；解包归档/GBFRDataTools/sqlite 那些大数据在它的 `.gitignore` 里）。因子表的生成规则见 gen 仓库的 `docs\sigils.xlsx 生成文档.md`。
 
 ## 仓库结构
 
@@ -92,7 +92,7 @@ tools/                           构建/部署/探针等工具（build-release.p
 
 ## 常用操作速查
 
-- **改专属数据（技能 / 因子 / 等级）**：改 gen 的 `pkgs/sigils/exclusive.go` 里的 `exclusiveSources` → 编译（vcxproj 编译前自动重跑它）→ 部署 → 验证。**加角色**走同一条路（查该角色专属因子 hash：`gem.json` 的专属行 + `gem.lang.json` 的名字表）。
+- **改专属数据（技能 / 因子 / 等级）**：改 gen 的 `pkgs/sigils/exclusive.go` 里的 `exclusiveSources` → 编译（vcxproj 编译前自动重跑它）→ 部署 → 验证。**加角色**走同一条路（查该角色专属因子 hash：`sigils.json` 的专属行 + `sigils.lang.json` 的名字表）。
 - **改通用槽 / 前端规则**：可视工具与托管逻辑（无内置通用默认；副技能规则见 `MAINTENANCE.md` §5）；配装的增删改步骤见 §4、§5。
 - **手动部署**：游戏退出后，把 `dist\GBFR.PreEquippedSigils` 复制到 Reloaded-II 的 `Mods\`。
 - **提交 / 推送**：`git -c user.name="baagod" -c user.email="780810441@qq.com" commit ...`（不要改全局 git config），提交前 `git status` 确认无 bin/obj/dist 混入；推送用 `git -c credential.helper="!gh auth git-credential" push origin main`（本地代理 127.0.0.1:7890）。

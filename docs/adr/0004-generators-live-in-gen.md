@@ -8,11 +8,11 @@
 
 - **生成器随使用方仓库**（本仓库此前的形态：三个 `tool-gen-*.ps1` + 一个自带 `go.mod` 的转换器）：
   第二个消费者出现时，必然要复制一份，或让一个仓库当另一个的宿主。
-- **审阅表 `gem.xlsx` 继续入库当数据源**：它和别的产物同源同命，入库只会让人以为它该手工维护。
+- **审阅表 `sigils.xlsx` 继续入库当数据源**：它和别的产物同源同命，入库只会让人以为它该手工维护。
 
 ## Consequences
 
 - **本仓库不再自包含**：原生编译（`exclusive_table.inc`）与发布构建的一致性门都需要 `..\gen`；
   换机器或上 CI 必须把它一起放好。
 - 产物分级：游戏数据与审阅表（`gen\extracted\`、`output\*.xlsx`…）不入库；mod 运行时/随包要的
-  （`gem.json`、`*.lang.json`、`gem.chara.json`、`skill*.json`）入库。
+  （`sigils.json`、`*.lang.json`、`sigils.chara.json`、`skill*.json`）入库。

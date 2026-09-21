@@ -14,8 +14,8 @@ namespace
 // player's loadout.json only; no config means the exclusive slots with no
 // general sigils.
 //
-// Character-exclusive gems/skills follow gem.json (the tool's source): the table below is
-// derived from it by gen/loadout.ps1 at build time, so nothing is read at runtime.
+// Character-exclusive gems/skills follow sigils.json (the tool's source): the table below is
+// derived from it by gen's `exclusive` command at build time, so nothing is read at runtime.
 //
 // IMPORTANT: a "no second skill" gem must use skill2 = kUnwornCharacterHash
 // (0x887AE0B0, the "not selected" sentinel the game understands), NOT 0.
@@ -45,13 +45,13 @@ struct CharacterExclusiveLoadout
    uint32_t war_skill = 0; // war skill hash
 };
 
-// 这张表（角色 → 三个专属槽的 gem 与技能）由 gen\loadout.ps1 从 $chars 生成：vcxproj
-// 每次编译前重跑那个脚本，所以 .inc 是构建中间产物、不入库——改数据去改脚本，源码里没有表段。
+// 这张表（角色 → 三个专属槽的 gem 与技能）由 gen 的 `exclusive` 子命令从 exclusiveSources 生成：
+// vcxproj 每次编译前跑它，所以 .inc 是构建中间产物、不入库——改数据去改 pkgs/sigils/exclusive.go。
 #include "exclusive_table.inc"
 
 // 这个 gem 属于哪个角色：直接在**已经编译进来的注入表**里找，不另存一张"限制表"。那道校验只
 // 可能看到注入表自己的 gem（唯一调用点是 TryCopyTemplateGem），所以"gem → 角色"在这里只有一份
-// 来源——生成时已核对它与 gem.json 的 character 列一致（84 个不重复 gem，0 处不一致）。
+// 来源——生成时已核对它与 sigils.json 的 character 列一致（84 个不重复 gem，0 处不一致）。
 // 古兰/姬塔共用同 3 个 gem：谁先出现返回谁，由 IsCharacterCompatible 认这一对。
 uint32_t RequiredCharacterForGem(uint32_t gem_hash) noexcept
 {
@@ -132,7 +132,7 @@ uint8_t ExclusiveBitForSkill(
 // 只有"被关掉的槽"会留下条目，所以没被提到的角色就是三槽全开
 // （ReadExclusiveStateLocked 对缺失条目返回 ExclusiveAll）。槽位由 skill hash 认——
 // 那张专属表就在本文件里，所以托管侧不必知道哪个 hash 是 T1、哪个是战气，也不必再读
-// gem.chara.json。认不出的 (角色, 技能) 对直接忽略：没有别的兼容形状。
+// sigils.chara.json。认不出的 (角色, 技能) 对直接忽略：没有别的兼容形状。
 //
 // Requires g_template_mutex held by the caller.
 void ApplyExclusiveSwitchesLocked(

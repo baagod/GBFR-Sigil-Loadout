@@ -50,37 +50,37 @@ $packageDir = Join-Path $distRoot 'GBFR.PreEquippedSigils'
 $zipPath = Join-Path $distRoot "GBFR-Pre-Equipped-Sigils-$Version.zip"
 
 # --- release consistency gates ------------------------------------------------
-# gem.json 是工具读的数据源，随包发布——必须在场，否则工具起来就没有因子表。
+# sigils.json 是工具读的数据源，随包发布——必须在场，否则工具起来就没有因子表。
 # 「character 行必须正好 87 条」那道门**已删**：mod 侧已经没有这个数字（不是常量、不是断言、
 # 不是日志、也不是门禁）——"gem → 角色"由编译进去的注入表派生，见 MAINTENANCE §6。
-$sigilsPath = Join-Path $root 'Loadout\assets\gem.json'
+$sigilsPath = Join-Path $root 'Loadout\assets\sigils.json'
 if (-not (Test-Path -LiteralPath $sigilsPath)) {
-    throw "gem.json is missing: $sigilsPath"
+    throw "sigils.json is missing: $sigilsPath"
 }
 
 # --- data freshness gate ------------------------------------------------------
-# gem.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   gem.json  <- gen\output\gem.xlsx（共享 gen 的 `go run . sigils-json`）
-# 审阅表 gem.xlsx 与 texts.xlsx 同待遇：都是生成物，住在 gen\output\（不入任何仓库）。
+# sigils.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
+#   sigils.json  <- gen\output\sigils.xlsx（共享 gen 的 `go run . sigils-json`）
+# 审阅表 sigils.xlsx 与 texts.xlsx 同待遇：都是生成物，住在 gen\output\（不入任何仓库）。
 # 这个生成器的两份产物待遇不同：`src\exclusive_table.inc` 不入库（.gitignore），是构建中间产物；
-# `Loadout\assets\gem.chara.json` **入库、随包**，却由同一次构建重写。所以入库的那一份另有一道
+# `Loadout\assets\sigils.chara.json` **入库、随包**，却由同一次构建重写。所以入库的那一份另有一道
 # 收尾门禁（见文件末尾的 generated-asset gate）——"构建中间产物"这句话对它不成立。
-# 这道门只比对本仓库里 gem.json 入库的那一份，不需要游戏数据在场。
+# 这道门只比对本仓库里 sigils.json 入库的那一份，不需要游戏数据在场。
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
-$sigilsXlsx = Join-Path $genDir 'output\gem.xlsx'
+$sigilsXlsx = Join-Path $genDir 'output\sigils.xlsx'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
-    throw "gem.json freshness source is missing: $sigilsXlsx（审阅表在 gen 里生成，不入库；先 cd gen && go run . sigils，不得跳过一致性检查）"
+    throw "sigils.json freshness source is missing: $sigilsXlsx（审阅表在 gen 里生成，不入库；先 cd gen && go run . sigils，不得跳过一致性检查）"
 }
 # 生成器住在仓库**外面**（..\gen，不入本仓库），所以这道门禁只有在本机才跑得起来。
 # 与其让 `go run` 报一句看不懂的错，不如在这里说清原因。
 if (-not (Test-Path -LiteralPath (Join-Path $genDir 'main.go'))) {
-    throw "共享生成器不在 $genDir（它不在本仓库里）。gem.json 的一致性门禁靠它运行，所以本仓库无法单独完成一次发布构建：把 gen\ 放回仓库旁，或在有它的机器上构建。"
+    throw "共享生成器不在 $genDir（它不在本仓库里）。sigils.json 的一致性门禁靠它运行，所以本仓库无法单独完成一次发布构建：把 gen\ 放回仓库旁，或在有它的机器上构建。"
 }
 Push-Location $genDir
 try {
     & go run . sigils-json $sigilsXlsx $sigilsPath --check
     if ($LASTEXITCODE -ne 0) {
-        throw 'gem.json 与 gen\output\gem.xlsx 不一致：先跑 gen 的 go run . sigils（审阅表在 gen\output\）'
+        throw 'sigils.json 与 gen\output\sigils.xlsx 不一致：先跑 gen 的 go run . sigils（审阅表在 gen\output\）'
     }
 } finally {
     Pop-Location
@@ -185,7 +185,7 @@ try {
 # 随包数据只有一份：Loadout\assets\。工具按 exeDir()\assets\ 找它，所以从源码目录直接跑
 # （wails3 dev / Loadout\Loadout.exe）与跑打包出来的那份用的是同一布局——这里不需要任何
 # "开发副本"，以前那一步同步已经删掉。
-foreach ($staleData in @('gem.json', 'gem.chara.json')) {
+foreach ($staleData in @('sigils.json', 'sigils.chara.json')) {
     $staleCopy = Join-Path $toolDir $staleData
     if (Test-Path -LiteralPath $staleCopy) {
         Remove-Item -LiteralPath $staleCopy -Force
@@ -248,13 +248,13 @@ Copy-Item -Path $toolExe -Destination $packageDir -Force
 
 # Required release files — this list is the ONLY holder of "which files a package must
 # have"; deploy.ps1 不再抄一份（它只问"这到底是不是一个包"）。
-# (gem.json lands here via the csproj CopyToOutputDirectory.)
+# (sigils.json lands here via the csproj CopyToOutputDirectory.)
 foreach ($requiredFile in @(
     'GBFR.PreEquippedSigils.dll',
     'GBFR.PreEquippedSigils.Native.dll',
     'Loadout.exe',
-    'assets\gem.json',
-    'assets\gem.chara.json'
+    'assets\sigils.json',
+    'assets\sigils.chara.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
@@ -301,14 +301,14 @@ if ($packagedConfig) {
 
 # --- generated-asset gate -----------------------------------------------------
 # 上面那些门禁跑完之后，构建还会在 native 编译前重跑生成器（vcxproj 的 GenerateExclusiveTable），
-# 而它重写的是**入库**的 gem.chara.json。改写本身不是错误（说明 $chars 变了），但那份改动必须在
+# 而它重写的是**入库**的 sigils.chara.json。改写本身不是错误（说明 $chars 变了），但那份改动必须在
 # 仓库里，否则随包发布的就是一份没进仓库的数据——而这个问题现在是不可见的（文件既是生成物，
 # 又是入库数据）。只查这一处，别把开发中的其它改动也算进来。
 $gitDir = Join-Path $root '.git'
 if (Test-Path -LiteralPath $gitDir) {
-    $generatedDiff = & git -C $root status --porcelain -- 'Loadout/assets/gem.chara.json'
+    $generatedDiff = & git -C $root status --porcelain -- 'Loadout/assets/sigils.chara.json'
     if ($generatedDiff) {
-        throw "gem.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen 的 pkgs/sigils/exclusive.go 里引起改写的改动。"
+        throw "sigils.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen 的 pkgs/sigils/exclusive.go 里引起改写的改动。"
     }
 }
 else {

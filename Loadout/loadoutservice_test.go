@@ -67,7 +67,7 @@ func TestValidateSlots(t *testing.T) {
 		{"missing main hash", []loadoutSlot{{
 			Items: []loadoutItem{{Gem: "9A60FBF0", Level: 15}},
 		}}, false},
-		// 上限不属于这一层：cap 是每条技能自己的值，只有前端（读 gem.json）与 mod
+		// 上限不属于这一层：cap 是每条技能自己的值，只有前端（读 sigils.json）与 mod
 		// （LoadoutConfig）知道它。这里写死一个数就会变成同一规则的第三份副本，
 		// 所以超过 cap 的等级在这一层是合法的，由 mod 侧判定。
 		{"level above cap", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", 201, 15)}, true},
@@ -253,28 +253,28 @@ func TestSaveLoadoutRejectsAnObjectWithoutSlots(t *testing.T) {
 因子表与名字文件由同一次生成写出，但它们是不同的文件：谁都不会替对方发现漂移，
 运行时也看不出来——少的那个只是少一行名字，屏幕上照旧显示回落的数据。
 
-所以这里按 hash 把两边对一遍，顺带钉住"表里不再带名字"这件事：gem.json 是 mod 也在读的
-数据，多语言名字只属于 gem.lang.json。
+所以这里按 hash 把两边对一遍，顺带钉住"表里不再带名字"这件事：sigils.json 是 mod 也在读的
+数据，多语言名字只属于 sigils.lang.json。
 */
 func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
-	// 入库的 gem.json 与四份名字文件都在 assets\ 里；测试的工作目录是包目录。
-	raw, err := os.ReadFile(filepath.Join("assets", "gem.json"))
+	// 入库的 sigils.json 与四份名字文件都在 assets\ 里；测试的工作目录是包目录。
+	raw, err := os.ReadFile(filepath.Join("assets", "sigils.json"))
 	if err != nil {
-		t.Fatalf("reading assets/gem.json: %v", err)
+		t.Fatalf("reading assets/sigils.json: %v", err)
 	}
 	var table struct {
 		Sigils []map[string]any `json:"sigils"`
 	}
 	if err := jsonv2.Unmarshal(raw, &table); err != nil {
-		t.Fatalf("parsing assets/gem.json: %v", err)
+		t.Fatalf("parsing assets/sigils.json: %v", err)
 	}
 	if len(table.Sigils) == 0 {
-		t.Fatal("gem.json lists no rows")
+		t.Fatal("sigils.json lists no rows")
 	}
 	for _, row := range table.Sigils {
 		for _, banned := range []string{"name", "zh"} {
 			if _, carried := row[banned]; carried {
-				t.Fatalf("gem.json row %v still carries %q; names belong in gem.lang.json", row["hash"], banned)
+				t.Fatalf("sigils.json row %v still carries %q; names belong in sigils.lang.json", row["hash"], banned)
 			}
 		}
 	}
@@ -283,12 +283,12 @@ func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 	for _, lang := range []string{LangZH, "en", "ja", "ko"} {
 		names := (&LoadoutService{}).GemNames(lang)
 		if len(names) != len(table.Sigils) {
-			t.Fatalf("gem.lang.json[%s] has %d names for %d rows", lang, len(names), len(table.Sigils))
+			t.Fatalf("sigils.lang.json[%s] has %d names for %d rows", lang, len(names), len(table.Sigils))
 		}
 		for _, row := range table.Sigils {
 			hash, _ := row["hash"].(string)
 			if names[hash] == "" {
-				t.Fatalf("gem.lang.json[%s] has no name for %s", lang, hash)
+				t.Fatalf("sigils.lang.json[%s] has no name for %s", lang, hash)
 			}
 		}
 		namesByLang[lang] = names
@@ -304,29 +304,29 @@ func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 }
 
 /*
-专属因子页的行标签来自另一份生成物（chara.lang.json，键是 PL 码），与 gem.chara.json
+专属因子页的行标签来自另一份生成物（chara.lang.json，键是 PL 码），与 sigils.chara.json
 同一次生成却不是一个文件：少的那个只是让整行退回 PL 码。这里把两边的键对一遍。
 */
 func TestCharaNamesCoverTheExclusiveTableInEveryUILanguage(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("assets", "gem.chara.json"))
+	raw, err := os.ReadFile(filepath.Join("assets", "sigils.chara.json"))
 	if err != nil {
-		t.Fatalf("reading assets/gem.chara.json: %v", err)
+		t.Fatalf("reading assets/sigils.chara.json: %v", err)
 	}
 	var rows []struct {
 		Player string     `json:"player"`
 		Gems   [][]string `json:"gems"`
 	}
 	if err := jsonv2.Unmarshal(raw, &rows); err != nil {
-		t.Fatalf("parsing assets/gem.chara.json: %v", err)
+		t.Fatalf("parsing assets/sigils.chara.json: %v", err)
 	}
 	if len(rows) == 0 {
-		t.Fatal("gem.chara.json lists no rows")
+		t.Fatal("sigils.chara.json lists no rows")
 	}
 	for _, lang := range []string{LangZH, "en", "ja", "ko"} {
 		names := (&LoadoutService{}).CharaNames(lang)
 		for _, row := range rows {
 			if row.Player == "" || len(row.Gems) != 3 {
-				t.Fatalf("gem.chara.json row %+v is not a 3-slot character entry", row)
+				t.Fatalf("sigils.chara.json row %+v is not a 3-slot character entry", row)
 			}
 			if names[row.Player] == "" {
 				t.Fatalf("chara.lang.json[%s] has no name for %s", lang, row.Player)

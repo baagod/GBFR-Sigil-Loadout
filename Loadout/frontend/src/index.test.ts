@@ -2,7 +2,7 @@
   因子表的派生索引与落盘载荷此前只活在 App.tsx 的 useMemo 里，没有测试能碰到——而
   "该写哪个变体 hash""解析不出的 gem 要整行跳过"这些规则决定的正是用户配置的内容。
 
-  这里跑的是**入库的真实 gem.json**，不是手搓夹具：夹具可以和 App 的构造各自漂移，而表
+  这里跑的是**入库的真实 sigils.json**，不是手搓夹具：夹具可以和 App 的构造各自漂移，而表
   是唯一的真相。
 */
 import { readFileSync } from "node:fs"
@@ -18,7 +18,7 @@ import {
 } from "./model"
 
 const rows = parseSigilRows(
-  readFileSync(new URL("../../assets/gem.json", import.meta.url), "utf8")
+  readFileSync(new URL("../../assets/sigils.json", import.meta.url), "utf8")
 )
 const sigils = itemRowsOf(rows)
 const skills = skillTableOf(rows)
@@ -37,7 +37,7 @@ const slot = (patch: Partial<Slot> = {}): Slot => ({
   ...patch,
 })
 
-describe("真实 gem.json 上的派生索引", () => {
+describe("真实 sigils.json 上的派生索引", () => {
   it("表不是空的，且每个主下拉取值都有显示名", () => {
     expect(sigils.length).toBeGreaterThan(0)
     expect(index.mainKeys.length).toBeGreaterThan(0)

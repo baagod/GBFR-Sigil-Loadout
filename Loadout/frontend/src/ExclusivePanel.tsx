@@ -11,7 +11,7 @@ export function ExclusivePanel({
 }: {
   table: Exclusive[]
   state: ExclusiveState | undefined
-  /** 当前语言的因子物品 hash -> 名字（gem.lang.json）；缺条目的槽显示 hash。 */
+  /** 当前语言的因子物品 hash -> 名字（sigils.lang.json）；缺条目的槽显示 hash。 */
   names: Record<string, string>
   /** 当前语言的 PL 码 -> 角色名（chara.lang.json）；缺条目的行显示 PL 码。 */
   charaNames: Record<string, string>
