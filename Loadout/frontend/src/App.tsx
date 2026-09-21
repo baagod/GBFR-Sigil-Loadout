@@ -340,7 +340,8 @@ export default function App() {
           配装那两页各自是滚动盒子（见 LOADOUT_PANEL），所以这里没有共用容器、
           也没有"不在这一页就整块不渲染"的分支：未激活的面板本来就不渲染。
         */}
-        <TabsPanel value="general" className={LOADOUT_PANEL}>
+        {/* 上下 16px 只归这一页：专属因子那页沿用 LOADOUT_PANEL 原本的间距。 */}
+        <TabsPanel value="general" className={`${LOADOUT_PANEL} py-4`}>
         <div className={HEADER_ROW}>
           <div className="pl-0.5 pr-3">
             {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}

@@ -457,7 +457,7 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-[888px] flex-col p-5 pb-6">
+    <div className="flex h-full min-h-0 min-w-[888px] flex-col px-5 pt-4 pb-6">
       {/*
         列表上方的一条横带：如何从中找到因子，以及语言切换——它一直待在那个角落。它下面的一切都归行所有。
       */}
