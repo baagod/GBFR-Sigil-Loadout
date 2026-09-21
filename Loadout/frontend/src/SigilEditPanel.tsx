@@ -323,10 +323,10 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
   }
 
   /*
-    指针在哪一行，是问文档而不是问 hover 事件：一次勾选之后，行在没动的指针下面
-    移动了，而在行内移动也不会触发 enter，所以 hover 事件说不出当前悬停的是哪一行。
-    这个函数由勾选之后的 layout effect 调用，所以这里找到的就是此刻指针下的那一行 ——
-    无论它是被勾选的那行，还是滑进来占了它位置的那行 —— tooltip 跟着它走就是了。
+    指针在哪一行，是问文档而不是问 hover 事件：行在没动的指针下面移动过（一次勾选的重排、
+    一次滚动之后），而在行内移动不会触发 enter，所以 hover 事件说不出当前悬停的是哪一行。
+    调用点：勾选之后的 layout effect，以及滚动关掉说明之后指针的第一次移动。
+    这里找到的就是此刻指针下的那一行，tooltip 跟着它走。
   */
   function resolveHoveredRow() {
     const at = lastMove.current;
@@ -527,7 +527,17 @@ export function SigilEditPanel({ lang }: { lang: Lang }) {
         className="skill-rows mt-6 min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]"
         onPointerMove={(e) => {
           lastMove.current = { x: e.clientX, y: e.clientY };
+          // 滚动关掉后指针常在原行（那不会再触发 enter）：下一次移动替它重解一次。
+          if (tipRow === null) resolveHoveredRow();
         }}
+        onPointerLeave={() => {
+          // 指针离开列表：位置不再有意义，留着它下一次重解会解出一个指针根本不在的行。
+          lastMove.current = null;
+          setTipRow(null);
+        }}
+        // 滚动就当场关掉：弹层是按"打开那一刻"的坐标画的，滚动只挪内容、不挪它，
+        // 继续开着要么跟着行跑到容器边缘被夹住、要么留一层退场残影——两种都不是要的效果。
+        onScroll={() => setTipRow(null)}
       >
         {/*
           整个列表共用一个 provider：哪个 tooltip 打开由这里决定（见 tipRow），

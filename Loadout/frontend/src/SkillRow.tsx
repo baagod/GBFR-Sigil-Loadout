@@ -295,13 +295,19 @@ function LevelRow({
         永远不会被盖住。比现成的气泡更宽，并保留游戏原文里的换行——有些说明是三行参数，
         单行气泡会把它们截掉。打开和关闭动画都关掉了：气泡是在行之间换位置，而不是被动画带进带出。
       */}
-      <TooltipContent
-        side="top"
-        align="center"
-        className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
-      >
-        {notation}
-      </TooltipContent>
+      {/*
+        只在打开时挂载。base-ui 关闭时会先让弹层走完自己的退场（那段残影就是截图里
+        半透明的那一层，位置还停在弹层被夹住的地方），整块不挂载 = 当帧就没了。
+      */}
+      {hovered && (
+        <TooltipContent
+          side="top"
+          align="center"
+          className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
+        >
+          {notation}
+        </TooltipContent>
+      )}
     </Tooltip>
   );
 }
@@ -423,13 +429,15 @@ export function SkillRow({
             )}
           </span>
         </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          align="center"
-          className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
-        >
-          {row.summary}
-        </TooltipContent>
+        {hoveredId === row.key && (
+          <TooltipContent
+            side="top"
+            align="center"
+            className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
+          >
+            {row.summary}
+          </TooltipContent>
+        )}
       </Tooltip>
 
       {isOpen &&
