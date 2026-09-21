@@ -2,6 +2,18 @@
 
 namespace gbfr::native
 {
+// 我们自己的重建调用正在游戏线程上跑（重建函数反过来进 detour）。见 native_internal.h。
+thread_local bool g_tls_hot_rebuild_build = false;
+
+namespace
+{
+// 带 __try 的函数里不能有需要析构的局部对象（C2712），所以日志拼串放在外面。
+void LogRebuildProblem(const char* what, uint32_t character_hash, uintptr_t status)
+{
+   Log(std::format(
+      "status rebuild: {} (char=0x{:08X} status=0x{:X})", what, character_hash, status));
+}
+} // namespace
 bool SafeReadPointer(uintptr_t address, uintptr_t& value) noexcept
 {
    __try
@@ -54,116 +66,6 @@ bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noex
    return true;
 }
 
-bool SafeReadUiSelectedCharacterHash(uint32_t& character_hash) noexcept
-{
-   character_hash = 0;
-   uintptr_t ui_manager = 0;
-   if (!g_layout_ready.load(std::memory_order_acquire) || g_image_base == 0 ||
-       !SafeReadPointer(g_image_base + g_game_layout.ui_manager_global_rva, ui_manager) || ui_manager == 0)
-      return false;
-   __try
-   {
-      const uint32_t value =
-         *reinterpret_cast<const uint32_t*>(ui_manager + g_game_layout.ui_selected_character_hash_offset);
-      if (value == 0 || value == kUnwornCharacterHash)
-         return false;
-      character_hash = value;
-      return true;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
-      character_hash = 0;
-      return false;
-   }
-}
-
-static bool SafeReadInt32(uintptr_t address, int32_t& value) noexcept
-{
-   __try
-   {
-      value = *reinterpret_cast<const int32_t*>(address);
-      return true;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
-      value = -1;
-      return false;
-   }
-}
-
-void SafeReadUiModes(int32_t& ui_mode, int32_t& source_mode) noexcept
-{
-   ui_mode = -1;
-   source_mode = -1;
-   if (!g_layout_ready.load(std::memory_order_acquire))
-      return;
-   uintptr_t ui_manager = 0;
-   if (g_image_base != 0 &&
-       SafeReadPointer(g_image_base + g_game_layout.ui_manager_global_rva, ui_manager) &&
-       ui_manager != 0)
-      (void)SafeReadInt32(ui_manager + g_game_layout.ui_mode_offset, ui_mode);
-
-   uintptr_t source = 0;
-   if (g_image_base != 0 &&
-       SafeReadPointer(g_image_base + g_game_layout.ui_state_source_global_rva, source) &&
-       source != 0)
-      (void)SafeReadInt32(source + g_game_layout.ui_state_source_mode_offset, source_mode);
-}
-
-void UpdateEditSessionState() noexcept
-{
-   uint32_t character_hash = 0;
-   const bool has_character = SafeReadUiSelectedCharacterHash(character_hash);
-   int32_t ui_mode = -1;
-   int32_t source_mode = -1;
-   SafeReadUiModes(ui_mode, source_mode);
-
-   if (source_mode != 1 || ui_mode < 0)
-   {
-      g_edit_session_state.store(EditSessionUnknownLocked, std::memory_order_release);
-      return;
-   }
-   if (!has_character || ui_mode == 4)
-   {
-      g_edit_session_state.store(EditSessionMissionLocked, std::memory_order_release);
-      return;
-   }
-   if (ui_mode == 0)
-   {
-      g_edit_session_state.store(EditSessionFreeTraining, std::memory_order_release);
-      return;
-   }
-   if (ui_mode != 1)
-   {
-      g_edit_session_state.store(EditSessionUnknownLocked, std::memory_order_release);
-      return;
-   }
-
-   // ui_mode 1 is shared by Equipment, normal missions, and free training. Equipment is
-   // the only observed 1/1 state whose exact UI-selected local status has context 0, so it
-   // may explicitly open a fresh Equipment edit session. A context-1 battle may preserve
-   // only a FreeTraining latch established by the practice menu's 0/1 state. It must never
-   // inherit Equipment edit permission. If status lookup is transiently unavailable,
-   // preserve the current fail-closed latch; SafeCanEditCharacter still requires an exact
-   // status lookup before accepting a mutation.
-   uintptr_t manager = 0;
-   uintptr_t status = 0;
-   StatusIdentity identity{};
-   if (SafeResolveSelectedCharacterStatus(character_hash, manager, status, identity))
-   {
-      if (identity.context_mode == 0)
-      {
-         g_edit_session_state.store(EditSessionEquipment, std::memory_order_release);
-      }
-      else if (g_edit_session_state.load(std::memory_order_acquire) ==
-               EditSessionEquipment)
-      {
-         g_edit_session_state.store(EditSessionMissionLocked, std::memory_order_release);
-      }
-   }
-}
-
-
 bool SafeReadStatusIdentity(uintptr_t status, StatusIdentity& identity) noexcept
 {
    if (!g_layout_ready.load(std::memory_order_acquire) || status == 0)
@@ -179,95 +81,6 @@ bool SafeReadStatusIdentity(uintptr_t status, StatusIdentity& identity) noexcept
       identity = {};
       return false;
    }
-}
-
-bool SafeResolveStatusByMapKey(
-   uintptr_t manager,
-   uint32_t map_key,
-   uintptr_t& status) noexcept
-{
-   status = 0;
-   if (!g_layout_ready.load(std::memory_order_acquire) || manager == 0 || map_key == 0)
-      return false;
-
-   __try
-   {
-      const uintptr_t sentinel =
-         *reinterpret_cast<const uintptr_t*>(manager + g_game_layout.status_map_sentinel_offset);
-      const uintptr_t buckets =
-         *reinterpret_cast<const uintptr_t*>(manager + g_game_layout.status_map_buckets_offset);
-      const uint32_t mask =
-         *reinterpret_cast<const uint32_t*>(manager + g_game_layout.status_map_mask_offset);
-      if (sentinel == 0 || buckets == 0 || (sentinel & 0x7) != 0 || (buckets & 0x7) != 0)
-         return false;
-
-      const uintptr_t bucket_index = static_cast<uintptr_t>(map_key & mask);
-      if (bucket_index > (~uintptr_t{0} - buckets) / 0x10)
-         return false;
-      const uintptr_t bucket = buckets + bucket_index * 0x10;
-      uintptr_t node = *reinterpret_cast<const uintptr_t*>(bucket + 0x08);
-      if (node == 0 || node == sentinel)
-         return false;
-
-      if (*reinterpret_cast<const uint32_t*>(node + 0x10) != map_key)
-      {
-         const uintptr_t chain_stop = *reinterpret_cast<const uintptr_t*>(bucket);
-         bool found = false;
-         for (uint32_t traversed = 0; traversed < 0x10000; ++traversed)
-         {
-            if (node == chain_stop)
-               return false;
-            node = *reinterpret_cast<const uintptr_t*>(node + 0x08);
-            if (node == 0 || node == sentinel)
-               return false;
-            if (*reinterpret_cast<const uint32_t*>(node + 0x10) == map_key)
-            {
-               found = true;
-               break;
-            }
-         }
-         if (!found)
-            return false;
-      }
-
-      status = *reinterpret_cast<const uintptr_t*>(node + 0x30);
-      return status != 0;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
-      status = 0;
-      return false;
-   }
-}
-
-bool SafeResolveCharacterStatus(
-   uint32_t character_hash,
-   uintptr_t& manager,
-   uintptr_t& status) noexcept
-{
-   manager = 0;
-   status = 0;
-   return g_layout_ready.load(std::memory_order_acquire) &&
-      g_image_base != 0 && character_hash != 0 &&
-      SafeReadPointer(g_image_base + g_game_layout.status_manager_global_rva, manager) &&
-      manager != 0 &&
-      SafeResolveStatusByMapKey(manager, character_hash, status);
-}
-
-bool SafeResolveSelectedCharacterStatus(
-   uint32_t character_hash,
-   uintptr_t& manager,
-   uintptr_t& status,
-   StatusIdentity& identity) noexcept
-{
-   manager = 0;
-   status = 0;
-   identity = {};
-   return character_hash != 0 &&
-      SafeResolveCharacterStatus(character_hash, manager, status) &&
-      SafeReadStatusIdentity(status, identity) &&
-      identity.character_hash == character_hash &&
-      IsValidContextMode(identity.context_mode);
 }
 
 void CommitAuthorizedStatus(
@@ -310,18 +123,19 @@ bool TryGetAuthorizedSelection(
    return true;
 }
 
-bool HasMatchingAuthorizedSelection(
+void DropAuthorizedSelectionIfStale(
    uintptr_t status,
    const StatusIdentity& identity,
-   const std::array<uint32_t, kVirtualSlotCapacity>& slots)
+   const std::array<uint32_t, kVirtualSlotCapacity>& current_slots)
 {
-   std::shared_lock lock(g_authorization_mutex);
+   std::unique_lock lock(g_authorization_mutex);
    const auto iterator = g_authorized_statuses.find(status);
-   return iterator != g_authorized_statuses.end() &&
-      iterator->second.status == status &&
-      iterator->second.character_hash == identity.character_hash &&
-      iterator->second.context_mode == identity.context_mode &&
-      iterator->second.slots == slots;
+   if (iterator == g_authorized_statuses.end())
+      return;
+   if (iterator->second.character_hash != identity.character_hash ||
+       iterator->second.context_mode != identity.context_mode ||
+       iterator->second.slots != current_slots)
+      g_authorized_statuses.erase(iterator);
 }
 
 bool TryGetAuthorizedContext1Status(
@@ -350,53 +164,6 @@ void EraseAuthorizedStatus(uintptr_t status)
    g_authorized_statuses.erase(status);
 }
 
-void ValidateAuthorizedStatuses()
-{
-   // Snapshot under the shared lock, then read game memory outside it: the
-   // detour readers (shared lock) must never wait behind this tick's SEH reads.
-   std::vector<AuthorizedStatus> snapshot;
-   {
-      std::shared_lock lock(g_authorization_mutex);
-      snapshot.reserve(g_authorized_statuses.size());
-      for (const auto& [status, authorization] : g_authorized_statuses)
-         snapshot.push_back(authorization);
-   }
-
-   for (const AuthorizedStatus& authorization : snapshot)
-   {
-      uintptr_t manager = 0;
-      uintptr_t current_status = 0;
-      StatusIdentity identity{};
-      bool resolved = false;
-      if (authorization.context_mode == 1)
-      {
-         current_status = authorization.status;
-         resolved = current_status != 0;
-      }
-      else
-      {
-         resolved = SafeResolveCharacterStatus(
-            authorization.character_hash, manager, current_status);
-      }
-      const bool valid = resolved && current_status == authorization.status &&
-         SafeReadStatusIdentity(current_status, identity) &&
-         identity.character_hash == authorization.character_hash &&
-         identity.context_mode == authorization.context_mode &&
-         IsValidContextMode(identity.context_mode);
-      if (valid)
-         continue;
-      // Erase only the exact entry that was validated: a concurrent commit
-      // (same status, newer generation) must survive this sweep.
-      std::unique_lock lock(g_authorization_mutex);
-      const auto iterator = g_authorized_statuses.find(authorization.status);
-      if (iterator != g_authorized_statuses.end() &&
-          iterator->second.character_hash == authorization.character_hash &&
-          iterator->second.context_mode == authorization.context_mode &&
-          iterator->second.generation == authorization.generation)
-         g_authorized_statuses.erase(iterator);
-   }
-}
-
 bool SafeCopyToOutput(const GemData& source, void* destination) noexcept
 {
    if (destination == nullptr)
@@ -414,11 +181,8 @@ bool SafeCopyToOutput(const GemData& source, void* destination) noexcept
 
 bool SafeInvokeStatusRebuild(
    uintptr_t status,
-   uint32_t character_hash,
-   StatusIdentity& restored_identity,
-   bool preserve_context) noexcept
+   uint32_t character_hash) noexcept
 {
-   restored_identity = {};
    if (!g_layout_ready.load(std::memory_order_acquire) ||
        !g_hooks_ready.load(std::memory_order_acquire) ||
        g_image_base == 0 || status == 0 || character_hash == 0)
@@ -428,25 +192,16 @@ bool SafeInvokeStatusRebuild(
    if (!SafeReadStatusIdentity(status, original_identity) ||
        original_identity.character_hash != character_hash ||
        !IsValidContextMode(original_identity.context_mode))
+   {
+      LogRebuildProblem("refused before the call (identity mismatch)", character_hash, status);
       return false;
+   }
 
    bool rebuild_succeeded = false;
-   bool identity_was_overridden = false;
+   // 重建函数会反过来进 detour 再建一遍这份对象：那段里的构建不算"新的一轮队伍装配"。
+   g_tls_hot_rebuild_build = true;
    __try
    {
-      if (!preserve_context)
-      {
-         // The caller verified (above and in ProcessPendingHotApply) that the
-         // status already belongs to character_hash, so the character-hash
-         // write would be a no-op and is omitted. Only context_mode is pinned
-         // to 0 so the game's rebuild function takes the equipment-style path;
-         // for already-equipment statuses (the normal hot-apply case) even
-         // this store writes the same value. One aligned 4-byte store; other
-         // threads only ever observe the former context value or 0 (the same
-         // value an open equipment screen has) during the synchronous rebuild.
-         *reinterpret_cast<int32_t*>(status + g_game_layout.status_context_mode_offset) = 0;
-         identity_was_overridden = true;
-      }
       reinterpret_cast<void(__fastcall*)(void*)>(g_image_base + g_game_layout.status_rebuild_rva)(
          reinterpret_cast<void*>(status));
       rebuild_succeeded = true;
@@ -455,45 +210,29 @@ bool SafeInvokeStatusRebuild(
    {
       rebuild_succeeded = false;
    }
+   g_tls_hot_rebuild_build = false;
 
-   if (identity_was_overridden)
+   if (!rebuild_succeeded)
    {
-      __try
-      {
-         *reinterpret_cast<int32_t*>(status + g_game_layout.status_context_mode_offset) =
-            original_identity.context_mode;
-      }
-      __except (EXCEPTION_EXECUTE_HANDLER)
-      {
-         return false;
-      }
-   }
-   return rebuild_succeeded &&
-      SafeReadStatusIdentity(status, restored_identity) &&
-      restored_identity.character_hash == original_identity.character_hash &&
-      restored_identity.context_mode == original_identity.context_mode;
-}
-
-bool SafeNotifyStatusDirty(
-   uintptr_t manager,
-   uint32_t character_hash,
-   uint32_t dirty_mask) noexcept
-{
-   if (!g_layout_ready.load(std::memory_order_acquire) ||
-       !g_hooks_ready.load(std::memory_order_acquire) ||
-       g_image_base == 0 || manager == 0 || character_hash == 0)
-      return false;
-   __try
-   {
-      reinterpret_cast<void(__fastcall*)(void*, uint32_t, uint32_t)>(
-         g_image_base + g_game_layout.status_notifier_rva)(
-         reinterpret_cast<void*>(manager), character_hash, dirty_mask);
-      return true;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
+      // 游戏的重建函数里抛了异常（多半是那份对象已经不在游戏手上了）。调用方会丢授权 + 冷却，
+      // 但这一步本身无法撤销——所以真正的修法是**别让这个调用发生**（见 selection_store.cpp
+      // 的装配轮次闸）。
+      LogRebuildProblem(
+         "the game's rebuild raised; the object was probably gone", character_hash, status);
       return false;
    }
+
+   // 重建必须保持这份对象还是原来的角色、原来的 context：身份变了说明游戏已经把
+   // 这份 status 换掉了（重建函数自己换了对象），这次不算成功。
+   StatusIdentity restored_identity{};
+   if (!SafeReadStatusIdentity(status, restored_identity) ||
+       restored_identity.character_hash != original_identity.character_hash ||
+       restored_identity.context_mode != original_identity.context_mode)
+   {
+      LogRebuildProblem("identity changed after the call", character_hash, status);
+      return false;
+   }
+   return true;
 }
 
 bool ReadByte(uintptr_t address, uint8_t& value) noexcept

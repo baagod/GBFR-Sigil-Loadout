@@ -35,15 +35,6 @@ struct ResolvedGameLayout
    uintptr_t status_rebuild_rva = 0;
    uintptr_t status_notifier_rva = 0;
    uintptr_t system_data_global_rva = 0;
-   uintptr_t status_manager_global_rva = 0;
-   uintptr_t ui_manager_global_rva = 0;
-   uintptr_t ui_state_source_global_rva = 0;
-   uintptr_t ui_selected_character_hash_offset = 0;
-   uintptr_t ui_mode_offset = 0;
-   uintptr_t ui_state_source_mode_offset = 0;
-   uintptr_t status_map_sentinel_offset = 0;
-   uintptr_t status_map_buckets_offset = 0;
-   uintptr_t status_map_mask_offset = 0;
    uintptr_t status_character_hash_offset = 0;
    uintptr_t status_context_mode_offset = 0;
    uint8_t skill_apply_original_limit = 0;
@@ -169,26 +160,6 @@ struct NaturalContributionFrame
    bool active = false;
 };
 
-enum EditSessionState : int32_t
-{
-   EditSessionUnknownLocked = 0,
-   EditSessionEquipment = 1,
-   EditSessionMissionLocked = 2,
-   EditSessionFreeTraining = 3,
-};
-
-enum ApplyResult : int
-{
-   ApplyResultNone = 0,
-   ApplyResultAppliedDuringNativeRebuild = 2,
-   ApplyResultSavedNoStatus = -1,
-   ApplyResultVirtualCopyFailed = -2,
-   ApplyResultStatusLookupFailed = -4,
-   ApplyResultNativeRebuildFailed = -5,
-   ApplyResultNativeSkillLoopMissing = -6,
-   ApplyResultNotifierFailed = -7,
-};
-
 struct ActiveCallGuard
 {
    explicit ActiveCallGuard(std::atomic_uint32_t& value) : counter(value)
@@ -234,37 +205,9 @@ extern std::unordered_map<uint32_t, std::array<uint32_t, kVirtualSlotCapacity>> 
 extern std::shared_mutex g_authorization_mutex;
 extern std::unordered_map<uintptr_t, AuthorizedStatus> g_authorized_statuses;
 
-extern std::atomic_int32_t g_edit_session_state;
-extern std::atomic_uint64_t g_lifecycle_rebind_signature;
-// 同一状态没到位时的下一次补排时间点（GetTickCount64 口径）。见 skill_hooks.cpp 的
-// ScheduleSelectedStatusRebind：没到位就补排、到位即停，这个值只是节流。
-extern std::atomic_uint64_t g_lifecycle_rebind_not_before_ms;
-// 正在等副本的签名：排了重建、但游戏那份"装备/测试"副本还没真的复制出来。只有复制成功
-// （skill 循环跑完且全部复制）才清回 0。授权匹配**不算**到位——装备页看的是副本。
-extern std::atomic_uint64_t g_rebind_pending_signature;
-
-extern std::atomic_bool g_pending_refresh;
-extern std::atomic<uint32_t> g_pending_character_hash;
-extern std::atomic_uint32_t g_pending_injected_count;
 extern std::atomic_uint32_t g_next_apply_generation;
-extern std::atomic_uint64_t g_queued_apply_request;
-extern std::atomic_uint64_t g_apply_retry_not_before_ms;
-extern std::atomic_bool g_apply_in_flight;
-extern std::atomic_uint64_t g_active_apply_generation;
-extern std::atomic_uint64_t g_claimed_apply_generation;
-extern std::atomic_uint32_t g_active_apply_thread_id;
-extern std::atomic_uint64_t g_active_apply_status;
-extern std::atomic_bool g_native_apply_call_active;
-extern std::array<std::atomic_uint32_t, kVirtualSlotCapacity> g_active_apply_slots;
-extern std::atomic_uint32_t g_active_apply_expected_count;
-extern std::atomic_uint64_t g_last_apply_generation;
-extern std::atomic_uint32_t g_last_apply_character_hash;
-extern std::atomic_uint32_t g_last_apply_expected_count;
-extern std::atomic_uint32_t g_last_apply_injected_count;
-extern std::atomic_int g_apply_result;
 extern std::atomic_uint32_t g_active_getter_calls;
 extern std::atomic_uint32_t g_active_mid_calls;
-extern thread_local uint64_t g_tls_apply_generation;
 extern thread_local NaturalContributionFrame g_tls_natural_contribution;
 
 int GetVirtualSlotCount() noexcept;
@@ -299,31 +242,47 @@ inline constexpr uint32_t kReadableProtect =
 inline constexpr uint32_t kWritableProtect =
    PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
 bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noexcept;
-bool SafeReadUiSelectedCharacterHash(uint32_t& character_hash) noexcept;
-void SafeReadUiModes(int32_t& ui_mode, int32_t& source_mode) noexcept;
-void UpdateEditSessionState() noexcept;
 bool SafeReadStatusIdentity(uintptr_t status, StatusIdentity& identity) noexcept;
-bool SafeResolveStatusByMapKey(uintptr_t manager, uint32_t map_key, uintptr_t& status) noexcept;
-bool SafeResolveCharacterStatus(uint32_t character_hash, uintptr_t& manager, uintptr_t& status) noexcept;
-bool SafeResolveSelectedCharacterStatus(uint32_t character_hash, uintptr_t& manager, uintptr_t& status, StatusIdentity& identity) noexcept;
 void CommitAuthorizedStatus(uintptr_t status, const StatusIdentity& identity, uint64_t generation, const std::array<uint32_t, kVirtualSlotCapacity>& slots);
 bool TryGetAuthorizedSelection(uintptr_t status, const StatusIdentity& identity, std::array<uint32_t, kVirtualSlotCapacity>& slots);
-bool HasMatchingAuthorizedSelection(uintptr_t status, const StatusIdentity& identity, const std::array<uint32_t, kVirtualSlotCapacity>& slots);
 bool TryGetAuthorizedContext1Status(uint32_t character_hash, AuthorizedStatus& authorization);
 void EraseAuthorizedStatus(uintptr_t status);
-void ValidateAuthorizedStatuses();
+// 一次构建开始时调用：store 里的选择与这条授权不一致（或身份/context 变了）就把它丢掉。
+// 授权只该保证"同一次构建内槽位一致"，不该让下一次构建继续吃上一轮的旧槽位——那正是
+// "改了配装却不生效"的根因（旧授权优先于 store，新选择永远进不去）。
+void DropAuthorizedSelectionIfStale(
+   uintptr_t status,
+   const StatusIdentity& identity,
+   const std::array<uint32_t, kVirtualSlotCapacity>& current_slots);
+// 出战队伍：从"游戏自己发起的 context-1 构建"里学出来（不需要逆向队伍表）。
+// RememberPartyCharacter 在 detour 里调用；SnapshotPartyCharacters 给热重建用。
+inline constexpr size_t kMaxPartyCharacters = 8;
+// 每次**游戏自己**建 context-1（在场那份）时调用：记下"这个角色现在这份 status 是哪个对象"、
+// 它属于哪一轮队伍装配（pass），并把它计入出战队伍候选。
+void RememberContext1Status(uint32_t character_hash, uintptr_t status);
+// 游戏刚自己建过一次状态（detour 里记）：热重建据此避让，别和游戏同时碰一份 status。
+void RememberGameBuild();
+size_t SnapshotPartyCharacters(std::array<uint32_t, kMaxPartyCharacters>& out);
+// 最近一次 context-1 构建的记录：status 对象 + 它属于哪一轮队伍装配。热重建只重建
+// pass_id == 当前轮的记录——上一轮的对象在换人/切场景时已经被游戏拆掉了，拿它去重建
+// 就是在戳内存垃圾（2026-09-21 那次崩溃：移出队友后仍用旧指针调游戏重建，ok=0，28 秒后崩）。
+bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& pass_id);
+// 我们自己的重建调用正在游戏线程上跑（重建函数会反过来进 detour）：这段里观察到的构建
+// 不算"新的一轮队伍装配"，否则被打断的那一轮成员会被误判为过期。
+extern thread_local bool g_tls_hot_rebuild_build;
+// 配装改动后，对**已知的出战角色**各调一次游戏的状态重建函数（就是旧强制路径的核心），
+// 每人一次、不重试、队伍刚变过两秒内不调。旧版之所以危险，是它 1 秒一次、整场不停、
+// 目标跟着装备页选中的人跑。
+void RebuildPartyStatusesOnce();
 bool SafeCopyToOutput(const GemData& source, void* destination) noexcept;
-bool SafeInvokeStatusRebuild(uintptr_t status, uint32_t character_hash, StatusIdentity& restored_identity, bool preserve_context) noexcept;
-bool SafeNotifyStatusDirty(uintptr_t manager, uint32_t character_hash, uint32_t dirty_mask) noexcept;
+bool SafeInvokeStatusRebuild(uintptr_t status, uint32_t character_hash) noexcept;
 bool ReadByte(uintptr_t address, uint8_t& value) noexcept;
 bool WriteByte(uintptr_t address, uint8_t value);
 
 std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash);
 // Bumps the shared apply generation; never returns 0 (0 means "no generation"
-// in the detour's pending-apply checks).
+// in the authorization table, which is the only place a 0 generation is rejected).
 uint32_t NextApplyGeneration();
-void RequestHotApply(uint32_t character_hash);
-void ProcessPendingHotApply();
 
 bool TryGetRuntimeSlot(uint32_t character_hash, int virtual_slot, TemplateGemSlot& out) noexcept;
 void InitializeRuntimeTemplates();
@@ -336,7 +295,6 @@ void PublishTemplateSelections() noexcept;
 bool TryCopyTemplateGem(uint32_t character_hash, uint32_t selected_slot_id, void* output) noexcept;
 bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept;
 
-void ScheduleSelectedStatusRebind();
 bool ResolveGameLayout();
 bool RevalidateGameLayout();
 void ResetGameLayout() noexcept;
@@ -351,5 +309,4 @@ void ResolveTableSlot();
 // GBFR20_WriteSkillStatusTable 的实现：校验后把整表按行差异写进游戏那份活表。
 // 返回 >= 0 是改写的行数；< 0 是 native_api.h 里的拒绝码（写之前的每一道闸都不动内存）。
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept;
-void ConsumeApplyResult();
 }

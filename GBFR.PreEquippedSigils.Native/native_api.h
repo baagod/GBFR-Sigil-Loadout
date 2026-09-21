@@ -20,7 +20,7 @@
 // side needs no per-character table of its own. All
 // selector/inventory/preset/input/present/state APIs of the derived original
 // were removed.
-constexpr uint32_t GBFR20_ABI_VERSION = 19;
+constexpr uint32_t GBFR20_ABI_VERSION = 20;
 
 // GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）。成功时返回的是实际改写的行数，所以
 // 这些码从 -1 往下排，0 与正数留给成功。每一条在原生日志里都带一句人话的原因。
@@ -80,7 +80,6 @@ static_assert(sizeof(GBFR20_ExclusiveOverride) == 0x0C);
 GBFR20_API uint32_t GBFR20_CALL GBFR20_GetAbiVersion();
 GBFR20_API void GBFR20_CALL GBFR20_SetLogCallback(GBFR20_LogCallback callback);
 GBFR20_API int32_t GBFR20_CALL GBFR20_Initialize();
-GBFR20_API void GBFR20_CALL GBFR20_Tick();
 GBFR20_API void GBFR20_CALL GBFR20_Shutdown();
 GBFR20_API uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(
    char* buffer,

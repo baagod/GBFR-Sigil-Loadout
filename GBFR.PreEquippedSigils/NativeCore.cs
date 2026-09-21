@@ -6,13 +6,13 @@ namespace GBFR.PreEquippedSigils;
 
 /// <summary>
 /// Minimal native-core facade. Only the functions the thin mod shell actually
-/// uses are kept: ABI check, log sink, input-hook disable, initialize, upkeep
-/// tick, shutdown and runtime-message readback. All selector/inventory/preset/
-/// input/present APIs of the derived original were removed.
+/// uses are kept: ABI check, log sink, input-hook disable, initialize, shutdown
+/// and runtime-message readback. All selector/inventory/preset/input/present
+/// APIs of the derived original were removed.
 /// </summary>
 internal static unsafe partial class NativeCore
 {
-    internal const int AbiVersion = 19;
+    internal const int AbiVersion = 20;
 
     private const string LibraryName = "GBFR.PreEquippedSigils.Native.dll";
     private static readonly object ResolverLock = new();
@@ -79,8 +79,6 @@ internal static unsafe partial class NativeCore
             throw;
         }
     }
-
-    internal static void Tick() => GBFR20_Tick();
 
     /// <summary>
     /// Formats one "Startup phase=… state=… elapsed_ms=…" line. It lives here

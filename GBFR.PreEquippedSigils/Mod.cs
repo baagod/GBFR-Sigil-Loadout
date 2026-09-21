@@ -70,16 +70,31 @@ public sealed class Mod : IMod
 
             string modDirectory = loader.GetDirectoryForModId(ModId);
             Directory.CreateDirectory(modDirectory);
+            // 日志**追加**写（不再每次启动清空），位置就在 mod 目录（惯例、好找）。
+            // 单份上限 4 MB，超了把当前份挪成 .1（只留一代）。只有更新 mod 那一次会丢历史，正常。
+            string logPath = Path.Combine(modDirectory, "GBFR.PreEquippedSigils.log");
+            try
+            {
+                FileInfo existing = new(logPath);
+                if (existing.Exists && existing.Length > 4 * 1024 * 1024)
+                {
+                    File.Delete(logPath + ".1");
+                    File.Move(logPath, logPath + ".1");
+                }
+            }
+            catch
+            {
+                // 轮转失败不能影响 mod 生命周期：最坏情况就是这份日志继续变大。
+            }
             lock (_logLock)
             {
                 _fileLog?.Dispose();
-                _fileLog = new StreamWriter(
-                    Path.Combine(modDirectory, "GBFR.PreEquippedSigils.log"),
-                    append: false)
+                _fileLog = new StreamWriter(logPath, append: true)
                 {
                     AutoFlush = true,
                 };
             }
+            Log($"===== session start {DateTime.Now:yyyy-MM-dd HH:mm:ss} =====");
             Log($"GBFR Pre-Equipped Sigils v{ReadModVersion(modDirectory)} (ABI {NativeCore.AbiVersion})");
             long nativeStarted = Stopwatch.GetTimestamp();
             NativeCore.Configure(modDirectory);
@@ -110,7 +125,6 @@ public sealed class Mod : IMod
                         LoadoutConfig.Tick(Log);
                         _sigilEdit?.Tick();
                         Hotkey.Tick(Log);
-                        NativeCore.Tick();
                     }
                     catch
                     {

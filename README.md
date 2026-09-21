@@ -17,10 +17,11 @@
 ## 因子编辑（原 GBFR.SigilEdit）
 
 同一个 mod 内置了**因子参数编辑器**：可视工具（`Loadout.exe`）的 **"因子编辑"页**改的是因子的等级数值，
-改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\gemedits.json`（与配装 loadout.json 同一个目录），运行中的游戏随即重写内存里那张 `skill_status` 表（毫秒级），**不用重启**；数值在下一次进入战斗时可见——游戏是在建立角色状态时读这张表的。
+改动写到 `%LOCALAPPDATA%\GBFRPreEquippedSigils\gemedits.json`（与配装 loadout.json 同一个目录），运行中的游戏随即重写内存里那张 `skill_status` 表（毫秒级），**不用重启**。
 
 - 它**不带 `.tbl` 文件**：表从游戏归档里读、在内存里改，所以能和其他改表 mod 并存。
-- 改动时游戏内该因子的**说明**即时更新；**实际效果**在下一场战斗开始时生效。
+- 改动时游戏内该因子的**说明**即时更新；**数值**要等游戏下一次建立角色状态才被算进去——**下一场战斗开始时生效**。
+- **配装**（`loadout.json` / 可视工具改槽位）不同：发布后会对已知的出战角色各调一次游戏的状态重建，**同一场战斗内生效**；不在场上、或正好撞上游戏自己在建状态时，退回下一场战斗（闸见 `docs/MAINTENANCE.md` §6）。
 - 原来独立的 `GBFR.SigilEdit` mod 已并入本 mod，**不要同时装两个**。
 - **需要** [gbfrelink.utility.manager](https://github.com/WistfulHopes/gbfrelink.utility.manager) 才能用这一页（表就是向它取的）；它是**可选依赖**，没装时 mod 照常加载，只是编辑器没有表可改。
 

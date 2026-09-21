@@ -16,11 +16,6 @@ std::atomic<GBFR20_LogCallback> g_log_callback{nullptr};
 std::mutex g_message_mutex;
 std::string g_runtime_message = "Waiting for initialization.";
 
-std::atomic_int32_t g_edit_session_state{EditSessionUnknownLocked};
-std::atomic_uint64_t g_lifecycle_rebind_signature{0};
-std::atomic_uint64_t g_lifecycle_rebind_not_before_ms{0};
-std::atomic_uint64_t g_rebind_pending_signature{0};
-
 std::atomic<int32_t> g_virtual_slot_count{kBuiltinExclusiveSlotCount};
 
 int GetVirtualSlotCount() noexcept

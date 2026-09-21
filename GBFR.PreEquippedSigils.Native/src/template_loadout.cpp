@@ -249,13 +249,14 @@ void InstallDefaultTemplateSelections()
       layout));
 }
 
-// 模板表变过之后必须做的事，只有这一个入口。以前三个调用点各拼一遍同一序列，而
-// "钩子还没装好就不排重建"这个条件只写在其中两个里。
-void PublishTemplateSelections() noexcept
-{
+// 模板表变过之后必须做的事，只有这一个入口。以前三个调用点各拼一遍同一序列，
+// 而 "钩子还没装好就不排重建" 这个条件只写在其中两个里。
+//
+// 配装改动只做两件事：换掉选择（对所有角色），然后对 **已知的出战角色** 各重建一次。
+// 不重建的话，改动要等到下一次开战才会进战斗状态（游戏不会在战斗中途重建 context-1）。
+void PublishTemplateSelections() noexcept {
    InstallDefaultTemplateSelections();
-   if (g_hooks_ready.load(std::memory_order_acquire))
-      ScheduleSelectedStatusRebind();
+   RebuildPartyStatusesOnce();
 }
 
 bool TryCopyTemplateGem(

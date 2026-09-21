@@ -52,10 +52,14 @@
     → natural bind 追踪：injected==expected 且 identity 一致 → CommitAuthorizedStatus
     → 日志 "Skill contribution confirmed for 0x...: N/N"（会话内首次状态重建报一次；未满每次报 incomplete N/M）
 
-维持（Mod.cs 250ms Tick → GBFR20_Tick）:
-  UpdateEditSessionState / ValidateAuthorizedStatuses /
-  ScheduleSelectedStatusRebind / ProcessPendingHotApply / ConsumeApplyResult
-  （hot-apply 产生 "Generation N ... copied N/N" 日志，验证装备界面/训练场路径）
+配装改动（ApplyLoadout → PublishTemplateSelections → RebuildPartyStatusesOnce）:
+  对**已知的出战角色**各调一次游戏的状态重建函数，让新配装在同一场战斗里被算进去。
+  三道闸（全部 fail-closed）：① 该角色有 context-1 授权、且授权指向"最近观察到的那个对象"
+  （没有 = 不在场上 → 不触发；所以"不在战斗中改配装"天然就等于回到下一场生效）；
+  ② 距离上一次"游戏自己在建状态"至少 250ms；③ 队伍刚变过 2 秒内不调；
+  再加一道熔断：上一次重建失败过（ok=0）就冷却 60 秒。**没有手动开关**（曾有 `hotrebuild.off`，
+  已删：它的唯一作用是掐掉这个功能本身，而降级路径上面闸①天然提供）。
+  **没有 tick**：不再有"稍后补一次"的排队/重试，也没有外部轮询——只在配装发布那一刻试一次。
 ```
 
 ## 4. 模板配装表（日常维护核心）
@@ -137,20 +141,21 @@ TemplateGemSlot{
 ## 6. 雷区（fail-closed 与安全边界，禁止削弱）
 
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
-- `skill_hooks.cpp`：detour 的 TLS/generation/identity/context/expected/injected 校验顺序、natural bind 的授权提交（`CommitAuthorizedStatus`）与 `ValidateAuthorizedStatuses`。
-- `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；写入仅 `context_mode` 销 0（单字段对齐原子写，无撕裂读风险）；**勿引入 8 字节原子写**。
+- `skill_hooks.cpp`：detour 的 TLS/identity/context/expected/injected 校验顺序、构建开始时的授权失效清理（`DropAuthorizedSelectionIfStale`）、natural bind 的授权提交（`CommitAuthorizedStatus`）。
+- `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；**只做一件事**：调游戏的重建函数，然后校验重建后身份没变（变了就当失败）。**不许**再往它里面加"先把 `context_mode` 改成 0"这类字段改写——那条路指向的是装备页那份对象，不是在场那份（2026-09-21 崩溃的写法）。
 - **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
-- ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=19`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` **与逐字段 `Marshal.OffsetOf`** 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，尺寸只挡得住"长度改了"，字段次序只有偏移断言挡得住。
+- ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=20`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` **与逐字段 `Marshal.OffsetOf`** 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，尺寸只挡得住"长度改了"，字段次序只有偏移断言挡得住。
 - **因子热应用走的是"一个地址"，没有第二条路**：原生在装钩子之前、用语义锚点解析出游戏发布 `skill_status` 表的那个固定槽（`table_slot.cpp`），之后每次应用都从槽里现读缓冲区指针、逐行比对后只写内容真的变了的那几行。四道闸全在写之前且都 fail-closed：槽已解析 → 指针非空且整表可写 → 缓冲区自己的行数与传入表一致 → 每一行的 Key 与传入表逐行相同（Key 是这张表的身份，编辑从不碰它）。**没有兜底**：拒写就是这一局内存里那份不变，但表此前已经重新注册，所以编辑在游戏下一次解析、或重启后照样生效，而原生那句 refusal 会说明是哪一闸拦的。曾经有一条全内存扫描兜底，**已删**——机制上线后它一次都没跑过（日志里从没出现 `located … copy/copies`），而它证明不了唯一重要的那件事："这块缓冲区就是游戏在用的那块"静态证不出来。
 - **可选配置**：无 `loadout.json` = 内置专属全开、通用全空；有 = 3 专属（`exclusive` 段开关，键 = **角色 hash**，内层 = 技能 hash → **只写 `false`** 的那些）+ 通用槽（`LoadoutConfig` 解析校验、mtime 250ms 热应用）。
   **只认这一种形状**：`loadout.json` 必须是 `{lang, slots:[…], exclusive?}`（裸数组不再接受）；外层键不是角色 hash 就记日志并忽略，内层键不是该角色三个专属槽之一则由原生侧忽略——没有旧形状兼容。PL 码只是可视工具的显示标签，**不是**这里的键（古兰/姬塔共享 PL0000，而它们是两个角色）。
   槽位由**原生侧**按技能 hash 认（`ExclusiveBitForSkill`，表就在 `template_loadout.cpp`），所以 mod 不再读 `gem.chara.json`；那个文件现在只服务可视工具的专属页。
 - 第三方 `third_party/`（safetyhook、Zydis）只可升级替换，不可手改。
 - 缩进：native 3 空格、托管 4 空格。
-- **维持 Tick 没有全局单飞闸**（`Mod.cs` 的 `System.Threading.Timer` 回调直接顺序跑四个阶段：`LoadoutConfig.Tick` → `SigilEditFeature.Tick` → `Hotkey.Tick` → `NativeCore.Tick`），而 `Timer` **不等**上一次回调结束。所以每个阶段都必须自己扛得住"上一拍还没跑完、下一拍又进来"。
+- **维持 Tick 没有全局单飞闸**（`Mod.cs` 的 `System.Threading.Timer` 回调直接顺序跑三个阶段：`LoadoutConfig.Tick` → `SigilEditFeature.Tick` → `Hotkey.Tick`），而 `Timer` **不等**上一次回调结束。所以每个阶段都必须自己扛得住"上一拍还没跑完、下一拍又进来"。
   - 今天只有 `SigilEditFeature` 自己扛：`_applying`（Interlocked）+ **先认领 `_handledUtc` 再应用**（见其 Tick）。它不是可选的，删掉就变成可重入（试过，随即回退）。
-  - `LoadoutConfig` / `Hotkey` / `NativeCore.Tick` **没有自己的守卫**，它们只在"没有任何一拍超过 250ms"这个前提下安全。
-  - **别加回全局单飞**：曾经有过（`Mod.cs` 的 `RunUpkeepTick` Interlocked 闸），它把当时那条 5–14 秒的内存扫描和另外三个阶段串成一串、把它们饿死，7907c56 撤掉了它并换回 `_applying`。那次扫描现在已删（见上），所以"串成长队"这条反对理由已经不存在——但**加回去依然要先量**：真正要回答的是"有没有哪一拍会超过 250ms"（`ProcessPendingHotApply` 那次同步状态重建是当前最可疑的一个），而不是"看起来都很快"。
+  - `LoadoutConfig` / `Hotkey` **没有自己的守卫**，它们只在"没有任何一拍超过 250ms"这个前提下安全。
+  - 这条 tick 里**不再**调原生（原 `NativeCore.Tick` / `GBFR20_Tick` 已删，ABI 20）：原生侧只被动响应"游戏自己发起的构建"和"配装发布"，没有轮询，也就没有"tick 里那次同步重建"这个可疑项了。
+  - **别加回全局单飞**：曾经有过（`Mod.cs` 的 `RunUpkeepTick` Interlocked 闸），它把当时那条 5–14 秒的内存扫描和另外三个阶段串成一串、把它们饿死，7907c56 撤掉了它并换回 `_applying`。那次扫描现在已删（见上），所以"串成长队"这条反对理由已经不存在——但**加回去依然要先量**：真正要回答的是"有没有哪一拍会超过 250ms"。
 - `loadout.json` 只有 `SaveLoadout` 一个写入口，且是"后提交者胜"：提交时取递增序号，写盘前比对，过期的那一份直接放弃。别改成无序号裸写——一次慢写（杀软扫 %LOCALAPPDATA%）会让两次保存在飞，而磁盘内容取决于最后完成的那个 rename。
 
 ## 7. 已知限制与未来方向
@@ -159,9 +164,12 @@ TemplateGemSlot{
 - 扩展新角色 = 生成器数据表加条目 + 查该角色专属因子 hash。
 - 游戏更新后需回归：`layout_resolver` 锚点可能失效；日志出现 layout failed 时等更新方案或重新逆向。`table_slot.cpp` 的锚点同理，但**失效只是退化，不会写错地方**：它拒绝解析，热应用记一行 `hot apply: FAIL - the native slot write refused (code -2 …)`，于是这一局内存里那份表不变。编辑不会丢——表在写之前已经重新注册过，所以游戏下一次解析、或重启后照样生效。**没有慢路径可退**：那条全内存扫描兜底已删（见 §6）。
 - `GBFR.SigilEdit` 已并入本 mod（见 §1）：两个 mod 同时装会让同一个 `skill_status` 表被两份 `IDataManager` 互相注册覆盖，所以发布说明里必须写"不要同时装"。
-- **因子编辑"改完当场可见"在战斗场景里做不到（2026-09-20 实测定案）**：表本身是毫秒级改写的（`hot apply: SUCCESS … in 4 ms`），但新值要**可见**必须再有一次状态建立——游戏是在建立角色状态时把表里的数值算进去的，而改表既没改选择、也没改授权（那正是 §6 里"已授权就返回"的判据）。所以现状 = **下一次进战斗时生效**，与游戏的天然节奏一致。
-  试过并已撤掉的路：编辑后主动要一次状态重建（新导出 `GBFR20_RebuildSelectedStatus` + `ScheduleSelectedStatusRebind` 的强制放行 + 用会话内缓存的角色 hash 当后退）。它卡在入口——这条路必须先知道"重建谁"，而那个值来自 `UiManager.ui_selected_character_hash_offset`，战斗场景里读不到；实测甚至出现过"整个会话一次都没读到"（缓存也是空的）。
-  **结论：别再往 UI 那条路加退路。** 真要实时生效，得从战斗/队伍状态里取"当前操作角色"（新逆向，照 `table_slot.cpp` 那套语义锚点做）。
+- **因子**编辑（只改表里的数值）**仍然是下一场战斗才可见**（2026-09-20 定案，机制未变）：表是毫秒级改写的（`hot apply: SUCCESS … in 4 ms`），但新值要**可见**必须再有一次状态建立——游戏是在建立角色状态时把表里的数值算进去的，而改表既没改选择、也没改授权。所以这条与游戏的天然节奏一致，不是缺陷。
+- **配装**编辑（槽位选择变了）**同一场战斗内生效**：发布后对已知的出战角色各调一次游戏的状态重建（`RebuildPartyStatusesOnce`），闸见 §3。它之所以安全，是因为"重建谁"来自**游戏自己发起的 context-1 构建**（detour 里记下的角色 hash + 那份 status 对象），不再需要 UI。
+  已撤掉、且**不要加回来**的两条路：
+  ① 编辑后强制重建（旧导出 `GBFR20_RebuildSelectedStatus` + `ScheduleSelectedStatusRebind` + 会话内缓存的 UI 选中角色）：入口就错了——那个值来自 `UiManager`，战斗场景里读不到，实测出现过"整个会话一次都没读到"。
+  ② tick（`GBFR20_Tick`）里周期性地做任何原生维护：它带来 8 次 AV 崩溃里"`ok=0` 之后 30–60 秒"这个签名，现在整条 tick 已删（ABI 20）。
+  随之一起删掉的死代码：UI 那条锚点链（`ui_mode_pair` / `ui_character`）与状态管理器哈希表那条锚点链（`status_manager` / `status_map_*`）——它们唯一的消费者就是上面①。删掉也少了两组"游戏一更新就整体解析失败"的锚点。
 
 ## 8. 背景与现状
 
@@ -201,9 +209,9 @@ TemplateGemSlot{
 | 因子编辑页宽度 | 888 DIP（比它窄时该页横向滚动；窗口的最小宽度按配装页的 760 定，见 Loadout/main.go） | Go main.go / TS SigilEditPanel.tsx |
 | 表路径与行布局 | system/table/skill_status.tbl，8 字节头 + 52 字节行（Key@+40、Level@+48）。**行数不写死在任何一边**：托管侧从归档读出的表自己定义形状，原生只检查游戏那份与它一致 | C# SigilEditFeature.cs（改表）与 Native src/table_slot.cpp（验形状、逐行 Key 比对）各存一份——它们是两个二进制，天然如此；三处数字由 `Loadout\sharedconstants_test.go` 对拍 |
 | skill_status 活表地址 | 游戏把已解析的表发布在一个固定槽里；槽的地址由原生从**语义锚点**（唯一的"行数×52 + 表首"行循环锚点，加上锚点前 0x800 字节里那一对发布指令）解析，不写死 RVA、失败即拒写。锚点字节与实测数字的唯一持有者是代码注释 | Native src/table_slot.cpp |
-| 原生 ABI 版本 | 19 | native_api.h / C# NativeCore.cs AbiVersion |
+| 原生 ABI 版本 | 20 | native_api.h / C# NativeCore.cs AbiVersion |
 | 原生结构尺寸与字段次序 | TemplateSlot 0x18（GemId@0 / Skill1@4 / Skill1Level@8 / Skill2@0xC / Skill2Level@0x10 / SigilLevel@0x14）、ExclusiveOverride 0x0C | native_api.h static_assert / C# EnsureAbiLayout（`Marshal.SizeOf` + `Marshal.OffsetOf`，加载后即对拍：尺寸拦不住字段互换，偏移才是"按这个次序对应"的证明） |
-| 原生导出口 | 8 个：GetAbiVersion / SetLogCallback / Initialize / Tick / Shutdown / CopyRuntimeMessage / ApplyLoadout / WriteSkillStatusTable | native_api.h |
+| 原生导出口 | 7 个：GetAbiVersion / SetLogCallback / Initialize / Shutdown / CopyRuntimeMessage / ApplyLoadout / WriteSkillStatusTable（原 Tick 已删） | native_api.h |
 | 等级校验 | 前端 1..cap（输入与载入都夹在 cap 内，空槽显示 0）；Go 只查结构与非负（上限是每条技能自己的 cap，写死一个数就是同一规则的第三份副本，且校验的不是真正的不变量）；C# 只**拒负数**（负数直接抛 `InvalidDataException`），**不判上界**——上界归可视工具（唯一写者） | TS SlotEditor.tsx / Go loadoutservice.go / C# LoadoutConfig.cs |
 | `exclusive` 键与形状 | 外层 = **角色 hash**（PL 码不是键——古兰/姬塔共享 PL0000，而它们是两个角色）；内层 = 该角色三槽的技能 hash → 只写 `false`。外层非 hash 记日志并忽略；内层由原生侧按 `kCharacterExclusives` 认槽；`loadout.json` 只认 `{lang, slots, exclusive?}` | C# LoadoutConfig.cs / TS model.ts / Go loadoutservice.go（只转发） |
 | 因子表派生索引与落盘载荷 | 一处实现：`buildSigilIndex()` / `buildLoadoutPayload()`（纯函数，入口在 `src/index.test.ts` 用真实 gem.json 测） | TS model.ts |

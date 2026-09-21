@@ -14,9 +14,6 @@ internal static unsafe partial class NativeCore
     private static extern int GBFR20_Initialize();
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-    private static extern void GBFR20_Tick();
-
-    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern void GBFR20_Shutdown();
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

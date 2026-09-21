@@ -22,21 +22,6 @@ int32_t GBFR20_CALL GBFR20_Initialize()
    return g_hooks_ready.load(std::memory_order_acquire) ? 1 : 0;
 }
 
-void GBFR20_CALL GBFR20_Tick()
-{
-   if (g_shutting_down.load(std::memory_order_acquire))
-      return;
-   EnsureInitialized();
-   if (!g_hooks_ready.load(std::memory_order_acquire) ||
-       !g_layout_ready.load(std::memory_order_acquire))
-      return;
-   UpdateEditSessionState();
-   ValidateAuthorizedStatuses();
-   ScheduleSelectedStatusRebind();
-   ProcessPendingHotApply();
-   ConsumeApplyResult();
-}
-
 void GBFR20_CALL GBFR20_Shutdown()
 {
    if (g_shutdown_complete.exchange(true, std::memory_order_acq_rel))

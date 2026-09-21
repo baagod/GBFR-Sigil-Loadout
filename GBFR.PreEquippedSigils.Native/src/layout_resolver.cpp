@@ -60,28 +60,6 @@ constexpr uint8_t kCategoryLoopBytes[] = {
 constexpr auto kCategoryLoopPattern =
    MakePattern(kCategoryLoopBytes, "xxxxxxxxx????");
 
-constexpr uint8_t kUiModePairBytes[] = {
-   0x48, 0x8B, 0x05, 0, 0, 0, 0,
-   0x48, 0x8B, 0x0D, 0, 0, 0, 0,
-   0x8B, 0x50, 0x34,
-   0x89, 0x91, 0x14, 0x0B, 0x00, 0x00,
-   0xC6, 0x40, 0x2C, 0x01};
-constexpr auto kUiModePairPattern =
-   MakePattern(kUiModePairBytes, "xxx????xxx????xxxxxxxxxxxxx");
-
-constexpr uint8_t kUiCharacterBytes[] = {
-   0x4C, 0x8B, 0x05, 0, 0, 0, 0,
-   0x48, 0x63, 0x86, 0xDC, 0x00, 0x00, 0x00,
-   0x48, 0x8B, 0x8E, 0xE0, 0x00, 0x00, 0x00,
-   0x44, 0x8B, 0x3C, 0x81,
-   0x45, 0x8B, 0xA0, 0, 0, 0, 0,
-   0x45, 0x39, 0xFC,
-   0x0F, 0x84, 0, 0, 0, 0,
-   0x45, 0x89, 0xB8, 0, 0, 0, 0};
-constexpr auto kUiCharacterPattern = MakePattern(
-   kUiCharacterBytes,
-   "xxx????xxxxxxxxxxxxxxxxxxxxx????xxxxx????xxx????");
-
 constexpr uint8_t kNotifierBytes[] = {
    0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x38,
    0x44, 0x89, 0xC6, 0x89, 0xD3, 0x48, 0x89, 0xCF,
@@ -118,24 +96,6 @@ constexpr uint8_t kSystemDataBytes[] = {
    0xFF, 0x50, 0x18};
 constexpr auto kSystemDataPattern =
    MakePattern(kSystemDataBytes, "xxx????xxx????xxx????xxx");
-
-constexpr uint8_t kStatusManagerBytes[] = {
-   0x4C, 0x8B, 0x25, 0, 0, 0, 0,
-   0x48, 0x8B, 0x05, 0, 0, 0, 0,
-   0x48, 0x89, 0x45, 0xC0,
-   0x41, 0x0F, 0xB6, 0x87, 0xC0, 0x5E, 0x00, 0x00};
-constexpr auto kStatusManagerPattern =
-   MakePattern(kStatusManagerBytes, "xxx????xxx????xxxxxxxxxxxx");
-
-constexpr uint8_t kStatusMapBytes[] = {
-   0x44, 0x8B, 0x83, 0, 0, 0, 0,
-   0x41, 0x21, 0xD0,
-   0x48, 0x8B, 0x83, 0, 0, 0, 0,
-   0x4C, 0x8B, 0x93, 0, 0, 0, 0,
-   0x4C, 0x89, 0xC1, 0x48, 0xC1, 0xE1, 0x04,
-   0x49, 0x8B, 0x4C, 0x0A, 0x08};
-constexpr auto kStatusMapPattern =
-   MakePattern(kStatusMapBytes, "xxx????xxxxxx????xxx????xxxxxxxxxxxx");
 
 struct ImageView
 {
@@ -443,37 +403,6 @@ bool FindStatusRebuild(
    return candidate_count == 1;
 }
 
-bool ResolveMapOffsets(
-   const ImageView& image,
-   const FunctionRange& owner_function,
-   ResolvedGameLayout& layout) noexcept
-{
-   uintptr_t status_map = 0;
-   if (!FindUniquePattern(
-          image,
-          owner_function.begin,
-          owner_function.end - owner_function.begin,
-          kStatusMapPattern,
-          status_map))
-      return false;
-   uint32_t status_mask = 0;
-   uint32_t status_sentinel = 0;
-   uint32_t status_buckets = 0;
-   if (!ReadValue(image, status_map + 3, status_mask) ||
-       !ReadValue(image, status_map + 13, status_sentinel) ||
-       !ReadValue(image, status_map + 20, status_buckets))
-      return false;
-
-   if (!IsReasonableObjectOffset(status_sentinel, alignof(uintptr_t)) ||
-       !IsReasonableObjectOffset(status_buckets, alignof(uintptr_t)) ||
-       !IsReasonableObjectOffset(status_mask, alignof(uint32_t)))
-      return false;
-   layout.status_map_sentinel_offset = status_sentinel;
-   layout.status_map_buckets_offset = status_buckets;
-   layout.status_map_mask_offset = status_mask;
-   return true;
-}
-
 bool ValidateResolvedGameLayout(
    const ImageView& image,
    const ResolvedGameLayout& layout) noexcept
@@ -509,36 +438,18 @@ bool ValidateResolvedGameLayout(
        !MatchesBytesAtRva(image, layout.status_notifier_rva, kStatusNotifierPreflight))
       return false;
 
-   const uintptr_t writable_globals[] = {
-      layout.system_data_global_rva,
-      layout.status_manager_global_rva,
-      layout.ui_manager_global_rva,
-      layout.ui_state_source_global_rva};
-   for (const uintptr_t global : writable_globals)
-   {
-      if (!IsRvaInSection(
-             image,
-             global,
-             sizeof(uintptr_t),
-             IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE,
-             IMAGE_SCN_MEM_EXECUTE))
-         return false;
-   }
+   if (!IsRvaInSection(
+          image,
+          layout.system_data_global_rva,
+          sizeof(uintptr_t),
+          IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE,
+          IMAGE_SCN_MEM_EXECUTE))
+      return false;
 
    if (!IsReasonableObjectOffset(
-          layout.ui_selected_character_hash_offset, alignof(uint32_t)) ||
-       !IsReasonableObjectOffset(layout.ui_mode_offset, alignof(uint32_t)) ||
-       !IsReasonableObjectOffset(
-          layout.ui_state_source_mode_offset, alignof(uint32_t)) ||
-       !IsReasonableObjectOffset(
           layout.status_character_hash_offset, alignof(uint32_t)) ||
        !IsReasonableObjectOffset(
-          layout.status_context_mode_offset, alignof(uint32_t)) ||
-       !IsReasonableObjectOffset(
-          layout.status_map_sentinel_offset, alignof(uintptr_t)) ||
-       !IsReasonableObjectOffset(
-          layout.status_map_buckets_offset, alignof(uintptr_t)) ||
-       !IsReasonableObjectOffset(layout.status_map_mask_offset, alignof(uint32_t)))
+          layout.status_context_mode_offset, alignof(uint32_t)))
       return false;
 
    uint8_t apply_limit = 0;
@@ -617,8 +528,6 @@ bool ResolveGameLayout()
    uintptr_t category_loop = 0;
    uintptr_t notifier = 0;
    uintptr_t owner_loop = 0;
-   uintptr_t ui_mode_pair = 0;
-   uintptr_t ui_character = 0;
    if (!FindUniquePattern(
           image, image.code_rva, image.code_size, kApplyLoopPattern, apply_loop) ||
        !FindUniquePattern(
@@ -626,11 +535,7 @@ bool ResolveGameLayout()
        !FindUniquePattern(
           image, image.code_rva, image.code_size, kNotifierPattern, notifier) ||
        !FindUniquePattern(
-          image, image.code_rva, image.code_size, kOwnerLoopPattern, owner_loop) ||
-       !FindUniquePattern(
-          image, image.code_rva, image.code_size, kUiModePairPattern, ui_mode_pair) ||
-       !FindUniquePattern(
-          image, image.code_rva, image.code_size, kUiCharacterPattern, ui_character))
+          image, image.code_rva, image.code_size, kOwnerLoopPattern, owner_loop))
       return FailResolution("unique semantic anchors");
 
    layout.skill_apply_loop_limit_immediate_rva = apply_loop + 4;
@@ -698,49 +603,6 @@ bool ResolveGameLayout()
       return FailResolution("SystemData/global-array decoding");
    layout.system_data_global_rva = system_data_global;
 
-   uintptr_t manager_pattern = 0;
-   if (!FindUniquePattern(
-          image,
-          apply_helper.begin,
-          apply_helper.end - apply_helper.begin,
-          kStatusManagerPattern,
-          manager_pattern) ||
-       !DecodeRipTarget(
-          image, manager_pattern, 3, 7, layout.status_manager_global_rva))
-      return FailResolution("StatusManager anchor");
-
-   if (!DecodeRipTarget(
-          image, ui_mode_pair, 3, 7, layout.ui_state_source_global_rva) ||
-       !DecodeRipTarget(
-          image, ui_mode_pair + 7, 3, 7, layout.ui_manager_global_rva))
-      return FailResolution("UI global decoding");
-   uint32_t ui_mode_offset = 0;
-   uint8_t source_mode_offset = 0;
-   if (!ReadValue(image, ui_mode_pair + 16, source_mode_offset) ||
-       !ReadValue(image, ui_mode_pair + 19, ui_mode_offset))
-      return FailResolution("UI mode offsets");
-   layout.ui_state_source_mode_offset = source_mode_offset;
-   layout.ui_mode_offset = ui_mode_offset;
-   if (!IsReasonableObjectOffset(
-          layout.ui_state_source_mode_offset, alignof(uint32_t)) ||
-       !IsReasonableObjectOffset(layout.ui_mode_offset, alignof(uint32_t)))
-      return FailResolution("UI mode offset ranges");
-
-   uintptr_t ui_character_global = 0;
-   uint32_t selected_character_offset = 0;
-   uint32_t repeated_selected_character_offset = 0;
-   if (!DecodeRipTarget(image, ui_character, 3, 7, ui_character_global) ||
-       ui_character_global != layout.ui_manager_global_rva ||
-       !ReadValue(image, ui_character + 28, selected_character_offset) ||
-       !ReadValue(
-          image, ui_character + 44, repeated_selected_character_offset) ||
-       selected_character_offset != repeated_selected_character_offset)
-      return FailResolution("UI selected-character contract");
-   layout.ui_selected_character_hash_offset = selected_character_offset;
-   if (!IsReasonableObjectOffset(
-          layout.ui_selected_character_hash_offset, alignof(uint32_t)))
-      return FailResolution("UI selected-character offset range");
-
    uint32_t status_context_offset = 0;
    uint32_t status_character_offset = 0;
    uint16_t getter_context_opcode = 0;
@@ -760,27 +622,20 @@ bool ResolveGameLayout()
           layout.status_character_hash_offset, alignof(uint32_t)))
       return FailResolution("status identity offset ranges");
 
-   if (!ResolveMapOffsets(image, owner_function, layout))
-      return FailResolution("status/character map offsets");
-
-   // Remaining map/object offsets are validated by ValidateResolvedGameLayout.
-
    if (!ValidateResolvedGameLayout(image, layout))
       return FailResolution("resolved layout final validation");
 
    g_game_layout = layout;
    g_layout_ready.store(true, std::memory_order_release);
-   // 成功这一行只报"解析出来了"和"是哪个游戏构建"；四个 RVA 另起一行——只有查疑难
+   // 成功这一行只报"解析出来了"和"是哪个游戏构建"；两个 RVA 另起一行——只有查疑难
    // session（钩子落到了别处）时才需要，平时扫日志不该被这串地址堵住眼睛。
    Log(std::format(
       "Layout resolved and validated from semantic anchors (PE 0x{:X}).",
       image.nt->FileHeader.TimeDateStamp));
    Log(std::format(
-      "  getter=0x{:X} SystemData=0x{:X} StatusManager=0x{:X} UiManager=0x{:X}",
+      "  getter=0x{:X} SystemData=0x{:X}",
       layout.get_gem_data_by_index_rva,
-      layout.system_data_global_rva,
-      layout.status_manager_global_rva,
-      layout.ui_manager_global_rva));
+      layout.system_data_global_rva));
    return true;
 }
 
