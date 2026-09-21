@@ -15,7 +15,7 @@ namespace
 // general sigils.
 //
 // Character-exclusive gems/skills follow gem.json (the tool's source): the table below is
-// derived from it by docs/tool-gen-loadout.ps1 at build time, so nothing is read at runtime.
+// derived from it by gen/loadout.ps1 at build time, so nothing is read at runtime.
 //
 // IMPORTANT: a "no second skill" gem must use skill2 = kUnwornCharacterHash
 // (0x887AE0B0, the "not selected" sentinel the game understands), NOT 0.
@@ -45,7 +45,7 @@ struct CharacterExclusiveLoadout
    uint32_t war_skill = 0; // war skill hash
 };
 
-// 这张表（角色 → 三个专属槽的 gem 与技能）由 docs/tool-gen-loadout.ps1 从 $chars 生成：vcxproj
+// 这张表（角色 → 三个专属槽的 gem 与技能）由 gen\loadout.ps1 从 $chars 生成：vcxproj
 // 每次编译前重跑那个脚本，所以 .inc 是构建中间产物、不入库——改数据去改脚本，源码里没有表段。
 #include "exclusive_table.inc"
 
