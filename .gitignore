@@ -15,5 +15,10 @@ dist/
 *.zip
 tools-test/
 
-# 构建中间产物：专属表由 docs/tool-gen-loadout.ps1 生成，vcxproj 每次编译前重跑它
+# 现场探针只提交源码：dll/obj/exe 是本地构建产物
+tools/live-probe/*.dll
+tools/live-probe/*.obj
+tools/live-probe/*.exe
+
+# 构建中间产物：专属表由 gen 的 loadout.ps1 生成，vcxproj 每次编译前重跑它
 GBFR.PreEquippedSigils.Native/src/exclusive_table.inc

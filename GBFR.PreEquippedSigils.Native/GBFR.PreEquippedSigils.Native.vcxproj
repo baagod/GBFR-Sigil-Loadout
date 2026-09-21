@@ -114,9 +114,10 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
-  <!-- 专属表是生成物（唯一数据源 = docs\tool-gen-loadout.ps1 的 $chars）：每次编译前重生成，
-       所以 src\exclusive_table.inc 不入库，也不需要"生成物是否过期"的门禁。 -->
+  <!-- 专属表是生成物（唯一数据源 = gen 仓库里 loadout.ps1 的 $chars）：每次编译前重生成，
+       所以 src\exclusive_table.inc 不入库，也不需要"生成物是否过期"的门禁。
+       gen 是仓库旁的共享生成器（..\..\gen）：本仓库不再放任何生成脚本。 -->
   <Target Name="GenerateExclusiveTable" BeforeTargets="ClCompile">
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\docs\tool-gen-loadout.ps1&quot;" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\gen\loadout.ps1&quot; -ModRepo &quot;$(MSBuildProjectDirectory)\..&quot;" />
   </Target>
 </Project>

@@ -41,7 +41,7 @@ var embeddedSkillJA []byte
 //go:embed assets/skill.ko.json
 var embeddedSkillKO []byte
 
-// gem.lang.json 是配装页显示用的名字：{语言: {因子 hash: 名字}}，由 docs\tool-gen-sigils.ps1
+// gem.lang.json 是配装页显示用的名字：{语言: {因子 hash: 名字}}，由 gen 的 go run . sigils
 // 生成。内嵌而不是与 gem.json 并排放：那份数据 mod 也要读，这份只有可视工具显示用。
 //
 //go:embed assets/gem.lang.json
@@ -50,7 +50,7 @@ var embeddedGemLang []byte
 // gemNamesByLang 按界面语言索引那份名字表（解码一次，之后各语言共用）。
 var gemNamesByLang = mustDecode[map[string]string](embeddedGemLang)
 
-// chara.lang.json 是角色名：{语言: {角色码: 名字}}，由 docs\tool-gen-texts.ps1 生成。
+// chara.lang.json 是角色名：{语言: {角色码: 名字}}，由 gen 的 go run . texts 生成。
 //
 //go:embed assets/chara.lang.json
 var embeddedCharaLang []byte

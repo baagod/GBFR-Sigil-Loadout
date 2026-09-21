@@ -140,13 +140,13 @@ $D = gen\extracted
 ### 生成命令
 
 ```powershell
-pwsh docs\tool-gen-sigils.ps1
+cd gen && go run . sigils
 ```
 
-包装脚本调共享 gen 的 Go 生成器（`go run . sigils`），一条命令同时生成
+包装脚本已经不在了：生成器就在共享工程 `gen` 里，直接调它。一条命令同时生成
 **`docs\gem.xlsx`**（入库）、**`Loadout\assets\gem.json`**（可视工具必须）与
 **`Loadout\assets\gem.lang.json`**（可视工具显示用的名字：`{语言: {因子 hash: 名字}}`，
-`-texts-langs zh,en,ja,ko`，可视工具编译期内嵌）。
+`-langs zh,en,ja,ko`，可视工具编译期内嵌）。
 
 第三份是刻意的"名字不进数据表"：`gem.json` 的每一行只有数据、不带任何语言的名字，
 其余语言各来一份名字串在每行上，会让可视工具也在读的那份文件白白变胖。哈希与

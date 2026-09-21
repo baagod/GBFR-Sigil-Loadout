@@ -78,7 +78,7 @@ Push-Location $genDir
 try {
     & go run . sigils-json $sigilsXlsx $sigilsPath --check
     if ($LASTEXITCODE -ne 0) {
-        throw 'gem.json 与 docs\gem.xlsx 不一致：先跑 pwsh docs\tool-gen-sigils.ps1'
+        throw 'gem.json 与 docs\gem.xlsx 不一致：先跑 gen 的 go run . sigils（共享生成器在仓库旁的 ..\gen）'
     }
 } finally {
     Pop-Location
@@ -306,7 +306,7 @@ $gitDir = Join-Path $root '.git'
 if (Test-Path -LiteralPath $gitDir) {
     $generatedDiff = & git -C $root status --porcelain -- 'Loadout/assets/gem.chara.json'
     if ($generatedDiff) {
-        throw "gem.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 docs\tool-gen-loadout.ps1 里引起改写的改动。"
+        throw "gem.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen\loadout.ps1 里引起改写的改动。"
     }
 }
 else {

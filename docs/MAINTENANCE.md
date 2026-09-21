@@ -74,14 +74,17 @@
 
 内置模板 = 每角色专属 3 槽（slot0=T1、slot1=T2、slot2=战气，每槽一个独立专属因子，**无"觉醒＋"合并**）；
 专属可经 loadout.json 的 `exclusive` 段逐项开关；通用槽无内置默认（来自玩家配置）。
-**数据由生成脚本维护，不要手改 hash。**
+**数据由生成器维护，不要手改 hash。生成器不在本仓库**：全部住在仓库旁的共享工程 `..\gen`（有自己的 git 仓库），本仓库只留产物 + 调用点。
 
-| 外部工具 | 作用 |
+| 生成器（在 gen 里） | 作用 |
 |---|---|
-| `docs/tool-gen-loadout.ps1` | 内嵌每角色专属数据（Hash/T1/T2/War），从 gem.json 推导变体 hash 与 player 码；生成 `native\src\exclusive_table.inc`（native 编译时 `#include`，**产物不入库**：vcxproj 每次编译前重跑本脚本）与 `Loadout\assets\gem.chara.json`（可视工具读；内容不变则不重写）|
+| `gen\loadout.ps1` | 本 mod 的策展表（`$chars`：每角色 Hash/T1/T2/War），从 mod 仓库的 `gem.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调本脚本）与 `Loadout\assets\gem.chara.json`（可视工具读；内容不变则不重写） |
+| `go run . sigils` | → mod 仓库的 `docs\gem.xlsx`（入库）+ `Loadout\assets\gem.json` + `gem.lang.json` |
+| `go run . texts` | → `gen\output\texts.xlsx` / `texts.json` + mod 仓库的 `Loadout\assets\chara.lang.json` |
+| `go run . skill-assets` | 由 `gen\output\texts.json` 出工具内嵌的 `skill_status.json` + `skill.<lang>.json`（写进 mod 仓库；游戏更新后才跑） |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
 
-**改配装流程**：改 `tool-gen-loadout.ps1` 的 `$chars` 表 → 编译（vcxproj 编译前自动重跑生成器，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
+**改配装流程**：改 `gen\loadout.ps1` 的 `$chars` 表 → 编译（vcxproj 编译前自动重跑它，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
 
 行结构（`*_gem` = 物品 hash 由脚本推导，skill = 技能 hash）：
 
@@ -149,6 +152,7 @@ TemplateGemSlot{
 ## 6. 雷区（fail-closed 与安全边界，禁止削弱）
 
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
+- **需要现场弄明白"游戏现在把什么放在哪"时**（锚点失效、要确认某份状态对象在哪）：用 `tools/live-probe/`——往运行中的游戏注入只读探针，按命令文件读/扫内存（不重启游戏）。用法见该目录的 `README.md`。`rva=` / `offset=` 这类值是**某一次游戏构建的实测值**，只当现场参数用，别写进产品代码。
 - `skill_hooks.cpp`：detour 的 TLS/identity/context/expected/injected 校验顺序、构建开始时的**槽位快照**（thread_local，构建内所有槽位共用一份）、natural bind 的计数与 N/M 报告。**别把快照改回"一张以 status 指针为键的授权表"**：那张表要提交/过期/清理，而且"残留授权命中被复用的地址"会注入旧槽位——游戏的两份 status 对象是轮换 + 地址跨角色复用的（§7）。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；**只做一件事**：调游戏的重建函数，然后校验重建后身份没变（变了就当失败）。**不许**再往它里面加"先把 `context_mode` 改成 0"这类字段改写——那条路指向的是装备页那份对象，不是在场那份（2026-09-21 崩溃的写法）。
 - **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
@@ -175,10 +179,8 @@ TemplateGemSlot{
 - **因子**编辑（只改表里的数值）**仍然是下一场战斗才可见**（2026-09-20 定案，机制未变）：表是毫秒级改写的（`hot apply: SUCCESS … in 4 ms`），但新值要**可见**必须再有一次状态建立——游戏是在建立角色状态时把表里的数值算进去的，而改表既没改选择、也没改授权。所以这条与游戏的天然节奏一致，不是缺陷。
 - **配装**编辑（槽位选择变了）**同一场战斗内生效**：判据与闸见 §3。它之所以安全，是因为"重建谁"完全来自**游戏自己发起的 context-1 构建**（detour 里记下的角色 hash + 那份 status 对象），不再需要 UI。
 - **崩溃机制（2026-09-21 实测定案，别再踩）**：游戏给每个角色维护的是**两份 status 对象轮换**——每次重建都可能换到另一个地址，而且同一地址会在不同角色之间复用（日志里 `(new object)` 11 分钟 24 次）。所以**"我记得的指针"不是身份**：那份旧对象里的指纹字段还是残留的，身份校验照样通过。对这样一份旧对象调游戏的重建函数，就会在游戏函数里抛异常（`ok=0`），进程随后 20~30 秒 AV：`0xc0000005`、**读 0x19**、偏移 `0x9318C3`（上午那条强制路径崩溃的是 `0x93B7D3`，同一片代码）；故障线程是我们那条托管 tick 线程（栈上有 coreclr + 本 DLL）。**结论：闸的判据必须是"对象还新不新"，不是"指针记不记得住"。**
-  崩溃复盘工具（别再从零写）：`tools/crashdump/parse.ps1` 取异常记录/模块表/栈摘要，
-  `walk.ps1` 解析故障线程真栈 + 故障点字节；dump 在 `%LOCALAPPDATA%\CrashDumps\`，用法见脚本头。
-  （用 `walk.ps1` 去解 `0x9318C3` 那次的字节：`mov rcx,[r9]; cmp byte [rcx+0x19],0` 且 `rcx=0`
-  —— 游戏在自己的一片 MSVC `std::map`（`_Rb_tree`）里走到了空节点，这正是"我们那一枪之后它的容器/对象已经坏掉"的物证。）
+  （那次崩溃的故障点字节：`mov rcx,[r9]; cmp byte [rcx+0x19],0` 且 `rcx=0` —— 游戏在自己的一片
+  MSVC `std::map`（`_Rb_tree`）里走到了空节点，这就是"我们那一枪之后它的容器已经坏掉"的字节级物证。）
 - **换队友的实测矩阵（2026-09-21，训练场，17 分钟 / 7 次配装发布 / 两种场景各循环两轮，全部同步、0 崩溃）**：
   ① 两人都在场 → 改配装 → **双方同时**生效；② 移出队友 → 改配装（只有主控换到新配装）→ **放回队友（= 重开战斗）** → 队友同步成最新配装；
   ③ 把因子反选回去（两人都进"无该因子"状态）→ 再循环一次 → 放回队友 → 双方都回到"有该因子"。
