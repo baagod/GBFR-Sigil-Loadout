@@ -10,7 +10,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$root = $PSScriptRoot
+# 本脚本住在 tools\ 里，仓库根是它的上一层。
+$root = Split-Path -Parent $PSScriptRoot
 
 # --- version: one authority ---------------------------------------------------
 # ModConfig.json 是版本号的唯一权威源。脚本以前自己也有一个默认字面量，于是"脚本里那份"
@@ -307,7 +308,7 @@ $gitDir = Join-Path $root '.git'
 if (Test-Path -LiteralPath $gitDir) {
     $generatedDiff = & git -C $root status --porcelain -- 'Loadout/assets/gem.chara.json'
     if ($generatedDiff) {
-        throw "gem.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen\loadout.ps1 里引起改写的改动。"
+        throw "gem.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen 的 pkgs/sigils/exclusive.go 里引起改写的改动。"
     }
 }
 else {

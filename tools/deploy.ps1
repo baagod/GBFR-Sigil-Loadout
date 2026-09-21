@@ -5,7 +5,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$root = $PSScriptRoot
+# 本脚本住在 tools\ 里，仓库根是它的上一层。
+$root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $root 'dist\GBFR.PreEquippedSigils'
 
 # 0. Refuse a target that is not the mod folder: the replacement below is a

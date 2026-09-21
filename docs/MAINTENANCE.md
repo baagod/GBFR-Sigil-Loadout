@@ -29,6 +29,7 @@
 - 跨层只有两个半契约：**ABI**（`native_api.h`，冻结、有版本与结构尺寸断言）、**玩家配置**（`loadout.json` / `gemedits.json`，单向：可视工具写、mod 读）、**热键播报**（`tool-hotkey.txt`，反向一行）。其余任何"两边都得知道"的事实，都必须先找到唯一拥有者——同一份事实有两个持有者就是缺陷。
 - 托管工程根是**平铺**的：放进去的每个 `.cs` 都会被编译（SDK 默认通配符，没有逐文件清单），要放生成代码得显式排除。
 - `docs\`：构建 / 部署 / 验证在仓库根 `README.md`；因子表生成规则在 gen 仓库的 `docs\gem.xlsx 生成文档.md`。
+- `docs\adr\`：决策记录（"为什么这么干"；操作与数据流仍在本手册）——`0001` 热应用只写表槽那一个地址、`0002` 表槽地址由语义锚点解析不写死 RVA、`0003` 战斗内实时生效靠发布时主动重建一次且只碰当前轮的对象、`0004` 生成器全部住在 `..\gen`。
 - 每个文件的职责写在那个文件里；跨语言协议常量清单见 §9。
 
 ## 3. 核心数据流
@@ -78,13 +79,13 @@
 
 | 生成器（在 gen 里） | 作用 |
 |---|---|
-| `gen\loadout.ps1` | 本 mod 的策展表（`$chars`：每角色 Hash/T1/T2/War），从 mod 仓库的 `gem.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调本脚本）与 `Loadout\assets\gem.chara.json`（可视工具读；内容不变则不重写） |
+| `go run . exclusive` | 本 mod 的策展表（`pkgs/sigils` 里的 `exclusiveSources`：每角色 Hash/T1/T2/War），从 mod 仓库的 `gem.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\gem.chara.json`（可视工具读；内容不变则不重写） |
 | `go run . sigils` | → `gen\output\gem.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\gem.json` + `gem.lang.json` |
 | `go run . texts` | → `gen\output\texts.xlsx` / `texts.json` + mod 仓库的 `Loadout\assets\chara.lang.json` |
-| `go run . skill-assets` | 由 `gen\output\texts.json` 出工具内嵌的 `skill_status.json` + `skill.<lang>.json`（写进 mod 仓库；游戏更新后才跑） |
+| `go run . skills` | 由 `gen\output\texts.json` 出工具内嵌的 `skill_status.json` + `skill.<lang>.json`（写进 mod 仓库；游戏更新后才跑） |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
 
-**改配装流程**：改 `gen\loadout.ps1` 的 `$chars` 表 → 编译（vcxproj 编译前自动重跑它，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
+**改配装流程**：改 gen 的 `pkgs/sigils/exclusive.go` 里的 `exclusiveSources` → 编译（vcxproj 编译前自动重跑它，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
 
 行结构（`*_gem` = 物品 hash 由脚本推导，skill = 技能 hash）：
 
