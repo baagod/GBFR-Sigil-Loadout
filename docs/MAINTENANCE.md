@@ -28,7 +28,7 @@
 
 - 跨层只有两个半契约：**ABI**（`native_api.h`，冻结、有版本与结构尺寸断言）、**玩家配置**（`loadout.json` / `gemedits.json`，单向：可视工具写、mod 读）、**热键播报**（`tool-hotkey.txt`，反向一行）。其余任何"两边都得知道"的事实，都必须先找到唯一拥有者——同一份事实有两个持有者就是缺陷。
 - 托管工程根是**平铺**的：放进去的每个 `.cs` 都会被编译（SDK 默认通配符，没有逐文件清单），要放生成代码得显式排除。
-- `docs\`：因子表生成规则 → `gem.xlsx 生成文档.md`；构建 / 部署 / 验证在仓库根 `README.md`。
+- `docs\`：构建 / 部署 / 验证在仓库根 `README.md`；因子表生成规则在 gen 仓库的 `docs\gem.xlsx 生成文档.md`。
 - 每个文件的职责写在那个文件里；跨语言协议常量清单见 §9。
 
 ## 3. 核心数据流
@@ -79,7 +79,7 @@
 | 生成器（在 gen 里） | 作用 |
 |---|---|
 | `gen\loadout.ps1` | 本 mod 的策展表（`$chars`：每角色 Hash/T1/T2/War），从 mod 仓库的 `gem.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调本脚本）与 `Loadout\assets\gem.chara.json`（可视工具读；内容不变则不重写） |
-| `go run . sigils` | → mod 仓库的 `docs\gem.xlsx`（入库）+ `Loadout\assets\gem.json` + `gem.lang.json` |
+| `go run . sigils` | → `gen\output\gem.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\gem.json` + `gem.lang.json` |
 | `go run . texts` | → `gen\output\texts.xlsx` / `texts.json` + mod 仓库的 `Loadout\assets\chara.lang.json` |
 | `go run . skill-assets` | 由 `gen\output\texts.json` 出工具内嵌的 `skill_status.json` + `skill.<lang>.json`（写进 mod 仓库；游戏更新后才跑） |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
@@ -118,12 +118,12 @@ TemplateGemSlot{
 - **内置默认（无配置）**：专属 3 槽全开，通用槽全空；总虚拟槽 = 3 + 通用槽数。通用槽数由 `LoadoutConfig.MaxSlots` 限为 ≤12（总虚拟槽 ≤15）；
   原生 `kVirtualSlotCapacity = 24` 是更宽松的数组边界兜底，正常配置不会触及。
 - 专属物品受 `gem.json` 专属行 `character` 字段限制：`TryCopyTemplateGem` 用 `GetRequiredCharacterHash(gem_id)` 校验，只能装给对应角色（古兰/姬塔互通，姬塔条目用古兰专属）。
-- 技能 hash 查询：`gem.json`（hash/上限）或 `docs\gem.xlsx`（Ctrl+F 搜名字）；显示名在 `Loadout\assets\gem.lang.json`。
+- 技能 hash 查询：`gem.json`（hash/上限）或 `gen\output\gem.xlsx`（Ctrl+F 搜名字）；显示名在 `Loadout\assets\gem.lang.json`。
 - 角色 hash：`gem.json` 专属行 `character` 字段；常用：古兰 `2A26B1B2`、姬塔 `A4ACBA76`、娜露梅 `E7053919`、芙劳 `646C3168`、菲迪埃 `74DD4C79`。
 
 ## 5. 数据文件生成（mod 运行时表：gem.json）
 
-`gem.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\gem.json`（生成器与数据源都不入本仓库；步骤见 `docs\gem.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录的 `assets\`）。
+`gem.json`（**合并单表**）**不是手工维护的**，由仓库级共享的 Go 生成器导出到 `Loadout\assets\gem.json`（生成器与数据源都不入本仓库；步骤见 gen 仓库的 `docs\gem.xlsx 生成文档.md`，构建会校验一致性；打包时复制到 mod 目录的 `assets\`）。
 **全仓库只有这一份**：可视工具按 `exeDir()\assets\` 找它，所以从源码目录直接跑（`Loadout\assets\` 就在 exe 旁边）与跑打包出来的那份用的是**同一布局**——不需要"开发副本"，也不需要回落查找。
 字段名与 `gem.xlsx` 表头一致（13 列）：`{ key, hash, skill1, skill2, mix, category, player, onlyone, cap, lot, character }`（`character` 只在专属行出现）。
 显示名不在数据表里：`Loadout\assets\gem.lang.json` 一个文件按语言收着它们（`{语言: {因子 hash: 名字}}`，zh/en/ja/ko 各 203 条），可视工具经 `GemNames(lang)` 取当前语言那一份。

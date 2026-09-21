@@ -59,15 +59,16 @@ if (-not (Test-Path -LiteralPath $sigilsPath)) {
 
 # --- data freshness gate ------------------------------------------------------
 # gem.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   gem.json  <- docs\gem.xlsx（共享 gen 的 `go run . sigils-json`）
+#   gem.json  <- gen\output\gem.xlsx（共享 gen 的 `go run . sigils-json`）
+# 审阅表 gem.xlsx 与 texts.xlsx 同待遇：都是生成物，住在 gen\output\（不入任何仓库）。
 # 这个生成器的两份产物待遇不同：`src\exclusive_table.inc` 不入库（.gitignore），是构建中间产物；
 # `Loadout\assets\gem.chara.json` **入库、随包**，却由同一次构建重写。所以入库的那一份另有一道
 # 收尾门禁（见文件末尾的 generated-asset gate）——"构建中间产物"这句话对它不成立。
 # 这道门只比对本仓库里 gem.json 入库的那一份，不需要游戏数据在场。
-$sigilsXlsx = Join-Path $root 'docs\gem.xlsx'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
+$sigilsXlsx = Join-Path $genDir 'output\gem.xlsx'
 if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
-    throw "gem.json freshness source is missing: $sigilsXlsx（该文件由 git 跟踪，缺失即检出异常；不得跳过一致性检查）"
+    throw "gem.json freshness source is missing: $sigilsXlsx（审阅表在 gen 里生成，不入库；先 cd gen && go run . sigils，不得跳过一致性检查）"
 }
 # 生成器住在仓库**外面**（..\gen，不入本仓库），所以这道门禁只有在本机才跑得起来。
 # 与其让 `go run` 报一句看不懂的错，不如在这里说清原因。
@@ -78,7 +79,7 @@ Push-Location $genDir
 try {
     & go run . sigils-json $sigilsXlsx $sigilsPath --check
     if ($LASTEXITCODE -ne 0) {
-        throw 'gem.json 与 docs\gem.xlsx 不一致：先跑 gen 的 go run . sigils（共享生成器在仓库旁的 ..\gen）'
+        throw 'gem.json 与 gen\output\gem.xlsx 不一致：先跑 gen 的 go run . sigils（审阅表在 gen\output\）'
     }
 } finally {
     Pop-Location

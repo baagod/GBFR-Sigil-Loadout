@@ -73,11 +73,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1          # 部署到 
 | 生成器（在共享工程 `gen` 里） | 作用 |
 |---|---|
 | `loadout.ps1` | 从 `$chars` 生成 `src\exclusive_table.inc`（native 编译时 `#include`，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\gem.chara.json`（**入库、随包**，只有可视工具读） |
-| `go run . sigils` | → `docs\gem.xlsx`（入库）+ `Loadout\assets\gem.json` + `gem.lang.json` |
+| `go run . sigils` | → `gen\output\gem.xlsx`（审阅表，不入库）+ `Loadout\assets\gem.json` + `gem.lang.json` |
 | `go run . texts` | → `gen\output\texts.xlsx` + `texts.json`，并生成 `Loadout\assets\chara.lang.json` |
 | `go run . skill-assets` | 由 `gen\output\texts.json` 出 `Loadout\assets\` 那五份内嵌资产（游戏更新后才跑） |
 
-`gen` 是与本仓库**平级的独立仓库**（两个 mod 共用，自带 git；解包归档/GBFRDataTools/sqlite 那些大数据在它的 `.gitignore` 里）。因子表的生成规则见 `docs\gem.xlsx 生成文档.md`。
+`gen` 是与本仓库**平级的独立仓库**（两个 mod 共用，自带 git；解包归档/GBFRDataTools/sqlite 那些大数据在它的 `.gitignore` 里）。因子表的生成规则见 gen 仓库的 `docs\gem.xlsx 生成文档.md`。
 
 ## 仓库结构
 
