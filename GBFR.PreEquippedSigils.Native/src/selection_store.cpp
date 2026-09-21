@@ -4,8 +4,6 @@ namespace gbfr::native
 {
 std::shared_mutex g_selection_mutex;
 std::unordered_map<uint32_t, std::array<uint32_t, kVirtualSlotCapacity>> g_character_selections;
-std::shared_mutex g_authorization_mutex;
-std::unordered_map<uintptr_t, AuthorizedStatus> g_authorized_statuses;
 
 namespace
 {
@@ -166,8 +164,6 @@ void RebuildPartyStatusesOnce()
             character_hash,
             record_pass,
             current_pass));
-         // 这条授权指向的对象已经不在场上了：留着它只会在指针被复用时被 detour 误当成有效选择。
-         EraseAuthorizedStatus(latest_status);
          continue;
       }
       const bool rebuilt = SafeInvokeStatusRebuild(latest_status, character_hash);
@@ -179,9 +175,8 @@ void RebuildPartyStatusesOnce()
          rebuilt ? 1 : 0));
       if (!rebuilt)
       {
-         // 这一份对象已经不可信（多半正在被游戏重建/替换）：丢掉授权，并冷却 60 秒——
+         // 这一份对象已经不可信（多半正在被游戏重建/替换）：冷却 60 秒 ——
          // 三次崩溃都跟在这样一个 ok=0 之后 30~60 秒，这段时间不再补刀。
-         EraseAuthorizedStatus(latest_status);
          g_hot_rebuild_cooldown_until_ms.store(
             GetTickCount64() + kHotRebuildCooldownMs, std::memory_order_release);
          Log("hot rebuild: cooling down 60s (a rebuild failed)");

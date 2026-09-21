@@ -11,6 +11,14 @@ SafetyHookMid g_skill_fetch_hook;
 std::atomic_uint32_t g_active_getter_calls{0};
 std::atomic_uint32_t g_active_mid_calls{0};
 thread_local NaturalContributionFrame g_tls_natural_contribution{};
+// 一次构建 = 一条线程上同步跑完扩展槽 13…N。所以 "本次构建用哪套槽位" 只要 thread_local：
+// 构建开始时（第一个扩展槽）快照一次 store，整个构建都读这一份。
+// 别改回 "一张以 status 指针为键的授权表"（曾经有），那张表要提交/过期/清理，
+// 而且 "残留授权命中被复用的地址" 会注入旧槽位——游戏的两份 status 对象是轮换 + 地址跨角色复用的。
+//（见 MAINTENANCE §7）。
+thread_local uintptr_t g_tls_build_status = 0;
+thread_local std::array<uint32_t, kVirtualSlotCapacity> g_tls_build_selection{};
+thread_local bool g_tls_build_has_selection = false;
 
 namespace
 {
@@ -88,7 +96,6 @@ void TrackNaturalContributionResult(
       final_identity.context_mode == identity.context_mode;
    if (final_valid)
    {
-      CommitAuthorizedStatus(status, identity, g_tls_natural_contribution.slots);
       // Log the live-battle confirmation only once per session: a healthy
       // loadout confirms 9/9 every battle, identical every time. Failures
       // below still report N/M on every occurrence.
@@ -120,16 +127,15 @@ bool TryLoadVirtualSkillSelection(
 {
    try
    {
-      // 这个角色的槽位全关掉了：把该状态上的授权清掉，否则旧槽位会在后续构建里继续被注入。
-      if (CountSelectedSlots(GetSelection(identity.character_hash)) == 0)
-         EraseAuthorizedStatus(status);
-      // 同一次构建里优先用授权（保证所有槽位用同一组选择，哪怕你此刻正好在改配装）。
-      // 授权过期的情况已在构建开始时清掉（见 detour 里的 DropAuthorizedSelectionIfStale）。
-      if (TryGetAuthorizedSelection(status, identity, selection))
+      // 构建循环内的取用：用构建开始时那一份快照，保证同一次构建里所有槽位用同一组选择。
+      // （哪怕你此刻正好在改配装）。
+      if (from_skill_data_loop && g_tls_build_status == status && g_tls_build_has_selection)
+      {
+         selection = g_tls_build_selection;
          return true;
-      if (!from_skill_data_loop)
-         return false;
-
+      }
+      // 构建循环外的取用（UI/效果读这份 status 的因子）：直接给当前 store。没有第二条路——
+      // 之前靠授权兜底，那张表已经删了（见文件顶部的注释）。
       selection = GetSelection(identity.character_hash);
       return CountSelectedSlots(selection) != 0;
    }
@@ -193,20 +199,18 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
       return 0;
 
    // 一次构建的开始（扩展槽位的第一格）：
+   //   - 快照这一份 status 本次构建要用的槽位（构建内所有槽位共用，见文件顶部 TLS 注释）；
    //   - 记下"游戏刚在建状态"，热重建据此避让（两条线程同时碰一份 status 就是竞态）；
-   //   - context-1 = 在场那份：记下"这个角色现在这份 status 是哪个对象"，并计入出战队伍。
-   //     热重建只认这个最近观察到的对象（授权表里那条可能指向上一场已拆掉的 status）；
-   //   - store 里的选择变了就丢掉上一轮剩下的授权：授权只该保证 "同一次构建内槽位一致"，
-   //     不该让下一次构建继续吃旧槽位——那正是"改了配装却不生效"的根因。
+   //   - context-1 = 在场那份：记下"这个角色现在这份 status 是哪个对象"，热重建只认它。
    if (from_skill_data_loop && slot_index == kNativeInternalSlotCount)
    {
+      const uintptr_t build_status = reinterpret_cast<uintptr_t>(status);
+      g_tls_build_selection = GetSelection(identity.character_hash);
+      g_tls_build_has_selection = CountSelectedSlots(g_tls_build_selection) != 0;
+      g_tls_build_status = build_status;
       RememberGameBuild();
-      const std::array<uint32_t, kVirtualSlotCapacity> current_selection =
-         GetSelection(identity.character_hash);
       if (identity.context_mode == 1)
-         RememberContext1Status(identity.character_hash, reinterpret_cast<uintptr_t>(status));
-      DropAuthorizedSelectionIfStale(
-         reinterpret_cast<uintptr_t>(status), identity, current_selection);
+         RememberContext1Status(identity.character_hash, build_status);
    }
 
    std::array<uint32_t, kVirtualSlotCapacity> selection{};
@@ -333,10 +337,6 @@ void DisableGameplayHooksAndRestore() noexcept
 
    g_skill_fetch_hook.reset();
    g_get_gem_hook.reset();
-   {
-      std::unique_lock lock(g_authorization_mutex);
-      g_authorized_statuses.clear();
-   }
    ResetGameLayout();
 }
 }

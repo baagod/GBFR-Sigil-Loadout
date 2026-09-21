@@ -83,65 +83,6 @@ bool SafeReadStatusIdentity(uintptr_t status, StatusIdentity& identity) noexcept
    }
 }
 
-void CommitAuthorizedStatus(
-   uintptr_t status,
-   const StatusIdentity& identity,
-   const std::array<uint32_t, kVirtualSlotCapacity>& slots)
-{
-   if (status == 0 || identity.character_hash == 0)
-      return;
-
-   std::unique_lock lock(g_authorization_mutex);
-   std::erase_if(g_authorized_statuses, [&](const auto& entry) {
-      return entry.second.character_hash == identity.character_hash ||
-         entry.first == status;
-   });
-   AuthorizedStatus authorization{};
-   authorization.character_hash = identity.character_hash;
-   authorization.context_mode = identity.context_mode;
-   authorization.slots = slots;
-   g_authorized_statuses.emplace(status, authorization);
-}
-
-bool TryGetAuthorizedSelection(
-   uintptr_t status,
-   const StatusIdentity& identity,
-   std::array<uint32_t, kVirtualSlotCapacity>& slots)
-{
-   std::shared_lock lock(g_authorization_mutex);
-   const auto iterator = g_authorized_statuses.find(status);
-   if (iterator == g_authorized_statuses.end() ||
-       iterator->second.character_hash != identity.character_hash ||
-       iterator->second.context_mode != identity.context_mode ||
-       !IsValidContextMode(identity.context_mode))
-      return false;
-   slots = iterator->second.slots;
-   return true;
-}
-
-void DropAuthorizedSelectionIfStale(
-   uintptr_t status,
-   const StatusIdentity& identity,
-   const std::array<uint32_t, kVirtualSlotCapacity>& current_slots)
-{
-   std::unique_lock lock(g_authorization_mutex);
-   const auto iterator = g_authorized_statuses.find(status);
-   if (iterator == g_authorized_statuses.end())
-      return;
-   if (iterator->second.character_hash != identity.character_hash ||
-       iterator->second.context_mode != identity.context_mode ||
-       iterator->second.slots != current_slots)
-      g_authorized_statuses.erase(iterator);
-}
-
-void EraseAuthorizedStatus(uintptr_t status)
-{
-   if (status == 0)
-      return;
-   std::unique_lock lock(g_authorization_mutex);
-   g_authorized_statuses.erase(status);
-}
-
 bool SafeCopyToOutput(const GemData& source, void* destination) noexcept
 {
    if (destination == nullptr)
@@ -192,9 +133,9 @@ bool SafeInvokeStatusRebuild(
 
    if (!rebuild_succeeded)
    {
-      // 游戏的重建函数里抛了异常（多半是那份对象已经不在游戏手上了）。调用方会丢授权 + 冷却，
-      // 但这一步本身无法撤销——所以真正的修法是**别让这个调用发生**（见 selection_store.cpp
-      // 的装配轮次闸）。
+      // 游戏的重建函数里抛了异常（多半是那份对象已经不在游戏手上了）。
+      // 调用方会冷却 60 秒，但这一步本身无法撤销——所以真正的修法是 **别让这个调用发生**。
+      //（见 selection_store.cpp 的装配轮次闸）。
       LogRebuildProblem(
          "the game's rebuild raised; the object was probably gone", character_hash, status);
       return false;
