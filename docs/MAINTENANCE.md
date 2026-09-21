@@ -45,11 +45,12 @@
 
 运行:
   游戏状态重建：GetGemDataByIndexDetour（slot 13 起共 count 个）
+    → 构建开始时（第一个扩展槽）快照一次 store 到 TLS：本次构建所有槽位共用这一份
     → TryLoadVirtualSkillSelection → TryCopySelectedVirtualGem
         → IsTemplateSlotId(0xFE000000+) → TryCopyTemplateGem
             → kCharacterExclusives（按 exclusive 状态组装三个专属槽，见 §4）
             → 组装 GemData（worn_by=0x887AE0B0 未装备，flags=0）→ SafeCopyToOutput
-    → natural bind 追踪：injected==expected 且 identity 一致 → CommitAuthorizedStatus
+    → natural bind 追踪：injected==expected 且 identity 一致
     → 日志 "Skill contribution confirmed for 0x...: N/N"（会话内首次状态重建报一次；未满每次报 incomplete N/M）
 
 配装改动（ApplyLoadout → PublishTemplateSelections → RebuildPartyStatusesOnce）:
@@ -57,8 +58,7 @@
   判据是"每个角色最近一次 context-1 构建（对象 + 轮次号）"：轮次号只由**游戏自己**的构建推进
   （我们自己的调用不推进），所以"记录轮次 ≠ 当前轮次" = 这个角色从这一轮开始到现在没被游戏建过
   （= 换人后已经离场，或那一份对象已经被游戏轮换掉了）。
-  判为落后的角色：跳过，**并立刻删掉它的授权**——那条授权指向的对象已经不作数，留着它只会在
-  地址被复用时把旧槽位注入进去（"队友带着旧配装回来"的来源之一）。
+  判为落后的角色：跳过（不再对它调游戏的重建函数）。
   其余闸：距离上一次"游戏自己在建状态"至少 250ms；队伍刚变过 2 秒内不调；
   熔断：上一次重建失败过（ok=0）就冷却 60 秒（ok=0 之后 20~30 秒是历史崩溃的签名）。
   **没有手动开关**（曾有 `hotrebuild.off`，已删）；**没有 tick**：没有排队、没有重试、没有轮询。
@@ -149,7 +149,7 @@ TemplateGemSlot{
 ## 6. 雷区（fail-closed 与安全边界，禁止削弱）
 
 - `layout_resolver.cpp`：唯一语义锚点、call/RIP 推导、精确字节预检。解析不完整/多重匹配/校验不过则**整套 gameplay hook 不安装**（fail-closed），不降级为"找个像的就 Hook"。
-- `skill_hooks.cpp`：detour 的 TLS/identity/context/expected/injected 校验顺序、构建开始时的授权失效清理（`DropAuthorizedSelectionIfStale`）、natural bind 的授权提交（`CommitAuthorizedStatus`）。
+- `skill_hooks.cpp`：detour 的 TLS/identity/context/expected/injected 校验顺序、构建开始时的**槽位快照**（thread_local，构建内所有槽位共用一份）、natural bind 的计数与 N/M 报告。**别把快照改回"一张以 status 指针为键的授权表"**：那张表要提交/过期/清理，而且"残留授权命中被复用的地址"会注入旧槽位——游戏的两份 status 对象是轮换 + 地址跨角色复用的（§7）。
 - `safe_game_access.cpp`：所有游戏内存读取必须走 SEH 安全包装与地址范围检查。`SafeInvokeStatusRebuild` 调用前校验 `status.character_hash == 目标角色`；**只做一件事**：调游戏的重建函数，然后校验重建后身份没变（变了就当失败）。**不许**再往它里面加"先把 `context_mode` 改成 0"这类字段改写——那条路指向的是装备页那份对象，不是在场那份（2026-09-21 崩溃的写法）。
 - **角色限制不许放宽**：`TryCopyTemplateGem` 必须用 `RequiredCharacterForGem` 判一次。它**从注入表派生**"gem → 角色"，**不另存一张限制表**：实测 84 个不重复注入 gem 与 `gem.json` 的 `character` 列 **0 处不一致**；而 gem.json 多出的 3 条 `_74` 进阶永远不会被这道校验看到（它只会拿到注入表自己的 gem），所以不需要它们。启动时不读任何数据文件——"文件缺失/损坏 → 不装钩子"这一类路径不存在；游戏本体专属物品 199 条，其余 115 条配装路径不可达，不校验。
 - ABI：`native_api.h`（导出签名、packing、`GBFR20_ABI_VERSION=20`）与 `NativeCore.Interop.cs`、`NativeCore.cs` 的 `AbiVersion` 必须一致；改动需三方同步 + 版本号递增。托管侧还有 `EnsureAbiLayout` 的 `Marshal.SizeOf` **与逐字段 `Marshal.OffsetOf`** 断言，与头里的 `static_assert` 成对——版本号只挡得住"加载到旧 DLL"，尺寸只挡得住"长度改了"，字段次序只有偏移断言挡得住。
@@ -175,6 +175,22 @@ TemplateGemSlot{
 - **因子**编辑（只改表里的数值）**仍然是下一场战斗才可见**（2026-09-20 定案，机制未变）：表是毫秒级改写的（`hot apply: SUCCESS … in 4 ms`），但新值要**可见**必须再有一次状态建立——游戏是在建立角色状态时把表里的数值算进去的，而改表既没改选择、也没改授权。所以这条与游戏的天然节奏一致，不是缺陷。
 - **配装**编辑（槽位选择变了）**同一场战斗内生效**：判据与闸见 §3。它之所以安全，是因为"重建谁"完全来自**游戏自己发起的 context-1 构建**（detour 里记下的角色 hash + 那份 status 对象），不再需要 UI。
 - **崩溃机制（2026-09-21 实测定案，别再踩）**：游戏给每个角色维护的是**两份 status 对象轮换**——每次重建都可能换到另一个地址，而且同一地址会在不同角色之间复用（日志里 `(new object)` 11 分钟 24 次）。所以**"我记得的指针"不是身份**：那份旧对象里的指纹字段还是残留的，身份校验照样通过。对这样一份旧对象调游戏的重建函数，就会在游戏函数里抛异常（`ok=0`），进程随后 20~30 秒 AV：`0xc0000005`、**读 0x19**、偏移 `0x9318C3`（上午那条强制路径崩溃的是 `0x93B7D3`，同一片代码）；故障线程是我们那条托管 tick 线程（栈上有 coreclr + 本 DLL）。**结论：闸的判据必须是"对象还新不新"，不是"指针记不记得住"。**
+  崩溃复盘工具（别再从零写）：`tools/crashdump/parse.ps1` 取异常记录/模块表/栈摘要，
+  `walk.ps1` 解析故障线程真栈 + 故障点字节；dump 在 `%LOCALAPPDATA%\CrashDumps\`，用法见脚本头。
+  （用 `walk.ps1` 去解 `0x9318C3` 那次的字节：`mov rcx,[r9]; cmp byte [rcx+0x19],0` 且 `rcx=0`
+  —— 游戏在自己的一片 MSVC `std::map`（`_Rb_tree`）里走到了空节点，这正是"我们那一枪之后它的容器/对象已经坏掉"的物证。）
+- **换队友的实测矩阵（2026-09-21，训练场，17 分钟 / 7 次配装发布 / 两种场景各循环两轮，全部同步、0 崩溃）**：
+  ① 两人都在场 → 改配装 → **双方同时**生效；② 移出队友 → 改配装（只有主控换到新配装）→ **放回队友（= 重开战斗）** → 队友同步成最新配装；
+  ③ 把因子反选回去（两人都进"无该因子"状态）→ 再循环一次 → 放回队友 → 双方都回到"有该因子"。
+  日志里的对应关系：移出队友 → 那次发布记 `skipped (left the party: assembly X < Y)`；
+  **放回队友 = 战斗重开**，游戏把整队重建一遍（pass 连续 +2，玩家/队友的对象各自换手到另一个地址），
+  队友的记录随之变成"当前轮"，下一次发布就是 `ok=1`。（这一条解释了为什么"移除→放回"总是伴随新一轮构建。）
+- **真实副本实测（2026-09-21，**退役 ①** 的方案据此被否）**：带满 3 个队友进副本、整场不改配置 ——
+  进副本那一刻四人整队（`ctx1 build` 四条同一毫秒），**之后 4 分 09 秒里一条构建都没有**
+  （玩家与三名队友全都没有），直到副本结算写存档（`SaveData2.dat` 落在最后一个构建后 4 秒）。
+  对照：进副本前在城里/菜单那 90 秒，玩家自己被重建了 6 次（约每 15 秒一次）。
+  **结论：场景/菜单切换会重建状态，"战斗中"不会** —— 所以"配装发布后主动重建"（`RebuildPartyStatusesOnce`）
+  不能退役；历史那条"战斗里不重建"的定案由此从推测变成了实测证据。
 - 已撤掉、且**不要加回来**的两条路：
   ① 编辑后强制重建（旧导出 `GBFR20_RebuildSelectedStatus` + `ScheduleSelectedStatusRebind` + 会话内缓存的 UI 选中角色）：入口就错了——那个值来自 `UiManager`，战斗场景里读不到，实测出现过"整个会话一次都没读到"。
   ② tick（`GBFR20_Tick`）里周期性地做任何原生维护：它带来那批 AV 崩溃里"`ok=0` 之后 20–60 秒"这个签名，现在整条 tick 已删（ABI 20）。
