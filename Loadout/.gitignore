@@ -1,8 +1,8 @@
 # Wails build output
 bin/
 Loadout.exe
-# 程序图标：仓库里只入库 icon.png（主图）；.ico 是构建中间产物（exe 的 .syso 用它，
-# 托盘那份由应用启动时用同一个包现编），所以放在被忽略的 build\ 里。
+# 程序图标：icon.png（主图）与 icon.ico（Windows 的 exe 资源 + 托盘）都入库，都是静态资产。
+# 这里忽略的是 Wails 的构建目录与链接期资源。
 build/
 rsrc_windows_amd64.syso
 # `go build ./...` 会把以模块名命名的二进制写在源码旁边。

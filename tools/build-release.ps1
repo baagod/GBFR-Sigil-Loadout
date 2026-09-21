@@ -163,22 +163,17 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend build failed with exit code $LASTEXITCODE."
     }
-    # Loadout.exe 的程序图标。Windows 只认链接期资源（.syso），而 .syso 要 .ico；
-    # 源图 icon.png 是 256px（由游戏原生 137px 的技能图标格子 cmn_icskill_05_12
-    # 用 hqx 边缘导向放大而来）。.ico 交给 tools/mkico 生成，不用 wails3 generate icons：
-    # 后者只会把一张图等比缩小，小档因此带一圈半透明辉光外溢、边缘也被插值糊掉——
-    # 任务栏里就是"又小又糊"。mkico 负责：裁掉外溢让方块铺满画布、每档轻锐化、
-    # 除 256 外写 DIB，并补齐 20/24/40/96 这些任务栏与资源管理器的精确档位。
-    # 这份 .ico 只是构建中间产物（托盘那份由应用启动时用同一个包现编），所以放 build\ 里不入库。
+    # Loadout.exe 的程序图标。Windows 只认链接期资源（.syso），而 .syso 要 .ico：
+    # Loadout\icon.ico 就是那份 .ico（10 档：16~128 为 BMP、256 为 PNG；由游戏原生 137px
+    # 技能图标格放大后逐档准备的手工资产，和 icon.png 一样只在改图标时重做一次）。
+    # 应用托盘 go:embed 的也是同一份（见 Loadout\main.go），所以不再需要生成器。
     $iconPng = Join-Path $toolDir 'icon.png'
     if (-not (Test-Path -LiteralPath $iconPng)) {
         throw "Tool icon is missing: $iconPng"
     }
-    $iconIco = Join-Path $toolDir 'build\windows\icon.ico'
-    New-Item -ItemType Directory -Path (Split-Path -Parent $iconIco) -Force | Out-Null
-    & go run ./tools/mkico -in $iconPng -out $iconIco
-    if ($LASTEXITCODE -ne 0) {
-        throw "Tool icon (.ico) generation failed with exit code $LASTEXITCODE."
+    $iconIco = Join-Path $toolDir 'icon.ico'
+    if (-not (Test-Path -LiteralPath $iconIco)) {
+        throw "Tool .ico is missing: $iconIco"
     }
     & wails3 generate syso -arch amd64 -icon $iconIco -manifest (Join-Path $toolDir 'app.manifest') -out (Join-Path $toolDir 'rsrc_windows_amd64.syso')
     if ($LASTEXITCODE -ne 0) {
