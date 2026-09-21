@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
 using GBFR.PreEquippedSigils.Configuration;
 using Reloaded.Mod.Interfaces;
 using Reloaded.Mod.Interfaces.Internal;
@@ -34,9 +33,10 @@ public sealed class Mod : IMod
 
     public Action Disposing => Dispose;
 
-    public void Start(IModLoaderV1 loader) => QueueStart(loader);
+    public void Start(IModLoaderV1 loader) => QueueStart(loader, null);
 
-    public void StartEx(IModLoaderV1 loader, IModConfigV1 _) => QueueStart(loader);
+    // 版本号直接问启动器：StartEx 的参数就带着它，不用再去读一遍 ModConfig.json。
+    public void StartEx(IModLoaderV1 loader, IModConfigV1 config) => QueueStart(loader, config?.ModVersion);
 
     public void Suspend()
     {
@@ -55,7 +55,7 @@ public sealed class Mod : IMod
 
     public bool CanSuspend() => false;
 
-    private void QueueStart(IModLoaderV1 loaderApi)
+    private void QueueStart(IModLoaderV1 loaderApi, string? modVersion)
     {
         // Idempotent: Start/StartEx are alternative loader entry points;
         // re-entry would duplicate the upkeep timer.
@@ -95,7 +95,7 @@ public sealed class Mod : IMod
                 };
             }
             Log($"===== session start {DateTime.Now:yyyy-MM-dd HH:mm:ss} =====");
-            Log($"GBFR Pre-Equipped Sigils v{ReadModVersion(modDirectory)} (ABI {NativeCore.AbiVersion})");
+            Log($"GBFR Pre-Equipped Sigils v{modVersion ?? "?"} (ABI {NativeCore.AbiVersion})");
             long nativeStarted = Stopwatch.GetTimestamp();
             NativeCore.Configure(modDirectory);
             bool hooksReady = NativeCore.Initialize(Log);
@@ -144,31 +144,12 @@ public sealed class Mod : IMod
         }
     }
 
-    /// <summary>
-    /// Reads the mod version from the Reloaded-II ModConfig.json manifest so
-    /// the first log line identifies the deployed build (fallback "?").
-    /// </summary>
-    private static string ReadModVersion(string modDirectory)
-    {
-        try
-        {
-            using JsonDocument doc = JsonDocument.Parse(
-                File.ReadAllText(Path.Combine(modDirectory, "ModConfig.json")));
-            return doc.RootElement.GetProperty("ModVersion").GetString() ?? "?";
-        }
-        catch
-        {
-            return "?";
-        }
-    }
-
     private void InitializeHotkeyConfiguration(IModLoader loader, string modDirectory)
     {
         try
         {
             string configDirectory = loader.GetModConfigDirectory(ModId);
-            HotkeyConfig configuration =
-                new Configurator(configDirectory).GetConfiguration<HotkeyConfig>(0);
+            HotkeyConfig configuration = (HotkeyConfig)new Configurator(configDirectory).Configurations[0];
             configuration.ConfigurationUpdated += OnHotkeyConfigurationUpdated;
             Hotkey.Configure(modDirectory, configuration.VirtualKey, Log);
         }

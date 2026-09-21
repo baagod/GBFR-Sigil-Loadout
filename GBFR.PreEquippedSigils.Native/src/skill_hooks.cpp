@@ -49,7 +49,6 @@ void BeginNaturalContributionTracking(
 
    g_tls_natural_contribution.status = status;
    g_tls_natural_contribution.identity = identity;
-   g_tls_natural_contribution.slots = selection;
    g_tls_natural_contribution.expected = expected;
    g_tls_natural_contribution.next_slot = kNativeInternalSlotCount;
    g_tls_natural_contribution.active = true;

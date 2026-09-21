@@ -18,9 +18,9 @@ namespace
 {
 // 命令/输出文件就放在本 DLL 旁边（DllMain 里按模块路径算出来）：换目录、换机器都不用改代码。
 std::string g_dir;
-// 要探的那个"全局槽"的 RVA。默认值是本次实测的 UiManager 全局——**它随游戏构建变化**，
-// 所以真正要用时用 `rva=0x...` 命令传进来，别指望这个默认值长期有效。
-uintptr_t g_slot_rva = 0x7C49640;
+// 要探的那个"全局槽"的 RVA。没有默认值：它是**某一次游戏构建**的实测值，写死只会误导。
+// 用 `rva=0x...` 命令传进来（命令文件里缺这一条就不探）。
+uintptr_t g_slot_rva = 0;
 uintptr_t g_configured_offset = 0;
 uintptr_t g_scan_window = 0x2000;
 std::string g_tag = "probe3";
@@ -117,6 +117,9 @@ bool ReadBlock(uintptr_t address, void* buffer, size_t bytes)
 
 void WriteStatus()
 {
+   // 没给 rva（命令文件里那条是必需的）就什么都不探：免得把映像头当成那个全局槽写进输出。
+   if (g_slot_rva == 0)
+      return;
    const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
    const uintptr_t slot = base + g_slot_rva;
    std::ostringstream out;
@@ -297,14 +300,6 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID)
       GetModuleFileNameW(module, path, MAX_PATH);
       std::wstring name(path);
       const size_t slash = name.find_last_of(L"\\/");
-      const size_t dot = name.find_last_of(L'.');
-      const size_t begin = slash == std::wstring::npos ? 0 : slash + 1;
-      std::wstring stem = name.substr(begin, (dot == std::wstring::npos ? name.size() : dot) - begin);
-      std::string tag;
-      for (wchar_t ch : stem)
-         tag.push_back(static_cast<char>(ch));
-      if (!tag.empty())
-         g_tag = tag;
       // 目录 = 本 DLL 所在目录（含结尾反斜杠）：命令与输出都落在这儿。
       if (slash != std::wstring::npos)
       {

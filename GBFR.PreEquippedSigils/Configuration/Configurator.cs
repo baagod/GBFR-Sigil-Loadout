@@ -8,8 +8,6 @@ namespace GBFR.PreEquippedSigils.Configuration;
 /// </summary>
 public class Configurator : IConfiguratorV3
 {
-    private static readonly ConfiguratorMixinBase _configuratorMixin = new();
-
     public string? ModFolder { get; private set; }
     public string? ConfigFolder { get; private set; }
     public ConfiguratorContext Context { get; private set; }
@@ -19,7 +17,12 @@ public class Configurator : IConfiguratorV3
 
     private IUpdatableConfigurable[] MakeConfigurations()
     {
-        var configurations = _configuratorMixin.MakeConfigurations(ConfigFolder!);
+        var configurations = new IUpdatableConfigurable[]
+        {
+            HotkeyConfig.FromFile(
+                Path.Combine(ConfigFolder!, HotkeyConfig.FileName),
+                HotkeyConfig.ConfigurationName),
+        };
 
         // Keep the array in sync with the launcher's copy-on-update behavior.
         for (int x = 0; x < configurations.Length; x++)
@@ -43,10 +46,11 @@ public class Configurator : IConfiguratorV3
         ConfigFolder = configDirectory;
     }
 
-    public void Migrate(string oldDirectory, string newDirectory) =>
-        _configuratorMixin.Migrate(oldDirectory, newDirectory);
-
-    public TType GetConfiguration<TType>(int index) => (TType)Configurations[index];
+    // 启动器换目录时调用（IConfiguratorV2）。这份配置只有一个文件、路径每次都由启动器传进来，
+    // 没有要搬的东西——留个空实现，别让它以为这里会做迁移。
+    public void Migrate(string oldDirectory, string newDirectory)
+    {
+    }
 
     public void SetConfigDirectory(string configDirectory) => ConfigFolder = configDirectory;
 
@@ -54,8 +58,8 @@ public class Configurator : IConfiguratorV3
 
     public IConfigurable[] GetConfigurations() => Configurations;
 
-    public bool TryRunCustomConfiguration() =>
-        _configuratorMixin.TryRunCustomConfiguration(this);
+    // 没有自定义配置窗口（IConfiguratorV1）：启动器按 HotkeyConfig 的属性表自己渲染那份 UI。
+    public bool TryRunCustomConfiguration() => false;
 
     public void SetModDirectory(string modDirectory) => ModFolder = modDirectory;
 }

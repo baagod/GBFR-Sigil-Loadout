@@ -144,7 +144,6 @@ struct NaturalContributionFrame
 {
    uintptr_t status = 0;
    StatusIdentity identity{};
-   std::array<uint32_t, kVirtualSlotCapacity> slots{};
    uint32_t expected = 0;
    uint32_t injected = 0;
    int next_slot = kNativeInternalSlotCount;
@@ -219,8 +218,16 @@ void Log(const std::string& message);
 void CompleteStartupPhase(std::string_view phase, uint64_t started_at_ms, bool succeeded);
 void SetRuntimeMessage(std::string message);
 
-bool SafeReadPointer(uintptr_t address, uintptr_t& value) noexcept;
 bool SafeReadUint64(uintptr_t address, uint64_t& value) noexcept;
+// `mov r,[rip+d]` / `mov [rip+d],r` 的 RIP-rel32 算术：位移在指令 +displacement_offset，
+// 指令长 instruction_size，目标必须落在映像内。布局锚点与槽发布锚点共用这一份。
+bool DecodeRipTarget(
+   uintptr_t image_base,
+   uintptr_t image_size,
+   uintptr_t instruction_rva,
+   size_t displacement_offset,
+   size_t instruction_size,
+   uintptr_t& target_rva) noexcept;
 // 游戏内存的范围闸：整段（可跨多个区域）都必须已提交、非 PAGE_GUARD、且保护位满足要求。
 // 游戏内存的读取与范围判断都归 safe_game_access.cpp（见 §6 的边界），别在别处再写一份。
 // 这两种掩码就是仅有的两种用法：读一个指针字段 / 写整张表。

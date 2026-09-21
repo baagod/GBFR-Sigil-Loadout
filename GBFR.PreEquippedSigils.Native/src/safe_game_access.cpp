@@ -14,18 +14,32 @@ void LogRebuildProblem(const char* what, uint32_t character_hash, uintptr_t stat
       "status rebuild: {} (char=0x{:08X} status=0x{:X})", what, character_hash, status));
 }
 } // namespace
-bool SafeReadPointer(uintptr_t address, uintptr_t& value) noexcept
+// RIP-rel32 算术：位移在指令 +displacement_offset，指令长 instruction_size，目标必须落在映像
+// 内。这里只做算术与范围判断——4 个字节落在已验证过的代码段里，不需要 SEH。
+bool DecodeRipTarget(
+   uintptr_t image_base,
+   uintptr_t image_size,
+   uintptr_t instruction_rva,
+   size_t displacement_offset,
+   size_t instruction_size,
+   uintptr_t& target_rva) noexcept
 {
-   __try
-   {
-      value = *reinterpret_cast<const uintptr_t*>(address);
-      return true;
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
-      value = 0;
+   target_rva = 0;
+   if (instruction_size == 0 || displacement_offset > instruction_size ||
+       sizeof(int32_t) > instruction_size - displacement_offset ||
+       instruction_rva > image_size || instruction_size > image_size - instruction_rva)
       return false;
-   }
+   int32_t displacement = 0;
+   std::memcpy(
+      &displacement,
+      reinterpret_cast<const void*>(image_base + instruction_rva + displacement_offset),
+      sizeof(displacement));
+   const int64_t target =
+      static_cast<int64_t>(instruction_rva) + static_cast<int64_t>(instruction_size) + displacement;
+   if (target < 0 || static_cast<uint64_t>(target) >= image_size)
+      return false;
+   target_rva = static_cast<uintptr_t>(target);
+   return true;
 }
 
 bool SafeReadUint64(uintptr_t address, uint64_t& value) noexcept

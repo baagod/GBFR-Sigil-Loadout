@@ -44,11 +44,6 @@ inline constexpr std::array<uint8_t, 12> kStatusRebuildPreflight = {
    0x55, 0x56, 0x57, 0x48, 0x83, 0xEC, 0x50, 0x48, 0x8D, 0x6C, 0x24, 0x50};
 inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
    0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x38, 0x44, 0x89, 0xC6};
-inline constexpr std::array<uint8_t, 24> kStatusOwnerTickPreflight = {
-   0x55, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41,
-   0x54, 0x56, 0x57, 0x53, 0x48, 0x81, 0xEC, 0x98,
-   0x05, 0x00, 0x00, 0x48, 0x8D, 0xAC, 0x24, 0x80};
-
 constexpr uint8_t kApplyLoopBytes[] = {
    0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0, 0, 0, 0,
    0xC5, 0xF8, 0x11, 0x75, 0xF0};
@@ -81,13 +76,6 @@ constexpr auto kNotifierPattern = MakePattern(
    "xxxxxxxxxxxxxxxxxxxxxxxxxxx"
    "????"
    "xxxxxxxxxxxxxxxxxxxxxx");
-
-constexpr uint8_t kOwnerLoopBytes[] = {
-   0x48, 0x8B, 0x73, 0x20, 0x48, 0x8B, 0x7B, 0x28,
-   0x48, 0x39, 0xFE, 0x0F, 0x84, 0, 0, 0, 0,
-   0x4C, 0x8D, 0xB3, 0x30, 0x32, 0x00, 0x00};
-constexpr auto kOwnerLoopPattern =
-   MakePattern(kOwnerLoopBytes, "xxxxxxxxxxxxx????xxxxxxx");
 
 constexpr uint8_t kSystemDataBytes[] = {
    0x48, 0x8B, 0x3D, 0, 0, 0, 0,
@@ -240,25 +228,25 @@ bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept
       alignment != 0 && (offset % alignment) == 0;
 }
 
-size_t FindPatternMatches(
+bool FindUniquePattern(
    const ImageView& image,
    uintptr_t begin,
    size_t size,
    PatternView pattern,
-   uintptr_t* matches,
-   size_t match_capacity) noexcept
+   uintptr_t& match) noexcept
 {
+   match = 0;
    if (pattern.size == 0 || size < pattern.size ||
        !RangeInsideImage(image, begin, size))
-      return 0;
+      return false;
    size_t anchor = 0;
    while (anchor < pattern.size && pattern.mask[anchor] != 'x')
       ++anchor;
    if (anchor == pattern.size)
-      return 0;
+      return false;
 
    const auto* source = reinterpret_cast<const uint8_t*>(image.base + begin);
-   size_t count = 0;
+   size_t found = 0;
    for (size_t offset = 0; offset <= size - pattern.size; ++offset)
    {
       if (source[offset + anchor] != pattern.bytes[anchor])
@@ -275,28 +263,12 @@ size_t FindPatternMatches(
       }
       if (!matched)
          continue;
-      if (count < match_capacity)
-         matches[count] = begin + offset;
-      ++count;
+      // 第二处命中就够判定"不唯一"了：不必数完，也就不必把命中存进数组。
+      if (++found > 1)
+         return false;
+      match = begin + offset;
    }
-   return count;
-}
-
-bool FindUniquePattern(
-   const ImageView& image,
-   uintptr_t begin,
-   size_t size,
-   PatternView pattern,
-   uintptr_t& match) noexcept
-{
-   match = 0;
-   uintptr_t candidates[2]{};
-   const size_t count = FindPatternMatches(
-      image, begin, size, pattern, candidates, std::size(candidates));
-   if (count != 1)
-      return false;
-   match = candidates[0];
-   return true;
+   return found == 1;
 }
 
 bool DecodeRel32Call(
@@ -313,29 +285,6 @@ bool DecodeRel32Call(
        !ReadValue(image, call_rva + 1, displacement))
       return false;
    const int64_t target = static_cast<int64_t>(call_rva + 5) + displacement;
-   if (target < 0 || static_cast<uint64_t>(target) >= image.size)
-      return false;
-   target_rva = static_cast<uintptr_t>(target);
-   return true;
-}
-
-bool DecodeRipTarget(
-   const ImageView& image,
-   uintptr_t instruction_rva,
-   size_t displacement_offset,
-   size_t instruction_size,
-   uintptr_t& target_rva) noexcept
-{
-   target_rva = 0;
-   if (instruction_size == 0 || displacement_offset > instruction_size ||
-       sizeof(int32_t) > instruction_size - displacement_offset ||
-       !RangeInsideImage(image, instruction_rva, instruction_size))
-      return false;
-   int32_t displacement = 0;
-   if (!ReadValue(image, instruction_rva + displacement_offset, displacement))
-      return false;
-   const int64_t target =
-      static_cast<int64_t>(instruction_rva + instruction_size) + displacement;
    if (target < 0 || static_cast<uint64_t>(target) >= image.size)
       return false;
    target_rva = static_cast<uintptr_t>(target);
@@ -527,15 +476,12 @@ bool ResolveGameLayout()
    uintptr_t apply_loop = 0;
    uintptr_t category_loop = 0;
    uintptr_t notifier = 0;
-   uintptr_t owner_loop = 0;
    if (!FindUniquePattern(
           image, image.code_rva, image.code_size, kApplyLoopPattern, apply_loop) ||
        !FindUniquePattern(
           image, image.code_rva, image.code_size, kCategoryLoopPattern, category_loop) ||
        !FindUniquePattern(
-          image, image.code_rva, image.code_size, kNotifierPattern, notifier) ||
-       !FindUniquePattern(
-          image, image.code_rva, image.code_size, kOwnerLoopPattern, owner_loop))
+          image, image.code_rva, image.code_size, kNotifierPattern, notifier))
       return FailResolution("unique semantic anchors");
 
    layout.skill_apply_loop_limit_immediate_rva = apply_loop + 4;
@@ -565,7 +511,6 @@ bool ResolveGameLayout()
 
    FunctionRange getter_function{};
    FunctionRange apply_helper{};
-   FunctionRange owner_function{};
    if (!FindRuntimeFunction(image, apply_getter, getter_function) ||
        getter_function.begin != apply_getter ||
        !MatchesBytesAtRva(image, apply_getter, kGetterPreflight) ||
@@ -574,11 +519,7 @@ bool ResolveGameLayout()
           apply_getter,
           1,
           IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE) ||
-       !FindRuntimeFunction(image, apply_loop, apply_helper) ||
-       !FindRuntimeFunction(image, owner_loop, owner_function) ||
-       owner_function.begin > owner_loop ||
-       !MatchesBytesAtRva(
-          image, owner_function.begin, kStatusOwnerTickPreflight))
+       !FindRuntimeFunction(image, apply_loop, apply_helper))
       return FailResolution("runtime-function boundaries");
    if (!FindStatusRebuild(image, apply_helper, layout.status_rebuild_rva))
       return FailResolution("status rebuild call graph");
@@ -594,7 +535,7 @@ bool ResolveGameLayout()
    uintptr_t system_data_global = 0;
    uint32_t gem_container_offset = 0;
    uint32_t repeated_gem_container_offset = 0;
-   if (!DecodeRipTarget(image, system_pattern, 3, 7, system_data_global) ||
+   if (!DecodeRipTarget(image.base, image.size, system_pattern, 3, 7, system_data_global) ||
        !ReadValue(image, system_pattern + 10, gem_container_offset) ||
        !ReadValue(image, system_pattern + 17, repeated_gem_container_offset) ||
        gem_container_offset != repeated_gem_container_offset ||

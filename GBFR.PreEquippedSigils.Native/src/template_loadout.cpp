@@ -46,7 +46,7 @@ struct CharacterExclusiveLoadout
 };
 
 // 这张表（角色 → 三个专属槽的 gem 与技能）由 gen 的 `exclusive` 子命令从 exclusiveSources 生成：
-// vcxproj 每次编译前跑它，所以 .inc 是构建中间产物、不入库——改数据去改 pkgs/sigils/exclusive.go。
+// vcxproj 每次编译前跑它，所以 .inc 是构建中间产物、不入库——改数据去改 gen\game\sigils\exclusive.go。
 #include "exclusive_table.inc"
 
 // 这个 gem 属于哪个角色：直接在**已经编译进来的注入表**里找，不另存一张"限制表"。那道校验只

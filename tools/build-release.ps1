@@ -308,7 +308,7 @@ $gitDir = Join-Path $root '.git'
 if (Test-Path -LiteralPath $gitDir) {
     $generatedDiff = & git -C $root status --porcelain -- 'Loadout/assets/sigils.chara.json'
     if ($generatedDiff) {
-        throw "sigils.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen 的 pkgs/sigils/exclusive.go 里引起改写的改动。"
+        throw "sigils.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen 的 sigils/exclusive.go 里引起改写的改动。"
     }
 }
 else {

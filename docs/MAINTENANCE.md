@@ -79,13 +79,13 @@
 
 | 生成器（在 gen 里） | 作用 |
 |---|---|
-| `go run . exclusive` | 本 mod 的策展表（`pkgs/sigils` 里的 `exclusiveSources`：每角色 Hash/T1/T2/War），从 mod 仓库的 `sigils.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\sigils.chara.json`（可视工具读；内容不变则不重写） |
+| `go run . exclusive` | 本 mod 的策展表（`game\sigils` 里的 `exclusiveSources`：每角色 Hash/T1/T2/War），从 mod 仓库的 `sigils.json` 推导变体 hash 与 player 码；生成 mod 仓库的 `native\src\exclusive_table.inc`（编译中间产物，**不入库**：vcxproj 每次编译前调它）与 `Loadout\assets\sigils.chara.json`（可视工具读；内容不变则不重写） |
 | `go run . sigils` | → `gen\output\sigils.xlsx`（审阅表，和 texts.xlsx 同待遇、不入库）+ mod 仓库的 `Loadout\assets\sigils.json` |
 | `go run . texts` | → `gen\output\texts.xlsx` / `texts.json`；**lang 系列全在这里**：mod 仓库的 `sigils.lang.json` + `skill.<lang>.json` + `chara.lang.json` |
 | `go run . skills` | 由 `gen\output\texts.json` 出 `skill_status.json`（写进 mod 仓库；游戏更新后才跑） |
 | [Nenkai/relink-modding](https://nenkai.github.io/relink-modding/) + [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) | 开发期数据核实，运行时不依赖 |
 
-**改配装流程**：改 gen 的 `pkgs/sigils/exclusive.go` 里的 `exclusiveSources` → 编译（vcxproj 编译前自动重跑它，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
+**改配装流程**：改 gen 的 `game\sigils\exclusive.go` 里的 `exclusiveSources` → 编译（vcxproj 编译前自动重跑它，数据随编译生效）→ 部署 → 验证（见 `README.md` 的验证清单）。
 
 行结构（`*_gem` = 物品 hash 由脚本推导，skill = 技能 hash）：
 
@@ -198,6 +198,7 @@ TemplateGemSlot{
   ① 编辑后强制重建（旧导出 `GBFR20_RebuildSelectedStatus` + `ScheduleSelectedStatusRebind` + 会话内缓存的 UI 选中角色）：入口就错了——那个值来自 `UiManager`，战斗场景里读不到，实测出现过"整个会话一次都没读到"。
   ② tick（`GBFR20_Tick`）里周期性地做任何原生维护：它带来那批 AV 崩溃里"`ok=0` 之后 20–60 秒"这个签名，现在整条 tick 已删（ABI 20）。
   随之一起删掉的死代码：UI 那条锚点链（`ui_mode_pair` / `ui_character`）与状态管理器哈希表那条锚点链（`status_manager` / `status_map_*`）——它们唯一的消费者就是上面①。删掉也少了两组"游戏一更新就整体解析失败"的锚点。
+  第三组同类死代码后来也删了：owner-loop 锚点链（`kOwnerLoopPattern` / `kStatusOwnerTickPreflight`）——它服务的 `status_owner_tick` 钩子随②一起没了，解出来的偏移没有任何消费方，只会在游戏改动那个函数时把整套解析拖垮。
   顺带一条**没做、也先不做**的事：想彻底摆脱"轮次"这种近似判据，需要"游戏现在把哪个对象当作某角色的当前 status"的权威登记处（可能要新逆向，或把上面那条哈希表锚点加回来验证它是否收录在场状态）。当前实测（19 次配装发布 × 反复换人，0 次 ok=0、0 次崩溃）不需要它。
 
 ## 8. 背景与现状

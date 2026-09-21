@@ -16,7 +16,7 @@ inject.exe granblue_fantasy_relink.exe <probe3.dll 全路径>   注入
    - `probe3-command.txt`：命令，一行一条（改文件即生效，探针每 500ms 看一眼）：
      | 命令 | 作用 |
      |---|---|
-     | `rva=0x7C49640` | 要探的那个全局槽的 RVA（**默认值是本次实测的 UiManager 全局，游戏更新即失效**） |
+     | `rva=0x7C49640` | 要探的那个全局槽的 RVA（**必须给**：没有默认值，不给就不探——它是某一次构建的实测值） |
      | `offset=0x5F0` | 从槽里的对象再读一个 u32（比如"选中角色 hash"的偏移） |
      | `scan=0x2000` | 在槽对象里按 4 字节步长找 `probe-hashes.txt` 里的值，报告命中偏移 |
      | `peek=0xADDR` | 十六进制 dump 该地址 0x200 字节 |

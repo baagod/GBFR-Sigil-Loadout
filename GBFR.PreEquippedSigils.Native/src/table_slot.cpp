@@ -147,29 +147,6 @@ AnchorSearch SearchAnchorWindow(uintptr_t code_rva, size_t code_size) noexcept
    return result;
 }
 
-// 这里只是 mov + disp32 的算术：4 个字节落在已验证过的代码段里，不会出错，所以不需要
-// SEH。目标仍然要落在映像内。两个锚点都是 `mov r,[rip+d]` / `mov [rip+d],r`：位移都在
-// 指令 +3，指令都长 7 字节。
-bool DecodeRipTarget(
-   uintptr_t instruction_rva,
-   uintptr_t image_size,
-   uintptr_t& target_rva) noexcept
-{
-   constexpr size_t kDisplacementOffset = 3;
-   constexpr size_t kInstructionSize = 7;
-   int32_t displacement = 0;
-   std::memcpy(
-      &displacement,
-      reinterpret_cast<const void*>(g_image_base + instruction_rva + kDisplacementOffset),
-      sizeof(displacement));
-   const int64_t target =
-      static_cast<int64_t>(instruction_rva) + static_cast<int64_t>(kInstructionSize) + displacement;
-   if (target < 0 || static_cast<uint64_t>(target) >= image_size)
-      return false;
-   target_rva = static_cast<uintptr_t>(target);
-   return true;
-}
-
 // 逐行 Key 比对：Key 是这张表的**身份**（编辑只动 LevelValue1..10 与 Level，从不碰 Key），
 // 所以这一关既是"确实是同一张表"的实证，又不会随编辑变化——每次应用都过得去。
 // 另开一个函数：SEH 帧里只许有平凡类型，而且不能和"要栈展开的对象"同处一个函数。
@@ -249,10 +226,13 @@ void ResolveTableSlot()
    // 两处 RIP 相对位移都解出来再验：槽首那条 mov [rip+d],rcx 与缓冲区指针那条
    // mov rbx,[rip+d] 必须正好差 8（槽是 handle@+0 / buffer@+8 / ?@+0x10 三档）。解不出这一
    // 对就不认。
+   // 两个锚点都是 `mov r,[rip+d]` / `mov [rip+d],r`：位移都在指令 +3，指令都长 7 字节。
    uintptr_t slot_rva = 0;
    uintptr_t buffer_pointer_rva = 0;
-   if (!DecodeRipTarget(anchor.slot_store_rva, code.image_size, slot_rva) ||
-       !DecodeRipTarget(anchor.buffer_load_rva, code.image_size, buffer_pointer_rva) ||
+   if (!DecodeRipTarget(
+          g_image_base, code.image_size, anchor.slot_store_rva, 3, 7, slot_rva) ||
+       !DecodeRipTarget(
+          g_image_base, code.image_size, anchor.buffer_load_rva, 3, 7, buffer_pointer_rva) ||
        buffer_pointer_rva != slot_rva + 8)
    {
       Log("Table slot: the publish anchors' displacements do not decode to a slot and its +8 "

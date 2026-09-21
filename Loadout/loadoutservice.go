@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	jsonv2 "encoding/json/v2"
 )
 
 // MaxSlots caps the number of ENABLED slots, mirroring the managed validator
@@ -222,7 +223,7 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 	}
 	// 只认这一种形状：别的拼写（早期版本的裸数组）在这里就报错，而不是被翻译成
 	// "空配置"写下去。
-	if err := json.Unmarshal([]byte(config), &c); err != nil {
+	if err := jsonv2.Unmarshal([]byte(config), &c); err != nil {
 		return err
 	}
 	// 缺了 slots 成员也要拒：mod 那边只认这一种形状（缺了就抛 "missing 'slots' array"），

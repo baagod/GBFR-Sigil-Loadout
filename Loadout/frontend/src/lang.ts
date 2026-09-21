@@ -31,8 +31,6 @@ export const LANG_LABEL: Record<Lang, string> = {
 */
 export function initialLang(): Lang {
   const preferred = navigator.language.toLowerCase();
-  if (preferred.startsWith("ja")) return "ja";
-  if (preferred.startsWith("ko")) return "ko";
-  if (preferred.startsWith("zh")) return "zh";
-  return "en";
+  // 四个代码互不为前缀，所以"谁先谁后"不影响结果。
+  return LANGS.find((lang) => preferred.startsWith(lang)) ?? "en";
 }
