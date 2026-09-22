@@ -58,6 +58,9 @@ internal sealed class SigilEditorFeature
     private IDataManager? _dm;
     private byte[]? _currentTable;
     private bool _started;
+    // 最近一次已经往日志里说过的那一版，以及"现在这一趟是静默重试吗"。
+    private DateTime _loggedAttemptUtc;
+    private bool _quiet;
     private int _stopped;
     private bool _waitedForManager;
 
@@ -177,6 +180,10 @@ internal sealed class SigilEditorFeature
     /// <param name="stamp">这一版文件的 mtime；只有真的写进游戏内存了才会被标记为已应用。</param>
     private void TryApply(DateTime stamp)
     {
+        // 失败会每 250ms 重试，而"这条表读不出来""原生拒写"在屏幕上是同一件事——同一版
+        // 只报一次，重试静默。版本一变就重新开口。
+        _quiet = stamp == _loggedAttemptUtc;
+        _loggedAttemptUtc = stamp;
         try
         {
             Apply(stamp);
@@ -185,6 +192,16 @@ internal sealed class SigilEditorFeature
         {
             _log("sigil edit hot apply EXCEPTION: " + ex);
         }
+        finally
+        {
+            _quiet = false;
+        }
+    }
+
+    private void LogAttempt(string message)
+    {
+        if (!_quiet)
+            _log(message);
     }
 
     /// <summary>
@@ -203,14 +220,14 @@ internal sealed class SigilEditorFeature
         // 卸载之后（Dispose 置了 _stopped）不再动内存：宿主的定时器不保证回调已经跑完。
         if (Volatile.Read(ref _stopped) != 0)
         {
-            _log("hot apply: skipped - the feature has been disposed");
+            LogAttempt("hot apply: skipped - the feature has been disposed");
             return;
         }
 
         byte[]? newTable = BuildCurrentTable();
         if (newTable is null)
         {
-            _log("hot apply: nothing to apply - the table could not be read, or its layout is not the one this build patches (see the lines above)");
+            LogAttempt("hot apply: nothing to apply - the table could not be read, or its layout is not the one this build patches (see the lines above)");
             return;
         }
 
@@ -219,7 +236,7 @@ internal sealed class SigilEditorFeature
         // "游戏手里那份"这个第二份事实。
         if (_currentTable is not null && newTable.AsSpan().SequenceEqual(_currentTable))
         {
-            _log("hot apply: the edit list matches what is already in memory; nothing to do");
+            LogAttempt("hot apply: the edit list matches what is already in memory; nothing to do");
             return;
         }
 
@@ -243,7 +260,7 @@ internal sealed class SigilEditorFeature
         }
         catch (Exception ex)
         {
-            _log("hot apply: re-register EXCEPTION (continuing with the memory write): " + ex);
+            LogAttempt("hot apply: re-register EXCEPTION (continuing with the memory write): " + ex);
         }
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -255,7 +272,7 @@ internal sealed class SigilEditorFeature
         {
             // 拒写：-7 是"行写崩了"，那意味着表可能已经被改了一部分——说清楚，别把它和
             // "一个字节都没写"混成一句。其余每个码都发生在写之前，内存原样。
-            _log($"hot apply: FAIL - the native slot write refused (code {written}; the reason is in the line above); the table is re-registered, so the edit applies at the game's next parse. Every code but -7 refused before writing anything; -7 means the row writes faulted part-way and this session's table may already hold some of the new values");
+            LogAttempt($"hot apply: FAIL - the native slot write refused (code {written}; the reason is in the line above); the table is re-registered, so the edit applies at the game's next parse. Every code but -7 refused before writing anything; -7 means the row writes faulted part-way and this session's table may already hold some of the new values");
             return;
         }
 
@@ -263,7 +280,7 @@ internal sealed class SigilEditorFeature
         // 唯一宣告"这一版处理完了"的地方：原生确实把行写进了游戏内存。放在这里，失败路径
         // 就自然不会推进版本，于是下一拍还会重试。
         _stamp.MarkApplied(stamp);
-        _log($"hot apply: SUCCESS - {written} row(s) of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
+        LogAttempt($"hot apply: SUCCESS - {written} row(s) of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
     }
 
     /// <summary>
@@ -308,23 +325,23 @@ internal sealed class SigilEditorFeature
     {
         if (_dm is null)
         {
-            _log("sigil edit FAIL: IDataManager controller not found (is gbfrelink.utility.manager enabled?)");
+            LogAttempt("sigil edit FAIL: IDataManager controller not found (is gbfrelink.utility.manager enabled?)");
             return null;
         }
 
         byte[]? file = _dm.GetArchiveFile(TablePath);
         if (file is null || file.Length == 0)
         {
-            _log($"sigil edit FAIL: GetArchiveFile('{TablePath}') returned nothing");
+            LogAttempt($"sigil edit FAIL: GetArchiveFile('{TablePath}') returned nothing");
             return null;
         }
-        _log($"sigil edit: read {file.Length} bytes");
+        LogAttempt($"sigil edit: read {file.Length} bytes");
 
         // 下面那些偏移量只对这种形状的表成立。2.0 之前的表是 36 字节一行，将来任何一次
         // 列变动又会把这些偏移量再挪一遍：那时候照改就是写进错误的行，或者写出行外，而且不吭声。
         if (!HasPatchableLayout(file, out long declaredRows))
         {
-            _log($"sigil edit FAIL: {TablePath} is not the {FileHeaderSize}-byte header + " +
+            LogAttempt($"sigil edit FAIL: {TablePath} is not the {FileHeaderSize}-byte header + " +
                  $"{RowSize}-byte row table this mod patches: {file.Length} bytes, header says " +
                  $"{declaredRows} row(s). Nothing applied.");
             return null;
@@ -344,13 +361,13 @@ internal sealed class SigilEditorFeature
         {
             if (!edit.Enabled)
             {
-                _log($"sigil edit:   skip (disabled): {edit.Key}");
+                LogAttempt($"sigil edit:   skip (disabled): {edit.Key}");
                 continue;
             }
 
             if (!uint.TryParse(edit.Key, System.Globalization.NumberStyles.HexNumber, null, out uint key))
             {
-                _log($"sigil edit:   skip (key is not an 8-digit hex hash yet): {edit.Key}");
+                LogAttempt($"sigil edit:   skip (key is not an 8-digit hex hash yet): {edit.Key}");
                 continue;
             }
 
@@ -358,7 +375,7 @@ internal sealed class SigilEditorFeature
             // 读起来像配置里写错了键，而不是表不可能有的那个等级。
             if (edit.Level < 1)
             {
-                _log($"sigil edit:   skip (level {edit.Level} is below the first level): {edit.Key}");
+                LogAttempt($"sigil edit:   skip (level {edit.Level} is below the first level): {edit.Key}");
                 continue;
             }
 
@@ -381,13 +398,13 @@ internal sealed class SigilEditorFeature
     {
         if (_dm is null)
         {
-            _log("sigil edit hot apply: re-register skipped (no data manager this session)");
+            LogAttempt("sigil edit hot apply: re-register skipped (no data manager this session)");
             return;
         }
 
         _dm.AddOrUpdateExternalFile(TablePath, table);
         _dm.UpdateIndex();
-        _log("sigil edit hot apply: table re-registered, future game parses serve the new values");
+        LogAttempt("sigil edit hot apply: table re-registered, future game parses serve the new values");
     }
 
     /// <summary>
@@ -403,9 +420,9 @@ internal sealed class SigilEditorFeature
         missing = false;
         try
         {
-            _log($"sigil edit: list path: {ConfigFile}");
+            LogAttempt($"sigil edit: list path: {ConfigFile}");
             Config config = Config.Load(ConfigFile);
-            _log($"sigil edit: list loaded: {config.Edits.Count} edit(s)");
+            LogAttempt($"sigil edit: list loaded: {config.Edits.Count} edit(s)");
             return config;
         }
         catch (FileNotFoundException)
@@ -418,11 +435,11 @@ internal sealed class SigilEditorFeature
         }
         catch (Exception ex)
         {
-            _log("sigil edit: list load failed: " + ex);
+            LogAttempt("sigil edit: list load failed: " + ex);
             return null;
         }
 
-        _log($"sigil edit: no edit list yet at {ConfigFile} (the tool writes it there)");
+        LogAttempt($"sigil edit: no edit list yet at {ConfigFile} (the tool writes it there)");
         return null;
     }
 
@@ -466,18 +483,18 @@ internal sealed class SigilEditorFeature
                 // 给的是一个 ±Infinity，写进去就是游戏拿着无穷大去做它自己的算术。
                 if (!float.IsFinite(value))
                 {
-                    _log($"sigil edit:   {key:X8} L{level}: slot {i + 1} is not a finite number ({value}); left as the game has it");
+                    LogAttempt($"sigil edit:   {key:X8} L{level}: slot {i + 1} is not a finite number ({value}); left as the game has it");
                     continue;
                 }
                 BitConverter.GetBytes(value).CopyTo(data, row + i * 4);
             }
 
-            _log($"sigil edit:   {key:X8} L{level} @0x{row:X}: was {before}");
-            _log($"sigil edit:   {key:X8} L{level} @0x{row:X}: now {RowValues(data, row)}");
+            LogAttempt($"sigil edit:   {key:X8} L{level} @0x{row:X}: was {before}");
+            LogAttempt($"sigil edit:   {key:X8} L{level} @0x{row:X}: now {RowValues(data, row)}");
             return true;
         }
 
-        _log($"sigil edit:   {key:X8} L{level}: row not found");
+        LogAttempt($"sigil edit:   {key:X8} L{level}: row not found");
         return false;
     }
 
