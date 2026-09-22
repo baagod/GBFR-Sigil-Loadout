@@ -267,7 +267,6 @@ function LevelRow({
             {row.label}
           </span>
         )}
-        {}
         <span className="w-12 shrink-0 text-sm leading-7 text-muted-foreground tabular-nums select-none">
           Lv {level}
         </span>

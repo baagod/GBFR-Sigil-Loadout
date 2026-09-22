@@ -439,8 +439,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         数值框上的点击就是靠这个保住自己的点击的），所以这个容器上挂 data-slot 会吞掉所有点在行上
         的点击，因子就打不开了。
       */}
-      {}
-      {}
       <div
         ref={listBox}
         className="skill-rows mt-6 min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]"
