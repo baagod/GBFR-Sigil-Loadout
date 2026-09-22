@@ -10,7 +10,7 @@
 
 #define GBFR20_CALL __cdecl
 
-// ABI v19: lifecycle exports, one call that applies a whole player
+// ABI v20: lifecycle exports, one call that applies a whole player
 // configuration, and one that writes the edited skill_status table straight
 // into the game's own parsed copy - whose address the native side resolves from
 // a semantic anchor, so the managed side never holds an address and never scans

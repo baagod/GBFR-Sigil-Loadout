@@ -71,12 +71,6 @@ type loadoutSlot struct {
 	Enabled bool          `json:"enabled"`
 }
 
-// exclusiveState mirrors the mod-side "exclusive" section: keyed by character
-// hash, inner keys are the skill hashes, false = that exclusive slot is off
-// (an absent character is a character with all three slots on). Parsed only to
-// validate the config; the payload is written verbatim.
-type exclusiveState map[string]bool
-
 func exeDir() string {
 	exe, err := os.Executable()
 	if err != nil {
@@ -261,7 +255,7 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 	var c struct {
 		Lang      string                    `json:"lang"`
 		Slots     []loadoutSlot             `json:"slots"`
-		Exclusive map[string]exclusiveState `json:"exclusive"`
+		Exclusive map[string]map[string]bool `json:"exclusive"`
 	}
 	// 只认这一种形状：别的拼写（早期版本的裸数组）在这里就报错，而不是被翻译成
 	// "空配置"写下去。

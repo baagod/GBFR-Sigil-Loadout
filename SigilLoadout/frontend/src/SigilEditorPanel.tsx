@@ -30,6 +30,7 @@ import { messages } from "./messages";
 import type { Lang } from "./lang";
 import { SkillRow, type RowContext } from "./SkillRow";
 import {
+  addressOf,
   asEdits,
   dedupe,
   explainAt,
@@ -49,13 +50,6 @@ const SERVICE = "main.EditService";
 */
 const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
 
-/** 可视工具准备写入的列表是否就是它读到的那个：同样的编辑，同样的数值。 */
-const sameRecords = (a: SigilSkill[], b: SigilSkill[]) =>
-  a.length === b.length &&
-  a.every((record, i) =>
-    record.values.every((value, slot) => value === b[i].values[slot]),
-  );
-
 /** 稍早之前的那个值：否则搜索框每敲一个键都要过滤一遍 200 行的列表。 */
 function useDebounced<T>(value: T, delay = 150): T {
   const [settled, setSettled] = useState(value);
@@ -73,7 +67,9 @@ function useDebounced<T>(value: T, delay = 150): T {
   所以窗口缩到比这更窄时，列是被滚动条推到视野外，而不是被裁掉。
 */
 export function SigilEditorPanel({ lang }: { lang: Lang }) {
-  const [edits, setEdits] = useState<SigilSkill[]>([]);
+  // 编辑态按**地址**（因子哈希 + 等级）索引：一个地址一条，这个不变量由容器本身保证，
+  // 所以没有任何路径需要手工去重或整体重建列表。
+  const [edits, setEdits] = useState<Map<string, SigilSkill>>(new Map());
   // 所选语言对每个因子的说法：名字、概要，以及共享同一段说明的那些连续等级——
   // 大多数只有一段，少数会在中途换措辞（见 explainAt）。
   const [texts, setTexts] = useState<Record<string, SkillText>>({});
@@ -177,16 +173,13 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
         ),
       }));
 
-    // 一个地址一条编辑，且只留编辑（见 asEdits）。结果与文件不同时立刻写回：
-    // 旧文件在第一次打开时就被理顺，而不是等到下一次敲键。
-    const records = dedupe(asEdits(raw, skillTable ?? {}));
-    setEdits(records);
+    // 一个地址一条编辑，且只留编辑（见 asEdits）。**只读，不写回**：归一化只是为了在
+    // 屏幕上理顺这一份列表，用户文件在下一次真正的编辑之前不该被动过——以前这里会在
+    // 读取时发现差异就回写，那等于"打开一次就等于改过一次"，与 App.tsx 里那条
+    // "启动不写盘" 是同一条规则。
+    const loaded = dedupe(asEdits(raw, skillTable ?? {}));
+    setEdits(new Map(loaded.map((record) => [addressOf(record.key, record.level), record])));
     setSkills(skillTable ?? {});
-    if (!sameRecords(records, raw)) {
-      Call.ByName(`${SERVICE}.SaveEdits`, records).catch((err) =>
-        showError({ title: messages[lang].writeFailed, detail: String(err) }),
-      );
-    }
   }
 
   useEffect(() => {
@@ -211,18 +204,20 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     被编辑的等级。找到某个因子是搜索框的活，所以这份列表是总目录，而不是一份新增清单。
   */
   const rows = useMemo(() => {
-    const byKey = new Map<string, SigilSkill[]>();
-    for (const record of edits) {
-      const held = byKey.get(record.key);
-      if (held) held.push(record);
-      else byKey.set(record.key, [record]);
-    }
-
+    const records = [...edits.values()];
     /*
       两个层级上都是打开的内容排最前：有启用等级的因子排在其余因子之上，
       因子内部启用的等级排在它的其他行之上。
       打开的内容就是游戏正在生效的东西，所以它必须最先被找到。
     */
+    // 状态按地址去重，这里按因子哈希再分一层，供 rows 与各行使用。
+    const byKey = new Map<string, SigilSkill[]>();
+    for (const record of records) {
+      const held = byKey.get(record.key);
+      if (held) held.push(record);
+      else byKey.set(record.key, [record]);
+    }
+
     const keys = [...Object.keys(texts)];
     // 表里没有的 hash——手写的 sigiledits.json、别的版本留下的编辑——保留而不是丢掉，
     // 因为列表显示不出来的编辑，就是谁都不知道正在生效的编辑。它和其他因子一起排序。
@@ -286,12 +281,13 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
   */
   function toggleLevel(key: string, level: number) {
     beginTick();
-    const at = edits.findIndex((e) => e.key === key && e.level === level);
-    if (at < 0) {
-      commit([...edits, newRecord(key, level, true)]);
+    const address = addressOf(key, level);
+    const existing = edits.get(address);
+    if (!existing) {
+      commit(new Map(edits).set(address, newRecord(key, level, true)));
       return;
     }
-    commit(edits.map((e, i) => (i === at ? { ...e, enabled: !e.enabled } : e)));
+    commit(new Map(edits).set(address, { ...existing, enabled: !existing.enabled }));
   }
 
   /*
@@ -300,17 +296,18 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
   */
   function toggleSkill(key: string, nextChecked: boolean) {
     beginTick();
-    const mine = edits.filter((e) => e.key === key);
-    if (!nextChecked) {
-      commit(edits.map((e) => (e.key === key ? { ...e, enabled: false } : e)));
-      return;
+    const next = new Map(edits);
+    for (const [address, record] of next) {
+      if (record.key === key) next.set(address, { ...record, enabled: nextChecked });
     }
-
-    const have = new Set(mine.map((e) => e.level));
-    const added = levelsOf(skills[key], mine)
-      .filter((level) => !have.has(level))
-      .map((level) => newRecord(key, level, true));
-    commit([...edits.map((e) => (e.key === key ? { ...e, enabled: true } : e)), ...added]);
+    if (nextChecked) {
+      const mine = [...next.values()].filter((record) => record.key === key);
+      for (const level of levelsOf(skills[key], mine)) {
+        const address = addressOf(key, level);
+        if (!next.has(address)) next.set(address, newRecord(key, level, true));
+      }
+    }
+    commit(next);
   }
 
   /**
@@ -377,10 +374,11 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     只有第一次敲键会保持滚动：创建记录可能让光标所在的那一行重排。之后每一次敲键都只是在原地改数值。
   */
   function updateLevel(key: string, level: number, patch: Partial<SigilSkill>) {
-    const at = edits.findIndex((e) => e.key === key && e.level === level);
-    if (at < 0) {
+    const address = addressOf(key, level);
+    const existing = edits.get(address);
+    if (!existing) {
       beginTick();
-      commit([...edits, { ...newRecord(key, level, false), ...patch }]);
+      commit(new Map(edits).set(address, { ...newRecord(key, level, false), ...patch }));
       return;
     }
     /*
@@ -391,7 +389,7 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
       按后半句判断：勾选着的记录会因为输入框被清空而丢掉勾选，于是也掉出置顶区——用户明确
       按下的那一下被一次输入框操作撤销了。
     */
-    commit(edits.map((e, i) => (i === at ? { ...e, ...patch } : e)));
+    commit(new Map(edits).set(address, { ...existing, ...patch }));
   }
 
   function toggleOpen(key: string) {
@@ -421,9 +419,11 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     后端的尾随防抖把一串敲键变成一次 sigiledits.json 写入和一次在线应用，
     只有完全无法被接受的列表才会作为值得打断用户的失败回来。
   */
-  function commit(next: SigilSkill[]) {
-    const kept = asEdits(next, skills);
-    setEdits(kept);
+  function commit(next: Map<string, SigilSkill>) {
+    // 状态本身就是按地址去重的容器，所以这里不必再跑一遍 dedupe：一个地址只有一条。
+    // 归一化仍走 asEdits，好让"同一条记录连着两次提交"得到逐字节相同的结果。
+    const kept = asEdits([...next.values()], skills);
+    setEdits(new Map(kept.map((record) => [addressOf(record.key, record.level), record])));
     Call.ByName(`${SERVICE}.SaveEdits`, kept).catch((err) =>
       showError({ title: messages[lang].writeFailed, detail: String(err) }),
     );
