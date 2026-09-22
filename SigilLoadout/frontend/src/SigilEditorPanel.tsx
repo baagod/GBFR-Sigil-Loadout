@@ -322,11 +322,19 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     整行是它内部勾选框的快捷方式。用户真正瞄准的东西——数值框、勾选框、箭头 ——
     都是 shadcn 控件并带 data-slot，所以各自保留自己的点击；
     触发器自身的 slot 不是控件，因此点在行上的点击仍然落到这里。
+
+    寻找必须**停在行边界**：不能沿祖先一路往上找。列表外面还有别的 data-slot——这个面板
+    整个包在 TabsPanel 里，而它带 data-slot="tabs-panel"——一路往上会让每一行都被判成
+    "点在控件上"，整行就再也点不开了。所以先夹到最近的那个 data-slot 元素，再确认它
+    确实落在这一行之内；越过行的（比如 tabs-panel）不算。
   */
-  const isControl = (e: MouseEvent<HTMLElement>) =>
-    !!(e.target as HTMLElement).closest(
-      '[data-slot]:not([data-slot="tooltip-trigger"])',
-    );
+  const isControl = (e: MouseEvent<HTMLElement>) => {
+    const target = e.target as HTMLElement;
+    const row = target.closest("[data-row]");
+    if (row === null) return false;
+    const control = target.closest('[data-slot]:not([data-slot="tooltip-trigger"])');
+    return control !== null && row.contains(control);
+  };
 
   /*
     每一次编辑都经过这里：屏幕上的列表就是全部状态，也是运行中的游戏最终拿到的东西。
