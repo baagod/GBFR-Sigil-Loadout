@@ -63,10 +63,24 @@ public class Configurable<TParentType> : IUpdatableConfigurable
     private void OnConfigurationUpdated() {
         try {
             lock (_readLock) {
-                var newConfig = Utilities.TryGetValue(() => ReadFrom(FilePath!, ConfigName!), 250, 2);
-                newConfig.ConfigurationUpdated = ConfigurationUpdated;
+                // 重试 250ms、每次隔 2ms：FSW 常常在文件只写了一半时就触发，读到半份 JSON 是常态。
+                // 超时就保留上一份配置——与下面那个 catch 的落点一致。
+                TParentType? reloaded = null;
+                long deadline = Environment.TickCount64 + 250;
+                while (reloaded is null && Environment.TickCount64 < deadline) {
+                    try {
+                        reloaded = ReadFrom(FilePath!, ConfigName!);
+                    }
+                    catch {
+                        Thread.Sleep(2);
+                    }
+                }
+                if (reloaded is null) {
+                    return;
+                }
+                reloaded.ConfigurationUpdated = ConfigurationUpdated;
                 DisposeEvents();
-                newConfig.ConfigurationUpdated?.Invoke(newConfig);
+                reloaded.ConfigurationUpdated?.Invoke(reloaded);
             }
         }
         catch {
