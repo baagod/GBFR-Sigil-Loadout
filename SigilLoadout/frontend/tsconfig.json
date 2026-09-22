@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
-    "noUnusedParameters": false,
+    "noUnusedParameters": true,
     // 不能开：wails3 generate bindings 生成的 bindings/*.js 没有 .d.ts（它是 gitignore 的
     // 生成物），打开 noImplicitAny 只会对那一句 import 报 TS7016。
     "noImplicitAny": false,

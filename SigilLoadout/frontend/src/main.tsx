@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client"
 import "./style.css"
 import App from "./App"
+import { ErrorBoundary } from "./ErrorBoundary"
 
 // 右键菜单只在输入框里放行（那里是原生编辑命令），页面其它地方一律拦掉。
 document.addEventListener("contextmenu", (event) => {
@@ -9,4 +10,8 @@ document.addEventListener("contextmenu", (event) => {
   event.preventDefault()
 })
 
-createRoot(document.getElementById("app")!).render(<App />)
+createRoot(document.getElementById("app")!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+)

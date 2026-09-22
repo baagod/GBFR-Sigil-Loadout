@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>GBFR Sigil Loadout</title>
+    <!-- 只报告、不拦截：Wails 会往页面注入内联脚本（事件 shim）和 /wails/runtime.js，
+         先把策略摆出来看违例，确认干净再摘掉 -Report-Only。
+         frame-ancestors 与 report-uri 在 <meta> 里会被忽略，所以这里不写。 -->
+    <meta
+      http-equiv="Content-Security-Policy-Report-Only"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
   </head>
   <body>
     <div id="app"></div>

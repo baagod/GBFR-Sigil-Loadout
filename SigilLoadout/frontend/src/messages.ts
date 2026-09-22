@@ -17,6 +17,8 @@ const zh = {
   tabExclusive: "专属因子",
   tabSigilEditor: "因子编辑",
   langSwitch: "切换语言",
+  crashed: "界面出错了，需要重新载入。",
+  reload: "重新载入",
   /** 两个因子下拉的搜索框：写 Hex 也能搜。 */
   searchSigil: "搜索因子 | Hex",
   /** 两个因子下拉的"筛不出来"。 */
@@ -54,6 +56,8 @@ export const messages: Record<Lang, Messages> = {
     tabExclusive: "Exclusives",
     tabSigilEditor: "Sigil edit",
     langSwitch: "Switch language",
+    crashed: "The interface crashed and has to reload.",
+    reload: "Reload",
     searchSigil: "Search sigil | Hex",
     noMatch: "No matching sigils",
 
@@ -81,6 +85,8 @@ export const messages: Record<Lang, Messages> = {
     tabExclusive: "専用ジーン",
     tabSigilEditor: "ジーン編集",
     langSwitch: "言語を切り替え",
+    crashed: "画面がエラーで停止しました。再読み込みが必要です。",
+    reload: "再読み込み",
     searchSigil: "ジーン | Hex で検索",
     noMatch: "一致するジーンがありません",
 
@@ -108,6 +114,8 @@ export const messages: Record<Lang, Messages> = {
     tabExclusive: "전용 진",
     tabSigilEditor: "진 편집",
     langSwitch: "언어 전환",
+    crashed: "화면이 오류로 멈췄습니다. 다시 불러와야 합니다.",
+    reload: "다시 불러오기",
     searchSigil: "진 | Hex 검색",
     noMatch: "일치하는 진이 없습니다",
 
