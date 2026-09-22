@@ -2,7 +2,7 @@ module sigilloadout
 
 go 1.27.0
 
-require github.com/wailsapp/wails/v3 v3.0.0-beta.25 // 升版：go get github.com/wailsapp/wails/v3@latest（Go 只存解析结果，@latest 存不住）
+require github.com/wailsapp/wails/v3 v3.0.0-beta.25
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
