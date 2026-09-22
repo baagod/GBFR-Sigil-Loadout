@@ -282,6 +282,66 @@ void OnSkillFetch(safetyhook::Context& context)
 
 namespace
 {
+/*
+   启动阶段计时。每个阶段都要"记开始时间 -> 干活 -> 报一行 phase 日志"，原来那三件事
+   各写一遍，七个阶段就是 21 处彼此无关的局部量。这个类把它们收成两行：
+
+      StartupPhases phases;
+      { auto phase = phases.Begin("gem-data-getter-hook");
+        ...install...; phase.Succeeded(installed); }
+
+   报日志由 phase 的析构完成——**这正是要 RAII 的地方**：函数里每个提前 return 都是一条
+   失败路径，忘了在其中一条上报，日志就少一个阶段，而这一层日志是排障时唯一的东西。
+
+   阶段之间刻意不重叠：每个 phase 都在自己的作用域里，日志的先后就与代码顺序一致。
+*/
+class StartupPhases
+{
+public:
+   class Phase
+   {
+   public:
+      Phase(StartupPhases& owner, std::string_view name)
+         : _owner(&owner), _name(name), _started(GetTickCount64())
+      {
+      }
+
+      Phase(const Phase&) = delete;
+      Phase& operator=(const Phase&) = delete;
+
+      // 析构即上报（同一次只报一次：显式调过之后 _owner 已经是 nullptr）。
+      ~Phase()
+      {
+         if (_owner != nullptr)
+            _owner->Report(_name, _started, false);
+      }
+
+      void Succeeded(bool succeeded)
+      {
+         if (_owner != nullptr)
+         {
+            _owner->Report(_name, _started, succeeded);
+            _owner = nullptr;
+         }
+      }
+
+   private:
+      StartupPhases* _owner;
+      std::string_view _name;
+      uint64_t _started;
+   };
+
+   Phase Begin(std::string_view name) { return Phase(*this, name); }
+
+private:
+   friend class Phase;
+
+   void Report(std::string_view name, uint64_t started, bool succeeded)
+   {
+      CompleteStartupPhase(name, started, succeeded);
+   }
+};
+
 void DisableGameplayHooksAndRestore() noexcept
 {
    g_hooks_ready.store(false, std::memory_order_release);
@@ -369,56 +429,67 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
 
 bool InstallHooks()
 {
-   const uint64_t preflight_started = GetTickCount64();
-   const bool preflight_ready = RevalidateGameLayout();
-   CompleteStartupPhase(
-      "required-byte-rva-preflight", preflight_started, preflight_ready);
-   if (!preflight_ready)
+   // 每个阶段在自己的作用域里：计时、上报、以及"失败就回滚并返回"。
+   //
+   // 四条失败路径现在都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，
+   // 顺序是有讲究的（见那个函数），而且在一个钩子都没装时是 no-op——它自己以
+   // ResetGameLayout() 收尾，所以 preflight 那条不再需要单独写一遍"只重置布局"。
+   StartupPhases phases;
+
    {
-      ResetGameLayout();
-      SetRuntimeMessage(
-         "Resolved game layout changed before hook installation; no gameplay hook or byte patch was installed.");
-      return false;
+      auto phase = phases.Begin("required-byte-rva-preflight");
+      const bool preflight_ready = RevalidateGameLayout();
+      phase.Succeeded(preflight_ready);
+      if (!preflight_ready)
+      {
+         DisableGameplayHooksAndRestore();
+         SetRuntimeMessage(
+            "Resolved game layout changed before hook installation; no gameplay hook or byte patch was installed.");
+         return false;
+      }
    }
 
-   const uint64_t gem_hook_started = GetTickCount64();
-   g_get_gem_hook = safetyhook::create_inline(
-      reinterpret_cast<void*>(
-         g_image_base + g_game_layout.get_gem_data_by_index_rva),
-      reinterpret_cast<void*>(&GetGemDataByIndexDetour));
-   CompleteStartupPhase(
-      "gem-data-getter-hook", gem_hook_started, static_cast<bool>(g_get_gem_hook));
-   if (!g_get_gem_hook)
    {
-      DisableGameplayHooksAndRestore();
-      SetRuntimeMessage("Failed to install the GemData getter hook.");
-      return false;
+      auto phase = phases.Begin("gem-data-getter-hook");
+      g_get_gem_hook = safetyhook::create_inline(
+         reinterpret_cast<void*>(
+            g_image_base + g_game_layout.get_gem_data_by_index_rva),
+         reinterpret_cast<void*>(&GetGemDataByIndexDetour));
+      phase.Succeeded(static_cast<bool>(g_get_gem_hook));
+      if (!g_get_gem_hook)
+      {
+         DisableGameplayHooksAndRestore();
+         SetRuntimeMessage("Failed to install the GemData getter hook.");
+         return false;
+      }
    }
 
-   const uint64_t skill_hook_started = GetTickCount64();
-   g_skill_fetch_hook = safetyhook::create_mid(
-      reinterpret_cast<void*>(
-         g_image_base + g_game_layout.skill_fetch_path_rva),
-      &OnSkillFetch);
-   CompleteStartupPhase(
-      "skill-fetch-hook", skill_hook_started, static_cast<bool>(g_skill_fetch_hook));
-   if (!g_skill_fetch_hook)
    {
-      DisableGameplayHooksAndRestore();
-      SetRuntimeMessage("Failed to install the skill fetch-path hook.");
-      return false;
+      auto phase = phases.Begin("skill-fetch-hook");
+      g_skill_fetch_hook = safetyhook::create_mid(
+         reinterpret_cast<void*>(
+            g_image_base + g_game_layout.skill_fetch_path_rva),
+         &OnSkillFetch);
+      phase.Succeeded(static_cast<bool>(g_skill_fetch_hook));
+      if (!g_skill_fetch_hook)
+      {
+         DisableGameplayHooksAndRestore();
+         SetRuntimeMessage("Failed to install the skill fetch-path hook.");
+         return false;
+      }
    }
 
-   const uint64_t loop_patch_started = GetTickCount64();
-   const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
-   CompleteStartupPhase(
-      "skill-loop-limit-patches", loop_patch_started, loop_patches_ready);
-   if (!loop_patches_ready)
    {
-      DisableGameplayHooksAndRestore();
-      SetRuntimeMessage(
-         "Failed to patch both native skill loop limits; changes were rolled back.");
-      return false;
+      auto phase = phases.Begin("skill-loop-limit-patches");
+      const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
+      phase.Succeeded(loop_patches_ready);
+      if (!loop_patches_ready)
+      {
+         DisableGameplayHooksAndRestore();
+         SetRuntimeMessage(
+            "Failed to patch both native skill loop limits; changes were rolled back.");
+         return false;
+      }
    }
 
    g_hooks_ready.store(true, std::memory_order_release);
