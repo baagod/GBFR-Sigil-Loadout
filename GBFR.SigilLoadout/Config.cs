@@ -13,8 +13,7 @@ namespace GBFR.SigilLoadout;
 /// 每个属性都要写明自己的 JSON 成员名：读取是严格的，这四个拼写就是文件格式，省掉特性就只能
 /// 依赖有意关掉的大小写折叠（Config.Options）。
 /// </summary>
-public class SigilSkill
-{
+public class SigilSkill {
     public const int LevelValueCount = 10;
 
     [JsonPropertyName("enabled")]
@@ -39,13 +38,11 @@ public class SigilSkill
 /// 有意不实现任何 Reloaded 配置接口：那会让启动器多出一个 "Mod configuration" 窗口，而它渲染不了
 /// 列表（只显示一对没有意义的 Capacity/Count）。编辑列表归工具所有，所以这里就是纯数据。
 /// </summary>
-public class Config
-{
+public class Config {
     [JsonPropertyName("edits")]
     public List<SigilSkill> Edits { get; set; } = [];
 
-    private static readonly JsonSerializerOptions Options = new()
-    {
+    private static readonly JsonSerializerOptions Options = new() {
         // 名字就是契约：不折叠、不猜。只有**外层**形状算错误——edits 里每条记录的成员名由
         // SigilSkill 的 [JsonPropertyName] 决定，认不出的成员读成默认值，由 PatchRows 逐条报
         // "跳过"：那是看得见的结果，不是"整份文件读不出来"。
@@ -56,8 +53,7 @@ public class Config
     /// 其余情况（没有文件、没有 <c>edits</c> 成员、不是数组、null）都抛异常。唯一的调用方记下
     /// 原因后干脆什么都不写，而不是抹掉本局还活着的那些编辑。
     /// </summary>
-    public static Config Load(string path)
-    {
+    public static Config Load(string path) {
         // 大小上限，与 loadout.json 同一道：文件可以手改，失控的那份该是一条记进日志的错误，
         // 而不是一次几个 GB 的读取。
         var info = new FileInfo(path);

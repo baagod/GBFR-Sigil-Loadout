@@ -18,8 +18,7 @@ namespace GBFR.SigilLoadout;
 ///   exclusive 只写 false 的那些：没提到的角色就是三槽全开。
 /// 只做形状校验：JSON 坏掉、缺技能 hash、等级不对、槽位太多。
 /// </summary>
-internal static class LoadoutConfig
-{
+internal static class LoadoutConfig {
     // 配装配置的路径：可视工具写、这里读。文件名字面量只出现在这一处（有一道对拍断言盯着它）。
     private static readonly string ConfigFile = UserConfig.FilePath("loadout.json");
 
@@ -32,14 +31,12 @@ internal static class LoadoutConfig
     // 版本门。本类用它的"认领"那一半（Changed）：见 Tick 里为什么有意无条件认领。
     private static readonly FileStamp Stamp = new(ConfigFile);
 
-    internal static void Initialize(Action<string> log)
-    {
+    internal static void Initialize(Action<string> log) {
         if (Stamp.Changed() is DateTime mtime)
             TryApply(log, mtime);
     }
 
-    internal static void Tick(Action<string> log)
-    {
+    internal static void Tick(Action<string> log) {
         // 认领后处理：这一版无论成败都算处理过了。有意如此——单次应用失败就保留上一份配置，
         // 下一次保存自然会改 mtime；重试同一份坏配置只会把同一个报错每 250ms 灌一遍。
         if (Stamp.Changed() is not DateTime mtime)
@@ -51,10 +48,8 @@ internal static class LoadoutConfig
     /// 按 <paramref name="mtime"/> 这一版应用配置。本类有意无条件认领（见 <see cref="Tick"/>），所以
     /// 成功与失败之后一样：都等下一版。
     /// </summary>
-    private static void TryApply(Action<string> log, DateTime mtime)
-    {
-        if (mtime == UserConfig.NoFile)
-        {
+    private static void TryApply(Action<string> log, DateTime mtime) {
+        if (mtime == UserConfig.NoFile) {
             // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。
             if (NativeCore.ApplyLoadout(null, null))
                 log("loadout.json removed; restored the built-in exclusive template.");
@@ -64,8 +59,7 @@ internal static class LoadoutConfig
             return;
         }
 
-        try
-        {
+        try {
             // 读之前先查大小，超大文件根本不会被读进来。
             if (new FileInfo(ConfigFile).Length > 1024 * 1024)
                 throw new InvalidDataException("loadout.json exceeds 1 MB");
@@ -76,14 +70,12 @@ internal static class LoadoutConfig
             // 一次调用交两半：通用槽 + 专属开关。两半都落在原生同一个"重新发布"步骤上，
             // 所以分成两次（v17 的形状）只会让同一张表被发布、被打印两遍。
             bool ok;
-            if (slots.Count == 0)
-            {
+            if (slots.Count == 0) {
                 // 存在（哪怕是空的）配置就等于"没有内置通用槽"：只留专属开关。
                 log("loadout.json has no general slots; built-in exclusive template active.");
                 ok = NativeCore.ApplyLoadout(null, overrides);
             }
-            else
-            {
+            else {
                 ok = NativeCore.ApplyLoadout(slots.ToArray(), overrides);
                 if (ok)
                     log($"Applied custom loadout, slots={slots.Count}.");
@@ -91,8 +83,7 @@ internal static class LoadoutConfig
             if (!ok)
                 log("Native rejected the custom loadout; kept previous configuration.");
         }
-        catch (Exception exception)
-        {
+        catch (Exception exception) {
             // 读取失败的原因照常报（日志由 Tick 的"版本变了才说"去重）；下一次保存会改 mtime，
             // 那时自然会被重新处理。
             log($"Invalid loadout.json; kept previous configuration: {exception.Message}");
@@ -110,38 +101,32 @@ internal static class LoadoutConfig
     /// 出的由原生侧忽略。
     /// </summary>
     private static NativeCore.ExclusiveOverrideNative[]? ParseExclusiveOverrides(
-        JsonElement root, Action<string> log)
-    {
+        JsonElement root, Action<string> log) {
         if (root.ValueKind != JsonValueKind.Object ||
             !root.TryGetProperty("exclusive", out JsonElement exclusive) ||
             exclusive.ValueKind != JsonValueKind.Object)
             return null;
 
         var result = new List<NativeCore.ExclusiveOverrideNative>();
-        foreach (JsonProperty property in exclusive.EnumerateObject())
-        {
+        foreach (JsonProperty property in exclusive.EnumerateObject()) {
             if (property.Value.ValueKind != JsonValueKind.Object)
                 continue;
             uint characterHash = PU(property.Name);
-            if (characterHash == 0)
-            {
+            if (characterHash == 0) {
                 // PL 码是可视工具显示用的标签，不是这里的身份（也不兼容）：说出来，
                 // 否则"开关点了没用"在日志里没有任何线索。
                 log($"exclusive: '{property.Name}' is not a character hash; ignored.");
                 continue;
             }
-            foreach (JsonProperty field in property.Value.EnumerateObject())
-            {
+            foreach (JsonProperty field in property.Value.EnumerateObject()) {
                 if (field.Value.ValueKind != JsonValueKind.False)
                     continue;
                 uint skillHash = PU(field.Name);
-                if (skillHash == 0)
-                {
+                if (skillHash == 0) {
                     log($"exclusive: '{property.Name}' has a non-hash skill key '{field.Name}'; ignored.");
                     continue;
                 }
-                result.Add(new NativeCore.ExclusiveOverrideNative
-                {
+                result.Add(new NativeCore.ExclusiveOverrideNative {
                     CharacterHash = characterHash,
                     SkillHash = skillHash,
                     Disabled = 1,
@@ -151,8 +136,7 @@ internal static class LoadoutConfig
         return result.Count == 0 ? null : result.ToArray();
     }
 
-    private static List<NativeCore.TemplateSlotNative> ParseAndValidate(JsonElement root)
-    {
+    private static List<NativeCore.TemplateSlotNative> ParseAndValidate(JsonElement root) {
         // 只认这一种形状：{ lang, slots: [...] }（lang 只有可视工具在意）。可视工具侧写的就是它，
         // Go 的 SaveLoadout 也会把别的拼写当场拒掉——所以这里没有第二种读法。
         if (root.ValueKind != JsonValueKind.Object)
@@ -163,8 +147,7 @@ internal static class LoadoutConfig
 
         var result = new List<NativeCore.TemplateSlotNative>();
         int index = 0;
-        foreach (JsonElement slot in slots.EnumerateArray())
-        {
+        foreach (JsonElement slot in slots.EnumerateArray()) {
             index++;
             bool enabled = !slot.TryGetProperty("enabled", out JsonElement enabledElement) ||
                            enabledElement.GetBoolean();
@@ -192,8 +175,7 @@ internal static class LoadoutConfig
 
             uint skill2Hash = UnwornCharacterHash; // "未选择"哨兵，永不为 0
             int skill2Level = 0;
-            if (items.GetArrayLength() >= 2)
-            {
+            if (items.GetArrayLength() >= 2) {
                 JsonElement sec = items[1];
                 string secHash = Hx(sec.GetProperty("hash"));
                 skill2Hash = PU(secHash);
@@ -201,8 +183,7 @@ internal static class LoadoutConfig
                     throw new InvalidDataException($"slot {index}: bad secondary skill hash '{secHash}'");
                 skill2Level = GetLevel(sec, "level", index);
             }
-            result.Add(new NativeCore.TemplateSlotNative
-            {
+            result.Add(new NativeCore.TemplateSlotNative {
                 GemId = mainGemHash,
                 Skill1 = mainSkill,
                 Skill1Level = level1,
@@ -216,8 +197,7 @@ internal static class LoadoutConfig
 
     // 等级只要求非负：上界是每条技能自己的 cap，而唯一持有那张表的是可视工具（它写之前已经夹在
     // cap 内）。在这一层再判一次上界就是同一规则的第三份副本，判的还不是真正的不变量。
-    private static int GetLevel(JsonElement item, string propertyName, int index)
-    {
+    private static int GetLevel(JsonElement item, string propertyName, int index) {
         if (!item.TryGetProperty(propertyName, out JsonElement element))
             return DefaultLevel;
         int level = element.GetInt32();

@@ -1,18 +1,15 @@
 #include "../native_internal.h"
 
-namespace gbfr::native
-{
+namespace gbfr::native {
 std::shared_mutex g_selection_mutex;
 std::unordered_map<uint32_t, std::array<uint32_t, kVirtualSlotCapacity>> g_character_selections;
 
-namespace
-{
+namespace {
 // 每个角色 **最近一次** context-1 构建用的 status 对象，以及它属于哪一轮队伍装配；这张表
 // 同时就是 "见过哪些角色" 的名单（键集），没有第二份。换人/切场景时游戏会重装队伍：被移出的
 // 人那份对象会被拆掉——所以 "最近观察到的对象" 必须连同 "它属于哪一轮" 一起记。
 std::mutex g_party_mutex;
-struct Context1Record
-{
+struct Context1Record {
    uintptr_t status = 0;
    uint32_t pass_id = 0;
 };
@@ -39,13 +36,11 @@ inline constexpr uint64_t kHotRebuildCooldownMs = 60000;
 
 } // namespace
 
-void RememberGameBuild()
-{
+void RememberGameBuild() {
    g_last_game_build_ms.store(GetTickCount64(), std::memory_order_release);
 }
 
-void RememberContext1Status(uint32_t character_hash, uintptr_t status)
-{
+void RememberContext1Status(uint32_t character_hash, uintptr_t status) {
    if (character_hash == 0 || status == 0)
       return;
 
@@ -60,8 +55,7 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status)
    bool learned_party_member = false;
    bool unchanged = false;
    size_t known_characters = 0;
-   uintptr_t previous_status = 0;
-   {
+   uintptr_t previous_status = 0; {
       std::scoped_lock lock(g_party_mutex);
       Context1Record& record = g_latest_context1_status[character_hash];
       previous_status = record.status;
@@ -82,16 +76,14 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status)
          previous_status != 0 && previous_status != status ? " (new object)" : "",
          ours ? " (via our rebuild)" : "",
          learned_party_member ? " (new party member)" : ""));
-   if (learned_party_member)
-   {
+   if (learned_party_member) {
       Log(std::format("party+ char=0x{:08X} ({} known)", character_hash, known_characters));
       // 队伍刚变过：接下来两秒内不许热重建（2026-09-21 三次崩溃都发生在换队友/切场景之后）。
       g_party_changed_ms.store(now, std::memory_order_release);
    }
 }
 
-bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& pass_id)
-{
+bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& pass_id) {
    std::scoped_lock lock(g_party_mutex);
    const auto iterator = g_latest_context1_status.find(character_hash);
    if (iterator == g_latest_context1_status.end())
@@ -112,16 +104,13 @@ bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& 
    CAS 这两条**刻意静默**：每个 tick 都可能命中，写日志只会把真正有信息量的跳过淹掉。
    "钩子/布局就绪"**不在这里**：那是 RebuildPartyStatusesOnce 的前置条件，不是闸门的一条理由。
 */
-bool TryClaimRebuildNow(uint64_t now)
-{
-   if (now < g_hot_rebuild_cooldown_until_ms.load(std::memory_order_acquire))
-   {
+bool TryClaimRebuildNow(uint64_t now) {
+   if (now < g_hot_rebuild_cooldown_until_ms.load(std::memory_order_acquire)) {
       Log("hot rebuild: skipped (cooling down after a failed rebuild)");
       return false;
    }
    // 跳过只是"这次不实时"：改动仍会在游戏下一次自然构建时落地（菜单里实测十几秒）。
-   if (now - g_last_game_build_ms.load(std::memory_order_acquire) < kGameBuildQuietMs)
-   {
+   if (now - g_last_game_build_ms.load(std::memory_order_acquire) < kGameBuildQuietMs) {
       Log("hot rebuild: skipped (game is building)");
       return false;
    }
@@ -134,22 +123,19 @@ bool TryClaimRebuildNow(uint64_t now)
    // 这条排在节流之后：所以"队伍还没认出来"同样会推掉那 500ms。
    {
       std::scoped_lock lock(g_party_mutex);
-      if (g_latest_context1_status.empty())
-      {
+      if (g_latest_context1_status.empty()) {
          Log("hot rebuild: no party known yet; skipped");
          return false;
       }
    }
-   if (now - g_party_changed_ms.load(std::memory_order_acquire) < 2000)
-   {
+   if (now - g_party_changed_ms.load(std::memory_order_acquire) < 2000) {
       Log("hot rebuild: skipped (party changed just now)");
       return false;
    }
    return true;
 }
 
-void RebuildPartyStatusesOnce()
-{
+void RebuildPartyStatusesOnce() {
    // 前置条件：钩子与语义布局都要在位。
    if (!g_hooks_ready.load(std::memory_order_acquire) ||
        !g_layout_ready.load(std::memory_order_acquire))
@@ -157,8 +143,7 @@ void RebuildPartyStatusesOnce()
    if (!TryClaimRebuildNow(GetTickCount64()))
       return;
 
-   std::vector<uint32_t> party;
-   {
+   std::vector<uint32_t> party; {
       std::scoped_lock lock(g_party_mutex);
       party.reserve(g_latest_context1_status.size());
       for (const auto& [character_hash, record] : g_latest_context1_status)
@@ -173,18 +158,15 @@ void RebuildPartyStatusesOnce()
    // 4 分 09 秒零次构建；进副本前在城里那 90 秒玩家自己被重建 6 次），所以"等下一场战斗"在
    // 战斗中永远等不到。它也是本项目唯一会去动游戏活对象的地方。
    const uint32_t current_pass = g_context1_pass_id.load(std::memory_order_acquire);
-   for (const uint32_t character_hash : party)
-   {
+   for (const uint32_t character_hash : party) {
       uintptr_t latest_status = 0;
       uint32_t record_pass = 0;
-      if (!LatestContext1Status(character_hash, latest_status, record_pass))
-      {
+      if (!LatestContext1Status(character_hash, latest_status, record_pass)) {
          Log(std::format(
             "hot rebuild: char=0x{:08X} skipped (no context-1 status seen)", character_hash));
          continue;
       }
-      if (record_pass != current_pass)
-      {
+      if (record_pass != current_pass) {
          Log(std::format(
             "hot rebuild: char=0x{:08X} skipped (left the party: assembly {} < {})",
             character_hash,
@@ -199,8 +181,7 @@ void RebuildPartyStatusesOnce()
          latest_status,
          record_pass,
          rebuilt ? 1 : 0));
-      if (!rebuilt)
-      {
+      if (!rebuilt) {
          // 这一份对象已经不可信（多半正在被游戏重建/替换）：冷却 60 秒，这段时间不再补刀。
          g_hot_rebuild_cooldown_until_ms.store(
             GetTickCount64() + kHotRebuildCooldownMs, std::memory_order_release);
@@ -211,8 +192,7 @@ void RebuildPartyStatusesOnce()
 }
 
 
-std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash)
-{
+std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash) {
    std::shared_lock lock(g_selection_mutex);
    const auto iterator = g_character_selections.find(character_hash);
    return iterator == g_character_selections.end()

@@ -3,8 +3,7 @@ using Reloaded.Mod.Interfaces;
 namespace GBFR.SigilLoadout.Configuration;
 
 /// <summary>Reloaded-II 配置页连接器；启动器发现它（IConfiguratorV3）并按声明的 UI 渲染。</summary>
-public class Configurator : IConfiguratorV3
-{
+public class Configurator : IConfiguratorV3 {
     public string? ModFolder { get; private set; }
     public string? ConfigFolder { get; private set; }
     public ConfiguratorContext Context { get; private set; }
@@ -12,21 +11,17 @@ public class Configurator : IConfiguratorV3
     public IUpdatableConfigurable[] Configurations => _configurations ??= MakeConfigurations();
     private IUpdatableConfigurable[]? _configurations;
 
-    private IUpdatableConfigurable[] MakeConfigurations()
-    {
-        var configurations = new IUpdatableConfigurable[]
-        {
+    private IUpdatableConfigurable[] MakeConfigurations() {
+        var configurations = new IUpdatableConfigurable[] {
             HotkeyConfig.FromFile(
                 Path.Combine(ConfigFolder!, HotkeyConfig.FileName),
                 HotkeyConfig.ConfigurationName),
         };
 
         // 数组要跟着启动器"更新时换一份"的行为走。
-        for (int x = 0; x < configurations.Length; x++)
-        {
+        for (int x = 0; x < configurations.Length; x++) {
             var index = x;
-            configurations[index].ConfigurationUpdated += configurable =>
-            {
+            configurations[index].ConfigurationUpdated += configurable => {
                 configurations[index] = configurable;
             };
         }
@@ -34,19 +29,16 @@ public class Configurator : IConfiguratorV3
         return configurations;
     }
 
-    public Configurator()
-    {
+    public Configurator() {
     }
 
-    public Configurator(string configDirectory) : this()
-    {
+    public Configurator(string configDirectory) : this() {
         ConfigFolder = configDirectory;
     }
 
     // 启动器换目录时调用（IConfiguratorV2）。这份配置只有一个文件、路径每次都由启动器传进来，
     // 没有要搬的东西——留个空实现，别让它以为这里会做迁移。
-    public void Migrate(string oldDirectory, string newDirectory)
-    {
+    public void Migrate(string oldDirectory, string newDirectory) {
     }
 
     public void SetConfigDirectory(string configDirectory) => ConfigFolder = configDirectory;

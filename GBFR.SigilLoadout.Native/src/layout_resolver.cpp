@@ -4,12 +4,9 @@
 #include <limits>
 #include <span>
 
-namespace gbfr::native
-{
-namespace
-{
-struct PatternView
-{
+namespace gbfr::native {
+namespace {
+struct PatternView {
    const uint8_t* bytes = nullptr;
    const char* mask = nullptr;
    size_t size = 0;
@@ -18,8 +15,7 @@ struct PatternView
 template <size_t ByteCount, size_t MaskCount>
 constexpr PatternView MakePattern(
    const uint8_t (&bytes)[ByteCount],
-   const char (&mask)[MaskCount]) noexcept
-{
+   const char (&mask)[MaskCount]) noexcept {
    static_assert(ByteCount + 1 == MaskCount);
    return {bytes, mask, ByteCount};
 }
@@ -52,8 +48,7 @@ inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
    这些偏移在流水线里被用三次（认领 RVA / 读循环上限或解 call / 最终预检）。以前三处各写一遍
    同一组数字、只靠字段名手工配对——改了一处却漏了另一处，不会有任何东西报错。
 */
-struct AnchorOffsets
-{
+struct AnchorOffsets {
    uintptr_t loop_limit_immediate = 0;
    uintptr_t getter_return = 0;
    uintptr_t fetch_path = 0;
@@ -77,8 +72,7 @@ inline constexpr uintptr_t kNotifierCharacterOpcodeOffset = 0x45;
    delta"得来，而它们的预检验的是**锚点本身**，所以这两条的 offset 必须与 kApplyLoopAnchors /
    kCategoryLoopAnchors 里的 loop_limit_immediate 一致；其余各条 offset = 0。
 */
-struct PreflightCheck
-{
+struct PreflightCheck {
    uintptr_t rva = 0;
    std::span<const uint8_t> expected{};
    // 在 rva - preflight_offset 处比对；下溢由 MatchesPreflight 的 RangeInsideImage 拒绝。
@@ -126,8 +120,7 @@ constexpr uint8_t kSystemDataBytes[] = {
 constexpr auto kSystemDataPattern =
    MakePattern(kSystemDataBytes, "xxx????xxx????xxx????xxx");
 
-struct ImageView
-{
+struct ImageView {
    uintptr_t base = 0;
    uintptr_t size = 0;
    uintptr_t code_rva = 0;
@@ -139,29 +132,25 @@ struct ImageView
    size_t runtime_function_count = 0;
 };
 
-struct FunctionRange
-{
+struct FunctionRange {
    uintptr_t begin = 0;
    uintptr_t end = 0;
    size_t index = 0;
 };
 
-bool RangeInsideImage(const ImageView& image, uintptr_t rva, size_t size) noexcept
-{
+bool RangeInsideImage(const ImageView& image, uintptr_t rva, size_t size) noexcept {
    return rva <= image.size && size <= image.size - rva;
 }
 
 template <typename T>
-bool ReadValue(const ImageView& image, uintptr_t rva, T& value) noexcept
-{
+bool ReadValue(const ImageView& image, uintptr_t rva, T& value) noexcept {
    if (!RangeInsideImage(image, rva, sizeof(T)))
       return false;
    std::memcpy(&value, reinterpret_cast<const void*>(image.base + rva), sizeof(T));
    return true;
 }
 
-bool TryBuildImageView(ImageView& image) noexcept
-{
+bool TryBuildImageView(ImageView& image) noexcept {
    image = {};
    if (g_image_base == 0)
       return false;
@@ -189,16 +178,14 @@ bool TryBuildImageView(ImageView& image) noexcept
    image.section_count = nt->FileHeader.NumberOfSections;
 
    const IMAGE_SECTION_HEADER* fallback_code = nullptr;
-   for (uint16_t index = 0; index < image.section_count; ++index)
-   {
+   for (uint16_t index = 0; index < image.section_count; ++index) {
       const IMAGE_SECTION_HEADER& section = image.sections[index];
       if ((section.Characteristics & IMAGE_SCN_MEM_EXECUTE) == 0)
          continue;
       if (fallback_code == nullptr ||
           section.Misc.VirtualSize > fallback_code->Misc.VirtualSize)
          fallback_code = &section;
-      if (std::memcmp(section.Name, ".text", 5) == 0)
-      {
+      if (std::memcmp(section.Name, ".text", 5) == 0) {
          fallback_code = &section;
          break;
       }
@@ -230,10 +217,8 @@ bool IsRvaInSection(
    uintptr_t rva,
    size_t size,
    DWORD required,
-   DWORD forbidden = 0) noexcept
-{
-   for (uint16_t index = 0; index < image.section_count; ++index)
-   {
+   DWORD forbidden = 0) noexcept {
+   for (uint16_t index = 0; index < image.section_count; ++index) {
       const IMAGE_SECTION_HEADER& section = image.sections[index];
       const uintptr_t section_begin = section.VirtualAddress;
       const uintptr_t section_size = std::max<uintptr_t>(
@@ -251,8 +236,7 @@ template <size_t Size>
 bool MatchesBytesAtRva(
    const ImageView& image,
    uintptr_t rva,
-   const std::array<uint8_t, Size>& expected) noexcept
-{
+   const std::array<uint8_t, Size>& expected) noexcept {
    return IsRvaInSection(
              image,
              rva,
@@ -266,15 +250,13 @@ bool MatchesBytesAtRva(
 bool MatchesPreflight(
    const ImageView& image,
    uintptr_t rva,
-   std::span<const uint8_t> expected) noexcept
-{
+   std::span<const uint8_t> expected) noexcept {
    if (expected.empty() || !RangeInsideImage(image, rva, expected.size()))
       return false;
    return MatchesBytesAt(image.base + rva, expected.data(), expected.size());
 }
 
-bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept
-{
+bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept {
    constexpr uintptr_t kMaximumDecodedObjectOffset = 0x200000;
    return offset != 0 && offset <= kMaximumDecodedObjectOffset &&
       alignment != 0 && (offset % alignment) == 0;
@@ -292,8 +274,7 @@ bool FindUniquePattern(
    uintptr_t begin,
    size_t size,
    PatternView pattern,
-   uintptr_t& match) noexcept
-{
+   uintptr_t& match) noexcept {
    match = 0;
    if (pattern.size == 0 || size < pattern.size ||
        !RangeInsideImage(image, begin, size))
@@ -306,16 +287,13 @@ bool FindUniquePattern(
 
    const auto* source = reinterpret_cast<const uint8_t*>(image.base + begin);
    size_t found = 0;
-   for (size_t offset = 0; offset <= size - pattern.size; ++offset)
-   {
+   for (size_t offset = 0; offset <= size - pattern.size; ++offset) {
       if (source[offset + anchor] != pattern.bytes[anchor])
          continue;
       bool matched = true;
-      for (size_t index = 0; index < pattern.size; ++index)
-      {
+      for (size_t index = 0; index < pattern.size; ++index) {
          if (pattern.mask[index] == 'x' &&
-             source[offset + index] != pattern.bytes[index])
-         {
+             source[offset + index] != pattern.bytes[index]) {
             matched = false;
             break;
          }
@@ -333,8 +311,7 @@ bool FindUniquePattern(
 bool DecodeRel32Call(
    const ImageView& image,
    uintptr_t call_rva,
-   uintptr_t& target_rva) noexcept
-{
+   uintptr_t& target_rva) noexcept {
    target_rva = 0;
    if (!RangeInsideImage(image, call_rva, 5))
       return false;
@@ -353,14 +330,11 @@ bool DecodeRel32Call(
 bool FindRuntimeFunction(
    const ImageView& image,
    uintptr_t rva,
-   FunctionRange& function) noexcept
-{
+   FunctionRange& function) noexcept {
    function = {};
-   for (size_t index = 0; index < image.runtime_function_count; ++index)
-   {
+   for (size_t index = 0; index < image.runtime_function_count; ++index) {
       const IMAGE_RUNTIME_FUNCTION_ENTRY& candidate = image.runtime_functions[index];
-      if (candidate.BeginAddress <= rva && rva < candidate.EndAddress)
-      {
+      if (candidate.BeginAddress <= rva && rva < candidate.EndAddress) {
          function = {candidate.BeginAddress, candidate.EndAddress, index};
          return candidate.BeginAddress < candidate.EndAddress &&
             RangeInsideImage(
@@ -375,13 +349,11 @@ bool FindRuntimeFunction(
 size_t CountCallsTo(
    const ImageView& image,
    const FunctionRange& function,
-   uintptr_t target_rva) noexcept
-{
+   uintptr_t target_rva) noexcept {
    size_t count = 0;
    for (uintptr_t cursor = function.begin;
         cursor + 5 <= function.end;
-        ++cursor)
-   {
+        ++cursor) {
       uintptr_t target = 0;
       if (DecodeRel32Call(image, cursor, target) && target == target_rva)
          ++count;
@@ -392,13 +364,11 @@ size_t CountCallsTo(
 bool FindStatusRebuild(
    const ImageView& image,
    const FunctionRange& apply_helper,
-   uintptr_t& status_rebuild_rva) noexcept
-{
+   uintptr_t& status_rebuild_rva) noexcept {
    status_rebuild_rva = 0;
    const size_t first = apply_helper.index > 16 ? apply_helper.index - 16 : 0;
    size_t candidate_count = 0;
-   for (size_t index = first; index < apply_helper.index; ++index)
-   {
+   for (size_t index = first; index < apply_helper.index; ++index) {
       const IMAGE_RUNTIME_FUNCTION_ENTRY& entry = image.runtime_functions[index];
       FunctionRange candidate{entry.BeginAddress, entry.EndAddress, index};
       if (candidate.begin >= candidate.end ||
@@ -413,8 +383,7 @@ bool FindStatusRebuild(
 
 bool ValidateResolvedGameLayout(
    const ImageView& image,
-   const ResolvedGameLayout& layout) noexcept
-{
+   const ResolvedGameLayout& layout) noexcept {
    const PreflightCheck checks[] = {
       {layout.skill_apply_loop_limit_immediate_rva, kSkillApplyLoopPreflight, kApplyLoopAnchors.loop_limit_immediate},
       {layout.skill_apply_getter_return_rva, kSkillApplyGetterReturnPreflight, 0},
@@ -426,11 +395,9 @@ bool ValidateResolvedGameLayout(
       {layout.status_rebuild_rva, kStatusRebuildPreflight, 0},
       {layout.status_notifier_rva, kStatusNotifierPreflight, 0},
    };
-   for (const PreflightCheck& check : checks)
-   {
+   for (const PreflightCheck& check : checks) {
       const uintptr_t at = check.rva - check.preflight_offset;
-      if (check.rva < check.preflight_offset || !MatchesPreflight(image, at, check.expected))
-      {
+      if (check.rva < check.preflight_offset || !MatchesPreflight(image, at, check.expected)) {
          // 布局解析失败只说"在哪个阶段"；这一行说清是**哪一条**预检、拿哪个地址比的。
          Log(std::format(
             "  layout preflight FAILED: rva=0x{:X} preflight_offset=0x{:X} checked_at=0x{:X} bytes={}",
@@ -470,8 +437,7 @@ bool ValidateResolvedGameLayout(
       category_limit == layout.skill_category_original_limit;
 }
 
-bool FailResolution(std::string_view stage)
-{
+bool FailResolution(std::string_view stage) {
    ResetGameLayout();
    SetRuntimeMessage(std::format(
       "Game layout resolution failed at {}; gameplay hooks were not installed and persisted "
@@ -481,8 +447,7 @@ bool FailResolution(std::string_view stage)
 }
 }
 
-bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept
-{
+bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept {
    if (g_image_base == 0 || size == 0)
       return false;
    ImageView image{};
@@ -495,8 +460,7 @@ bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept
          IMAGE_SCN_MEM_EXECUTE);
 }
 
-bool TryGetCodeSection(CodeSectionView& view) noexcept
-{
+bool TryGetCodeSection(CodeSectionView& view) noexcept {
    view = {};
    ImageView image{};
    if (!TryBuildImageView(image) || image.code_rva == 0 || image.code_size == 0 ||
@@ -509,15 +473,13 @@ bool TryGetCodeSection(CodeSectionView& view) noexcept
    return true;
 }
 
-void ResetGameLayout() noexcept
-{
+void ResetGameLayout() noexcept {
    // 已发布的布局在进程余下时间里保持不变（g_initialize_once）；在这里清空
    // 这个平凡结构体会与"刚在关机或安装失败回滚前读到上一份真状态"的读者相争。
    g_layout_ready.store(false, std::memory_order_release);
 }
 
-bool ResolveGameLayout()
-{
+bool ResolveGameLayout() {
    ResetGameLayout();
    ImageView image{};
    if (!TryBuildImageView(image))
@@ -632,8 +594,7 @@ bool ResolveGameLayout()
    return true;
 }
 
-bool RevalidateGameLayout()
-{
+bool RevalidateGameLayout() {
    if (!g_layout_ready.load(std::memory_order_acquire) || g_image_base == 0)
       return false;
    ImageView image{};

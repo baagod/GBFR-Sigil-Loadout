@@ -12,8 +12,7 @@ namespace GBFR.SigilLoadout;
 /// 它还承载因子编辑器：按用户的编辑列表改写 skill_status 行——启动时经 IDataManager 写一次，
 /// 游戏跑起来之后再来一次，那时由下面的维护拍发现文件变了并重新应用。
 /// </summary>
-public sealed class Mod : IMod
-{
+public sealed class Mod : IMod {
     private const string ModId = "GBFR.SigilLoadout";
     private const string LogTag = "GBFR Sigil Loadout"; // 仅作为面向用户的日志前缀（ModId 保持技术性）
     private const int TickIntervalMilliseconds = 250;
@@ -35,14 +34,12 @@ public sealed class Mod : IMod
     // 版本号直接问启动器：StartEx 的参数就带着它，不用再去读一遍 ModConfig.json。
     public void StartEx(IModLoaderV1 loader, IModConfigV1 config) => QueueStart(loader, config?.ModVersion);
 
-    public void Suspend()
-    {
+    public void Suspend() {
         // 不会被调：CanSuspend() 返回 false。原生钩子没法安全暂停，说 true 只是向启动器承诺
         // 一个不存在的能力。
     }
 
-    public void Resume()
-    {
+    public void Resume() {
         // 同 Suspend()。
     }
 
@@ -52,14 +49,12 @@ public sealed class Mod : IMod
 
     public bool CanSuspend() => false;
 
-    private void QueueStart(IModLoaderV1 loaderApi, string? modVersion)
-    {
+    private void QueueStart(IModLoaderV1 loaderApi, string? modVersion) {
         // 幂等：Start/StartEx 是启动器的两个入口，重入会让维护定时器多出一个。
         if (System.Threading.Interlocked.Exchange(ref _startRequested, 1) != 0)
             return;
         long started = Stopwatch.GetTimestamp();
-        try
-        {
+        try {
             IModLoader loader = (IModLoader)loaderApi;
             lock (_logLock)
                 _logger = (ILogger)loader.GetLogger();
@@ -69,24 +64,19 @@ public sealed class Mod : IMod
             // 日志**追加**写（不再每次启动清空），位置就在 mod 目录（惯例、好找）。
             // 单份上限 4 MB，超了把当前份挪成 .1（只留一代）。只有更新 mod 那一次会丢历史，正常。
             string logPath = Path.Combine(modDirectory, "GBFR.SigilLoadout.log");
-            try
-            {
+            try {
                 FileInfo existing = new(logPath);
-                if (existing.Exists && existing.Length > 4 * 1024 * 1024)
-                {
+                if (existing.Exists && existing.Length > 4 * 1024 * 1024) {
                     File.Delete(logPath + ".1");
                     File.Move(logPath, logPath + ".1");
                 }
             }
-            catch
-            {
+            catch {
                 // 轮转失败不能影响 mod 生命周期：最坏情况就是这份日志继续变大。
             }
-            lock (_logLock)
-            {
+            lock (_logLock) {
                 _fileLog?.Dispose();
-                _fileLog = new StreamWriter(logPath, append: true)
-                {
+                _fileLog = new StreamWriter(logPath, append: true) {
                     AutoFlush = true,
                 };
             }
@@ -97,8 +87,7 @@ public sealed class Mod : IMod
             NativeCore.Configure(modDirectory);
             bool hooksReady = NativeCore.Initialize(Log);
             CompleteStartupPhase("native-core", nativeStarted, hooksReady);
-            if (!hooksReady)
-            {
+            if (!hooksReady) {
                 Log($"Native core loaded without hooks: {NativeCore.GetRuntimeMessage()}");
             }
             LoadoutConfig.Initialize(Log);
@@ -112,24 +101,20 @@ public sealed class Mod : IMod
             CompleteStartupPhase("sigil-editor", sigilEditorStarted);
 
             _tickTimer = new System.Threading.Timer(
-                _ =>
-                {
+                _ => {
                     // 定时器回调不串行：上一拍没跑完，下一拍就会进来。三个阶段都按"让过去"处理
                     // （mtime 门不认领、热键只是采样），所以在这里统一挡住，不必每个阶段各防一遍。
                     if (Interlocked.Exchange(ref _ticking, 1) != 0)
                         return;
-                    try
-                    {
+                    try {
                         LoadoutConfig.Tick(Log);
                         _sigilEditor?.Tick();
                         Hotkey.Tick(Log);
                     }
-                    catch
-                    {
+                    catch {
                         // 维护拍绝不能把进程带走。
                     }
-                    finally
-                    {
+                    finally {
                         Interlocked.Exchange(ref _ticking, 0);
                     }
                 },
@@ -139,68 +124,55 @@ public sealed class Mod : IMod
 
             CompleteStartupPhase("managed-initialize", started);
         }
-        catch (Exception exception)
-        {
+        catch (Exception exception) {
             Log($"Initialization failed: {exception}");
             Dispose();
         }
     }
 
-    private void InitializeHotkeyConfiguration(IModLoader loader, string modDirectory)
-    {
-        try
-        {
+    private void InitializeHotkeyConfiguration(IModLoader loader, string modDirectory) {
+        try {
             string configDirectory = loader.GetModConfigDirectory(ModId);
             HotkeyConfig configuration = (HotkeyConfig)new Configurator(configDirectory).Configurations[0];
             configuration.ConfigurationUpdated += OnHotkeyConfigurationUpdated;
             Hotkey.Configure(modDirectory, configuration.VirtualKey, Log);
         }
-        catch (Exception exception)
-        {
+        catch (Exception exception) {
             Log($"Hotkey configuration unavailable: {exception.Message}; falling back to the default F1 hotkey.");
             Hotkey.Configure(modDirectory, (int)OverlayHotkey.F1, Log);
         }
     }
 
-    private void OnHotkeyConfigurationUpdated(IUpdatableConfigurable configurable)
-    {
+    private void OnHotkeyConfigurationUpdated(IUpdatableConfigurable configurable) {
         if (configurable is HotkeyConfig configuration)
             Hotkey.UpdateHotkey(configuration.VirtualKey);
     }
 
-    private void Log(string message)
-    {
+    private void Log(string message) {
         string line = $"[{DateTime.Now:HH:mm:ss.fff}] [{LogTag}] {message}";
         ILogger? logger;
-        lock (_logLock)
-        {
+        lock (_logLock) {
             logger = _logger;
-            try
-            {
+            try {
                 _fileLog?.WriteLine(line);
             }
-            catch
-            {
+            catch {
                 // 文件日志绝不能影响 mod 生命周期。
             }
         }
-        try
-        {
+        try {
             logger?.WriteLine(line);
         }
-        catch
-        {
+        catch {
             // 外部日志器出错不能影响 mod 生命周期。
         }
     }
 
-    private void CompleteStartupPhase(string phase, long startedAt, bool succeeded = true)
-    {
+    private void CompleteStartupPhase(string phase, long startedAt, bool succeeded = true) {
         Log(NativeCore.StartupPhaseLine(phase, startedAt, succeeded));
     }
 
-    private void Dispose()
-    {
+    private void Dispose() {
         if (_disposed)
             return;
         _disposed = true;
@@ -213,16 +185,13 @@ public sealed class Mod : IMod
         // 无条件关停。Initialize 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，
         // 之后的每一步都可能抛异常把控制权交到这里。以前这个调用被一个"全都成功之后才置位"的标志
         // 门着，失败路径就会把原生钩子留在游戏里。Shutdown 自身异常安全。
-        try
-        {
+        try {
             NativeCore.Shutdown();
         }
-        catch
-        {
+        catch {
         }
 
-        lock (_logLock)
-        {
+        lock (_logLock) {
             _fileLog?.Dispose();
             _fileLog = null;
         }

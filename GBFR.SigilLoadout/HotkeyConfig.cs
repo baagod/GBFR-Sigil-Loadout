@@ -5,8 +5,7 @@ using GBFR.SigilLoadout.Configuration;
 
 namespace GBFR.SigilLoadout;
 
-public enum OverlayHotkey
-{
+public enum OverlayHotkey {
     F1 = 0x70,
     F2 = 0x71,
     F3 = 0x72,
@@ -34,8 +33,7 @@ public enum OverlayHotkey
 }
 
 /// <summary>Reloaded-II 配置页条目；启动器按属性表把它渲染出来。</summary>
-public sealed class HotkeyConfig : Configurable<HotkeyConfig>
-{
+public sealed class HotkeyConfig : Configurable<HotkeyConfig> {
     internal const string FileName = "HotkeyConfig.json";
     internal const string ConfigurationName = "Hotkey / 快捷键";
 

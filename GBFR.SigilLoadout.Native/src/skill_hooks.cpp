@@ -3,8 +3,7 @@
 #include <format>
 #include <intrin.h>
 
-namespace gbfr::native
-{
+namespace gbfr::native {
 SafetyHookInline g_get_gem_hook;
 SafetyHookMid g_skill_fetch_hook;
 
@@ -21,14 +20,12 @@ thread_local uint32_t g_tls_build_character = 0;
 thread_local std::array<uint32_t, kVirtualSlotCapacity> g_tls_build_selection{};
 thread_local bool g_tls_build_has_selection = false;
 
-namespace
-{
+namespace {
 // 会话级一次性标志；只有这个翻译单元用。
 std::atomic_bool g_live_confirmation_reported{false};
 
 uint32_t CountSelectedSlots(
-   const std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept
-{
+   const std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept {
    return static_cast<uint32_t>(std::count_if(
       selection.begin(),
       selection.begin() + GetVirtualSlotCount(),
@@ -38,8 +35,7 @@ uint32_t CountSelectedSlots(
 void BeginNaturalContributionTracking(
    uintptr_t status,
    const StatusIdentity& identity,
-   const std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept
-{
+   const std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept {
    g_tls_natural_contribution = {};
    const uint32_t expected = CountSelectedSlots(selection);
    if (expected == 0)
@@ -60,23 +56,19 @@ void TrackNaturalContributionResult(
    const StatusIdentity& identity,
    int slot_index,
    uint32_t selected_slot_id,
-   bool copied) noexcept
-{
+   bool copied) noexcept {
    if (!g_tls_natural_contribution.active)
       return;
    if (g_tls_natural_contribution.status != status ||
        g_tls_natural_contribution.identity.character_hash != identity.character_hash ||
        g_tls_natural_contribution.identity.context_mode != identity.context_mode ||
-       g_tls_natural_contribution.next_slot != slot_index)
-   {
+       g_tls_natural_contribution.next_slot != slot_index) {
       g_tls_natural_contribution = {};
       return;
    }
 
-   if (selected_slot_id != 0)
-   {
-      if (!copied)
-      {
+   if (selected_slot_id != 0) {
+      if (!copied) {
          g_tls_natural_contribution = {};
          return;
       }
@@ -94,8 +86,7 @@ void TrackNaturalContributionResult(
       SafeReadStatusIdentity(status, final_identity) &&
       final_identity.character_hash == identity.character_hash &&
       final_identity.context_mode == identity.context_mode;
-   if (final_valid)
-   {
+   if (final_valid) {
       // 实战确认每会话只记一次：健康的配装每场战斗都重复 9/9。下面那些失败仍每次
       // 报 N/M。
       if (!g_live_confirmation_reported.exchange(true, std::memory_order_acq_rel))
@@ -106,8 +97,7 @@ void TrackNaturalContributionResult(
             injected,
             expected));
    }
-   else if (expected != 0)
-   {
+   else if (expected != 0) {
       SetRuntimeMessage(std::format(
          "Skill contribution incomplete for 0x{:08X}: {}/{} virtual sigils reached the "
          "context-1 status.",
@@ -122,15 +112,12 @@ bool TryLoadVirtualSkillSelection(
    uintptr_t status,
    const StatusIdentity& identity,
    bool from_skill_data_loop,
-   std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept
-{
-   try
-   {
+   std::array<uint32_t, kVirtualSlotCapacity>& selection) noexcept {
+   try {
       // 构建循环内取用：用构建开始时的快照，保证同一次构建里所有槽位用同一组选择（哪怕此刻
       // 正在改配装）。角色也要比——status 地址跨角色复用（见文件顶部）。
       if (from_skill_data_loop && g_tls_build_status == status &&
-          g_tls_build_character == identity.character_hash && g_tls_build_has_selection)
-      {
+          g_tls_build_character == identity.character_hash && g_tls_build_has_selection) {
          selection = g_tls_build_selection;
          return true;
       }
@@ -138,8 +125,7 @@ bool TryLoadVirtualSkillSelection(
       selection = GetSelection(identity.character_hash);
       return CountSelectedSlots(selection) != 0;
    }
-   catch (...)
-   {
+   catch (...) {
       selection = {};
       return false;
    }
@@ -150,8 +136,7 @@ bool TryCopySelectedVirtualGem(
    const std::array<uint32_t, kVirtualSlotCapacity>& selection,
    int virtual_index,
    void* output,
-   uint32_t& selected_slot_id) noexcept
-{
+   uint32_t& selected_slot_id) noexcept {
    selected_slot_id = 0;
    if (virtual_index < 0 || virtual_index >= GetVirtualSlotCount() || output == nullptr)
       return false;
@@ -172,8 +157,7 @@ bool TryCopySelectedVirtualGem(
    两个来源 bool（而不是一个枚举）：调用方要分辨的正是"来自哪条循环"。"是不是两条技能循环之一"
    **不存字段**——它恒等于那两个的析取，存起来就允许出现自相矛盾的状态；派生关系用成员函数表达。
 */
-struct GemCall
-{
+struct GemCall {
    void* status = nullptr;
    int slot_index = 0;
    void* output = nullptr;
@@ -189,8 +173,7 @@ struct GemCall
    刚在建状态"（热重建据此避让——同时碰一份 status 就是竞态）；context-1（在场那份）还记下
    "这个角色现在这份 status 是哪个对象"，热重建只认它。
 */
-void ObserveBuildStart(const GemCall& call)
-{
+void ObserveBuildStart(const GemCall& call) {
    const uintptr_t build_status = reinterpret_cast<uintptr_t>(call.status);
    g_tls_build_selection = GetSelection(call.identity.character_hash);
    g_tls_build_has_selection = CountSelectedSlots(g_tls_build_selection) != 0;
@@ -208,8 +191,7 @@ void ObserveBuildStart(const GemCall& call)
 */
 uint8_t LoadSelectionAndCopy(
    const GemCall& call,
-   std::array<uint32_t, kVirtualSlotCapacity>& selection)
-{
+   std::array<uint32_t, kVirtualSlotCapacity>& selection) {
    if (!TryLoadVirtualSkillSelection(
           reinterpret_cast<uintptr_t>(call.status),
           call.identity,
@@ -239,8 +221,7 @@ uint8_t LoadSelectionAndCopy(
    return copied ? 1 : 0;
 }
 
-uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
-{
+uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output) {
    ActiveCallGuard active_call(g_active_getter_calls);
 
    const uintptr_t return_address = reinterpret_cast<uintptr_t>(_ReturnAddress());
@@ -274,8 +255,7 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
    return LoadSelectionAndCopy(call, selection);
 }
 
-void OnSkillFetch(safetyhook::Context& context)
-{
+void OnSkillFetch(safetyhook::Context& context) {
    ActiveCallGuard active_call(g_active_mid_calls);
    if (context.r13 < static_cast<uintptr_t>(kNativeInternalSlotCount) ||
        context.r13 >= static_cast<uintptr_t>(GetExpandedInternalSlotCount()))
@@ -286,15 +266,13 @@ void OnSkillFetch(safetyhook::Context& context)
    StatusIdentity identity{};
    if (!g_shutting_down.load(std::memory_order_acquire) && context.r12 != 0 &&
        SafeReadStatusIdentity(status, identity) &&
-       IsValidContextMode(identity.context_mode))
-   {
+       IsValidContextMode(identity.context_mode)) {
       std::array<uint32_t, kVirtualSlotCapacity> selection{};
       if (TryLoadVirtualSkillSelection(
              status,
              identity,
              true,
-             selection))
-      {
+             selection)) {
          uint32_t selected_slot_id = 0;
          copied = TryCopySelectedVirtualGem(
             identity,
@@ -313,8 +291,7 @@ void OnSkillFetch(safetyhook::Context& context)
 }
 
 
-namespace
-{
+namespace {
 /*
    启动阶段计时：把"记开始时间 -> 干活 -> 报一行 phase 日志"收成两行：
 
@@ -330,26 +307,22 @@ namespace
 
    阶段之间刻意不重叠：每个 phase 都在自己的作用域里，日志的先后就与代码顺序一致。
 */
-class StartupPhase
-{
+class StartupPhase {
 public:
    explicit StartupPhase(std::string_view name)
-      : _name(name), _started(GetTickCount64())
-   {
+      : _name(name), _started(GetTickCount64()) {
    }
 
    StartupPhase(const StartupPhase&) = delete;
    StartupPhase& operator=(const StartupPhase&) = delete;
 
    // 析构即上报；显式调过 Succeeded 之后不再报。
-   ~StartupPhase()
-   {
+   ~StartupPhase() {
       if (!_reported)
          CompleteStartupPhase(_name, _started, false);
    }
 
-   void Succeeded(bool succeeded)
-   {
+   void Succeeded(bool succeeded) {
       CompleteStartupPhase(_name, _started, succeeded);
       _reported = true;
    }
@@ -360,13 +333,11 @@ private:
    bool _reported = false;
 };
 
-void DisableGameplayHooksAndRestore() noexcept
-{
+void DisableGameplayHooksAndRestore() noexcept {
    g_hooks_ready.store(false, std::memory_order_release);
    // 先恢复循环上限字节，此时两个 detour 都还活着：slot >= 13 的请求仍被它们挡住，
    // 先拆钩子会留下一段窗口，让原始 13 槽 getter 被问到 slot 13+N。
-   if (g_image_base != 0 && g_layout_ready.load(std::memory_order_acquire))
-   {
+   if (g_image_base != 0 && g_layout_ready.load(std::memory_order_acquire)) {
       const uint8_t expanded_slot_count =
          static_cast<uint8_t>(GetExpandedInternalSlotCount());
       // 只回退仍是我们那个扩展值的上限字节；已经恢复过（或从未打过补丁）的不能碰。
@@ -397,10 +368,8 @@ void DisableGameplayHooksAndRestore() noexcept
    // 执行的内存。
    const uint64_t drain_deadline = GetTickCount64() + 5000;
    while (g_active_getter_calls.load(std::memory_order_acquire) != 0 ||
-          g_active_mid_calls.load(std::memory_order_acquire) != 0)
-   {
-      if (GetTickCount64() > drain_deadline)
-      {
+          g_active_mid_calls.load(std::memory_order_acquire) != 0) {
+      if (GetTickCount64() > drain_deadline) {
          Log("Hook teardown timed out waiting for in-flight calls; hooks left installed.");
          return;
       }
@@ -413,16 +382,14 @@ void DisableGameplayHooksAndRestore() noexcept
 }
 }
 
-void ShutdownHooks()
-{
+void ShutdownHooks() {
    g_shutting_down.store(true, std::memory_order_release);
    g_hooks_ready.store(false, std::memory_order_release);
 
    DisableGameplayHooksAndRestore();
 }
 
-bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
-{
+bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept {
    const uint8_t expanded_slot_count =
       static_cast<uint8_t>(kNativeInternalSlotCount + virtual_slot_count);
    const uintptr_t apply_limit_rva = g_game_layout.skill_apply_loop_limit_immediate_rva;
@@ -437,8 +404,7 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
 
    if (!WriteByte(g_image_base + apply_limit_rva, expanded_slot_count))
       return false;
-   if (!WriteByte(g_image_base + category_limit_rva, expanded_slot_count))
-   {
+   if (!WriteByte(g_image_base + category_limit_rva, expanded_slot_count)) {
       // 把第一个字节回滚到它原来的值，两条循环就保持一致。
       (void)WriteByte(g_image_base + apply_limit_rva, previous_apply_limit);
       return false;
@@ -446,8 +412,7 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
    return true;
 }
 
-bool InstallHooks()
-{
+bool InstallHooks() {
    // 每个阶段在自己的作用域里：计时、上报、以及"失败就回滚并返回"。
    //
    // 四条失败路径都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，顺序是
@@ -457,8 +422,7 @@ bool InstallHooks()
       auto phase = StartupPhase("required-byte-rva-preflight");
       const bool preflight_ready = RevalidateGameLayout();
       phase.Succeeded(preflight_ready);
-      if (!preflight_ready)
-      {
+      if (!preflight_ready) {
          DisableGameplayHooksAndRestore();
          SetRuntimeMessage(
             "Resolved game layout changed before hook installation; no gameplay hook or byte patch was installed.");
@@ -473,8 +437,7 @@ bool InstallHooks()
             g_image_base + g_game_layout.get_gem_data_by_index_rva),
          reinterpret_cast<void*>(&GetGemDataByIndexDetour));
       phase.Succeeded(static_cast<bool>(g_get_gem_hook));
-      if (!g_get_gem_hook)
-      {
+      if (!g_get_gem_hook) {
          DisableGameplayHooksAndRestore();
          SetRuntimeMessage("Failed to install the GemData getter hook.");
          return false;
@@ -488,8 +451,7 @@ bool InstallHooks()
             g_image_base + g_game_layout.skill_fetch_path_rva),
          &OnSkillFetch);
       phase.Succeeded(static_cast<bool>(g_skill_fetch_hook));
-      if (!g_skill_fetch_hook)
-      {
+      if (!g_skill_fetch_hook) {
          DisableGameplayHooksAndRestore();
          SetRuntimeMessage("Failed to install the skill fetch-path hook.");
          return false;
@@ -500,8 +462,7 @@ bool InstallHooks()
       auto phase = StartupPhase("skill-loop-limit-patches");
       const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
       phase.Succeeded(loop_patches_ready);
-      if (!loop_patches_ready)
-      {
+      if (!loop_patches_ready) {
          DisableGameplayHooksAndRestore();
          SetRuntimeMessage(
             "Failed to patch both native skill loop limits; changes were rolled back.");

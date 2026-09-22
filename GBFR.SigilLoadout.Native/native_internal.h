@@ -21,10 +21,8 @@
 #include <unordered_map>
 #include <vector>
 
-namespace gbfr::native
-{
-struct ResolvedGameLayout
-{
+namespace gbfr::native {
+struct ResolvedGameLayout {
    uintptr_t skill_apply_loop_limit_immediate_rva = 0;
    uintptr_t skill_apply_getter_return_rva = 0;
    uintptr_t skill_category_loop_limit_immediate_rva = 0;
@@ -55,18 +53,15 @@ inline constexpr uint32_t kDjeetaCharacterHash = 0xA4ACBA76;
 // 模板（合成）sigil 槽用的 slot-id 区间与真实库存 slot id（0 .. 5099）永不冲突。
 inline constexpr uint32_t kTemplateSlotIdBase = 0xFE000000u;
 
-inline constexpr bool IsTemplateSlotId(uint32_t slot_id) noexcept
-{
+inline constexpr bool IsTemplateSlotId(uint32_t slot_id) noexcept {
    return slot_id >= kTemplateSlotIdBase;
 }
 
-inline constexpr uint32_t MakeTemplateSlotId(int virtual_slot) noexcept
-{
+inline constexpr uint32_t MakeTemplateSlotId(int virtual_slot) noexcept {
    return kTemplateSlotIdBase + static_cast<uint32_t>(virtual_slot);
 }
 
-struct TemplateGemSlot
-{
+struct TemplateGemSlot {
    uint32_t gem_id = 0; // gem-master 查询用的真实 gem hash；0 = 空槽
    uint32_t skill1 = 0;
    int32_t skill1_level = 0;
@@ -83,8 +78,7 @@ static_assert(sizeof(TemplateGemSlot) == sizeof(GBFR20_TemplateSlot));
 static_assert(offsetof(TemplateGemSlot, gem_id) == offsetof(GBFR20_TemplateSlot, gem_id));
 static_assert(offsetof(TemplateGemSlot, skill1) == offsetof(GBFR20_TemplateSlot, skill1));
 
-struct CharacterTemplate
-{
+struct CharacterTemplate {
    uint32_t character_hash = 0;
    std::array<TemplateGemSlot, kVirtualSlotCapacity> slots{};
 };
@@ -96,15 +90,13 @@ extern std::shared_mutex g_template_mutex;
 extern std::array<CharacterTemplate, kRuntimeTemplateCapacity> g_runtime_templates;
 extern std::atomic<int32_t> g_virtual_slot_count;
 
-inline constexpr bool IsCaptainCharacterHash(uint32_t character_hash) noexcept
-{
+inline constexpr bool IsCaptainCharacterHash(uint32_t character_hash) noexcept {
    return character_hash == kGranCharacterHash || character_hash == kDjeetaCharacterHash;
 }
 
 inline constexpr bool IsCharacterCompatible(
    uint32_t required_character_hash,
-   uint32_t character_hash) noexcept
-{
+   uint32_t character_hash) noexcept {
    return required_character_hash == 0 ||
       required_character_hash == character_hash ||
       (IsCaptainCharacterHash(required_character_hash) &&
@@ -124,8 +116,7 @@ static_assert(!IsCharacterCompatible(0x18E2F9F9, kDjeetaCharacterHash));
 // 读那份"ABI 契约"的人误以为它跨边界）。
 //
 // 九个 32 位字段：自然对齐与 pack(1) 同为 0x24，所以不需要 pack 指令。
-struct GemData
-{
+struct GemData {
    uint32_t skill1 = 0;
    int32_t skill1_level = 0;
    uint32_t skill2 = 0;
@@ -137,20 +128,17 @@ struct GemData
    uint32_t flags = 0;
 };
 static_assert(sizeof(GemData) == 0x24);
-struct StatusIdentity
-{
+struct StatusIdentity {
    uint32_t character_hash = 0;
    int32_t context_mode = -1;
 };
 
 // 上下文模式只有三个取值。这条判断在好几条"读状态身份"的路径上各要一次，所以边界只写在这里。
-constexpr bool IsValidContextMode(int32_t context_mode)
-{
+constexpr bool IsValidContextMode(int32_t context_mode) {
    return context_mode >= 0 && context_mode <= 2;
 }
 
-struct NaturalContributionFrame
-{
+struct NaturalContributionFrame {
    uintptr_t status = 0;
    StatusIdentity identity{};
    uint32_t expected = 0;
@@ -159,42 +147,33 @@ struct NaturalContributionFrame
    bool active = false;
 };
 
-struct ActiveCallGuard
-{
-   explicit ActiveCallGuard(std::atomic_uint32_t& value) : counter(value)
-   {
+struct ActiveCallGuard {
+   explicit ActiveCallGuard(std::atomic_uint32_t& value) : counter(value) {
       counter.fetch_add(1, std::memory_order_acq_rel);
    }
-   ~ActiveCallGuard()
-   {
+   ~ActiveCallGuard() {
       counter.fetch_sub(1, std::memory_order_acq_rel);
    }
    std::atomic_uint32_t& counter;
 };
 
 template <size_t Size>
-bool MatchesBytes(uintptr_t address, const std::array<uint8_t, Size>& expected) noexcept
-{
-   __try
-   {
+bool MatchesBytes(uintptr_t address, const std::array<uint8_t, Size>& expected) noexcept {
+   __try {
       return std::memcmp(reinterpret_cast<const void*>(address), expected.data(), Size) == 0;
    }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
+   __except (EXCEPTION_EXECUTE_HANDLER) {
       return false;
    }
 }
 
 // 运行期长度版本：表驱动的预检长度只有运行时才知道。**不能**套上面那个模板——它的长度来自
 // 数组类型，套过去会连缓冲尾部的垃圾一起比（128 字节的表在真机上永远不匹配）。SEH 逐字同上。
-inline bool MatchesBytesAt(uintptr_t address, const uint8_t* expected, size_t size) noexcept
-{
-   __try
-   {
+inline bool MatchesBytesAt(uintptr_t address, const uint8_t* expected, size_t size) noexcept {
+   __try {
       return std::memcmp(reinterpret_cast<const void*>(address), expected, size) == 0;
    }
-   __except (EXCEPTION_EXECUTE_HANDLER)
-   {
+   __except (EXCEPTION_EXECUTE_HANDLER) {
       return false;
    }
 }
@@ -225,8 +204,7 @@ int GetExpandedInternalSlotCount() noexcept;
 bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept;
 // 游戏自己的代码段（PE 视图的唯一持有者仍是 layout_resolver.cpp：先按名字找 `.text`，
 // 找不到才取最大的可执行段）。锚点扫描要的三个量就是它 + 映像大小 + PE 指纹。
-struct CodeSectionView
-{
+struct CodeSectionView {
    uintptr_t rva = 0;
    size_t size = 0;
    uintptr_t image_size = 0;

@@ -32,8 +32,7 @@ using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 
 #pragma pack(push, 1)
 // 原生 TemplateGemSlot 的 ABI 镜像（字段顺序一致，pack 1）。
-struct GBFR20_TemplateSlot
-{
+struct GBFR20_TemplateSlot {
    uint32_t gem_id;
    uint32_t skill1;
    int32_t skill1_level;
@@ -45,8 +44,7 @@ struct GBFR20_TemplateSlot
 // 一个专属开关：角色、skill hash、disabled（0/1）。这里不点名 T1 / T2 / 战气
 // ——skill hash *就是*名字，由原生专属表把它映射到槽位。调用方从不发
 // disabled == 0 的条目，所以没出现的角色就是三个专属槽全开。
-struct GBFR20_ExclusiveOverride
-{
+struct GBFR20_ExclusiveOverride {
    uint32_t character_hash;
    uint32_t skill_hash;
    uint8_t disabled;

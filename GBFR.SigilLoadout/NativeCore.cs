@@ -8,8 +8,7 @@ namespace GBFR.SigilLoadout;
 /// 最小原生核心门面：ABI 检查、日志汇、初始化、关停与运行时消息回读。它派生自的那份原始实现里
 /// 所有 selector/inventory/preset/input/present API 都已删除。
 /// </summary>
-internal static unsafe partial class NativeCore
-{
+internal static unsafe partial class NativeCore {
     internal const int AbiVersion = 20;
 
     private const string LibraryName = "GBFR.SigilLoadout.Native.dll";
@@ -20,21 +19,17 @@ internal static unsafe partial class NativeCore
     private static int _resolverConfigured;
     private static Action<string>? _nativeLogSink;
 
-    internal static void Configure(string modDirectory)
-    {
+    internal static void Configure(string modDirectory) {
         string path = Path.GetFullPath(Path.Combine(modDirectory, LibraryName));
-        lock (ResolverLock)
-        {
+        lock (ResolverLock) {
             if (_libraryPath is not null &&
-                !string.Equals(_libraryPath, path, StringComparison.OrdinalIgnoreCase))
-            {
+                !string.Equals(_libraryPath, path, StringComparison.OrdinalIgnoreCase)) {
                 throw new InvalidOperationException(
                     $"Native core was already bound to a different path: {_libraryPath}"
                 );
             }
             _libraryPath = path;
-            if (Interlocked.Exchange(ref _resolverConfigured, 1) == 0)
-            {
+            if (Interlocked.Exchange(ref _resolverConfigured, 1) == 0) {
                 NativeLibrary.SetDllImportResolver(
                     typeof(NativeCore).Assembly,
                     ResolveLibrary
@@ -43,22 +38,19 @@ internal static unsafe partial class NativeCore
         }
     }
 
-    internal static bool Initialize(Action<string> log)
-    {
+    internal static bool Initialize(Action<string> log) {
         ArgumentNullException.ThrowIfNull(log);
         lock (NativeLogLock)
             _nativeLogSink = log;
 
         long nativeLibraryStarted = Stopwatch.GetTimestamp();
         bool nativeLibraryCompleted = false;
-        try
-        {
+        try {
             GBFR20_SetLogCallback(
                 Marshal.GetFunctionPointerForDelegate(NativeLogCallbackProc)
             );
             uint abiVersion = GBFR20_GetAbiVersion();
-            if (abiVersion != AbiVersion)
-            {
+            if (abiVersion != AbiVersion) {
                 throw new InvalidOperationException(
                     $"Native ABI mismatch: managed {AbiVersion}, native {abiVersion}."
                 );
@@ -69,8 +61,7 @@ internal static unsafe partial class NativeCore
             nativeLibraryCompleted = true;
             return GBFR20_Initialize() != 0;
         }
-        catch
-        {
+        catch {
             if (!nativeLibraryCompleted)
                 log(StartupPhaseLine("native-library-load", nativeLibraryStarted, false));
             DetachNativeLogSink();
@@ -92,8 +83,7 @@ internal static unsafe partial class NativeCore
     /// </summary>
     internal static bool ApplyLoadout(
         TemplateSlotNative[]? slots,
-        ExclusiveOverrideNative[]? overrides)
-    {
+        ExclusiveOverrideNative[]? overrides) {
         return GBFR20_ApplyLoadout(
             slots,
             (uint)(slots?.Length ?? 0),
@@ -101,28 +91,23 @@ internal static unsafe partial class NativeCore
             (uint)(overrides?.Length ?? 0)) != 0;
     }
 
-    internal static void Shutdown()
-    {
-        try
-        {
+    internal static void Shutdown() {
+        try {
             GBFR20_Shutdown();
         }
-        finally
-        {
+        finally {
             DetachNativeLogSink();
         }
     }
 
-    internal static string GetRuntimeMessage()
-    {
+    internal static string GetRuntimeMessage() {
         uint required = GBFR20_CopyRuntimeMessage(null, 0);
         if (required <= 1)
             return string.Empty;
         if (required > 64 * 1024)
             required = 64 * 1024;
         byte[] bytes = new byte[required];
-        fixed (byte* buffer = bytes)
-        {
+        fixed (byte* buffer = bytes) {
             GBFR20_CopyRuntimeMessage((sbyte*)buffer, required);
             return Marshal.PtrToStringUTF8((IntPtr)buffer) ?? string.Empty;
         }
@@ -135,10 +120,8 @@ internal static unsafe partial class NativeCore
 
     private static readonly NativeLogCallback NativeLogCallbackProc = ForwardNativeLog;
 
-    private static void ForwardNativeLog(sbyte* message)
-    {
-        try
-        {
+    private static void ForwardNativeLog(sbyte* message) {
+        try {
             string? text = Marshal.PtrToStringUTF8((IntPtr)message);
             if (string.IsNullOrEmpty(text))
                 return;
@@ -147,21 +130,17 @@ internal static unsafe partial class NativeCore
                 sink = _nativeLogSink;
             sink?.Invoke("Native: " + text);
         }
-        catch
-        {
+        catch {
             // 诊断回调绝不能让异常展开回原生钩子代码。
         }
     }
 
-    private static void DetachNativeLogSink()
-    {
-        try
-        {
+    private static void DetachNativeLogSink() {
+        try {
             if (_libraryHandle != IntPtr.Zero)
                 GBFR20_SetLogCallback(IntPtr.Zero);
         }
-        catch
-        {
+        catch {
             // 进程拆卸期间原生模块可能已经不在了。
         }
         lock (NativeLogLock)
@@ -171,12 +150,10 @@ internal static unsafe partial class NativeCore
     private static IntPtr ResolveLibrary(
         string libraryName,
         Assembly assembly,
-        DllImportSearchPath? searchPath)
-    {
+        DllImportSearchPath? searchPath) {
         if (!string.Equals(libraryName, LibraryName, StringComparison.OrdinalIgnoreCase))
             return IntPtr.Zero;
-        lock (ResolverLock)
-        {
+        lock (ResolverLock) {
             if (_libraryHandle != IntPtr.Zero)
                 return _libraryHandle;
             if (_libraryPath is null || !File.Exists(_libraryPath))

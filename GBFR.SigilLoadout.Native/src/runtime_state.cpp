@@ -2,8 +2,7 @@
 
 #include <format>
 
-namespace gbfr::native
-{
+namespace gbfr::native {
 uintptr_t g_image_base = 0;
 
 std::once_flag g_initialize_once;
@@ -18,18 +17,15 @@ std::string g_runtime_message = "Waiting for initialization.";
 
 std::atomic<int32_t> g_virtual_slot_count{kBuiltinExclusiveSlotCount};
 
-int GetVirtualSlotCount() noexcept
-{
+int GetVirtualSlotCount() noexcept {
    return g_virtual_slot_count.load(std::memory_order_acquire);
 }
 
-int GetExpandedInternalSlotCount() noexcept
-{
+int GetExpandedInternalSlotCount() noexcept {
    return kNativeInternalSlotCount + GetVirtualSlotCount();
 }
 
-void Log(const std::string& message)
-{
+void Log(const std::string& message) {
    SYSTEMTIME time{};
    GetLocalTime(&time);
    const std::string line = std::format(
@@ -41,8 +37,7 @@ void Log(const std::string& message)
       message);
    OutputDebugStringA(line.c_str());
    if (const GBFR20_LogCallback callback = g_log_callback.load(std::memory_order_acquire);
-       callback != nullptr)
-   {
+       callback != nullptr) {
       callback(message.c_str());
    }
 }
@@ -50,8 +45,7 @@ void Log(const std::string& message)
 void CompleteStartupPhase(
    std::string_view phase,
    uint64_t started_at_ms,
-   bool succeeded)
-{
+   bool succeeded) {
    const uint64_t elapsed_ms = GetTickCount64() - started_at_ms;
    Log(std::format(
       "Startup phase={} state={} elapsed_ms={}.",
@@ -60,8 +54,7 @@ void CompleteStartupPhase(
       elapsed_ms));
 }
 
-void SetRuntimeMessage(std::string message)
-{
+void SetRuntimeMessage(std::string message) {
    // 先记日志再存，日志行就不会与别的线程的 store 相争；下面那份存储拷贝
    // 始终在 mutex 下写入。
    Log(message);

@@ -2,27 +2,22 @@ using System.Diagnostics;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-internal static class Utilities
-{
+internal static class Utilities {
     public static T TryGetValue<T>(Func<T> getValue, int timeout, int sleepTime,
-        CancellationToken token = default) where T : new()
-    {
+        CancellationToken token = default) where T : new() {
         Stopwatch watch = Stopwatch.StartNew();
         bool valueSet = false;
         T value = new();
 
-        while (watch.ElapsedMilliseconds < timeout)
-        {
+        while (watch.ElapsedMilliseconds < timeout) {
             if (token.IsCancellationRequested)
                 return value;
-            try
-            {
+            try {
                 value = getValue();
                 valueSet = true;
                 break;
             }
-            catch
-            {
+            catch {
             }
             Thread.Sleep(sleepTime);
         }

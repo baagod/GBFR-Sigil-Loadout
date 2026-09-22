@@ -4,41 +4,34 @@
 
 using namespace gbfr::native;
 
-uint32_t GBFR20_CALL GBFR20_GetAbiVersion()
-{
+uint32_t GBFR20_CALL GBFR20_GetAbiVersion() {
    return GBFR20_ABI_VERSION;
 }
 
-void GBFR20_CALL GBFR20_SetLogCallback(GBFR20_LogCallback callback)
-{
+void GBFR20_CALL GBFR20_SetLogCallback(GBFR20_LogCallback callback) {
    g_log_callback.store(callback, std::memory_order_release);
 }
 
-int32_t GBFR20_CALL GBFR20_Initialize()
-{
+int32_t GBFR20_CALL GBFR20_Initialize() {
    if (g_shutting_down.load(std::memory_order_acquire))
       return 0;
    EnsureInitialized();
    return g_hooks_ready.load(std::memory_order_acquire) ? 1 : 0;
 }
 
-void GBFR20_CALL GBFR20_Shutdown()
-{
+void GBFR20_CALL GBFR20_Shutdown() {
    if (g_shutdown_complete.exchange(true, std::memory_order_acq_rel))
       return;
    ShutdownHooks();
 }
 
-uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(char* buffer, uint32_t buffer_size)
-{
-   std::string message;
-   {
+uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(char* buffer, uint32_t buffer_size) {
+   std::string message; {
       std::scoped_lock lock(g_message_mutex);
       message = g_runtime_message;
    }
    const size_t required_size = message.size() + 1;
-   if (buffer != nullptr && buffer_size != 0)
-   {
+   if (buffer != nullptr && buffer_size != 0) {
       const size_t copy_size = std::min<size_t>(message.size(), buffer_size - 1);
       std::memcpy(buffer, message.data(), copy_size);
       buffer[copy_size] = '\0';
@@ -48,8 +41,7 @@ uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(char* buffer, uint32_t buffer_siz
 
 int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    const GBFR20_TemplateSlot* slots, uint32_t slot_count,
-   const GBFR20_ExclusiveOverride* overrides, uint32_t override_count)
-{
+   const GBFR20_ExclusiveOverride* overrides, uint32_t override_count) {
    // 一个调用带两张调用方持有的表，守卫都在这里：关机中拒绝、计数越界拒绝、然后懒初始化并
    // 要求钩子已装；任一条不成立都以 0 报告失败。
    //
@@ -58,8 +50,7 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    constexpr int32_t kMaxTemplateSlots = static_cast<int32_t>(kVirtualSlotCapacity);
    constexpr int32_t kMaxExclusiveOverrides =
       static_cast<int32_t>(kRuntimeTemplateCapacity) * 3;
-   if (slot_count > kMaxTemplateSlots || override_count > kMaxExclusiveOverrides)
-   {
+   if (slot_count > kMaxTemplateSlots || override_count > kMaxExclusiveOverrides) {
       Log(std::format(
          "ApplyLoadout: counts out of range (slots {} > {}, overrides {} > {}); rejected.",
          slot_count, kMaxTemplateSlots, override_count, kMaxExclusiveOverrides));
@@ -82,10 +73,8 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
 
 // 拒绝码的人话解释只有这一处：托管层那边只记"被拒 + 码"。每一个码都要在这里有一句，
 // 否则 default 会把一个具体的失败说成另一件事。
-static const char* SkillStatusRefusalReason(int32_t code)
-{
-   switch (code)
-   {
+static const char* SkillStatusRefusalReason(int32_t code) {
+   switch (code) {
    case GBFR20_TABLE_NOT_READY:
       return "the native core is not initialized yet, or is shutting down.";
    case GBFR20_TABLE_SLOT_UNRESOLVED:
@@ -105,8 +94,7 @@ static const char* SkillStatusRefusalReason(int32_t code)
    }
 }
 
-int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t length)
-{
+int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t length) {
    if (g_shutting_down.load(std::memory_order_acquire))
       return GBFR20_TABLE_NOT_READY;
    // 刻意**不**要求 g_hooks_ready：写的是数据管理器供给的那张表，与钩子装没装成无关，而
@@ -121,16 +109,14 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
    static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
 
    const int32_t result = WriteSkillStatusTable(table, length);
-   if (result < 0)
-   {
+   if (result < 0) {
       if (last_refusal.exchange(result, std::memory_order_acq_rel) != result)
          Log(std::format(
             "WriteSkillStatusTable: refused ({}): {}",
             result,
             SkillStatusRefusalReason(result)));
    }
-   else
-   {
+   else {
       // 成功过就把"上次报过的码"清掉：下一次拒写（比如换了一份编辑）值得再报一次。
       last_refusal.store(std::numeric_limits<int32_t>::min(), std::memory_order_release);
    }

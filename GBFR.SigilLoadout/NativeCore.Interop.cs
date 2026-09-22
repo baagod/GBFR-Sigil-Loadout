@@ -2,8 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace GBFR.SigilLoadout;
 
-internal static unsafe partial class NativeCore
-{
+internal static unsafe partial class NativeCore {
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern uint GBFR20_GetAbiVersion();
 
@@ -20,8 +19,7 @@ internal static unsafe partial class NativeCore
     private static extern uint GBFR20_CopyRuntimeMessage(sbyte* buffer, uint bufferSize);
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct TemplateSlotNative
-    {
+    internal struct TemplateSlotNative {
         public uint GemId;
         public uint Skill1;
         public int Skill1Level;
@@ -31,8 +29,7 @@ internal static unsafe partial class NativeCore
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct ExclusiveOverrideNative
-    {
+    internal struct ExclusiveOverrideNative {
         public uint CharacterHash;
         /// <summary>
         /// 被切换的技能 hash；**身份就是槽位**——原生拿它去专属表里认 T1、T2 还是战气，托管侧
@@ -63,8 +60,7 @@ internal static unsafe partial class NativeCore
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int GBFR20_WriteSkillStatusTable(byte* table, uint length);
 
-    internal static int WriteSkillStatusTable(byte[] table)
-    {
+    internal static int WriteSkillStatusTable(byte[] table) {
         fixed (byte* pointer = table)
             return GBFR20_WriteSkillStatusTable(pointer, (uint)table.Length);
     }
@@ -76,8 +72,7 @@ internal static unsafe partial class NativeCore
     /// 方式。尺寸不符与版本不符同样处理：抛异常 → 整套 hook 不装（fail-closed）。用 Marshal.SizeOf
     /// 而不是 sizeof：要验证的是**封送器实际会写多少字节**，那才是跨过 ABI 的东西。
     /// </summary>
-    internal static void EnsureAbiLayout()
-    {
+    internal static void EnsureAbiLayout() {
         AssertSize("TemplateSlot", 0x18, Marshal.SizeOf<TemplateSlotNative>());
         AssertSize("ExclusiveOverride", 0x0C, Marshal.SizeOf<ExclusiveOverrideNative>());
 
@@ -95,8 +90,7 @@ internal static unsafe partial class NativeCore
         AssertOffset<ExclusiveOverrideNative>(nameof(ExclusiveOverrideNative.Disabled), 0x08);
     }
 
-    private static void AssertSize(string name, int expected, int actual)
-    {
+    private static void AssertSize(string name, int expected, int actual) {
         if (actual != expected)
             throw new InvalidOperationException(
                 $"ABI layout mismatch: {name} marshals as {actual} bytes but native_api.h "
@@ -104,8 +98,7 @@ internal static unsafe partial class NativeCore
             );
     }
 
-    private static void AssertOffset<T>(string field, int expected)
-    {
+    private static void AssertOffset<T>(string field, int expected) {
         int actual = (int)Marshal.OffsetOf<T>(field);
         if (actual != expected)
             throw new InvalidOperationException(
