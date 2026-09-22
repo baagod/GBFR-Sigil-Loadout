@@ -166,6 +166,57 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 				{"C++", "../GBFR.SigilLoadout.Native/src/table_slot.cpp", regexp.MustCompile(`kRowKeyOffset = (\d+)`)},
 			},
 		},
+		// sigiledits.json 的成员名：Config.cs 的注释说得很直白——"这四个拼写**就是**文件格式"，
+		// 而且大小写折叠是关的。Go 写、C# 读，两边各声明一份，改错一边能编译、测试也全绿，只在
+		// 游戏里表现成"每条编辑被跳过"（Key 读成空串）。所以逐个成员名钉住。
+		//
+		// Go 侧的正则锚在 `type SigilSkill struct {` 上：`json:"key"` 在这个包里合法地出现两次
+		// （SigilSkill.Key 与 SkillInfo.Key，两个不同的文件格式），只有锚到场结构上才是
+		// "sigiledits.json 的那个 key"。
+		{
+			name: "sigiledits.json 的 edits 成员",
+			decls: []decl{
+				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(edits)"\)\]`)},
+				{"Go", "editservice.go", regexp.MustCompile("json:\"(edits)\"")},
+			},
+		},
+		{
+			name: "sigiledits.json 的 enabled 成员",
+			decls: []decl{
+				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(enabled)"\)\]`)},
+				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(enabled)"`)},
+			},
+		},
+		{
+			name: "sigiledits.json 的 key 成员",
+			decls: []decl{
+				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(key)"\)\]`)},
+				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(key)"`)},
+			},
+		},
+		{
+			name: "sigiledits.json 的 level 成员",
+			decls: []decl{
+				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(level)"\)\]`)},
+				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(level)"`)},
+			},
+		},
+		{
+			name: "sigiledits.json 的 values 成员",
+			decls: []decl{
+				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(values)"\)\]`)},
+				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(values)"`)},
+			},
+		},
+		// 防抖写盘失败时由后端推给前端的事件名。前端用 Call.ByName 那套手写字符串的同一个
+		// 理由：两边各写一份字面量，改名只改一边不会编译失败，只会让那个失败对话框永远不弹。
+		{
+			name: "保存失败事件名（Go 发、前端收）",
+			decls: []decl{
+				{"Go", "editservice.go", regexp.MustCompile(`const saveFailedEvent = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
+				{"TS", "frontend/src/SigilEditorPanel.tsx", regexp.MustCompile(`const SAVE_FAILED = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
+			},
+		},
 	}
 
 	for _, group := range groups {

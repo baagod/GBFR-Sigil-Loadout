@@ -125,9 +125,24 @@ static_assert(!IsCharacterCompatible(0x18E2F9F9, kDjeetaCharacterHash));
 // 布局预检字节表住在 layout_resolver.cpp 的匿名命名空间里：只有那一个翻译单元用它们，
 // 放进共享内部头等于把实现细节当成模块接口发布。
 
-using GemData = GBFR20_GemData;
+// 游戏那份 GemData 的布局。**它不跨 ABI**：唯一穿过边界的是 GBFR20_TemplateSlot 与
+// GBFR20_ExclusiveOverride，没有任何导出函数收发这个类型。原来它挂在 native_api.h 里，
+// 让读那份"ABI 契约"的人以为它跨边界——它其实是这一层的内部事实，所以定义搬到这里。
+//
+// 九个 32 位字段，自然对齐与 pack(1) 结果相同（0x24），故不需要 pack 指令。
+struct GemData
+{
+   uint32_t skill1 = 0;
+   int32_t skill1_level = 0;
+   uint32_t skill2 = 0;
+   int32_t skill2_level = 0;
+   uint32_t gem_id = 0;
+   uint32_t worn_by = 0;
+   int32_t sigil_level = 0;
+   uint32_t slot_id = 0;
+   uint32_t flags = 0;
+};
 static_assert(sizeof(GemData) == 0x24);
-
 struct StatusIdentity
 {
    uint32_t character_hash = 0;

@@ -16,8 +16,10 @@ func slot(gem, sec string, lvl, secLvl int) loadoutSlot {
 	if sec != "" {
 		items = append(items, loadoutItem{Hash: sec, Level: secLvl})
 	}
-	return loadoutSlot{Items: items, Enabled: true}
+	return loadoutSlot{Items: items, Enabled: boolPtr(true)}
 }
+
+func boolPtr(v bool) *bool { return &v }
 
 // manySlots builds n enabled single-item slots, all alike.
 func manySlots(n int) []loadoutSlot {
@@ -37,10 +39,25 @@ func TestUserCfgDirMatchesModPath(t *testing.T) {
 	}
 }
 
+// 缺 enabled 与 enabled:true 同义——mod（LoadoutConfig.ParseAndValidate 的
+// `!TryGetProperty("enabled", …) || …`）和前端（model.ts 的 `s.enabled !== false`）都这么认。
+// 这里曾经用 bool（零值 false），于是同一份文件在 Go 数出 0 个启用、在 mod 那边数出十几个，
+// 结果是"存盘成功、游戏里什么都没变"。这条用例把默认值钉住。
+func TestValidateSlotsTreatsMissingEnabledAsEnabled(t *testing.T) {
+	slots := manySlots(MaxSlots + 1)
+	for i := range slots {
+		slots[i].Enabled = nil // 一份完全没写 enabled 的文件
+	}
+	if err := validateSlots(slots); err == nil {
+		t.Fatalf("validateSlots accepted %d rows with no \"enabled\" member; a missing member means enabled",
+			len(slots))
+	}
+}
+
 func TestValidateSlots(t *testing.T) {
 	many := manySlots(MaxSlots + 1)
 	oneDisabled := manySlots(MaxSlots + 1)
-	oneDisabled[0].Enabled = false
+	oneDisabled[0].Enabled = boolPtr(false)
 	cases := []struct {
 		name string
 		cfg  []loadoutSlot

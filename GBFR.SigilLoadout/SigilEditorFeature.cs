@@ -88,7 +88,7 @@ internal sealed class SigilEditorFeature
     public void Start(IModLoader loader)
     {
         _loader = loader;
-        // 不在这里打横幅：紧跟着的 "list loaded: N edit(s)" 已经说明这一半起来了，
+        // 不在这里打横幅：紧跟着的 "sigil edit: N enabled" 已经说明这一半起来了，
         // 而一句 "=== Sigil edit start ===" 不含任何可排查的信息。
         Bootstrap();
     }
@@ -106,6 +106,12 @@ internal sealed class SigilEditorFeature
 
         try
         {
+            // 版本号必须在**读内容之前**取。反过来的话：内容来自 T1、版本号来自 T4，而在
+            // T1→T4 之间（读归档 328KB + 逐行补丁）落盘的那次保存会被 MarkApplied(T4) 判成
+            // 已生效——内存里却是旧内容，那次编辑静默丢失且不再重试（门已经推过去了）。
+            // Tick 那一路的顺序本来就是对的（:187 先取 mtime，:199 才应用），这里对齐它。
+            DateTime stamp = _stamp.Now();
+
             Config? loaded = LoadConfig(out _);
             Config config = loaded ?? new Config();
             byte[]? table = BuildEditedTable(config, out int applied);
@@ -122,17 +128,28 @@ internal sealed class SigilEditorFeature
             {
                 // 两份空列表要分开说：一份"读不出来"的空列表和一份"用户清空了"的空列表，
                 // 在这一行之前各有一句日志说明是哪种，这里不该把前者说成"列表里 0 条编辑"。
+                // 数启用数而不是总数：上面那行报的就是启用数，同一个词在相邻两行里指两件事
+                // 会让人对不上；而"该写却有 0 行落地"的原因只跟启用数有关。
                 _log(loaded is null
                     ? "sigil edit: there is no edit list yet, or it could not be read (see the line above); nothing applied and the table was not written back"
-                    : $"sigil edit: no edits applied (list held {config.Edits.Count} edit(s)); not writing the table back");
+                    : $"sigil edit: no edit reached a row ({config.Edits.Count(edit => edit.Enabled)} enabled); not writing the table back");
+                return;
+            }
+
+            // 造表期间文件又变了：这一版已经过期。什么都不写、也不推进版本，让 Tick 的 mtime
+            // 门按新版本重来（它自己会重新读配置与归档）。否则我们就会用一个旧版本号去标记
+            // 一份新内容"已应用"。
+            if (_stamp.Now() != stamp)
+            {
+                _log("sigil edit: the edit list changed while the table was being built; it will be applied on the next tick");
                 return;
             }
 
             // 启动这次写与运行中的热应用是同一件事：注册给 IDataManager，再原地写进游戏内存。
             // 表**直接交过去**（bootTable）——它刚在这里建好，让 Tick 那一路再读一遍配置、
-            // 再建一次表纯属白干（实测日志里 "list loaded" 出现两次就是它）。
+            // 再建一次表纯属白干（实测日志里 "sigil edit: N enabled" 出现两次就是它）。
             // 走 TryApply 而不是直接 Apply：那一版"我已经说过"的状态要一起登记上。
-            TryApply(_stamp.Now(), table);
+            TryApply(stamp, table);
         }
         catch (Exception ex)
         {
@@ -333,7 +350,7 @@ internal sealed class SigilEditorFeature
         // 唯一宣告"这一版处理完了"的地方：原生确实把行写进了游戏内存。放在这里，失败路径
         // 就自然不会推进版本，于是下一拍还会重试。
         _stamp.MarkApplied(stamp);
-        LogAttempt($"hot apply: SUCCESS - {written} row(s) of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
+        LogAttempt($"hot apply: SUCCESS - rows={written} of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
         return true;
     }
 
@@ -398,8 +415,8 @@ internal sealed class SigilEditorFeature
         if (!HasPatchableLayout(file, out long declaredRows))
         {
             LogAttempt($"sigil edit FAIL: {TablePath} is not the {FileHeaderSize}-byte header + " +
-                 $"{RowSize}-byte row table this mod patches: {file.Length} bytes, header says " +
-                 $"{declaredRows} row(s). Nothing applied.");
+                 $"{RowSize}-byte row table this mod patches: {file.Length} bytes, " +
+                 $"header rows={declaredRows}. Nothing applied.");
             return null;
         }
 
@@ -479,8 +496,12 @@ internal sealed class SigilEditorFeature
         {
             // 不报路径：它是这个类里的编译期常量（而且有一道跨语言断言盯着），读失败那句
             // 会把路径带出来。每次热应用打一遍它，读的人只是多滑一行。
+            // 报**启用了几条**：那才是"这一轮会写进去几行"，也说明文件确实读到了
+            // （读不到走的是下面那句 "no edit list yet at ..."）。不写 edit(s) 那种懒复数：
+            // 中文语境里那个 (s) 不带信息，而去掉名词就没有单/复数问题。
+            // 被禁用的条目各自还有一行 "skip (disabled): <key>"，所以总数推得回来。
             Config config = Config.Load(ConfigFile);
-            LogAttempt($"sigil edit: list loaded: {config.Edits.Count} edit(s)");
+            LogAttempt($"sigil edit: {config.Edits.Count(edit => edit.Enabled)} enabled");
             return config;
         }
         catch (FileNotFoundException)

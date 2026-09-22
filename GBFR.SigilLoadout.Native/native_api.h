@@ -35,19 +35,6 @@ constexpr int32_t GBFR20_TABLE_WRITE_FAILED = -7;           // 写的时候崩�
 using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 
 #pragma pack(push, 1)
-struct GBFR20_GemData
-{
-   uint32_t skill1;
-   int32_t skill1_level;
-   uint32_t skill2;
-   int32_t skill2_level;
-   uint32_t gem_id;
-   uint32_t worn_by;
-   int32_t sigil_level;
-   uint32_t slot_id;
-   uint32_t flags;
-};
-
 // ABI mirror of the native TemplateGemSlot (same field order, packed 1).
 struct GBFR20_TemplateSlot
 {
@@ -73,7 +60,6 @@ struct GBFR20_ExclusiveOverride
 };
 #pragma pack(pop)
 
-static_assert(sizeof(GBFR20_GemData) == 0x24);
 static_assert(sizeof(GBFR20_TemplateSlot) == 0x18);
 static_assert(sizeof(GBFR20_ExclusiveOverride) == 0x0C);
 

@@ -227,14 +227,13 @@ void ResolveTableSlot()
        anchor.slot_store_matches != 1)
    {
       Log(std::format(
-         "Table slot: in the code section the skill_status row-loop anchor matched {} time(s) and, "
-         "in the {} bytes before it, the buffer-pointer load matched {} time(s) while the slot store "
-         "matched {} time(s); expected exactly one of each. This game build is not the one the "
-         "mod was written for; no slot was resolved.",
+         "Table slot: in the code section the skill_status anchor matches are row_loop={}, "
+         "buffer_load={}, slot_store={} (window {} bytes before the anchor); expected exactly one "
+         "of each. This game build is not the one the mod was written for; no slot was resolved.",
          anchor.row_loop_matches,
-         anchor.window_bytes,
          anchor.buffer_load_matches,
-         anchor.slot_store_matches));
+         anchor.slot_store_matches,
+         anchor.window_bytes));
       return;
    }
 

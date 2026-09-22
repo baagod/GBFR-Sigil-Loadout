@@ -68,6 +68,11 @@ internal static class LoadoutConfig
             // "先清 overrides、再恢复内置模板"两步合成的同一件事。
             if (NativeCore.ApplyLoadout(null, null))
                 log("loadout.json removed; restored the built-in exclusive template.");
+            // 这里是这条路径的终点。少了它就会落到下面那次读取上，而文件不存在时
+            // new FileInfo(...).Length 必然抛 FileNotFoundException，被 catch 接住后每局都多打
+            // 一条假的 "Invalid loadout.json; kept previous configuration"——那句话在这条路上
+            // 本身也是错的：根本不存在"上一份"可保。
+            return;
         }
 
         try
@@ -94,7 +99,7 @@ internal static class LoadoutConfig
             {
                 ok = NativeCore.ApplyLoadout(slots.ToArray(), overrides);
                 if (ok)
-                    log($"Applied custom loadout with {slots.Count} slot(s).");
+                    log($"Applied custom loadout, slots={slots.Count}.");
             }
             if (!ok)
                 log("Native rejected the custom loadout; kept previous configuration.");

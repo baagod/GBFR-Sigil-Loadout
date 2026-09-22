@@ -17,6 +17,10 @@ thread_local NaturalContributionFrame g_tls_natural_contribution{};
 // 而且 "残留授权命中被复用的地址" 会注入旧槽位——游戏的两份 status 对象是轮换 + 地址跨角色复用的。
 //（判据是对象还新不新，见 selection_store.cpp 的轮次闸）。
 thread_local uintptr_t g_tls_build_status = 0;
+// 快照那一版的角色。只比 status 地址不够：本文件上面刚写明"地址跨角色复用"，所以
+// "地址相同"不等于"还是同一个角色"。自然贡献帧（BeginNaturalContributionTracking）比的是
+// 四项（status + character_hash + context_mode + next_slot），这条路径此前只比一项。
+thread_local uint32_t g_tls_build_character = 0;
 thread_local std::array<uint32_t, kVirtualSlotCapacity> g_tls_build_selection{};
 thread_local bool g_tls_build_has_selection = false;
 
@@ -127,8 +131,9 @@ bool TryLoadVirtualSkillSelection(
    try
    {
       // 构建循环内的取用：用构建开始时那一份快照，保证同一次构建里所有槽位用同一组选择。
-      // （哪怕你此刻正好在改配装）。
-      if (from_skill_data_loop && g_tls_build_status == status && g_tls_build_has_selection)
+      // （哪怕你此刻正好在改配装）。角色也要比——status 地址是跨角色复用的（见文件顶部）。
+      if (from_skill_data_loop && g_tls_build_status == status &&
+          g_tls_build_character == identity.character_hash && g_tls_build_has_selection)
       {
          selection = g_tls_build_selection;
          return true;
@@ -199,6 +204,7 @@ void ObserveBuildStart(const GemCall& call)
    g_tls_build_selection = GetSelection(call.identity.character_hash);
    g_tls_build_has_selection = CountSelectedSlots(g_tls_build_selection) != 0;
    g_tls_build_status = build_status;
+   g_tls_build_character = call.identity.character_hash;
    RememberGameBuild();
    if (call.identity.context_mode == 1)
       RememberContext1Status(call.identity.character_hash, build_status);
@@ -329,64 +335,50 @@ namespace
    启动阶段计时。每个阶段都要"记开始时间 -> 干活 -> 报一行 phase 日志"，原来那三件事
    各写一遍，七个阶段就是 21 处彼此无关的局部量。这个类把它们收成两行：
 
-      StartupPhases phases;
-      { auto phase = phases.Begin("gem-data-getter-hook");
+      { auto phase = StartupPhase("gem-data-getter-hook");
         ...install...; phase.Succeeded(installed); }
 
    上报由调用点显式触发，**不是**靠析构兜底：忘了调 Succeeded，析构会报 false —— 那是
    日志里一条**假的失败**，比缺一行更难查（会让人去追一个不存在的故障）。
 
-   析构真正兜住的是另一条路：**阶段体抛异常**。RevalidateGameLayout 与
-   safetyhook::create_inline 都会抛（项目按 /EHa 编），那时栈展开会跑析构，而报出来的
+   析构真正兜住的是另一条路：**阶段体抛异常**。这个构建按 /EHa 编，而 RevalidateGameLayout
+   那条链会分配（std::format / std::string），分配失败就抛。那时栈展开会跑析构，报出来的
    false 是对的 —— 这一层日志于是留下了"崩在哪个阶段"，那是崩溃现场唯一的线索。
+   （safetyhook::create_inline 不抛：vendored 版本失败时 return {}，见 third_party。）
 
    阶段之间刻意不重叠：每个 phase 都在自己的作用域里，日志的先后就与代码顺序一致。
+
+   这个类只有这一个成员，没有外层容器：`CompleteStartupPhase` 是自由函数，所以原来那层
+   "外层对象 + 反向指针 + 私有 Report 转调" 是纯间接，去过一次（47 行 -> 22 行）。
 */
-class StartupPhases
+class StartupPhase
 {
 public:
-   class Phase
+   explicit StartupPhase(std::string_view name)
+      : _name(name), _started(GetTickCount64())
    {
-   public:
-      Phase(StartupPhases& owner, std::string_view name)
-         : _owner(&owner), _name(name), _started(GetTickCount64())
-      {
-      }
+   }
 
-      Phase(const Phase&) = delete;
-      Phase& operator=(const Phase&) = delete;
+   StartupPhase(const StartupPhase&) = delete;
+   StartupPhase& operator=(const StartupPhase&) = delete;
 
-      // 析构即上报（同一次只报一次：显式调过之后 _owner 已经是 nullptr）。
-      ~Phase()
-      {
-         if (_owner != nullptr)
-            _owner->Report(_name, _started, false);
-      }
+   // 析构即上报（同一次只报一次：显式调过之后 _reported 已经是 true）。
+   ~StartupPhase()
+   {
+      if (!_reported)
+         CompleteStartupPhase(_name, _started, false);
+   }
 
-      void Succeeded(bool succeeded)
-      {
-         if (_owner != nullptr)
-         {
-            _owner->Report(_name, _started, succeeded);
-            _owner = nullptr;
-         }
-      }
-
-   private:
-      StartupPhases* _owner;
-      std::string_view _name;
-      uint64_t _started;
-   };
-
-   Phase Begin(std::string_view name) { return Phase(*this, name); }
+   void Succeeded(bool succeeded)
+   {
+      CompleteStartupPhase(_name, _started, succeeded);
+      _reported = true;
+   }
 
 private:
-   friend class Phase;
-
-   void Report(std::string_view name, uint64_t started, bool succeeded)
-   {
-      CompleteStartupPhase(name, started, succeeded);
-   }
+   std::string_view _name;
+   uint64_t _started;
+   bool _reported = false;
 };
 
 void DisableGameplayHooksAndRestore() noexcept
@@ -461,14 +453,21 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
       static_cast<uint8_t>(kNativeInternalSlotCount + virtual_slot_count);
    const uintptr_t apply_limit_rva = g_game_layout.skill_apply_loop_limit_immediate_rva;
    const uintptr_t category_limit_rva = g_game_layout.skill_category_loop_limit_immediate_rva;
+
+   // 事务式：先记下 apply 字节**原来那个值**。写第二个字节失败时回到它，而不是回到游戏出厂的
+   // 原始值——调用方在失败时会把 g_virtual_slot_count 恢复成 previous_count，所以写回 13 会留下
+   // "count 说还有 N 个虚拟槽、apply 字节说 13、category 字节还是上一次的展开值"这种三者互相
+   // 矛盾的状态，正是下面那句注释说绝不允许的分歧（一条循环会越过 13 格数组）。
+   // 读不到就退回原始值（那种情况下写也大概率会失败，行为与从前一致）。
+   uint8_t previous_apply_limit = g_game_layout.skill_apply_original_limit;
+   (void)ReadByte(g_image_base + apply_limit_rva, previous_apply_limit);
+
    if (!WriteByte(g_image_base + apply_limit_rva, expanded_slot_count))
       return false;
    if (!WriteByte(g_image_base + category_limit_rva, expanded_slot_count))
    {
-      // Roll the first byte back: diverging limits would let one loop run past
-      // its gate (out-of-bounds reads on the 13-slot gem array).
-      (void)WriteByte(
-         g_image_base + apply_limit_rva, g_game_layout.skill_apply_original_limit);
+      // Roll the first byte back to what it held, so the two loops stay in agreement.
+      (void)WriteByte(g_image_base + apply_limit_rva, previous_apply_limit);
       return false;
    }
    return true;
@@ -481,10 +480,9 @@ bool InstallHooks()
    // 四条失败路径现在都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，
    // 顺序是有讲究的（见那个函数），而且在一个钩子都没装时是 no-op——它自己以
    // ResetGameLayout() 收尾，所以 preflight 那条不再需要单独写一遍"只重置布局"。
-   StartupPhases phases;
 
    {
-      auto phase = phases.Begin("required-byte-rva-preflight");
+      auto phase = StartupPhase("required-byte-rva-preflight");
       const bool preflight_ready = RevalidateGameLayout();
       phase.Succeeded(preflight_ready);
       if (!preflight_ready)
@@ -497,7 +495,7 @@ bool InstallHooks()
    }
 
    {
-      auto phase = phases.Begin("gem-data-getter-hook");
+      auto phase = StartupPhase("gem-data-getter-hook");
       g_get_gem_hook = safetyhook::create_inline(
          reinterpret_cast<void*>(
             g_image_base + g_game_layout.get_gem_data_by_index_rva),
@@ -512,7 +510,7 @@ bool InstallHooks()
    }
 
    {
-      auto phase = phases.Begin("skill-fetch-hook");
+      auto phase = StartupPhase("skill-fetch-hook");
       g_skill_fetch_hook = safetyhook::create_mid(
          reinterpret_cast<void*>(
             g_image_base + g_game_layout.skill_fetch_path_rva),
@@ -527,7 +525,7 @@ bool InstallHooks()
    }
 
    {
-      auto phase = phases.Begin("skill-loop-limit-patches");
+      auto phase = StartupPhase("skill-loop-limit-patches");
       const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
       phase.Succeeded(loop_patches_ready);
       if (!loop_patches_ready)

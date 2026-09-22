@@ -244,7 +244,7 @@ void InstallDefaultTemplateSelections()
    if (last_installed.exchange(installed, std::memory_order_acq_rel) == installed)
       return;
    Log(std::format(
-      "Installed {} built-in template loadout selection(s). {}; inventory-independent.",
+      "Installed built-in template loadout selections={}. {}; inventory-independent.",
       installed,
       layout));
 }
@@ -312,7 +312,7 @@ bool ApplyLoadout(
    if (requested != effective_count)
    {
       Log(std::format(
-         "ApplyLoadout: the request asked for {} general slot(s), which exceeds the {} this build "
+         "ApplyLoadout: the request asked for general slots={}, which exceeds the {} this build "
          "supports; only the first {} were applied.",
          requested,
          kVirtualSlotCapacity - kBuiltinExclusiveSlotCount,

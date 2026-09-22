@@ -68,7 +68,11 @@ type loadoutItem struct {
 
 type loadoutSlot struct {
 	Items   []loadoutItem `json:"items"`
-	Enabled bool          `json:"enabled"`
+	// 指针：缺这个成员时 mod 那边算**启用**（LoadoutConfig.ParseAndValidate 的
+	// `!TryGetProperty("enabled", …) || …`），前端也是（model.ts 的 `s.enabled !== false`）。
+	// 用 bool 会得到零值 false，于是同一份文件在这里数出 0 个启用、在 mod 那边数出十几个，
+	// 结果是"存盘成功、游戏里什么都没变"——正是本文件 validateSlots 注释要拦的那种后果。
+	Enabled *bool         `json:"enabled"`
 }
 
 func exeDir() string {
@@ -216,7 +220,8 @@ func (s *LoadoutService) LoadExclusives() (string, error) {
 func validateSlots(slots []loadoutSlot) error {
 	enabled := 0
 	for i, slot := range slots {
-		if slot.Enabled {
+		// 缺 enabled 与 enabled:true 同义，与 mod / 前端一致。
+		if slot.Enabled == nil || *slot.Enabled {
 			enabled++
 		}
 		if len(slot.Items) < 1 || len(slot.Items) > 2 {
