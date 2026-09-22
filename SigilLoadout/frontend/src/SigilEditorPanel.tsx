@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+} from "react";
 import { Call, Events } from "@wailsio/runtime";
 import { X } from "lucide-react";
 
@@ -21,7 +29,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { messages } from "./messages";
 import type { Lang } from "./lang";
 import { SkillRow, type RowContext } from "./SkillRow";
-import { useRowTooltip } from "./useRowTooltip";
 import {
   addressOf,
   asEdits,
@@ -72,18 +79,37 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
   // 哪些因子是展开的。数值只落在一个等级上的因子没有可展开的东西，
   // 所以只有跨多个等级的因子会进到这里。
   const [open, setOpen] = useState<Set<string>>(new Set());
-  // 列表上的 tooltip 指向哪一行：整套"指针下那一行"的状态与重放都在 useRowTooltip 里。
-  // 它是列表那层唯一的共同状态——行自己只拿 hoveredRow 跟自己的 id 比一比。
-  const {
-    hoveredRow,
-    listBox,
-    keepScroll,
-    onPointerMove,
-    onPointerLeave,
-    onRowPointerEnter,
-    onRowPointerLeave,
-    closeTooltip,
-  } = useRowTooltip<HTMLDivElement>();
+  /*
+    指针停留在的那一行，tooltip 是否显示全看它：指针在行里，说明就显示；只有离开这一行才会收起。
+
+    以前 Base UI 自己的关闭理由（在触发器内部按下、焦点从数值框移到行上）会在
+    指针还在行里时就把说明收走，所以打开状态改成由这里控制，只有指针能改变它，
+    包括一次勾选：它是行在动而不是指针在动，随后由 resolveHoveredRow 跟进。
+  */
+  const [tipRow, setTipRow] = useState<string | null>(null);
+  const listBox = useRef<HTMLDivElement>(null);
+  /*
+    跨过一次勾选重渲染保留的滚动偏移，没有待处理的勾选时为 null。
+
+    一次勾选会重排列表——打开的内容排到最前——而浏览器会跟着刚被点击、仍持有焦点的
+    那个勾选框走：它把该行滚回视野，这正是让勾选感觉列表跳了一下的原因。偏移在下面
+    的 layout effect 里放回去，和把 tooltip 重新指向此刻指针下那一行（原本悬停的行已经
+    移开，另一行滑到了它的位置）是同一次 pass，于是两者都落在指针所在的位置。
+  */
+  const heldScroll = useRef<number | null>(null);
+  /*
+    指针最后一次移动的位置。一次勾选会在指针没动的情况下移动行，
+    而在行内移动也不会触发 enter，所以勾选之后，浏览器的 hover
+    和我们自己的 enter/leave 都说不出当前悬停的是哪一行。
+  */
+  const lastMove = useRef<{ x: number; y: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (heldScroll.current === null) return;
+    if (listBox.current) listBox.current.scrollTop = heldScroll.current;
+    heldScroll.current = null;
+    resolveHoveredRow();
+  });
   const [query, setQuery] = useState("");
   const search = useDebounced(query);
   // 搜索框本身，好让它的清除按钮能把光标交还给它。
@@ -254,7 +280,7 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     没有编辑，commit 会把它丢掉。
   */
   function toggleLevel(key: string, level: number) {
-    keepScroll();
+    beginTick();
     const address = addressOf(key, level);
     const existing = edits.get(address);
     if (!existing) {
@@ -269,7 +295,7 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     点击还会让这些等级诞生——没人编辑过的因子还没有任何行，而勾选表头就是关于它们全体的一句话。
   */
   function toggleSkill(key: string, nextChecked: boolean) {
-    keepScroll();
+    beginTick();
     const next = new Map(edits);
     for (const [address, record] of next) {
       if (record.key === key) next.set(address, { ...record, enabled: nextChecked });
@@ -284,6 +310,62 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     commit(next);
   }
 
+  /**
+    勾选在重渲染之前做的事：为随后的 layout effect 记下滚动偏移（heldScroll），
+    后者把视口放回原处，并把 tooltip 指向此刻指针下的那一行。
+  */
+  function beginTick() {
+    heldScroll.current = listBox.current?.scrollTop ?? null;
+  }
+
+  /*
+    指针在哪一行，是问文档而不是问 hover 事件：行在没动的指针下面移动过（一次勾选的重排、
+    一次滚动之后），而在行内移动不会触发 enter，所以 hover 事件说不出当前悬停的是哪一行。
+    调用点：勾选之后的 layout effect，以及滚动关掉说明之后指针的第一次移动。
+    这里找到的就是此刻指针下的那一行，tooltip 跟着它走。
+  */
+  function resolveHoveredRow() {
+    const at = lastMove.current;
+    if (!at) return;
+    const row = document.elementFromPoint(at.x, at.y)?.closest("[data-row]");
+    const id = row?.getAttribute("data-row") ?? null;
+    /*
+      这里只补一个 move，而 restInRow 会把整个进入过程重放一遍：造成这次勾选的点击
+      让 Base UI 关掉了它的弹层，而 move 才是它的 hover 接受的入场——先来一个 leave
+      只会又把它关上，何况对于没挪窝的那一行，我们的 open prop 并没有变。
+    */
+    row?.dispatchEvent(
+      new window.MouseEvent("mousemove", { bubbles: true, clientX: at.x, clientY: at.y }),
+    );
+    setTipRow(id);
+  }
+
+  /*
+    指针进入和离开行；它所在的那一行是决定 tooltip 是否显示的唯一因素（见 tipRow）。
+    能改变它的只有指针从一行移到另一行——或者一次勾选，那是行在动，由 resolveHoveredRow 处理。
+  */
+  function restInRow(id: string, e: PointerEvent<HTMLElement>) {
+    /*
+      Base UI 只在打开它的那个事件是 mouseenter 或 mousemove 时才让 tooltip 跟随光标
+      （useClientPoint 检查的正是这一点），而一次点击之后，它根本不允许 hover 打开，
+      直到指针离开这一行再回来。聚焦一个数值框、切换窗口、回来再扫进这一行，记录里写的仍然是 focus，
+      它自己的 hover 也仍然被挡住——于是这次访问的第一个 tooltip 锚在行的中央，只有第二个才落在光标上。
+
+      所以进入的过程在行上被完整重放：leave 清掉那个闩，enter 是它接受的入场，
+      move 带上指针的位置。resolveHoveredRow 需要的比这少，因为那里的弹层已经在行上打开了。
+    */
+    const at = { bubbles: true, clientX: e.clientX, clientY: e.clientY };
+    const row = e.currentTarget;
+    row.dispatchEvent(new window.MouseEvent("mouseleave", at));
+    row.dispatchEvent(new window.MouseEvent("mouseenter", at));
+    row.dispatchEvent(new window.MouseEvent("mousemove", at));
+    setTipRow(id);
+  }
+
+  function leaveRow(id: string) {
+    setTipRow((cur) => (cur === id ? null : cur));
+  }
+
   /*
     一个数值框。往还没有编辑的等级里输入，会像勾选它的勾选框一样开始一条编辑 ——
     但不会把它打开：这些数值是用户的、会被保存，而勾选框才是把它们送进游戏的动作。
@@ -295,7 +377,7 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     const address = addressOf(key, level);
     const existing = edits.get(address);
     if (!existing) {
-      keepScroll();
+      beginTick();
       commit(new Map(edits).set(address, { ...newRecord(key, level, false), ...patch }));
       return;
     }
@@ -364,8 +446,8 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
   const rowCtx: RowContext = {
     t,
     notationOf: slotNotation,
-    rest: onRowPointerEnter,
-    leave: onRowPointerLeave,
+    rest: restInRow,
+    leave: leaveRow,
     toggleLevel,
     toggleSkill,
     toggleOpen,
@@ -442,24 +524,34 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
       <div
         ref={listBox}
         className="skill-rows mt-6 min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]"
-        onPointerMove={onPointerMove}
-        onPointerLeave={onPointerLeave}
-        onScroll={closeTooltip}
+        onPointerMove={(e) => {
+          lastMove.current = { x: e.clientX, y: e.clientY };
+          // 滚动关掉后指针常在原行（那不会再触发 enter）：下一次移动替它重解一次。
+          if (tipRow === null) resolveHoveredRow();
+        }}
+        onPointerLeave={() => {
+          // 指针离开列表：位置不再有意义，留着它下一次重解会解出一个指针根本不在的行。
+          lastMove.current = null;
+          setTipRow(null);
+        }}
+        // 滚动就当场关掉：弹层是按"打开那一刻"的坐标画的，滚动只挪内容、不挪它，
+        // 继续开着要么跟着行跑到容器边缘被夹住、要么留一层退场残影——两种都不是要的效果。
+        onScroll={() => setTipRow(null)}
       >
         {/*
-          整个列表共用一个 provider：哪个 tooltip 打开由这里决定（见 useRowTooltip），
+          整个列表共用一个 provider：哪个 tooltip 打开由这里决定（见 tipRow），
           所以 base-ui 自己的打开/关闭时序根本不起作用——provider 剩下的用处是 tooltip 其余那一套设置，每一行都共用。
         */}
         <TooltipProvider>
           {rows.map((row) => (
             /*
               指针下的那一行决定哪个 tooltip 显示，
-              所以每一行都会拿到那个 id 并与自己的比较——指针而不是 hover 事件为什么说了算，见 useRowTooltip。
+              所以每一行都会拿到那个 id 并与自己的比较——指针而不是 hover 事件为什么说了算，见 tipRow。
             */
             <SkillRow
               key={row.key}
               row={row}
-              hoveredId={hoveredRow}
+              hoveredId={tipRow}
               isOpen={open.has(row.key)}
               ctx={rowCtx}
             />
