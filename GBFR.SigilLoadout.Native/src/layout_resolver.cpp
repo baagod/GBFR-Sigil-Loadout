@@ -291,6 +291,15 @@ bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept
       alignment != 0 && (offset % alignment) == 0;
 }
 
+/*
+   找唯一命中。这一套用**显式 mask**（'x' 精确、'?' 通配），而 table_slot.cpp 的 CountMatches
+   用"0 = 通配"。两套并存，各自只服务一个文件——不要"顺手合一"：那要么得给这边的 pattern
+   补一套 0 编码（把可读的 mask 变成靠数字位置说话），要么得给那边补 mask 字符串（那里每个
+   0 都是 rip 位移，本来就是"这里是通配"的直白写法）。两边各自读得懂，比多一层抽象值钱。
+
+   注意这条只负责**找唯一命中**，不负责判"是不是要找的那条指令"：mask 里通配的位置必须
+   恰好是位移那种"每台机器都不同"的字节，写错就会命中别处或命中不到。
+*/
 bool FindUniquePattern(
    const ImageView& image,
    uintptr_t begin,

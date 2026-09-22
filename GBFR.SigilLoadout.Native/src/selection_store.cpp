@@ -60,25 +60,32 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status)
       g_last_game_context1_ms.store(now, std::memory_order_release);
 
    bool learned_party_member = false;
+   bool unchanged = false;
    size_t known_characters = 0;
    uintptr_t previous_status = 0;
    {
       std::scoped_lock lock(g_party_mutex);
       Context1Record& record = g_latest_context1_status[character_hash];
       previous_status = record.status;
+      // 同一个对象、同一轮 = 这次进来没带来新信息（见下面日志那段）。
+      unchanged = record.status == status && record.pass_id == pass_id;
       record.status = status;
       record.pass_id = pass_id;
       learned_party_member = previous_status == 0;
       known_characters = g_latest_context1_status.size();
    }
-   // 每一次 context-1 构建都记一行：谁、哪个对象、第几轮装配。这是唯一能看出
-   // "游戏在什么时候重建了谁"的证据（`(via our rebuild)` 是我们自己那次调用引发的）。
-   Log(std::format(
-      "ctx1 build: char=0x{:08X} status=0x{:X} pass={}{}{}{}",
-      character_hash, status, pass_id,
-      previous_status != 0 && previous_status != status ? " (new object)" : "",
-      ours ? " (via our rebuild)" : "",
-      learned_party_member ? " (new party member)" : ""));
+   // 记录两次都要做，**日志只说一遍**：一次构建会被两条循环各问一次扩展槽（apply 与
+   // category），于是这个函数对同一次构建连着进来两次、参数完全相同——原来每个构建刷两行
+   // 一模一样的 "ctx1 build"，实测占整份日志的 43%。
+   //
+   // 说一行的条件因此是"这一份记录真的变了"：换了对象、或进了新一轮。
+   if (!unchanged)
+      Log(std::format(
+         "ctx1 build: char=0x{:08X} status=0x{:X} pass={}{}{}{}",
+         character_hash, status, pass_id,
+         previous_status != 0 && previous_status != status ? " (new object)" : "",
+         ours ? " (via our rebuild)" : "",
+         learned_party_member ? " (new party member)" : ""));
    if (learned_party_member)
    {
       Log(std::format("party+ char=0x{:08X} ({} known)", character_hash, known_characters));
@@ -98,29 +105,71 @@ bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& 
    return true;
 }
 
-void RebuildPartyStatusesOnce()
+/*
+   热重建的闸门：能不能在此刻动手。**只放判据**——四个时间戳原子量留在文件作用域，
+   因为它们同时被 RememberGameBuild / RememberContext1Status 写，收进一个对象就得让它变成
+   全局实例，那是多一层间接而不是少一层。
+
+   为什么要把这些聚成一处：它们各自看一个时间窗，而"窗口多久、为什么是这个数"原先散在
+   这些原子量的定义处，判据本身又散在下面那个函数的中间（连"队伍刚变过"那条都排到了收集
+   队伍之后）。聚起来之后，策略级的 60s / 250ms / 500 / 2000 只读这一处。
+
+   名字叫 TryClaim 而不是 Can：它**有副作用**，而且那个副作用就是节流本身——过了前两条
+   之后它用 CAS 把"下一次最早什么时候"推掉 500ms。名字得把这件事说出来，否则调用方会把它
+   当成纯谓词。
+
+   返回 true = 可以动手（节流窗口已认领）；false = 这一拍不动手，原因已进日志。
+   "游戏正在建"与 CAS 这两条**刻意静默**：它们每个 tick 都可能命中，写日志只会把真正有
+   信息量的跳过淹掉。
+
+   "钩子/布局就绪"**不在这里**：那是 RebuildPartyStatusesOnce 的前置条件，不是闸门的一条
+   理由——混进来会让这个名字承诺一件它不做的事。
+*/
+bool TryClaimRebuildNow(uint64_t now)
 {
-   if (!g_hooks_ready.load(std::memory_order_acquire) ||
-       !g_layout_ready.load(std::memory_order_acquire))
-      return;
-   const uint64_t now = GetTickCount64();
    if (now < g_hot_rebuild_cooldown_until_ms.load(std::memory_order_acquire))
    {
       Log("hot rebuild: skipped (cooling down after a failed rebuild)");
-      return;
+      return false;
    }
    // 游戏此刻正在建状态就不动手：两条线程同时碰一份 status 就是竞态（ok=0 都出在这种重叠里）。
    // 跳过的代价只是"这次不实时"，改动仍会在游戏下一次自然构建时落地（菜单里实测十几秒）。
    if (now - g_last_game_build_ms.load(std::memory_order_acquire) < kGameBuildQuietMs)
    {
       Log("hot rebuild: skipped (game is building)");
-      return;
+      return false;
    }
    uint64_t expected = g_hot_rebuild_not_before_ms.load(std::memory_order_acquire);
-   if (now < expected)
-      return;
-   if (!g_hot_rebuild_not_before_ms.compare_exchange_strong(
+   if (now < expected ||
+       !g_hot_rebuild_not_before_ms.compare_exchange_strong(
           expected, now + 500, std::memory_order_acq_rel))
+      return false;
+
+   // 顺序与原实现一致：这条排在节流之后，所以"队伍还没认出来"同样会推掉那 500ms。
+   {
+      std::scoped_lock lock(g_party_mutex);
+      if (g_latest_context1_status.empty())
+      {
+         Log("hot rebuild: no party known yet; skipped");
+         return false;
+      }
+   }
+   // 队伍刚变过：接下来两秒内不许重建（崩溃都发生在换队友/切场景之后）。
+   if (now - g_party_changed_ms.load(std::memory_order_acquire) < 2000)
+   {
+      Log("hot rebuild: skipped (party changed just now)");
+      return false;
+   }
+   return true;
+}
+
+void RebuildPartyStatusesOnce()
+{
+   // 前置条件：这套东西要靠钩子与语义布局都在位（原先混在闸门里，读闸门的人看不到它）。
+   if (!g_hooks_ready.load(std::memory_order_acquire) ||
+       !g_layout_ready.load(std::memory_order_acquire))
+      return;
+   if (!TryClaimRebuildNow(GetTickCount64()))
       return;
 
    std::vector<uint32_t> party;
@@ -129,16 +178,6 @@ void RebuildPartyStatusesOnce()
       party.reserve(g_latest_context1_status.size());
       for (const auto& [character_hash, record] : g_latest_context1_status)
          party.push_back(character_hash);
-   }
-   if (party.empty())
-   {
-      Log("hot rebuild: no party known yet; skipped");
-      return;
-   }
-   if (now - g_party_changed_ms.load(std::memory_order_acquire) < 2000)
-   {
-      Log("hot rebuild: skipped (party changed just now)");
-      return;
    }
 
    // 只重建**当前这轮队伍装配里建出来的对象**：

@@ -76,7 +76,16 @@ int32_t TryGetLiveTableBuffer(uintptr_t& buffer) noexcept
    return 0;
 }
 
-// 在一个范围内数一个模式的全部命中，并记下第一处。0 字节当通配。
+/*
+   在这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用的是显式
+   mask 字符串，两套并存，各自只服务一个文件）。
+
+   这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是
+   自动成立的——加一条新 pattern 时如果里面有一个 0 是想精确匹配的 0，匹配会静默变宽，
+   而变宽的后果是"命中数 != 1"，于是 fail-closed：游戏照常启动、hook 不装、只有日志说得出
+   原因。上面那三条都满足前提（kRowLoopSetup 里一个 0 都没有，另两条的 0 全是 rip 位移）。
+   所以改这三条时**逐个数字对一遍**，别只改个数。
+*/
 template <size_t Size>
 size_t CountMatches(
    const uint8_t* base,
@@ -254,17 +263,11 @@ void ResolveTableSlot()
    }
 
    g_slot_rva.store(slot_rva, std::memory_order_release);
-   Log(std::format(
-      "Table slot: row-loop anchor at RVA 0x{:X}, publish anchors at 0x{:X} / 0x{:X} "
-      "(PE 0x{:X}) resolve slot=0x{:X} (loaded 0x{:X}), buffer pointer=0x{:X} (loaded 0x{:X}).",
-      anchor.row_loop_rva,
-      anchor.slot_store_rva,
-      anchor.buffer_load_rva,
-      code.timestamp,
-      slot_rva,
-      g_image_base + slot_rva,
-      buffer_pointer_rva,
-      g_image_base + buffer_pointer_rva));
+   // 只报解析出来的那个槽。三个锚点 RVA、PE 时间戳、以及"槽 + 8"的缓冲区指针都不报：
+   // 后者的偏移是当面断言过的（上面那道 buffer_pointer_rva != slot_rva + 8），loaded 地址
+   // 就是 g_image_base + 这个 RVA——全是可推导的，而它们在这里只是噪音，真正需要时由上面
+   // 那几条失败分支负责说清楚（成功的锚点必然唯一，那是 FindUniquePattern 的判据）。
+   Log(std::format("Table slot: resolved slot=0x{:X}.", slot_rva));
 }
 
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept

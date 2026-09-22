@@ -306,6 +306,18 @@ bool ApplyLoadout(
    const int32_t requested = slots == nullptr ? 0 : std::max(slot_count, 0);
    const int32_t effective_count =
       std::min(requested, kVirtualSlotCapacity - kBuiltinExclusiveSlotCount);
+   // 超容量不是被拒绝，而是被截断：调用方以为拿到了 requested 个槽，实际只有
+   // effective_count 个。这里不改成拒绝——那会让一份超容量的配置连其余槽位一起失效，
+   // 比截断更糟——但必须让它**可见**：否则症状只是"某几个槽位静默不生效"。
+   if (requested != effective_count)
+   {
+      Log(std::format(
+         "ApplyLoadout: the request asked for {} general slot(s), which exceeds the {} this build "
+         "supports; only the first {} were applied.",
+         requested,
+         kVirtualSlotCapacity - kBuiltinExclusiveSlotCount,
+         effective_count));
+   }
    const int32_t total_slot_count = kBuiltinExclusiveSlotCount + effective_count;
    const int32_t previous_count = g_virtual_slot_count.load(std::memory_order_acquire);
    if (total_slot_count != previous_count)

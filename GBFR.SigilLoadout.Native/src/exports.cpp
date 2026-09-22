@@ -115,11 +115,26 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
    // 下面返回 SLOT_UNRESOLVED：拒写，一个字节都不动——编辑没丢（表已经重新注册过），只是要等
    // 游戏下一次解析或重启。没有第二条写路径。
    EnsureInitialized();
+   // 上一次报出来的拒绝码。同一种拒写只报一次：
+   //
+   // 拒写会按 5 秒一次重试，而在游戏把那张表读进内存之前**必然**一直是 -3——这条消息于是
+   // 每次都逐字相同，实测 3 行只差时间戳。真正的结论由托管侧那句 SUCCESS / 拒写承担，
+   // 这里只需要说一次"为什么没写进去"。拒绝码换了（或中间成功过一次）才再报。
+   static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
+
    const int32_t result = WriteSkillStatusTable(table, length);
    if (result < 0)
-      Log(std::format(
-         "WriteSkillStatusTable: refused ({}): {}",
-         result,
-         SkillStatusRefusalReason(result)));
+   {
+      if (last_refusal.exchange(result, std::memory_order_acq_rel) != result)
+         Log(std::format(
+            "WriteSkillStatusTable: refused ({}): {}",
+            result,
+            SkillStatusRefusalReason(result)));
+   }
+   else
+   {
+      // 成功过就把"上次报过的码"清掉：下一次拒写（比如换了一份编辑）值得再报一次。
+      last_refusal.store(std::numeric_limits<int32_t>::min(), std::memory_order_release);
+   }
    return result;
 }

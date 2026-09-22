@@ -168,77 +168,120 @@ bool TryCopySelectedVirtualGem(
    return TryCopyTemplateGem(identity.character_hash, selected_slot_id, output);
 }
 
-uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
+/*
+   一次调用的"这次构建从哪来"分类 + 这份 status 的身份——后面几个阶段都只读它。
+
+   两个来源 bool（而不是一个枚举）：调用方要分辨的正是"来自哪条循环"。
+   而"是不是两条技能循环之一"**不存字段**——它恒等于那两个的析取，存起来就允许出现
+   "来源为真而这条为假"的自相矛盾状态。派生关系用成员函数表达。
+*/
+struct GemCall
 {
-   ActiveCallGuard active_call(g_active_getter_calls);
-   const uintptr_t return_address = reinterpret_cast<uintptr_t>(_ReturnAddress());
-   const bool from_skill_apply_loop =
-      return_address ==
-      g_image_base + g_game_layout.skill_apply_getter_return_rva;
-   const bool from_skill_category_loop =
-      return_address ==
-      g_image_base + g_game_layout.skill_category_getter_return_rva;
-   const bool from_skill_data_loop =
-      from_skill_apply_loop || from_skill_category_loop;
+   void* status = nullptr;
+   int slot_index = 0;
+   void* output = nullptr;
+   bool from_apply_loop = false;
+   bool from_category_loop = false;
    StatusIdentity identity{};
-   const bool valid_identity =
-      SafeReadStatusIdentity(reinterpret_cast<uintptr_t>(status), identity) &&
-      IsValidContextMode(identity.context_mode);
 
-   const int expanded_slot_count = GetExpandedInternalSlotCount();
-   if (slot_index < kNativeInternalSlotCount)
-      return g_get_gem_hook.call<uint8_t>(status, slot_index, output);
-   // Out-of-range high indices never occur while the patched loop limits are in
-   // place; refuse them instead of forwarding to the 13-slot original getter
-   // (which would read past its own array).
-   if (slot_index >= expanded_slot_count)
-      return 0;
-   if (g_shutting_down.load(std::memory_order_acquire) || !valid_identity ||
-       output == nullptr)
-      return 0;
+   bool from_skill_data_loop() const { return from_apply_loop || from_category_loop; }
+};
 
-   // 一次构建的开始（扩展槽位的第一格）：
-   //   - 快照这一份 status 本次构建要用的槽位（构建内所有槽位共用，见文件顶部 TLS 注释）；
-   //   - 记下"游戏刚在建状态"，热重建据此避让（两条线程同时碰一份 status 就是竞态）；
-   //   - context-1 = 在场那份：记下"这个角色现在这份 status 是哪个对象"，热重建只认它。
-   if (from_skill_data_loop && slot_index == kNativeInternalSlotCount)
-   {
-      const uintptr_t build_status = reinterpret_cast<uintptr_t>(status);
-      g_tls_build_selection = GetSelection(identity.character_hash);
-      g_tls_build_has_selection = CountSelectedSlots(g_tls_build_selection) != 0;
-      g_tls_build_status = build_status;
-      RememberGameBuild();
-      if (identity.context_mode == 1)
-         RememberContext1Status(identity.character_hash, build_status);
-   }
+/*
+   扩展槽位里的**第一格** = 一次构建的开始。三件事都在这里发生，而且只有这里有副作用：
+   - 快照这一份 status 本次构建要用的槽位（构建内所有槽位共用，见文件顶部 TLS 注释）；
+   - 记下"游戏刚在建状态"，热重建据此避让（两条线程同时碰一份 status 就是竞态）；
+   - context-1 = 在场那份：记下"这个角色现在这份 status 是哪个对象"，热重建只认它。
+*/
+void ObserveBuildStart(const GemCall& call)
+{
+   const uintptr_t build_status = reinterpret_cast<uintptr_t>(call.status);
+   g_tls_build_selection = GetSelection(call.identity.character_hash);
+   g_tls_build_has_selection = CountSelectedSlots(g_tls_build_selection) != 0;
+   g_tls_build_status = build_status;
+   RememberGameBuild();
+   if (call.identity.context_mode == 1)
+      RememberContext1Status(call.identity.character_hash, build_status);
+}
 
-   std::array<uint32_t, kVirtualSlotCapacity> selection{};
+/*
+   读选择表、挑出这一格要的那个模板 gem，可选地把结果并进自然贡献的统计。
+
+   来自技能数据循环时读的是本次构建开头快照下来的那一份（构建内不变）；否则按当前身份现查。
+   `selection` 由调用方持有——BeginNaturalContributionTracking 会把它记进 TLS 帧，
+   所以它必须活过这次复制。
+*/
+uint8_t LoadSelectionAndCopy(
+   const GemCall& call,
+   std::array<uint32_t, kVirtualSlotCapacity>& selection)
+{
    if (!TryLoadVirtualSkillSelection(
-          reinterpret_cast<uintptr_t>(status),
-          identity,
-          from_skill_data_loop,
+          reinterpret_cast<uintptr_t>(call.status),
+          call.identity,
+          call.from_skill_data_loop(),
           selection))
       return 0;
-   const int virtual_index = slot_index - kNativeInternalSlotCount;
+
+   const int virtual_index = call.slot_index - kNativeInternalSlotCount;
    uint32_t selected_slot_id = 0;
 
-   if (from_skill_apply_loop && slot_index == kNativeInternalSlotCount &&
-       identity.context_mode == 1)
+   if (call.from_apply_loop && call.slot_index == kNativeInternalSlotCount &&
+       call.identity.context_mode == 1)
       BeginNaturalContributionTracking(
-         reinterpret_cast<uintptr_t>(status), identity, selection);
+         reinterpret_cast<uintptr_t>(call.status), call.identity, selection);
 
    const bool copied = TryCopySelectedVirtualGem(
-      identity, selection, virtual_index, output, selected_slot_id);
+      call.identity, selection, virtual_index, call.output, selected_slot_id);
 
-   if (from_skill_apply_loop)
+   if (call.from_apply_loop)
       TrackNaturalContributionResult(
-         reinterpret_cast<uintptr_t>(status),
-         identity,
-         slot_index,
+         reinterpret_cast<uintptr_t>(call.status),
+         call.identity,
+         call.slot_index,
          selected_slot_id,
          copied);
 
    return copied ? 1 : 0;
+}
+
+uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
+{
+   ActiveCallGuard active_call(g_active_getter_calls);
+
+   // ClassifyCall：这次调用从哪来。
+   const uintptr_t return_address = reinterpret_cast<uintptr_t>(_ReturnAddress());
+   GemCall call{};
+   call.status = status;
+   call.slot_index = slot_index;
+   call.output = output;
+   call.from_apply_loop =
+      return_address == g_image_base + g_game_layout.skill_apply_getter_return_rva;
+   call.from_category_loop =
+      return_address == g_image_base + g_game_layout.skill_category_getter_return_rva;
+
+   // 真实槽位：原样交给游戏自己的 getter。
+   if (slot_index < kNativeInternalSlotCount)
+      return g_get_gem_hook.call<uint8_t>(status, slot_index, output);
+
+   // 超出扩展范围的高索引在循环上限被补齐之后不该出现；拒绝它们，而不是转给那个只有
+   // 13 格的原始 getter（那样它会读出自己数组的边界）。
+   if (slot_index >= GetExpandedInternalSlotCount())
+      return 0;
+
+   // 读身份（下面每一段都要用），并与"正在关机"一起作为一次性闸门：这两条任一不成立，
+   // 这次调用什么都不做——回 0 而不是转发。
+   if (g_shutting_down.load(std::memory_order_acquire) ||
+       !SafeReadStatusIdentity(reinterpret_cast<uintptr_t>(status), call.identity) ||
+       !IsValidContextMode(call.identity.context_mode) || output == nullptr)
+      return 0;
+
+   // ObserveBuildStart：只有扩展槽位的第一格、且来自技能数据循环，才是一次构建的开始。
+   if (call.from_skill_data_loop() && slot_index == kNativeInternalSlotCount)
+      ObserveBuildStart(call);
+
+   // LoadSelection + CopyAndTrack。
+   std::array<uint32_t, kVirtualSlotCapacity> selection{};
+   return LoadSelectionAndCopy(call, selection);
 }
 
 void OnSkillFetch(safetyhook::Context& context)
@@ -290,8 +333,12 @@ namespace
       { auto phase = phases.Begin("gem-data-getter-hook");
         ...install...; phase.Succeeded(installed); }
 
-   报日志由 phase 的析构完成——**这正是要 RAII 的地方**：函数里每个提前 return 都是一条
-   失败路径，忘了在其中一条上报，日志就少一个阶段，而这一层日志是排障时唯一的东西。
+   上报由调用点显式触发，**不是**靠析构兜底：忘了调 Succeeded，析构会报 false —— 那是
+   日志里一条**假的失败**，比缺一行更难查（会让人去追一个不存在的故障）。
+
+   析构真正兜住的是另一条路：**阶段体抛异常**。RevalidateGameLayout 与
+   safetyhook::create_inline 都会抛（项目按 /EHa 编），那时栈展开会跑析构，而报出来的
+   false 是对的 —— 这一层日志于是留下了"崩在哪个阶段"，那是崩溃现场唯一的线索。
 
    阶段之间刻意不重叠：每个 phase 都在自己的作用域里，日志的先后就与代码顺序一致。
 */

@@ -96,7 +96,9 @@ public sealed class Mod : IMod
                     AutoFlush = true,
                 };
             }
-            Log($"===== session start {DateTime.Now:yyyy-MM-dd HH:mm:ss} =====");
+            // 每次运行的分隔标记：日志是追加写的，跨会话累积，这一行是"新的一次运行从这里开始"
+            // 的唯一记号——时间戳是它真正起作用的部分（区分是哪次）。
+            Log($"======== Session Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ========");
             Log($"GBFR Sigil Loadout v{modVersion ?? "?"} (ABI {NativeCore.AbiVersion})");
             long nativeStarted = Stopwatch.GetTimestamp();
             NativeCore.Configure(modDirectory);
