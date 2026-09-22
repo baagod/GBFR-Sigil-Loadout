@@ -2,7 +2,7 @@ module sigilloadout
 
 go 1.27.0
 
-require github.com/wailsapp/wails/v3 v3.0.0-beta.24
+require github.com/wailsapp/wails/v3 v3.0.0-beta.25
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
