@@ -26,6 +26,10 @@ namespace GBFR.SigilLoadout;
 /// </summary>
 internal static class LoadoutConfig
 {
+    // 配装配置的路径：可视工具写、这里读。文件名字面量只出现在这一处（有一道对拍断言盯着它），
+    // 其余地方都用从它派生的这个字段。
+    private static readonly string ConfigFile = UserConfig.FilePath("loadout.json");
+
     // keep in sync with Native/native_internal.h kUnwornCharacterHash (0x887AE0B0)
     private const uint UnwornCharacterHash = 0x887AE0B0;
     // keep in sync with SigilLoadout/loadoutservice.go MaxSlots
@@ -39,14 +43,14 @@ internal static class LoadoutConfig
     // 初值就是"没有这个文件"那个时间戳，所以"配置被删了"是一次正常的 mtime 变化，不需要
     // 额外字段去记住"以前有过文件"。这份约定只有一处实现：UserConfig.Stamp（SigilEditorFeature
     // 那条同样用它）。
-    private static readonly FileStamp Stamp = new(UserConfig.FilePath("loadout.json"));
-    private static string _loadoutPath = "";
+    private static readonly FileStamp Stamp = new(ConfigFile);
+    
 
     internal static void Initialize(Action<string> log)
     {
         // Player config lives in the user directory so mod updates (which
         // replace the mod folder) never wipe it. No config -> built-in template.
-        _loadoutPath = UserConfig.FilePath("loadout.json");
+        
         TryApply(log);
     }
 
@@ -78,9 +82,9 @@ internal static class LoadoutConfig
         {
             // Check the size before reading so an oversized file is never
             // loaded into memory at all.
-            if (new FileInfo(_loadoutPath).Length > 1024 * 1024)
+            if (new FileInfo(ConfigFile).Length > 1024 * 1024)
                 throw new InvalidDataException("loadout.json exceeds 1 MB");
-            string json = File.ReadAllText(_loadoutPath);
+            string json = File.ReadAllText(ConfigFile);
             using JsonDocument doc = JsonDocument.Parse(json);
             var overrides = ParseExclusiveOverrides(doc.RootElement, log);
             var slots = ParseAndValidate(doc.RootElement);

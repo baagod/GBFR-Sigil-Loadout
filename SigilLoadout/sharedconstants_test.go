@@ -19,8 +19,30 @@ import (
 //
 // 测试的工作目录是包目录（SigilLoadout\），所以路径都是相对它的。
 func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
+	// read 取一个声明的承载文本。Go 的声明属于**包**、不属于某个文件（文件怎么切是编辑决定，
+	// 与协议无关），所以 "*.go" 表示把本包所有非测试源文件拼起来找——否则一次纯搬移就会让
+	// 断言红，而它盯的"值漂没漂"根本没变。
 	read := func(name string) string {
 		t.Helper()
+		if name == "*.go" {
+			paths, err := filepath.Glob("*.go")
+			if err != nil {
+				t.Fatalf("globbing *.go: %v", err)
+			}
+			var all strings.Builder
+			for _, path := range paths {
+				if strings.HasSuffix(path, "_test.go") {
+					continue
+				}
+				data, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("reading %s: %v", path, err)
+				}
+				all.Write(data)
+				all.WriteByte('\n')
+			}
+			return all.String()
+		}
 		data, err := os.ReadFile(filepath.FromSlash(name))
 		if err != nil {
 			t.Fatalf("reading %s: %v", name, err)
@@ -103,14 +125,14 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "可视工具窗口标题（mod 靠它找窗口）",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`ToolWindowTitle = "([^"]+)"`)},
-				{"Go", "main.go", regexp.MustCompile(`const toolWindowTitle = "([^"]+)"`)},
+				{"Go", "*.go", regexp.MustCompile(`const toolWindowTitle = "([^"]+)"`)},
 			},
 		},
 		{
 			name: "激活 / 显示消息（WM_APP+0x10）",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`PostMessage\(hWnd, (0x[0-9A-Fa-f]+)`)},
-				{"Go", "main.go", regexp.MustCompile(`const wmActivate = (0x[0-9A-Fa-f]+)`)},
+				{"Go", "*.go", regexp.MustCompile(`const wmActivate = (0x[0-9A-Fa-f]+)`)},
 			},
 		},
 		{
