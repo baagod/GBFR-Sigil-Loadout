@@ -5,23 +5,17 @@ namespace GBFR.SigilLoadout;
 
 /// <summary>
 /// 按用户编辑的 sigiledits.json 改写 skill_status.tbl 的行：启动时改一份表交给 IDataManager，
-/// 运行中则直接覆写游戏内存里已经有的那份表。它没有自己的配置目录、配置文件名，也没有用来叫醒
-/// 它的 win32 具名事件：日志走宿主的日志，生命周期与"什么时候该重新应用"也跟着宿主走。
+/// 运行中直接覆写游戏内存里那份已解析的表。它没有自己的配置目录、文件名或 win32 具名事件——
+/// 日志、生命周期与"什么时候该重新应用"都跟着宿主走，由宿主 250ms 的 tick 驱动
+/// （见 <see cref="Tick"/>；启动那次写与运行中的热应用是同一个操作，见 <see cref="Publish"/>）。
 ///
-/// 运行中改写由宿主 250ms 的 tick 驱动（见 <see cref="Tick"/>）：可视工具每存一次编辑列表，文件
-/// 时间就变一次，<see cref="Apply"/> 随即覆写游戏内存里的表——不重启、不挂钩子。
+/// 行布局（对着 GBFRDataTools 的 skill_status.headers 与 GameTable.cs 里
+/// 8 + RowSize * rowCount == file.Length 那句断言核对过）：8 字节 int64 头 + 每行 52 字节——
+/// +0..+36 float LevelValue1..10、+40 Key（技能哈希）、+44 LevelDescription、+48 Level；
+/// 第 k 行从 8 + 52k 开始，行按 Key 分组、Level 升序。常量见下面的字段，与原生侧对拍。
+/// 一次改写匹配 (Key, Level)，只动那一行的 LevelValue1..10。
 ///
-/// 启动那次写与运行中的热应用是**同一个操作**（<see cref="Publish"/>）：读表、套编辑、注册给
-/// IDataManager、原地写进游戏内存。不带静态 .tbl。
-///
-/// 行的布局（对着 GBFRDataTools 的 skill_status.headers 与 GameTable.cs 里那句
-/// 8 + RowSize * rowCount == file.Length 的断言核对过）：8 字节头 = 行数（int64）；每行 52 字节，
-/// +0..+36 float LevelValue1..10、+40 uint Key（技能哈希）、+44 uint LevelDescription、+48 uint Level。
-/// 第 k 行从 8 + 52k 开始。一次改写匹配 (Key, Level)，写那一行自己的 LevelValue1..10，所以编辑里写的
-/// Level 就落在 Level 字段上——正是游戏显示的那个数字。行按 Key 分组、Level 升序。
-///
-/// LevelValue7..10 只在游戏 2.0.0 之后存在；2.0 之前的表是 36 字节一行、Key 在 +24，所以 Start()
-/// 动它之前先验表的形状。
+/// LevelValue7..10 只在 2.0.0 之后存在；2.0 之前是 36 字节一行、Key 在 +24，所以动手前先验形状。
 /// </summary>
 internal sealed class SigilEditorFeature {
     private const string TablePath = "system/table/skill_status.tbl";
@@ -153,10 +147,8 @@ internal sealed class SigilEditorFeature {
     }
 
     /// <summary>
-    /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试一次；接上了就看编辑列表的文件时间变了没有，
-    /// 变了就重新应用一次。
-    ///
-    /// 250ms 不是个量——数值要到下一场战斗才生效；它换掉的是一条阻塞在 WaitOne 的线程和一个内核事件对象。
+    /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试；接上了，看编辑列表的文件时间变了没有。
+    /// 250ms 不是个量（数值要到下一场战斗才生效），它换掉的是一条阻塞在 WaitOne 的线程和一个内核事件对象。
     /// </summary>
     public void Tick() {
         if (_dm is null) {
@@ -211,12 +203,11 @@ internal sealed class SigilEditorFeature {
     public void Dispose() => Interlocked.Exchange(ref _stopped, 1);
 
     /// <summary>
-    /// 把表应用到内存里。调用方是宿主 250ms 的 tick（见 <see cref="Tick"/>）与启动那次（<see
-    /// cref="Bootstrap"/> 把刚建好的表直接交进来）。<paramref name="bootTable"/> 非空表示"这份表已经
-    /// 建好、就是这一版的"，不必再读一遍配置与归档；为 null 时按磁盘上的编辑列表现建。
+    /// 把表应用到内存里。<paramref name="bootTable"/> 非空表示这份表已经建好、就是这一版的，
+    /// 不必再读配置与归档（启动那次走这里）；为 null 时按磁盘上的编辑列表现建。
     ///
-    /// <paramref name="stamp"/> 是这一版的 mtime：**只有真的写进游戏内存了**才在最后标记为"已应用"。
-    /// 读不出表、或原生拒写，都提前 return，那一版还欠着，下一拍会再来。
+    /// <paramref name="stamp"/> 是这一版的 mtime：**只有真的写进游戏内存了**才标记"已应用"——
+    /// 读不出表或原生拒写都提前 return，那一版还欠着，下一拍会再来。
     /// </summary>
     private void Apply(DateTime stamp, byte[]? bootTable = null) {
         // 卸载之后（Dispose 置了 _stopped）不再动内存：宿主的定时器不保证回调已经跑完。
@@ -249,15 +240,11 @@ internal sealed class SigilEditorFeature {
     }
 
     /// <summary>
-    /// 唯一那条交给游戏的路径：先重新注册（便宜；游戏若再次解析那份送达的文件，那次解析也必须看到
-    /// 新值），再让原生按行原地写进游戏已经解析好的那份表。
-    ///
-    /// 返回"真的写进游戏内存了吗"。没写进去时留下这份候选（<see cref="_retryTable"/>），同一版重试
-    /// 时不必再从归档重建（328 KB）。
+    /// 唯一那条交给游戏的路径：先重新注册，再让原生按行原地写进游戏已解析的那份表。返回"真的写进去了吗"；
+    /// 没写进去就留下候选（<see cref="_retryTable"/>），同一版重试不必再从归档重建（328 KB）。
     /// </summary>
     private bool Publish(byte[] table, DateTime stamp) {
-        // 先注册：它便宜，而且游戏若真的重新解析送达的文件，那次解析也必须看到新值，
-        // 而不是用旧值把行重建出来。
+        // 注册在前：它便宜，而且游戏若真的重新解析送达的文件，那次解析也必须看到新值。
         try {
             RegisterWithManager(table);
         }
@@ -389,11 +376,9 @@ internal sealed class SigilEditorFeature {
     }
 
     /// <summary>
-    /// 磁盘上此刻的编辑列表。
-    ///
-    /// <paramref name="missing"/> 只在"文件不存在"时为 true；没权限、被占用、手改坏 JSON 都不是它。
-    /// 删掉文件是真实的答案（空列表 → 未编辑的技能表），读不出来是另一个（什么都不写）；两者折成同一个
-    /// null，删除就变成"什么都不做"——而隔壁 loadout.json 遇到删除会恢复内置模板。
+    /// 磁盘上此刻的编辑列表。<paramref name="missing"/> 只在"文件不存在"时为 true——没权限、
+    /// 被占用、手改坏 JSON 都不是它。删掉文件是真实的答案（空列表 → 未编辑的技能表），
+    /// 读不出来是另一个（什么都不写）；折成同一个 null 会让"删除"变成"什么都不做"。
     /// </summary>
     private Config? LoadConfig(out bool missing) {
         missing = false;

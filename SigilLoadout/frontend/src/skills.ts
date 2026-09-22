@@ -43,21 +43,16 @@ export const SLOTS = 10;
 export const addressOf = (key: string, level: number) => `${key}#${level}`;
 
 /**
- * 一条记录算不算编辑——决定它会不会被保存。
- *
- * 两件事之一就够：被勾选，或带着数字。两者都没有，就是用户勾了又取消的那一行，
- * sigiledits.json 里不会有这样的行。
+ * 一条记录算不算编辑——决定它会不会被保存。被勾选或带着数字就够；两者都没有，就是用户勾了又
+ * 取消的那一行，sigiledits.json 里不会有这样的行。
  */
 export const isEdit = (record: SigilSkill) =>
   record.enabled || record.values.some((value) => value !== null);
 
 /**
- * 把该等级自己的数值从槽里摘出去：槽里放着游戏的值就不算输入，于是置为 null——
- * 行的那部分保持原样，该数字只作为占位符显示。这也让旧文件能读对：在 null 出现之前，
- * 旧版本为了把行写回去会把每个槽都填上游戏自己的数值。
- *
- * 表里没有的等级（手工添加的记录）保留数值：没有东西可比对，而这些数字很可能正是游戏
- * 需要写入的。
+ * 把该等级自己的数值从槽里摘出去：槽里放着游戏的值就不算输入，于是置为 null——该数字只作为占位符
+ * 显示。这也让旧文件能读对：在 null 出现之前，旧版本为了把行写回去会把每个槽都填上游戏自己的数值。
+ * 表里没有的等级（手工添加的记录）保留数值：没有东西可比对，而那些数字很可能正是游戏需要写入的。
  */
 export const trimGameValues = (
   values: (number | null)[],
