@@ -8,20 +8,14 @@ import (
 	"testing"
 )
 
-// 跨语言常量：C# / Go / TS / C++ 各有自己的类型系统，"一处声明"做不到，但"一处漂了立刻红"
-// 做得到——这就是把跨语言常量从'人工对拍'变成断言。
+// 跨语言常量：C# / Go / TS / C++ 各有自己的类型系统，"一处声明"做不到，但"一处漂了立刻红"做得到。
 //
-// 这些值写错**不会编译失败**，只会在游戏里表现成错值（最难查的一类），所以值得钉住。
-// 只收录真的有多处声明的常量：只有一处的没有可漂移的对象，不必进这里。
-//
-// 这道门是**对拍**，不是那份文档表的替代品：文档那张表还写着改不该改、为什么是这个值，
-// 这里只管"两边的字面量是不是同一个"。所以两边都得维护，别把绿当成"边界已证明"。
-//
-// 测试的工作目录是包目录（SigilLoadout\），所以路径都是相对它的。
+// 这些值写错**不会编译失败**，只会在游戏里表现成错值（最难查的一类），所以值得钉住；只收录真的有
+// 多处声明的常量。这道门是**对拍**，不是那份文档表的替代品——文档还写着改不该改、为什么是这个值，
+// 两边都得维护，别把绿当成"边界已证明"。测试的工作目录是包目录（SigilLoadout\），路径都相对它。
 func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
-	// read 取一个声明的承载文本。Go 的声明属于**包**、不属于某个文件（文件怎么切是编辑决定，
-	// 与协议无关），所以 "*.go" 表示把本包所有非测试源文件拼起来找——否则一次纯搬移就会让
-	// 断言红，而它盯的"值漂没漂"根本没变。
+	// read 取一个声明的承载文本。Go 的声明属于**包**、不属于某个文件，所以 "*.go" 表示把本包所有
+	// 非测试源文件拼起来找——否则一次纯搬移就会让断言红，而它盯的"值漂没漂"根本没变。
 	read := func(name string) string {
 		t.Helper()
 		if name == "*.go" {
@@ -97,9 +91,8 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 				{"TS", "frontend/src/skills.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
 			},
 		},
-		// 用户配置目录与两个文件名：两者各自算出同一个字符串，中间没有任何协商（mod 目录
-		// 每次更新都被替换，所以配置不能放在那里）。漂了不会报错，只会表现成"配置完全没
-		// 生效 / 编辑永远不落地"。
+		// 用户配置目录与两个文件名：两边各自算出同一个字符串，中间没有任何协商。漂了不会报错，
+		// 只会表现成"配置完全没生效 / 编辑永远不落地"。
 		{
 			name: "用户配置目录名",
 			decls: []decl{
@@ -142,9 +135,8 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 				{"Go", "loadoutservice.go", regexp.MustCompile(`readModFile\("(tool-hotkey\.txt)"\)`)},
 			},
 		},
-		// skill_status 的行布局：托管侧（改表）与原生（验形状、逐行 Key 比对）各自都需要这三个数，
-		// 而它们是两个二进制，天然各存一份。拷错一个的后果是"行错位/认成别的表"，所以钉住。
-		// Level 偏移（48）只有托管侧用，没有第二个声明可漂，故不收。
+		// skill_status 的行布局：托管侧与原生各存一份（两个二进制）。拷错一个的后果是"行错位 /
+		// 认成别的表"，所以钉住；Level 偏移只有托管侧用，没有第二个声明可漂，故不收。
 		{
 			name: "skill_status 表头字节",
 			decls: []decl{
@@ -166,13 +158,11 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 				{"C++", "../GBFR.SigilLoadout.Native/src/table_slot.cpp", regexp.MustCompile(`kRowKeyOffset = (\d+)`)},
 			},
 		},
-		// sigiledits.json 的成员名：Config.cs 的注释说得很直白——"这四个拼写**就是**文件格式"，
-		// 而且大小写折叠是关的。Go 写、C# 读，两边各声明一份，改错一边能编译、测试也全绿，只在
-		// 游戏里表现成"每条编辑被跳过"（Key 读成空串）。所以逐个成员名钉住。
+		// sigiledits.json 的成员名：这四个拼写**就是**文件格式，且大小写折叠是关的。Go 写、C# 读，
+		// 改错一边能编译、测试也全绿，只在游戏里表现成"每条编辑被跳过"（Key 读成空串）。
 		//
-		// Go 侧的正则锚在 `type SigilSkill struct {` 上：`json:"key"` 在这个包里合法地出现两次
-		// （SigilSkill.Key 与 SkillInfo.Key，两个不同的文件格式），只有锚到场结构上才是
-		// "sigiledits.json 的那个 key"。
+		// Go 侧正则锚在 `type SigilSkill struct {` 上：`json:"key"` 在本包里合法地出现两次
+		// （SigilSkill 与 SkillInfo，两个不同的文件格式），只有锚到结构体上才是前者。
 		{
 			name: "sigiledits.json 的 edits 成员",
 			decls: []decl{
@@ -208,8 +198,8 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(values)"`)},
 			},
 		},
-		// 防抖写盘失败时由后端推给前端的事件名。前端用 Call.ByName 那套手写字符串的同一个
-		// 理由：两边各写一份字面量，改名只改一边不会编译失败，只会让那个失败对话框永远不弹。
+		// 防抖写盘失败时由后端推给前端的事件名：两边各写一份字面量，改名只改一边不会编译失败，
+		// 只会让那个失败对话框永远不弹。
 		{
 			name: "保存失败事件名（Go 发、前端收）",
 			decls: []decl{
@@ -222,8 +212,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 	for _, group := range groups {
 		want, first := "", ""
 		for _, d := range group.decls {
-			// 每条声明必须**正好**匹配一次：正则写松了（比如只匹配一个裸的字符串字面量），
-			// 就会对着文件里第一个碰巧像它的东西比，比出来还是绿的——那是假绿。
+			// 每条声明必须**正好**匹配一次：正则写松了就会对着文件里第一个碰巧像它的东西比，比出来还是绿的——假绿。
 			matches := d.re.FindAllStringSubmatch(read(d.file), -1)
 			if len(matches) != 1 {
 				t.Errorf("%s: %s（%s）里这条声明匹配到 %d 次，正则 %s", group.name, d.file, d.who, len(matches), d.re)

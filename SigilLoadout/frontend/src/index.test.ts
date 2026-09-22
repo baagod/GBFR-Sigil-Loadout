@@ -2,8 +2,8 @@
   因子表的派生索引与落盘载荷此前只活在 App.tsx 的 useMemo 里，没有测试能碰到——而
   "该写哪个变体 hash""解析不出的 gem 要整行跳过"这些规则决定的正是用户配置的内容。
 
-  这里跑的是**入库的真实 sigils.json**，不是手搓夹具：夹具可以和 App 的构造各自漂移，而表
-  是唯一的真相。
+  这里跑的是**入库的真实 sigils.json**，不是手搓夹具：夹具会和 App 的构造各自漂移，而表是
+  唯一的真相。
 */
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"

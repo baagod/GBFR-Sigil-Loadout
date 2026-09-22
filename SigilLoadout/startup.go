@@ -12,10 +12,9 @@ import (
 
 // ensureSingleInstance: second launches activate the existing window and exit.
 //
-// 只创建、不持有：单实例判断用的是 CreateMutexW 的 ERROR_ALREADY_EXISTS，全程没有
-// WaitForSingleObject，所以没有"释放"这一步可做（对一个本线程不拥有的互斥体调
-// ReleaseMutex 只会以 ERROR_NOT_OWNER 失败）。句柄也故意不 Close——命名对象活到
-// 进程退出为止，而这正是单实例判断需要的时间窗。
+// 只创建、不持有：判据是 CreateMutexW 的 ERROR_ALREADY_EXISTS，全程没有 WaitForSingleObject，
+// 所以没有"释放"可做（对不拥有的互斥体调 ReleaseMutex 只会以 ERROR_NOT_OWNER 失败）。句柄也
+// 故意不 Close——命名对象活到进程退出，而这正是这个判据需要的时间窗。
 func ensureSingleInstance() {
 	name, _ := syscall.UTF16PtrFromString(mutexName)
 	namePtr := uintptr(unsafe.Pointer(name))
@@ -36,8 +35,8 @@ func ensureSingleInstance() {
 	}
 }
 
-// fatalDialog 是"随包数据读不到"时唯一的出路：这个 exe 用 -H windowsgui 链接，没有控制台，
-// 写到 stderr 没人看得见。装上却读不到 assets\ 是坏安装，说清缺哪一份然后退出，别装死。
+// fatalDialog 是"随包数据读不到"时唯一的出路：-H windowsgui 没有控制台，写到 stderr 没人看得见；
+// 装上却读不到 assets\ 是坏安装，说清缺哪一份然后退出，别装死。
 func fatalDialog(err error) {
 	const mbIconError = 0x10
 	text, _ := syscall.UTF16PtrFromString(fmt.Sprintf(

@@ -1,13 +1,9 @@
 /*
-  The shadcn registry's tooltip (style base-nova), with one change: the popup is
-  pointer-events-none.
+  shadcn registry 的 tooltip（style base-nova），只改了一处：弹层 pointer-events-none。
 
-  In this app the tooltip sits over the row above the one being hovered, so a popup
-  that takes the pointer traps it: the row above can never be reached, and the
-  tooltip the user was moving towards never opens. Base UI's own switch for this is
-  disableHoverablePopup, which marks the popup inert - that also takes it out of the
-  accessibility tree, and not taking the pointer is the whole of what is wanted
-  here.
+  本应用里 tooltip 停在正悬停那一行的**上方**，一个会接收指针的弹层就把指针困住了：上面那行
+  永远够不到，用户正移过去的那个 tooltip 也永远不开。base-ui 自己的开关是 disableHoverablePopup，
+  而它同时把弹层标成 inert、移出无障碍树——这里要的只是不接收指针。
 */
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 import { cn } from "cn"

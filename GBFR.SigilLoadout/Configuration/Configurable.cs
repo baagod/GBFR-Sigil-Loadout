@@ -5,10 +5,7 @@ using Reloaded.Mod.Interfaces;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-/// <summary>
-/// Base class for Reloaded-II configuration entries. Copied from the official
-/// Reloaded-II mod template (templates/configurable/Template/Configuration).
-/// </summary>
+/// <summary>Base class for Reloaded-II configuration entries, copied from the official mod template.</summary>
 public class Configurable<TParentType> : IUpdatableConfigurable
     where TParentType : Configurable<TParentType>, new()
 {
@@ -83,10 +80,8 @@ public class Configurable<TParentType> : IUpdatableConfigurable
         }
         catch
         {
-            // A bad/partially-written config must never escape this FSW thread
-            // callback (an unhandled exception would tear down the game
-            // process): keep the previous configuration and retry on the next
-            // change event.
+            // A bad/partially-written config must never escape this FSW callback: an unhandled
+            // exception would tear down the game process. Keep the previous config.
         }
     }
 

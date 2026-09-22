@@ -35,8 +35,8 @@ internal static unsafe partial class NativeCore
     {
         public uint CharacterHash;
         /// <summary>
-        /// 被切换的那个技能 hash。它的**身份**就是槽位：原生侧拿它去专属表里认这是
-        /// T1、T2 还是战气，所以托管侧不必知道这个映射，也不必读 sigils.chara.json。
+        /// 被切换的技能 hash；**身份就是槽位**——原生拿它去专属表里认 T1、T2 还是战气，托管侧
+        /// 不必知道这个映射，也不必读 sigils.chara.json。
         /// </summary>
         public uint SkillHash;
         public byte Disabled;
@@ -54,12 +54,11 @@ internal static unsafe partial class NativeCore
         uint overrideCount);
 
     /// <summary>
-    /// 把整张编辑后的表交给原生，写进**游戏自己已经解析好的那一份**。那一份的地址由原生从语义
-    /// 锚点解析出来（见原生 src/table_slot.cpp），托管侧既不持有地址、也不扫描内存——这就是
-    /// "唯一那张表、零扫描"。
+    /// 把整张编辑后的表交给原生，写进**游戏自己已经解析好的那一份**；地址由原生从语义锚点解析出来
+    /// （src/table_slot.cpp），托管侧既不持有地址、也不扫内存。
     ///
-    /// 返回 >= 0 是这次真正改写的 52 字节行数（0 = 内存里已经是一样的）；< 0 是拒绝码，且一个
-    /// 字节都没写，原因由原生落一行日志（码的含义与那行日志都在 native_api.h / exports.cpp）。
+    /// 返回 >= 0 是真正改写的 52 字节行数（0 = 内存里已经一样）；< 0 是拒绝码，一个字节都没写，原因
+    /// 由原生落一行日志（码的含义在 native_api.h / exports.cpp）。
     /// </summary>
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int GBFR20_WriteSkillStatusTable(byte* table, uint length);
@@ -73,22 +72,18 @@ internal static unsafe partial class NativeCore
     /// <summary>
     /// 托管侧的 ABI 布局自检，与 native_api.h 的 static_assert 一一对应。
     ///
-    /// 版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"——而后者才是结构体错位最
-    /// 可能发生的方式（native_api.h 一直有 static_assert，C# 这边此前只有版本号）。
-    /// 尺寸不符与版本不符同样处理：抛异常 → 整套 hook 不装（fail-closed）。
-    ///
-    /// 用 Marshal.SizeOf 而不是 sizeof：这里要验证的是**封送器实际会写多少字节**，
-    /// 那正是跨过 ABI 的东西。
+    /// 版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"——而后者才是结构体错位最可能发生的
+    /// 方式。尺寸不符与版本不符同样处理：抛异常 → 整套 hook 不装（fail-closed）。用 Marshal.SizeOf
+    /// 而不是 sizeof：要验证的是**封送器实际会写多少字节**，那才是跨过 ABI 的东西。
     /// </summary>
     internal static void EnsureAbiLayout()
     {
         AssertSize("TemplateSlot", 0x18, Marshal.SizeOf<TemplateSlotNative>());
         AssertSize("ExclusiveOverride", 0x0C, Marshal.SizeOf<ExclusiveOverrideNative>());
 
-        // 尺寸挡不住字段互换：TemplateSlot 是六个 32 位字段，gem_id 与 skill1 对调之后
-        // 照样是 0x18。而"字段按这个次序对应"才是这份 ABI 的全部内容，所以偏移量也得对拍
-        // （native_api.h 那边是同样的字段次序 + #pragma pack(1)）。字段名用 nameof：改名的
-        // 时候这里跟着改，不会变成一句"这个字段不存在"的 ArgumentException。
+        // 尺寸挡不住字段互换：六个 32 位字段里 gem_id 与 skill1 对调之后照样是 0x18，而"字段按
+        // 这个次序对应"才是这份 ABI 的全部内容，所以偏移量也得对拍（native_api.h 是同样的次序 +
+        // #pragma pack(1)）。字段名用 nameof：改名时这里跟着改，不会变成"这个字段不存在"。
         AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.GemId), 0x00);
         AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Skill1), 0x04);
         AssertOffset<TemplateSlotNative>(nameof(TemplateSlotNative.Skill1Level), 0x08);

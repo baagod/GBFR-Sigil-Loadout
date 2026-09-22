@@ -6,16 +6,13 @@ using Reloaded.Mod.Interfaces.Internal;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Thin Reloaded-II shell for GBFR.SigilLoadout.
-/// There is no overlay UI, input capture, preset store or Overlay Broker:
-/// the native core installs its own hooks via SafetyHook and applies the
-/// built-in template loadout automatically. This shell only hosts the
-/// native module, forwards logs, and drives the upkeep tick.
+/// Thin Reloaded-II shell: no overlay UI, input capture, preset store or Overlay Broker. The
+/// native core installs its own hooks via SafetyHook and applies the built-in template loadout
+/// automatically; this shell only hosts it, forwards logs, and drives the upkeep tick.
 ///
-/// It also hosts the sigil editor: that half rewrites skill_status rows from
-/// the user's edit list, both
-/// at startup - through IDataManager - and inside the running game, where the
-/// upkeep tick below notices a changed file and re-applies it.
+/// It also hosts the sigil editor, which rewrites skill_status rows from the user's edit list -
+/// at startup through IDataManager, and again inside the running game, where the upkeep tick
+/// below notices a changed file and re-applies it.
 /// </summary>
 public sealed class Mod : IMod
 {
@@ -42,8 +39,8 @@ public sealed class Mod : IMod
 
     public void Suspend()
     {
-        // 不会被调：CanSuspend() 说 false。原生钩子没法安全地"暂停"，所以这里不能假装
-        // 能暂停——说 true 只是向启动器承诺一个不存在的能力。
+        // 不会被调：CanSuspend() 返回 false。原生钩子没法安全暂停，说 true 只是向启动器承诺
+        // 一个不存在的能力。
     }
 
     public void Resume()
@@ -59,8 +56,8 @@ public sealed class Mod : IMod
 
     private void QueueStart(IModLoaderV1 loaderApi, string? modVersion)
     {
-        // Idempotent: Start/StartEx are alternative loader entry points;
-        // re-entry would duplicate the upkeep timer.
+        // Idempotent: Start/StartEx are alternative loader entry points; re-entry would duplicate
+        // the upkeep timer.
         if (System.Threading.Interlocked.Exchange(ref _startRequested, 1) != 0)
             return;
         long started = Stopwatch.GetTimestamp();
@@ -96,8 +93,7 @@ public sealed class Mod : IMod
                     AutoFlush = true,
                 };
             }
-            // 每次运行的分隔标记：日志是追加写的，跨会话累积，这一行是"新的一次运行从这里开始"
-            // 的唯一记号——时间戳是它真正起作用的部分（区分是哪次）。
+            // 每次运行的分隔标记：日志跨会话追加，这一行是"新的一次运行从这里开始"的唯一记号。
             Log($"======== Session Start {DateTime.Now:yyyy-MM-dd HH:mm:ss} ========");
             Log($"GBFR Sigil Loadout v{modVersion ?? "?"} (ABI {NativeCore.AbiVersion})");
             long nativeStarted = Stopwatch.GetTimestamp();
@@ -111,11 +107,9 @@ public sealed class Mod : IMod
             LoadoutConfig.Initialize(Log);
             InitializeHotkeyConfiguration(loader, modDirectory);
 
-            // The sigil editor is independent of the native core: it only reads
-            // the archive and rewrites skill_status rows, so it starts whatever
-            // the hooks did. It reads the whole table synchronously, so it gets
-            // its own phase line: that read is the one step here that can be
-            // slow enough to delay the upkeep tick below.
+            // The sigil editor is independent of the native core: it only reads the archive and
+            // rewrites skill_status rows, so it starts whatever the hooks did. Its synchronous
+            // table read is the one step here slow enough to deserve its own phase line.
             long sigilEditorStarted = Stopwatch.GetTimestamp();
             _sigilEditor = new SigilEditorFeature(Log);
             _sigilEditor.Start(loader);
@@ -124,9 +118,8 @@ public sealed class Mod : IMod
             _tickTimer = new System.Threading.Timer(
                 _ =>
                 {
-                    // 定时器的回调是不串行的：一次维护没跑完，下一拍就会进来。三个阶段都按
-                    // "这一拍让过去"处理（mtime 门不认领、热键只是采样），所以这里统一挡住，
-                    // 而不是让每个阶段各自再防一遍重入。
+                    // 定时器回调不串行：上一拍没跑完，下一拍就会进来。三个阶段都按"让过去"处理
+                    // （mtime 门不认领、热键只是采样），所以在这里统一挡住，不必每个阶段各防一遍。
                     if (Interlocked.Exchange(ref _ticking, 1) != 0)
                         return;
                     try
@@ -221,17 +214,15 @@ public sealed class Mod : IMod
         _sigilEditor?.Dispose();
         _sigilEditor = null;
         Hotkey.Shutdown();
-        // 无条件关停。NativeCore.Initialize 一旦返回，原生 DLL 就已经加载、日志回调已经
-        // 挂上、钩子可能已经装好，而它之后的每一步都可能抛异常把控制权交到这里。以前这个
-        // 调用被一个"全都成功之后才置位"的标志门着，于是失败路径会让原生钩子一直留在游戏
-        // 里，同时托管侧已经宣称 Dispose 完成。Shutdown 自身是异常安全的。
+        // 无条件关停。Initialize 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，
+        // 之后的每一步都可能抛异常把控制权交到这里。以前这个调用被一个"全都成功之后才置位"的标志
+        // 门着，失败路径就会把原生钩子留在游戏里。Shutdown 自身异常安全。
         try
         {
             NativeCore.Shutdown();
         }
         catch
         {
-            // Preserve the original shutdown path.
         }
 
         lock (_logLock)

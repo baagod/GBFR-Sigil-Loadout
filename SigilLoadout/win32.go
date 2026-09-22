@@ -10,26 +10,23 @@ import (
 	"unsafe"
 )
 
-// 这一文件只放 Win32 依赖：DLL/proc 声明、窗口与常量、以及它们的薄包装。
-// 它不持有任何状态机语义——"什么时候藏、什么时候显"在 windowstate.go。
+// 这一文件只放 Win32 依赖（DLL/proc 声明、窗口与常量及其薄包装），不持有状态机语义——那在 windowstate.go。
 
-// mutexName 是单实例互斥体的名字（ensureSingleInstance 用）。
+// mutexName 供 ensureSingleInstance 使用。
 const mutexName = "Local\\GBFRSigilLoadout"
 
-// wmFakeHide posts the hide to the UI thread. fakeHide must not run on the
-// Wails service goroutine: SetForegroundWindow synchronises with the window's
-// own thread, which is still blocked inside the service call, so it deadlocks.
+// wmFakeHide posts the hide to the UI thread: fakeHide must not run on the Wails service
+// goroutine — SetForegroundWindow waits on the window's own thread, blocked in that very call.
 const wmFakeHide = 0x8011
 
-// wmActivate is WM_APP+0x10, the single activation command posted by the tray,
-// the in-game hotkey and a second instance (the C# side posts the same value).
+// wmActivate is WM_APP+0x10, the single activation command posted by the tray, the in-game
+// hotkey and a second instance (the C# side posts the same value).
 const wmActivate = 0x8010
 
 // gwHwndNext is GW_HWNDNEXT: the next window below in Z-order.
 const gwHwndNext = 2
 
-// mouse_event flags used to replay the game's own "first click hides the
-// cursor" gesture after handing focus back.
+// mouse_event flags used to replay the game's own "first click hides the cursor" gesture.
 const (
 	mouseeventfLeftDown = 0x0002
 	mouseeventfLeftUp   = 0x0004
@@ -70,13 +67,11 @@ const (
 	swpFrameChanged    = 0x27    // SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED
 )
 
-// gwlExStyle is GWL_EXSTYLE (-20) as a uintptr; Go consts cannot hold a
-// negative uintptr, so compute the two's-complement value instead.
+// gwlExStyle is GWL_EXSTYLE (-20) as a uintptr (Go consts cannot hold a negative uintptr).
 var gwlExStyle = ^uintptr(0) - 19
 
-// debugf appends a diagnostic line to tool-debug.log next to the exe, but only
-// while tool-debug.on exists there. Release installs never create the marker,
-// so the log stays silent by default.
+// debugf appends a diagnostic line to tool-debug.log next to the exe, but only while
+// tool-debug.on exists there — release installs never create the marker, so it stays silent.
 func debugf(format string, args ...any) {
 	dir := exeDir()
 	if _, err := os.Stat(filepath.Join(dir, "tool-debug.on")); err != nil {
@@ -90,12 +85,10 @@ func debugf(format string, args ...any) {
 	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
 }
 
-// nextForegroundWindow walks down the Z-order from hwnd and returns the first
-// visible, enabled, titled top-level window - the one the user was most likely
-// using before the tool came to the front. Returns 0 when there is none.
-// Used when the tool was opened directly (no 0x8010 summon, so nothing was
-// remembered): Windows keeps a hidden/disabled window as the foreground window,
-// so it must be handed over explicitly.
+// nextForegroundWindow walks down the Z-order from hwnd and returns the first visible, enabled,
+// titled top-level window — the one the user was most likely using before the tool came to the
+// front (0 when there is none). Needed when the tool was opened directly (no 0x8010 summon, so
+// nothing was remembered): Windows keeps a hidden/disabled window as the foreground one.
 func nextForegroundWindow(hwnd uintptr) uintptr {
 	next := hwnd
 	for range 16 {
@@ -125,16 +118,14 @@ func findToolWindow() uintptr {
 	return hwnd
 }
 
-// foregroundWindow is GetForegroundWindow with the error return dropped.
 func foregroundWindow() uintptr {
 	value, _, _ := procGetForegroundWindow.Call()
 	return value
 }
 
-// isGameWindow reports whether hwnd belongs to granblue_fantasy_relink.exe.
-// Used to gate the cursor-hiding click replay: that gesture is only safe in
-// the game (its first click after the cursor appears is swallowed by the game
-// instead of reaching gameplay), never in an arbitrary foreground app.
+// isGameWindow reports whether hwnd belongs to granblue_fantasy_relink.exe. It gates the
+// cursor-hiding click replay: that gesture is only safe in the game (its first click after the
+// cursor appears is swallowed instead of reaching gameplay), never in an arbitrary foreground app.
 func isGameWindow(hwnd uintptr) bool {
 	var pid uint32
 	procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))

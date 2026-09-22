@@ -5,53 +5,43 @@ import (
 	"time"
 )
 
-// 这一文件是窗口显隐状态机的唯一所有者：假隐藏是什么、什么时候切换、以及宿主消息
-// 怎么映射到它。Win32 的细节在 win32.go。
+// 这一文件是窗口显隐状态机的唯一所有者（假隐藏是什么、何时切换、宿主消息怎么映射）；Win32 细节在 win32.go。
 
-// toolHidden mirrors the fake-hide state (see fakeHide): the window stays
-// shown for the whole session, so IsWindowVisible can no longer tell the two
-// states apart.
+// toolHidden mirrors the fake-hide state (see fakeHide): the window stays shown for the whole
+// session, so IsWindowVisible can no longer tell the two states apart.
 var toolHidden atomic.Bool
 
-// returnFocusTo is the window that was foreground before the tool was revealed
-// (the game, in the in-game hotkey path). fakeHide hands focus back to it: the
-// mod only acts on the hotkey while the game is the foreground window, so
-// without this the next F1 press is ignored.
+// returnFocusTo is the window that was foreground before the tool was revealed (the game, in
+// the hotkey path). fakeHide hands focus back to it: the mod only acts on the hotkey while the
+// game is the foreground window, so without this the next F1 press is ignored.
 var returnFocusTo atomic.Uintptr
 
-// fakeHide hides the window without hiding the WebView2: the frame stays shown
-// but fully transparent (alpha 0 = mouse-transparent), input-disabled (which
-// also moves focus away) and off the taskbar/Alt-Tab (WS_EX_TOOLWINDOW). The
-// WebView keeps rendering, so a later reveal never flashes white and never
-// needs the repaint size nudge — no ShowWindow transition happens at all.
-// fakeHide requests the hide on the UI thread (see wmFakeHide); the actual
-// work happens in hideNow.
+// fakeHide hides the window without hiding the WebView2: the frame stays shown but fully
+// transparent (alpha 0 = mouse-transparent), input-disabled (which also moves focus away) and
+// off the taskbar/Alt-Tab (WS_EX_TOOLWINDOW). The WebView keeps rendering, so a later reveal
+// never flashes white and no ShowWindow transition happens at all. The work itself runs on the
+// UI thread (see wmFakeHide / hideNow).
 func fakeHide(hwnd uintptr) {
 	debugf("fakeHide post hwnd=%d target=%d", hwnd, returnFocusTo.Load())
 	procPostMessageW.Call(hwnd, wmFakeHide, 0, 0)
 }
 
-// hideNow performs the fake hide on the UI thread.
 func hideNow(hwnd uintptr) {
 	debugf("hideNow hwnd=%d fg=%d target=%d", hwnd, foregroundWindow(), returnFocusTo.Load())
 	exStyle, _, _ := procGetWindowLong.Call(hwnd, gwlExStyle)
-	// Wails creates the window with WS_EX_APPWINDOW, which forces a taskbar
-	// button for shown windows: it must be cleared together with adding
-	// TOOLWINDOW, or the icon lingers while the window is fake-hidden.
-	// WS_EX_TRANSPARENT also hands the mouse cursor to the window below (the
-	// game): while the invisible window was hit-testable, the cursor stayed
-	// visible as this thread's arrow even after the game regained focus.
+	// WS_EX_APPWINDOW (Wails sets it to force a taskbar button) must be cleared together with
+	// adding TOOLWINDOW, or the icon lingers while the window is fake-hidden. WS_EX_TRANSPARENT
+	// hands the cursor to the game: while the invisible window stayed hit-testable, the cursor
+	// kept showing as this thread's arrow after the game regained focus.
 	procSetWindowLong.Call(hwnd, gwlExStyle, (exStyle|exStyleLayered|exStyleToolWindow|exStyleTransparent)&^exStyleAppWindow)
 	procSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0, swpFrameChanged)
 	procSetLayeredWindowAttributes.Call(hwnd, 0, 0, 0x2)
-	// Hand focus back BEFORE disabling the window: EnableWindow(FALSE) moves
-	// focus away synchronously, after which this process no longer has the
-	// foreground rights SetForegroundWindow needs (the call would just fail).
+	// Hand focus back BEFORE disabling the window: EnableWindow(FALSE) moves focus away
+	// synchronously, after which this process no longer has the foreground rights it needs.
 	target := returnFocusTo.Swap(0)
 	summoned := target != 0
 	if target == 0 {
-		// Opened without a summon (tray/Explorer): fall back to the window just
-		// below the tool in Z-order.
+		// Opened without a summon (tray/Explorer): fall back to the window below in Z-order.
 		target = nextForegroundWindow(hwnd)
 	}
 	if target != 0 && target != hwnd {
@@ -59,18 +49,13 @@ func hideNow(hwnd uintptr) {
 			debugf("  pre-setfg fg=%d target=%d", foregroundWindow(), target)
 			ret, _, err := procSetForegroundWindow.Call(target)
 			debugf("  SetForegroundWindow(%d) ret=%d err=%v fgNow=%d", target, ret, err, foregroundWindow())
-			// The game parks the mouse at (0,0) and hides the cursor; any focus
-			// loss makes Windows draw the arrow again, and the game only hides
-			// it on the next mouse button press - its first click after a focus
-			// change is swallowed for exactly that and never reaches the game
-			// (measured in-game). Replay that click only when the tool was
-			// summoned from the game, so a directly opened tool never injects.
+			// The game parks the cursor and only hides it on the next mouse press, so its first
+			// click after a focus change is swallowed (measured in-game). Replay that click only
+			// when the tool was summoned from the game — a directly opened tool never injects.
 			if ret != 0 && summoned && isGameWindow(target) {
 				go func() {
-					// A moment for the game to process the focus change, and
-					// then hold the button for the same amount: a zero-length
-					// click is missed by input polling, and 1ms is too short -
-					// the game raises the timer resolution while it runs.
+					// A moment for the game to process the focus change, then hold the button as
+					// long: a zero-length click is missed by polling, and 1ms is too short.
 					time.Sleep(20 * time.Millisecond)
 					debugf("  replay cursor-hiding click (hold)")
 					procMouseEvent.Call(mouseeventfLeftDown, 0, 0, 0, 0)
@@ -105,10 +90,8 @@ func hideToTray() {
 	}
 }
 
-// handleWndMsg filters the window messages we care about: WM_CLOSE (the X
-// button) fake-hides the window, and 0x8010 (posted by the tray, the in-game
-// hotkey and a second instance) is the single activation command — reveal,
-// restore, show, focus.
+// handleWndMsg filters the window messages we care about: WM_CLOSE (the X button) fake-hides the
+// window, and 0x8010 (tray / in-game hotkey / second instance) is the single activation command.
 func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 	if win == nil {
 		return 0, false
@@ -122,8 +105,7 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 		hideNow(hwnd)
 		return 0, true
 	case wmActivate: // activate: reveal (if fake-hidden), restore, show, focus
-		// Remember the current foreground window before the tool takes focus,
-		// so fakeHide can give it back (see returnFocusTo).
+		// Remember the foreground window before the tool takes focus, so fakeHide can hand it back.
 		if prev := foregroundWindow(); prev != 0 && prev != hwnd {
 			returnFocusTo.Store(prev)
 			debugf("0x8010 prev=%d hidden=%v", prev, toolHidden.Load())

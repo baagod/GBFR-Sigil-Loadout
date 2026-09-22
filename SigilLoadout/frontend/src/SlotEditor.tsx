@@ -18,7 +18,7 @@ const GRID_COLS =
 export const HEADER_ROW = `${GRID_COLS} min-h-[44px] border-b text-sm font-medium text-foreground`
 const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
 
-/** Clamped numeric level input with a grey "/ max" suffix. */
+/** 夹在 min/max 之间的等级输入框，右侧带一个灰色的 "/ max"。 */
 function LevelInput({
   value,
   max,
@@ -37,10 +37,8 @@ function LevelInput({
   const groupRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  // Wheel adjusts the level over the WHOLE input group (suffix "/ max"
-  // included), but only while the number input is focused — otherwise the
-  // wheel is left alone and scrolls the page. Why the listener is native and
-  // passive: false lives in useWheelStep.
+  // 滚轮在**整个 input group** 上调整等级（含 "/ max" 后缀），但只在数字框聚焦时生效
+  // ——否则滚轮不动它，页面照常滚。监听器为什么是原生的、passive: false，见 useWheelStep。
   useWheelStep(
     groupRef,
     () => document.activeElement === inputRef.current,

@@ -11,15 +11,12 @@ SafetyHookMid g_skill_fetch_hook;
 std::atomic_uint32_t g_active_getter_calls{0};
 std::atomic_uint32_t g_active_mid_calls{0};
 thread_local NaturalContributionFrame g_tls_natural_contribution{};
-// 一次构建 = 一条线程上同步跑完扩展槽 13…N。所以 "本次构建用哪套槽位" 只要 thread_local：
-// 构建开始时（第一个扩展槽）快照一次 store，整个构建都读这一份。
-// 别改回 "一张以 status 指针为键的授权表"（曾经有），那张表要提交/过期/清理，
-// 而且 "残留授权命中被复用的地址" 会注入旧槽位——游戏的两份 status 对象是轮换 + 地址跨角色复用的。
-//（判据是对象还新不新，见 selection_store.cpp 的轮次闸）。
+// 一次构建 = 一条线程上同步跑完扩展槽 13…N，所以 "本次构建用哪套槽位" 只要 thread_local：
+// 构建开始时（第一个扩展槽）快照一次 store，整个构建都读这一份。别改回 "一张以 status 指针为键的
+// 授权表"（曾经有）：残留授权命中被复用的地址会注入旧槽位——status 对象是轮换且地址跨角色复用的。
 thread_local uintptr_t g_tls_build_status = 0;
-// 快照那一版的角色。只比 status 地址不够：本文件上面刚写明"地址跨角色复用"，所以
-// "地址相同"不等于"还是同一个角色"。自然贡献帧（BeginNaturalContributionTracking）比的是
-// 四项（status + character_hash + context_mode + next_slot），这条路径此前只比一项。
+// 快照那一版的角色：只比 status 地址不够（地址跨角色复用），"地址相同"不等于"还是同一个角色"。
+// 自然贡献帧比的是四项（status + character_hash + context_mode + next_slot），这条路径此前只比一项。
 thread_local uint32_t g_tls_build_character = 0;
 thread_local std::array<uint32_t, kVirtualSlotCapacity> g_tls_build_selection{};
 thread_local bool g_tls_build_has_selection = false;
@@ -99,9 +96,8 @@ void TrackNaturalContributionResult(
       final_identity.context_mode == identity.context_mode;
    if (final_valid)
    {
-      // Log the live-battle confirmation only once per session: a healthy
-      // loadout confirms 9/9 every battle, identical every time. Failures
-      // below still report N/M on every occurrence.
+      // Log the live-battle confirmation only once per session: a healthy loadout
+      // repeats 9/9 every battle. Failures below still report N/M every occurrence.
       if (!g_live_confirmation_reported.exchange(true, std::memory_order_acq_rel))
          SetRuntimeMessage(std::format(
             "Skill contribution confirmed for 0x{:08X}: {}/{} virtual sigils reached the "
@@ -130,16 +126,15 @@ bool TryLoadVirtualSkillSelection(
 {
    try
    {
-      // 构建循环内的取用：用构建开始时那一份快照，保证同一次构建里所有槽位用同一组选择。
-      // （哪怕你此刻正好在改配装）。角色也要比——status 地址是跨角色复用的（见文件顶部）。
+      // 构建循环内取用：用构建开始时的快照，保证同一次构建里所有槽位用同一组选择（哪怕此刻
+      // 正在改配装）。角色也要比——status 地址跨角色复用（见文件顶部）。
       if (from_skill_data_loop && g_tls_build_status == status &&
           g_tls_build_character == identity.character_hash && g_tls_build_has_selection)
       {
          selection = g_tls_build_selection;
          return true;
       }
-      // 构建循环外的取用（UI/效果读这份 status 的因子）：直接给当前 store。没有第二条路——
-      // 之前靠授权兜底，那张表已经删了（见文件顶部的注释）。
+      // 构建循环外的取用（UI/效果读这份 status 的因子）：直接给当前 store，没有第二条路。
       selection = GetSelection(identity.character_hash);
       return CountSelectedSlots(selection) != 0;
    }
@@ -165,9 +160,8 @@ bool TryCopySelectedVirtualGem(
    if (selected_slot_id == 0)
       return false;
 
-   // Template slots synthesize a GemData from the built-in loadout table
-   // instead of referencing a physical inventory copy. There is no
-   // inventory-backed virtual slot path in this mod.
+   // Template slots synthesize a GemData from the built-in loadout table; there is
+   // no inventory-backed virtual slot path in this mod.
    if (!IsTemplateSlotId(selected_slot_id))
       return false;
    return TryCopyTemplateGem(identity.character_hash, selected_slot_id, output);
@@ -176,9 +170,8 @@ bool TryCopySelectedVirtualGem(
 /*
    一次调用的"这次构建从哪来"分类 + 这份 status 的身份——后面几个阶段都只读它。
 
-   两个来源 bool（而不是一个枚举）：调用方要分辨的正是"来自哪条循环"。
-   而"是不是两条技能循环之一"**不存字段**——它恒等于那两个的析取，存起来就允许出现
-   "来源为真而这条为假"的自相矛盾状态。派生关系用成员函数表达。
+   两个来源 bool（而不是一个枚举）：调用方要分辨的正是"来自哪条循环"。"是不是两条技能循环之一"
+   **不存字段**——它恒等于那两个的析取，存起来就允许出现自相矛盾的状态；派生关系用成员函数表达。
 */
 struct GemCall
 {
@@ -193,10 +186,9 @@ struct GemCall
 };
 
 /*
-   扩展槽位里的**第一格** = 一次构建的开始。三件事都在这里发生，而且只有这里有副作用：
-   - 快照这一份 status 本次构建要用的槽位（构建内所有槽位共用，见文件顶部 TLS 注释）；
-   - 记下"游戏刚在建状态"，热重建据此避让（两条线程同时碰一份 status 就是竞态）；
-   - context-1 = 在场那份：记下"这个角色现在这份 status 是哪个对象"，热重建只认它。
+   扩展槽位里的**第一格** = 一次构建的开始，只有这里有副作用：快照这次的槽位选择；记下"游戏
+   刚在建状态"（热重建据此避让——同时碰一份 status 就是竞态）；context-1（在场那份）还记下
+   "这个角色现在这份 status 是哪个对象"，热重建只认它。
 */
 void ObserveBuildStart(const GemCall& call)
 {
@@ -211,11 +203,9 @@ void ObserveBuildStart(const GemCall& call)
 }
 
 /*
-   读选择表、挑出这一格要的那个模板 gem，可选地把结果并进自然贡献的统计。
-
-   来自技能数据循环时读的是本次构建开头快照下来的那一份（构建内不变）；否则按当前身份现查。
-   `selection` 由调用方持有——BeginNaturalContributionTracking 会把它记进 TLS 帧，
-   所以它必须活过这次复制。
+   读选择表、挑出这一格要的那个模板 gem，可选地把结果并进自然贡献的统计。来自技能数据循环时
+   读的是构建开头那份快照（构建内不变），否则按当前身份现查。`selection` 由调用方持有——
+   BeginNaturalContributionTracking 会把它记进 TLS 帧，所以它必须活过这次复制。
 */
 uint8_t LoadSelectionAndCopy(
    const GemCall& call,
@@ -254,7 +244,6 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
 {
    ActiveCallGuard active_call(g_active_getter_calls);
 
-   // ClassifyCall：这次调用从哪来。
    const uintptr_t return_address = reinterpret_cast<uintptr_t>(_ReturnAddress());
    GemCall call{};
    call.status = status;
@@ -265,7 +254,6 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
    call.from_category_loop =
       return_address == g_image_base + g_game_layout.skill_category_getter_return_rva;
 
-   // 真实槽位：原样交给游戏自己的 getter。
    if (slot_index < kNativeInternalSlotCount)
       return g_get_gem_hook.call<uint8_t>(status, slot_index, output);
 
@@ -274,18 +262,15 @@ uint8_t GetGemDataByIndexDetour(void* status, int slot_index, void* output)
    if (slot_index >= GetExpandedInternalSlotCount())
       return 0;
 
-   // 读身份（下面每一段都要用），并与"正在关机"一起作为一次性闸门：这两条任一不成立，
-   // 这次调用什么都不做——回 0 而不是转发。
+   // 读身份，并与"正在关机"一起作为一次性闸门：任一不成立就回 0，而不是转发。
    if (g_shutting_down.load(std::memory_order_acquire) ||
        !SafeReadStatusIdentity(reinterpret_cast<uintptr_t>(status), call.identity) ||
        !IsValidContextMode(call.identity.context_mode) || output == nullptr)
       return 0;
 
-   // ObserveBuildStart：只有扩展槽位的第一格、且来自技能数据循环，才是一次构建的开始。
    if (call.from_skill_data_loop() && slot_index == kNativeInternalSlotCount)
       ObserveBuildStart(call);
 
-   // LoadSelection + CopyAndTrack。
    std::array<uint32_t, kVirtualSlotCapacity> selection{};
    return LoadSelectionAndCopy(call, selection);
 }
@@ -332,24 +317,19 @@ void OnSkillFetch(safetyhook::Context& context)
 namespace
 {
 /*
-   启动阶段计时。每个阶段都要"记开始时间 -> 干活 -> 报一行 phase 日志"，原来那三件事
-   各写一遍，七个阶段就是 21 处彼此无关的局部量。这个类把它们收成两行：
+   启动阶段计时：把"记开始时间 -> 干活 -> 报一行 phase 日志"收成两行：
 
       { auto phase = StartupPhase("gem-data-getter-hook");
         ...install...; phase.Succeeded(installed); }
 
-   上报由调用点显式触发，**不是**靠析构兜底：忘了调 Succeeded，析构会报 false —— 那是
-   日志里一条**假的失败**，比缺一行更难查（会让人去追一个不存在的故障）。
+   上报由调用点显式触发，**不是**靠析构兜底：忘了调 Succeeded，析构报出来的 false 就是日志里
+   一条**假的失败**，比缺一行更难查。
 
-   析构真正兜住的是另一条路：**阶段体抛异常**。这个构建按 /EHa 编，而 RevalidateGameLayout
-   那条链会分配（std::format / std::string），分配失败就抛。那时栈展开会跑析构，报出来的
-   false 是对的 —— 这一层日志于是留下了"崩在哪个阶段"，那是崩溃现场唯一的线索。
+   析构真正兜住的是另一条路——**阶段体抛异常**（按 /EHa 编，std::format / std::string 分配失败
+   就会抛）：栈展开跑析构，报出来的 false 是对的，于是这层日志留下了"崩在哪个阶段"。
    （safetyhook::create_inline 不抛：vendored 版本失败时 return {}，见 third_party。）
 
    阶段之间刻意不重叠：每个 phase 都在自己的作用域里，日志的先后就与代码顺序一致。
-
-   这个类只有这一个成员，没有外层容器：`CompleteStartupPhase` 是自由函数，所以原来那层
-   "外层对象 + 反向指针 + 私有 Report 转调" 是纯间接，去过一次（47 行 -> 22 行）。
 */
 class StartupPhase
 {
@@ -362,7 +342,7 @@ public:
    StartupPhase(const StartupPhase&) = delete;
    StartupPhase& operator=(const StartupPhase&) = delete;
 
-   // 析构即上报（同一次只报一次：显式调过之后 _reported 已经是 true）。
+   // 析构即上报；显式调过 Succeeded 之后不再报。
    ~StartupPhase()
    {
       if (!_reported)
@@ -384,17 +364,15 @@ private:
 void DisableGameplayHooksAndRestore() noexcept
 {
    g_hooks_ready.store(false, std::memory_order_release);
-   // Restore the loop-limit bytes FIRST, while both detours are still live:
-   // until they are disabled below, a slot >= 13 request is still gated by the
-   // detours, and once the limits are back to their original values the game
-   // no longer asks for expanded slots. Disabling first would leave a window
-   // where the raw getter (13 real slots) gets asked for slot 13+N.
+   // Restore the loop-limit bytes FIRST, while both detours are still live: a slot >= 13
+   // request is still gated by them, and disabling first would leave a window where the raw
+   // 13-slot getter gets asked for slot 13+N.
    if (g_image_base != 0 && g_layout_ready.load(std::memory_order_acquire))
    {
       const uint8_t expanded_slot_count =
          static_cast<uint8_t>(GetExpandedInternalSlotCount());
-      // Only revert a limit byte that still holds our expanded value: one that
-      // was already restored (or never patched) must not be touched.
+      // Only revert a limit byte that still holds our expanded value; an already-restored
+      // (or never patched) one must not be touched.
       const auto restore_limit =
          [expanded_slot_count](uintptr_t rva, uint8_t original, const char* failure) {
             uint8_t current = 0;
@@ -417,10 +395,9 @@ void DisableGameplayHooksAndRestore() noexcept
    if (g_get_gem_hook)
       (void)g_get_gem_hook.disable();
 
-   // Wait for in-flight detour bodies to drain before releasing the hook
-   // trampolines. If they do not drain in time the process is already shutting
-   // down, so leave the hooks installed (they are disabled and the loop limits
-   // are restored) rather than freeing memory a live call may still execute.
+   // Wait for in-flight detour bodies to drain before releasing the hook trampolines.
+   // If they do not drain in time the process is already shutting down, so leave the hooks
+   // installed (disabled, limits restored) rather than freeing memory a live call may still execute.
    const uint64_t drain_deadline = GetTickCount64() + 5000;
    while (g_active_getter_calls.load(std::memory_order_acquire) != 0 ||
           g_active_mid_calls.load(std::memory_order_acquire) != 0)
@@ -456,9 +433,8 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
 
    // 事务式：先记下 apply 字节**原来那个值**。写第二个字节失败时回到它，而不是回到游戏出厂的
    // 原始值——调用方在失败时会把 g_virtual_slot_count 恢复成 previous_count，所以写回 13 会留下
-   // "count 说还有 N 个虚拟槽、apply 字节说 13、category 字节还是上一次的展开值"这种三者互相
-   // 矛盾的状态，正是下面那句注释说绝不允许的分歧（一条循环会越过 13 格数组）。
-   // 读不到就退回原始值（那种情况下写也大概率会失败，行为与从前一致）。
+   // "count 说还有 N 个虚拟槽、apply 字节说 13、category 字节还是上一次的展开值"这种矛盾状态
+   //（一条循环会越过 13 格数组）。读不到就退回原始值。
    uint8_t previous_apply_limit = g_game_layout.skill_apply_original_limit;
    (void)ReadByte(g_image_base + apply_limit_rva, previous_apply_limit);
 
@@ -477,9 +453,8 @@ bool InstallHooks()
 {
    // 每个阶段在自己的作用域里：计时、上报、以及"失败就回滚并返回"。
    //
-   // 四条失败路径现在都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，
-   // 顺序是有讲究的（见那个函数），而且在一个钩子都没装时是 no-op——它自己以
-   // ResetGameLayout() 收尾，所以 preflight 那条不再需要单独写一遍"只重置布局"。
+   // 四条失败路径都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，顺序是
+   // 有讲究的（见那个函数），而且在一个钩子都没装时是 no-op——它自己以 ResetGameLayout() 收尾。
 
    {
       auto phase = StartupPhase("required-byte-rva-preflight");

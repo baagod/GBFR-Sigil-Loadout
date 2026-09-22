@@ -24,8 +24,8 @@ constexpr PatternView MakePattern(
    return {bytes, mask, ByteCount};
 }
 
-// 布局预检字节表：解析出的每个 RVA 都必须以这些字节开头，否则整套 gameplay hook 不装
-// （fail-closed，见 §7）。只有本文件用它们，所以它们住在这里而不是共享内部头。
+// 布局预检字节表：每个已认领的 RVA 都必须以这些字节开头，否则整套 gameplay hook 不装
+//（fail-closed）。只有本文件用它们。
 inline constexpr std::array<uint8_t, 16> kSkillApplyLoopPreflight = {
    0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0xB7,
    0x00, 0x00, 0x00, 0xC5, 0xF8, 0x11, 0x75, 0xF0};
@@ -47,12 +47,10 @@ inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
    0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x38, 0x44, 0x89, 0xC6};
 
 /*
-   语义锚点表：每个锚点命中处到它那几个 RVA 的偏移住在这里，**只此一处**。
+   语义锚点表：每个锚点命中处到它那几个 RVA 的偏移只写在这里。
 
-   三块锚点（apply 循环 / category 循环 / notifier）各自派生好几个 RVA，而这些偏移在流水线里
-   被用了三次：① 认领 RVA、② 读循环上限或解 call、③ 最终预检。以前 ①②③ 各写一遍同一组数字，
-   而 ① 与 ③ 之间只靠字段名手工配对——改了一个 delta 却漏了另一处，除非那处恰好也被 ② 用到，
-   否则不会有任何东西报错。
+   这些偏移在流水线里被用三次（认领 RVA / 读循环上限或解 call / 最终预检）。以前三处各写一遍
+   同一组数字、只靠字段名手工配对——改了一处却漏了另一处，不会有任何东西报错。
 */
 struct AnchorOffsets
 {
@@ -75,25 +73,18 @@ inline constexpr uintptr_t kNotifierCharacterOpcodeOffset = 0x45;
    预检表：认领 RVA 与它的预检**同一行**，所以"这个 RVA 是这么算出来的"和"它有这串字节"
    不可能分开改。
 
-   preflight_offset：预检字节要在这个 RVA **往前 offset 字节**处比对。两条循环上限 RVA 是
-   "锚点 + delta"得来的（apply_loop+4 / category_loop+6），而它们的预检字节验的是**锚点本身**，
-   所以这两条是 (rva, delta) 这对组合把它和 kApplyLoopAnchors / kCategoryLoopAnchors 里的
-   loop_limit_immediate 对上了——偏移一旦改，这里必须跟着改，同表同行正是为此。
-   其余各条的预检就在 RVA 处，offset = 0。
-
-   表里的 RVA 都是**流水线已经解出来**的那些——调用图解出的 getter、status_rebuild 同样在列——
-   所以校验只需遍历它，不必再按字段名逐条手写。
+   preflight_offset：预检字节在 rva **往前 offset 字节**处比对。两条循环上限 RVA 由"锚点 +
+   delta"得来，而它们的预检验的是**锚点本身**，所以这两条的 offset 必须与 kApplyLoopAnchors /
+   kCategoryLoopAnchors 里的 loop_limit_immediate 一致；其余各条 offset = 0。
 */
 struct PreflightCheck
 {
    uintptr_t rva = 0;
    std::span<const uint8_t> expected{};
-   // 在 rva - preflight_offset 处比对；下溢由 MatchesPreflight 的 RangeInsideImage 拒绝
-   // （与原来那两条 `< 4` / `< 6` 的下界是同一件事）。
+   // 在 rva - preflight_offset 处比对；下溢由 MatchesPreflight 的 RangeInsideImage 拒绝。
    uintptr_t preflight_offset = 0;
 };
 
-// 定长拷贝用的上界已不需要（比较走 MatchesBytesAt，按 span 的长度比）。
 constexpr uint8_t kApplyLoopBytes[] = {
    0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0, 0, 0, 0,
    0xC5, 0xF8, 0x11, 0x75, 0xF0};
@@ -183,9 +174,8 @@ bool TryBuildImageView(ImageView& image) noexcept
       return false;
    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
       g_image_base + static_cast<uintptr_t>(dos->e_lfanew));
-   // Sanity-limit SizeOfImage: both reads above stay inside the mapped image
-   // header region, so a malformed e_lfanew can never point into unmapped
-   // memory (a crash would violate the fail-closed contract).
+   // Sanity-limit SizeOfImage: the reads above stay inside the mapped header
+   // region, so a malformed e_lfanew can never reach unmapped memory (fail-closed).
    if (nt->Signature != IMAGE_NT_SIGNATURE ||
        nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
        nt->OptionalHeader.SizeOfImage < 0x1000 ||
@@ -271,9 +261,8 @@ bool MatchesBytesAtRva(
       MatchesBytes(image.base + rva, expected);
 }
 
-// SEH 版比较：表里的形状是运行期的 span，长度也只有那时才知道。**不能**套上面那个模板——
-// 它的长度取自数组类型，套过去就会按定长缓冲的整个长度去比，把缓冲尾部的垃圾也算进去。
-// 拷贝本身受 RangeInsideImage 保护；比较走 MatchesBytesAt（同一份 __try）。
+// SEH 版比较（表里的形状是运行期 span）：**不能**套上面那个模板——它按数组类型的长度比，
+// 会连缓冲尾部的垃圾一起比。拷贝本身受 RangeInsideImage 保护，比较走 MatchesBytesAt。
 bool MatchesPreflight(
    const ImageView& image,
    uintptr_t rva,
@@ -292,13 +281,11 @@ bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept
 }
 
 /*
-   找唯一命中。这一套用**显式 mask**（'x' 精确、'?' 通配），而 table_slot.cpp 的 CountMatches
-   用"0 = 通配"。两套并存，各自只服务一个文件——不要"顺手合一"：那要么得给这边的 pattern
-   补一套 0 编码（把可读的 mask 变成靠数字位置说话），要么得给那边补 mask 字符串（那里每个
-   0 都是 rip 位移，本来就是"这里是通配"的直白写法）。两边各自读得懂，比多一层抽象值钱。
+   找唯一命中。本文件用**显式 mask**（'x' 精确、'?' 通配），table_slot.cpp 的 CountMatches 用
+   "0 = 通配"——两套并存、各服务一个文件，不要"顺手合一"（各自读得懂比多一层抽象值钱）。
 
-   注意这条只负责**找唯一命中**，不负责判"是不是要找的那条指令"：mask 里通配的位置必须
-   恰好是位移那种"每台机器都不同"的字节，写错就会命中别处或命中不到。
+   注意它只负责**找唯一命中**，不负责判"是不是要找的那条指令"：通配的位置必须恰好是位移那种
+   "每台机器都不同"的字节，写错就会命中别处或命中不到。
 */
 bool FindUniquePattern(
    const ImageView& image,
@@ -335,7 +322,7 @@ bool FindUniquePattern(
       }
       if (!matched)
          continue;
-      // 第二处命中就够判定"不唯一"了：不必数完，也就不必把命中存进数组。
+      // 第二处命中就够判定"不唯一"，不必数完，也就不必把命中存进数组。
       if (++found > 1)
          return false;
       match = begin + offset;
@@ -428,8 +415,6 @@ bool ValidateResolvedGameLayout(
    const ImageView& image,
    const ResolvedGameLayout& layout) noexcept
 {
-   // 每个已认领的 RVA 与它的预检同源：这张表就是上面那些偏移的另一种写法，所以
-   // "RVA 是这么算的"和"它有这串字节"不可能分头改。
    const PreflightCheck checks[] = {
       {layout.skill_apply_loop_limit_immediate_rva, kSkillApplyLoopPreflight, kApplyLoopAnchors.loop_limit_immediate},
       {layout.skill_apply_getter_return_rva, kSkillApplyGetterReturnPreflight, 0},
@@ -446,8 +431,7 @@ bool ValidateResolvedGameLayout(
       const uintptr_t at = check.rva - check.preflight_offset;
       if (check.rva < check.preflight_offset || !MatchesPreflight(image, at, check.expected))
       {
-         // 诊断：布局解析失败只会说"在哪个阶段"，而这里能说清是**哪一条**预检、
-         // 拿哪个地址去比的——少了这一行，一次失败就得靠猜。
+         // 布局解析失败只说"在哪个阶段"；这一行说清是**哪一条**预检、拿哪个地址比的。
          Log(std::format(
             "  layout preflight FAILED: rva=0x{:X} preflight_offset=0x{:X} checked_at=0x{:X} bytes={}",
             check.rva,
@@ -527,11 +511,9 @@ bool TryGetCodeSection(CodeSectionView& view) noexcept
 
 void ResetGameLayout() noexcept
 {
-   // Initialization is process-wide and guarded by g_initialize_once. Once a
-   // layout is published it therefore stays immutable for the remainder of the
-   // process. Revoking readiness is enough; clearing the plain struct here could
-   // race a reader that acquired the previous true state immediately before a
-   // shutdown or failed-install rollback.
+   // A published layout stays immutable for the rest of the process
+   // (g_initialize_once); clearing the plain struct here could race a reader that
+   // acquired the previous true state just before a shutdown or failed-install rollback.
    g_layout_ready.store(false, std::memory_order_release);
 }
 
@@ -555,7 +537,6 @@ bool ResolveGameLayout()
           image, image.code_rva, image.code_size, kNotifierPattern, notifier))
       return FailResolution("unique semantic anchors");
 
-   // 偏移全部从语义锚点表取：认领、读上限、最终预检用的是同一组数字。
    const uintptr_t apply_loop_limit = apply_loop + kApplyLoopAnchors.loop_limit_immediate;
    const uintptr_t category_loop_limit = category_loop + kCategoryLoopAnchors.loop_limit_immediate;
    layout.skill_apply_loop_limit_immediate_rva = apply_loop_limit;
@@ -640,8 +621,8 @@ bool ResolveGameLayout()
 
    g_game_layout = layout;
    g_layout_ready.store(true, std::memory_order_release);
-   // 成功这一行只报"解析出来了"和"是哪个游戏构建"；两个 RVA 另起一行——只有查疑难
-   // session（钩子落到了别处）时才需要，平时扫日志不该被这串地址堵住眼睛。
+   // 成功这行只报"解析出来了"和"哪个游戏构建"；两个 RVA 另起一行——只有查疑难 session
+   //（钩子落到别处）时才需要，平时扫日志不该被这串地址堵住眼睛。
    Log(std::format(
       "Layout resolved and validated from semantic anchors (PE 0x{:X}).",
       image.nt->FileHeader.TimeDateStamp));

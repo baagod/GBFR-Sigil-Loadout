@@ -6,16 +6,13 @@ namespace gbfr::native
 {
 namespace
 {
-// 这里曾是唯一一处"全内存扫描"兜底（TableLocator，279 行）：锚点失效时扫过全部内存、
-// 把所有内容相同的表都写一遍。已删——它在这套机制上线后一次都没跑过（日志里从没出现
-// `located … copy/copies`），而且它证明不了唯一重要的那件事："这块缓冲区就是游戏在用的
-// 那块"静态证不出来。**不要再加回来**：拒写的代价是这一局内存不变（表此前已重新注册，
-// 编辑在游戏下一次解析或重启后照样生效），而扫描的代价是 5~6 秒的慢路径。
+// 这里删掉过一版"全内存扫描"兜底（TableLocator）：它在这套机制上线后一次都没跑过，而且证明
+// 不了唯一重要的事——"这块缓冲区就是游戏在用的那块"静态证不出来。**不要再加回来**：拒写的代价
+// 只是这一局内存不变（编辑在游戏下一次解析或重启后照样生效），而扫描是 5~6 秒的慢路径。
 //
 // 定位分两步，靠语义而不是靠地址常量。
 //
-// 第一步，行循环锚点：skill_status 那张表按"8 字节行数头 + 52 字节行"读出来，
-// 行尾就是 rows + rowCount*52：
+// 第一步，行循环锚点：skill_status 那张表按"8 字节行数头 + 52 字节行"读出来，行尾 = rows + rowCount*52：
 //   48 6B FE 34        imul rdi, rsi, 0x34        ; end = count*52
 //   48 01 DF           add  rdi, rbx              ; + rows
 //   C4 41 38 57 C0     vxorps xmm8, xmm8, xmm8
@@ -40,9 +37,9 @@ inline constexpr std::array<uint8_t, 20> kSlotBaseStore = {
    0xC5, 0xF8, 0x11, 0x05, 0, 0, 0, 0};
 
 // 为什么锚点要配一个窗口：这两条发布指令在 2.0.6 里全段分别出现 37 处和 23 处（同一个函数
-// 里每一张表都有一份），只有落在行循环锚点前面的那一对属于 skill_status。实测：真正的
-// 距离是 0xCA（load）和 0xFE（store）；隔壁 skill.tbl 的那一对在 0x836 和 0x86E，正好在
-// 窗口外。窗口取 0x800：真实距离有 8 倍余量，又刚好把隔壁那张表挡出去。
+// 里每一张表都有一份），只有落在行循环锚点前面的那一对属于 skill_status。实测真实距离是
+// 0xCA（load）和 0xFE（store），隔壁 skill.tbl 的那一对在 0x836 和 0x86E（正好在窗口外）。
+// 窗口取 0x800：真实距离有 8 倍余量，又刚好把隔壁那张表挡出去。
 inline constexpr size_t kAnchorWindowBytes = 0x800;
 
 // File header size and row stride of skill_status.tbl: 8-byte row count, then
@@ -54,10 +51,10 @@ inline constexpr uint64_t kTableRowBytes = 52;
 inline constexpr uint64_t kRowKeyOffset = 40;
 
 // 解析成功后要记住的全部东西：槽首的 RVA（0 = 还没解析出来）。缓冲区指针字段就是槽 +8，
-// 不必另存一份；单写者、读者只 load，所以一个原子量就够，不需要锁和那个结构体。
+// 不必另存一份；单写者、读者只 load，所以一个原子量就够，不需要锁。
 std::atomic_uintptr_t g_slot_rva{0};
 
-// 从槽里取出游戏那份活表的缓冲区地址：0 表示取到了，负数表示拒绝码。
+// 从槽里取出游戏那份活表的缓冲区地址（0 = 取到了，负数 = 拒绝码）。
 //
 // 每次问都重新读指针，不缓存地址——游戏换掉那份表（重新解析、发布新缓冲区）时下一个
 // 调用就跟上了，所以这里不存在"缓存失效"这个概念。
@@ -77,14 +74,13 @@ int32_t TryGetLiveTableBuffer(uintptr_t& buffer) noexcept
 }
 
 /*
-   在这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用的是显式
-   mask 字符串，两套并存，各自只服务一个文件）。
+   这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用显式 mask
+   字符串；两套并存，各自只服务一个文件）。
 
    这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是
    自动成立的——加一条新 pattern 时如果里面有一个 0 是想精确匹配的 0，匹配会静默变宽，
-   而变宽的后果是"命中数 != 1"，于是 fail-closed：游戏照常启动、hook 不装、只有日志说得出
-   原因。上面那三条都满足前提（kRowLoopSetup 里一个 0 都没有，另两条的 0 全是 rip 位移）。
-   所以改这三条时**逐个数字对一遍**，别只改个数。
+   而变宽的后果是"命中数 != 1"，于是 fail-closed（游戏照常启动、hook 不装、只有日志说得出
+   原因）。所以改这三条 pattern 时**逐个数字对一遍**，别只改个数。
 */
 template <size_t Size>
 size_t CountMatches(
@@ -130,8 +126,8 @@ struct AnchorSearch
 };
 
 // .text 扫描单独一个函数：它必须待在 SEH 帧里，而 SEH 帧不能和"需要栈展开的对象"同处
-// 一个函数（MSVC C2712），所以构造消息、拼字符串那些都留在调用方，这里只回报原始结果。
-// 三个计数各自都要恰好 1，任何一处不是 1 都由调用方 fail closed。
+// 一个函数（MSVC C2712），所以构造消息、拼字符串那些都留在调用方。三个计数各自都要恰好
+// 1，任何一处不是 1 都由调用方 fail closed。
 AnchorSearch SearchAnchorWindow(uintptr_t code_rva, size_t code_size) noexcept
 {
    AnchorSearch result{};
@@ -162,8 +158,7 @@ AnchorSearch SearchAnchorWindow(uintptr_t code_rva, size_t code_size) noexcept
    return result;
 }
 
-// 逐行 Key 比对：Key 是这张表的**身份**（编辑只动 LevelValue1..10 与 Level，从不碰 Key），
-// 所以这一关既是"确实是同一张表"的实证，又不会随编辑变化——每次应用都过得去。
+// 逐行 Key 比对：这一关既是"确实是同一张表"的实证，又不会随编辑变化——每次应用都过得去。
 // 另开一个函数：SEH 帧里只许有平凡类型，而且不能和"要栈展开的对象"同处一个函数。
 bool SameRowIdentity(const uint8_t* live, const uint8_t* table, uint64_t row_count) noexcept
 {
@@ -214,7 +209,7 @@ void ResolveTableSlot()
       return;
 
    // 代码段来自 layout_resolver 的 PE 视图——它才是"映像里哪一段是代码"的唯一持有者
-   // （先按名字找 `.text`，找不到才取最大的可执行段）。这里不再自己解析一遍 PE 头。
+   // （先按名字找 `.text`，找不到才取最大的可执行段）。
    CodeSectionView code{};
    if (!TryGetCodeSection(code))
    {
@@ -237,10 +232,9 @@ void ResolveTableSlot()
       return;
    }
 
-   // 两处 RIP 相对位移都解出来再验：槽首那条 mov [rip+d],rcx 与缓冲区指针那条
-   // mov rbx,[rip+d] 必须正好差 8（槽是 handle@+0 / buffer@+8 / ?@+0x10 三档）。解不出这一
-   // 对就不认。
-   // 两个锚点都是 `mov r,[rip+d]` / `mov [rip+d],r`：位移都在指令 +3，指令都长 7 字节。
+   // 两处 RIP 相对位移都解出来再验：槽首那条 mov [rip+d],rcx 与缓冲区指针那条 mov rbx,[rip+d]
+   // 必须正好差 8（槽是 handle@+0 / buffer@+8 / ?@+0x10 三档）。两条锚点都是 `mov r,[rip+d]` /
+   // `mov [rip+d],r`：位移都在指令 +3，指令都长 7 字节；解不出这一对就不认。
    uintptr_t slot_rva = 0;
    uintptr_t buffer_pointer_rva = 0;
    if (!DecodeRipTarget(
@@ -262,18 +256,16 @@ void ResolveTableSlot()
    }
 
    g_slot_rva.store(slot_rva, std::memory_order_release);
-   // 只报解析出来的那个槽。三个锚点 RVA、PE 时间戳、以及"槽 + 8"的缓冲区指针都不报：
-   // 后者的偏移是当面断言过的（上面那道 buffer_pointer_rva != slot_rva + 8），loaded 地址
-   // 就是 g_image_base + 这个 RVA——全是可推导的，而它们在这里只是噪音，真正需要时由上面
-   // 那几条失败分支负责说清楚（成功的锚点必然唯一，那是 FindUniquePattern 的判据）。
+   // 只报解析出来的那个槽。三个锚点 RVA、PE 时间戳、以及"槽 + 8"的缓冲区指针都不报：后者的
+   // 偏移上面刚断言过（buffer_pointer_rva != slot_rva + 8），loaded 地址就是 g_image_base + 这个
+   // RVA——全是可推导的，报出来只是噪音；需要时由上面那几条失败分支说清楚。
    Log(std::format("Table slot: resolved slot=0x{:X}.", slot_rva));
 }
 
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept
 {
    // 表的形状由**调用方**给的那张表定义（它来自归档，是权威），原生只检查游戏那份与它一致。
-   // 所以这里没有"6320"这种把游戏版本写死的常量：行的列布局变一次，只要 52 字节/行的关系还
-   // 成立，这条路就照样走；行数变了也不用改一个字。
+   // 所以这里没有把行数写死的常量：只要 52 字节/行的关系还在，列布局或行数变了都照样走。
    if (table == nullptr || length <= kTableHeaderBytes ||
        (length - kTableHeaderBytes) % kTableRowBytes != 0)
       return GBFR20_TABLE_LENGTH_UNEXPECTED;
@@ -284,7 +276,7 @@ int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept
    if (refusal != 0)
       return refusal;
 
-   // 三道闸全在写之前，任何一条不成立都是一个字节都不写。
+   // 三道闸全在写之前：任何一条不成立都是一个字节都不写。
    if (!IsGameRange(buffer, length, kWritableProtect))
       return GBFR20_TABLE_BUFFER_UNREADABLE;
 

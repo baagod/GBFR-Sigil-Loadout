@@ -50,12 +50,11 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    const GBFR20_TemplateSlot* slots, uint32_t slot_count,
    const GBFR20_ExclusiveOverride* overrides, uint32_t override_count)
 {
-   // 一个调用带两张调用方持有的表，所以守卫在这里：关机中拒绝、计数超出这张表可能有的条目数
-   // 拒绝、然后懒初始化并要求钩子已装。任一条不成立都以 0 报告失败。
+   // 一个调用带两张调用方持有的表，守卫都在这里：关机中拒绝、计数越界拒绝、然后懒初始化并
+   // 要求钩子已装；任一条不成立都以 0 报告失败。
    //
-   // 上界不是形式：下面会按调用方给的计数逐个读它那两块内存。槽数由 ApplyLoadout 自己截断，
-   // 但专属开关没有自己的容器大小可依——一个凭空来的计数会一路读到调用方数组之外。
-   // 上界取"专属表里的角色数 × 每角色三个专属槽"。
+   // 上界不是形式：下面按调用方的计数逐个读那两块内存，而专属开关没有自己的容器大小可依——
+   // 一个凭空来的计数会一路读到调用方数组之外。上界取"专属表角色数 × 每角色三个专属槽"。
    constexpr int32_t kMaxTemplateSlots = static_cast<int32_t>(kVirtualSlotCapacity);
    constexpr int32_t kMaxExclusiveOverrides =
       static_cast<int32_t>(kRuntimeTemplateCapacity) * 3;
@@ -71,8 +70,8 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    EnsureInitialized();
    if (!g_hooks_ready.load(std::memory_order_acquire))
       return 0;
-   // GBFR20_TemplateSlot is layout-identical to the native TemplateGemSlot
-   // (packed 1, same field order, 0x18 bytes); only read, never modified.
+   // Layout-identical to the native TemplateGemSlot (packed 1, same field order,
+   // 0x18 bytes); read only, never modified.
    const bool applied = ApplyLoadout(
       reinterpret_cast<const TemplateGemSlot*>(slots),
       static_cast<int32_t>(slot_count),
@@ -110,16 +109,15 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
 {
    if (g_shutting_down.load(std::memory_order_acquire))
       return GBFR20_TABLE_NOT_READY;
-   // 刻意**不**要求 g_hooks_ready：写的是数据管理器供给的那张表，和钩子装没装成无关，而槽的
-   // 解析（ResolveTableSlot）本来就排在装钩子之前、只要语义布局解析成功就会跑。槽没解析出来时
-   // 下面返回 SLOT_UNRESOLVED：拒写，一个字节都不动——编辑没丢（表已经重新注册过），只是要等
-   // 游戏下一次解析或重启。没有第二条写路径。
+   // 刻意**不**要求 g_hooks_ready：写的是数据管理器供给的那张表，与钩子装没装成无关，而
+   // ResolveTableSlot 本来就排在装钩子之前。槽没解析出来时下面返回 SLOT_UNRESOLVED：拒写、
+   // 一个字节都不动——编辑没丢（表已经重新注册过），只是要等游戏下一次解析或重启。
    EnsureInitialized();
-   // 上一次报出来的拒绝码。同一种拒写只报一次：
+   // 上一次报出来的拒绝码；同一种拒写只报一次：
    //
-   // 拒写会按 5 秒一次重试，而在游戏把那张表读进内存之前**必然**一直是 -3——这条消息于是
-   // 每次都逐字相同，实测 3 行只差时间戳。真正的结论由托管侧那句 SUCCESS / 拒写承担，
-   // 这里只需要说一次"为什么没写进去"。拒绝码换了（或中间成功过一次）才再报。
+   // 拒写每 5 秒重试一次，而游戏把那张表读进内存之前**必然**一直是 -3——这条消息于是逐字
+   // 相同，实测 3 行只差时间戳。这里只说一次"为什么没写进去"，真正的结论由托管侧那句
+   // SUCCESS / 拒写承担。拒绝码换了（或中间成功过一次）才再报。
    static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
 
    const int32_t result = WriteSkillStatusTable(table, length);

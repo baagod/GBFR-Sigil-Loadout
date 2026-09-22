@@ -2,9 +2,8 @@ package main
 
 import "log"
 
-// trayOnClick reveals/raises the window: a fake-hidden window is revealed
-// through the shared 0x8010 activation command; a visible window only gets
-// the command when it is not already foreground.
+// trayOnClick reveals/raises the window: a fake-hidden window is revealed via the shared
+// 0x8010 activation command; a visible one only gets it when not already foreground.
 func trayOnClick() {
 	defer func() {
 		if r := recover(); r != nil {

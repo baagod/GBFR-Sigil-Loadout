@@ -20,9 +20,9 @@ interface SkillItem {
 interface SkillPickerProps {
   value: string
   skills: string[]
-  /** Display name map (value -> localized label). Falls back to value. */
+  /** Display name map (value -> localized label); falls back to value. */
   labels?: Record<string, string>
-  /** Text shown on the trigger when value is empty (t.pickSkill / t.none). */
+  /** Trigger text when value is empty (t.pickSkill / t.none). */
   placeholder: string
   /** Prepend a "无" (empty value) option - used for the second skill. */
   noneOption?: boolean
@@ -34,7 +34,7 @@ interface SkillPickerProps {
   emptyLabel: string
   /** Disable the picker (e.g. secondary sigil before a primary is chosen). */
   disabled?: boolean
-  /** Optional set of legal values; items outside it are dimmed (illegal). */
+  /** Items outside this set are dimmed (illegal combination). */
   legal?: Set<string>
   /** Current selection is illegal for the chosen main sigil (red trigger). */
   invalid?: boolean
@@ -60,8 +60,7 @@ export function SkillPicker({
     return noneOption ? [{ value: "", label: noneLabel }, ...mapped] : mapped
   }, [skills, labels, noneOption, noneLabel])
 
-  // An unrecognised value (a stored skill the picker no longer offers) stays
-  // visible by its label/raw hash instead of masquerading as "none".
+  // 不认识的取值（存档里有、下拉不再提供的技能）按它的标签/裸 hash 显示，而不是冒充"无"。
   const selected: SkillItem =
     items.find((item) => item.value === value) ??
     (value !== ""
@@ -84,9 +83,8 @@ export function SkillPicker({
             variant="outline"
             disabled={disabled}
             onKeyDownCapture={(e) => {
-              // Base UI opens the list on ArrowUp/ArrowDown from the trigger.
-              // Swallow them in the capture phase so arrow keys stay free for
-              // field navigation (and the number inputs' own stepper).
+              // Base UI 在触发器上按方向键就会打开列表：在捕获阶段吞掉它们，方向键才留给
+              // 字段导航（以及数值输入框自己的步进）。
               if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                 e.preventDefault()
                 e.stopPropagation()

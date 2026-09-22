@@ -2,7 +2,7 @@
 
 namespace gbfr::native
 {
-// 我们自己的重建调用正在游戏线程上跑（重建函数反过来进 detour）。见 native_internal.h。
+// 我们自己的重建调用正在游戏线程上跑（重建函数反过来进 detour）。
 thread_local bool g_tls_hot_rebuild_build = false;
 
 namespace
@@ -14,8 +14,7 @@ void LogRebuildProblem(const char* what, uint32_t character_hash, uintptr_t stat
       "status rebuild: {} (char=0x{:08X} status=0x{:X})", what, character_hash, status));
 }
 } // namespace
-// RIP-rel32 算术：位移在指令 +displacement_offset，指令长 instruction_size，目标必须落在映像
-// 内。这里只做算术与范围判断——4 个字节落在已验证过的代码段里，不需要 SEH。
+// 只做算术与范围判断：读的 4 个字节落在已验证过的代码段里，不需要 SEH。
 bool DecodeRipTarget(
    uintptr_t image_base,
    uintptr_t image_size,
@@ -59,7 +58,7 @@ bool SafeReadUint64(uintptr_t address, uint64_t& value) noexcept
 bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noexcept
 {
    // 一次 VirtualQuery 只答一个区域，而"整表"可能跨好几个（328,648 字节实测就跨了），
-   // 所以一个区域一个区域往前走。可读与可写的差别只是 required_protect。
+   // 所以一个区域一个区域往前走。
    uintptr_t current = address;
    size_t remaining = size;
    while (remaining > 0)
@@ -147,13 +146,9 @@ bool SafeInvokeStatusRebuild(
 
    if (!rebuild_succeeded)
    {
-      // 2026-09-21 崩溃物证（结论已在 selection_store.cpp 的轮次闸；此处只留签名）：
-      // ok=0 之后 20~30 秒 AV —— 0xc0000005、读 0x19、偏移 0x9318C3；故障点
-      // mov rcx,[r9] / cmp byte [rcx+0x19],0 而 rcx=0。所以"闸"判的是对象还新不新，
-      // 不是指针记不记得住。
-      // 游戏的重建函数里抛了异常（多半是那份对象已经不在游戏手上了）。
-      // 调用方会冷却 60 秒，但这一步本身无法撤销——所以真正的修法是 **别让这个调用发生**。
-      //（见 selection_store.cpp 的装配轮次闸）。
+      // 2026-09-21 崩溃物证：ok=0 之后 20~30 秒 AV（0xc0000005、读 0x19、偏移 0x9318C3，
+      // 故障点 mov rcx,[r9] / cmp byte [rcx+0x19],0 而 rcx=0）——所以闸判的是对象还新不新，
+      // 不是指针记不记得住。冷却 60 秒撤不掉这一步，真正的修法是**别让这个调用发生**（见轮次闸）。
       LogRebuildProblem(
          "the game's rebuild raised; the object was probably gone", character_hash, status);
       return false;

@@ -5,10 +5,9 @@ using System.Runtime.InteropServices;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Minimal native-core facade. Only the functions the thin mod shell actually
-/// uses are kept: ABI check, log sink, input-hook disable, initialize, shutdown
-/// and runtime-message readback. All selector/inventory/preset/input/present
-/// APIs of the derived original were removed.
+/// Minimal native-core facade: ABI check, log sink, initialize, shutdown and runtime-message
+/// readback. All selector/inventory/preset/input/present APIs of the original it derives from
+/// were removed.
 /// </summary>
 internal static unsafe partial class NativeCore
 {
@@ -81,19 +80,17 @@ internal static unsafe partial class NativeCore
     }
 
     /// <summary>
-    /// Formats one "Startup phase=… state=… elapsed_ms=…" line. It lives here
-    /// because this class owns the first phase and Mod consumes it for the rest,
-    /// so the phase-log contract has exactly one implementation.
+    /// Formats one "Startup phase=… state=… elapsed_ms=…" line. It lives here because this class owns
+    /// the first phase and Mod consumes the rest, so the phase-log contract has one implementation.
     /// </summary>
     internal static string StartupPhaseLine(string phase, long startedAt, bool succeeded) =>
         $"Startup phase={phase} state={(succeeded ? "complete" : "failed")} " +
         $"elapsed_ms={(long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds}.";
 
     /// <summary>
-    /// Applies one whole player configuration in a single native call: the general
-    /// slots plus the per-character exclusive switches. A null/empty half means
-    /// "none of it" (no general slots = built-in exclusive template only; no
-    /// switches = every exclusive enabled).
+    /// Applies one whole player configuration in a single native call: the general slots plus the
+    /// per-character exclusive switches. A null/empty half means "none of it" (no general slots =
+    /// built-in template only; no switches = every exclusive enabled).
     /// </summary>
     internal static bool ApplyLoadout(
         TemplateSlotNative[]? slots,
@@ -133,8 +130,8 @@ internal static unsafe partial class NativeCore
         }
     }
 
-    // Native log callback as a plain delegate (kept alive in a static field):
-    // avoids the [UnmanagedCallersOnly] path entirely.
+    // Native log callback as a plain delegate, held alive in a static field: a collected
+    // delegate would leave native code calling a freed function pointer.
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void NativeLogCallback(sbyte* message);
 

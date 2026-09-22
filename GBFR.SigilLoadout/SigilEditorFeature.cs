@@ -4,35 +4,24 @@ using Reloaded.Mod.Interfaces;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// 按用户编辑的 sigiledits.json 改写 skill_status.tbl 的行：启动时改一份表交给
-/// IDataManager，运行中则直接覆写游戏内存里已经有的那份表。
+/// 按用户编辑的 sigiledits.json 改写 skill_status.tbl 的行：启动时改一份表交给 IDataManager，
+/// 运行中则直接覆写游戏内存里已经有的那份表。它没有自己的配置目录、配置文件名，也没有用来叫醒
+/// 它的 win32 具名事件：日志走宿主的日志，生命周期与"什么时候该重新应用"也跟着宿主走。
 ///
-/// 它没有自己的配置目录、配置文件名，也没有用来叫醒它的 win32 具名事件：日志走宿主的
-/// 日志（<see cref="Mod"/> 注入进来的），生命周期与"什么时候该重新应用"也跟着宿主走。
-///
-/// 运行中改写由宿主每隔 250ms 的 tick 驱动（见 <see cref="Tick"/>）：可视工具每存一次编辑列表，
-/// 文件时间就变一次，<see cref="Apply"/> 随即覆写游戏内存里的表——不重启、不挂钩子。
+/// 运行中改写由宿主 250ms 的 tick 驱动（见 <see cref="Tick"/>）：可视工具每存一次编辑列表，文件
+/// 时间就变一次，<see cref="Apply"/> 随即覆写游戏内存里的表——不重启、不挂钩子。
 ///
 /// 启动那次写与运行中的热应用是**同一个操作**（<see cref="Publish"/>）：读表、套编辑、注册给
-/// IDataManager、原地写进游戏内存；差别只在启动时配置已经拿在手里。
+/// IDataManager、原地写进游戏内存。不带静态 .tbl。
 ///
-/// 不带静态 .tbl：表从游戏归档里读出来、在内存里改、再写回去。
+/// 行的布局（对着 GBFRDataTools 的 skill_status.headers 与 GameTable.cs 里那句
+/// 8 + RowSize * rowCount == file.Length 的断言核对过）：8 字节头 = 行数（int64）；每行 52 字节，
+/// +0..+36 float LevelValue1..10、+40 uint Key（技能哈希）、+44 uint LevelDescription、+48 uint Level。
+/// 第 k 行从 8 + 52k 开始。一次改写匹配 (Key, Level)，写那一行自己的 LevelValue1..10，所以编辑里写的
+/// Level 就落在 Level 字段上——正是游戏显示的那个数字。行按 Key 分组、Level 升序。
 ///
-/// 行的布局。对着文件和读这张表的外部工具的表定义都核对过——GBFRDataTools 的
-/// skill_status.headers，以及 GameTable.cs 里那句断言 8 + RowSize * rowCount == file.Length：
-///   - 8 字节头：行数，int64。
-///   - 每行 52 字节：
-///       +0   float  LevelValue1 ... +36 float LevelValue10
-///       +40  uint   Key（技能哈希）
-///       +44  uint   LevelDescription
-///       +48  uint   Level
-///
-/// 第 k 行从 8 + 52k 开始。一次改写匹配 (Key, Level)，写的是那一行自己的
-/// LevelValue1..10，所以编辑里写的 Level 就落在 Level 字段上——正是游戏显示的那个数字。
-/// 行按 Key 分组、Level 升序。
-///
-/// LevelValue7..10 只在游戏 2.0.0（Endless Ragnarok）之后存在。2.0 之前的表是
-/// 36 字节一行、Key 在 +24，所以 Start() 动它之前先验表的形状。
+/// LevelValue7..10 只在游戏 2.0.0 之后存在；2.0 之前的表是 36 字节一行、Key 在 +24，所以 Start()
+/// 动它之前先验表的形状。
 /// </summary>
 internal sealed class SigilEditorFeature
 {
@@ -48,7 +37,6 @@ internal sealed class SigilEditorFeature
 
     // 编辑列表住在 mod 自己的用户配置目录里（见 UserConfig），和配装 loadout.json 挨着：
     // 可视工具写、这里读。改动由下面 Tick() 的 mtime 门发现。
-    //
     private static readonly string ConfigFile = UserConfig.FilePath(ConfigFileName);
 
     // 编辑器要用的表来自 gbfrelink.utility.manager，而那是**可选**依赖：管理器可能比本 mod
@@ -63,10 +51,9 @@ internal sealed class SigilEditorFeature
     private bool _quiet;
     // 还没成功过时的重试间隔，以及上一次尝试的时刻（Environment.TickCount64）。
     //
-    // 这段重试唯一可能的成功条件是"游戏把 skill_status 表读进了内存"，那是分钟级的事，
-    // 所以 250ms 一拍没有意义：每次尝试都要走一遍原生写入，而**原生在自己那句 "refused"
-    // 里打字**——托管侧的静默管不到它，于是重试把日志刷成洪水（实测 6 秒 26 行）。
-    // 拉到 5s 之后，同样的等待只留下十几行而不是上千行；已经成功过的路径不受影响（走 mtime 门）。
+    // 唯一可能的成功条件是"游戏把表读进了内存"，那是分钟级的事，所以 250ms 一拍没意义：每次尝试
+    // 都走一遍原生写入，而**原生在自己那句 "refused" 里打字**，托管侧的静默管不到（实测 6 秒 26 行）。
+    // 拉到 5s 只剩十几行；已成功过的路径走 mtime 门，不受影响。
     private const long RetryIntervalMs = 5000;
     private long _lastAttemptMs;
     // 上一次拒写留下的候选表与它对应的文件版本：同版本重试直接复用，不重建。
@@ -82,21 +69,19 @@ internal sealed class SigilEditorFeature
     public SigilEditorFeature(Action<string> log) => _log = log;
 
     /// <summary>
-    /// 读编辑列表、改出表、交给 IDataManager，并把热应用接起来。
-    /// 任何一步失败都只记日志：这项功能坏掉不该把整个 mod 带走。
+    /// 读编辑列表、改出表、交给 IDataManager，并把热应用接起来。任何一步失败都只记日志：这项功能
+    /// 坏掉不该把整个 mod 带走。
     /// </summary>
     public void Start(IModLoader loader)
     {
         _loader = loader;
-        // 不在这里打横幅：紧跟着的 "sigil edit: N enabled" 已经说明这一半起来了，
-        // 而一句 "=== Sigil edit start ===" 不含任何可排查的信息。
         Bootstrap();
     }
 
     /// <summary>
-    /// 只跑一次（<c>_started</c>）：还没接上 IDataManager 时由 <see cref="Tick"/> 再来叫；
-    /// 接上了但这次没造出表（归档读不出来、或这是本构建不认识的布局）也由 Tick 重试，
-    /// 一旦交出去过一份表，之后就只由 mtime 门驱动。
+    /// 只跑一次（<c>_started</c>）：还没接上 IDataManager 时由 <see cref="Tick"/> 再来叫；接上了但没
+    /// 造出表（归档读不出来、或布局是本构建不认识的）也由 Tick 重试；一旦交出去过一份表，之后只由
+    /// mtime 门驱动。
     /// </summary>
     private void Bootstrap()
     {
@@ -106,18 +91,17 @@ internal sealed class SigilEditorFeature
 
         try
         {
-            // 版本号必须在**读内容之前**取。反过来的话：内容来自 T1、版本号来自 T4，而在
-            // T1→T4 之间（读归档 328KB + 逐行补丁）落盘的那次保存会被 MarkApplied(T4) 判成
-            // 已生效——内存里却是旧内容，那次编辑静默丢失且不再重试（门已经推过去了）。
-            // Tick 那一路的顺序本来就是对的（:187 先取 mtime，:199 才应用），这里对齐它。
+            // 版本号必须在**读内容之前**取。反过来：内容来自 T1、版本号来自 T4，而 T1→T4 之间（读
+            // 归档 328KB + 逐行补丁）落盘的那次保存会被 MarkApplied(T4) 判成已生效——内存里却是旧
+            // 内容，编辑静默丢失且不再重试。Tick 那一路本来就是对的，这里对齐它。
             DateTime stamp = _stamp.Now();
 
             Config? loaded = LoadConfig(out _);
             Config config = loaded ?? new Config();
             byte[]? table = BuildEditedTable(config, out int applied);
 
-            // 造不出表就说清楚为什么，什么都不写；_started 已经置上，所以这一局只由 Tick 的
-            // mtime 门继续看——每次应用前会重新读表，那时归档可能已经就绪。
+            // 造不出表就说清楚为什么，什么都不写；_started 已置上，这一局只由 Tick 的 mtime 门继续看，
+            // 每次应用前会重新读表，那时归档可能已经就绪。
             if (table is null)
             {
                 _log("sigil edit: nothing applied - the table could not be read, or its layout is not the one this build patches (see the lines above)");
@@ -126,29 +110,25 @@ internal sealed class SigilEditorFeature
 
             if (applied == 0)
             {
-                // 两份空列表要分开说：一份"读不出来"的空列表和一份"用户清空了"的空列表，
-                // 在这一行之前各有一句日志说明是哪种，这里不该把前者说成"列表里 0 条编辑"。
-                // 数启用数而不是总数：上面那行报的就是启用数，同一个词在相邻两行里指两件事
-                // 会让人对不上；而"该写却有 0 行落地"的原因只跟启用数有关。
+                // 两份空列表要分开说：这里的措辞是"没有编辑"，不能把"读不出来"说成"列表里 0 条编辑"。
+                // 数启用数而不是总数：上面那行报的就是启用数，同一个词指两件事会让人对不上。
                 _log(loaded is null
                     ? "sigil edit: there is no edit list yet, or it could not be read (see the line above); nothing applied and the table was not written back"
                     : $"sigil edit: no edit reached a row ({config.Edits.Count(edit => edit.Enabled)} enabled); not writing the table back");
                 return;
             }
 
-            // 造表期间文件又变了：这一版已经过期。什么都不写、也不推进版本，让 Tick 的 mtime
-            // 门按新版本重来（它自己会重新读配置与归档）。否则我们就会用一个旧版本号去标记
-            // 一份新内容"已应用"。
+            // 造表期间文件又变了：这一版已经过期。什么都不写、也不推进版本，让 Tick 的 mtime 门
+            // 按新版本重来，否则就是用旧版本号把一份新内容标记成"已应用"。
             if (_stamp.Now() != stamp)
             {
                 _log("sigil edit: the edit list changed while the table was being built; it will be applied on the next tick");
                 return;
             }
 
-            // 启动这次写与运行中的热应用是同一件事：注册给 IDataManager，再原地写进游戏内存。
-            // 表**直接交过去**（bootTable）——它刚在这里建好，让 Tick 那一路再读一遍配置、
-            // 再建一次表纯属白干（实测日志里 "sigil edit: N enabled" 出现两次就是它）。
-            // 走 TryApply 而不是直接 Apply：那一版"我已经说过"的状态要一起登记上。
+            // 启动这次写与运行中的热应用是同一件事：注册给 IDataManager，再原地写进游戏内存。表直接
+            // 交过去（bootTable，刚在这里建好）——让 Tick 再读一遍配置、再建一次表纯属白干。走
+            // TryApply 而不是 Apply：那一版"我已经说过"的状态要一起登记上。
             TryApply(stamp, table);
         }
         catch (Exception ex)
@@ -160,8 +140,8 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 拿 IDataManager。管理器是可选依赖（本 mod 只有编辑器这一半需要它），可能比我们晚加载，
-    /// 所以这里每次 Tick 都会被重试；只在第一次没拿到时说一句话，免得刷屏。
+    /// 拿 IDataManager。管理器是可选依赖、可能比我们晚加载，所以每次 Tick 都重试；只在第一次没拿到
+    /// 时说一句话，免得刷屏。
     /// </summary>
     private bool TryAttachManager()
     {
@@ -184,15 +164,13 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试一次接；接上了就看编辑列表的文件时间
-    /// 变了没有，变了就重新应用一次。
+    /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试一次；接上了就看编辑列表的文件时间变了没有，
+    /// 变了就重新应用一次。
     ///
-    /// 250ms 对这项功能不是个量——数值要到下一场战斗才开始生效；它换掉的是一条永久阻塞在
-    /// WaitOne 的线程和一个内核事件对象。
+    /// 250ms 不是个量——数值要到下一场战斗才生效；它换掉的是一条阻塞在 WaitOne 的线程和一个内核事件对象。
     /// </summary>
     public void Tick()
     {
-        // 管理器是可选依赖，可能比本 mod 晚加载——那时连表都读不出来，先把它接上。
         if (_dm is null)
         {
             Bootstrap();
@@ -205,8 +183,8 @@ internal sealed class SigilEditorFeature
         if (!_stamp.Pending(current))
             return;
 
-        // 还没成功过时按 RetryIntervalMs 节流：原生拒写会在自己那句日志里打字，托管侧的
-        // 静默管不到它，所以重试频率就是日志频率。文件变了要立刻处理，所以那一版不算节流。
+        // 还没成功过时按 RetryIntervalMs 节流：原生拒写会在自己那句日志里打字，托管侧的静默
+        // 管不到它，所以重试频率就是日志频率。文件变了要立刻处理，那一版不算节流。
         long now = Environment.TickCount64;
         bool sameVersionRetry = _currentTable is null && current == _loggedAttemptUtc;
         if (sameVersionRetry && now - _lastAttemptMs < RetryIntervalMs)
@@ -219,8 +197,7 @@ internal sealed class SigilEditorFeature
     /// <param name="stamp">这一版文件的 mtime；只有真的写进游戏内存了才会被标记为已应用。</param>
     /// <param name="bootTable">
     /// 启动那次已经建好的表（见 <see cref="Bootstrap"/>）。启动那次也走这里而不是直接调
-    /// <see cref="Apply"/>：这两个"我已经说过哪一版"的状态必须一起对齐——否则第一次 Tick
-    /// 会以为这是新的一版，于是既不静默（多打一行同样的拒写）、也不走 5 秒节流（立刻白重试一次）。
+    /// <see cref="Apply"/>，否则第一次 Tick 会以为这是新的一版：既不静默、也不节流，白重试一次。
     /// </param>
     private void TryApply(DateTime stamp, byte[]? bootTable = null)
     {
@@ -248,21 +225,16 @@ internal sealed class SigilEditorFeature
             _log(message);
     }
 
-    /// <summary>
-    /// 置上停止标志——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。
-    /// </summary>
+    /// <summary>置上停止标志——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。</summary>
     public void Dispose() => Interlocked.Exchange(ref _stopped, 1);
 
     /// <summary>
-    /// 把表应用到内存里。调用方是宿主那条 250ms 的 tick（见 <see cref="Tick"/>），以及启动那次
-    /// （<see cref="Bootstrap"/> 把刚建好的表直接交进来）。
+    /// 把表应用到内存里。调用方是宿主 250ms 的 tick（见 <see cref="Tick"/>）与启动那次（<see
+    /// cref="Bootstrap"/> 把刚建好的表直接交进来）。<paramref name="bootTable"/> 非空表示"这份表已经
+    /// 建好、就是这一版的"，不必再读一遍配置与归档；为 null 时按磁盘上的编辑列表现建。
     ///
-    /// <paramref name="bootTable"/> 非空表示"这份表已经建好、就是这一版的"：启动那次已经读过
-    /// 配置并建过一次表，再重读一遍只是白读（配置文件 + 归档共约 600 KB）。为 null 时按当前
-    /// 磁盘上的编辑列表现建。
-    ///
-    /// <paramref name="stamp"/> 是这一版的 mtime：**只有真的写进游戏内存了**才在最后标记为
-    /// "已应用"。读不出表、或原生拒写，都提前 return，那一版就还欠着，下一拍会再来。
+    /// <paramref name="stamp"/> 是这一版的 mtime：**只有真的写进游戏内存了**才在最后标记为"已应用"。
+    /// 读不出表、或原生拒写，都提前 return，那一版还欠着，下一拍会再来。
     /// </summary>
     private void Apply(DateTime stamp, byte[]? bootTable = null)
     {
@@ -273,9 +245,8 @@ internal sealed class SigilEditorFeature
             return;
         }
 
-        // 上一拍写过、但没写进去的那份候选还在，而且文件还是那一版：直接拿它重试。
-        // 没有这一步，每次重试都要从归档重建一份同样的内容（328 KB 读 + 6,320 次行比较），
-        // 而拒写期间重试是 5 秒一次。
+        // 上一拍写过、但没写进去的那份候选还在，而且文件还是那一版：直接拿它重试。没有这一步，
+        // 每次重试都要从归档重建一份同样的内容（328 KB 读 + 6,320 次行比较），而拒写期间是 5 秒一次。
         if (_retryTable is not null && _retryTableStamp == stamp)
         {
             Publish(_retryTable, stamp);
@@ -289,9 +260,8 @@ internal sealed class SigilEditorFeature
             return;
         }
 
-        // 只是捷径：这次保存和上次交上去的那份逐字节一样就什么都不做。基线未知（启动那次没能
-        // 产出表）就不比，让这一拍照常做一遍——代价是一次原生写入，换来的是这里不用再维护
-        // "游戏手里那份"这个第二份事实。
+        // 只是捷径：这份和上次交上去的逐字节一样就什么都不做。基线未知（启动那次没产出表）就不比，
+        // 让这一拍照常做一遍——代价是一次原生写入，换来的是不必再维护"游戏手里那份"这个第二份事实。
         if (_currentTable is not null && newTable.AsSpan().SequenceEqual(_currentTable))
         {
             LogAttempt("hot apply: the edit list matches what is already in memory; nothing to do");
@@ -302,24 +272,16 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 唯一那条交给游戏的路径：先重新注册（便宜，而且游戏若再次解析那份被送达的文件，
-    /// 那次解析也必须看到新值），再让原生按行原地写进游戏已经解析好的那份表。
-    /// 启动那次写与运行中的热应用走的都是这里——它们是同一件事。
-    /// </summary>
-    /// <summary>
-    /// 唯一那条交给游戏的路径：先重新注册（便宜，而且游戏若再次解析那份被送达的文件，
-    /// 那次解析也必须看到新值），再让原生按行原地写进游戏已经解析好的那份表。
-    /// 启动那次写与运行中的热应用走的都是这里——它们是同一件事。
+    /// 唯一那条交给游戏的路径：先重新注册（便宜；游戏若再次解析那份送达的文件，那次解析也必须看到
+    /// 新值），再让原生按行原地写进游戏已经解析好的那份表。
     ///
-    /// 返回"真的写进游戏内存了吗"。没写进去时把这份候选留下（<see cref="_retryTable"/>）：
-    /// 同一版重试时不必再从归档重建一份同样的内容（归档 328 KB，重建一次就是白干）。
+    /// 返回"真的写进游戏内存了吗"。没写进去时留下这份候选（<see cref="_retryTable"/>），同一版重试
+    /// 时不必再从归档重建（328 KB）。
     /// </summary>
     private bool Publish(byte[] table, DateTime stamp)
     {
-        // Registration first: it is cheap, and if the game ever parses the table
-        // from the served file again, that parse must see the new values rather
-        // than quietly re-creating rows with the old ones. It is also what makes a
-        // refusal below survivable: the edit is not lost, only late.
+        // Registration first: it is cheap, and if the game re-parses the table from the served file,
+        // that parse must see the new values, not rows re-created with the old ones.
         try
         {
             RegisterWithManager(table);
@@ -336,9 +298,8 @@ internal sealed class SigilEditorFeature
         int written = NativeCore.WriteSkillStatusTable(table);
         if (written < 0)
         {
-            // 拒写。不对每个码再解释一遍——权威那张表在 native_api.h（-1..-7，每条一句人话），
-            // 在这里重述同一批事实只会多出一份必然先烂的副本。这里只说**本层**的后果：
-            // 这份列表已经存进文件、也重新注册过了，所以游戏下一次解析就会拿到它。
+            // 拒写。不为每个码再解释一遍——权威那张表在 native_api.h（-1..-7）。这里只说**本层**的
+            // 后果：这份列表已经存进文件、也重新注册过，游戏下一次解析就会拿到它。
             LogAttempt($"hot apply: the native write was refused ({written}); the edit list is saved and re-registered, so the game picks it up at its next parse");
             _retryTable = table;
             _retryTableStamp = stamp;
@@ -355,10 +316,8 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 按 <paramref name="config"/> 造出表的字节：原表，叠上启用的那些编辑。
-    ///
-    /// 造不出来时返回 null 并说明原因。启动那次写与运行中的热应用走的是同一条造表路径
-    /// ——布局检查与行格式只有一处，出问题时说原因的日志也只有一处。
+    /// 按 <paramref name="config"/> 造出表的字节：原表，叠上启用的那些编辑；造不出来返回 null 并说明
+    /// 原因。启动那次写与热应用走同一条路径，布局检查、行格式、报原因的日志都只有一处。
     /// </summary>
     private byte[]? BuildEditedTable(Config config, out int applied)
     {
@@ -373,10 +332,8 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 热应用要的那张表：按此刻磁盘上的编辑列表改出来的字节；改不出来就 null（并已说明原因）。
-    ///
-    /// 编辑列表在这里重新读，所以造出来的是此刻的文件——tick 已经确认过它的文件时间变了。
-    /// 启动那条路走 <see cref="BuildEditedTable"/>，同一套偏移量与同一套日志，只是配置已经拿在手里。
+    /// 热应用要的那张表：按此刻磁盘上的编辑列表改出来的字节；改不出来就 null（并已说明原因）。编辑
+    /// 列表在这里重新读，所以造出来的是此刻的文件——tick 已经确认过它的文件时间变了。
     /// </summary>
     private byte[]? BuildCurrentTable()
     {
@@ -389,8 +346,8 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 从游戏归档里取出没动过的表；取不到就返回 null 并说明原因：没有数据管理器、
-    /// 没拿到东西，或者这是本套偏移量描述不了的布局。
+    /// 从游戏归档里取出没动过的表；取不到就返回 null 并说明原因：没有数据管理器、没拿到东西，或者
+    /// 这是本套偏移量描述不了的布局。
     /// </summary>
     private byte[]? TryReadTable()
     {
@@ -406,12 +363,11 @@ internal sealed class SigilEditorFeature
             LogAttempt($"sigil edit FAIL: GetArchiveFile('{TablePath}') returned nothing");
             return null;
         }
-        // 不在这里报"读了多少字节"：那只是"归档读取返回了 N 字节"，对排查没有指向性。
-        // 两条真正要看的信息下面各自带着：读不到是上面那句，形状不对是紧跟着的
-        // HasPatchableLayout 那句（它把实际字节数、头里声明的行数一起报出来）。
+        // 不在这里报"读了多少字节"：没有指向性。两条真正要看的信息都带着——读不到是上面那句，
+        // 形状不对是下面 HasPatchableLayout 那句（它把实际字节数、头里声明的行数一起报出来）。
 
-        // 下面那些偏移量只对这种形状的表成立。2.0 之前的表是 36 字节一行，将来任何一次
-        // 列变动又会把这些偏移量再挪一遍：那时候照改就是写进错误的行，或者写出行外，而且不吭声。
+        // 下面那些偏移量只对这种形状的表成立：2.0 之前的表是 36 字节一行，将来任何一次列变动又会把它们
+        // 再挪一遍——那时照改就是写进错误的行（或行外），而且不吭声。
         if (!HasPatchableLayout(file, out long declaredRows))
         {
             LogAttempt($"sigil edit FAIL: {TablePath} is not the {FileHeaderSize}-byte header + " +
@@ -423,10 +379,7 @@ internal sealed class SigilEditorFeature
         return file;
     }
 
-    /// <summary>
-    /// 把 <paramref name="config"/> 里启用的编辑原地写进 <paramref name="file"/>，
-    /// 返回落下去几条。每一次跳过都说清楚为什么跳过。
-    /// </summary>
+    /// <summary>把 <paramref name="config"/> 里启用的编辑原地写进 <paramref name="file"/>，返回落下去几条。</summary>
     private int PatchRows(byte[] file, Config config)
     {
         int applied = 0;
@@ -460,12 +413,9 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 把 <paramref name="table"/> 作为对外供给的文件交回管理器，调用的正是启动时那次写
-    /// 用的那几个方法。
-    ///
-    /// 热应用需要这一步而不只是写内存：游戏在读档、开界面时会重新解析这张表，而之后每一次
-    /// 解析读的都是供给的那份文件——没有这次重新注册，那些解析会用旧值把行重建出来，
-    /// 当场把实时编辑抹掉。
+    /// 把 <paramref name="table"/> 作为对外供给的文件交回管理器（就是启动时那次写用的那两个方法）。
+    /// 热应用需要这一步而不只是写内存：游戏在读档、开界面时会重新解析这张表，之后每次解析读的都是
+    /// 供给的那份文件——不重新注册，那些解析会用旧值把行重建出来，当场抹掉实时编辑。
     /// </summary>
     private void RegisterWithManager(byte[] table)
     {
@@ -477,29 +427,22 @@ internal sealed class SigilEditorFeature
 
         _dm.AddOrUpdateExternalFile(TablePath, table);
         _dm.UpdateIndex();
-        // 成功注册这件事不再单独打一行：紧随其后的 SUCCESS / 拒写各自都说了结果，而拒写那句
-        // 本来就写着"已经重新注册，游戏下一次解析会拿到"。一次热应用里它只是把结论说第三遍。
     }
 
     /// <summary>
     /// 磁盘上此刻的编辑列表。
     ///
-    /// <paramref name="missing"/> 只在"文件不存在"时为 true，别的失败（没权限、被占用、
-    /// 手改坏了 JSON）都不是它：删掉文件是一个真实的答案（空列表，产出未编辑的技能表），读不出来是
-    /// 另一个（什么都不写）。两者折成同一个 null，删除就会变成"什么都不做"——而隔壁同目录的
-    /// loadout.json 遇到删除是会恢复内置模板的。
+    /// <paramref name="missing"/> 只在"文件不存在"时为 true；没权限、被占用、手改坏 JSON 都不是它。
+    /// 删掉文件是真实的答案（空列表 → 未编辑的技能表），读不出来是另一个（什么都不写）；两者折成同一个
+    /// null，删除就变成"什么都不做"——而隔壁 loadout.json 遇到删除会恢复内置模板。
     /// </summary>
     private Config? LoadConfig(out bool missing)
     {
         missing = false;
         try
         {
-            // 不报路径：它是这个类里的编译期常量（而且有一道跨语言断言盯着），读失败那句
-            // 会把路径带出来。每次热应用打一遍它，读的人只是多滑一行。
-            // 报**启用了几条**：那才是"这一轮会写进去几行"，也说明文件确实读到了
-            // （读不到走的是下面那句 "no edit list yet at ..."）。不写 edit(s) 那种懒复数：
-            // 中文语境里那个 (s) 不带信息，而去掉名词就没有单/复数问题。
-            // 被禁用的条目各自还有一行 "skip (disabled): <key>"，所以总数推得回来。
+            // 不报路径（编译期常量，读失败那句会带出来）；报**启用了几条**——那才是"这一轮会写进去
+            // 几行"，也说明文件确实读到了。被禁用的条目各自还有一行 "skip (disabled)"，总数推得回来。
             Config config = Config.Load(ConfigFile);
             LogAttempt($"sigil edit: {config.Edits.Count(edit => edit.Enabled)} enabled");
             return config;
@@ -523,10 +466,9 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 表就是上面那些偏移量写来对付的那一张时返回 true：8 字节头里声明的行数，
-    /// 正好按 52 字节一行把剩下的文件算完——和生成这张表的外部工具读它时断言的是同一个恒等式。
-    /// 2.0 之前的表（36 字节一行）与将来任何一次列变动都过不了这一关，这正是重点：
-    /// 调用方于是什么都不改，而不是写进错误的行。
+    /// 表就是上面那些偏移量写来对付的那一张时返回 true：8 字节头里声明的行数正好按 52 字节一行把剩下的
+    /// 文件算完——和生成这张表的外部工具读它时断言的是同一个恒等式。2.0 之前的表与将来任何一次列变动都
+    /// 过不了这一关，这正是重点：调用方于是什么都不改，而不是写进错误的行。
     /// </summary>
     private static bool HasPatchableLayout(byte[] data, out long declaredRows)
     {
@@ -539,9 +481,8 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 按 52 字节的步长走这张表，匹配 (Key, Level)，把 <paramref name="values"/> 写进
-    /// LevelValue1..N。null 的槽位保持游戏的原样：只写用户设过的数字，所以没人碰过的槽位
-    /// 不可能被这张表的旧副本盖掉。
+    /// 按 52 字节的步长走这张表，匹配 (Key, Level)，把 <paramref name="values"/> 写进 LevelValue1..N。null
+    /// 的槽位保持游戏的原样：只写用户设过的数字，所以没人碰过的槽位不可能被旧副本盖掉。
     /// </summary>
     private bool PatchRow(byte[] data, uint key, uint level, float?[] values)
     {
@@ -552,13 +493,10 @@ internal sealed class SigilEditorFeature
             if (BitConverter.ToUInt32(data, row + LevelOffset) != level)
                 continue;
 
-            // 基线取**上一次建出来的那份表**：已发布过就是 _currentTable，被拒写还没进去就是
-            // _retryTable（启动那段拒写期也在内）。它只用来判断"这一行相对上一次变没变"。
-            //
-            // 不用这份刚读出来的归档当基线：归档里永远是原始值，而每条编辑本来就与归档不同
-            // ——"变了"永远成立，于是一次"改一个输入框"就把整张编辑表重打一遍（实测 6 条 = 12 行）。
-            // 两份都没有（第一次建表）时取补丁前的值：那必然与补丁后的不同，于是全部会打出来
-            // ——那些行对游戏来说确实都是新的。
+            // 基线取**上一次建出来的那份表**：已发布过是 _currentTable，被拒写还没进去是 _retryTable。
+            // 只用来判断"这一行相对上一次变没变"。不用刚读出来的归档当基线：归档里永远是原始值，"变了"
+            // 必然成立，于是改一个输入框就把整张编辑表重打一遍（实测 6 条 = 12 行）。两份都没有（第一次
+            // 建表）时取补丁前的值，于是全部会打出来——那些行对游戏确实都是新的。
             byte[]? baseline = _retryTable ?? _currentTable;
             string before = baseline is not null && baseline.Length == data.Length
                ? RowValues(baseline, row)
@@ -578,11 +516,8 @@ internal sealed class SigilEditorFeature
                 BitConverter.GetBytes(value).CopyTo(data, row + i * 4);
             }
 
-            // 只在**这一行相对上一次真的变了**时说一行：这一行现在是什么值。
-            //
-            // 不报"was"：那个值恒等于归档里的游戏原值（每条编辑一份、永不变化），每次打都是
-            // 同一串数字；而"上一次是多少"上一条日志里的这个位置已经说过了——它对不上，还会
-            // 让人以为 57→58 那次是 50→58（实测踩过）。
+            // 只在**这一行相对上一次真的变了**时才说一行：这一行现在是什么值。不报 "was"：它恒等于归档里
+            // 的游戏原值，而"上一次是多少"上一条同位置的日志已经说过，两者对不上（实测踩过）。
             string after = RowValues(data, row);
             if (after != before)
                 LogAttempt($"sigil edit:   {key:X8} L{level} @0x{row:X}: {after}");
@@ -593,7 +528,7 @@ internal sealed class SigilEditorFeature
         return false;
     }
 
-    /// <summary>一行那十个 LevelValue 槽位，给上面那两行日志用。</summary>
+    /// <summary>一行那十个 LevelValue 槽位，给上面那行日志用。</summary>
     private static string RowValues(byte[] data, int row) =>
         string.Join(" / ", Enumerable.Range(0, SigilSkill.LevelValueCount)
             .Select(i => BitConverter.ToSingle(data, row + i * 4)));

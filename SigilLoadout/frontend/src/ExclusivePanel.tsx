@@ -18,8 +18,7 @@ export function ExclusivePanel({
   /** 只报"哪个角色码的哪个技能被切成了什么"；落到文件里的键由 App 决定。 */
   onChange: (player: string, skillHash: string, value: boolean) => void
 }) {
-  // One row per shared player code (Gran/Djeeta both PL0000 with the same
-  // exclusives): the toggle is linked for both in-game characters.
+  // 每个共享的玩家码一行（古兰/姬塔都是 PL0000、专属相同）：开关对两个游戏角色联动。
   const rows = useMemo(() => {
     const seen = new Set<string>()
     return table.filter((e) => {
@@ -32,8 +31,6 @@ export function ExclusivePanel({
   return (
     <div>
       {rows.map((e) => {
-          // 状态按**角色 hash** 存（那是身份）。合并成一行的那两个角色由 App 一起写，
-          // 所以读这一行的 hash 就代表了这一行。
           const st = state?.[e.hash]
           return (
           <div

@@ -4,10 +4,9 @@ using System.Runtime.InteropServices;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Windows-level hotkey via RegisterHotKey (message-driven: zero sampling,
-/// zero loss). A hidden message-only window on a background thread receives
-/// WM_HOTKEY and brings the loadout editor tool to the front. The legacy
-/// 250 ms poll remains only as a fallback when registration is unavailable.
+/// Windows-level hotkey via RegisterHotKey (message-driven: zero sampling, zero loss): a hidden
+/// message-only window on a background thread receives WM_HOTKEY and brings the loadout editor
+/// tool to the front. The legacy 250 ms poll remains only as a fallback when registration fails.
 /// </summary>
 internal static class Hotkey
 {
@@ -92,12 +91,10 @@ internal static class Hotkey
     private static Action<string>? _log;
 
     /// <summary>
-    /// Configures the hotkey and starts the message-only window thread.
-    /// Called once per mod lifetime (Mod.QueueStart is once-only); re-arming a
-    /// live hotkey is UpdateHotkey's job and Shutdown tears the thread down, so
-    /// there is deliberately no re-entry path here.
-    /// (Pre-warming the tool process was removed: Process.Start during mod
-    /// startup triggered a .NET fatal in this environment.)
+    /// Configures the hotkey and starts the message-only window thread. Called once per mod
+    /// lifetime (Mod.QueueStart is once-only); re-arming a live hotkey is UpdateHotkey's job and
+    /// Shutdown tears the thread down, so there is deliberately no re-entry path here.
+    /// 别改回"启动时 Process.Start 预热工具进程"：那会触发 .NET fatal（实测）。
     /// </summary>
     internal static void Configure(string modDirectory, int virtualKey, Action<string> log)
     {
@@ -133,13 +130,10 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Re-arms the hotkey on the message window with the current virtual key.
-    /// Called by <see cref="UpdateHotkey"/> only: <see cref="Configure"/> runs once per
-    /// mod lifetime, and the loop registers the key itself while creating the window.
-    /// Both read <c>_virtualKey</c> rather than a captured copy, so a key changed at any
-    /// point is the one that ends up registered: whichever of the two runs second sees
-    /// the new value (the loop picks it up if the window did not exist yet, and the
-    /// re-arm below covers the other order).
+    /// Re-arms the hotkey on the message window with the current virtual key; called by
+    /// <see cref="UpdateHotkey"/> only. Both this and the loop's own registration read
+    /// <c>_virtualKey</c> rather than a captured copy, so whichever of the two runs second sees a
+    /// key changed in between, and that is the one registered.
     /// </summary>
     private static bool ReregisterHotkey(IntPtr window)
     {
@@ -148,9 +142,8 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Publishes the current virtual key next to the tool exe so the editor
-    /// can use the same key to hide itself (works irrespective of where
-    /// Reloaded-II stores its own user config).
+    /// Publishes the current virtual key next to the tool exe so the editor can use the same key to
+    /// hide itself (independent of where Reloaded-II stores its own user config).
     /// </summary>
     private static void PublishHotkey(int virtualKey)
     {
@@ -166,9 +159,7 @@ internal static class Hotkey
         }
     }
 
-    /// <summary>
-    /// Tears down the message window and thread (invoked from Mod.Dispose).
-    /// </summary>
+    /// <summary>Tears down the message window and thread (invoked from Mod.Dispose).</summary>
     internal static void Shutdown()
     {
         _threadExit = true;
@@ -176,11 +167,8 @@ internal static class Hotkey
         if (hwnd != IntPtr.Zero)
         {
             PostMessage(hwnd, (uint)WmQuit, IntPtr.Zero, IntPtr.Zero);
-            // The loop owns all window cleanup (hotkey unregister + destroy)
-            // when it exits; joining here only waits for it. A timeout is fine
-            // — the loop still finishes on its own thread, and a cross-thread
-            // DestroyWindow on a live message window is unsafe, so it is never
-            // attempted here.
+            // The loop owns all window cleanup (unregister + destroy) when it exits; joining here only
+            // waits. A timeout is fine, and DestroyWindow is never done here: it is unsafe cross-thread.
             _hotkeyThread?.Join(1000);
         }
         _messageWindow = IntPtr.Zero;
@@ -199,9 +187,9 @@ internal static class Hotkey
             return;
         }
         _hotKeyRegistered = RegisterHotKey(hwnd, HotkeyId, ModNoRepeat, (uint)_virtualKey);
-        // 句柄要排在注册之后发布：UpdateHotkey 一旦看见非零句柄就会自己再注册一次，抢在注册
-        // 之前发布会让同一对 (窗口, id) 被注册两次——后到的那次失败，把 _hotKeyRegistered 置成
-        // false，于是日志说回退轮询生效（键其实是好的），而且同一个按键会走两条路径各启动一次。
+        // 句柄要排在注册之后发布：UpdateHotkey 一看见非零句柄就会自己再注册一次，抢在注册之前
+        // 发布会让同一对 (窗口, id) 被注册两次——后到的那次失败，把 _hotKeyRegistered 置成 false，
+        // 于是日志谎称"回退轮询生效"（键其实是好的），同一个按键还会走两条路径各启动一次。
         _messageWindow = hwnd;
         _log?.Invoke(
             _hotKeyRegistered
@@ -221,9 +209,8 @@ internal static class Hotkey
                 {
                     try
                     {
-                        // Wait for the key to be released before activating so
-                        // the same key's key-up never lands on the launcher
-                        // window (it would be treated as an in-tool hide).
+                        // Wait for the key to be released first: the same key's key-up must not land
+                        // on the launcher window (it would be treated as an in-tool hide).
                         WaitForKeyRelease(_virtualKey);
                         TryLaunchTool(_log ?? (_ => { }));
                     }
@@ -237,15 +224,12 @@ internal static class Hotkey
             DispatchMessage(ref msg);
         }
         UnregisterHotKey(hwnd, HotkeyId);
-        // The loop created the window, so it also destroys it here: a shutdown
-        // join timeout must never leak the message window (the shutdown path
-        // deliberately never touches it cross-thread).
+        // The loop created the window, so it destroys it here: a shutdown join timeout must never
+        // leak the message window (the shutdown path never touches it cross-thread).
         DestroyWindow(hwnd);
     }
 
-    /// <summary>
-    /// Legacy polling fallback, active only when RegisterHotKey failed.
-    /// </summary>
+    /// <summary>Legacy polling fallback, active only when RegisterHotKey failed.</summary>
     internal static void Tick(Action<string> log)
     {
         if (_virtualKey < 0 || _modDirectory.Length == 0 || _hotKeyRegistered)
@@ -278,8 +262,7 @@ internal static class Hotkey
 
     private static void TryLaunchTool(Action<string> log)
     {
-        // Single instance: bring the existing editor window to the front
-        // (works for both minimised and hidden windows).
+        // Single instance: bring the existing editor window to the front (also when minimised/hidden).
         IntPtr existing = FindWindow(null, ToolWindowTitle);
         if (existing == IntPtr.Zero && IsToolProcessRunning())
         {
@@ -322,17 +305,14 @@ internal static class Hotkey
         }
     }
 
-    /// <summary>
-    /// Human-readable key name for the configured virtual key.
-    /// </summary>
     private static string HotkeyName(int virtualKey) =>
         Enum.IsDefined(typeof(OverlayHotkey), virtualKey)
             ? ((OverlayHotkey)virtualKey).ToString()
             : $"0x{virtualKey:X2}";
 
     /// <summary>
-    /// Polls until the given virtual key is no longer down (max 400ms) so the
-    /// hotkey's key-up event is consumed while the game still owns the input.
+    /// Polls until the given virtual key is no longer down (max 400 ms), so the hotkey's key-up is
+    /// consumed while the game still owns the input.
     /// </summary>
     private static void WaitForKeyRelease(int vk)
     {
@@ -345,12 +325,10 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Requests the tool to show/restore/focus itself (WM_APP+0x10; the tool
-    /// handles the fake-hidden/minimized states: reveal, restore, focus) and
-    /// then takes
-    /// foreground permission. SetForegroundWindow must run here on the hotkey
-    /// process: the RegisterHotKey press is what Windows treats as user input
-    /// and grants activation rights to this process.
+    /// Requests the tool to show/restore/focus itself (WM_APP+0x10; the tool handles the fake-hidden
+    /// and minimized states) and then takes foreground permission. SetForegroundWindow must run here
+    /// on the hotkey process: the RegisterHotKey press is what Windows treats as user input and
+    /// grants activation rights to this process.
     /// </summary>
     private static void ActivateWindow(IntPtr hWnd)
     {

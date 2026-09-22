@@ -2,10 +2,7 @@ using Reloaded.Mod.Interfaces;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-/// <summary>
-/// Reloaded-II configuration page connector. The launcher discovers this class
-/// (IConfiguratorV3) automatically and renders the declared configuration UI.
-/// </summary>
+/// <summary>Reloaded-II config page connector; the launcher discovers it (IConfiguratorV3) and renders the declared UI.</summary>
 public class Configurator : IConfiguratorV3
 {
     public string? ModFolder { get; private set; }

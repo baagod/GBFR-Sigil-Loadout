@@ -4,30 +4,24 @@ using System.Text.Json;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Reads the optional loadout.json (written by the player/editor tool) and
-/// pushes it into the native runtime template table through the ABI.
-/// No config file keeps the built-in exclusive template; invalid files are
-/// reported and the last valid configuration stays active.
+/// Reads the optional loadout.json (written by the player/editor tool) and pushes it into the
+/// native runtime template table through the ABI. No config file keeps the built-in exclusive
+/// template; invalid files are reported and the last valid configuration stays active.
 ///
-/// **本类只做一件事：把可视工具写下的载荷映射成 ABI 结构。它不读任何数据文件、不持有任何表。**
-/// "物品 → 主技能 / 上限"的语义只属于唯一写者（可视工具，它读 assets\sigils.json），所以载荷自带
-/// items[0].hash（主技能）。选得对不对、有没有超上限，在这一层都不再判：可视工具是唯一写者，
-/// 手写歪了的载荷它不认。
+/// **本类只做一件事：把可视工具写下的载荷映射成 ABI 结构；不读数据文件、不持有任何表。**
+/// "物品 → 主技能 / 上限"的语义只属于唯一写者（可视工具，它读 assets\sigils.json），所以载荷
+/// 自带 items[0].hash（主技能）。选得对不对、有没有超上限，在这一层都不再判。
 ///
 /// Data model (mod reads only the fields it maps):
-///   loadout.json : { lang, slots: [ { items: [ {gem, hash, level},
-///                    {hash, level}? ], enabled } ],
-///                    exclusive: { 角色hash: { 技能hash: bool } } }
-///                  items[0] = sigil（gem = 物品 hash，hash = 它给的主技能）；
-///                  items[1] = 副技能（可选，没有就不写这一项）。
-///                  exclusive 只写 false 的那些：没提到的角色就是三槽全开。
-/// Shape validation only: malformed JSON, a missing skill hash, a bad level,
-/// or too many enabled slots.
+///   { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ],
+///     exclusive: { 角色hash: { 技能hash: bool } } }
+///   items[0] = sigil（gem = 物品 hash，hash = 它给的主技能）；items[1] = 副技能（可选）。
+///   exclusive 只写 false 的那些：没提到的角色就是三槽全开。
+/// Shape validation only: malformed JSON, a missing skill hash, a bad level, too many slots.
 /// </summary>
 internal static class LoadoutConfig
 {
-    // 配装配置的路径：可视工具写、这里读。文件名字面量只出现在这一处（有一道对拍断言盯着它），
-    // 其余地方都用从它派生的这个字段。
+    // 配装配置的路径：可视工具写、这里读。文件名字面量只出现在这一处（有一道对拍断言盯着它）。
     private static readonly string ConfigFile = UserConfig.FilePath("loadout.json");
 
     // keep in sync with Native/native_internal.h kUnwornCharacterHash (0x887AE0B0)
@@ -41,8 +35,6 @@ internal static class LoadoutConfig
 
     internal static void Initialize(Action<string> log)
     {
-        // Player config lives in the user directory so mod updates (which
-        // replace the mod folder) never wipe it. No config -> built-in template.
         if (Stamp.Changed() is DateTime mtime)
             TryApply(log, mtime);
     }
@@ -57,28 +49,25 @@ internal static class LoadoutConfig
     }
 
     /// <summary>
-    /// 按 <paramref name="mtime"/> 这一版应用配置。本类有意无条件认领（见 <see cref="Tick"/>），
-    /// 所以没有返回值：成功与失败之后都一样等下一版。
+    /// 按 <paramref name="mtime"/> 这一版应用配置。本类有意无条件认领（见 <see cref="Tick"/>），所以
+    /// 成功与失败之后一样：都等下一版。
     /// </summary>
     private static void TryApply(Action<string> log, DateTime mtime)
     {
         if (mtime == UserConfig.NoFile)
         {
-            // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。这就是原来的
-            // "先清 overrides、再恢复内置模板"两步合成的同一件事。
+            // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。
             if (NativeCore.ApplyLoadout(null, null))
                 log("loadout.json removed; restored the built-in exclusive template.");
-            // 这里是这条路径的终点。少了它就会落到下面那次读取上，而文件不存在时
-            // new FileInfo(...).Length 必然抛 FileNotFoundException，被 catch 接住后每局都多打
-            // 一条假的 "Invalid loadout.json; kept previous configuration"——那句话在这条路上
-            // 本身也是错的：根本不存在"上一份"可保。
+            // 这条路径到此为止。少了它就会落到下面那次读取上：文件不存在时 new FileInfo(...).Length
+            // 必抛 FileNotFoundException，被 catch 接住后每局多一条假的 "Invalid loadout.json; kept
+            // previous configuration"——而这条路上根本不存在"上一份"可保。
             return;
         }
 
         try
         {
-            // Check the size before reading so an oversized file is never
-            // loaded into memory at all.
+            // Check the size before reading, so an oversized file is never loaded at all.
             if (new FileInfo(ConfigFile).Length > 1024 * 1024)
                 throw new InvalidDataException("loadout.json exceeds 1 MB");
             string json = File.ReadAllText(ConfigFile);
@@ -90,8 +79,7 @@ internal static class LoadoutConfig
             bool ok;
             if (slots.Count == 0)
             {
-                // An existing (even empty) config means "no built-in general
-                // slots": only the per-character exclusives stay active.
+                // 存在（哪怕是空的）配置就等于"没有内置通用槽"：只留专属开关。
                 log("loadout.json has no general slots; built-in exclusive template active.");
                 ok = NativeCore.ApplyLoadout(null, overrides);
             }
@@ -106,8 +94,8 @@ internal static class LoadoutConfig
         }
         catch (Exception exception)
         {
-            // 读取失败时日志由 Tick 的"版本变了才说"去重，这里照常报原因。下一次保存会改
-            // mtime，那时自然会被重新处理。
+            // 读取失败的原因照常报（日志由 Tick 的"版本变了才说"去重）；下一次保存会改 mtime，
+            // 那时自然会被重新处理。
             log($"Invalid loadout.json; kept previous configuration: {exception.Message}");
         }
     }
@@ -115,13 +103,12 @@ internal static class LoadoutConfig
     /// <summary>
     /// Parses the optional "exclusive" object into native overrides.
     ///
-    /// 形状：{ 角色hash: { 技能hash: bool } }。只把 **false**（= 关掉）变成一条
-    /// override，因为"没说"和"说开着"是同一件事：原生侧对没被提到的角色一律三槽全开。
-    /// 槽位由技能 hash 决定，而那张专属表在原生侧，所以这里只做转发——不需要 sigils.chara.json，
-    /// 也不需要知道哪个 hash 是 T1。
+    /// 形状：{ 角色hash: { 技能hash: bool } }。只把 **false**（= 关掉）变成一条 override，因为
+    /// "没说"和"说开着"是同一件事：原生侧对没被提到的角色一律三槽全开。槽位由技能 hash 决定，而
+    /// 那张专属表在原生侧，所以这里只做转发——不需要 sigils.chara.json，也不需要知道哪个是 T1。
     ///
-    /// 只认这一种形状：外层键必须是角色 hash（十六进制），解析不出就记一行日志并忽略；
-    /// 内层键必须是这个技能 hash，认不出的由原生侧忽略。没有兼容形状。
+    /// 只认这一种形状：外层键必须是角色 hash（十六进制），解析不出就记一行日志并忽略；内层键认不
+    /// 出的由原生侧忽略。
     /// </summary>
     private static NativeCore.ExclusiveOverrideNative[]? ParseExclusiveOverrides(
         JsonElement root, Action<string> log)

@@ -14,9 +14,8 @@ import (
 	"time"
 )
 
-// localConfig 是 mod 读取的路径：用户配置目录（%LOCALAPPDATA%\GBFRSigilLoadout）
-// 下的一个文件，配装 loadout.json 也在那里。这里走的是与实现同一批常量，位置本身由
-// sharedconstants_test.go 对着 C# 那份断言——测试不该是同一份事实的第三份手抄。
+// localConfig 是 mod 读取的路径：用户配置目录（%LOCALAPPDATA%\GBFRSigilLoadout）下的一个文件。
+// 这里走实现同一批常量，位置本身由 sharedconstants_test.go 对着 C# 断言——测试不该是同一份事实的第三份手抄。
 func localConfig(t *testing.T, name string) string {
 	t.Helper()
 	local := os.Getenv("LOCALAPPDATA")
@@ -59,8 +58,7 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	if len(cfg.Edits) != 1 || cfg.Edits[0].Key != "06719232" || *cfg.Edits[0].Values[0] != 30 {
 		t.Fatalf("sigiledits.json round-trip lost data: %+v", cfg.Edits)
 	}
-	// 没人输入过的参槽在文件里是 null 这个词，而正是它告诉 mod 那一部分保持原样。
-	// 这条记录设置了十个参槽里的三个。
+	// 没人输入过的参槽在文件里是 null 这个词，正是它告诉 mod 那一部分保持原样；这条记录只设了三个参槽。
 	if len(cfg.Edits[0].Values) < LevelValueCount {
 		t.Fatalf("sigiledits.json came back with %d slots, want %d", len(cfg.Edits[0].Values), LevelValueCount)
 	}
@@ -73,12 +71,9 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 }
 
 /*
-防抖是尾沿触发，这既是在说什么时候不写，也一样是在说什么时候写：编辑还在进行时，
-mod 读取的那个文件必须仍是旧的那份——而且每次调用都必须重启那段安静期，所以真正发生的
-那次写入带的是最后的状态，而不是第一个状态。
-
-气泡把这件事从关于时钟的陈述变成关于代码的陈述：半秒瞬间过去，一个不再重启定时器的实现
-会在这里失败，而不是在一台只是碰巧很慢的机器上蒙混过关。
+防抖是尾沿触发：编辑还在进行时 mod 读到的必须仍是旧的那份，而每次调用都重启那段安静期，所以真正
+发生的那次写入带的是最后的状态。synctest 气泡把这件事从关于时钟的陈述变成关于代码的陈述：一个不再
+重启定时器的实现会在这里失败，而不是在一台碰巧很慢的机器上蒙混过关。
 */
 func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 	hermeticHome(t)
@@ -106,7 +101,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 			t.Fatal("a second edit did not restart the debounce window")
 		}
 
-		// 从这里开始安静下来：最后的状态落地，且只落一次。不用轮询：气泡已经把定时器的回调跑到结束了。
+		// 从这里开始安静下来：最后的状态落地，且只落一次（不用轮询：气泡已把定时器回调跑到结束了）。
 		time.Sleep(debounceDelay * 2)
 		synctest.Wait()
 
@@ -125,15 +120,13 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 }
 
 /*
-做不成的写入会被记进日志并推给前端，而这两件事都不能把可视工具一起带走：失败发生在防抖
-定时器的 goroutine 上，那里没有调用方可以接住 panic。测试里没有窗口，
-所以这里也覆盖了 “没有 app 可通知” 那条分支。
+做不成的写入会被记进日志并推给前端，而这两件事都不能把可视工具一起带走：失败发生在防抖定时器的
+goroutine 上，那里没有调用方可以接住 panic。测试里没有窗口，所以也覆盖了"没有 app 可通知"那条分支。
 */
 func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	home := hermeticHome(t)
 
-	// 一个占着配置文件夹位置的普通文件：它下面每一次 mkdir 和写入都必然失败，
-	// 这正是一个被锁住或只读的用户配置目录的真实模样。
+	// 一个占着配置文件夹位置的普通文件：它下面每一次 mkdir 和写入都必然失败，正是被锁住或只读的配置目录的模样。
 	blocked := filepath.Join(home, "AppData", "Local", userCfgDirName)
 	writeFile(t, blocked, "not a folder")
 
@@ -143,7 +136,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 		t.Fatalf("SaveEdits: %v", err)
 	}
 
-	// 失败必须在某处可见。这里没有窗口可推，所以日志是这条故事里本测试抓得住的那一半。
+	// 失败必须在某处可见；这里没有窗口可推，所以日志是本测试抓得住的那一半。
 	var logged bytes.Buffer
 	previous := log.Writer()
 	log.SetOutput(&logged)
@@ -156,7 +149,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 		t.Fatalf("a write that could not be made went unrecorded: %q", logged.String())
 	}
 
-	// 失败的这份列表必须还在待写里：不编辑而直接退出时，flushNow 是它唯一的机会。
+	// 失败的这份列表必须还在待写里：不编辑而直接退出时 flushNow 是它唯一的机会。
 	// 把挡路的东西挪开，同一个 flushNow 就该把它写下去。
 	if err := os.Remove(blocked); err != nil {
 		t.Fatal(err)
@@ -171,8 +164,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	}
 }
 
-// 可视工具编辑的那份列表就是 mod 读取的那份，所以它必须从同一个文件里读回来：
-// 读别处的实现会给用户看一份并非正在部署的列表。
+// 工具编辑的那份列表就是 mod 读取的那份，所以必须从同一个文件读回来；读别处的实现会给用户看一份并非正在部署的列表。
 func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 	hermeticHome(t)
 
@@ -192,11 +184,9 @@ func TestLoadEditsReadsTheUserConfig(t *testing.T) {
 }
 
 /*
-没有文件时是一份空列表，而不是一份内置的起始编辑。
-
-这不是"还没想好显示什么"，是一条关于谁在动游戏的界线：面板在应用启动时就挂载（App.tsx 的
-keepMounted），所以一份起始编辑会让"打开可视工具"本身变成一次对游戏的改动——用户什么都没点。
-一条编辑要被应用，得先是用户自己点出来的。
+没有文件时是一份空列表，而不是一份内置的起始编辑。这不是"还没想好显示什么"，是一条关于谁在动游戏的
+界线：面板在应用启动时就挂载（App.tsx 的 keepMounted），所以一份起始编辑会让"打开可视工具"本身
+变成一次对游戏的改动——用户什么都没点。
 */
 func TestLoadEditsStartsWithNothing(t *testing.T) {
 	hermeticHome(t)
@@ -214,10 +204,9 @@ func TestLoadEditsStartsWithNothing(t *testing.T) {
 }
 
 /*
-存在但解析不了的文件是一个会点出文件名的错误。
-
-这个区分的要点在于屏幕上显示什么：“解析不了”说的是文件坏了、坏的是哪一个，而空列表
-看起来就和“什么都没打开”一模一样——下一次按键就会把这份空列表覆盖回用户自己的编辑。
+存在但解析不了的文件是一个会点出文件名的错误。这个区分的要点在于屏幕上显示什么："解析不了"说的是
+文件坏了、坏的是哪一个，而空列表看起来就和"什么都没打开"一模一样——下一次按键就会把这份空列表
+覆盖回用户自己的编辑。
 */
 func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 	hermeticHome(t)
@@ -234,8 +223,7 @@ func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 	}
 }
 
-// 空列表是一个状态，不是起点：它是把所有编辑都关掉之后留下的东西，所以它就保持为空，
-// 而不会变回用户刚刚关掉的那些内置默认值。
+// 空列表是一个状态，不是起点：它是把所有编辑都关掉之后留下的东西，不会变回用户刚刚关掉的那些内置默认值。
 func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
 	hermeticHome(t)
 
@@ -251,8 +239,7 @@ func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
 	}
 }
 
-// 没有 edits 成员的文件（{}）读出来同样是空列表，而空列表到线上必须是 [] 而不是 null：
-// 同一个状态两种拼写，就是每个调用方都得自己记着写 `?? []` 的那种事。
+// 没有 edits 成员的文件（{}）读出来同样是空列表，而它到线上必须是 [] 而不是 null——否则每个调用方都得自己写 `?? []`。
 func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 	hermeticHome(t)
 	writeFile(t, localConfig(t, editListName), `{}`)
@@ -271,9 +258,9 @@ func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 }
 
 /*
-只有一种格式、一个读取器：来自 Key 还写作大写那个构建的文件既不会被读取，也不会被改写。
-它读作空列表——这正是用户在格式变更时要的行为：“它读一个 Edits，读不到就是一个空配置” ——
-而下一次保存写出当前格式。这个测试特意把这个行为钉下来，好让它是一个决定，而不是一次意外。
+只有一种格式、一个读取器：来自 Key 还写作大写那个构建的文件既不会被读取，也不会被改写。它读作空
+列表——这正是用户在格式变更时要的行为——而下一次保存写出当前格式。这个测试特意把它钉成一个决定，
+而不是一次意外。
 */
 func TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling(t *testing.T) {
 	hermeticHome(t)
@@ -300,9 +287,9 @@ func TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling(t *testing.T) {
 }
 
 /*
-padValues 是“正好十个参槽”这条不变量的守门人，无论文件里装的是什么：短列表用 nil 补齐，
-长列表被截断，因为它喂的那张表只有十个 LevelValue 参槽，而 mod 按顺序读取它们。nil 就是
-没人输入过的那个参槽——游戏自己的值——所以用它补齐等于什么都没写，而不是写一个零。
+padValues 是"正好十个参槽"这条不变量的守门人，无论文件里装的是什么：短列表用 nil 补齐，长列表被
+截断（那张表只有十个 LevelValue 参槽，mod 按顺序读）。nil 就是没人输入过的那个参槽——游戏自己的值
+——所以用它补齐等于什么都没写，而不是写一个零。
 */
 func TestPadValuesAlwaysGivesTenSlots(t *testing.T) {
 	short := padValues([]*float64{new(1.0), new(2.0), new(3.0)})
@@ -322,9 +309,9 @@ func TestPadValuesAlwaysGivesTenSlots(t *testing.T) {
 	}
 }
 
-// 资产是一起生成的，但仍然分成两个文件：数值与语言无关，文案不是。如果它们的 Key 集合
-// 发生漂移，新增一个技能会悄悄产出一个空名字（或一行没有数值的行），
-// 所以这里断言每种语言描述的技能集合与数值一致——并且互相之间也一致。
+// 资产是一起生成的，但仍然分成两个文件：数值与语言无关，文案不是。如果它们的 Key 集合发生漂移，
+// 新增一个技能会悄悄产出一个空名字（或一行没有数值的行），所以这里断言每种语言的技能集合与数值
+// 一致——并且互相之间也一致。
 func TestSkillTablesAgree(t *testing.T) {
 	if len(skillInfo) == 0 {
 		t.Fatal("skill_status.json did not load")
@@ -361,8 +348,8 @@ func TestSkillTablesAgree(t *testing.T) {
 		}
 	}
 	for hash, info := range skillInfo {
-		// 一次编辑可能点到的每个等级都有自己的一行，且带齐十个参槽：
-		// 否则一个参槽的占位符（以及清空输入框后写回的值）就会来自另一个等级。
+		// 一次编辑可能点到的每个等级都有自己的一行，且带齐十个参槽，否则一个参槽的占位符
+		// （以及清空输入框后写回的值）就会来自另一个等级。
 		if len(info.Rows) == 0 {
 			t.Fatalf("skill %s has no level rows", hash)
 		}
@@ -377,9 +364,9 @@ func TestSkillTablesAgree(t *testing.T) {
 
 // 线格式合同：资产里的 [等级, 数值] / [等级, 文案] 元组，Go 侧解码后必须原样编码回去。
 //
-// 这是手写契约，没有别的机械校验：MarshalJSON 一旦丢失、或退回成结构体字段语义，Go 测试与
-// 前端 tsc 都会全绿，而 App.tsx 里 `as Record<string, SkillText>` 会静默收下
-// {Level, Text}，用户看到的只是空 tooltip 与 0 占位。所以这里按字节把它钉住。
+// 这是手写契约，没有别的机械校验：MarshalJSON 一旦丢失、或退回成结构体字段语义，Go 测试与前端
+// tsc 都会全绿，而 App.tsx 的 `as Record<string, SkillText>` 会静默收下 {Level, Text}，用户看到的
+// 只是空 tooltip 与 0 占位。所以这里按字节把它钉住。
 func TestWireShapeStaysTuples(t *testing.T) {
 	status, err := jsonv2.Marshal(map[string]SkillInfo{
 		"06719232": {
@@ -437,9 +424,8 @@ func TestSkillMapFallsBack(t *testing.T) {
 }
 
 // 黑龙的咒印 是那个现成的例子：本体在等级 15 是 10/3/20，而 mod 的全部用意就是把第一个值提上去。
-//
-// 它也是说明为什么只有带数字的等级会进资产的例子：
-// 这个技能的等级 1 到 14 全是零，所以它们根本不在资产里——编辑只能点到一个游戏真正会读到值的行。
+// 它也是说明为什么只有带数字的等级会进资产的例子：这个技能 1~14 级全是零，所以它们根本不在资产里，
+// 编辑只能点到一条游戏真正会读到值的行。
 func TestKnownSkillRows(t *testing.T) {
 	info, ok := skillInfo["06719232"]
 	if !ok {

@@ -10,8 +10,8 @@ import (
 )
 
 func slot(gem, sec string, lvl, secLvl int) loadoutSlot {
-	// items[0] 带着物品 hash 与它给的主技能 hash——mod 两个都要（LoadoutConfig），
-	// 所以这里两个都写；主技能用同一个占位值，这些用例只关心形状。
+	// items[0] 带物品 hash 与它给的主技能 hash——mod 两个都要（LoadoutConfig）；主技能用同一个
+	// 占位值，这些用例只关心形状。
 	items := []loadoutItem{{Gem: gem, Hash: gem, Level: lvl}}
 	if sec != "" {
 		items = append(items, loadoutItem{Hash: sec, Level: secLvl})
@@ -21,7 +21,6 @@ func slot(gem, sec string, lvl, secLvl int) loadoutSlot {
 
 func boolPtr(v bool) *bool { return &v }
 
-// manySlots builds n enabled single-item slots, all alike.
 func manySlots(n int) []loadoutSlot {
 	out := make([]loadoutSlot, n)
 	for i := range out {
@@ -42,7 +41,7 @@ func TestUserCfgDirMatchesModPath(t *testing.T) {
 // 缺 enabled 与 enabled:true 同义——mod（LoadoutConfig.ParseAndValidate 的
 // `!TryGetProperty("enabled", …) || …`）和前端（model.ts 的 `s.enabled !== false`）都这么认。
 // 这里曾经用 bool（零值 false），于是同一份文件在 Go 数出 0 个启用、在 mod 那边数出十几个，
-// 结果是"存盘成功、游戏里什么都没变"。这条用例把默认值钉住。
+// 结果是"存盘成功、游戏里什么都没变"。
 func TestValidateSlotsTreatsMissingEnabledAsEnabled(t *testing.T) {
 	slots := manySlots(MaxSlots + 1)
 	for i := range slots {
@@ -85,8 +84,7 @@ func TestValidateSlots(t *testing.T) {
 			Items: []loadoutItem{{Gem: "9A60FBF0", Level: 15}},
 		}}, false},
 		// 上限不属于这一层：cap 是每条技能自己的值，只有前端（读 sigils.json）与 mod
-		// （LoadoutConfig）知道它。这里写死一个数就会变成同一规则的第三份副本，
-		// 所以超过 cap 的等级在这一层是合法的，由 mod 侧判定。
+		// （LoadoutConfig）知道它，写死一个数就是同一规则的第三份副本，所以这里合法。
 		{"level above cap", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", 201, 15)}, true},
 	}
 	for _, c := range cases {
@@ -111,7 +109,6 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	if string(data) != cfg {
 		t.Errorf("stored config = %q, want %q", data, cfg)
 	}
-	// The unique temp file must not linger next to the config.
 	entries, err := os.ReadDir(filepath.Dir(path))
 	if err != nil {
 		t.Fatalf("read dir: %v", err)
@@ -145,8 +142,7 @@ func TestSaveLoadoutOverwritesExisting(t *testing.T) {
 func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
-	// Structural violations are rejected before any directory or file is
-	// created, so a rejected save must leave no trace on disk.
+	// Structural violations are rejected before any directory or file is created — no trace on disk.
 	if err := (&LoadoutService{}).SaveLoadout(`{"slots":[{"items":[],"enabled":true}]}`); err == nil {
 		t.Fatal("expected a validation error")
 	}
@@ -157,9 +153,8 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 }
 
 /*
-写盘只有 SaveLoadout 一个出口，而它会被并发调用：前端的防抖挡不住"一次写盘比防抖窗口
-还慢"（杀软扫 %LOCALAPPDATA% 就是这样），那时两次保存同时在飞，而磁盘上留哪一份取决于
-最后完成的那个 rename。所以序号在提交时取、写盘前比一次，过期的那份直接放弃。
+写盘只有 SaveLoadout 一个出口，而它会被并发调用：防抖挡不住"一次写盘比防抖窗口还慢"（杀软扫
+%LOCALAPPDATA%）。序号在提交时取、写盘前比一次，磁盘上就不会留下被后来者取代的旧状态。
 */
 func TestSaveLoadoutDropsASupersededSave(t *testing.T) {
 	dir := t.TempDir()
@@ -176,7 +171,6 @@ func TestSaveLoadoutDropsASupersededSave(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("a superseded save must not reach the disk (stat err=%v)", err)
 	}
-	// 最新的那一次照常落盘。
 	if err := svc.writeSubmitted(7, current); err != nil {
 		t.Fatalf("the current save must land: %v", err)
 	}
@@ -190,8 +184,7 @@ func TestSaveLoadoutDropsASupersededSave(t *testing.T) {
 }
 
 /*
-并发保存不能撕开文件：唯一临时名 + 原子 rename 保证磁盘上最后只会是某一次完整保存的
-内容，而不会是两次保存的混合。
+并发保存不能撕开文件：唯一临时名 + 原子 rename，磁盘上最后只会是某一次完整保存的内容。
 */
 func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 	dir := t.TempDir()
@@ -227,9 +220,8 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 }
 
 /*
-只认当前形状：早期版本的裸数组（[ { items, enabled } ]）不再被翻译成"空配置"写下去，
-而是当场报错。翻译过的写法会把一份读不出来的旧文件静默变成"没有任何参槽"落盘，
-用户看到的是自己的配置被清空。
+只认当前形状：早期版本的裸数组（[ { items, enabled } ]）不再被翻译成"空配置"写下去，而是当场
+报错——翻译过的写法会把一份读不出来的旧文件静默变成"没有任何参槽"落盘，用户看到的是配置被清空。
 */
 func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {
 	dir := t.TempDir()
@@ -245,9 +237,8 @@ func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {
 }
 
 /*
-"缺 slots 成员"要和"裸数组"一样被拒：mod 那边会抛 `missing 'slots' array` 并保留内存里的旧
-配置，所以放过去的后果是"可视工具说保存成功、游戏里什么都没变"。空数组仍然是合法的——
-它就是"没有通用槽"。
+"缺 slots 成员"要和"裸数组"一样被拒：mod 会抛 `missing 'slots' array` 并保留内存里的旧配置，
+放过去就是"可视工具说保存成功、游戏里什么都没变"。空数组仍合法——它就是"没有通用槽"。
 */
 func TestSaveLoadoutRejectsAnObjectWithoutSlots(t *testing.T) {
 	dir := t.TempDir()
@@ -267,11 +258,9 @@ func TestSaveLoadoutRejectsAnObjectWithoutSlots(t *testing.T) {
 }
 
 /*
-因子表与名字文件由同一次生成写出，但它们是不同的文件：谁都不会替对方发现漂移，
-运行时也看不出来——少的那个只是少一行名字，屏幕上照旧显示回落的数据。
-
-所以这里按 hash 把两边对一遍，顺带钉住"表里不再带名字"这件事：sigils.json 是 mod 也在读的
-数据，多语言名字只属于 sigils.lang.json。
+因子表与名字文件由同一次生成写出，但它们是不同的文件：谁都不会替对方发现漂移，运行时也看不
+出来——少的那个只是少一行名字。所以按 hash 把两边对一遍，顺带钉住"表里不再带名字"：sigils.json
+是 mod 也在读的数据，多语言名字只属于 sigils.lang.json。
 */
 func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 	// 入库的 sigils.json 与四份名字文件都在 assets\ 里；测试的工作目录是包目录。
@@ -321,8 +310,8 @@ func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 }
 
 /*
-专属因子页的行标签来自另一份生成物（chara.lang.json，键是 PL 码），与 sigils.chara.json
-同一次生成却不是一个文件：少的那个只是让整行退回 PL 码。这里把两边的键对一遍。
+专属因子页的行标签来自另一份生成物（chara.lang.json，键是 PL 码），与 sigils.chara.json 同一次
+生成却不是一个文件：少的那个只是让整行退回 PL 码。
 */
 func TestCharaNamesCoverTheExclusiveTableInEveryUILanguage(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("assets", "sigils.chara.json"))
