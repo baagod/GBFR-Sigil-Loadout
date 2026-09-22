@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:908324ec8659397e81e9cb8fff829eaade5fe38e0dec2937995d54b1eeb451c0",
+  "claims": [
+    {
+      "id": "claim_2121110c885f42509b01f574633c82db",
+      "statement": "GBFR-Sigil-Loadout is a Granblue Fantasy: Relink mod (ER 2.0.5, derived from GBFR Extra Sigil Slots) that gives every character a preconfigured sigil loadout through runtime synthesis injection, without consuming the game's 12 sigil slots, requiring inventory, or touching a save file.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L1-L5",
+          "version": "repo-lines-v1:sha256:766eb3e77afc9f13ec05b16c528704fdecba4a592a8ae32dc33039dcbec8df52:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzhlOTYzMTVhOGJmOTJjM2I4MTgwOWZiMzJhMzUxN2Q0MWZkMjRjZjI0ZWFjOTcxN2UxMzdmNTQyZmRiNGYyNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGU1ZThkMmZhZDNmZDk4ZDY0YTJjOWY3YTJiMDMzMzMzNDczMDY3OTM5N2M1YjA0YzE5ZDA4NmQwYzg4NTViNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGEyNTFmZGNmN2NhYjY2Mjg4OTYxZWYyZGYyMTBlZjQ1MGQzZWNhM2JmMjc4NzQyMGYwZjRiNGIwZTczZWZiYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b39d275d0541471bb6de27175feeb53b",
+      "statement": "The mod ships no .tbl file: the table is read out of the game archive and changed in memory, which is what allows it to coexist with other table-editing mods.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L21-L22",
+          "version": "repo-lines-v1:sha256:17304b6fcd1cd0a6a49acbc5cea38a565efd252655920272ed2fce67edf22e92:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk0Njc2MWNhMGFkNzUyNmZjMzNhMGNiNjBkYTkyOWRmNGY4YzA4MWYxNThiN2I2M2IzY2QwODgyNDQ4ODYxOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWZmZWM0ZTUzNGVhMDgyZjdiNTc3NDk1MmY0OWViNmNkY2NiODM0NTJhMDczY2U3OGNjNWZjZGM4OGNhMDUwMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTkyYjhjNDFiYTcwMjc5YjI3YzY4YzhiY2VkMjUxNDYzMDg0NTg2ZDU3ZWMwMGNkNWEzNjg5NjQ5MjYwMmFjZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_58b539b5e7f14843bb2d8c2b67709329",
+      "statement": "Four units make up the project, hosted by Reloaded-II, the game process (C++), a separate Go process, and WebView2 respectively; the README states that two holders of the same fact is a defect, so anything both sides must know needs a single owner identified first.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L27-L36",
+          "version": "repo-lines-v1:sha256:5eb434e4ae3183d072538c580887b8bddcfd53a43fe6a5a00b25da167f47d59a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMTg2Yzg1YzJiZmQyZGMxNDU0OGUwNmU2MjgzODlhOTU4YTg2MzA2MDkyMzEyN2MxMzk3MThlZWVkNTljMjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkNjNkYWUyYWJjMWZhM2VlZDU3NWViOTg0N2ZhYTg5OTBkODg5MTA0ZjhkNjgyYTJjODJlYjkxZWMzMGY1OWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlYjAxN2UyZDI0ZmY4YWY0NDk1MGFmNzc2MmQ1N2ExNTgyY2UwZjQ3NWM1NWQ3ZTkxZjE0YTQ5OTc0NWQzNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5YmJkNmYxZDc5ZmFhZGRmNDZiZGEwODQxYjI2MTI3NjIzMmVmODI3MDZhYTlkZjY1NmVhMjE3MGRhOGE5ZmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3a1eaafb1e2a47a2acaa22fa9bc213ba",
+      "statement": "A sigil parameter change updates the skill's in-game description immediately but its numbers only count once the game next builds character state, whereas a loadout publish rebuilds state for the known deployed characters and can take effect within the same battle.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L22-L24",
+          "version": "repo-lines-v1:sha256:0470fc3b785ba1444f36646cf41a03a6d705bff18f6024313fbb497f30284c03:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk0Njc2MWNhMGFkNzUyNmZjMzNhMGNiNjBkYTkyOWRmNGY4YzA4MWYxNThiN2I2M2IzY2QwODgyNDQ4ODYxOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjkzZGIxYTk5MmJmYzM2MjQ5MTc0NTJmMGU3MmQ3ZmRhYWM2NWJmNWE3ZjU3ZThiYzkzZTU3ZDVlZTdlMzQ0MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2Q1OTY2M2JhODUxZDliNDQwYTFlMjkxNTVlODZhYjEwNmNjYWYzOTdkY2E5YjczYWFlMDhkZWZmNDMyYjc3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjFlODI3OThmNGE3ZDJlNzU0MTE4ZmI4Mzk1MTEyOGNlYjg0ODJjYzYwYzVjZGNmZDYwNGMyNDI5OWFiMTNhNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_80e53479ed0549cf91a29747e49df075",
+      "statement": "gbfrelink.utility.manager is an optional dependency that supplies the table; without it the mod still loads but the editor has no table to change.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L25-L25",
+          "version": "repo-lines-v1:sha256:f44c280f116538d317016da7b184961dd4f3506d7f7d2f386e989ca62da2a1bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ0YzI4MGYxMTY1MzhkMzE3MDE2ZGE3YjE4NDk2MWRkNGYzNTA2ZDdmN2QyZjM4NmU5ODljYTYyZGEyYTFiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ0YzI4MGYxMTY1MzhkMzE3MDE2ZGE3YjE4NDk2MWRkNGYzNTA2ZDdmN2QyZjM4NmU5ODljYTYyZGEyYTFiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDQ3MGZjM2I3ODViYTE0NDRmMzY2NDZjZjQxYTAzYTZkNzA1YmZmMThmNjAyNDMxM2ZiYjQ5N2YzMDI4NGMwMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGI3N2I3YWQzZTM0ODkxZjUyZGQxMjZiNTEwMDE4YzNhYzkyZDE0ZDc2Yjk3ZjU3YTBlMjlkYWI1OGU0NjgzOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_3ed69452f52b4298b1519a49c9978d73",
+      "statement": "The repository is not self-contained: native compilation and the release consistency gate require the sibling ..\\gen repository that owns the data generators.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/0004-generators-live-in-gen.md#L1-L5",
+          "version": "repo-lines-v1:sha256:e2cd69eaf12413705fa66167f49e260bd75b7c39f812067a95cbc8c580881df4:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM2MDYxNDNkYTljNjc3OGM4MzQ0ODhjNDcwMzkzZTg5YTZjN2MwMzQ2MTgwMDJhMjQzNWYwMDdlMzdkYTg0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2RlYzZiMjVjNWEyMWMyZjY2MTE2MWZmZDg0NGY4ZDIyM2VlNTk1ODRlNTNkNmNhYjc3ZDNkMjczY2MxMzM3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzQ1OTY0YTg4Y2IwYTIyNzkwZjkyYzQ0MmY5ZDFlMGZlZjdkNjIzNGM2Yzc3NmZmMTMwYmZmMTRlMzVhNmY2MyJ9"
+        },
+        {
+          "resource": "repo://docs/adr/0004-generators-live-in-gen.md#L13-L18",
+          "version": "repo-lines-v1:sha256:c7ca745f37c1f17ed6e91a01cab7b9da5b92c10d76f0f1a6fd3d659bd63f0922:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODYxMDViNDE3ZjE5NTg5NGJmNTE5YmRlZDdmY2M0NzgyOGJkZDZkN2IyNzMxNDI5NzJkNjRkMDAzMjg2NDRiNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmY3YzdlZTRhMGI1NWJkZjNlNWQ2ZTQ5ZDlmZjM4ZWQ3ZmI3MjczMTI1YWE3YWQ3NjU4OTFjMmJiNGZlZDRiYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjU0NTUxOGMyNzNlMmViYzRmMDNmZjcyZDdjN2NiOGQ3ZDhlZmQ2ZjBhZjNiMjc3YTY1MmUxNjQzYjU1YjJjNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a9ae442abc584b5cb9ba59cb1e3bc713",
+      "statement": "docs/MAINTENANCE.md is written for people changing the code and is described as required reading before starting, while CONTEXT.md is the single source of truth for terminology.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L38-L45",
+          "version": "repo-lines-v1:sha256:70044e3bea517bda8d280d60f8e57e5c56cd1ce9cc4b1144cd75abba41f0e957:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjcxZTEzY2M1Yzg4ZDU4ZTA0OWQyMmViMjBiYjM0NDA2YjJhYzBjYjYwOTUwZGJlZDg4OGQ1ODlhNTU0MzEwMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODc1ZjZlMzhkNjEzZWUzNGViMzEyMzk0Y2MwYmZhZTMzZmJjMTllNjhiZjM3YjE0NDJlMWY5ZjNmMmZmY2M0ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDE3MTgyOWMwOTczMjdhZDZmNWZhNDEyNDdkYzFhZWU1ZjdlZmE4ZWZiMzAxOWNkZTA0Y2IzNGVlMWFiYjJjZSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-22T11:42:24.258Z"
+  }
+}

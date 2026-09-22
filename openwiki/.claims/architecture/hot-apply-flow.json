@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:2d469c2b2fc093f0c1a1df8eab3f71c3a82e7ecc865a3c2f75530a6cdf4a6d5b",
+  "claims": [
+    {
+      "id": "claim_3f18d5a1c3dd460cbda4bc9395916a9e",
+      "statement": "The edit list lives at gemedits.json under the mod's user config directory, and both the Go and C# halves compute that directory independently with no negotiation; the path derivation therefore has exactly one implementation and cannot use os.UserConfigDir(), which would resolve to Roaming AppData.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L183-L190",
+          "version": "repo-lines-v1:sha256:00e1124031e4bc3497720bfcc4da11ff4bf299d134f606b64f2fe6fd86e63a27:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzhiMGM0MTIyMDg5ODFlNDAwOGVhODI4Nzk0NDljNGQ5NTI3MzgxNGEyZDI0ZTgxODUyOGQxNjBlMTg1ZmY5NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmZlZGIyYTliYjk5YzkwMWQ3NzY3NjQ5MmIzYWM5NGY3MjZiZDM0Nzk0ZTEyMmI5NWY2OGE0YzkxODNiMjRiNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWQ5MjZmMWFmMGFiYzE1OWU3NzllYmU1YjAzYmFlM2JhZTk2OTFlNGEzZjgxMjZjZWViMTVjYjdkYjU1ODk3YyJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L37-L39",
+          "version": "repo-lines-v1:sha256:7157b417fa4b8c9b6f9390d960d1df84f1f201b2327af46aaf75ceb161162c65:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTE3Y2I1OTkxODY2OTBjODJkMzliYmM5NGVmNTNkOGJkNDhkZWNiN2YwZTI3ZTMwYWJlZjI4ODVlODRkMGIwNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjA4NDQ1ODczMDgyOTMxZDQzMTU2NzdmMjlkZGRhNTVjOTc5ODg4ZDE2ZWNhOTI3YWZiNTVmYzZmYWJmODkxNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmIyNTAxYjQ2ZDM5NWZkNTk5ZDkzODdlNjM2ZGJkNTVkODFlNWUzNDNjODFiZDg1ZTg5MjI5ZTg0NGVhMGE0YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI0ODRjNDVmY2M0Nzk0ZDBmODEwMjE3ZDkzZGMyYTg1YjBjM2I0NGRlYmY2MGE3MjZhYWUyZWJkM2Q4MGU3ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_afccb027cd054032a5e956432644add2",
+      "statement": "SaveEdits hands over the entire edit list on every change and resets a 500 ms debounce timer; the write is deliberately not performed in that call.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L239-L265",
+          "version": "repo-lines-v1:sha256:d05a467b572271ecd5889f1c648cd49ee7308d9fb143cab72b341a080ff1134f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyOWI3MTQ5MTNiMTBkNTM3ZjkxMWVlNDNlMjZiYzdjNjIzOTRlZmM2NDA0ODFiZDVlYTcxZjdkZjZjN2MwMTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4NDU0NzBkY2EwYTAxOWVkOGJlYzhlNzY4YzQzZmRiNDA2N2JmZjEzY2FiYzJkNWIxMmNkYzEwNGE4ODBjMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzYTNkZDFiOWExNjdkOGFmZGI0OGZlYzRlY2IxMDExYjlhMGVkZWQzMmEwMGNkZDA3MTEyZTUwOThmNmI5NzQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5a36a98a76ce4f7d8f037c84a5a81a2a",
+      "statement": "publishLocked takes the pending list rather than reading it, so a subsequent flush finds nothing to send; taking and writing happen in one critical section because otherwise the debounce flush and the shutdown flush could each take a copy and write concurrently, letting the older list win at the rename.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L279-L299",
+          "version": "repo-lines-v1:sha256:bbca019c3e2de637b0e4a8cf05a41b3bb5dc620771221ff81560dbd7700fbe78:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjNWVjN2QzNDgxOGYyOGU4NmQ3YzdiMDBiYzgyNjg5NWZkZDY4OTM2M2QwODAzMjkxNWVjOGJhMmNmNTJjNDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE1NzA2YTAxNmMzOGIxYWQ1YmFiZTMxYmQ4NTQ5ZjU2MjI0YmExNTI1ODIzY2QxOWYzNzk2ZmM2MmZlMDMwMDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NWI4YzNkNjMwODU4NjExYjRkZTQ0MmQ0MTViZDQ5YjJkYjc3ZTExZGFhN2Q5NmI5MzQ0M2MzYzMyYWYyNzQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L301-L313",
+          "version": "repo-lines-v1:sha256:0963c96d3ef350e6034d656a8f855cde7b04a81780d86249e3e12673b830e3d7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1NWNlOGUwMTYxZGEyMjYxN2Q5ODU4MDdiYmE2MzQ4ZDVmNGEzOWZjMmYwYmU5NThiYzY4N2E5NjA2MGVmYzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyZWNlM2JiMjg1ZTllYzFlMGFjODBjMTc1ZDBiNDhkNWZlMzI4N2RlNDc2YjM4MWNjMmUxZTA2NWQ0Y2YxYjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg0MmNjN2ZiZDM2MjBlZDY1MjYyMGY5ZmZkYTdmNzM3N2RmZmI0MmMwOTQ3YzMzMmI2NmRmNjEwNGE5ODczZWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg4MzI2NTZhMmMzMWZiYmNhODk0MDdhMDZmNDE3NjZjN2MzY2JlNWI5OGZmNjQ4NTA0NGVhODEzMmZmM2VjZDAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_84551d5df40d4bbfbab84b517d52ad78",
+      "statement": "Both services write config files through a unique temporary file in the same directory followed by rename, so the running mod can never observe a partially written JSON document and two concurrent saves can never share a transfer file.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/atomicwrite.go#L9-L15",
+          "version": "repo-lines-v1:sha256:4384da7565a6920148e109dfdad16ef0e65963b59bf594e6775b4fe08935261c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM2YjcxYjY0MjMyOGJhNmEwM2Y5Mjk4OWI3ZTE2NzYyNmVkN2EwYTc5OGEyYWI2Y2MzZmIwYTU5OGEwMzU0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjI2OGJhYTFkN2Q2MDAzOTQ5MzMyOGRjNGUyYzU4Y2E1MGEyMzdlZjg5ODI4MWZkNmExMzA0ODY0MTYyMmFhYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTdiMDQ2ODU0MTc2NDgzMzIwZTdjNDJiMTliNjdhZmY4YzhkOGQ1MmZhMjkzYmEwN2U1YmE2ZTk2MDUwYjI4YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWEzMjg0OTUyMzBjN2ZjMTc2MjEwYzZhOWQzNmUyYzM3OWE2NWY1M2E1YzEzYTBmNWEzYjUyYTFhZGZlZmY3MCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_afe668f0ce1f4570bf5bb3c548ff32b8",
+      "statement": "Bootstrap claims the file's modification time before the try block that builds the hot-apply object and performs the boot write; claiming it in a finally instead would let a timer callback fire an apply against a live hot-apply while the handled timestamp is still default, colliding with the startup write.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L84-L101",
+          "version": "repo-lines-v1:sha256:a6ba4fcf46c7a9cca8dd8e55a56708238f62fa7b2a42ee1c1b8e793d886383ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyNTgwN2ZjN2IzNmM0YWVkYTdmMzQwZTBhZTBkOGM3YjJmMzdmNTA2MWIzZDc3OGFmNTY2Mjc2NGI1ODI5NmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhZGQ1YWQ3MDI4MWEzOTlhMjhkMDhlNjkyMjZhZjIyZmE1ZmExYzM2ZmEzNTFjOTY1ODZiYmZjZWYxODk1OWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI4MmJiNjdjZGFmNjVkMmZlNWE4YTAzYmU1N2NmNjEzNjk1MmMzNjNjMDJkNWJiNGI2YWQzZTI0MDBjYWMwYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2ODVmZGM2MTIxYTYyMWZlZWU0ZTRlOGYxYTg5Yzc1ODFkYTljMDE5NGU5NGUyYzY0NmFjMzdmOWFmMjQyNWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_52bc9100a25d44d090b47fd65707e062",
+      "statement": "Tick returns early when the file's modification time equals the last handled one, and uses an interlocked compare-exchange as a re-entrancy gate that lets the round pass without claiming the change so the next tick handles it.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L192-L217",
+          "version": "repo-lines-v1:sha256:f7be7cdd650c97bdb79bc3c3c29c2950b3ded91e6987e8ad43306f1588005d49:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5ZTA3NTZjMDhiYWVlNDdmNGM2YzFjZDM1MDdmMzkxNzMwODQ4NGIzM2I1NmVjOWQzMzhhYzI5ZWJmY2VkODUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzMzhmZDI4MWYxMDY0NzIxODQzZDM0ZjA3OGNjYzJjNGNjNjk4M2U1YzgyYmQ4MmJlZjk5MjYxZWQwNmNmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJkZmJjODQ5MzRlZTRmZDRmZDA2ZTZhMmIzZjNkNGQzYTM5ODZlN2U0ODg5MWQ3NGQyMjc4ZTgxYWVjNjUwMDkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_20054b7c487045c8be1afdcc2ea6af7c",
+      "statement": "The handled timestamp is claimed before Apply rather than after, and the accepted consequence is deliberate: a failed apply does not retry itself and waits for the file to change again.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L201-L204",
+          "version": "repo-lines-v1:sha256:a0305726818c461c94a349938f613cfb7acfe325962e077c36e41b3c9346fd1e:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWFhMjg1ZTE2NTE0MGQzZWY1ODVkOGUzZGU2NjU3ZDg1MDIwYWJkNjUyOTE3MWNmMjllMTg3NTY4Y2Y2YjBhNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWJiZjA1MzlmYzVkYTIzYmVjMDFhMjEyYTRiNTQ5YWQ3ZWJiZDQ1ZjYzYzc4NzcxN2Q3NTRlM2Q5YmEyMDQ1YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWJmODY4N2M5Y2JhYWM3MmY4MTU3M2MxZGM1MjlkY2MxYjI1NTViMWRjODJkNTE5NmZkM2M0MTJlY2Y0MzRmYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTY4NWZkYzYxMjFhNjIxZmVlZTRlNGU4ZjFhODljNzU4MWRhOWMwMTk0ZTk0ZTJjNjQ2YWMzN2Y5YWYyNDI1ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_30b1d1d3c2d94d2b89f29b8c8a082911",
+      "statement": "The new table is re-registered with IDataManager before the native memory write, both because a re-parse must see the new values and because registration is what makes a refused write survivable rather than lost.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/HotApply.cs#L103-L114",
+          "version": "repo-lines-v1:sha256:d3b905b9b5143d7216a981e15186bd2be03dda0748124a83e7acd60f0fd67ea9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1MzgxNTc5NjdiZTFlMDQ2ZTRkMjI5Y2QzODNmZTVjYWE1YjI3MTU3MDg2Y2I3NjI1NmNiZDY0NzZjOGY5MTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzMzhmZDI4MWYxMDY0NzIxODQzZDM0ZjA3OGNjYzJjNGNjNjk4M2U1YzgyYmQ4MmJlZjk5MjYxZWQwNmNmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQyMDZkNjc5ZWQ5MjQzNzNkZWI2OTJkOTkzMGRjODIyMjI0MzY3ZjY1YWY4MjllZTc1ZmY4Y2ZhNDliY2VmOWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f91539128b0646a88dfdc9549e0aea90",
+      "statement": "A refused native write is reported with its code, and code -7 is distinguished from every other code: -7 means the row writes faulted part-way so this session's table may already hold some new values, while every other code refused before writing anything.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/HotApply.cs#L121-L127",
+          "version": "repo-lines-v1:sha256:23d2ec5ac7181bc48c991c94a8e66550bbac813d58b649f90fee0096c6bbe221:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzViYzYwNzNlMWQ5MDJmMzFmMmI0OGU5MWQ4MjBmM2E5YjI5NWQ1NzEwZjM0NThhMmIxNjNlMTNkNDkzMmJhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDMyYjZjNWJmNDRiNTYzMWI2OTJiODdjNjYyMzI1MTkwNDI4OTZmMjU0NDFmNmFkMzkwN2U1YmM4MDAzNjE1NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGI1NDM0NWExYTRhOTRhYzdmNjNjNGQ2MTUzODU0ZjdiMTY1MmRlN2FiM2RkMmYwYzI0ZTA2YTQwMWY2YWU0MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a0da9c31996a40a3b42123abd9d0bcd9",
+      "statement": "The layout pre-flight derives the declared row count and requires the body to divide exactly by the row size, so an unrecognised table layout is refused instead of writing into the wrong row or past the end of the file; integer division is used because the 8-byte header is arbitrary and the equivalent multiplication could wrap on a long.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L283-L291",
+          "version": "repo-lines-v1:sha256:8867bbca8f477c4177953012ded0c3228034ba804df817ab9e94478a30aa5a98:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdhMWRiNTlmYzhiY2IxYjY0ZWVjNzYxN2EzOTEzNzUyNjZhOTZhMjY2MWZhYTA0YzdkZDcwYWYzMzIwNjk1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzU3NmU3ZTc5ZjA3ZmMwYjRlNTlmMzNmZmMxZTg5NmNjNjQzNTE5ZDMxYzU0NDBmNTkzZDNmY2ViMDQ0ZDgzYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzAxMDEzZjM2ZDVkY2IyYTMwMTRjYzBhMWI4NDc4MDI3MmQzOGMxMzYyMjQyNWE3ZGI1NDBmZTE1N2EwZWE1NiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L396-L403",
+          "version": "repo-lines-v1:sha256:588dbed454a473de00938106f37b1acef7302116a5d8c35a95ca10541c27914c:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjljYTg5MWJmZjdhYzFmN2NlYWFlNDBlZjA1MTA2NmJlOWVmZTQ3YjRlNDI4MWU4NmMzMTliZTJjNTVlYmNlNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTQxZWNjZGZiNzY5MjU0NDY2YjdhZTk5MmYxMjYwNWMyODQyZTJjNGRmNDVmZmQwMDdhMmJjYjBhZmZjM2RjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmIxYjc5ZjkyNGU5OTc3OGU0YzdlMGNmNjZkYzFiYjZjYmIzMWIzYmZiOTQ0OGE0Y2VmYzk4N2I4MjMyZmQ5MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_07efa932f6b64bfdb413de0aac8d8fa4",
+      "statement": "A failure anywhere in this feature is logged only: the stated rule is that a broken editor feature must not take the whole mod down.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L69-L72",
+          "version": "repo-lines-v1:sha256:1cdcb70bec7edbb5383a668061cc487a5f4f5e68434016577032bdabe7a07698:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzJiNmRjOTBiMmY3OTI5NjNkY2RhZGZlZmI0MDg0ODU0OTNjMDNjM2UxYTgwZjE0OWJjNjM4MDNjZGQwNDY4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmNkZWI0ODBlMWYxOThjNDgxZTk2ZmRkYjU3Nzc4NzdhNTQzOGU0NDlhOWU0MzQ0Y2JhZTBjNTc0YWRlNTc5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjMzNTE3MTQ2YmMzZDI4ZTgyYjc1MjUxY2FmODgwMjhlZTA2ZDk1OTBiOTNmZDlkYWY1NDI2NGM4NTZjNmMwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmVhNDc0MmI0MDA2MDNjYTY0NDM5YWFhYjI5NjEyMzcwOTMwOGRhZjA0MWFjZjk1ZTU5NDQyMWY1MGM1NzAwMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4e1d0719726049578c819ef03c85a1e9",
+      "statement": "After disposal the hot-apply refuses to touch game memory and the feature clears its reference, because the host timer does not guarantee its callback has finished.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/HotApply.cs#L79-L85",
+          "version": "repo-lines-v1:sha256:ff28ec0426893ae4e137510a0aa5549dc9198ddc99526ca2b5576c2873d0fed9:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGI1ZGMwM2I0NDY5YTI1YjFlMzlhMjhhMzhlN2ViOWE4ZTg4YzcyYmViZGU0NmZhNjBmYWY5Nzk4MjE1YjRkOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWVjZWI4OWNiZGY2NGJhMjNjNzgzNzZhNzBhYWE2MjQxNDJlNzc0Yjg1ODhjMWMwZWY2OGJjMzgxZjFjZmVkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI3Y2U1OTk4NWZkZGRiZmUyZGYxODkyZWNlNDBlN2MyMzM1NmE1MjA1ZTM3NjhlMDhhYjljNzIwNjg3MzJhMSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L220-L227",
+          "version": "repo-lines-v1:sha256:7b93ea2bbf00661ede32e9fe70fcec5b1f7bdda59f8b1e915b9f1258d6536530:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzJiNmRjOTBiMmY3OTI5NjNkY2RhZGZlZmI0MDg0ODU0OTNjMDNjM2UxYTgwZjE0OWJjNjM4MDNjZGQwNDY4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTk5YmRlZmVlYWNhNjM0MGUwMjkwZGM4NmU4ODljODlkNWUxODlhYTViYTQ0YjU4NWIzYjcwNzM0ZjRhNjJkOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmRmZTFkMWZjOWUyMTg2ZjkxMTRlNjcwNWZlN2YzYzk1MTJjZGYyMmQzMmRjZjdkNTdjODIyM2M0YWM1ODVhMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_01f71cfa4ea24e5a9715aa65d63c9db4",
+      "statement": "A save byte-identical to the served table is skipped only as a shortcut; when the baseline is unknown the comparison is skipped and the round proceeds, avoiding a second maintained fact about which copy the game holds.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/HotApply.cs#L94-L101",
+          "version": "repo-lines-v1:sha256:05857cce71207065878c533ecec2f815d407e06448a654b995305e4d73c7faca:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2NjOTU5MGE3ZTk0NjQyOTE1NzJhNTVlZWY0Njg1ZjlhM2NlZWM5NGFiZTI3NjA3NDUwZjZhNjk1MmViN2Y3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjMzOGZkMjgxZjEwNjQ3MjE4NDNkMzRmMDc4Y2NjMmM0Y2M2OTgzZTVjODJiZDgyYmVmOTkyNjFlZDA2Y2YyMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzE2YzUxMTg5NTBiMTA4OGM4OGExZmFmYjM2NWU5NzE2YWJkZmRmN2M2YzIzZjNjMDYzY2MxYzdhMWM0MmFmMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_8fb6fb16418543f0803713b842ac81c9",
+      "statement": "The 250 ms tick interval is not a latency budget for this feature, since the values do not take effect until the next battle; it replaced a permanently blocked WaitOne thread and a kernel event object.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L180-L182",
+          "version": "repo-lines-v1:sha256:ff98a3a3137158901f83cfe8a31c37ab9b7a52a2808bc35e552a1b6e5b349e79:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGNhNWI5MGY4YjhhY2E4MDA4OTMxZTU4MjM5YjNhMzlkYWM0MjFkZWYxYTE4ZmI2NDliY2FkY2I1Mzg1ZTI3ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmNkZWI0ODBlMWYxOThjNDgxZTk2ZmRkYjU3Nzc4NzdhNTQzOGU0NDlhOWU0MzQ0Y2JhZTBjNTc0YWRlNTc5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWNkZTViODBlNGE3YjU4MTJkNjk2Yjk1YmUyYTE1ZDYxMGQzYjRlODcxNjYxNGJlODk1NzM3OGYzMjdhM2Q0YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGUzYTFiOTVlOWEyMWRkZGIwYTk5MzVhODQxZjYwNzM1ZDNkYjZkMWM1NTE4Yzc2Y2Y2MWE4OWRkZWNiYzgzOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_de3fb248ea6745aaaf2acb38724cf4a2",
+      "statement": "The table slot address is resolved before InstallHooks() is called, because the project's own safetyhook rewrites .text and anchors must match unpatched bytes.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/0002-semantic-anchors-over-rvas.md#L22-L23",
+          "version": "repo-lines-v1:sha256:9f8b08a16fdc9ef1b17cca03a68a7d0872cd883fd656c5ec83f1ea93359b1e13:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzc5YmMzZWFlZTQ1Y2Y2MTE1ZWU0MjM2NWI0NzEzNGRmNTAwOWU3M2I0NmUwNzk0NDVjNjYzMWEwZDM5OTkzOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzM3N2JjYjc0NDY5ZTM2N2E5NGI3ZDNmZTYzZGEzODVjZjQ3OTQwOWIwYzU3NjU2YTYzZTNjMDdiNGZjOWU2OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWFiOTNhNDUxMmJkZGQ3YTM0OGZhNTU5MzgwYWE2YjlkZjM1NWE5MWQ1MzQyYmQxZjE3NDMwNDI3ODRiZjA2OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-22T11:42:24.258Z"
+  }
+}

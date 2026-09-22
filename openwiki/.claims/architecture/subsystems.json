@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:cf947c43aa985fbc8b2b1904d341d19a49644ebb96c04be99ab83ef93ab0a84e",
+  "claims": [
+    {
+      "id": "claim_014c14c574f9406c85bda06e7444fca2",
+      "statement": "The Go surface is a Wails v3 desktop application that registers exactly two services, LoadoutService and EditService; the React frontend reaches them through Wails bindings rather than HTTP endpoints.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L224-L231",
+          "version": "repo-lines-v1:sha256:e1de7a478e00e6561a3e9e6371858a0fa55ff7997f234e449be521b11570bc93:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM2MThkOTI3NTI0ZDUxNGI1NTZjMWY3NWE5ODNjYWZhOGZjNjNiYzYzNmI3YjM1YzQ4Y2U5ZGRiNzQyYmQ3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzQyYTc4ZjZhOTE2ZDdiZDdkNWMwMWRjZTVkOWEyYWQ3MmZhMmQxNjRhNDA2YjZjMDhiM2Y3M2RmNWUxNTQyOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjg4YmNlNjIzODMzYjgwY2Y5Nzk3ZDlhNTdiMDg0NDg2ZjdiNTgxNWEzNzFiZjZjY2U2YjIyYTY5NWMyOGFkMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmFiYjg0YmI2OTgwYmE3NjIyODYyYmI2OGRlMzQ1OTAzNzQzZThlYWM1OGM4ZmU5MDk2M2IwYjJlNDQ1ZDFmNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_091366e8dc6b4da6b163d99144d20294",
+      "statement": "Which records count as edits is decided by the frontend, not by Go: the Go read path performs no filtering and only pads values.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L192-L201",
+          "version": "repo-lines-v1:sha256:5af26cc4a387b09a56730dd9c93ebdf5e1259ee757f90eaceced62caedb836bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2OTQzMDEyZDJhYjZhMTMzNjc3ODE0MTdiMTU1ZWQyNjU5YmQxNDk4ZWMzNDI4ZmU2YTdjZmY4MmRiMDYxMjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzNWUyOTEwNjk4MzE1ZmE2MmEzZWQ4MWM5NTdiYzZhYTkyODhkNTFiYmViN2E5YjRiNzQ5MWUxZDYzNDRlN2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzhhNDMyMTc1MzRlZThkYzA0YzQyNjZjNjg1OWJjNmUxNzczMzAzZGYyY2E3OGMxMTkyMzZkMzUzNWU5YjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYyMzM3NzlhNjIyOWE4MmY5NWM0NGQxOGNjMWVlN2JiOThkMDdhMzQ1OTRjYzkxZDY1MTE2Y2Y5YmZiNmUxNzQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L224-L226",
+          "version": "repo-lines-v1:sha256:21dadadc5219a0e4d2606cae625faacd3796ef0eb0f0b5753e7238d6e1c242c5:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmUwMTJkNWJhM2RjZDc0MmU3YTBjMWExZGU3NDU3NzQ1ZTdmMzQyZTg5OTM0Njg3OTc4ZDIzMGYzOTFhZDFjMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzUzMTYwMzJkZDg2YTExNTA3MDFlZWM1NzEwOGUxMjZlZTAwNjFjZDUzMmY4YjY3MjUyZWRkOGRmMWM0ZDhjOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzQ5NWExOTllZGY1NmI4M2I1NzI4ZDJjYWY1YjhhM2E2ZjJlOWRlZmZlZjkzOWFkYTU5ZTY0OGJiMjA3ZWFiOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2NhZWRjY2Q3NjUyNGRlZDhmNDFhZjJmYjE3ZGMxMWJlOGM0MmJlZDgxODFkMGEwODFkYTMzODUzMDRjZDA3ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_49f386e87af64302907170935741a1b7",
+      "statement": "A file that exists but cannot be read or parsed is treated as an error rather than as an empty list, because an empty list is a real state (all edits switched off) and showing a broken file as empty is how one stray keystroke overwrites the user's edits.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L198-L201",
+          "version": "repo-lines-v1:sha256:2d5a08f9ce2b1de11ee7ffa1f9dd821de3d7ef5a5b314fb6159577f80d50d1bd:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2QzNDIzNTVlM2FmYWU2YjE0MzhhODdmMmUwOGZkODdkYmNhZThhZmNmMGY1ZGZhYzMyODcwM2I2MzAzMWQ5MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTM1ZTI5MTA2OTgzMTVmYTYyYTNlZDgxYzk1N2JjNmFhOTI4OGQ1MWJiZWI3YTliNGI3NDkxZTFkNjM0NGU3YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2YyMTRmZjc1MTU0N2UzNWRkMjQ2MjMwNmU2Y2Q3YWJlY2VlNzA1ODJmYzMwOTg4MzBhODVlOTE3ZjMyYWM3NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjIzMzc3OWE2MjI5YTgyZjk1YzQ0ZDE4Y2MxZWU3YmI5OGQwN2EzNDU5NGNjOTFkNjUxMTZjZjliZmI2ZTE3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_768624bd6e0147148593ec7b92659939",
+      "statement": "The frontend is state-free at the boundary: it calls SaveEdits on every change and never waits for an answer, so a write failure at flush time is surfaced to the frontend as the GBFR.SigilLoadout.SaveFailed event, whose name is mirrored in SigilEditorPanel.tsx with no coupling between the two files.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L45-L47",
+          "version": "repo-lines-v1:sha256:1ae6cf74087376bcd4daa14718386bcab0d8ba8734d47ce60380f0ce1c8b1393:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM4NjU2NzI4MWIzZjgzMDQ5NTE4OWRiZjA4ZDMxZTk5YjYxMjEwY2I2NDAyYzkxMWJiZGI0ZDFjMWU3NzAwYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNkM2UzNTBkYTA2Y2FjZmIyMjg0MDhmYTQyNTlkYTlmYmU5ZmM0YWZjZGZhYWY2NGMzNDEzNzViNzYxNTM1YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTFkYjA0YmRjOGNmMmQ4NWQ3MTEwYjE5YTg0MmY1MTk1N2JiMzU3MWE5MzBlYjgwOGI0NTdkNmUyMWE3N2FjNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmFjYTVhYzRmYmNmYTY0YjIzOTQ4ZDVhNWQ1ZDI2OWUxOTY5NWQyMWZkYzUzNGFiOGE3YWNhODY0MGYyNTA1NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_58ed993025894a9598d6c22d9c2a8fae",
+      "statement": "nil and an empty list are distinct states in SaveEdits: nil means nothing was handed over and nothing is written, while an empty list writes a file with every edit switched off.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L249-L251",
+          "version": "repo-lines-v1:sha256:a6c7548f92fbf4dd6bd2585bd7aa873aa204012e3996edb551e07300dcab3c7f:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjU1MzYxMmU5MDI0NzFlN2MxMTQ4NDk5MDdlYWZiMDk0NTU1YTMwMmU2YmI1NWEzMDY3YTBjMzE5OTU3NTQ0MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDI5ODU1OGM0YjQxNjczYTM1ZTYyOWFlMzc2ZWExZDUwOTRiYmIxZDFiNjJiYjNmOWU1YWYwYTkxZjM4YTgyMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDczZWQyZTU4MTZkNWRhMTY3ZWY4YTJjZDg3ZTBjNzU2NDUzOGNkMjdlZTMwMTE3OGM1YTdhNGNkMWUxYjk3YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWU5NzhiODI2YTRiZGMxNjJiZTA3Y2NjMDAyNDk2YmFhNjUwNTk1ZDAxN2QyMmQyMzc3ZjBhYTdmYmJiMTBhNCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L314-L319",
+          "version": "repo-lines-v1:sha256:b0248d3f47c813d236f98cc9659f7a422a5c8f9df6b6e58f385b82acf0967880:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFhYjRlMTA3MzlhOTFkNzZiNzFkMTZkMTAxNGY2MTliM2I2YTU3YjU3NTE1ODNiZjk1ZGE2YTIyNmY0NTY2OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjZGE4MmRhNjA2MjM4ZTA1ZTYyMzk5NTY5YzVlZTAzOTkzNDE5NjQ4YWU1ZDQzYTJiZjhjZDYzNDdmODI2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDE0ZTc5NmIxMzYwMmE3YjgzNTYwYTllM2FlZjNhMmRkMmY0ZDY4MDUyZWMxNjcxYjNjMzJjN2U0ZTVhNGE2MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmMwOTNkZjkyZTc5ZGI4MTBkNTFhMzZjYmY5NzVkYjI5NmY2OThiYTNkNDY4NjRhMDgxNTQ1ZWJhYTEwNTVkMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6835cd86696483e995256342bf9713f",
+      "statement": "There is no compatibility path for older files: JSON member names are matched exactly without case folding, so a file written by an older build that spelled members Edits/Enabled matches nothing and reads as an empty list, which the code treats as the intended start-over shape.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L211-L222",
+          "version": "repo-lines-v1:sha256:d34627cb2aa18d2a8f8fa76675f1091e34dc2b4f10fffdd80e26e1d13f556772:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxNjk2ZmZlMzIwYTU1M2NlMTc1YzI1NWYzZjY1YjEzOGZiOTNmYzc4NjAwZGMxZGFhMDE3OTZlNmNlYzMwM2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY3Y2M1M2ViZjZlMDQ5MzYyMWIzYTk5MDg0Yjc1NjdlYmYxOTJkODNkZGM1YjdkODg5YTY5ZmU2YmU3Y2ZjOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiZjk1NzhkNzIwZjRmNGEyOTgyODA0ZDk5ZDNkMTgwOGY4OTdhZGZlNDg5ZmU4MjIzMTVjZGI5MGVhYzc0MWQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_dd5fe624a32f431aa9c7c8b017425008",
+      "statement": "Unknown JSON members in the edit list are ignored rather than rejected, which is the json/v2 default and is deliberate rather than an oversight.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L216-L219",
+          "version": "repo-lines-v1:sha256:eedb158961920e97b0de0c111dd935a2f7ac978d556c7d3c3678675deb3df41b:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODRmYzkwODc1M2QzMzI5NGRiODk0MTVkOWU1MTc5ODFhMzM2Mzc5YWM5YzU1ZmEzZjg3OWY5ZDAyYzUzYjE1YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjI5OGVhOGIwNWZlYWY2ZGIxMjUxNmZkMjI5NWE4ZTc3MWMxNThmNzcwMWQxMTk2MTNlNDVjZmQxYWQ4YjNiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWE5YWU4ODFlMDgyYWJhM2M0YjcwNzNjODE4MDg0YzQ3ODA2ODk3ZTc3YWE1NGE3YjE5ZTM4ZGM3ZTdhMzQxYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e67a26a0ce8b483fbf9b1a6697a193a1",
+      "statement": "This repository is not self-contained: native compilation and the release consistency gate require the sibling ..\\gen repository that owns the data generators.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/0004-generators-live-in-gen.md#L1-L5",
+          "version": "repo-lines-v1:sha256:e2cd69eaf12413705fa66167f49e260bd75b7c39f812067a95cbc8c580881df4:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM2MDYxNDNkYTljNjc3OGM4MzQ0ODhjNDcwMzkzZTg5YTZjN2MwMzQ2MTgwMDJhMjQzNWYwMDdlMzdkYTg0ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2RlYzZiMjVjNWEyMWMyZjY2MTE2MWZmZDg0NGY4ZDIyM2VlNTk1ODRlNTNkNmNhYjc3ZDNkMjczY2MxMzM3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzQ1OTY0YTg4Y2IwYTIyNzkwZjkyYzQ0MmY5ZDFlMGZlZjdkNjIzNGM2Yzc3NmZmMTMwYmZmMTRlMzVhNmY2MyJ9"
+        },
+        {
+          "resource": "repo://docs/adr/0004-generators-live-in-gen.md#L13-L18",
+          "version": "repo-lines-v1:sha256:c7ca745f37c1f17ed6e91a01cab7b9da5b92c10d76f0f1a6fd3d659bd63f0922:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODYxMDViNDE3ZjE5NTg5NGJmNTE5YmRlZDdmY2M0NzgyOGJkZDZkN2IyNzMxNDI5NzJkNjRkMDAzMjg2NDRiNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmY3YzdlZTRhMGI1NWJkZjNlNWQ2ZTQ5ZDlmZjM4ZWQ3ZmI3MjczMTI1YWE3YWQ3NjU4OTFjMmJiNGZlZDRiYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjU0NTUxOGMyNzNlMmViYzRmMDNmZjcyZDdjN2NiOGQ3ZDhlZmQ2ZjBhZjNiMjc3YTY1MmUxNjQzYjU1YjJjNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0d47c55fe0f343868a9f5ce648aa7876",
+      "statement": "Whether the table can be patched, whether the native slot resolves, and whether the write is permitted are all decided on the C# side, which consumes the same edit-list JSON shape as the Go side with no runtime validation of member names in either direction.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L235-L245",
+          "version": "repo-lines-v1:sha256:24fb6bf60d42b1bb41f1a5e1cb962a537a8e740803a5d7fa3837acd6a1b00e9b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4YWQzZjAzOTA5MzZiZjA3ZTc2OTFmMDVhNTQ3ZTE1NWYwNzcyN2U2YmJiZWNlMWQ2NjFmYWFjMzFiOGExMWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0NzQ4NjI3MGQzZTBkNjVkNmYwZDlhOWZmMDY5YmJmOTA3OTg3MzdlYmMyY2Y3YWFkYWNlNmY0ZTgzNTE1MjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwYWNmMTE3MDBmNWEzNWU4MDM4MmRkNjUyYTMzNzAyM2JjZDJhYmJjNDk5M2Q4M2QxZmUyNjRiYTAzZDgwOTQifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-22T11:42:24.258Z"
+  }
+}

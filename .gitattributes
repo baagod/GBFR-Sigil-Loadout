@@ -9,7 +9,7 @@
 *.sln text eol=crlf
 *.vcxproj text eol=crlf
 *.vcxproj.filters text eol=crlf
-GBFR.PreEquippedSigils.Native/third_party/** -text
+GBFR.SigilLoadout.Native/third_party/** -text
 
 # Binary assets (never normalised)
 *.png binary

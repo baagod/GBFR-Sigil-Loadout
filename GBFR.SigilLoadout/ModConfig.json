@@ -1,0 +1,28 @@
+{
+  "ModId": "GBFR.SigilLoadout",
+  "ModName": "GBFR Sigil Loadout (2.0.5)",
+  "ModAuthor": "baagod",
+  "ModVersion": "0.6.0",
+  "ModDescription": "为全角色预配扩展因子，不占用本体 12 槽位，无需库存、不写存档；并内置因子参数编辑器，可在工具里改写因子的等级数值。Pre-equips extra sigils for all characters, using none of the base 12 slots. No inventory required, no save-file changes. Includes the sigil parameter editor.",
+  "ModDll": "GBFR.SigilLoadout.dll",
+  "ModIcon": "icon.png",
+  "ModR2RManagedDll32": "",
+  "ModR2RManagedDll64": "",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "",
+  "Tags": [],
+  "CanUnload": false,
+  "HasExports": false,
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "GBFR.SigilLoadout.ReleaseMetadata.json",
+  "PluginData": {},
+  "IsUniversalMod": false,
+  "ModDependencies": [],
+  "OptionalDependencies": [
+    "gbfrelink.utility.manager"
+  ],
+  "SupportedAppId": [
+    "granblue_fantasy_relink.exe"
+  ],
+  "ProjectUrl": "https://www.nexusmods.com/granbluefantasyrelink/mods/823"
+}

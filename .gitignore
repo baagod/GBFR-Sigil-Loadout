@@ -21,4 +21,7 @@ tools/live-probe/*.obj
 tools/live-probe/*.exe
 
 # 构建中间产物：专属表由 gen 的 exclusive 子命令生成，vcxproj 每次编译前重跑它
-GBFR.PreEquippedSigils.Native/src/exclusive_table.inc
+GBFR.SigilLoadout.Native/src/exclusive_table.inc
+
+# 决策记录不入库：设计意图的权威在 openwiki/ 与代码注释，ADR 只当本地草稿
+docs/adr/

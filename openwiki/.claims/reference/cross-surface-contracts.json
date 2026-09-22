@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:ec407d1befeb5ff41254e3b002116ece0767a97b5a16335620351671977094b4",
+  "claims": [
+    {
+      "id": "claim_14646b71fd4e4aeaaf3e31627062a5b5",
+      "statement": "LoadoutConfig does one thing only: it maps the payload the visual tool wrote into an ABI structure, reads no data file and holds no table; the semantics of item to main skill and cap belong solely to the single writer, so whether the choice was correct or over the cap is not re-judged in this layer.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L6-L26",
+          "version": "repo-lines-v1:sha256:4641c5864482b72739dbfa4c4838189334163975064f8a78273de87f66e1f97c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMTk3YjE5MDQ4M2YxYjcwZDQxNDEwNmFlNjEyYzk5ODdlMjczMjY3MDE1MGJjYTBjMmM5NzRmNzkzYzBhMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA1ZGE0MDVkNGZhNDNhYmVhMWY4YjRiZDZkNDM4YTU3ZmJmNjkzMTgyNDMyZTg2ZjVkOTkxNzc0ZjczZmMwMTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2YzQxMzY2MDc1NjkzZWVmNjhlYzc4ZDg3NzZkY2MxYzYyMzhiZmYzYWZiMDMzYjJiNjkxNDkwZDkxZjYwYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQyOTA0YmI5YmFkOWMzZDZjMDJjNjFiMzI2YTNmYWRkNTM1MTMzNzk5MDVjZWNjYjc3MWQ4OGUwOTZjNzBjNDMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_818d12fdcbc74f54a981a266a5c7f71e",
+      "statement": "LoadoutConfig performs shape validation only: malformed JSON, a missing skill hash, a bad level, or too many enabled slots.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L24-L26",
+          "version": "repo-lines-v1:sha256:76c0d1a7324461433dd1036d0e19cc15a46fb40a183f381c38692d63bf3cdd3d:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmY5Yzc2YWY4NWQ0MzViOTEzZThjNjk4ZWU4NTZiMzVkNTRhZDZiMWI4NThiNjcxMGM3ODU1NTViMjE5ZDY4YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDVkYTQwNWQ0ZmE0M2FiZWExZjhiNGJkNmQ0MzhhNTdmYmY2OTMxODI0MzJlODZmNWQ5OTE3NzRmNzNmYzAxMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODA2YWJiZDYyNmZmZGM1YmFiZTk3NjA4OGRkMGExYmJjZTg0NDgxYWJiZDYxM2E1MTBiZTkzZTBhNzI4MzIwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDI5MDRiYjliYWQ5YzNkNmMwMmM2MWIzMjZhM2ZhZGQ1MzUxMzM3OTkwNWNlY2NiNzcxZDg4ZTA5NmM3MGM0MyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7fa84f680c5948d79822b1cbe6aa7b65",
+      "statement": "No loadout config file keeps the built-in exclusive template active, and an invalid file is reported while the last valid configuration stays active.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L6-L10",
+          "version": "repo-lines-v1:sha256:c5fd09266ca8e211fb32cc617e85c09d7f57ecd4fb4e29aa613fe2042408ebf0:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWMxOTdiMTkwNDgzZjFiNzBkNDE0MTA2YWU2MTJjOTk4N2UyNzMyNjcwMTUwYmNhMGMyYzk3NGY3OTNjMGEwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGI0Y2IzYWQ2MTIyMGRhZTRlYzI5ZDI5NTU2MDdiZjQ0YTIwMTdlODY0OWZlY2VmMGVlZDk1YTYyYzgxYmNmMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjZjNDEzNjYwNzU2OTNlZWY2OGVjNzhkODc3NmRjYzFjNjIzOGJmZjNhZmIwMzNiMmI2OTE0OTBkOTFmNjBiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJlZGE1OTc3ZWQxODBlYjZmOWRlN2IxMTQ0OThkMWYwZjQ4OTgxZTEwMTJmMjc2MWE4MGU0M2YxYjI5ODE4YSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ac0982281f4c46488cb21bee4c7f5e07",
+      "statement": "In loadout.json, an items[0] entry carries the main skill as gem plus hash, items[1] is the optional secondary skill, and the exclusive map records only false entries so an unmentioned character keeps all three slots open.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L17-L26",
+          "version": "repo-lines-v1:sha256:d856fe66f5f82c0d797ebcae12f918089b22aabb1134bf4b72aa8efd86f53015:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg2YjRmMDI4OTY5ZjBiZGY4NzI2ZGY0YjEwMmJmMGI2ZDQzM2E1NTkwMjIwOTZlNzVlMGEyYjBhMmQ3ODFlMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA1ZGE0MDVkNGZhNDNhYmVhMWY4YjRiZDZkNDM4YTU3ZmJmNjkzMTgyNDMyZTg2ZjVkOTkxNzc0ZjczZmMwMTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUxMzc3NTI2NzZiN2VlOTVkMTBlOTRiMzNlNmIyNzkzODc3ZTkxM2RmMmNiY2E2ZGIxMGIwZDg2MWU5NDY4YjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQyOTA0YmI5YmFkOWMzZDZjMDJjNjFiMzI2YTNmYWRkNTM1MTMzNzk5MDVjZWNjYjc3MWQ4OGUwOTZjNzBjNDMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a0e35adda086483c9dc51a653a6c0d89",
+      "statement": "UnwornCharacterHash mirrors Native/native_internal.h and MaxSlots = 12 mirrors SigilLoadout/loadoutservice.go, and MaxSlots is a conservative safety cap because more slots risk instability rather than a format limit.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L29-L32",
+          "version": "repo-lines-v1:sha256:70fa6466b8d248144b6b8724b4719ce2627499c7c51e7bdd6cc213679918dbcc:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDBhZGFmMTk2YzIyNTFhYmIyOTQ3NzFiYjZkMmJlZDE5NDU1ODUxOWQ5NDczOGI2ZmJlZDgwYTliMzc2MzU4OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2JlNzRjMWE4ODBjY2VjY2Q5ZWFlNGY4ODZiNmU4N2FmY2E4MzBhMzI2ODZiNjNiZTgwYjMzNjcyODJhYjg1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2RkZWNkYjMyZjUxYzkyMDJlM2UyNWVjM2FlNTUzN2YxNjQ5MzEzMWUwNDFiZmJiNGJmZDVlMTIyNjJiYTU5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDliNTZiMjc3MDQ0ODk4NzYxMmM5YmQxZTE2Mzk4NDZmOWY2OTRiNDcwMTliYjVlMmI3NmQwYmY0YjQzNDBjMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_85c6964aac5943a1a3281862e1664d12",
+      "statement": "The modification-time gate has one implementation in UserConfig.Stamp / UserConfig.NoFile, shared by the loadout path and the sigil editor path, and its initial value is the file-does-not-exist timestamp so a deleted config is a normal modification-time change.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L35-L42",
+          "version": "repo-lines-v1:sha256:744d1c4c607c607a73d12bb41b06a4b48017c13456a5b7f53e2883dce8fca7bf:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzI3Mzk4NjdiZDRhODY0ODdjMTc3YTFjYzkwMTE1MzMxZTlkYzQ3Yjg3ODZlMGZhZGYyMGJmYmMwYzE5MDEyOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWZmZWI3MTUxZmM1ZmYwNzBjYTJiNDYzMDZkYjg2OTViODhmY2E5ZTdkZDkyMTc5ZTBlMWI2MGQ3MTI0YTBhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDU2NTlmZTM0MjdmMzAwM2UwMjkyYTI4OGYwZGIwMzRkMDgzODQyZDNjNTI5YTBmNTZkM2YxYzAyNTQ4ODliYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzE3ZWEwMWZiODVkZTA1OTIwNjc2NzhlYzI1MjcxNWY1NTdiNWYyMzJlYjIyNDg2MmU2MjExYzU1MjJjMGU4ZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1f7e91e4e32b4b36a542e27423ef6859",
+      "statement": "A config file that is deleted reaches the apply path too, because deletion restores the built-in template, while an unchanged file exits after a single last-write-time call.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L53-L58",
+          "version": "repo-lines-v1:sha256:a1dc106d184d62961bf45870916dfaaecc2e0fa4a85788604baa87cf2de82d9e:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjkzZTUzYmY5MzM5OTIzNjFjOWI2MjJlZDA2NTdmYjM3OTdjMDY5NjE1YTAzZDk3YjNjYjc5NzBiOWQ0NTY0MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjJhYTI3MDJhOGM4NTEzYmQ4MDAwNjc4NGZmMTcyYTllNzkwMjczYjg0MWI1Yzk5ZDVlNDhlNmJkNmExOTAyMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGYzYWQxYWIwNzZhNmI3MTZiNmY1MGY0NzIyZDExNzZjYTUyZjU1ZGMzMmQ2MTdhNDEyYjkzMDhlMGNjYjJkYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGFhM2MzMmNlNTEwMjc4NWYxOGZiNWY1OTBlYzZjOTc0ZTRmN2UzMzg2Y2Y5YzNhOWQxZmNiNGM1MDI4Mzc5NyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_306cc13ffa9f4582be2f086a10f66a38",
+      "statement": "The skill_status layout trio (header bytes, row bytes, row key offset) is declared separately in the C# and C++ binaries, and the Level offset has no second declaration so it is deliberately not covered by the cross-language check.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L126-L146",
+          "version": "repo-lines-v1:sha256:1ef5c9b9759f8f66f46e1af3d75f6354668d35f9e9136ab7e95f8939ed2b4467:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlmZGQ0NTcyNzhlNzkwZmI1Y2RlZWFmYWQxMjdiOGJiMjVjNjhjZmUwZWEzMDVjZmY5Mzk2MmYyMzdkYzgzM2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlM2FmOGI3ZjI2ZGJlZTU0NzhiZDY5MTFhNzkxNTFmZTNmNmE1NDdmOGU1NDczMzA4OGZkMThiZDdhNmUwNzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_eb2bb5b539534dc3b44cbcffce6ee62c",
+      "statement": "The hotkey broadcast filename is a contract across two languages with no type checking: the mod writes tool-hotkey.txt into its own directory and the Go side reads that literal name, so renaming one side alone fails only at runtime.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L116-L121",
+          "version": "repo-lines-v1:sha256:946c38c8656b1240d3ad1649f222fe682385c01b353b18ca3d635c08d38ca2eb:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODAyOTZhM2MwNDc4ZjExMzFkMWMzNDU4MjRiMDlkOGMxMzBkODc2YWQzZDk3NzY2NjhkMjI2MTVjOTM1YjAzMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMwYWYxNzg5ZTFjMTljMzJkNmIzOWJmMDM4OGNmNjUwYjI3ZDgwNmVmNmExYTE4Nzk1OWNhMWI2NWJjYTc1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWEyMGM4YmE3OWMwOGQ3ODY3MTdmM2Y3MzZjYzU3NzhkNjYxZTkzYzM2NjYxNjQ4NzUxNDExNmJkNDZiZmY5ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b0bacf73784c48b7acc77125e4425d55",
+      "statement": "The activate/display window message value (WM_APP+0x10) is also pinned across the C# and Go declarations by the same test.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L110-L114",
+          "version": "repo-lines-v1:sha256:face40fe35fae88beabc55c2ce62c4254da7ee2db04385ee993afd1d6787792e:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTc4MWFkNGI2NGMwM2UxYThhMDQxY2E2MGUwOTE4N2Q2NTI4NzIzZWRiZWMyZWRiMmQzYjFjOWIyZmNlMWEwMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODAyOTZhM2MwNDc4ZjExMzFkMWMzNDU4MjRiMDlkOGMxMzBkODc2YWQzZDk3NzY2NjhkMjI2MTVjOTM1YjAzMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODM5ZTVmOTE1NGM1YzIwNTJhYmNmMmEzYjFkZDNhOTlmMjI2NmY2NTVhMGFjOWNhMjRkMDViZTc5NzNjYmFiOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGY4ZWQyZDNmMDgyYjJhOGZjYzVlN2UxYzAyNjc1NmM0OGE1MTYwODljNjYzM2U2ZjQ1NmU4MmRkZDE0NzVlMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_88931c80fadf471993443401296707d2",
+      "statement": "The edit list is serialised as the Config shape with indented JSON and written through the atomic writer, so the on-disk member names are the interface between the Go and C# sides.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L267-L277",
+          "version": "repo-lines-v1:sha256:a36a03ab7b65b0e3671dd3e434f31038e5ddb269d23155abd175adf0fd00409e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5YmM0YzQ0YTI1Nzg0YzkyNGY1NTJhY2QyYTY2ZGIxMzg3NTAyNzAwN2JkNGM2ZjFiNWZiNGJmMjE1NDc1M2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE2MzFiNmUyY2EwN2Q4YmFmMGViNDRlNzQ5ZGJmNDkwYjM5MmUzYTUzNGVmNjEwMjI3NzExNDZjZGY5YWYxYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY1ZjY4MDQwNGIwYzczYjBlNTMzNWEyYzhlNDFmNWEzNWUyNDE2ZTE0NjQ5YzNiNDQ3ZDVlYTVkY2QyYmE5NTMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_35402a82208b459ca3b312061e1e645f",
+      "statement": "The atomic writer exists because the running mod reads these files repeatedly, and it creates the config folder before writing so a missing user config directory is not a failure path.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/atomicwrite.go#L9-L15",
+          "version": "repo-lines-v1:sha256:4384da7565a6920148e109dfdad16ef0e65963b59bf594e6775b4fe08935261c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM2YjcxYjY0MjMyOGJhNmEwM2Y5Mjk4OWI3ZTE2NzYyNmVkN2EwYTc5OGEyYWI2Y2MzZmIwYTU5OGEwMzU0YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjI2OGJhYTFkN2Q2MDAzOTQ5MzMyOGRjNGUyYzU4Y2E1MGEyMzdlZjg5ODI4MWZkNmExMzA0ODY0MTYyMmFhYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTdiMDQ2ODU0MTc2NDgzMzIwZTdjNDJiMTliNjdhZmY4YzhkOGQ1MmZhMjkzYmEwN2U1YmE2ZTk2MDUwYjI4YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWEzMjg0OTUyMzBjN2ZjMTc2MjEwYzZhOWQzNmUyYzM3OWE2NWY1M2E1YzEzYTBmNWEzYjUyYTFhZGZlZmY3MCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-22T11:42:24.258Z"
+  }
+}

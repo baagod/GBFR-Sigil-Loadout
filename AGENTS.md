@@ -11,10 +11,9 @@
 ## 约束
 
 - **始终保持中文回复**，即使调用的 **Skill** 说明是英文。
-- 始终以 `/i-have-adhd` + `/wait-what` 的方式回复对话。
+- 始终以 `/i-have-adhd` 方式回复对话。
 - **逐一回答所有问题**：当用户一次提出多个问题时，必须逐条回答，若问题之间有关联，先说明关系。
 - **精确修改 ( 字符串替换 )** 文件，禁止 **覆盖重建**。
-- **术语只有一个来源**：查词先看 `CONTEXT.md`（那是唯一的术语表）；出现新词就当场往那儿加一行，不要在别处再解释一遍。
 
 ## 编码原则
 
@@ -69,3 +68,16 @@
   - 谁调用 / 影响面 → MCP 工具 `mcp:codegraph`（自然语言可问，watch 自动同步，返回含 blast radius）；
   - 模板 `@click` 与 **注释** 不在索引，grep 兜底。
   - 字 / 术语 / 注释出现在哪 → grep
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->

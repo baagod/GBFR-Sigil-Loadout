@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:cb23af9645e468208ab0515d8179c5136b717a5a31b71bc1487a209c5e800e34",
+  "claims": [
+    {
+      "id": "claim_9cc55fd423ca459f9a99028725a952ea",
+      "statement": "A change to any shared constant must be made in every declaring file, and the lockstep is enforced by a Go test that parses the other surfaces' sources with regular expressions rather than by a shared header or code generation.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L40-L47",
+          "version": "repo-lines-v1:sha256:9e0faaec6f8257d1ad50423c9193e2604d1f6badefea48f26ccf72dc85b1ff5e:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmZhNjMyZTIzZDk4ZGQ4OGY1YzliZDQxNDQyY2RlOTM3OTBkNjg2ZWM1MzIyMjM2NTc4NDBiZmQxMDRhNGIwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGU5Nzk1YzgwNDlkZGEwOThkYzY2MjI4NzcyZDJlM2E3ODZmYzU0YjM5ZjgzNWFiYzI3ZjU3M2NhZDhhYmNlNSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L78-L87",
+          "version": "repo-lines-v1:sha256:00a459d30abd7f50b3a9d0f52adeccdcebbdf64c9c8d6ae83979bb575d9de5d0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjMTFmY2FmY2QwN2ZhYzdlZDk4MWIyMTA4MGIwZTU4YTg2ZmFlYjZjMmFkOWZmY2E0ZmVhNDY1NjU1MGYzNmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRjOTRhNzY1ZmZjY2ZhNjU5NzI4ODI0NjQyYTE5NTJkNGNiZWRmODYyZTczMDk0MDIxYzExYTMwNDJkMDM2MzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5N2VlZjNiZDE4YWJiZjMzODg2NGI2ZDZhNzMzOTc1ZDQxYTI4ZWFmNTUwMGU3ZTdlMjZlYjdkY2ZkMWRmZWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8df950c09e84412ab6294c1f54058d78",
+      "statement": "A drifted user config directory name or config filename produces no error, only the symptom that configuration has no effect or that edits never land.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L78-L81",
+          "version": "repo-lines-v1:sha256:4e76e31a14843dc1177110c71a719adb5660dc8a2a0d2eb2cb5004a7f10309ef:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWMxMWZjYWZjZDA3ZmFjN2VkOTgxYjIxMDgwYjBlNThhODZmYWViNmMyYWQ5ZmZjYTRmZWE0NjU2NTUwZjM2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGM5NGE3NjVmZmNjZmE2NTk3Mjg4MjQ2NDJhMTk1MmQ0Y2JlZGY4NjJlNzMwOTQwMjFjMTFhMzA0MmQwMzYzNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjhiOTNmZGRkMTAyYTA2YThkODhiOWZiYjM3NWFlNDk3ZjRkMGE3MWE4MTQ1MWU3ZGFhMTcyMThhNmQ4NTAwOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d799c2ef81e94039b1b2fc50a2e9397c",
+      "statement": "LevelValueCount is declared three times: LevelValueCount in Config.cs, LevelValueCount in editservice.go, and SLOTS in skills.ts.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L70-L77",
+          "version": "repo-lines-v1:sha256:6b4c2ccf159a1164cdce5c006459f78d6893d58ed4755bed271affb6d0a1b16b:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTY1NmVkN2RkNTk4NTg4NDE5OGM3Mzc0N2E5ODMwODNiYzg0N2Y1ZGI4N2M0MGI1NmNjMDA0MzExMmM1NzE1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGM0NTUyMjIwZGFhYjJhN2JlMzI0OWIzY2RjYmQxYjhkMGVhMDczZDRkMmE3NzVhYWRlN2YwMWM4YzRkZTM0YSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_071a1d5fe7e340848c8b7810a84050d5",
+      "statement": "MaxSlots is declared in LoadoutConfig.cs, model.ts and loadoutservice.go, and it is a conservative cap chosen because more slots risk instability rather than a limit of the file format.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L29-L33",
+          "version": "repo-lines-v1:sha256:e223a8321f7c1d5d1ae1150570619f070b93c414cb129bb9f3d7506f788cc73b:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDBhZGFmMTk2YzIyNTFhYmIyOTQ3NzFiYjZkMmJlZDE5NDU1ODUxOWQ5NDczOGI2ZmJlZDgwYTliMzc2MzU4OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmQ1OWYxNDVjZTZlNjdhOWU3NzRhNjU1NWM5NGMxMmI1YWY4ZmRmMmM0NjIyYzhkOWQ4ZmY2YmU4N2E0ZjUwOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2RkZWNkYjMyZjUxYzkyMDJlM2UyNWVjM2FlNTUzN2YxNjQ5MzEzMWUwNDFiZmJiNGJmZDVlMTIyNjJiYTU5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZThkMTkwNmE1MjY2MGJlNGNiODIxNmEyYmJkNmFmY2NmYjM2N2RkNjVlMTdkNTg5OGQ3YjBkMmQxNzgzNGIzZiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L40-L47",
+          "version": "repo-lines-v1:sha256:9e0faaec6f8257d1ad50423c9193e2604d1f6badefea48f26ccf72dc85b1ff5e:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmZhNjMyZTIzZDk4ZGQ4OGY1YzliZDQxNDQyY2RlOTM3OTBkNjg2ZWM1MzIyMjM2NTc4NDBiZmQxMDRhNGIwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGU5Nzk1YzgwNDlkZGEwOThkYzY2MjI4NzcyZDJlM2E3ODZmYzU0YjM5ZjgzNWFiYzI3ZjU3M2NhZDhhYmNlNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a591a3437e114faf893b2f8762107d40",
+      "statement": "UnwornCharacterHash is the sentinel for no secondary skill and is declared in both LoadoutConfig.cs and Native/native_internal.h (kUnwornCharacterHash).",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L55-L61",
+          "version": "repo-lines-v1:sha256:d2b859751a506cbd991826bc7f64bfa32ca3e16902fc8eaa9a50880dafa3a362:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODY0YWU1MWQyNDZmMzk3ZTVmNWUxY2FjNjEyYWE1YjIxYzY0Yzg2YTljNjU5YjkyOTk2ZDgzMTc2ZGVkNTliMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzFjYWExMTkyNjI2NDg3Y2IyNjM4ZTNiMDgxODdjODYzMTRhYzE5OGIzOTFkNDYwZWEyNjM1OTQ1MDI4Y2ZhYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7c70d8d9a09e4b51872e68d1553799de",
+      "statement": "The hide-key fallback is declared three times as F1 in HotkeyConfig.cs, defaultHotkeyVK in loadoutservice.go and DEFAULT_HIDE_KEY in model.ts.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L62-L69",
+          "version": "repo-lines-v1:sha256:22b1d51071943056b8a2a9d6a0096ff0d81e5a57a320f0c6da00a51db18463c3:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjM2MGZjNTg4NjY1YjQ5OTk4NTEwZjlmMmNjYmM4OTE0N2VmOTQ5ZWQwNDMxNTUzYTk0NzU1Nzg4NDA2ZTUyZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWEzZWVlYjM5Y2E3YmIwM2YwYWJkZTI0OWE3ZGQzMTA2YTI5YmM4YTVjMDE3YzcwMTJiZjgwNWNmZDRjNjgzYiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5c9ad646db8a450e92cfd4407b35cf81",
+      "statement": "The loadout filename and the sigil edit-list filename are each declared once in C# and once in Go with no shared definition.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L88-L101",
+          "version": "repo-lines-v1:sha256:dbfb5f0cd2ec16740fd748c51ac7a33ecb0fca4b64bf61ce9b25427c8b5b8243:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwODU0YThhZmJhN2JmMmRhMGIyYzczMjMxZGNhZjg4NDg2MzlmYTVkZTk0Y2ZkZTViNzM4ZTJlMTFlNmVhMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA1MWQ5NjRlNjQwZWRlMDY1NjY1MzVlMzUwZGEwODEzNjljMGEyNTRjODRkNjhiMTQ0ZmM0ZDY0NmY2MjFhNGEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8b464be3ca3848d1b48139ac17885364",
+      "statement": "The visual tool's window title is a contract between Hotkey.cs and main.go because the mod finds the tool's window by that title.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L102-L108",
+          "version": "repo-lines-v1:sha256:9d044bdcf825ebd7f83f2f35dac09c43241105123e9b4c9030821824c0b7b0fa:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDliYmEwNWY4NDFlOTk0MmUwNWU5ZmE2NDU3N2E1ZWRmYjIwNmY1MWQ3MGQ0ZmVkYTA2ZTE1YzRkZjE4MmJiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDFhYTIyNzE1NThkYzA2MGQxYmE3NWQ0ODFhMTNkMjEzNDUzZWI4ZjQ5MWI4ZWM3ZDM2YzRhNmViYTk0NWYyYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cf6898afd09d456a94c2299472889d95",
+      "statement": "The hotkey broadcast filename tool-hotkey.txt is written by the mod and read by the visual tool, so its two declarations must agree.",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L116-L121",
+          "version": "repo-lines-v1:sha256:946c38c8656b1240d3ad1649f222fe682385c01b353b18ca3d635c08d38ca2eb:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODAyOTZhM2MwNDc4ZjExMzFkMWMzNDU4MjRiMDlkOGMxMzBkODc2YWQzZDk3NzY2NjhkMjI2MTVjOTM1YjAzMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMwYWYxNzg5ZTFjMTljMzJkNmIzOWJmMDM4OGNmNjUwYjI3ZDgwNmVmNmExYTE4Nzk1OWNhMWI2NWJjYTc1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWEyMGM4YmE3OWMwOGQ3ODY3MTdmM2Y3MzZjYzU3NzhkNjYxZTkzYzM2NjYxNjQ4NzUxNDExNmJkNDZiZmY5ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_8ded4c4f2ffe46d39571229873093cdb",
+      "statement": "The skill_status layout constants are declared in two binaries, and the layout pre-flight validates the real table against them by requiring the body to divide exactly by the row size so an unrecognised layout writes nothing rather than writing into the wrong row.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L283-L291",
+          "version": "repo-lines-v1:sha256:8867bbca8f477c4177953012ded0c3228034ba804df817ab9e94478a30aa5a98:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdhMWRiNTlmYzhiY2IxYjY0ZWVjNzYxN2EzOTEzNzUyNjZhOTZhMjY2MWZhYTA0YzdkZDcwYWYzMzIwNjk1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzU3NmU3ZTc5ZjA3ZmMwYjRlNTlmMzNmZmMxZTg5NmNjNjQzNTE5ZDMxYzU0NDBmNTkzZDNmY2ViMDQ0ZDgzYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzAxMDEzZjM2ZDVkY2IyYTMwMTRjYzBhMWI4NDc4MDI3MmQzOGMxMzYyMjQyNWE3ZGI1NDBmZTE1N2EwZWE1NiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L126-L146",
+          "version": "repo-lines-v1:sha256:1ef5c9b9759f8f66f46e1af3d75f6354668d35f9e9136ab7e95f8939ed2b4467:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlmZGQ0NTcyNzhlNzkwZmI1Y2RlZWFmYWQxMjdiOGJiMjVjNjhjZmUwZWEzMDVjZmY5Mzk2MmYyMzdkYzgzM2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlM2FmOGI3ZjI2ZGJlZTU0NzhiZDY5MTFhNzkxNTFmZTNmNmE1NDdmOGU1NDczMzA4OGZkMThiZDdhNmUwNzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d88d000edcb5460bb139039b4c582d01",
+      "statement": "The pre-flight uses integer division rather than an 8 + 52 * rows == length multiplication because the header's 8 bytes are arbitrary and the multiplication can wrap on a long and construct a row count that passes the check.",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L396-L403",
+          "version": "repo-lines-v1:sha256:588dbed454a473de00938106f37b1acef7302116a5d8c35a95ca10541c27914c:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjljYTg5MWJmZjdhYzFmN2NlYWFlNDBlZjA1MTA2NmJlOWVmZTQ3YjRlNDI4MWU4NmMzMTliZTJjNTVlYmNlNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTQxZWNjZGZiNzY5MjU0NDY2YjdhZTk5MmYxMjYwNWMyODQyZTJjNGRmNDVmZmQwMDdhMmJjYjBhZmZjM2RjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmIxYjc5ZjkyNGU5OTc3OGU0YzdlMGNmNjZkYzFiYjZjYmIzMWIzYmZiOTQ0OGE0Y2VmYzk4N2I4MjMyZmQ5MiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_9c75713e19bb40cf9853c0db8b533578",
+      "statement": "Row count is not hardcoded in native code: the table shape is defined by the managed side's archive-read table, so a change in row count requires no native change.",
+      "evidence": [
+        {
+          "resource": "repo://docs/adr/0002-semantic-anchors-over-rvas.md#L20-L22",
+          "version": "repo-lines-v1:sha256:28f0b4065da53b6b2bb20c035148d872d1bb09a54c4e36302a6898ad8af89148:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDVjZjJlYzE2NjcxNDVmOTMyYTg5YzVlMGJhYTY3ZjViZDI1NDhlNWEzMmNkODk0MGM4YTNjNGM3MzIzZGM1NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzc5YmMzZWFlZTQ1Y2Y2MTE1ZWU0MjM2NWI0NzEzNGRmNTAwOWU3M2I0NmUwNzk0NDVjNjYzMWEwZDM5OTkzOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWY3MzI4OWRlMWJiNWUzYTg0MzRjZmYzNjE2NzM4Zjg1ZTdkNDMyYzkxMzZjYTgwOTQwYjQ1OTgwYThhZWI4ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzM3N2JjYjc0NDY5ZTM2N2E5NGI3ZDNmZTYzZGEzODVjZjQ3OTQwOWIwYzU3NjU2YTYzZTNjMDdiNGZjOWU2OCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-22T11:42:24.258Z"
+  }
+}
