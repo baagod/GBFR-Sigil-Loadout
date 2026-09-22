@@ -73,8 +73,13 @@ inline constexpr uintptr_t kNotifierCharacterOpcodeOffset = 0x45;
 
 /*
    预检表：认领 RVA 与它的预检**同一行**，所以"这个 RVA 是这么算出来的"和"它有这串字节"
-   不可能分开改。min_rva 是原校验里那两条下界的表化（apply 循环上限立即数必须 ≥ 4、category ≥ 6，
-   否则"命中处减 4/减 6"就落到了不该落的地方）。
+   不可能分开改。
+
+   preflight_offset：预检字节要在这个 RVA **往前 offset 字节**处比对。两条循环上限 RVA 是
+   "锚点 + delta"得来的（apply_loop+4 / category_loop+6），而它们的预检字节验的是**锚点本身**，
+   所以这两条是 (rva, delta) 这对组合把它和 kApplyLoopAnchors / kCategoryLoopAnchors 里的
+   loop_limit_immediate 对上了——偏移一旦改，这里必须跟着改，同表同行正是为此。
+   其余各条的预检就在 RVA 处，offset = 0。
 
    表里的 RVA 都是**流水线已经解出来**的那些——调用图解出的 getter、status_rebuild 同样在列——
    所以校验只需遍历它，不必再按字段名逐条手写。
@@ -83,7 +88,9 @@ struct PreflightCheck
 {
    uintptr_t rva = 0;
    std::span<const uint8_t> expected{};
-   uintptr_t min_rva = 0;
+   // 在 rva - preflight_offset 处比对；下溢由 MatchesPreflight 的 RangeInsideImage 拒绝
+   // （与原来那两条 `< 4` / `< 6` 的下界是同一件事）。
+   uintptr_t preflight_offset = 0;
 };
 
 // 定长拷贝用的上界：现有最长的一条是 kNotifierPattern（约 58 字节），留一倍余量。
@@ -418,9 +425,9 @@ bool ValidateResolvedGameLayout(
    // 每个已认领的 RVA 与它的预检同源：这张表就是上面那些偏移的另一种写法，所以
    // "RVA 是这么算的"和"它有这串字节"不可能分头改。
    const PreflightCheck checks[] = {
-      {layout.skill_apply_loop_limit_immediate_rva, kSkillApplyLoopPreflight, 4},
+      {layout.skill_apply_loop_limit_immediate_rva, kSkillApplyLoopPreflight, kApplyLoopAnchors.loop_limit_immediate},
       {layout.skill_apply_getter_return_rva, kSkillApplyGetterReturnPreflight, 0},
-      {layout.skill_category_loop_limit_immediate_rva, kSkillCategoryLoopPreflight, 6},
+      {layout.skill_category_loop_limit_immediate_rva, kSkillCategoryLoopPreflight, kCategoryLoopAnchors.loop_limit_immediate},
       {layout.skill_fetch_path_rva, kSkillFetchPreflight, 0},
       {layout.skill_fetch_call_path_rva, kSkillFetchCallPathPreflight, 0},
       {layout.skill_category_getter_return_rva, kSkillCategoryGetterReturnPreflight, 0},
@@ -430,7 +437,8 @@ bool ValidateResolvedGameLayout(
    };
    for (const PreflightCheck& check : checks)
    {
-      if (check.rva < check.min_rva || !MatchesPreflight(image, check.rva, check.expected))
+      if (check.rva < check.preflight_offset ||
+          !MatchesPreflight(image, check.rva - check.preflight_offset, check.expected))
          return false;
    }
 
