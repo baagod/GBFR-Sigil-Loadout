@@ -334,10 +334,12 @@ export default function App() {
         )}
         {/*
           配装那两页各自是滚动盒子（见 LOADOUT_PANEL）：这里没有共用容器，也没有"不在这一页
-          就整块不渲染"的分支——未激活的面板本来就不渲染。
+          就整块不渲染"的分支。两页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow
+          （每行两个 Base UI 下拉），切页于是只剩显示/隐藏。代价是三页在启动时都挂上——专属页
+          29 行，可忽略。
         */}
         {/* 上下 16px 只归这一页：专属因子那页沿用 LOADOUT_PANEL 原本的间距。 */}
-        <TabsPanel value="general" className={`${LOADOUT_PANEL} py-4`}>
+        <TabsPanel value="general" keepMounted className={`${LOADOUT_PANEL} py-4`}>
         <div className={HEADER_ROW}>
           <div className="pl-0.5 pr-3">
             {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
@@ -354,7 +356,7 @@ export default function App() {
           <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
         ))}
         </TabsPanel>
-        <TabsPanel value="exclusive" className={LOADOUT_PANEL}>
+        <TabsPanel value="exclusive" keepMounted className={LOADOUT_PANEL}>
           <ExclusivePanel
             table={exclusiveTable}
             state={exclusiveState}
