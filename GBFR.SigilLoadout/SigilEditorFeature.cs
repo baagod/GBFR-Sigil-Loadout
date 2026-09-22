@@ -58,11 +58,6 @@ internal sealed class SigilEditorFeature
     private IDataManager? _dm;
     private byte[]? _currentTable;
     private bool _started;
-    // 上一次应用**真的落进了游戏内存**。与"文件的 mtime 被认领过了"是两件事：原生拒写
-    // （最典型的是 -3，游戏还没把 skill_status 表解析进来、指针还是 0）时 mtime 已经认领，
-    // 而内存里一个字节都没变。那时必须留着这份待办，否则启动那一次失败就是永久失败——
-    // 文件不再变，mtime 门也就再不会放行。
-    private bool _published;
     private int _stopped;
     private bool _waitedForManager;
 
@@ -94,12 +89,6 @@ internal sealed class SigilEditorFeature
             return;
         _started = true;
 
-        // 读之前先在门上认领这份文件的版本：下面那次读只保证读到了"某一刻"的内容，而可视工具随时
-        // 可能在读完与结束之间写一次。认领**读之前**的时间戳，那次写入就仍然是一次 tick 看得见的
-        // 改动；认领"读之后"的，它就被这次启动悄悄吃掉了。认领由门自己完成（Changed 一次做完
-        // 取时间戳与认领），所以这里不再需要单独记一个字段。
-        _ = _stamp.Changed();
-
         try
         {
             Config? loaded = LoadConfig(out _);
@@ -126,7 +115,8 @@ internal sealed class SigilEditorFeature
 
             // 启动这次写与运行中的热应用是同一件事：注册给 IDataManager，再原地写进游戏内存。
             // 表由 Apply 自己持有（_currentTable），所以 Tick 从这一拍起就会应用后续改动。
-            Publish(table);
+            // 版本在这里取：成功则由 Publish 标记为已应用，失败就还欠着、下一拍重试。
+            Publish(table, _stamp.Now());
         }
         catch (Exception ex)
         {
@@ -169,36 +159,27 @@ internal sealed class SigilEditorFeature
     /// </summary>
     public void Tick()
     {
-        if (!_published)
+        // 管理器是可选依赖，可能比本 mod 晚加载——那时连表都读不出来，先把它接上。
+        if (_dm is null)
         {
-            // 管理器是可选依赖，可能比本 mod 晚加载——那时连表都读不出来，先把它接上。
-            // Bootstrap 只在下述情况会再跑一遍：还没接上管理器（_started 仍为 false），
-            // 或者接上了但这一局还没成功交出去过一份表。
-            if (_dm is null)
-            {
-                Bootstrap();
-                return;
-            }
-            // 上一次应用被拒了（典型是 -3：游戏还没把 skill_status 表读进内存，指针还是 0）。
-            // **不认领**文件版本，于是下一拍、再下一拍都会继续试，直到真的写进游戏内存为止。
-            if (!_stamp.Peek())
-                return;
-            TryApply();
+            Bootstrap();
             return;
         }
 
-        // 门：文件时间没变就这一拍什么都不做（一次 File.GetLastWriteTimeUtc 就退出）。
-        // 成功过一次之后，认领就是"这份内容已经进游戏内存了"。
-        if (_stamp.Changed() is null)
+        // 一道门，两种情况都覆盖：还没成功过（_applied 仍是初值）与文件又变了。失败时
+        // _applied 不推进，所以**下一拍还会再来**——不必再有"重试"这件事单独存在。
+        DateTime current = _stamp.Now();
+        if (!_stamp.Pending(current))
             return;
-        TryApply();
+        TryApply(current);
     }
 
-    private void TryApply()
+    /// <param name="stamp">这一版文件的 mtime；只有真的写进游戏内存了才会被标记为已应用。</param>
+    private void TryApply(DateTime stamp)
     {
         try
         {
-            Apply();
+            Apply(stamp);
         }
         catch (Exception ex)
         {
@@ -212,10 +193,12 @@ internal sealed class SigilEditorFeature
     public void Dispose() => Interlocked.Exchange(ref _stopped, 1);
 
     /// <summary>
-    /// 重新读配置并把表应用到内存里。调用方是宿主那条 250ms 的 tick（见 <see cref="Tick"/>），
-    /// 它已经按 mtime 门保证只在编辑列表真的变了时才调这里。
+    /// 重新读配置并把表应用到内存里。调用方是宿主那条 250ms 的 tick（见 <see cref="Tick"/>）。
+    ///
+    /// <paramref name="stamp"/> 是这一版的 mtime：**只有真的写进游戏内存了**才在最后标记为
+    /// "已应用"。读不出表、或原生拒写，都提前 return，那一版就还欠着，下一拍会再来。
     /// </summary>
-    private void Apply()
+    private void Apply(DateTime stamp)
     {
         // 卸载之后（Dispose 置了 _stopped）不再动内存：宿主的定时器不保证回调已经跑完。
         if (Volatile.Read(ref _stopped) != 0)
@@ -240,7 +223,7 @@ internal sealed class SigilEditorFeature
             return;
         }
 
-        Publish(newTable);
+        Publish(newTable, stamp);
     }
 
     /// <summary>
@@ -248,7 +231,7 @@ internal sealed class SigilEditorFeature
     /// 那次解析也必须看到新值），再让原生按行原地写进游戏已经解析好的那份表。
     /// 启动那次写与运行中的热应用走的都是这里——它们是同一件事。
     /// </summary>
-    private void Publish(byte[] table)
+    private void Publish(byte[] table, DateTime stamp)
     {
         // Registration first: it is cheap, and if the game ever parses the table
         // from the served file again, that parse must see the new values rather
@@ -277,9 +260,9 @@ internal sealed class SigilEditorFeature
         }
 
         _currentTable = table;
-        if (!_published)
-            _log("sigil edit: first successful write to the game's table; the editor is now armed");
-        _published = true;
+        // 唯一宣告"这一版处理完了"的地方：原生确实把行写进了游戏内存。放在这里，失败路径
+        // 就自然不会推进版本，于是下一拍还会重试。
+        _stamp.MarkApplied(stamp);
         _log($"hot apply: SUCCESS - {written} row(s) of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
     }
 

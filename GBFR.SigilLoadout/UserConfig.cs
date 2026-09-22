@@ -28,39 +28,47 @@ internal static class UserConfig
 }
 
 /// <summary>
-/// 一个配置文件的 mtime 门：问"这份文件自上次处理以来变过没有"，**并把这一步认领掉**。
+/// 一个配置文件的版本门：记着**已经真正应用过**的那一版 mtime，回答"现在这一版还没应用吧"。
 ///
-/// 认领与判断是同一件事，所以"先认领、再干活"不可能被写反——这正是原来两个特性各自实现一遍时
-/// 容易分叉的地方（一个认领在 try 之前、另一个在成功之后）。认领**不看结果**：一份读不出来的
-/// 文件不会被每 250ms 重解析一次，失败的修复要等文件自己再变一次。文件不存在是一种真实的 mtime
-/// 变化（<see cref="UserConfig.NoFile"/>），所以"配置被删掉"走的也是同一道门。
+/// 关键在那半句"真正应用过"：判据只在**确实生效之后**才推进。于是"读不出来""原生拒写"
+/// 这类失败不会把这一版吃掉——没推进就还欠着，调用方按自己的节奏重试，直到成功为止。
+/// 这正是原来那个"先认领、再干活"的形态丢掉的东西：认领等于宣告"处理过了"，而拒写时
+/// 内存里一个字节都没变，那一版从此再也不会被放行。
+///
+/// 它因此不预设"什么时候算处理完"——那是调用方的判断（写盘成功 / 原生写入成功），
+/// 由调用方在那一刻调 <see cref="MarkApplied"/>。
 /// </summary>
 internal sealed class FileStamp
 {
     private readonly string _path;
-    private DateTime _claimed;
+    private DateTime _applied;
 
     internal FileStamp(string path) => _path = path;
 
     /// <summary>
-    /// 变过就返回它现在的 mtime（并认领），没变返回 null。调用方拿到的就是那一刻的版本，
-    /// 所以"文件不存在"（<see cref="UserConfig.NoFile"/>）与真实 mtime 用同一个值分辨，不必再查一次。
-    ///
-    /// 另有一条 <see cref="Peek"/>：只问变没变、**不认领**。给"这一步失败了、这份内容还得再来一次"
-    /// 的调用方用——认领是"我处理过了"，而拒写不算处理过。
+    /// 这一版变了就返回它的 mtime，**并认领**（无论调用方随后成不成功）。适用于"失败就保留
+    /// 上一份、等下一次保存再来"的单次应用——那样认领最省事，且不会把同一个报错每 250ms
+    /// 灌一遍。需要"失败了还得再试"的调用方用 <see cref="Pending"/> + <see cref="MarkApplied"/>
+    /// （只有真的生效之后才推进版本，于是失败自动留待重试）。
     /// </summary>
     internal DateTime? Changed()
     {
         DateTime stamp = UserConfig.Stamp(_path);
-        if (stamp == _claimed)
+        if (stamp == _applied)
             return null;
-        _claimed = stamp;
+        _applied = stamp;
         return stamp;
     }
 
-    /// <summary>只问变没变，不认领。见 <see cref="Changed"/>。</summary>
-    internal bool Peek()
-    {
-        return UserConfig.Stamp(_path) != _claimed;
-    }
+    /// <summary>
+    /// 此刻文件那一版的 mtime。文件不存在时是 <see cref="UserConfig.NoFile"/>（1601-01-01），
+    /// 与初值 <c>default(0001-01-01)</c> 不同——所以"文件被删掉"是一版真实的、可比较的版本。
+    /// </summary>
+    internal DateTime Now() => UserConfig.Stamp(_path);
+
+    /// <summary>这一版还没被应用过。失败之后仍然为 true，于是调用方下一拍会再试。</summary>
+    internal bool Pending(DateTime current) => current != _applied;
+
+    /// <summary>在**确实生效之后**调一次，宣告这一版处理完了。</summary>
+    internal void MarkApplied(DateTime stamp) => _applied = stamp;
 }

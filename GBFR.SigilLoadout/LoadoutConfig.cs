@@ -36,46 +36,38 @@ internal static class LoadoutConfig
     private const int MaxSlots = 12; // conservative cap (more slots risk instability)
     private const int DefaultLevel = 15;
 
-    // 配置文件唯一的状态：**已经处理过**的那份内容的 mtime。应用成功是它，读不出来或被
-    // 原生拒掉也是它——写下这一条就是认领，所以同一份内容不会被解析第二次，坏文件也不会
-    // 每 250ms 刷一次日志。
-    //
-    // 初值就是"没有这个文件"那个时间戳，所以"配置被删了"是一次正常的 mtime 变化，不需要
-    // 额外字段去记住"以前有过文件"。这份约定只有一处实现：UserConfig.Stamp（SigilEditorFeature
-    // 那条同样用它）。
+    // 版本门。本类用它的"认领"那一半（Changed）：见 Tick 里为什么有意无条件认领。
     private static readonly FileStamp Stamp = new(ConfigFile);
-    
 
     internal static void Initialize(Action<string> log)
     {
         // Player config lives in the user directory so mod updates (which
         // replace the mod folder) never wipe it. No config -> built-in template.
-        
-        TryApply(log);
+        if (Stamp.Changed() is DateTime mtime)
+            TryApply(log, mtime);
     }
 
     internal static void Tick(Action<string> log)
     {
-        // TryApply owns the mtime/deletion gating: a deleted file must reach it
-        // too (it restores the built-in template), and an unchanged file exits
-        // after one File.GetLastWriteTimeUtc call.
-        TryApply(log);
-    }
-
-    private static void TryApply(Action<string> log)
-    {
-        // 门自己完成"取 mtime + 比对 + 认领"：变了才往下走，而且这一步就认领掉了（成功、
-        // 读不出来、被原生拒掉都一样），所以同一份内容不会被解析第二次。
+        // 认领后处理：这一版无论成败都算处理过了。有意如此——单次应用失败就保留上一份配置，
+        // 下一次保存自然会改 mtime；重试同一份坏配置只会把同一个报错每 250ms 灌一遍。
         if (Stamp.Changed() is not DateTime mtime)
             return;
+        TryApply(log, mtime);
+    }
 
+    /// <summary>
+    /// 按 <paramref name="mtime"/> 这一版应用配置。本类有意无条件认领（见 <see cref="Tick"/>），
+    /// 所以没有返回值：成功与失败之后都一样等下一版。
+    /// </summary>
+    private static void TryApply(Action<string> log, DateTime mtime)
+    {
         if (mtime == UserConfig.NoFile)
         {
             // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。这就是原来的
             // "先清 overrides、再恢复内置模板"两步合成的同一件事。
             if (NativeCore.ApplyLoadout(null, null))
                 log("loadout.json removed; restored the built-in exclusive template.");
-            return;
         }
 
         try
@@ -105,17 +97,12 @@ internal static class LoadoutConfig
                     log($"Applied custom loadout with {slots.Count} slot(s).");
             }
             if (!ok)
-            {
                 log("Native rejected the custom loadout; kept previous configuration.");
-                return;
-            }
         }
         catch (Exception exception)
         {
-            // 这份内容只报一次，然后就不再碰它：写入方是原子写（temp + rename），所以
-            // "读到半截文件"不存在；而一个被杀软锁住或被人改坏的文件，再解析三次也同样
-            // 读不出来——那 750ms 只推迟了诊断，没有换来别的。下一次保存会改 mtime，
-            // 那时它自然会被重新处理。
+            // 读取失败时日志由 Tick 的"版本变了才说"去重，这里照常报原因。下一次保存会改
+            // mtime，那时自然会被重新处理。
             log($"Invalid loadout.json; kept previous configuration: {exception.Message}");
         }
     }
