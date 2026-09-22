@@ -498,8 +498,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
   );
 }
 
-/*
-  这一页是 keepMounted 的（见 App），所以 App 任何一次重渲染都会连带重渲整棵编辑器子树——切个
-  Tab 也会。memo 住之后只有 lang 变了才重渲；行级 hover 状态在 useRowTooltip 里，不受影响。
-*/
+/* keepMounted 的一页：memo 住才不会被 App 的重渲染连带（切 Tab 也算）；hover 状态在
+   useRowTooltip 里，不受影响。 */
 export const SigilEditorPanel = memo(SigilEditorPanelBase);
