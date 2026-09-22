@@ -2,6 +2,7 @@
 
 #include <format>
 #include <limits>
+#include <span>
 
 namespace gbfr::native
 {
@@ -44,6 +45,49 @@ inline constexpr std::array<uint8_t, 12> kStatusRebuildPreflight = {
    0x55, 0x56, 0x57, 0x48, 0x83, 0xEC, 0x50, 0x48, 0x8D, 0x6C, 0x24, 0x50};
 inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
    0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x38, 0x44, 0x89, 0xC6};
+
+/*
+   语义锚点表：每个锚点命中处到它那几个 RVA 的偏移住在这里，**只此一处**。
+
+   三块锚点（apply 循环 / category 循环 / notifier）各自派生好几个 RVA，而这些偏移在流水线里
+   被用了三次：① 认领 RVA、② 读循环上限或解 call、③ 最终预检。以前 ①②③ 各写一遍同一组数字，
+   而 ① 与 ③ 之间只靠字段名手工配对——改了一个 delta 却漏了另一处，除非那处恰好也被 ② 用到，
+   否则不会有任何东西报错。
+*/
+struct AnchorOffsets
+{
+   uintptr_t loop_limit_immediate = 0;
+   uintptr_t getter_return = 0;
+   uintptr_t fetch_path = 0;
+   uintptr_t fetch_call_path = 0;
+   uintptr_t category_getter_return = 0;
+};
+
+// 偏移取自原流水线：apply_loop +4 / +0x29，category_loop +6 / +0x1E / +0x60 / +0x6E。
+inline constexpr AnchorOffsets kApplyLoopAnchors{4, 0x29, 0, 0, 0};
+inline constexpr AnchorOffsets kCategoryLoopAnchors{6, 0, 0x1E, 0x60, 0x6E};
+
+// notifier 命中处本身就是 status_notifier_rva（偏移 0），它的字段偏移另算（见读身份那段）。
+inline constexpr uintptr_t kNotifierRvaOffset = 0;
+inline constexpr uintptr_t kNotifierCharacterOpcodeOffset = 0x45;
+
+/*
+   预检表：认领 RVA 与它的预检**同一行**，所以"这个 RVA 是这么算出来的"和"它有这串字节"
+   不可能分开改。min_rva 是原校验里那两条下界的表化（apply 循环上限立即数必须 ≥ 4、category ≥ 6，
+   否则"命中处减 4/减 6"就落到了不该落的地方）。
+
+   表里的 RVA 都是**流水线已经解出来**的那些——调用图解出的 getter、status_rebuild 同样在列——
+   所以校验只需遍历它，不必再按字段名逐条手写。
+*/
+struct PreflightCheck
+{
+   uintptr_t rva = 0;
+   std::span<const uint8_t> expected{};
+   uintptr_t min_rva = 0;
+};
+
+// 定长拷贝用的上界：现有最长的一条是 kNotifierPattern（约 58 字节），留一倍余量。
+inline constexpr size_t kMaxPreflightBytes = 128;
 constexpr uint8_t kApplyLoopBytes[] = {
    0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0, 0, 0, 0,
    0xC5, 0xF8, 0x11, 0x75, 0xF0};
@@ -221,6 +265,21 @@ bool MatchesBytesAtRva(
       MatchesBytes(image.base + rva, expected);
 }
 
+// SEH 版比较：表里的形状是运行期的 span，而"读到不可读页"仍要由 MatchesBytes 的 __try 兜住，
+// 所以先按上界拷进定长缓冲再交过去（拷贝本身受 RangeInsideImage 保护，见调用方）。
+bool MatchesPreflight(
+   const ImageView& image,
+   uintptr_t rva,
+   std::span<const uint8_t> expected) noexcept
+{
+   if (expected.empty() || expected.size() > kMaxPreflightBytes ||
+       !RangeInsideImage(image, rva, expected.size()))
+      return false;
+   std::array<uint8_t, kMaxPreflightBytes> buffer{};
+   std::copy(expected.begin(), expected.end(), buffer.begin());
+   return MatchesBytes(image.base + rva, buffer);
+}
+
 bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept
 {
    constexpr uintptr_t kMaximumDecodedObjectOffset = 0x200000;
@@ -356,36 +415,24 @@ bool ValidateResolvedGameLayout(
    const ImageView& image,
    const ResolvedGameLayout& layout) noexcept
 {
-   if (layout.skill_apply_loop_limit_immediate_rva < 4 ||
-       layout.skill_category_loop_limit_immediate_rva < 6 ||
-       !MatchesBytesAtRva(
-          image,
-          layout.skill_apply_loop_limit_immediate_rva - 4,
-          kSkillApplyLoopPreflight) ||
-       !MatchesBytesAtRva(
-          image,
-          layout.skill_apply_getter_return_rva,
-          kSkillApplyGetterReturnPreflight) ||
-       !MatchesBytesAtRva(
-          image,
-          layout.skill_category_loop_limit_immediate_rva - 6,
-          kSkillCategoryLoopPreflight) ||
-       !MatchesBytesAtRva(image, layout.skill_fetch_path_rva, kSkillFetchPreflight) ||
-       !MatchesBytesAtRva(
-          image,
-          layout.skill_fetch_call_path_rva,
-          kSkillFetchCallPathPreflight) ||
-       !MatchesBytesAtRva(
-          image,
-          layout.skill_category_getter_return_rva,
-          kSkillCategoryGetterReturnPreflight) ||
-       !MatchesBytesAtRva(
-          image,
-          layout.get_gem_data_by_index_rva,
-          kGetterPreflight) ||
-       !MatchesBytesAtRva(image, layout.status_rebuild_rva, kStatusRebuildPreflight) ||
-       !MatchesBytesAtRva(image, layout.status_notifier_rva, kStatusNotifierPreflight))
-      return false;
+   // 每个已认领的 RVA 与它的预检同源：这张表就是上面那些偏移的另一种写法，所以
+   // "RVA 是这么算的"和"它有这串字节"不可能分头改。
+   const PreflightCheck checks[] = {
+      {layout.skill_apply_loop_limit_immediate_rva, kSkillApplyLoopPreflight, 4},
+      {layout.skill_apply_getter_return_rva, kSkillApplyGetterReturnPreflight, 0},
+      {layout.skill_category_loop_limit_immediate_rva, kSkillCategoryLoopPreflight, 6},
+      {layout.skill_fetch_path_rva, kSkillFetchPreflight, 0},
+      {layout.skill_fetch_call_path_rva, kSkillFetchCallPathPreflight, 0},
+      {layout.skill_category_getter_return_rva, kSkillCategoryGetterReturnPreflight, 0},
+      {layout.get_gem_data_by_index_rva, kGetterPreflight, 0},
+      {layout.status_rebuild_rva, kStatusRebuildPreflight, 0},
+      {layout.status_notifier_rva, kStatusNotifierPreflight, 0},
+   };
+   for (const PreflightCheck& check : checks)
+   {
+      if (check.rva < check.min_rva || !MatchesPreflight(image, check.rva, check.expected))
+         return false;
+   }
 
    if (!IsRvaInSection(
           image,
@@ -484,22 +531,23 @@ bool ResolveGameLayout()
           image, image.code_rva, image.code_size, kNotifierPattern, notifier))
       return FailResolution("unique semantic anchors");
 
-   layout.skill_apply_loop_limit_immediate_rva = apply_loop + 4;
-   layout.skill_apply_getter_return_rva = apply_loop + 0x29;
-   layout.skill_category_loop_limit_immediate_rva = category_loop + 6;
-   layout.skill_fetch_path_rva = category_loop + 0x1E;
-   layout.skill_fetch_call_path_rva = category_loop + 0x60;
-   layout.skill_category_getter_return_rva = category_loop + 0x6E;
-   layout.status_notifier_rva = notifier;
+   // 偏移全部从语义锚点表取：认领、读上限、最终预检用的是同一组数字。
+   const uintptr_t apply_loop_limit = apply_loop + kApplyLoopAnchors.loop_limit_immediate;
+   const uintptr_t category_loop_limit = category_loop + kCategoryLoopAnchors.loop_limit_immediate;
+   layout.skill_apply_loop_limit_immediate_rva = apply_loop_limit;
+   layout.skill_apply_getter_return_rva = apply_loop + kApplyLoopAnchors.getter_return;
+   layout.skill_category_loop_limit_immediate_rva = category_loop_limit;
+   layout.skill_fetch_path_rva = category_loop + kCategoryLoopAnchors.fetch_path;
+   layout.skill_fetch_call_path_rva = category_loop + kCategoryLoopAnchors.fetch_call_path;
+   layout.skill_category_getter_return_rva = category_loop + kCategoryLoopAnchors.category_getter_return;
+   layout.status_notifier_rva = notifier + kNotifierRvaOffset;
 
    uint8_t apply_limit = 0;
    uint8_t category_limit = 0;
    uintptr_t apply_getter = 0;
    uintptr_t category_getter = 0;
-   if (!ReadValue(
-          image, layout.skill_apply_loop_limit_immediate_rva, apply_limit) ||
-       !ReadValue(
-          image, layout.skill_category_loop_limit_immediate_rva, category_limit) ||
+   if (!ReadValue(image, apply_loop_limit, apply_limit) ||
+       !ReadValue(image, category_loop_limit, category_limit) ||
        apply_limit != kNativeInternalSlotCount || category_limit != apply_limit ||
        !DecodeRel32Call(image, apply_loop + 0x24, apply_getter) ||
        !DecodeRel32Call(image, category_loop + 0x69, category_getter) ||
@@ -551,7 +599,7 @@ bool ResolveGameLayout()
    if (!ReadValue(image, apply_getter + 0x1F, getter_context_opcode) ||
        getter_context_opcode != 0x818B ||
        !ReadValue(image, apply_getter + 0x21, status_context_offset) ||
-       !ReadValue(image, notifier + 0x45, notifier_character_opcode) ||
+       !ReadValue(image, notifier + kNotifierCharacterOpcodeOffset, notifier_character_opcode) ||
        notifier_character_opcode != 0x888B ||
        !ReadValue(image, notifier + 0x47, status_character_offset))
       return FailResolution("status identity offsets");
