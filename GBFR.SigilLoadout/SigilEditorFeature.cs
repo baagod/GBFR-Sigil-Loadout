@@ -11,7 +11,10 @@ namespace GBFR.SigilLoadout;
 /// 日志（<see cref="Mod"/> 注入进来的），生命周期与"什么时候该重新应用"也跟着宿主走。
 ///
 /// 运行中改写由宿主每隔 250ms 的 tick 驱动（见 <see cref="Tick"/>）：可视工具每存一次编辑列表，
-/// 文件时间就变一次，HotApply 随即覆写游戏内存里的表——不重启、不挂钩子。
+/// 文件时间就变一次，<see cref="Apply"/> 随即覆写游戏内存里的表——不重启、不挂钩子。
+///
+/// 启动那次写与运行中的热应用是**同一个操作**（<see cref="Publish"/>）：读表、套编辑、注册给
+/// IDataManager、原地写进游戏内存；差别只在启动时配置已经拿在手里。
 ///
 /// 不带静态 .tbl：表从游戏归档里读出来、在内存里改、再写回去。
 ///
@@ -53,8 +56,9 @@ internal sealed class SigilEditorFeature
     private readonly Action<string> _log;
     private IModLoader? _loader;
     private IDataManager? _dm;
-    private HotApply? _hotApply;
+    private byte[]? _currentTable;
     private bool _started;
+    private int _stopped;
     private bool _waitedForManager;
 
     // 已经被 tick 认领的那一份文件的 mtime。宿主每 250ms 调一次 Tick()，所以这里只做一次
@@ -78,8 +82,9 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 只跑一次（<c>_started</c>）：还没接上 IDataManager 时由 <see cref="Tick"/> 再来叫，
-    /// 一旦接上就只由 mtime 门驱动。
+    /// 只跑一次（<c>_started</c>）：还没接上 IDataManager 时由 <see cref="Tick"/> 再来叫；
+    /// 接上了但这次没造出表（归档读不出来、或这是本构建不认识的布局）也由 Tick 重试，
+    /// 一旦交出去过一份表，之后就只由 mtime 门驱动。
     /// </summary>
     private void Bootstrap()
     {
@@ -92,30 +97,24 @@ internal sealed class SigilEditorFeature
         // 改动；认领"读之后"的，它就被这次启动悄悄吃掉了。
         DateTime readingUtc = LastWriteUtc();
 
-        // 就在这里认领，不能等到 finally：下面先建热应用（_hotApply 一旦非 null，tick 就会
-        // 走 Apply 那条路），再调管理器的慢写入。Timer 的回调是不串行的，这中间进来的一拍
-        // 会看到 _hotApply 已就绪而 _handledUtc 还是 default(0001-01-01)，于是当场引爆一次
-        // 应用，并和这里的启动写撞在一起；它认领的 mtime 随后还会被 finally 覆盖。
-        // 门停在 default 会让第一个 tick 白跑一次（文件不存在时的时间戳是 1601-01-01，永不相等），
-        // 所以认领必须早于一切可能的提前 return —— 放在 try 之前即满足这点。
+        // 就在这里认领，不能挪到后面：Timer 的回调是不串行的，这一拍可能正在进行时下一拍就进来，
+        // 而门停在 default(0001-01-01) 会让那一拍白跑一次（文件不存在时的时间戳是 1601-01-01，
+        // 永不相等）。放在一切可能的提前 return 之前即满足这点。
         _handledUtc = readingUtc;
 
         try
         {
             Config? loaded = LoadConfig(out _);
             Config config = loaded ?? new Config();
-            byte[]? file = BuildEditedTable(config, out int applied);
+            byte[]? table = BuildEditedTable(config, out int applied);
 
-            // 先接热应用、再看启动写有没有产出，而且不管有没有产出都接：一个从没建起来的
-            // 热应用，就是"编辑存进了文件、却永远到不了游戏"，而且哪儿都不会说。启动时拿不到
-            // 表——归档还读不出来，或者这是本构建不认识的布局——第一次应用会重新读表。
-            //
-            // 每次应用前由 BuildCurrentTable 重新读编辑列表，所以它交上去的就是此刻的文件，
-            // 也就是可视工具刚写下的那份。构造器本身只记下这几个委托，不读文件。
-            _hotApply = new HotApply(_log, file, BuildCurrentTable, RegisterWithManager);
-
-            if (file is null)
+            // 造不出表就说清楚为什么，什么都不写；_started 已经置上，所以这一局只由 Tick 的
+            // mtime 门继续看——每次应用前会重新读表，那时归档可能已经就绪。
+            if (table is null)
+            {
+                _log("sigil edit: nothing applied - the table could not be read, or its layout is not the one this build patches (see the lines above)");
                 return;
+            }
 
             if (applied == 0)
             {
@@ -127,19 +126,15 @@ internal sealed class SigilEditorFeature
                 return;
             }
 
-            _dm!.AddOrUpdateExternalFile(TablePath, file);
-            _dm.UpdateIndex();
-            _log($"sigil edit SUCCESS: {applied} edit(s) applied and table written back");
+            // 启动这次写与运行中的热应用是同一件事：注册给 IDataManager，再原地写进游戏内存。
+            // 表由 Apply 自己持有（_currentTable），所以 Tick 从这一拍起就会应用后续改动。
+            Publish(table);
         }
         catch (Exception ex)
         {
-            // 说清这一行意味着什么。热应用是在下面的管理器调用之前就建起来的，所以只有
-            // "建起来之前就抛"（读表时管理器抛、或线程起不来）才会让这一半在本局里彻底不工作
-            // ——tick 之后每次都在 _started 处直接返回。那种情形必须能从日志里认出来，
-            // 否则这一行读起来只是记了一笔，而功能其实已经没了。
-            _log(_hotApply is null
-                ? "sigil edit EXCEPTION - the hot apply was never created, so the editor is off for this run: " + ex
-                : "sigil edit EXCEPTION - the hot apply is running; only the boot write did not complete: " + ex);
+            // 说清这一行意味着什么：表还没交出去（_currentTable 为 null），而 Tick 之后每一拍都会
+            // 再来一次 Bootstrap，所以这只是"这一次没成"，不是这一半被关掉。
+            _log("sigil edit EXCEPTION during the boot write (the hot apply will retry): " + ex);
         }
     }
 
@@ -182,9 +177,9 @@ internal sealed class SigilEditorFeature
     /// </summary>
     public void Tick()
     {
-        if (_hotApply is null)
+        if (_currentTable is null)
         {
-            // 编辑器要用的管理器是可选依赖，可能比本 mod 晚加载。
+            // 表还没交出去过：管理器是可选依赖，可能比本 mod 晚加载；也可能是归档那一次读不出来。
             Bootstrap();
             return;
         }
@@ -205,7 +200,7 @@ internal sealed class SigilEditorFeature
 
         try
         {
-            _hotApply.Apply();
+            Apply();
         }
         catch (Exception ex)
         {
@@ -218,19 +213,84 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 置上停止标志并把引用清掉——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。
+    /// 置上停止标志——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。
     /// </summary>
-    public void Dispose()
+    public void Dispose() => Interlocked.Exchange(ref _stopped, 1);
+
+    /// <summary>
+    /// 重新读配置并把表应用到内存里。调用方是宿主那条 250ms 的 tick（见 <see cref="Tick"/>），
+    /// 它已经按 mtime 门保证只在编辑列表真的变了时才调这里。
+    /// </summary>
+    private void Apply()
     {
-        _hotApply?.Dispose();
-        _hotApply = null;
+        // 卸载之后（Dispose 置了 _stopped）不再动内存：宿主的定时器不保证回调已经跑完。
+        if (Volatile.Read(ref _stopped) != 0)
+        {
+            _log("hot apply: skipped - the feature has been disposed");
+            return;
+        }
+
+        byte[]? newTable = BuildCurrentTable();
+        if (newTable is null)
+        {
+            _log("hot apply: nothing to apply - the table could not be read, or its layout is not the one this build patches (see the lines above)");
+            return;
+        }
+
+        // 只是捷径：这次保存和上次交上去的那份逐字节一样就什么都不做。基线未知（启动那次没能
+        // 产出表）就不比，让这一拍照常做一遍——代价是一次原生写入，换来的是这里不用再维护
+        // "游戏手里那份"这个第二份事实。
+        if (_currentTable is not null && newTable.AsSpan().SequenceEqual(_currentTable))
+        {
+            _log("hot apply: the edit list matches what is already in memory; nothing to do");
+            return;
+        }
+
+        Publish(newTable);
+    }
+
+    /// <summary>
+    /// 唯一那条交给游戏的路径：先重新注册（便宜，而且游戏若再次解析那份被送达的文件，
+    /// 那次解析也必须看到新值），再让原生按行原地写进游戏已经解析好的那份表。
+    /// 启动那次写与运行中的热应用走的都是这里——它们是同一件事。
+    /// </summary>
+    private void Publish(byte[] table)
+    {
+        // Registration first: it is cheap, and if the game ever parses the table
+        // from the served file again, that parse must see the new values rather
+        // than quietly re-creating rows with the old ones. It is also what makes a
+        // refusal below survivable: the edit is not lost, only late.
+        try
+        {
+            RegisterWithManager(table);
+        }
+        catch (Exception ex)
+        {
+            _log("hot apply: re-register EXCEPTION (continuing with the memory write): " + ex);
+        }
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // 唯一那条路：原生用启动时解析出的那个槽拿到游戏那份活表的地址，把不一样的行原地写进去。
+        // 零扫描、零地址缓存，所以 "第一次点击要不要重扫" 这个问题不存在。
+        int written = NativeCore.WriteSkillStatusTable(table);
+        if (written < 0)
+        {
+            // 拒写：-7 是"行写崩了"，那意味着表可能已经被改了一部分——说清楚，别把它和
+            // "一个字节都没写"混成一句。其余每个码都发生在写之前，内存原样。
+            _log($"hot apply: FAIL - the native slot write refused (code {written}; the reason is in the line above); the table is re-registered, so the edit applies at the game's next parse. Every code but -7 refused before writing anything; -7 means the row writes faulted part-way and this session's table may already hold some of the new values");
+            return;
+        }
+
+        _currentTable = table;
+        _log($"hot apply: SUCCESS - {written} row(s) of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
     }
 
     /// <summary>
     /// 按 <paramref name="config"/> 造出表的字节：原表，叠上启用的那些编辑。
     ///
-    /// 造不出来时返回 null 并说明原因。启动时那次写走这里——布局检查与行格式只有一处，
-    /// 出问题时说原因的日志也只有一处。
+    /// 造不出来时返回 null 并说明原因。启动那次写与运行中的热应用走的是同一条造表路径
+    /// ——布局检查与行格式只有一处，出问题时说原因的日志也只有一处。
     /// </summary>
     private byte[]? BuildEditedTable(Config config, out int applied)
     {
