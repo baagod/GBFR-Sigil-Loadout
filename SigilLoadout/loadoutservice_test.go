@@ -142,7 +142,7 @@ func TestSaveLoadoutOverwritesExisting(t *testing.T) {
 func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
-	// Structural violations are rejected before any directory or file is created — no trace on disk.
+	// 结构上的违规在任何目录或文件建出来之前就被拒——磁盘上不留痕迹。
 	if err := (&LoadoutService{}).SaveLoadout(`{"slots":[{"items":[],"enabled":true}]}`); err == nil {
 		t.Fatal("expected a validation error")
 	}

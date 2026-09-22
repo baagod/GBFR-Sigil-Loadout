@@ -42,8 +42,8 @@ inline constexpr std::array<uint8_t, 20> kSlotBaseStore = {
 // 窗口取 0x800：真实距离有 8 倍余量，又刚好把隔壁那张表挡出去。
 inline constexpr size_t kAnchorWindowBytes = 0x800;
 
-// File header size and row stride of skill_status.tbl: 8-byte row count, then
-// 52-byte rows (see GBFR.SigilLoadout/SigilEditorFeature.cs, same numbers).
+// skill_status.tbl 的文件头大小与行步长：8 字节行数头，然后 52 字节行
+//（见 GBFR.SigilLoadout/SigilEditorFeature.cs，数字一致）。
 inline constexpr uint64_t kTableHeaderBytes = 8;
 inline constexpr uint64_t kTableRowBytes = 52;
 // 行里 Key 的位置（相对行首）：编辑只碰 LevelValue1..10 与 Level，从不碰 Key，

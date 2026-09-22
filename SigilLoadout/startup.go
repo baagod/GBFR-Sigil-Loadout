@@ -10,7 +10,7 @@ import (
 
 // 启动期的两件事：单实例判定，以及"坏安装"的唯一出口。
 
-// ensureSingleInstance: second launches activate the existing window and exit.
+// ensureSingleInstance：第二次启动激活已有窗口然后退出。
 //
 // 只创建、不持有：判据是 CreateMutexW 的 ERROR_ALREADY_EXISTS，全程没有 WaitForSingleObject，
 // 所以没有"释放"可做（对不拥有的互斥体调 ReleaseMutex 只会以 ERROR_NOT_OWNER 失败）。句柄也

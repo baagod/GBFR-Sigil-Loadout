@@ -4,9 +4,9 @@ using System.Runtime.InteropServices;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Windows-level hotkey via RegisterHotKey (message-driven: zero sampling, zero loss): a hidden
-/// message-only window on a background thread receives WM_HOTKEY and brings the loadout editor
-/// tool to the front. The legacy 250 ms poll remains only as a fallback when registration fails.
+/// Windows 级热键，走 RegisterHotKey（消息驱动：零采样、零丢失）：后台线程上一个隐藏的
+/// message-only 窗口收 WM_HOTKEY，把配装编辑器工具带到前台。旧的 250 ms 轮询只在注册失败时
+/// 留作回退。
 /// </summary>
 internal static class Hotkey
 {
@@ -15,7 +15,7 @@ internal static class Hotkey
     private const int HotkeyId = 0x47B1;
     private const uint ModNoRepeat = 0x4000;
     private const int WmQuit = 0x0012;
-    // Keep in sync with the tool (window title; asserted in sharedconstants_test.go).
+    // 与工具保持同步（窗口标题；sharedconstants_test.go 里对拍）。
     private const string ToolWindowTitle = "GBFR Sigil Loadout";
 
     [DllImport("user32.dll")]
@@ -91,9 +91,8 @@ internal static class Hotkey
     private static Action<string>? _log;
 
     /// <summary>
-    /// Configures the hotkey and starts the message-only window thread. Called once per mod
-    /// lifetime (Mod.QueueStart is once-only); re-arming a live hotkey is UpdateHotkey's job and
-    /// Shutdown tears the thread down, so there is deliberately no re-entry path here.
+    /// 配置热键并启动 message-only 窗口线程。每个 mod 生命周期调一次（Mod.QueueStart 只跑一次）；
+    /// 重新武装一个活着的热键是 UpdateHotkey 的事，线程由 Shutdown 拆掉，所以这里有意不留重入路径。
     /// 别改回"启动时 Process.Start 预热工具进程"：那会触发 .NET fatal（实测）。
     /// </summary>
     internal static void Configure(string modDirectory, int virtualKey, Action<string> log)
@@ -130,10 +129,9 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Re-arms the hotkey on the message window with the current virtual key; called by
-    /// <see cref="UpdateHotkey"/> only. Both this and the loop's own registration read
-    /// <c>_virtualKey</c> rather than a captured copy, so whichever of the two runs second sees a
-    /// key changed in between, and that is the one registered.
+    /// 用当前虚拟键在消息窗口上重新武装热键；只由 <see cref="UpdateHotkey"/> 调。这里和循环里那次
+    /// 注册都读 <c>_virtualKey</c> 而不是捕获的副本，所以两者中后跑的那个会看到中途换过的键，
+    /// 而注册上的正是它。
     /// </summary>
     private static bool ReregisterHotkey(IntPtr window)
     {
@@ -142,8 +140,8 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Publishes the current virtual key next to the tool exe so the editor can use the same key to
-    /// hide itself (independent of where Reloaded-II stores its own user config).
+    /// 把当前虚拟键发布到工具 exe 旁边，好让编辑器用同一个键把自己藏起来（不依赖 Reloaded-II
+    /// 把自己的用户配置存在哪）。
     /// </summary>
     private static void PublishHotkey(int virtualKey)
     {
@@ -155,11 +153,11 @@ internal static class Hotkey
         }
         catch
         {
-            // Tool-side hint only; the mod hotkey works regardless.
+            // 只是给工具侧的提示；mod 热键照常工作。
         }
     }
 
-    /// <summary>Tears down the message window and thread (invoked from Mod.Dispose).</summary>
+    /// <summary>拆掉消息窗口和线程（由 Mod.Dispose 调）。</summary>
     internal static void Shutdown()
     {
         _threadExit = true;
@@ -167,8 +165,8 @@ internal static class Hotkey
         if (hwnd != IntPtr.Zero)
         {
             PostMessage(hwnd, (uint)WmQuit, IntPtr.Zero, IntPtr.Zero);
-            // The loop owns all window cleanup (unregister + destroy) when it exits; joining here only
-            // waits. A timeout is fine, and DestroyWindow is never done here: it is unsafe cross-thread.
+            // 循环退出时窗口的清理（注销 + 销毁）都归它；这里的 join 只是等。超时没关系，而且
+            // DestroyWindow 绝不在这里做：跨线程不安全。
             _hotkeyThread?.Join(1000);
         }
         _messageWindow = IntPtr.Zero;
@@ -200,23 +198,22 @@ internal static class Hotkey
         {
             int result = GetMessage(out MSG msg, IntPtr.Zero, 0, 0);
             if (result <= 0)
-                break; // 0 = WM_QUIT, -1 = error
+                break; // 0 = WM_QUIT，-1 = 出错
             if (msg.Message == WmHotkey)
             {
                 if (_threadExit)
-                    break; // Shutdown began: drop in-flight hotkey messages
+                    break; // Shutdown 已开始：丢掉在途的热键消息
                 if (IsGameForeground())
                 {
                     try
                     {
-                        // Wait for the key to be released first: the same key's key-up must not land
-                        // on the launcher window (it would be treated as an in-tool hide).
+                        // 先等按键抬起：同一个键的 key-up 不能落到启动器窗口上（那会被当成工具内的隐藏）。
                         WaitForKeyRelease(_virtualKey);
                         TryLaunchTool(_log ?? (_ => { }));
                     }
                     catch
                     {
-                        // never let the message loop die
+                        // 绝不让消息循环死掉
                     }
                 }
             }
@@ -224,12 +221,12 @@ internal static class Hotkey
             DispatchMessage(ref msg);
         }
         UnregisterHotKey(hwnd, HotkeyId);
-        // The loop created the window, so it destroys it here: a shutdown join timeout must never
-        // leak the message window (the shutdown path never touches it cross-thread).
+        // 窗口是循环建的，所以也由它销毁：关停时 join 超时绝不能把消息窗口漏掉
+        // （关停路径从不跨线程碰它）。
         DestroyWindow(hwnd);
     }
 
-    /// <summary>Legacy polling fallback, active only when RegisterHotKey failed.</summary>
+    /// <summary>旧轮询回退，只在 RegisterHotKey 失败时生效。</summary>
     internal static void Tick(Action<string> log)
     {
         if (_virtualKey < 0 || _modDirectory.Length == 0 || _hotKeyRegistered)
@@ -262,7 +259,7 @@ internal static class Hotkey
 
     private static void TryLaunchTool(Action<string> log)
     {
-        // Single instance: bring the existing editor window to the front (also when minimised/hidden).
+        // 单实例：把已经开着的编辑器窗口带到前台（最小化/隐藏时也一样）。
         IntPtr existing = FindWindow(null, ToolWindowTitle);
         if (existing == IntPtr.Zero && IsToolProcessRunning())
         {
@@ -285,7 +282,7 @@ internal static class Hotkey
             log("SigilLoadout.exe not found in the mod directory.");
             return;
         }
-        // The tool resolves its own data directory (exeDir); no args needed.
+        // 工具自己算数据目录（exeDir）；不需要参数。
         using var process = Process.Start(new ProcessStartInfo(toolPath)
         {
             UseShellExecute = true,
@@ -311,8 +308,7 @@ internal static class Hotkey
             : $"0x{virtualKey:X2}";
 
     /// <summary>
-    /// Polls until the given virtual key is no longer down (max 400 ms), so the hotkey's key-up is
-    /// consumed while the game still owns the input.
+    /// 轮询到给定虚拟键不再按下为止（最多 400 ms），好让热键的 key-up 在游戏还握着输入时被消费掉。
     /// </summary>
     private static void WaitForKeyRelease(int vk)
     {
@@ -325,10 +321,9 @@ internal static class Hotkey
     }
 
     /// <summary>
-    /// Requests the tool to show/restore/focus itself (WM_APP+0x10; the tool handles the fake-hidden
-    /// and minimized states) and then takes foreground permission. SetForegroundWindow must run here
-    /// on the hotkey process: the RegisterHotKey press is what Windows treats as user input and
-    /// grants activation rights to this process.
+    /// 请求工具显示/还原/聚焦自己（WM_APP+0x10；假隐藏和最小化状态由工具处理），然后取前台权限。
+    /// SetForegroundWindow 必须跑在热键这个进程里：Windows 把 RegisterHotKey 的这次按下当成用户输入，
+    /// 激活权是给这个进程的。
     /// </summary>
     private static void ActivateWindow(IntPtr hWnd)
     {

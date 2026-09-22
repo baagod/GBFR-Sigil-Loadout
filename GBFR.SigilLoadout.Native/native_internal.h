@@ -42,20 +42,17 @@ struct ResolvedGameLayout
 };
 
 inline constexpr int kNativeInternalSlotCount = 13;
-// slots 0/1/2 of every character template are the mod-injected exclusives
-// (T1/T2/war spirit, one factor each; player configuration only fills the slots
-// after these). Total virtual slots = kBuiltinExclusiveSlotCount + config count.
+// 每个角色模板的 slot 0/1/2 是 mod 注入的专属槽（T1/T2/战气，各一个因子；
+// 玩家配置只填它们之后的槽位）。虚拟槽总数 = kBuiltinExclusiveSlotCount + 配置数。
 inline constexpr int kBuiltinExclusiveSlotCount = 3;
 inline constexpr int kVirtualSlotCapacity = 24;
-// The character-restriction table (which character wears which exclusive gem) is
-// compiled in from src/exclusive_table.inc, so there is no runtime data file to
-// read and nothing left to fail closed on at startup.
+// 角色限制表（哪个角色戴哪个专属 gem）由 src/exclusive_table.inc 编译进来，
+// 所以运行期没有数据文件要读，启动时也没有可 fail closed 的东西。
 inline constexpr uint32_t kUnwornCharacterHash = 0x887AE0B0;
 inline constexpr uint32_t kGranCharacterHash = 0x2A26B1B2;
 inline constexpr uint32_t kDjeetaCharacterHash = 0xA4ACBA76;
 
-// Template (synthesized) sigil slots use a slot-id range that can never
-// collide with real inventory slot ids (0 .. 5099).
+// 模板（合成）sigil 槽用的 slot-id 区间与真实库存 slot id（0 .. 5099）永不冲突。
 inline constexpr uint32_t kTemplateSlotIdBase = 0xFE000000u;
 
 inline constexpr bool IsTemplateSlotId(uint32_t slot_id) noexcept
@@ -70,18 +67,18 @@ inline constexpr uint32_t MakeTemplateSlotId(int virtual_slot) noexcept
 
 struct TemplateGemSlot
 {
-   uint32_t gem_id = 0; // real gem hash for the gem-master lookup; 0 = empty slot
+   uint32_t gem_id = 0; // gem-master 查询用的真实 gem hash；0 = 空槽
    uint32_t skill1 = 0;
    int32_t skill1_level = 0;
-   // Single-skill slots must use kUnwornCharacterHash (0x887AE0B0): 0 makes the
-   // game render an extra empty Lv1 entry in the full-sigil list.
+   // 单技能槽必须用 kUnwornCharacterHash (0x887AE0B0)：填 0 会让游戏在完整
+   // sigil 列表里多渲染一条空的 Lv1 条目。
    uint32_t skill2 = 0;
    int32_t skill2_level = 0;
-   int32_t sigil_level = 0; // displayed sigil level (V+ = 15)
+   int32_t sigil_level = 0; // 显示用的 sigil 等级（V+ = 15）
 };
 
-// Layout contract with GBFR20_TemplateSlot (native_api.h): same field order and
-// packing; the ABI path only ever reads through a reinterpret_cast.
+// 与 GBFR20_TemplateSlot（native_api.h）的布局契约：字段顺序与 pack 一致；
+// ABI 路径只经 reinterpret_cast 读。
 static_assert(sizeof(TemplateGemSlot) == sizeof(GBFR20_TemplateSlot));
 static_assert(offsetof(TemplateGemSlot, gem_id) == offsetof(GBFR20_TemplateSlot, gem_id));
 static_assert(offsetof(TemplateGemSlot, skill1) == offsetof(GBFR20_TemplateSlot, skill1));
@@ -92,9 +89,8 @@ struct CharacterTemplate
    std::array<TemplateGemSlot, kVirtualSlotCapacity> slots{};
 };
 
-// Runtime template table: initialized from the built-in loadout, replaced by
-// GBFR20_ApplyLoadout. Readers copy values under the shared mutex (same as
-// GetSelection) so detour paths stay lock-safe.
+// 运行期模板表：从内置配装初始化，由 GBFR20_ApplyLoadout 替换。读者在共享
+// mutex 下复制值（同 GetSelection），所以 detour 路径保持锁安全。
 inline constexpr size_t kRuntimeTemplateCapacity = 32;
 extern std::shared_mutex g_template_mutex;
 extern std::array<CharacterTemplate, kRuntimeTemplateCapacity> g_runtime_templates;
@@ -239,9 +235,8 @@ struct CodeSectionView
 
 bool TryGetCodeSection(CodeSectionView& view) noexcept;
 void Log(const std::string& message);
-// Phases are timed with GetTickCount64 at the call site and log once on
-// completion (with elapsed time); failures are explicit, so a stuck startup is
-// identifiable by the last completed phase.
+// 各阶段在调用点用 GetTickCount64 计时，完成时记一行日志（含耗时）；失败是
+// 显式的，所以卡住的启动能靠最后一个完成的阶段定位。
 void CompleteStartupPhase(std::string_view phase, uint64_t started_at_ms, bool succeeded);
 void SetRuntimeMessage(std::string message);
 

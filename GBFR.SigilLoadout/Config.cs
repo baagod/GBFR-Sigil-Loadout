@@ -4,13 +4,11 @@ using System.Text.Json.Serialization;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// One skill-status override: which row, and the LevelValue slots to write.
+/// 一条技能状态覆盖：改哪一行，以及要写哪些 LevelValue 槽位。
 ///
-/// <see cref="Values"/> maps positionally onto LevelValue1..10, the slots a skill's own description
-/// calls {0}, {1}, ... null leaves a slot exactly as the game has it: only the numbers are written,
-/// so a slot this tool knows nothing about cannot overwrite the row with a stale copy of the game's
-/// table. Descriptions are all the information available about a slot's meaning, so it is not
-/// modelled here.
+/// <see cref="Values"/> 按位置对应 LevelValue1..10，即技能自己的描述里写作 {0}、{1} … 的那些槽位。
+/// null 让槽位保持游戏原样：只写数字，所以本工具一无所知的槽位不可能用游戏表的旧副本盖掉这一行。
+/// 描述是槽位含义唯一可得的线索，所以这里不给它建模。
 ///
 /// 每个属性都要写明自己的 JSON 成员名：读取是严格的，这四个拼写就是文件格式，省掉特性就只能
 /// 依赖有意关掉的大小写折叠（Config.Options）。
@@ -22,25 +20,24 @@ public class SigilSkill
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; } = true;
 
-    /// <summary>skill_status Key: 8-digit hex hash, e.g. 06719232.</summary>
+    /// <summary>skill_status Key：8 位十六进制 hash，如 06719232。</summary>
     [JsonPropertyName("key")]
     public string Key { get; set; } = "";
 
-    /// <summary>The row's Level field: the level the game shows, and where an edit lands.</summary>
+    /// <summary>行的 Level 字段：游戏显示的那个等级，也是编辑落点。</summary>
     [JsonPropertyName("level")]
     public int Level { get; set; } = 15;
 
-    /// <summary>LevelValue1..10 in order; null leaves that slot alone.</summary>
+    /// <summary>LevelValue1..10，按序；null 表示不动那个槽位。</summary>
     [JsonPropertyName("values")]
     public float?[] Values { get; set; } = new float?[LevelValueCount];
 }
 
 /// <summary>
-/// The mod's sigiledits.json. Written by the editor tool (SigilLoadout.exe), read here at startup.
+/// 本 mod 的 sigiledits.json。由编辑器工具（SigilLoadout.exe）写，这里在启动时读。
 ///
-/// Deliberately implements no Reloaded configuration interface: that would make the launcher offer a
-/// "Mod configuration" window, which cannot render a list (it shows a meaningless Capacity/Count
-/// pair). The tool owns the edit list, so this is plain data.
+/// 有意不实现任何 Reloaded 配置接口：那会让启动器多出一个 "Mod configuration" 窗口，而它渲染不了
+/// 列表（只显示一对没有意义的 Capacity/Count）。编辑列表归工具所有，所以这里就是纯数据。
 /// </summary>
 public class Config
 {
@@ -55,15 +52,14 @@ public class Config
     };
 
     /// <summary>
-    /// The edit list in <paramref name="path"/>. An empty <c>edits</c> array is a real answer and
-    /// comes back as an empty list; anything else (no file, no <c>edits</c> member, not an array,
-    /// null) throws. The only caller logs the reason and then writes nothing at all, rather than
-    /// wiping the edits that are live in this session.
+    /// <paramref name="path"/> 里的编辑列表。空的 <c>edits</c> 数组是真实答案，返回空列表；
+    /// 其余情况（没有文件、没有 <c>edits</c> 成员、不是数组、null）都抛异常。唯一的调用方记下
+    /// 原因后干脆什么都不写，而不是抹掉本局还活着的那些编辑。
     /// </summary>
     public static Config Load(string path)
     {
-        // Size cap, the same one loadout.json gets: the file is hand-editable, and a
-        // runaway one should be a logged error, not a multi-gigabyte read.
+        // 大小上限，与 loadout.json 同一道：文件可以手改，失控的那份该是一条记进日志的错误，
+        // 而不是一次几个 GB 的读取。
         var info = new FileInfo(path);
         if (info.Length > MaxBytes)
             throw new InvalidDataException($"sigiledits.json exceeds {MaxBytes} bytes");
@@ -83,8 +79,8 @@ public class Config
         var config = doc.RootElement.Deserialize<Config>(Options)
             ?? throw new InvalidDataException("sigiledits.json is not a JSON object");
 
-        // An explicit "values": null overwrites the initialiser and every reader of Values
-        // would then have to cope with null; normalise here, as the tool's padValues does.
+        // 显式的 "values": null 会盖掉初始化式，之后每个读 Values 的地方都得处理 null；
+        // 在这里规整一次，与工具的 padValues 一致。
         foreach (var edit in config.Edits)
             edit.Values ??= new float?[SigilSkill.LevelValueCount];
 

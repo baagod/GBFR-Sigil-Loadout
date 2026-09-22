@@ -2,7 +2,7 @@ using Reloaded.Mod.Interfaces;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-/// <summary>Reloaded-II config page connector; the launcher discovers it (IConfiguratorV3) and renders the declared UI.</summary>
+/// <summary>Reloaded-II 配置页连接器；启动器发现它（IConfiguratorV3）并按声明的 UI 渲染。</summary>
 public class Configurator : IConfiguratorV3
 {
     public string? ModFolder { get; private set; }
@@ -21,7 +21,7 @@ public class Configurator : IConfiguratorV3
                 HotkeyConfig.ConfigurationName),
         };
 
-        // Keep the array in sync with the launcher's copy-on-update behavior.
+        // 数组要跟着启动器"更新时换一份"的行为走。
         for (int x = 0; x < configurations.Length; x++)
         {
             var index = x;

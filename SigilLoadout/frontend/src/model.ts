@@ -1,7 +1,7 @@
-export const MAX_SLOTS = 12 // fixed rows shown in the editor
-/** Fallback sigil/skill level when no cap is known (mirrors C# DefaultLevel). */
+export const MAX_SLOTS = 12 // 编辑器固定显示的行数
+/** 不知道 cap 时的因子/技能等级回落值（对应 C# 的 DefaultLevel）。 */
 export const DEFAULT_LEVEL = 15
-/** Menu hotkey fallback when tool-hotkey.txt is unavailable (F1). */
+/** tool-hotkey.txt 读不到时的菜单热键回落值（F1）。 */
 export const DEFAULT_HIDE_KEY = 0x70
 
 export interface Slot {
@@ -24,14 +24,14 @@ export interface SavedItem {
 }
 
 export interface Sigil {
-  hash: string // gem hash (= item identity; skill entries use the skill hash)
-  skill1: string // primary skill hash — the main picker's group key
+  hash: string // gem hash（= 物品身份；技能行的 hash 是技能 hash）
+  skill1: string // 主技能 hash——主下拉的组键
   player: string
   onlyone?: string // gem.CanOnlyHoldOne: "1" = 唯一持有
   mix?: string // gem.CanGemMix："0" 普通（自由组合），"1" 锁定
   cap?: number // 技能等级上限（行数据，只喂技能字典）
-  lot?: string[] // pool versions: legal secondary skill hashes (empty = no pool)
-  skill2?: string // fixed-second versions: the fixed secondary skill hash
+  lot?: string[] // 池版：合法副技能 hash（空 = 无池）
+  skill2?: string // 固定副技能版：那个固定的副技能 hash
 }
 
 export interface Skill {

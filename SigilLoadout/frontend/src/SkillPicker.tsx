@@ -20,23 +20,23 @@ interface SkillItem {
 interface SkillPickerProps {
   value: string
   skills: string[]
-  /** Display name map (value -> localized label); falls back to value. */
+  /** 显示名表（value -> 当前语言的标签）；取不到就回落成 value。 */
   labels?: Record<string, string>
-  /** Trigger text when value is empty (t.pickSkill / t.none). */
+  /** value 为空时触发器上的文案（t.pickSkill / t.none）。 */
   placeholder: string
-  /** Prepend a "无" (empty value) option - used for the second skill. */
+  /** 在最前面加一个"无"（空 value）选项——副技能用。 */
   noneOption?: boolean
-  /** Label of the empty option ("无" / "None"); only used with noneOption. */
+  /** 空选项的标签（"无" / "None"）；只在 noneOption 下用。 */
   noneLabel?: string
-  /** Search input placeholder ("搜索" / "Search"). */
+  /** 搜索框的 placeholder（"搜索" / "Search"）。 */
   searchPlaceholder: string
-  /** Empty list message ("无匹配因子" / "No matching sigils"). */
+  /** 列表为空时的文案（"无匹配因子" / "No matching sigils"）。 */
   emptyLabel: string
-  /** Disable the picker (e.g. secondary sigil before a primary is chosen). */
+  /** 禁用这个下拉（如还没选主因子时的副技能）。 */
   disabled?: boolean
-  /** Items outside this set are dimmed (illegal combination). */
+  /** 不在这集合里的项灰显（非法组合）。 */
   legal?: Set<string>
-  /** Current selection is illegal for the chosen main sigil (red trigger). */
+  /** 当前取值对这主因子非法（触发器变红）。 */
   invalid?: boolean
   onSelect: (value: string) => void
 }

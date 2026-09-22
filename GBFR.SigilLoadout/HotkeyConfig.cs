@@ -33,7 +33,7 @@ public enum OverlayHotkey
     End = 0x23,
 }
 
-/// <summary>Reloaded-II config page entry; the launcher renders it from the property attributes.</summary>
+/// <summary>Reloaded-II 配置页条目；启动器按属性表把它渲染出来。</summary>
 public sealed class HotkeyConfig : Configurable<HotkeyConfig>
 {
     internal const string FileName = "HotkeyConfig.json";
@@ -47,8 +47,8 @@ public sealed class HotkeyConfig : Configurable<HotkeyConfig>
     [DefaultValue(OverlayHotkey.F1)]
     public OverlayHotkey MenuHotkey { get; set; } = OverlayHotkey.F1;
 
-    // Derived: keep it out of the JSON and the launcher grid. JsonStringEnumConverter accepts
-    // arbitrary ints from a hand-edited file, so the value domain is checked here.
+    // 派生值：挡在 JSON 和启动器表格之外。JsonStringEnumConverter 会收下手改文件里的任意整数，
+    // 所以取值范围在这里判。
     [JsonIgnore]
     [Browsable(false)]
     public int VirtualKey =>

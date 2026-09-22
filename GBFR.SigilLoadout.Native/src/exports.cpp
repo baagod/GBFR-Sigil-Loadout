@@ -70,8 +70,8 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    EnsureInitialized();
    if (!g_hooks_ready.load(std::memory_order_acquire))
       return 0;
-   // Layout-identical to the native TemplateGemSlot (packed 1, same field order,
-   // 0x18 bytes); read only, never modified.
+   // 与原生 TemplateGemSlot 布局一致（pack 1、字段顺序一致、0x18 字节）；
+   // 只读，从不修改。
    const bool applied = ApplyLoadout(
       reinterpret_cast<const TemplateGemSlot*>(slots),
       static_cast<int32_t>(slot_count),

@@ -10,7 +10,7 @@ import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "./model"
 import type { Messages } from "./messages"
 import { useWheelStep } from "./useWheelStep"
 
-/* Fixed side columns + factor columns that eat all remaining width.
+/* 两侧列固定，因子列吃掉全部剩余宽度。
    启用列按内容自适应（勾选框 16px）左右留 2 / 12px；序号列固定 28px、单元格不带内间距。 */
 const GRID_COLS =
   "grid grid-cols-[auto_1.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"

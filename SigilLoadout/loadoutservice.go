@@ -12,16 +12,14 @@ import (
 	jsonv2 "encoding/json/v2"
 )
 
-// MaxSlots caps the number of ENABLED slots only, mirroring the managed validator
-// (LoadoutConfig.ParseAndValidate).
+// MaxSlots 只限制**启用**的槽数，与托管侧校验器（LoadoutConfig.ParseAndValidate）一致。
 const MaxSlots = 12
 
-// LoadoutService reads the mod-directory data files (sigils.json, sigils.chara.json,
-// tool-hotkey.txt — all next to the exe) and writes the player configuration to
-// LOCALAPPDATA/GBFRSigilLoadout (mirroring the mod's userCfgDir, so mod updates never
-// wipe it). It writes loadout.json:
-// { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] } — one
-// shape, no other spelling is accepted, so items[0] must carry the skill hash.
+// LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json、tool-hotkey.txt——
+// 都在 exe 旁），把玩家配置写到 LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新
+// 不会冲掉它）。它写出的 loadout.json 是
+// { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] }——只认这一种形状，
+// 别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
 	// 写盘只有 SaveLoadout 这一个出口，而它可能被并发调用：一次慢写（杀软扫 %LOCALAPPDATA%）
 	// 会让两次保存在飞，磁盘上留哪一份取决于最后完成的那个 rename。提交时取递增序号、写前比一次，
@@ -30,20 +28,17 @@ type LoadoutService struct {
 	saveMu    sync.Mutex
 }
 
-// MinimiseApp fake-hides the window to the tray (alpha 0, the WebView stays live) so the
-// in-game hotkey can bring it back instantly. Invoked by the tool's own hotkey; the X button
-// fake-hides directly through the WndProc interceptor in main.go.
+// MinimiseApp 把窗口假隐藏到托盘（alpha 0，WebView 保持活着），好让游戏内热键一按就回来。
+// 由工具自己的热键调用；X 按钮走 main.go 的 WndProc 拦截器直接假隐藏。
 func (s *LoadoutService) MinimiseApp() {
 	hideToTray()
 }
 
-// defaultHotkeyVK is F1, the fallback when the mod has published no hotkey
-// (shared protocol constant: model.ts DEFAULT_HIDE_KEY).
+// defaultHotkeyVK 是 F1：mod 没播报热键时的回落值（跨层协议常量：model.ts 的 DEFAULT_HIDE_KEY）。
 const defaultHotkeyVK = 0x70
 
-// GetHotkey returns the configured menu hotkey as a virtual key code, published by the mod in
-// tool-hotkey.txt next to the exe (a runtime handoff, not shipped data, so not in assets/);
-// a missing or unreadable file falls back to F1 (0x70).
+// GetHotkey 返回配置的菜单热键虚拟键码，由 mod 写在 exe 旁的 tool-hotkey.txt 里（运行期交接，
+// 不是随包数据，所以不在 assets/ 下）；文件缺失或读不出时回落 F1 (0x70)。
 func (s *LoadoutService) GetHotkey() int {
 	// 读不出来时 data 是空串、Atoi 也失败，两条路汇到同一个回落值，不必分开写。
 	data, _ := readModFile("tool-hotkey.txt")
@@ -54,7 +49,7 @@ func (s *LoadoutService) GetHotkey() int {
 }
 
 type loadoutItem struct {
-	Gem   string `json:"gem"`   // items[0]: gem (物品) hash
+	Gem   string `json:"gem"`   // items[0]: gem（物品）的 hash
 	Hash  string `json:"hash"`  // items[0]: 该物品给的主技能；items[1]: 副技能
 	Level int    `json:"level"`
 }
@@ -75,10 +70,9 @@ func exeDir() string {
 	return filepath.Dir(exe)
 }
 
-// userCfgDir is where the player configuration (loadout.json) lives. The mod folder is
-// replaced on every update; this location survives them. Must match the C# side
-// (Environment.SpecialFolder.LocalApplicationData): do NOT fall back to os.UserConfigDir(),
-// which on Windows returns %AppData% (Roaming).
+// userCfgDir 是玩家配置（loadout.json）所在处。mod 目录每次更新都会被整个换掉，这个位置能活
+// 过更新。必须与 C# 侧一致（Environment.SpecialFolder.LocalApplicationData）：**不要**回落到
+// os.UserConfigDir()——它在 Windows 上返回 %AppData%（Roaming）。
 //
 // 目录名与文件名是协议的一部分（mod 那边算的是同一个字符串，中间没有任何协商），各只有这一处
 // 声明——sharedconstants_test.go 把它们和 C# 那份对拍。
@@ -99,8 +93,7 @@ func userCfgDir() string {
 // 落点），打包后是 mod 目录下的 assets\——**同一个布局，没有第二种**，所以不需要"开发副本"。
 const assetsDir = "assets"
 
-// readModFile reads one file relative to the exe's folder (the mod folder is replaced on
-// every update; user configuration lives in userCfgDir instead).
+// readModFile 读一个相对 exe 目录的文件（mod 目录每次更新都会被换掉；用户配置另住在 userCfgDir）。
 func readModFile(relative string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(exeDir(), relative))
 	if err != nil {
@@ -151,8 +144,8 @@ func loadAssetsFrom(dir string) error {
 	return nil
 }
 
-// LoadSigils returns the merged sigil/skill table (assets/sigils.json): item rows plus
-// non-item skill rows (hash == skill1). Display names come separately from GemNames.
+// LoadSigils 返回合并后的因子/技能表（assets/sigils.json）：物品行加上非物品的技能行
+// （hash == skill1）。显示名另由 GemNames 给。
 func (s *LoadoutService) LoadSigils() (string, error) {
 	return readModFile(filepath.Join(assetsDir, "sigils.json"))
 }
@@ -170,8 +163,7 @@ func (s *LoadoutService) CharaNames(lang string) map[string]string {
 	return pick(lang, charaNamesByLang)
 }
 
-// LoadConfig returns the player configuration from the user directory; an empty config is
-// returned when none exists yet (the editor starts from zero — no built-in preset).
+// LoadConfig 从用户目录返回玩家配置；还没有配置时返回一份空配置（编辑器从零开始——没有内置预设）。
 func (s *LoadoutService) LoadConfig() (string, error) {
 	data, err := os.ReadFile(filepath.Join(userCfgDir(), loadoutFileName))
 	if err != nil {
@@ -185,13 +177,13 @@ func (s *LoadoutService) LoadConfig() (string, error) {
 	return string(data), nil
 }
 
-// LoadExclusives returns assets/sigils.chara.json (gen's `exclusive` command output).
+// LoadExclusives 返回 assets/sigils.chara.json（gen 的 `exclusive` 命令产物）。
 func (s *LoadoutService) LoadExclusives() (string, error) {
 	return readModFile(filepath.Join(assetsDir, "sigils.chara.json"))
 }
 
-// validateSlots enforces the shared schema limits. Every row must be structurally valid, but
-// only enabled rows count against MaxSlots (the mod ignores disabled rows).
+// validateSlots 执行共用的 schema 限制。每一行都必须结构合法，但计入 MaxSlots 的只有启用的行
+// （mod 忽略禁用的行）。
 //
 // 这里**不**校验等级上限：上限是每条技能自己的 cap，持有那张表的是前端（读 sigils.json 并把值夹在
 // cap 内），最终由 mod 侧（LoadoutConfig）判定。再写一个固定上限只会成为同一规则的第三份副本。
@@ -229,10 +221,9 @@ func validateSlots(slots []loadoutSlot) error {
 	return nil
 }
 
-// SaveLoadout writes the player configuration (the shape the mod reads). Atomic write
-// (temp + rename) so the mod's 250ms mtime tick never sees a half-written file, and
-// last-write-wins: a save a newer save has superseded is dropped rather than racing it
-// to the rename.
+// SaveLoadout 写出玩家配置（mod 读的那种形状）。原子写（temp + rename），所以 mod 每 250ms 看
+// 一次 mtime 也不会看到半截文件；并且后写者胜：被更新的保存取代掉的那次直接放弃，而不是抢着去
+// rename。
 func (s *LoadoutService) SaveLoadout(config string) error {
 	var c struct {
 		Lang      string                    `json:"lang"`

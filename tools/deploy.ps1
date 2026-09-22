@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $root 'dist\GBFR.SigilLoadout'
 
-# 0. Refuse a target that is not the mod folder: the replacement below is a recursive delete, so a mistyped -Target must never hit an unrelated path.
+# 0. 拒绝不是 mod 目录的目标：下面的替换是一次递归删除，所以 -Target 敲错绝不能打到无关路径。
 $resolvedTarget = [IO.Path]::GetFullPath($Target).TrimEnd('\')
 if (-not $resolvedTarget.EndsWith('\GBFR.SigilLoadout', [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to deploy to a path that is not the mod folder: $Target"
@@ -50,13 +50,13 @@ if ($newestSource -and $newestBuilt -and $newestSource.LastWriteTimeUtc -gt $new
     throw "The built package is older than the sources ($newestRel is newer than everything in dist). Run build-release.ps1 before deploying."
 }
 
-# 2. The game must be closed: its mod DLLs are loaded from the Mods folder.
+# 2. 游戏必须已关闭：它的 mod DLL 是从 Mods 目录加载的。
 if (Get-Process -Name 'granblue_fantasy_relink' -ErrorAction SilentlyContinue) {
     throw 'The game is running; close it first (its Reloaded-II mods are loaded from the Mods folder).'
 }
 
-# 3. Stop a running tool so the deployed files are not locked, and wait until it is really gone: the
-# tool holds a single-instance mutex, so a launch racing the shutdown would activate the dying window.
+# 3. 停掉正在跑的工具，免得部署的文件被锁住，并等到它真的没了：工具持有单实例 mutex，与关闭
+# 赛跑的启动只会激活那个正在死掉的窗口。
 function Stop-SigilLoadout {
     Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
@@ -66,7 +66,7 @@ function Stop-SigilLoadout {
     }
 }
 
-# Launch from the deployed copy and report whether it survived the start.
+# 从部署好的那份启动，并报告它是否活过了启动。
 function Start-SigilLoadout {
     Start-Process -FilePath (Join-Path $Target 'SigilLoadout.exe')
     Start-Sleep -Seconds 3
@@ -75,7 +75,7 @@ function Start-SigilLoadout {
 
 Stop-SigilLoadout
 
-# 4. Replace the deployed folder.
+# 4. 替换部署目录。
 $targetDir = Split-Path -Parent $Target
 if (Test-Path -LiteralPath $Target) {
     Remove-Item -LiteralPath $Target -Recurse -Force
@@ -83,8 +83,7 @@ if (Test-Path -LiteralPath $Target) {
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 Copy-Item -Path $source -Destination $targetDir -Recurse -Force
 
-# 5. Reopen the editor tool from the freshly deployed copy. If that first start did not survive
-# (a lingering instance still held the mutex), stop everything and start once more.
+# 5. 从刚部署好的那份重开编辑工具。若第一次启动没活下来（残留实例还占着 mutex），全停掉再来一次。
 if (-not (Start-SigilLoadout)) {
     Stop-SigilLoadout
     if (-not (Start-SigilLoadout)) {

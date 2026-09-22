@@ -5,9 +5,8 @@ using System.Runtime.InteropServices;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Minimal native-core facade: ABI check, log sink, initialize, shutdown and runtime-message
-/// readback. All selector/inventory/preset/input/present APIs of the original it derives from
-/// were removed.
+/// 最小原生核心门面：ABI 检查、日志汇、初始化、关停与运行时消息回读。它派生自的那份原始实现里
+/// 所有 selector/inventory/preset/input/present API 都已删除。
 /// </summary>
 internal static unsafe partial class NativeCore
 {
@@ -80,17 +79,16 @@ internal static unsafe partial class NativeCore
     }
 
     /// <summary>
-    /// Formats one "Startup phase=… state=… elapsed_ms=…" line. It lives here because this class owns
-    /// the first phase and Mod consumes the rest, so the phase-log contract has one implementation.
+    /// 拼一行 "Startup phase=… state=… elapsed_ms=…"。放在这里是因为第一个阶段归本类，
+    /// 其余由 Mod 消费，于是阶段日志契约只有一份实现。
     /// </summary>
     internal static string StartupPhaseLine(string phase, long startedAt, bool succeeded) =>
         $"Startup phase={phase} state={(succeeded ? "complete" : "failed")} " +
         $"elapsed_ms={(long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds}.";
 
     /// <summary>
-    /// Applies one whole player configuration in a single native call: the general slots plus the
-    /// per-character exclusive switches. A null/empty half means "none of it" (no general slots =
-    /// built-in template only; no switches = every exclusive enabled).
+    /// 一次原生调用套用整份玩家配置：通用槽加逐角色专属开关。任一半为 null/空表示"这一半不要"
+    /// （没有通用槽 = 只用内置模板；没有开关 = 专属全开）。
     /// </summary>
     internal static bool ApplyLoadout(
         TemplateSlotNative[]? slots,
@@ -130,8 +128,8 @@ internal static unsafe partial class NativeCore
         }
     }
 
-    // Native log callback as a plain delegate, held alive in a static field: a collected
-    // delegate would leave native code calling a freed function pointer.
+    // 原生日志回调就是一个普通委托，由静态字段持有不回收：委托被回收之后，
+    // 原生代码就在调一个已释放的函数指针。
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void NativeLogCallback(sbyte* message);
 
@@ -151,7 +149,7 @@ internal static unsafe partial class NativeCore
         }
         catch
         {
-            // A diagnostic callback must never unwind into native hook code.
+            // 诊断回调绝不能让异常展开回原生钩子代码。
         }
     }
 
@@ -164,7 +162,7 @@ internal static unsafe partial class NativeCore
         }
         catch
         {
-            // The native module may already be unavailable during process teardown.
+            // 进程拆卸期间原生模块可能已经不在了。
         }
         lock (NativeLogLock)
             _nativeLogSink = null;

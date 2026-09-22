@@ -174,8 +174,8 @@ bool TryBuildImageView(ImageView& image) noexcept
       return false;
    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
       g_image_base + static_cast<uintptr_t>(dos->e_lfanew));
-   // Sanity-limit SizeOfImage: the reads above stay inside the mapped header
-   // region, so a malformed e_lfanew can never reach unmapped memory (fail-closed).
+   // 给 SizeOfImage 设合理上界：上面的读都落在已映射的头区域内，所以畸形
+   // e_lfanew 永远碰不到未映射内存（fail-closed）。
    if (nt->Signature != IMAGE_NT_SIGNATURE ||
        nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
        nt->OptionalHeader.SizeOfImage < 0x1000 ||
@@ -511,9 +511,8 @@ bool TryGetCodeSection(CodeSectionView& view) noexcept
 
 void ResetGameLayout() noexcept
 {
-   // A published layout stays immutable for the rest of the process
-   // (g_initialize_once); clearing the plain struct here could race a reader that
-   // acquired the previous true state just before a shutdown or failed-install rollback.
+   // 已发布的布局在进程余下时间里保持不变（g_initialize_once）；在这里清空
+   // 这个平凡结构体会与"刚在关机或安装失败回滚前读到上一份真状态"的读者相争。
    g_layout_ready.store(false, std::memory_order_release);
 }
 

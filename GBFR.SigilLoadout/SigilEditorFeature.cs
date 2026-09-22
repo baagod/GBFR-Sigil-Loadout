@@ -280,8 +280,8 @@ internal sealed class SigilEditorFeature
     /// </summary>
     private bool Publish(byte[] table, DateTime stamp)
     {
-        // Registration first: it is cheap, and if the game re-parses the table from the served file,
-        // that parse must see the new values, not rows re-created with the old ones.
+        // 先注册：它便宜，而且游戏若真的重新解析送达的文件，那次解析也必须看到新值，
+        // 而不是用旧值把行重建出来。
         try
         {
             RegisterWithManager(table);

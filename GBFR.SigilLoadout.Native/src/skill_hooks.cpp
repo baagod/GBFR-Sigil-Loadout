@@ -23,7 +23,7 @@ thread_local bool g_tls_build_has_selection = false;
 
 namespace
 {
-// Session-wide one-shot flag; only this translation unit uses it.
+// 会话级一次性标志；只有这个翻译单元用。
 std::atomic_bool g_live_confirmation_reported{false};
 
 uint32_t CountSelectedSlots(
@@ -96,8 +96,8 @@ void TrackNaturalContributionResult(
       final_identity.context_mode == identity.context_mode;
    if (final_valid)
    {
-      // Log the live-battle confirmation only once per session: a healthy loadout
-      // repeats 9/9 every battle. Failures below still report N/M every occurrence.
+      // 实战确认每会话只记一次：健康的配装每场战斗都重复 9/9。下面那些失败仍每次
+      // 报 N/M。
       if (!g_live_confirmation_reported.exchange(true, std::memory_order_acq_rel))
          SetRuntimeMessage(std::format(
             "Skill contribution confirmed for 0x{:08X}: {}/{} virtual sigils reached the "
@@ -160,8 +160,7 @@ bool TryCopySelectedVirtualGem(
    if (selected_slot_id == 0)
       return false;
 
-   // Template slots synthesize a GemData from the built-in loadout table; there is
-   // no inventory-backed virtual slot path in this mod.
+   // 模板槽从内置配装表合成 GemData；这个 mod 没有以库存为后端的虚拟槽路径。
    if (!IsTemplateSlotId(selected_slot_id))
       return false;
    return TryCopyTemplateGem(identity.character_hash, selected_slot_id, output);
@@ -306,8 +305,8 @@ void OnSkillFetch(safetyhook::Context& context)
       }
    }
 
-   // Resume after the native getter call so the game still performs its own
-   // invalid-flag check, gem-master lookup, category count, cap, and effect math.
+   // 在原生 getter 调用之后返回，游戏仍会自己做无效标志检查、gem-master 查询、
+   // 类别计数、上限与效果计算。
    context.rax = copied ? 1 : 0;
    context.rip = g_image_base + g_game_layout.skill_category_getter_return_rva;
 }
@@ -364,15 +363,13 @@ private:
 void DisableGameplayHooksAndRestore() noexcept
 {
    g_hooks_ready.store(false, std::memory_order_release);
-   // Restore the loop-limit bytes FIRST, while both detours are still live: a slot >= 13
-   // request is still gated by them, and disabling first would leave a window where the raw
-   // 13-slot getter gets asked for slot 13+N.
+   // 先恢复循环上限字节，此时两个 detour 都还活着：slot >= 13 的请求仍被它们挡住，
+   // 先拆钩子会留下一段窗口，让原始 13 槽 getter 被问到 slot 13+N。
    if (g_image_base != 0 && g_layout_ready.load(std::memory_order_acquire))
    {
       const uint8_t expanded_slot_count =
          static_cast<uint8_t>(GetExpandedInternalSlotCount());
-      // Only revert a limit byte that still holds our expanded value; an already-restored
-      // (or never patched) one must not be touched.
+      // 只回退仍是我们那个扩展值的上限字节；已经恢复过（或从未打过补丁）的不能碰。
       const auto restore_limit =
          [expanded_slot_count](uintptr_t rva, uint8_t original, const char* failure) {
             uint8_t current = 0;
@@ -395,9 +392,9 @@ void DisableGameplayHooksAndRestore() noexcept
    if (g_get_gem_hook)
       (void)g_get_gem_hook.disable();
 
-   // Wait for in-flight detour bodies to drain before releasing the hook trampolines.
-   // If they do not drain in time the process is already shutting down, so leave the hooks
-   // installed (disabled, limits restored) rather than freeing memory a live call may still execute.
+   // 释放 hook trampoline 之前先等在途的 detour 体退空。若没能及时退空，进程本就
+   // 在关机中，所以宁可把钩子留着（已禁用、上限已恢复），也不释放活调用可能仍在
+   // 执行的内存。
    const uint64_t drain_deadline = GetTickCount64() + 5000;
    while (g_active_getter_calls.load(std::memory_order_acquire) != 0 ||
           g_active_mid_calls.load(std::memory_order_acquire) != 0)
@@ -442,7 +439,7 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept
       return false;
    if (!WriteByte(g_image_base + category_limit_rva, expanded_slot_count))
    {
-      // Roll the first byte back to what it held, so the two loops stay in agreement.
+      // 把第一个字节回滚到它原来的值，两条循环就保持一致。
       (void)WriteByte(g_image_base + apply_limit_rva, previous_apply_limit);
       return false;
    }

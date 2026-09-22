@@ -6,22 +6,19 @@ namespace gbfr::native
 {
 namespace
 {
-// Built-in character-exclusive template: every playable character keeps its three
-// exclusive sigil slots (slot 0 = T1 factor, slot 1 = T2 factor, slot 2 = war
-// spirit; one independent factor per slot, no 觉醒+ merge). Disabled factors leave
-// their slot empty; gaps are skipped by InstallDefaultTemplateSelections. The
-// general slots (3+) come from the player's loadout.json only. The gems/skills
-// come from sigils.json via gen's `exclusive` command at build time.
+// 内置角色专属模板：每个可玩角色保留它的三个专属 sigil 槽（slot 0 = T1 因子，
+// slot 1 = T2 因子，slot 2 = 战气；每槽一个独立因子，不做觉醒+合并）。被关掉的
+// 因子留空槽，空档由 InstallDefaultTemplateSelections 跳过。通用槽（3+）只来自
+// 玩家的 loadout.json。gem/技能在构建时由 gen 的 `exclusive` 子命令从 sigils.json 生成。
 //
-// IMPORTANT: a "no second skill" gem must use skill2 = kUnwornCharacterHash
-// (0x887AE0B0, the "not selected" sentinel the game understands), NOT 0.
-// skill2 = 0 renders an extra empty Lv1 entry in the game's full-sigil list
-// (observed 2026-09-02 on ER 2.0.5). skill1_level and sigil_level are
-// independent: the former is the skill effect level, the latter the sigil's
-// list display level.
+// 重要："没有第二个技能"的 gem 必须用 skill2 = kUnwornCharacterHash
+//（0x887AE0B0，游戏认的"未选中"哨兵值），**不是** 0。skill2 = 0 会让游戏在
+// 完整 sigil 列表里多渲染一条空的 Lv1 条目（2026-09-02 在 ER 2.0.5 观察到）。
+// skill1_level 与 sigil_level 相互独立：前者是技能效果等级，后者是 sigil 在
+// 列表里的显示等级。
 //
-// Djeeta (姬塔) shares Gran's captain exclusives (captain compatibility).
-// Bits for per-character exclusive overrides (default: all enabled).
+// 姬塔（Djeeta）与古兰共用队长的专属（captain 兼容）。
+// 按角色专属开关的位（默认：全部启用）。
 enum ExclusiveState : uint8_t
 {
    ExclusiveT1 = 1 << 0,
@@ -59,11 +56,11 @@ uint32_t RequiredCharacterForGem(uint32_t gem_hash) noexcept
    return 0;
 }
 
-// character_hash -> index into g_runtime_templates (built once in
-// InitializeRuntimeTemplates and never reordered, so the hot getter path is O(1)).
+// character_hash -> g_runtime_templates 的下标（InitializeRuntimeTemplates 里
+// 建一次、从不重排，所以热路径 getter 是 O(1)）。
 std::unordered_map<uint32_t, size_t> g_character_template_index;
-// Per-character exclusive overrides (absent = ExclusiveAll), guarded by
-// g_template_mutex; written by GBFR20_ApplyLoadout.
+// 按角色的专属开关（缺失 = ExclusiveAll），由 g_template_mutex 保护；
+// 由 GBFR20_ApplyLoadout 写入。
 std::unordered_map<uint32_t, uint8_t> g_exclusive_state;
 
 TemplateGemSlot MakeSingleSkillSlot(uint32_t gem_id, uint32_t skill) noexcept
@@ -77,7 +74,7 @@ TemplateGemSlot MakeSingleSkillSlot(uint32_t gem_id, uint32_t skill) noexcept
       .sigil_level = 15};
 }
 
-// Requires g_template_mutex held by the caller.
+// 要求调用方持有 g_template_mutex。
 uint8_t ReadExclusiveStateLocked(uint32_t character_hash) noexcept
 {
    const auto iterator = g_exclusive_state.find(character_hash);
@@ -86,11 +83,9 @@ uint8_t ReadExclusiveStateLocked(uint32_t character_hash) noexcept
    return iterator->second & ExclusiveAll;
 }
 
-// One independent factor per virtual slot (0 = T1, 1 = T2, 2 = war spirit);
-// disabled factors leave their slot empty, other slots stay empty (the player
-// loadout fills them in ApplyLoadout).
-// Requires g_template_mutex held by the caller, with the character already
-// registered in g_character_template_index.
+// 每个虚拟槽一个独立因子（0 = T1，1 = T2，2 = 战气）；被关掉的因子留空槽，
+// 其余槽也留空（玩家配装在 ApplyLoadout 里填它们）。
+// 要求调用方持有 g_template_mutex，且该角色已注册进 g_character_template_index。
 void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept
 {
    const auto index = g_character_template_index.find(character.character_hash);
@@ -128,7 +123,7 @@ uint8_t ExclusiveBitForSkill(
 // 缺失条目返回 ExclusiveAll）。槽位由 skill hash 认——专属表就在本文件里，所以托管侧不必知道
 // 哪个 hash 是 T1、哪个是战气，也不必再读 sigils.chara.json。认不出的 (角色, 技能) 对直接忽略。
 //
-// Requires g_template_mutex held by the caller.
+// 要求调用方持有 g_template_mutex。
 void ApplyExclusiveSwitchesLocked(
    const GBFR20_ExclusiveOverride* overrides, int32_t count) noexcept
 {
@@ -170,8 +165,7 @@ void InitializeRuntimeTemplates()
       CharacterTemplate& character = g_runtime_templates[index];
       character = CharacterTemplate{};
       character.character_hash = kCharacterExclusives[index].character_hash;
-      // The index map is populated first: ApplyExclusiveStateLocked resolves this
-      // character's exclusive row through it.
+      // 先填下标表：ApplyExclusiveStateLocked 靠它找到这个角色的专属行。
       g_character_template_index.emplace(character.character_hash, index);
       ApplyExclusiveStateLocked(character);
    }
@@ -204,12 +198,12 @@ void InstallDefaultTemplateSelections()
 {
    size_t installed = 0;
    {
-      // Lock order: template -> selection (same as the runtime writers); iterating
-      // the template table under only the selection mutex would be a data race.
+      // 锁顺序：template -> selection（与运行期写者一致）；只在 selection mutex
+      // 下遍历模板表就是数据竞争。
       std::unique_lock template_lock(g_template_mutex);
       std::unique_lock lock(g_selection_mutex);
-      // g_virtual_slot_count is published by ApplyLoadout clamped to
-      // kVirtualSlotCapacity; clamp again so the slot index stays in range.
+      // g_virtual_slot_count 由 ApplyLoadout 按 kVirtualSlotCapacity 钳制后发布；
+      // 这里再钳一次，让槽下标保持在范围内。
       const int slot_limit = std::min(
          g_virtual_slot_count.load(std::memory_order_acquire), kVirtualSlotCapacity);
       for (const CharacterTemplate& character : g_runtime_templates)
@@ -221,7 +215,7 @@ void InstallDefaultTemplateSelections()
          for (int index = 0; index < slot_limit; ++index)
          {
             if (character.slots[static_cast<size_t>(index)].gem_id == 0)
-               continue; // Disabled exclusives leave gaps.
+               continue; // 被关掉的专属槽留空档。
             slots[static_cast<size_t>(index)] = MakeTemplateSlotId(index);
             ++installed;
          }
@@ -264,9 +258,8 @@ bool TryCopyTemplateGem(
    if (!TryGetRuntimeSlot(character_hash, virtual_slot, template_slot))
       return false;
 
-   // Character-restricted template gems (e.g. awakening / war-spirit sigils) must
-   // still honor the character restrictions; unrestricted gems pass for any
-   // character (required hash == 0).
+   // 带角色限制的模板 gem（如觉醒 / 战气 sigil）仍须遵守角色限制；无限制的 gem
+   // 对任何角色都通过（required hash == 0）。
    if (!IsCharacterCompatible(
           RequiredCharacterForGem(template_slot.gem_id), character_hash))
       return false;
@@ -288,9 +281,9 @@ bool ApplyLoadout(
    const TemplateGemSlot* slots, int32_t slot_count,
    const GBFR20_ExclusiveOverride* overrides, int32_t override_count) noexcept
 {
-   // Player configuration only fills general slots kBuiltinExclusiveSlotCount+; slots 0/1/2
-   // are assembled per character from the exclusives + their switches. nullptr = no player
-   // config -> zero player rows, so the general-slot loop below wipes rather than fills.
+   // 玩家配置只填 kBuiltinExclusiveSlotCount 之后的通用槽；slot 0/1/2 由专属表加
+   // 它们的开关按角色组装。nullptr = 没有玩家配置 -> 玩家行数为零，于是下面通用槽
+   // 循环是擦除而不是填充。
    //
    // 两半一起来，是因为它们落在同一个"重新发布"步骤上：最后只发布一次（v17 分成两个导出，
    // 代价是每份配置把同一张表发布并打印两遍）。
@@ -312,9 +305,8 @@ bool ApplyLoadout(
    const int32_t previous_count = g_virtual_slot_count.load(std::memory_order_acquire);
    if (total_slot_count != previous_count)
    {
-      // Publish the new count before widening/narrowing the game's skill loop limit:
-      // the detour gates virtual slots on the count, so it must already match the
-      // patch game threads observe on their next loop iteration.
+      // 在拓宽/收窄游戏的技能循环上限之前先发布新计数：detour 按这个计数给虚拟槽
+      // 设闸，所以它必须已经与游戏线程下一轮循环看到的补丁一致。
       g_virtual_slot_count.store(total_slot_count, std::memory_order_release);
       if (g_hooks_ready.load(std::memory_order_acquire) &&
           g_layout_ready.load(std::memory_order_acquire))
@@ -335,8 +327,8 @@ bool ApplyLoadout(
          if (character.character_hash == 0)
             continue;
          ApplyExclusiveStateLocked(character);
-         // effective_count == 0 makes every iteration take the TemplateGemSlot{} arm, so the
-         // wipe and the fill are the same loop.
+         // effective_count == 0 时每次迭代都走 TemplateGemSlot{} 分支，于是擦除和
+         // 填充是同一个循环。
          for (int32_t slot_index = kBuiltinExclusiveSlotCount;
               slot_index < kVirtualSlotCapacity; ++slot_index)
          {

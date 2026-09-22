@@ -48,7 +48,7 @@ export default function App() {
   // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页的行标签。
   const [charaNames, setCharaNames] = useState<Record<string, string>>({})
   const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
-  const [lang, setLang] = useState<Lang>(initialLang) // persisted in loadout.json
+  const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
   // 整个可视工具一份文案（messages.ts）；换成别的语言只是换一个索引。
   const t = messages[lang]
 
@@ -183,7 +183,7 @@ export default function App() {
     setExclusiveState(sanitizeExclusiveState(cfg.exclusive))
   }
 
-  // Header check box: select all / clear all (official Table pattern).
+  // 表头勾选框：全选 / 全不选（官方 Table 的写法）。
   const allEnabled = slots.every((s) => s.enabled)
   const toggleAll = () => {
     setSlots((prev) => prev.map((slot) => ({ ...slot, enabled: !allEnabled })))

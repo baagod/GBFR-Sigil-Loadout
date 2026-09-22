@@ -5,7 +5,7 @@ using Reloaded.Mod.Interfaces;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-/// <summary>Base class for Reloaded-II configuration entries, copied from the official mod template.</summary>
+/// <summary>Reloaded-II 配置条目的基类，抄自官方 mod 模板。</summary>
 public class Configurable<TParentType> : IUpdatableConfigurable
     where TParentType : Configurable<TParentType>, new()
 {
@@ -80,8 +80,8 @@ public class Configurable<TParentType> : IUpdatableConfigurable
         }
         catch
         {
-            // A bad/partially-written config must never escape this FSW callback: an unhandled
-            // exception would tear down the game process. Keep the previous config.
+            // 坏掉或只写了一半的配置绝不能跑出这个 FSW 回调：未捕获的异常会把游戏进程带走。
+            // 保留上一份配置。
         }
     }
 

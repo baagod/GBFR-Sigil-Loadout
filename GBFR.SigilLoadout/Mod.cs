@@ -6,18 +6,16 @@ using Reloaded.Mod.Interfaces.Internal;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Thin Reloaded-II shell: no overlay UI, input capture, preset store or Overlay Broker. The
-/// native core installs its own hooks via SafetyHook and applies the built-in template loadout
-/// automatically; this shell only hosts it, forwards logs, and drives the upkeep tick.
+/// 薄薄一层 Reloaded-II 外壳：没有 overlay UI、输入捕获、预设存储或 Overlay Broker。原生核心
+/// 自己经 SafetyHook 装钩子，并自动套用内置模板配装；这层外壳只承载它、转发日志、驱动维护拍。
 ///
-/// It also hosts the sigil editor, which rewrites skill_status rows from the user's edit list -
-/// at startup through IDataManager, and again inside the running game, where the upkeep tick
-/// below notices a changed file and re-applies it.
+/// 它还承载因子编辑器：按用户的编辑列表改写 skill_status 行——启动时经 IDataManager 写一次，
+/// 游戏跑起来之后再来一次，那时由下面的维护拍发现文件变了并重新应用。
 /// </summary>
 public sealed class Mod : IMod
 {
     private const string ModId = "GBFR.SigilLoadout";
-    private const string LogTag = "GBFR Sigil Loadout"; // user-facing log prefix only (ModId stays technical)
+    private const string LogTag = "GBFR Sigil Loadout"; // 仅作为面向用户的日志前缀（ModId 保持技术性）
     private const int TickIntervalMilliseconds = 250;
 
     private readonly object _logLock = new();
@@ -56,8 +54,7 @@ public sealed class Mod : IMod
 
     private void QueueStart(IModLoaderV1 loaderApi, string? modVersion)
     {
-        // Idempotent: Start/StartEx are alternative loader entry points; re-entry would duplicate
-        // the upkeep timer.
+        // 幂等：Start/StartEx 是启动器的两个入口，重入会让维护定时器多出一个。
         if (System.Threading.Interlocked.Exchange(ref _startRequested, 1) != 0)
             return;
         long started = Stopwatch.GetTimestamp();
@@ -107,9 +104,8 @@ public sealed class Mod : IMod
             LoadoutConfig.Initialize(Log);
             InitializeHotkeyConfiguration(loader, modDirectory);
 
-            // The sigil editor is independent of the native core: it only reads the archive and
-            // rewrites skill_status rows, so it starts whatever the hooks did. Its synchronous
-            // table read is the one step here slow enough to deserve its own phase line.
+            // 因子编辑器与原生核心无关：它只读归档、改写 skill_status 行，所以钩子成没成都照样启动。
+            // 它那次同步读表是这里唯一慢到值得单独一条阶段日志的步骤。
             long sigilEditorStarted = Stopwatch.GetTimestamp();
             _sigilEditor = new SigilEditorFeature(Log);
             _sigilEditor.Start(loader);
@@ -130,7 +126,7 @@ public sealed class Mod : IMod
                     }
                     catch
                     {
-                        // The upkeep tick must never tear down the process.
+                        // 维护拍绝不能把进程带走。
                     }
                     finally
                     {
@@ -185,7 +181,7 @@ public sealed class Mod : IMod
             }
             catch
             {
-                // File logging must never affect the mod lifecycle.
+                // 文件日志绝不能影响 mod 生命周期。
             }
         }
         try
@@ -194,7 +190,7 @@ public sealed class Mod : IMod
         }
         catch
         {
-            // External logger failures must not affect the mod lifecycle.
+            // 外部日志器出错不能影响 mod 生命周期。
         }
     }
 

@@ -15,18 +15,16 @@ import (
 // mutexName 供 ensureSingleInstance 使用。
 const mutexName = "Local\\GBFRSigilLoadout"
 
-// wmFakeHide posts the hide to the UI thread: fakeHide must not run on the Wails service
-// goroutine — SetForegroundWindow waits on the window's own thread, blocked in that very call.
+// fakeHide 必须 post 到 UI 线程：SetForegroundWindow 等的是窗口自身线程，而它正阻塞在这个调用里。
 const wmFakeHide = 0x8011
 
-// wmActivate is WM_APP+0x10, the single activation command posted by the tray, the in-game
-// hotkey and a second instance (the C# side posts the same value).
+// 由托盘、游戏内热键与第二个实例 post 的唯一激活命令（C# 侧也 post 同一个值）。
 const wmActivate = 0x8010
 
-// gwHwndNext is GW_HWNDNEXT: the next window below in Z-order.
+// GW_HWNDNEXT：Z 序里的下一个窗口。
 const gwHwndNext = 2
 
-// mouse_event flags used to replay the game's own "first click hides the cursor" gesture.
+// 用来重放游戏自己那记「首击隐藏光标」的 mouse_event flags。
 const (
 	mouseeventfLeftDown = 0x0002
 	mouseeventfLeftUp   = 0x0004
@@ -60,18 +58,18 @@ var (
 )
 
 const (
-	exStyleAppWindow   = 0x40000 // WS_EX_APPWINDOW: Wails sets it at creation to force the taskbar button
-	exStyleLayered     = 0x80000 // WS_EX_LAYERED: per-window alpha (alpha 0 = mouse-transparent)
-	exStyleToolWindow  = 0x80    // WS_EX_TOOLWINDOW: no taskbar button / Alt-Tab entry
-	exStyleTransparent = 0x20    // WS_EX_TRANSPARENT: mouse hit-testing passes through to the window below
+	exStyleAppWindow   = 0x40000 // WS_EX_APPWINDOW：Wails 创建时就设上，用它强出任务栏按钮
+	exStyleLayered     = 0x80000 // WS_EX_LAYERED：整窗 alpha（alpha 0 = 鼠标穿透）
+	exStyleToolWindow  = 0x80    // WS_EX_TOOLWINDOW：不进任务栏、不进 Alt-Tab
+	exStyleTransparent = 0x20    // WS_EX_TRANSPARENT：鼠标命中测试穿透到下面那个窗口
 	swpFrameChanged    = 0x27    // SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_FRAMECHANGED
 )
 
-// gwlExStyle is GWL_EXSTYLE (-20) as a uintptr (Go consts cannot hold a negative uintptr).
+// GWL_EXSTYLE (-20)，写作 uintptr：Go 常量放不下负的 uintptr。
 var gwlExStyle = ^uintptr(0) - 19
 
-// debugf appends a diagnostic line to tool-debug.log next to the exe, but only while
-// tool-debug.on exists there — release installs never create the marker, so it stays silent.
+// debugf 往 exe 旁的 tool-debug.log 追一行诊断，且只在 tool-debug.on 存在时——正式安装从不建
+// 这个标记，于是它一直静默。
 func debugf(format string, args ...any) {
 	dir := exeDir()
 	if _, err := os.Stat(filepath.Join(dir, "tool-debug.on")); err != nil {
@@ -85,10 +83,9 @@ func debugf(format string, args ...any) {
 	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
 }
 
-// nextForegroundWindow walks down the Z-order from hwnd and returns the first visible, enabled,
-// titled top-level window — the one the user was most likely using before the tool came to the
-// front (0 when there is none). Needed when the tool was opened directly (no 0x8010 summon, so
-// nothing was remembered): Windows keeps a hidden/disabled window as the foreground one.
+// nextForegroundWindow 从 hwnd 沿 Z 序向下找第一个可见、启用、带标题的顶层窗口——也就是工具
+// 抢到前台前用户最可能用的那个（没有则 0）。直接打开工具时需要它（没有 0x8010 召唤，什么都没
+// 记住）：Windows 会把隐藏/禁用的窗口继续当作前台窗口。
 func nextForegroundWindow(hwnd uintptr) uintptr {
 	next := hwnd
 	for range 16 {
@@ -111,7 +108,7 @@ func nextForegroundWindow(hwnd uintptr) uintptr {
 	return 0
 }
 
-// findToolWindow returns the tool's main window handle (0 = not found).
+// findToolWindow 返回工具主窗口的 handle（0 = 没找到）。
 func findToolWindow() uintptr {
 	title, _ := syscall.UTF16PtrFromString(toolWindowTitle)
 	hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(title)))
@@ -123,9 +120,8 @@ func foregroundWindow() uintptr {
 	return value
 }
 
-// isGameWindow reports whether hwnd belongs to granblue_fantasy_relink.exe. It gates the
-// cursor-hiding click replay: that gesture is only safe in the game (its first click after the
-// cursor appears is swallowed instead of reaching gameplay), never in an arbitrary foreground app.
+// isGameWindow 判断 hwnd 是否属于 granblue_fantasy_relink.exe，用来把住光标隐藏点击的重放：
+// 那记动作只在游戏里安全（光标出现后的第一下点击会被吞掉、到不了操作），绝不能发给任意前台程序。
 func isGameWindow(hwnd uintptr) bool {
 	var pid uint32
 	procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))

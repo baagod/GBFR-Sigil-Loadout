@@ -62,8 +62,8 @@ void CompleteStartupPhase(
 
 void SetRuntimeMessage(std::string message)
 {
-   // Log before storing so the log line can never race another thread's store;
-   // the stored copy below stays under the mutex.
+   // 先记日志再存，日志行就不会与别的线程的 store 相争；下面那份存储拷贝
+   // 始终在 mutex 下写入。
    Log(message);
    std::scoped_lock lock(g_message_mutex);
    g_runtime_message = std::move(message);

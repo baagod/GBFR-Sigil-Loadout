@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 # 本脚本住在 tools\ 里，仓库根是它的上一层。
 $root = Split-Path -Parent $PSScriptRoot
 
-# --- version: one authority ---------------------------------------------------
+# --- 版本号：唯一权威源 -------------------------------------------------------
 # ModConfig.json 是版本号的唯一权威源：脚本以前自带一个默认字面量，于是有了两个真相源，而前端的
 # package.json / package-lock.json 根本没人管，工具里显示的版本可以一直停在旧值上。
 # 现在 -Version 只是发布时的可选覆盖手段。
@@ -48,7 +48,7 @@ $distRoot = Join-Path $root 'dist'
 $packageDir = Join-Path $distRoot 'GBFR.SigilLoadout'
 $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 
-# --- release consistency gates ------------------------------------------------
+# --- 发布一致性闸门 -----------------------------------------------------------
 # sigils.json 是工具读的数据源，随包发布，必须在场，否则工具起来就没有因子表。
 # 「character 行必须正好 87 条」那道门**已删**：mod 侧已经没有这个数字，"gem → 角色"由编译进去的注入表派生。
 $sigilsPath = Join-Path $root 'SigilLoadout\assets\sigils.json'
@@ -56,7 +56,7 @@ if (-not (Test-Path -LiteralPath $sigilsPath)) {
     throw "sigils.json is missing: $sigilsPath"
 }
 
-# --- data freshness gate ------------------------------------------------------
+# --- 数据新鲜度闸门 -----------------------------------------------------------
 # sigils.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
 #   sigils.json  <- gen\output\sigils.xlsx（共享 gen 的 `go run . sigils-json`；审阅表 sigils.xlsx
 #   与 texts.xlsx 同待遇，都是生成物，住在 gen\output\ 且不入任何仓库）
@@ -115,8 +115,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "Native build failed with exit code $LASTEXITCODE."
 }
 
-# NuGetAudit=false keeps offline builds green; check vulnerabilities with a one-off
-# `dotnet list package --vulnerable` when the environment allows it.
+# NuGetAudit=false 让离线构建保持绿的；环境允许时另跑一次
+# `dotnet list package --vulnerable` 查漏洞。
 & dotnet restore $managedProject `
     --ignore-failed-sources `
     --nologo `
@@ -135,17 +135,17 @@ if ($LASTEXITCODE -ne 0) {
     throw "Managed build failed with exit code $LASTEXITCODE."
 }
 
-# Loadout editor tool: Wails v3 build (GUI subsystem, embedded frontend dist).
+# 配装编辑工具：Wails v3 构建（GUI 子系统，前端 dist 编进去）。
 $toolDir = Join-Path $root 'SigilLoadout'
 Push-Location $toolDir
 try {
-    # Bindings are git-ignored generated output; regenerate before the frontend build.
+    # bindings 是 git 忽略的生成产物；前端构建前重新生成。
     & wails3 generate bindings
     if ($LASTEXITCODE -ne 0) {
         throw "Wails bindings generation failed with exit code $LASTEXITCODE."
     }
-    # vite only strips types, so nothing below would notice a type error: run the compiler
-    # first. The tests are a gate too — a release that ships with a red suite is unchecked.
+    # vite 只抹掉类型，后面的步骤都不会发现类型错误：所以先跑编译器。测试也是一道门禁——带着
+    # 红的测试集发出去的就是没检查过的版本。
     & npm --prefix (Join-Path $toolDir 'frontend') run typecheck
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend typecheck failed with exit code $LASTEXITCODE."
@@ -173,8 +173,8 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Windows resource (.syso) generation failed with exit code $LASTEXITCODE."
     }
-    # -buildvcs=false for the same reason the csproj keeps SourceLink and the commit revision
-    # out of the managed metadata: Go otherwise stamps the commit sha and a "modified" flag in.
+    # 用 -buildvcs=false 的理由和 csproj 把 SourceLink 与提交版本排出托管元数据一样：否则 Go 会
+    # 把提交 sha 和一个 "modified" 标记盖进去。
     & go vet ./...
     if ($LASTEXITCODE -ne 0) {
         throw "Tool go vet failed with exit code $LASTEXITCODE."
@@ -216,14 +216,13 @@ if (-not $resolvedPackage.StartsWith($resolvedDist, [StringComparison]::OrdinalI
     throw "Refusing to clean a package path outside dist: $packageDir"
 }
 
-# Force-stop a running editor tool: it locks dist\GBFR.SigilLoadout\SigilLoadout.exe and would
-# make the recursive dist cleanup below fail. The tool is reopened at the end of this script.
+# 强杀正在跑的编辑工具：它锁着 dist\GBFR.SigilLoadout\SigilLoadout.exe，会让下面那次递归清理
+# dist 失败。脚本末尾会重新打开工具。
 $loadoutProcesses = Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue
 if ($loadoutProcesses) {
     $loadoutProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
-    # Wait for a real exit instead of a fixed delay: the tool holds a single-instance mutex, so a
-    # relaunch racing this shutdown would only activate the dying window and exit by itself
-    # (deploy.ps1 polls for the same reason; the reopen below would silently fail).
+    # 等它真的退出，而不是固定延时：工具持有单实例 mutex，与这次关闭赛跑的重启只会激活那个正在
+    # 死掉的窗口、然后自己退出（deploy.ps1 轮询也是这个理由；下面的重开会静默失败）。
     $loadoutDeadline = (Get-Date).AddSeconds(15)
     while ((Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue) -and
            (Get-Date) -lt $loadoutDeadline) {
@@ -252,8 +251,8 @@ Copy-Item -Path $toolExe -Destination $packageDir -Force
 # 托盘/exe 是同一张图（工具那份是编译进 SigilLoadout.exe 的）。
 Copy-Item -Path (Join-Path $toolDir 'icon.png') -Destination $packageDir -Force
 
-# Required release files — this list is the ONLY holder of "which files a package must have";
-# deploy.ps1 不再抄一份（它只问"这到底是不是一个包"）。sigils.json 由 csproj 拷进输出目录。
+# 必需的发布文件——「一个包该有哪些文件」只有这一份持有者；deploy.ps1 不再抄一份（它只问
+# "这到底是不是一个包"）。sigils.json 由 csproj 拷进输出目录。
 foreach ($requiredFile in @(
     'GBFR.SigilLoadout.dll',
     'GBFR.SigilLoadout.Native.dll',
@@ -278,8 +277,8 @@ foreach ($requiredFile in @(
     }
 }
 
-# The managed PDB must never ship. Mutable config files are not deleted here: the guard below
-# treats a packaged one as an error (fail closed).
+# 托管 PDB 绝不能随包发布。可变的配置文件不在这里删：下面的门禁把被打进包的那种当错误
+# （fail closed）。
 $pdbPath = Join-Path $packageDir 'GBFR.SigilLoadout.pdb'
 if (Test-Path -LiteralPath $pdbPath) {
     Remove-Item -LiteralPath $pdbPath -Force
@@ -314,7 +313,7 @@ if ($packagedConfig) {
     throw "Mutable config state must be runtime-created and was packaged unexpectedly: $($packagedConfig.FullName)"
 }
 
-# --- generated-asset gate -----------------------------------------------------
+# --- 生成资产门禁 -------------------------------------------------------------
 # 上面那些门禁跑完之后，构建还会在 native 编译前重跑生成器（vcxproj 的 GenerateExclusiveTable），
 # 而它重写的是**入库**的 sigils.chara.json。改写本身不是错误（说明 $chars 变了），但那份改动必须在
 # 仓库里，否则随包发布的就是一份没进仓库的数据（文件既是生成物又是入库数据，这个问题现在不可见）。
@@ -336,6 +335,5 @@ Compress-Archive -LiteralPath $packageDir -DestinationPath $zipPath -Compression
 Write-Output "Reloaded-II package: $packageDir"
 Write-Output "ZIP: $zipPath"
 
-# Dev convenience: open the editor tool for immediate review. An already running instance
-# activates its own window instead (its single-instance mutex).
+# 开发便利：打开编辑工具以便立刻查看。已经有实例在跑时，改为激活它自己的窗口（单实例 mutex）。
 Start-Process -FilePath (Join-Path $packageDir 'SigilLoadout.exe')

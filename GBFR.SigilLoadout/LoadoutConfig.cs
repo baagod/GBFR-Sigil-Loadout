@@ -4,30 +4,29 @@ using System.Text.Json;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// Reads the optional loadout.json (written by the player/editor tool) and pushes it into the
-/// native runtime template table through the ABI. No config file keeps the built-in exclusive
-/// template; invalid files are reported and the last valid configuration stays active.
+/// 读可选的 loadout.json（玩家/编辑器工具写），经 ABI 推进原生运行时模板表。内置专属模板不靠任何
+/// 配置文件保留；文件无效就记一条日志，上一份有效配置继续生效。
 ///
 /// **本类只做一件事：把可视工具写下的载荷映射成 ABI 结构；不读数据文件、不持有任何表。**
 /// "物品 → 主技能 / 上限"的语义只属于唯一写者（可视工具，它读 assets\sigils.json），所以载荷
 /// 自带 items[0].hash（主技能）。选得对不对、有没有超上限，在这一层都不再判。
 ///
-/// Data model (mod reads only the fields it maps):
+/// 数据模型（mod 只读它映射的那些字段）：
 ///   { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ],
 ///     exclusive: { 角色hash: { 技能hash: bool } } }
 ///   items[0] = sigil（gem = 物品 hash，hash = 它给的主技能）；items[1] = 副技能（可选）。
 ///   exclusive 只写 false 的那些：没提到的角色就是三槽全开。
-/// Shape validation only: malformed JSON, a missing skill hash, a bad level, too many slots.
+/// 只做形状校验：JSON 坏掉、缺技能 hash、等级不对、槽位太多。
 /// </summary>
 internal static class LoadoutConfig
 {
     // 配装配置的路径：可视工具写、这里读。文件名字面量只出现在这一处（有一道对拍断言盯着它）。
     private static readonly string ConfigFile = UserConfig.FilePath("loadout.json");
 
-    // keep in sync with Native/native_internal.h kUnwornCharacterHash (0x887AE0B0)
+    // 与 Native/native_internal.h 的 kUnwornCharacterHash 保持同步（0x887AE0B0）
     private const uint UnwornCharacterHash = 0x887AE0B0;
-    // keep in sync with SigilLoadout/loadoutservice.go MaxSlots
-    private const int MaxSlots = 12; // conservative cap (more slots risk instability)
+    // 与 SigilLoadout/loadoutservice.go 的 MaxSlots 保持同步
+    private const int MaxSlots = 12; // 保守上限（槽位更多有失稳风险）
     private const int DefaultLevel = 15;
 
     // 版本门。本类用它的"认领"那一半（Changed）：见 Tick 里为什么有意无条件认领。
@@ -67,7 +66,7 @@ internal static class LoadoutConfig
 
         try
         {
-            // Check the size before reading, so an oversized file is never loaded at all.
+            // 读之前先查大小，超大文件根本不会被读进来。
             if (new FileInfo(ConfigFile).Length > 1024 * 1024)
                 throw new InvalidDataException("loadout.json exceeds 1 MB");
             string json = File.ReadAllText(ConfigFile);
@@ -101,7 +100,7 @@ internal static class LoadoutConfig
     }
 
     /// <summary>
-    /// Parses the optional "exclusive" object into native overrides.
+    /// 把可选的 "exclusive" 对象解析成原生覆盖项。
     ///
     /// 形状：{ 角色hash: { 技能hash: bool } }。只把 **false**（= 关掉）变成一条 override，因为
     /// "没说"和"说开着"是同一件事：原生侧对没被提到的角色一律三槽全开。槽位由技能 hash 决定，而
@@ -191,7 +190,7 @@ internal static class LoadoutConfig
                 throw new InvalidDataException($"slot {index}: bad main skill hash");
             int level1 = GetLevel(main, "level", index);
 
-            uint skill2Hash = UnwornCharacterHash; // "not selected" sentinel, never 0
+            uint skill2Hash = UnwornCharacterHash; // "未选择"哨兵，永不为 0
             int skill2Level = 0;
             if (items.GetArrayLength() >= 2)
             {

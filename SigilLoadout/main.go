@@ -51,7 +51,7 @@ func main() {
 		fatalDialog(err)
 	}
 
-	// The edit list's debounce lives in the service, so the shutdown hook needs that same instance.
+	// 编辑列表的防抖住在 service 里，所以关闭钩子要的正是同一个实例。
 	editService := &EditService{}
 
 	app = application.New(application.Options{
@@ -66,20 +66,17 @@ func main() {
 		},
 		Windows: application.WindowsOptions{
 			DisableQuitOnLastWindowClosed: true,
-			// X button = fake-hide to tray (the WebView stays live, so a later reveal never
-			// flashes white). A WebviewWindow HWND accessor is not exposed by this Wails
-			// version, so each message doubles as a window-specific command.
+			// X 按钮 = 假隐藏到托盘（WebView 保持活着，之后再显出来不会白闪）。这一版 Wails 没有暴露
+			// WebviewWindow 的 HWND 取用口，所以每条消息兼作一条针对该窗口的命令。
 			WndProcInterceptor: handleWndMsg,
 		},
 	})
 
 	win = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: toolWindowTitle,
-		// Wails v3 sizes are the full window frame (incl. title bar) in DIP. The minimum is the
-		// narrower page's, not the wider one's: pinning the floor at the sigil-editor page's 888
-		// would leave the window unable to shrink at all. Below 888 that page scrolls sideways
-		// instead of clipping its columns. 560 is a chosen floor, not a measured one: every list
-		// in both pages scrolls, so a short window costs rows, not layout.
+		// Wails v3 的尺寸是整扇窗口外框（含标题栏）的 DIP。最小值取较窄那页的，不是较宽那页的：把下限
+		// 钉在因子编辑页的 888 上，窗口就再也缩不动。低于 888 那页会横向滚动，而不是把列切掉。560 是
+		// 挑的下限、不是量出来的：两页里每个列表都能滚，所以窗口矮了只少几行、不破布局。
 		Width:            888 + 16,
 		Height:           840,
 		MinWidth:         760 + 16,
@@ -88,8 +85,8 @@ func main() {
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
-	// The sigil-editor page debounces its writes, so closing the window can race the timer:
-	// whatever the debounce still holds must go out on the way down, or the last edit is lost.
+	// 因子编辑页的写入带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
+	// 否则最后一次编辑就丢了。
 	app.OnShutdown(editService.flushNow)
 
 	tray := app.SystemTray.New()
