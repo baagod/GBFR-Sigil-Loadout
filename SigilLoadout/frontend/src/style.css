@@ -148,20 +148,12 @@
     }
 
     /*
-      只认数值框自己（`.level-value`，见 SkillRow）。以前按 `.skill-rows input` 收——那是按元素
-      类型收的，将来谁在这个列表里再放一个 input（搜索框现在在兄弟容器里，暂时命中不到）就会
-      白捡这套底色。也不能拿组件自带的 data-slot="input" 当这个标记：那是 shadcn 的公共契约，
-      覆盖掉等于让这些框在别人的 [data-slot="input"] 规则里消失。
-    */
-    .skill-rows .level-value[data-focus-hold] {
-        /*
-          只补深色那一条。深色主题里"聚焦"本来就没有底色（编译产物里 dark:bg-transparent 与
-          focus:bg-muted/50 同特异性且排在后面，把后者压掉了），所以失活时也不该有；补上它就够。
+      数值框（详情页每个等级的那十个槽）**不在这里补**：深色主题里"聚焦"本来就没有底色
+      （编译产物里 dark:bg-transparent 与 focus:bg-muted/50 同特异性且排在后面，把后者压掉了），
+      浅色主题下补了才会与聚焦态不同——所以两边都不需要一条 data-focus-hold 规则。
 
-          浅色主题下这条规则不产生任何声明，于是失活那一刻底色会**消失**（聚焦态是有底色的）。
-          这是当前有意的取舍：只修深色。要浅色也一致，就再补 @apply bg-muted/50，
-          或把整条规则收进 html:not(.dark) 里。
-        */
-        @apply dark:bg-transparent;
-    }
+      代价：浅色主题下失活那一刻，聚焦底色会消失（聚焦态是有底色的）。这是已知的、有意的取舍：
+      本项目只在深色下使用。要浅色也一致，就在这条规则旁边补一条
+      `.skill-rows <数值框的选择器>[data-focus-hold] { @apply bg-muted/50; }`。
+    */
 }
