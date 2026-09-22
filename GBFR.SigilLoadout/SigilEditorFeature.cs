@@ -58,6 +58,11 @@ internal sealed class SigilEditorFeature
     private IDataManager? _dm;
     private byte[]? _currentTable;
     private bool _started;
+    // 上一次应用**真的落进了游戏内存**。与"文件的 mtime 被认领过了"是两件事：原生拒写
+    // （最典型的是 -3，游戏还没把 skill_status 表解析进来、指针还是 0）时 mtime 已经认领，
+    // 而内存里一个字节都没变。那时必须留着这份待办，否则启动那一次失败就是永久失败——
+    // 文件不再变，mtime 门也就再不会放行。
+    private bool _published;
     private int _stopped;
     private bool _waitedForManager;
 
@@ -164,18 +169,33 @@ internal sealed class SigilEditorFeature
     /// </summary>
     public void Tick()
     {
-        if (_currentTable is null)
+        if (!_published)
         {
-            // 表还没交出去过：管理器是可选依赖，可能比本 mod 晚加载；也可能是归档那一次读不出来。
-            Bootstrap();
+            // 管理器是可选依赖，可能比本 mod 晚加载——那时连表都读不出来，先把它接上。
+            // Bootstrap 只在下述情况会再跑一遍：还没接上管理器（_started 仍为 false），
+            // 或者接上了但这一局还没成功交出去过一份表。
+            if (_dm is null)
+            {
+                Bootstrap();
+                return;
+            }
+            // 上一次应用被拒了（典型是 -3：游戏还没把 skill_status 表读进内存，指针还是 0）。
+            // **不认领**文件版本，于是下一拍、再下一拍都会继续试，直到真的写进游戏内存为止。
+            if (!_stamp.Peek())
+                return;
+            TryApply();
             return;
         }
 
         // 门：文件时间没变就这一拍什么都不做（一次 File.GetLastWriteTimeUtc 就退出）。
-        // "变了吗"与"认领"是同一个动作，所以不会出现"认领了却没应用"或反之。
+        // 成功过一次之后，认领就是"这份内容已经进游戏内存了"。
         if (_stamp.Changed() is null)
             return;
+        TryApply();
+    }
 
+    private void TryApply()
+    {
         try
         {
             Apply();
@@ -257,6 +277,9 @@ internal sealed class SigilEditorFeature
         }
 
         _currentTable = table;
+        if (!_published)
+            _log("sigil edit: first successful write to the game's table; the editor is now armed");
+        _published = true;
         _log($"hot apply: SUCCESS - {written} row(s) of the game's own table rewritten in place at its boot slot in {sw.ElapsedMilliseconds} ms");
     }
 

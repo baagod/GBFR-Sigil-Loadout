@@ -45,6 +45,9 @@ internal sealed class FileStamp
     /// <summary>
     /// 变过就返回它现在的 mtime（并认领），没变返回 null。调用方拿到的就是那一刻的版本，
     /// 所以"文件不存在"（<see cref="UserConfig.NoFile"/>）与真实 mtime 用同一个值分辨，不必再查一次。
+    ///
+    /// 另有一条 <see cref="Peek"/>：只问变没变、**不认领**。给"这一步失败了、这份内容还得再来一次"
+    /// 的调用方用——认领是"我处理过了"，而拒写不算处理过。
     /// </summary>
     internal DateTime? Changed()
     {
@@ -53,5 +56,11 @@ internal sealed class FileStamp
             return null;
         _claimed = stamp;
         return stamp;
+    }
+
+    /// <summary>只问变没变，不认领。见 <see cref="Changed"/>。</summary>
+    internal bool Peek()
+    {
+        return UserConfig.Stamp(_path) != _claimed;
     }
 }
