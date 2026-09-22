@@ -28,6 +28,34 @@ foreach ($sanity in @('GBFR.SigilLoadout.dll', 'SigilLoadout.exe')) {
     }
 }
 
+# 1b. And it must not be stale. "包存在且完整"不等于"它就是当前源码的产物"：构建失败时
+#     dist 会原封不动留着上一次的产物，脚本照样把它装上去——那样部署的是一个与仓库不同步的
+#     exe，而 deploy 会报"成功"。踩过一次，所以这里对拍。
+#
+#     只比**参与构建的输入**（三个单元的源码），不比工具脚本和文档：那些改了并不需要重新
+#     构建，算进来只会让这道闸门在无关改动上挡路，久了就会被绕过。
+#
+#     前端产物由 go:embed 编进 SigilLoadout.exe，所以它的新鲜度也跟着 SigilLoadout\ 走。
+$buildInputs = @(
+    Join-Path $root 'GBFR.SigilLoadout'
+    Join-Path $root 'GBFR.SigilLoadout.Native'
+    Join-Path $root 'SigilLoadout'
+)
+$newestSource = @(
+    foreach ($dir in $buildInputs) {
+        Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\(node_modules|bin|obj|dist|\.git)\\' }
+    }
+) | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+
+$newestBuilt = @(Get-ChildItem -LiteralPath $source -Recurse -File) |
+    Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+
+if ($newestSource -and $newestBuilt -and $newestSource.LastWriteTimeUtc -gt $newestBuilt.LastWriteTimeUtc) {
+    $newestRel = $newestSource.FullName.Substring($root.Length + 1)
+    throw "The built package is older than the sources ($newestRel is newer than everything in dist). Run build-release.ps1 before deploying."
+}
+
 # 2. The game must be closed: its mod DLLs are loaded from the Mods folder.
 if (Get-Process -Name 'granblue_fantasy_relink' -ErrorAction SilentlyContinue) {
     throw 'The game is running; close it first (its Reloaded-II mods are loaded from the Mods folder).'

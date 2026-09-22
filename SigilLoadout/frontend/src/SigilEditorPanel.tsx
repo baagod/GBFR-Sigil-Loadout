@@ -319,22 +319,17 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
   }
 
   /*
-    整行是它内部勾选框的快捷方式。用户真正瞄准的东西——数值框、勾选框、箭头 ——
-    都是 shadcn 控件并带 data-slot，所以各自保留自己的点击；
-    触发器自身的 slot 不是控件，因此点在行上的点击仍然落到这里。
+    整行是它内部控件的快捷方式：点在**控件上**才让控件自己处理，点在行的其余任何位置
+    （文字、箭头、空白）都算点在行上。
 
-    寻找必须**停在行边界**：不能沿祖先一路往上找。列表外面还有别的 data-slot——这个面板
-    整个包在 TabsPanel 里，而它带 data-slot="tabs-panel"——一路往上会让每一行都被判成
-    "点在控件上"，整行就再也点不开了。所以先夹到最近的那个 data-slot 元素，再确认它
-    确实落在这一行之内；越过行的（比如 tabs-panel）不算。
+    判据用元素本身，不用 data-slot：行里的控件就是十个数值框与那个勾选框，而它们是
+    <input> 与 <span role="checkbox">（Base UI 的 Checkbox 不渲染成 button，所以这里
+    不能只写 button）。以前拿 data-slot 当"这是控件"的代理，就得处理"最近的 data-slot
+    元素到底在不在这一行里"——列表外面还有 data-slot（面板整个包在 TabsPanel 里），
+    代理于是把每一行都判成控件、整行再也点不开。语义判据没有这个歧义。
   */
-  const isControl = (e: MouseEvent<HTMLElement>) => {
-    const target = e.target as HTMLElement;
-    const row = target.closest("[data-row]");
-    if (row === null) return false;
-    const control = target.closest('[data-slot]:not([data-slot="tooltip-trigger"])');
-    return control !== null && row.contains(control);
-  };
+  const isControl = (e: MouseEvent<HTMLElement>) =>
+    !!(e.target as HTMLElement).closest("input, button, [role='checkbox']");
 
   /*
     每一次编辑都经过这里：屏幕上的列表就是全部状态，也是运行中的游戏最终拿到的东西。
