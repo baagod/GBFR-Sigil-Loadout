@@ -35,6 +35,10 @@ function failureText(failure: Failure, t: Messages): string {
 // 因子编辑不套它——那一页自带内边距与滚动。
 const LOADOUT_PANEL = "min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-gutter:stable]"
 
+// 每语言的显示名表在 Go 侧只在启动时读一次（main.go 的 loadAssets），之后不再变，所以缓存住：
+// 换语言命中缓存就同步落地，标签与外层文字同一帧换掉——否则要先显示旧名字、等 IPC 回来再跳一次。
+const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string> }>()
+
 export default function App() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [sigils, setSigils] = useState<Sigil[]>([])
@@ -142,12 +146,20 @@ export default function App() {
   // 显示名按语言取（随包的 sigils.lang.json / chara.lang.json）。取不到名字的条目由
   // SkillPicker 回落成 hash——看得见但不好看，总比显示一个别的语言的名字强。
   useEffect(() => {
+    const hit = nameCache.get(lang)
+    if (hit) {
+      setNames(hit.names)
+      setCharaNames(hit.charas)
+      return
+    }
     let cancelled = false
     Promise.all([GemNames(lang), CharaNames(lang)])
       .then(([gems, charas]) => {
         if (cancelled) return
-        setNames(gems ?? {})
-        setCharaNames(charas ?? {})
+        const entry = { names: gems ?? {}, charas: charas ?? {} }
+        nameCache.set(lang, entry)
+        setNames(entry.names)
+        setCharaNames(entry.charas)
       })
       .catch(() => {
         if (cancelled) return

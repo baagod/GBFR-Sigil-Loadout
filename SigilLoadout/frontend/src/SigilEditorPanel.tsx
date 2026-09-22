@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Call, Events } from "@wailsio/runtime";
 import { X } from "lucide-react";
 
@@ -59,7 +59,10 @@ function useDebounced<T>(value: T, delay = 150): T {
   根节点按这一页排出来的宽度（888 DIP）设了下限，外面那一层面板负责横向滚动，所以窗口更窄
   时列是被滚动条推到视野外，而不是被裁掉。
 */
-export function SigilEditorPanel({ lang }: { lang: Lang }) {
+// 每语言的文本表同样在 Go 侧只读一次，缓存住：命中就同步落地，换语言不再等一次 IPC。
+const textCache = new Map<Lang, Record<string, SkillText>>();
+
+function SigilEditorPanelBase({ lang }: { lang: Lang }) {
   // 编辑态按**地址**（因子哈希 + 等级）索引：一个地址一条，这个不变量由容器本身保证，
   // 所以没有路径需要手工去重或整体重建列表。
   const [edits, setEdits] = useState<Map<string, SigilSkill>>(new Map());
@@ -104,10 +107,17 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     因子的名字和说明来自游戏针对所选语言的自有文本。编辑列表与语言无关，这里刻意不动它。
   */
   useEffect(() => {
+    const hit = textCache.get(lang);
+    if (hit) {
+      setTexts(hit);
+      return;
+    }
     // 整个语言一次调用，名字、概要、说明都从这一份里读，切换语言不会让它们各自描述不同的表。
     Call.ByName(`${SERVICE}.SkillMap`, lang)
       .then((map) => {
-        setTexts((map ?? {}) as Record<string, SkillText>);
+        const entry = (map ?? {}) as Record<string, SkillText>;
+        textCache.set(lang, entry);
+        setTexts(entry);
       })
       .catch((err) => showError({ title: t.readFailed, detail: String(err) }));
   }, [lang]);
@@ -487,3 +497,9 @@ export function SigilEditorPanel({ lang }: { lang: Lang }) {
     </div>
   );
 }
+
+/*
+  这一页是 keepMounted 的（见 App），所以 App 任何一次重渲染都会连带重渲整棵编辑器子树——切个
+  Tab 也会。memo 住之后只有 lang 变了才重渲；行级 hover 状态在 useRowTooltip 里，不受影响。
+*/
+export const SigilEditorPanel = memo(SigilEditorPanelBase);
