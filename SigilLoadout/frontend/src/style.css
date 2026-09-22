@@ -6,103 +6,104 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+    --color-background:           var(--background);
+    --color-foreground:           var(--foreground);
+    --color-popover:              var(--popover);
+    --color-popover-foreground:   var(--popover-foreground);
+    --color-primary:              var(--primary);
+    --color-primary-foreground:   var(--primary-foreground);
+    --color-secondary:            var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted:                var(--muted);
+    --color-muted-foreground:     var(--muted-foreground);
+    --color-accent:               var(--accent);
+    --color-accent-foreground:    var(--accent-foreground);
+    --color-destructive:          var(--destructive);
+    --color-border:               var(--border);
+    --color-input:                var(--input);
+    --color-ring:                 var(--ring);
+    --radius-sm:                  calc(var(--radius) * 0.6);
+    --radius-md:                  calc(var(--radius) * 0.8);
+    --radius-lg:                  var(--radius);
+    --radius-xl:                  calc(var(--radius) * 1.4);
+    --radius-2xl:                 calc(var(--radius) * 1.8);
+    --radius-3xl:                 calc(var(--radius) * 2.2);
+    --radius-4xl:                 calc(var(--radius) * 2.6);
+    --font-heading:               var(--font-sans);
+    --font-sans:                  'Geist Variable', sans-serif;
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+    --radius:               0.625rem;
+    --background:           oklch(1 0 0);
+    --foreground:           oklch(0.145 0 0);
+    --popover:              oklch(1 0 0);
+    --popover-foreground:   oklch(0.145 0 0);
+    --primary:              oklch(0.205 0 0);
+    --primary-foreground:   oklch(0.985 0 0);
+    --secondary:            oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted:                oklch(0.97 0 0);
+    --muted-foreground:     oklch(0.556 0 0);
+    --accent:               oklch(0.97 0 0);
+    --accent-foreground:    oklch(0.205 0 0);
+    --destructive:          oklch(0.577 0.245 27.325);
+    --border:               oklch(0.922 0 0);
+    --input:                oklch(0.922 0 0);
+    --ring:                 oklch(0.708 0 0);
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #f9f9f9;
-  --popover: #171717;
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: #272727;
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: #272727;
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: #272727;
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: #ff6568;
-  --border: oklch(1 0 0 / 10%);
-  --input: #404040;
-  --ring: oklch(0.556 0 0);
+    --background:           #0a0a0a;
+    --foreground:           #f9f9f9;
+    --popover:              #171717;
+    --popover-foreground:   oklch(0.985 0 0);
+    --primary:              oklch(0.922 0 0);
+    --primary-foreground:   oklch(0.205 0 0);
+    --secondary:            #272727;
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted:                #272727;
+    --muted-foreground:     oklch(0.708 0 0);
+    --accent:               #272727;
+    --accent-foreground:    oklch(0.985 0 0);
+    --destructive:          #ff6568;
+    --border:               oklch(1 0 0 / 10%);
+    --input:                #404040;
+    --ring:                 oklch(0.556 0 0);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
 
-  /*
-    cursor：可选中文字默认给 I 形光标（cursor: auto 在文字上解析成 text）。整棵树收回箭头，
-    只给输入框显式要回 I 形光标——页面上的文字标签因此不必一个个加 cursor-default。
-  */
-  body {
-    @apply bg-background text-foreground cursor-default;
-  }
-  input,
-  textarea {
-    cursor: text;
-  }
-  html {
-    @apply font-sans;
-    color-scheme: dark;
-  }
-  /*
-    外壳钉在窗口上，只有列表滚动。
+    /*
+      cursor：可选中文字默认给 I 形光标（cursor: auto 在文字上解析成 text）。整棵树收回箭头，
+      只给输入框显式要回 I 形光标——页面上的文字标签因此不必一个个加 cursor-default。
+    */
+    body {
+        @apply bg-background text-foreground cursor-default;
+    }
 
-    不管它的话文档也会跟着滚：一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大
-    可滚动区域，于是窗口自己的滚动条从右边冒出来——而它要从视口里拿走宽度，
-    整个外壳就被推得向左一跳，等它消失才弹回来。在指针停在列表上快速上滚时能看到。
-  */
-  html,
-  body {
-    overflow: hidden;
-  }
+    input, textarea {
+        cursor: text;
+    }
+
+    html {
+        @apply font-sans;
+        color-scheme: dark;
+    }
+
+    /*
+      外壳钉在窗口上，只有列表滚动。
+
+      不管它的话文档也会跟着滚：一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大
+      可滚动区域，于是窗口自己的滚动条从右边冒出来——而它要从视口里拿走宽度，
+      整个外壳就被推得向左一跳，等它消失才弹回来。在指针停在列表上快速上滚时能看到。
+    */
+    html, body {
+        overflow: hidden;
+    }
 }
 
 /*
@@ -114,39 +115,53 @@
   会让点在行上的点击全被吞掉，因子就展不开了。
 */
 @layer utilities {
-  /* 勾一下会让那一行移位，而组件自带的 transition 会在行已经跳走之后还在填充颜色，
-     看起来像是原地填的——那就是闪一下的来源。 */
-  .skill-rows [data-slot="checkbox"] {
-    transition: none;
-  }
+    /* 勾一下会让那一行移位，而组件自带的 transition 会在行已经跳走之后还在填充颜色，
+       看起来像是原地填的——那就是闪一下的来源。 */
+    .skill-rows [data-slot="checkbox"] {
+        transition: none;
+    }
 
-  /* 勾选框是行的第一个子元素，而 focus ring 是向外长的，会被容器边缘切掉。
-     行在左边留了 2px 给它，而 ring 正好是 2px。 */
-  .skill-rows [data-slot="checkbox"]:focus-visible {
-    box-shadow: 0 0 0 2px var(--ring);
-  }
+    /* 勾选框是行的第一个子元素，而 focus ring 是向外长的，会被容器边缘切掉。
+       行在左边留了 2px 给它，而 ring 正好是 2px。 */
+    .skill-rows [data-slot="checkbox"]:focus-visible {
+        box-shadow: 0 0 0 2px var(--ring);
+    }
 
-  /* 半选：盒子用选中态那套填充。那根横杠由行自己画——base-ui 只给 data-indeterminate，
-     而组件的 indicator 永远画的是对勾。 */
-  .skill-rows [data-slot="checkbox"][data-indeterminate] {
-    background-color: var(--primary);
-    border-color: var(--primary);
-    color: var(--primary-foreground);
-  }
+    /* 半选：盒子用选中态那套填充。那根横杠由行自己画——base-ui 只给 data-indeterminate，
+       而组件的 indicator 永远画的是对勾。 */
+    .skill-rows [data-slot="checkbox"][data-indeterminate] {
+        background-color: var(--primary);
+        border-color:     var(--primary);
+        color:            var(--primary-foreground);
+    }
 
-  .skill-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
-    display: none;
-  }
+    .skill-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
+        display: none;
+    }
 
-  /*
-    窗口失活时伪类会被判掉（指示灭），而 DOM 焦点还在框里。App 在那一刻给该元素挂上
-    data-focus-hold，这里把那套指示补齐；值必须与 components/ui 里的聚焦类一致。
-  */
-  [data-slot="input-group"]:has([data-focus-hold]) {
-    @apply border-ring ring-3 ring-ring/50;
-  }
+    /*
+      窗口失活时伪类会被判掉（指示灭），而 DOM 焦点还在框里。App 在那一刻给该元素挂上
+      data-focus-hold，这里把那套指示补齐；值必须与 components/ui 里的聚焦类一致。
+    */
+    [data-slot="input-group"]:has([data-focus-hold]) {
+        @apply border-ring ring-3 ring-ring/50;
+    }
 
-  .skill-rows input[data-focus-hold] {
-    @apply bg-muted/50;
-  }
+    /*
+      只认数值框自己（`.level-value`，见 SkillRow）。以前按 `.skill-rows input` 收——那是按元素
+      类型收的，将来谁在这个列表里再放一个 input（搜索框现在在兄弟容器里，暂时命中不到）就会
+      白捡这套底色。也不能拿组件自带的 data-slot="input" 当这个标记：那是 shadcn 的公共契约，
+      覆盖掉等于让这些框在别人的 [data-slot="input"] 规则里消失。
+    */
+    .skill-rows .level-value[data-focus-hold] {
+        /*
+          只补深色那一条。深色主题里"聚焦"本来就没有底色（编译产物里 dark:bg-transparent 与
+          focus:bg-muted/50 同特异性且排在后面，把后者压掉了），所以失活时也不该有；补上它就够。
+
+          浅色主题下这条规则不产生任何声明，于是失活那一刻底色会**消失**（聚焦态是有底色的）。
+          这是当前有意的取舍：只修深色。要浅色也一致，就再补 @apply bg-muted/50，
+          或把整条规则收进 html:not(.dark) 里。
+        */
+        @apply dark:bg-transparent;
+    }
 }

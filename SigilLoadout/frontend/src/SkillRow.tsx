@@ -192,7 +192,7 @@ function ValueSlots({
               显示为占位符，第一次敲键或步进就开始这条编辑（见 updateLevel）。所以
               没有需要绕开的禁用态——只有占位符，而已编辑等级里没碰过的槽显示的也是它。
             */
-            className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus:bg-muted/50 focus-visible:ring-0 dark:bg-transparent"
+            className="level-value h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus:bg-muted/50 focus-visible:ring-0 dark:bg-transparent"
           />
         </Fragment>
       ))}
