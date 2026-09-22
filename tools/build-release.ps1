@@ -179,9 +179,36 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Tool go vet failed with exit code $LASTEXITCODE."
     }
-    & go test ./...
-    if ($LASTEXITCODE -ne 0) {
-        throw "Tool Go tests failed with exit code $LASTEXITCODE."
+    # 竞态检测：-race 需要 cgo，cgo 需要一份 gcc，而工位上 gcc 通常不在 PATH 上——在几个常见
+    # 位置找一遍。找不到就退回不带 -race 的跑法并**明说**，不静默降级。
+    # CGO_ENABLED 只在这一条命令上生效再还原：开着它跑下面的 go build，net 之类会改用 cgo
+    # 版本，产物就凭空多出一个 libc 依赖。
+    $gccDir = $null
+    $gccOnPath = Get-Command gcc -ErrorAction SilentlyContinue
+    if ($gccOnPath) {
+        $gccDir = Split-Path $gccOnPath.Source
+    }
+    else {
+        foreach ($candidate in 'D:\Programs\mingw64\bin', 'C:\msys64\mingw64\bin', 'C:\mingw64\bin') {
+            if (Test-Path (Join-Path $candidate 'gcc.exe')) { $gccDir = $candidate; break }
+        }
+    }
+    $savedCgo = $env:CGO_ENABLED
+    if ($gccDir) {
+        $env:PATH = "$gccDir;$env:PATH"
+        $env:CGO_ENABLED = '1'
+        & go test -race ./...
+        $testExit = $LASTEXITCODE
+    }
+    else {
+        Write-Host '  gcc not found: tests run without -race (data-race detection skipped).'
+        & go test ./...
+        $testExit = $LASTEXITCODE
+    }
+    if ($null -eq $savedCgo) { Remove-Item env:CGO_ENABLED -ErrorAction SilentlyContinue }
+    else { $env:CGO_ENABLED = $savedCgo }
+    if ($testExit -ne 0) {
+        throw "Tool Go tests failed with exit code $testExit."
     }
     & go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o SigilLoadout.exe .
     if ($LASTEXITCODE -ne 0) {
