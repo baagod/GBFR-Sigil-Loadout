@@ -176,6 +176,21 @@ bool MatchesBytes(uintptr_t address, const std::array<uint8_t, Size>& expected) 
    }
 }
 
+// 同上的运行期长度版本。表驱动的预检拿到的是一次运行才知道长度的形状，而上面那个模板的长度
+// 来自数组类型——套过去就会拿**整个数组**的长度去比（128 字节的表会连缓冲尾部的垃圾一起比，
+// 于是真机上永远不匹配）。SEH 与上面那一份逐字相同。
+inline bool MatchesBytesAt(uintptr_t address, const uint8_t* expected, size_t size) noexcept
+{
+   __try
+   {
+      return std::memcmp(reinterpret_cast<const void*>(address), expected, size) == 0;
+   }
+   __except (EXCEPTION_EXECUTE_HANDLER)
+   {
+      return false;
+   }
+}
+
 extern uintptr_t g_image_base;
 extern std::once_flag g_initialize_once;
 extern std::atomic_bool g_hooks_ready;

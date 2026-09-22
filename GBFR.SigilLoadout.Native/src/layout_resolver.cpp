@@ -93,8 +93,7 @@ struct PreflightCheck
    uintptr_t preflight_offset = 0;
 };
 
-// 定长拷贝用的上界：现有最长的一条是 kNotifierPattern（约 58 字节），留一倍余量。
-inline constexpr size_t kMaxPreflightBytes = 128;
+// 定长拷贝用的上界已不需要（比较走 MatchesBytesAt，按 span 的长度比）。
 constexpr uint8_t kApplyLoopBytes[] = {
    0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0, 0, 0, 0,
    0xC5, 0xF8, 0x11, 0x75, 0xF0};
@@ -272,19 +271,17 @@ bool MatchesBytesAtRva(
       MatchesBytes(image.base + rva, expected);
 }
 
-// SEH 版比较：表里的形状是运行期的 span，而"读到不可读页"仍要由 MatchesBytes 的 __try 兜住，
-// 所以先按上界拷进定长缓冲再交过去（拷贝本身受 RangeInsideImage 保护，见调用方）。
+// SEH 版比较：表里的形状是运行期的 span，长度也只有那时才知道。**不能**套上面那个模板——
+// 它的长度取自数组类型，套过去就会按定长缓冲的整个长度去比，把缓冲尾部的垃圾也算进去。
+// 拷贝本身受 RangeInsideImage 保护；比较走 MatchesBytesAt（同一份 __try）。
 bool MatchesPreflight(
    const ImageView& image,
    uintptr_t rva,
    std::span<const uint8_t> expected) noexcept
 {
-   if (expected.empty() || expected.size() > kMaxPreflightBytes ||
-       !RangeInsideImage(image, rva, expected.size()))
+   if (expected.empty() || !RangeInsideImage(image, rva, expected.size()))
       return false;
-   std::array<uint8_t, kMaxPreflightBytes> buffer{};
-   std::copy(expected.begin(), expected.end(), buffer.begin());
-   return MatchesBytes(image.base + rva, buffer);
+   return MatchesBytesAt(image.base + rva, expected.data(), expected.size());
 }
 
 bool IsReasonableObjectOffset(uintptr_t offset, size_t alignment) noexcept
@@ -437,9 +434,19 @@ bool ValidateResolvedGameLayout(
    };
    for (const PreflightCheck& check : checks)
    {
-      if (check.rva < check.preflight_offset ||
-          !MatchesPreflight(image, check.rva - check.preflight_offset, check.expected))
+      const uintptr_t at = check.rva - check.preflight_offset;
+      if (check.rva < check.preflight_offset || !MatchesPreflight(image, at, check.expected))
+      {
+         // 诊断：布局解析失败只会说"在哪个阶段"，而这里能说清是**哪一条**预检、
+         // 拿哪个地址去比的——少了这一行，一次失败就得靠猜。
+         Log(std::format(
+            "  layout preflight FAILED: rva=0x{:X} preflight_offset=0x{:X} checked_at=0x{:X} bytes={}",
+            check.rva,
+            check.preflight_offset,
+            at,
+            check.expected.size()));
          return false;
+      }
    }
 
    if (!IsRvaInSection(
