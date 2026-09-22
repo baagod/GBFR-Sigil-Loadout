@@ -30,6 +30,8 @@ public sealed class Mod : IMod
     private SigilEditorFeature? _sigilEditor;
     private bool _disposed;
     private int _startRequested;
+    // 1 = 一拍维护正在进行。定时器回调不串行，见下面那条 Timer。
+    private int _ticking;
 
     public Action Disposing => Dispose;
 
@@ -120,6 +122,11 @@ public sealed class Mod : IMod
             _tickTimer = new System.Threading.Timer(
                 _ =>
                 {
+                    // 定时器的回调是不串行的：一次维护没跑完，下一拍就会进来。三个阶段都按
+                    // "这一拍让过去"处理（mtime 门不认领、热键只是采样），所以这里统一挡住，
+                    // 而不是让每个阶段各自再防一遍重入。
+                    if (Interlocked.Exchange(ref _ticking, 1) != 0)
+                        return;
                     try
                     {
                         LoadoutConfig.Tick(Log);
@@ -129,6 +136,10 @@ public sealed class Mod : IMod
                     catch
                     {
                         // The upkeep tick must never tear down the process.
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _ticking, 0);
                     }
                 },
                 null,

@@ -39,7 +39,7 @@ internal static class LoadoutConfig
     // 初值就是"没有这个文件"那个时间戳，所以"配置被删了"是一次正常的 mtime 变化，不需要
     // 额外字段去记住"以前有过文件"。这份约定只有一处实现：UserConfig.Stamp（SigilEditorFeature
     // 那条同样用它）。
-    private static DateTime _handledUtc = UserConfig.NoFile;
+    private static readonly FileStamp Stamp = new(UserConfig.FilePath("loadout.json"));
     private static string _loadoutPath = "";
 
     internal static void Initialize(Action<string> log)
@@ -60,15 +60,13 @@ internal static class LoadoutConfig
 
     private static void TryApply(Action<string> log)
     {
-        // 文件不存在时 Stamp 给的是 UserConfig.NoFile，那是一个与任何真实 mtime 都不相等的、
-        // 可认领的状态，所以"删掉配置"和"改过配置"走同一条门。
-        DateTime mtime = UserConfig.Stamp(_loadoutPath);
-        if (mtime == _handledUtc)
+        // 门自己完成"取 mtime + 比对 + 认领"：变了才往下走，而且这一步就认领掉了（成功、
+        // 读不出来、被原生拒掉都一样），所以同一份内容不会被解析第二次。
+        if (Stamp.Changed() is not DateTime mtime)
             return;
 
         if (mtime == UserConfig.NoFile)
         {
-            _handledUtc = mtime;
             // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。这就是原来的
             // "先清 overrides、再恢复内置模板"两步合成的同一件事。
             if (NativeCore.ApplyLoadout(null, null))
@@ -105,10 +103,8 @@ internal static class LoadoutConfig
             if (!ok)
             {
                 log("Native rejected the custom loadout; kept previous configuration.");
-                _handledUtc = mtime;
                 return;
             }
-            _handledUtc = mtime;
         }
         catch (Exception exception)
         {
@@ -116,7 +112,6 @@ internal static class LoadoutConfig
             // "读到半截文件"不存在；而一个被杀软锁住或被人改坏的文件，再解析三次也同样
             // 读不出来——那 750ms 只推迟了诊断，没有换来别的。下一次保存会改 mtime，
             // 那时它自然会被重新处理。
-            _handledUtc = mtime;
             log($"Invalid loadout.json; kept previous configuration: {exception.Message}");
         }
     }

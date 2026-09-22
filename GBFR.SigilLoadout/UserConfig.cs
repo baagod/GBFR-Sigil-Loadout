@@ -26,3 +26,32 @@ internal static class UserConfig
         "GBFRSigilLoadout",
         name);
 }
+
+/// <summary>
+/// 一个配置文件的 mtime 门：问"这份文件自上次处理以来变过没有"，**并把这一步认领掉**。
+///
+/// 认领与判断是同一件事，所以"先认领、再干活"不可能被写反——这正是原来两个特性各自实现一遍时
+/// 容易分叉的地方（一个认领在 try 之前、另一个在成功之后）。认领**不看结果**：一份读不出来的
+/// 文件不会被每 250ms 重解析一次，失败的修复要等文件自己再变一次。文件不存在是一种真实的 mtime
+/// 变化（<see cref="UserConfig.NoFile"/>），所以"配置被删掉"走的也是同一道门。
+/// </summary>
+internal sealed class FileStamp
+{
+    private readonly string _path;
+    private DateTime _claimed;
+
+    internal FileStamp(string path) => _path = path;
+
+    /// <summary>
+    /// 变过就返回它现在的 mtime（并认领），没变返回 null。调用方拿到的就是那一刻的版本，
+    /// 所以"文件不存在"（<see cref="UserConfig.NoFile"/>）与真实 mtime 用同一个值分辨，不必再查一次。
+    /// </summary>
+    internal DateTime? Changed()
+    {
+        DateTime stamp = UserConfig.Stamp(_path);
+        if (stamp == _claimed)
+            return null;
+        _claimed = stamp;
+        return stamp;
+    }
+}

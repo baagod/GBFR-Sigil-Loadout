@@ -61,12 +61,9 @@ internal sealed class SigilEditorFeature
     private int _stopped;
     private bool _waitedForManager;
 
-    // 已经被 tick 认领的那一份文件的 mtime。宿主每 250ms 调一次 Tick()，所以这里只做一次
-    // File.GetLastWriteTimeUtc 就退出（元数据缓存里的一次查询）。
-    private DateTime _handledUtc;
-
-    // 1 = 一次应用正在进行。宿主那条定时器的回调会并发触发，而一次应用要走一遍原生写入。
-    private int _applying;
+    // 门：编辑列表的 mtime 变了才干活，而"取 mtime + 比对 + 认领"由 FileStamp 一处完成，
+    // 所以"先认领、再应用"不可能被写反（两个特性共用同一个实现）。
+    private readonly FileStamp _stamp = new(ConfigFile);
 
     public SigilEditorFeature(Action<string> log) => _log = log;
 
@@ -92,15 +89,11 @@ internal sealed class SigilEditorFeature
             return;
         _started = true;
 
-        // 读之前先记下这份文件的版本：下面那次读只保证读到了"某一刻"的内容，而可视工具随时可能
-        // 在读完与结束之间写一次。认领**读之前**的时间戳，那次写入就仍然是一次 tick 看得见的
-        // 改动；认领"读之后"的，它就被这次启动悄悄吃掉了。
-        DateTime readingUtc = LastWriteUtc();
-
-        // 就在这里认领，不能挪到后面：Timer 的回调是不串行的，这一拍可能正在进行时下一拍就进来，
-        // 而门停在 default(0001-01-01) 会让那一拍白跑一次（文件不存在时的时间戳是 1601-01-01，
-        // 永不相等）。放在一切可能的提前 return 之前即满足这点。
-        _handledUtc = readingUtc;
+        // 读之前先在门上认领这份文件的版本：下面那次读只保证读到了"某一刻"的内容，而可视工具随时
+        // 可能在读完与结束之间写一次。认领**读之前**的时间戳，那次写入就仍然是一次 tick 看得见的
+        // 改动；认领"读之后"的，它就被这次启动悄悄吃掉了。认领由门自己完成（Changed 一次做完
+        // 取时间戳与认领），所以这里不再需要单独记一个字段。
+        _ = _stamp.Changed();
 
         try
         {
@@ -163,12 +156,6 @@ internal sealed class SigilEditorFeature
     }
 
     /// <summary>
-    /// 编辑列表的文件时间。文件不存在时是 <see cref="UserConfig.NoFile"/>（1601-01-01），与
-    /// <c>default(0001-01-01)</c> 不同，所以"列表被删掉"这件事同样会被 tick 看见。
-    /// </summary>
-    private static DateTime LastWriteUtc() => UserConfig.Stamp(ConfigFile);
-
-    /// <summary>
     /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试一次接；接上了就看编辑列表的文件时间
     /// 变了没有，变了就重新应用一次。
     ///
@@ -184,19 +171,10 @@ internal sealed class SigilEditorFeature
             return;
         }
 
-        DateTime mtime = LastWriteUtc();
-        if (mtime == _handledUtc)
+        // 门：文件时间没变就这一拍什么都不做（一次 File.GetLastWriteTimeUtc 就退出）。
+        // "变了吗"与"认领"是同一个动作，所以不会出现"认领了却没应用"或反之。
+        if (_stamp.Changed() is null)
             return;
-
-        // 上一次应用还没跑完：这一拍让过去，而且**不认领**这次的改动，
-        // 好让它在下一拍被处理。排队没有意义——那只会把两次应用串起来。
-        if (Interlocked.CompareExchange(ref _applying, 1, 0) != 0)
-            return;
-
-        // 先认领、再应用：这一行也是防重入的第二道锁（第一道是上面的 _applying），
-        // 不能挪到 Apply 之后。（代价：一次失败的 Apply 不会自己重试，要等文件再变一次；
-        //   这是刻意的——要让 Apply 返回结果并重试，得先想清楚 in-flight 与重试上限。）
-        _handledUtc = mtime;
 
         try
         {
@@ -205,10 +183,6 @@ internal sealed class SigilEditorFeature
         catch (Exception ex)
         {
             _log("sigil edit hot apply EXCEPTION: " + ex);
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _applying, 0);
         }
     }
 
