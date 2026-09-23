@@ -1,0 +1,386 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:9cca0f14e2ace6033aceb55d7580359b7abf086c8900b0ab5318d96e929d9ced",
+  "claims": [
+    {
+      "id": "claim_f4a3bd4f1e3d4c598846ae0ca46671a9",
+      "statement": "main() 的装配链是：application.New 注册 LoadoutService 与 EditService、以 AssetFileServerFS 提供 go:embed all:frontend/dist 的前端资产、Windows 选项设 DisableQuitOnLastWindowClosed=true 与 WndProcInterceptor=handleWndMsg，随后建窗口、装托盘、app.Run()。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L10-L11",
+          "version": "repo-lines-v1:sha256:9ca98eedf6962419541a944e02df659284131d98633636053071f57ff3625cd7:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzI4YjE4MDQzNzZiMWNjZmNjNTdmMGRhYTk5ZWI2YmYzNGEyNDkwNmZmNWUyYmM2ZDQxMTcxMmYyNTNjNDI3OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjhiNmRjMTYyNjE0NGJiM2FhNDNmNzM0ZGEzMDY2OTRkNGNjMWI0Mjk2YWVjOGE3OGY3Nzc1NzI4ZDg5MzA4YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmVjOTk3NTk0NDliYjgxNWMxMjc4NjUzMmNiNmIzY2I1MTAxYjY2MTk4ZDFjNDk2NDNlNjhlYmRmNDczMzFlOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTM1NDE2NDAwNmJkYWVlZDZjOWJhYWFkMmM4YzhmMmE0NzkwNWI1NGY4ZjVhOWU0YjJlZGIxMzk0Mzk2YmZiNiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L54-L74",
+          "version": "repo-lines-v1:sha256:94cd77b30642b894de5a0d856c800ca02cbfa755b8485fd7279b11a03046cf55:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFmYzExZDdlZWZhNDMwMzYxNWI4NDY0Mjg0YmQxMjc4NzhmOWU1ZmIwOWNiZTVkMjFkYjhmZjhkY2IwMzI0MzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3YTliNWU5MDE5YzhkYjg3ODNlYzljM2ZlYmIwYTJjOTg2MmY2MWEwNWMzMDhmZTg5NWU0YTliZWQwM2VkYjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyMDIyZjk4ODdhZjY1MzNmNmUzMTg3NzQ5MTRlNTRiNTZjZmVkODBmY2YwYTRkOTJiNjA1YTRiY2M3OWI5NzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRiNjkyMzRhYTNmOGZmNjE0MTA0ODY5OTcwNGYwN2QzYTlkYjFjNmI1YTYzZjc2ZDc2Y2RhYjkyODY0ZmI5YWYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L98-L111",
+          "version": "repo-lines-v1:sha256:11341d0610915b5ffacfcb0e33b585b3176d079b37b06bf94433041c614f90a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2MDA5OGY3ZGEzODM1YmZlNjI2NzdmOTdiNjA5YzE4YmY1MDM3N2NjOWVjMDkwMTQzZTM4YmMzNWQ5ZjY5ZWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZjMjA5OGI5YTYwMmI3Y2U0MzUzNzhlNjkzYTg2YjUxZjk0Y2MwNTUzYzQwNDZhNmRiYzBkNjJkYzMxMTMzMmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bc33fb8d2d2e42549cb82fc919197eaa",
+      "statement": "窗口尺寸按整扇外框（含标题栏）的 DIP 计：初值 888+16 × 840，下限 760+16 × 560；最小宽度取的是较窄那页需要的 760 而不是因子编辑页的 888，因为把下限钉在 888 上窗口就再也缩不动，而低于 888 时那页横向滚动而不是把列切掉。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L76-L88",
+          "version": "repo-lines-v1:sha256:d6aacdac5ba0d7871fec87b57688cb1bab5dfb69b838a649f182d295d2f25660:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMxMzdhYjhiZjI1OGVkMzBkMWMxOGRhZWMzYzI2MjQ2NjhkNGYyMjM0ODk3ZTRlNWJhZDNkMGQyZGU0Mzg5ZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3YTliNWU5MDE5YzhkYjg3ODNlYzljM2ZlYmIwYTJjOTg2MmY2MWEwNWMzMDhmZTg5NWU0YTliZWQwM2VkYjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmMTU5Yzk2ZWIwMzUwNjQ0ZTMyOThjNGM0NzgwMDVmNDg0NzJlZmY4NDFmZjNiMTM2N2YwYzMzZmU5ZTRkZTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiMWM2ODM0NGFhZGZmNjYyODU3ZTU1YmQyYjdjMWI5N2IyYjE3YmMzNjkxOTMzNGVhMWIyZDRlZTE1OTNlNmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cb41e57853994f7c8c1d5e83af2cf3b7",
+      "statement": "app.OnShutdown 依次注册 editService.flushNow、loadoutService.flushNow 与置位 quitting 的钩子；置位必须早于框架 cleanup() 里的 window.Close()，否则关机时那记 WM_CLOSE 会被状态机当成用户点 X 而改成假隐藏。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L89-L96",
+          "version": "repo-lines-v1:sha256:4d49bfc7eb947c7562955a5c2fa4064c2d0c55ee38c0899c8f73c4bd8891ea58:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTk1MzczYjhkMmJhMzM1NjUxYWJkOGEzMTIwMGFlOTgyNmRlNGUyYTcyMDA5MjI1NTVhMDA2NDRmYmQ1ZTZjMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWNlYzA4ZmU5YjFmMWE1YWFiYzVmYzM0NmIyMzI4YmMxYjcwYjYwZTIwODhiMzUyMzkzN2QxOTJkZjViMmNjNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzkzOGIzMjU2NGVmNTcxNGFhMWQ3NzBmMmJkNDYxMDkzNTg1MmE4YTIzZjQ1MmI4OTU5MDdiZGJlMDNjYWQyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjlkNGU4M2YzOWQyZjEwOGVlNTM0NGI1MmI1MWIwYzI4ZDVjZWMxMzE2YjBjOTI3NWRlYTRkNDkwZmM1OWE0YiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L96-L103",
+          "version": "repo-lines-v1:sha256:61e85d686653f6d6673f3655f32307bececedbe8baa12f514065714ba2dc4010:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmZkN2Y0NDFmMzMyOGI1MTk5NWFiNjJjNzRiNzBkOGJiYjI3ODE5YWVkNWYyZTUyNzAxMGJmOGVmZWRiOTQzMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmE2YmM5Y2QyZjZiODMzMWEyYmQwNzhjNGU0NzhkMzA3Y2QwNWM3NWIzNTMzZThjMmRjZWU5NjE5NWIxMjVhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWM4NGIzNzU1ODA0ODVlNzAzNGYzMGZmMDJjYzAwZTdiZDY2OTNmNzgyMTUwM2MzYzllY2IyMjY1YzY0NDM0MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWNmODY4YmU1Mjg0M2NkOTVjZGIzMzczNWI1OWJkZThjNzA2ZmVmZDdjNjY3ZmE5MGJmZjlkN2VmNjFjZDI2YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_34cf66df8da7444a929be8458edaf64e",
+      "statement": "退出唯一路径是 app.Quit()（托盘菜单 Exit）→ OnShutdown → 框架 cleanup() → window.Close() → WM_CLOSE；正因为 DisableQuitOnLastWindowClosed=true 让关掉最后一扇窗口不等于退出进程，WM_CLOSE 才可以被改写成假隐藏。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L104-L106",
+          "version": "repo-lines-v1:sha256:7cc9da0aa3d667cbdc0ed136341cc3f43fc11b4bb939b2c6512a37475fd0dcb6:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQwYjViZThjYTcxMzIwNGZkOWY3Y2JhNGI4NTM1YjE1ZmYzMTRmNWU3ZjNmZjUwMGE5NGI3ZTAxMGRiZGIxOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzIzYTkxN2U5ZmI1MzY3NTljODc0ZGNiMjEyZWYzMjRmNzRhMjY5YWM0NTk2NDNlMDcxZDg5NjQzNGYxNmM5OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzIzYTkxMzcyNTc0YzE1ODlmNzkwMTFiYTIwMDNhMzE2NjVmMTRiZmYwYjg4NzQzMzIzNjljYzk1YzAyYTdiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjQ5YmE1Y2E1YjRlOWZkOTE5Y2VmMzMyMGM4OTBiOTg0ZGFiYjMyMmNlYjA1MDkwMDJlYzFmZDU3Y2RkOTM0ZiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L68-L74",
+          "version": "repo-lines-v1:sha256:c2ab4280d4adb56669d46951a809e96c443057a55ce522cdc050c6f503fe2a4a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2NmMzY3ZjgwYTM1YzZmOGI3YjRjNjE1OGY1NmQyYzRmYTc2YTJkNTgyMGM0NzI0ZWI4NzRhMWRjMjZjZDEwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzdhOWI1ZTkwMTljOGRiODc4M2VjOWMzZmViYjBhMmM5ODYyZjYxYTA1YzMwOGZlODk1ZTRhOWJlZDAzZWRiMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWFjNDdkYzRkMmUxMWI4ZTMyNTA1MGYwMGZjMjRlZTQ1ODZiNjFiMGE2MmM4MGJlN2M4YTcxMTU3YzVhNGI1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGI2OTIzNGFhM2Y4ZmY2MTQxMDQ4Njk5NzA0ZjA3ZDNhOWRiMWM2YjVhNjNmNzZkNzZjZGFiOTI4NjRmYjlhZiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L17-L19",
+          "version": "repo-lines-v1:sha256:9d48dd9909b037ed723aef3b4ffb30270ef088f461276529d7f8c034da0a8412:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ2NDgxMDU4YjExNGYxYjRkYjRiMDkyZmI5ODU3MTQ3ZDFiMjZhMmZlMWVlMTg1ZTYwYzEzNDA4NGNmN2U4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFlMmM4NmFlNTA3YTUzNmRiZGQ5MmQyYzNiZDUyYzk1ZTcxMjRhMGRlMzljMzE1YTdiY2M3MmMzZjgyYWNiOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmMzMDM5NzRiMGJlMzM3Nzk1MjZmMTkwZTczN2M4MzZmMTUzZDhmYWNmY2Q4NmNhMjJjMDZkYzBiNjYyYmMyYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDc1ZWU0NTc1NmUyNWI4YTRkMWU4MWExMmNiMGJiYjRlODdkZDMzMDAyN2ZiMTQwMWFiZTMyMGNkMjc1Y2U0NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fbe231d8eb93409bb163a58b6eee48b5",
+      "statement": "托盘由 app.SystemTray.New() 装配：SetIcon(trayIconBytes)、SetTooltip(toolWindowTitle)、AttachWindow(win)，左键在 goroutine 里走 trayOnClick()，菜单只有 Exit→app.Quit()；刻意不在 app.Run() 之前调 tray.Show()，因为那时 SystemTray 的 impl 还是 nil、Show() 会立刻返回。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L98-L107",
+          "version": "repo-lines-v1:sha256:a25bf05d48e5df9fdd1fbbf65aecca19ba29bfd7d67e8e071287a8d8116cb5fe:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2MDA5OGY3ZGEzODM1YmZlNjI2NzdmOTdiNjA5YzE4YmY1MDM3N2NjOWVjMDkwMTQzZTM4YmMzNWQ5ZjY5ZWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlNDM2NmVjNzEyZTJjMzhiMjQ0MjRjYTk1ZjIwMzQxOTYxYzVmMWQwZWRkODVkNThlMTM0ZmUyZDM2MzU1YjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZjMjA5OGI5YTYwMmI3Y2U0MzUzNzhlNjkzYTg2YjUxZjk0Y2MwNTUzYzQwNDZhNmRiYzBkNjJkYzMxMTMzMmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVkYjZhYTFkZmJmZWRlMmM3M2M3OWIyYjg0OTk3Nzk3ZWY0YTc5MjMwM2IwOGUzZWNjMmY5NmM2NDkxYjU4YTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9936acbcf133413faf21b95635aa59f6",
+      "statement": "trayOnClick 只在窗口不是前台或正假隐藏时才 post 0x8010，之后无条件 SetForegroundWindow，并整段带 recover 兜住 panic（它跑在一个无人接管的 goroutine 里）。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/tray.go#L7-L21",
+          "version": "repo-lines-v1:sha256:7a926b151ad7119149ee8572b112fd77eae204c39f20cc495b7d4dcfb76ac3a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRlN2E1NjU1MDY3MDJkNGMxMTQxNDY0ODRlYThjMWY4MDg4NWU1ZTkwNDcxYTM0ZjIxNjBiNjA3NWRjODQ4MDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU2MTdmYzYyN2NhYzQ0MTY4MzI4YmU5MWRjODU2YzNlZDlkZGRiZjVhM2YxYWE4NTQ3NTU3NWVlNTdkMzU3MzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ed3ebdcede1646edaf814fca756fc942",
+      "statement": "单实例判据只用 CreateMutexW 对命名互斥体 Local\\GBFRSigilLoadout 返回的 ERROR_ALREADY_EXISTS：不 WaitForSingleObject、不 CloseHandle（命名对象活到进程退出，正是该判据需要的时间窗）；CreateMutexW 返回 0 时只记一行日志然后无锁继续。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/startup.go#L13-L25",
+          "version": "repo-lines-v1:sha256:65f4098f42dbc95f8287c248b5be38fa3f16af513fcea52d7f37c626fab9c125:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwNDY5Zjc3MWU3MDY4MDcyNDFkOWE5NGIyMzBiMmMzYjc4MzI0ZTc5ZDczMjc2NzBhNWU5MDBkZWNiN2JmOWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2NmEzNDI0MWRmZDdkZTIyMzg2NTY3ZDE1ZWUxN2RlZWIyZmY5NGY0YjExMzQwMWVhNzY1MzJkMmEwZDk1N2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIxOTU4OTIzNGZlNTk2NjgzNTIxNDMyMGFiMTliODUxZWU3MjNjZGJmZTc0ZWQ0YjY2NDFlODVjOTVkNTAzMzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2OTNkM2FiYTZlNDQ5ODBjMzdkMTU2NTExMTVmOWNiYTExMzIzZDQzMTJiYWYwM2Y5ODE3MDg1YzVlNmJlY2YifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/win32.go#L15-L15",
+          "version": "repo-lines-v1:sha256:a265e288655c2ad171f82ef82adf8d8bb2156cb0e0e44043cd28019baf885513:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTI2NWUyODg2NTVjMmFkMTcxZjgyZWY4MmFkZjhkOGJiMjE1NmNiMGUwZTQ0MDQzY2QyODAxOWJhZjg4NTUxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTI2NWUyODg2NTVjMmFkMTcxZjgyZWY4MmFkZjhkOGJiMjE1NmNiMGUwZTQ0MDQzY2QyODAxOWJhZjg4NTUxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTUzNTMwZGVlZmViNDcyZGM1YTg2ZDQyMDFhNmZjY2EyNzc4ZTZlOWVhYzNmNTg1MWI3YjUwY2JhYmU2ZDMzZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTcwNjE5ZTUwYWVkODU3NDBiOGZiNDBjNTE5Mjk2MTNiZGYzNGY1ODMxMTdkZDhjYmQ2ZDBlMTViNzFhYWEzMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a6de031b442946e38ab19cef14d71f91",
+      "statement": "第二次启动不初始化任何东西：按窗口标题 FindWindowW 找到已有窗口后 ShowWindow(SW_SHOW)+PostMessage(0x8010)+SetForegroundWindow 并 os.Exit(0)；它 post 的是激活而非开关，且因为排在 loadAssets() 之前，坏安装不会在第二次启动时弹框。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L46-L52",
+          "version": "repo-lines-v1:sha256:c09ed863daea7ba6b4f68b1b5c2224e90dd857d030480becffa2f8af943499a7:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE1ZDY0Zjk3MWIyNGY3MDFkMzRjNzdmMTI1YWQ5M2Q3MGI3YjQwYTAyYzAyMzZiMDQ1MzkzZTI0YmY2YjVmZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjZGE4MmRhNjA2MjM4ZTA1ZTYyMzk5NTY5YzVlZTAzOTkzNDE5NjQ4YWU1ZDQzYTJiZjhjZDYzNDdmODI2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDczOTRlYTE3OTBhNWJhMDE0OTI0M2IwOWE0MDFjMjJhZTNiOGU4ODdmYjAzZDliYmI1NWI5OGI0NGIwMzE0NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNlZDczNjRkNDI1NGY4YWUyNDY0NTYxZTkzMGQxN2I5ZWNkMTRiNzc1N2JjM2JjNmQ2ZmI3YmU1ODNiMTBiZCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/startup.go#L26-L37",
+          "version": "repo-lines-v1:sha256:496f9d03ab12612241444e9c01042e32092f481b1c87122f227928b39b4314ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlOTMyMTNlZjY2MmI1OWI3MWFmMTY2ZjMwNGJiYmE4NTA2NjM3ZTdjNjI0ZTIxNmRkZjgyMmIyZDQ0N2M5OTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFlMmE4NzY5YmI3ZGIzNjFlZDFmM2JkODlkNGE3MWYwYmVlMWMyODFhNzcyZTBjOTI4Mjg0YWJjZGVlMzJhYmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d4447986b7c446e9a2688a20c50915f1",
+      "statement": "fatalDialog 是坏安装的唯一出口：-H windowsgui 没有控制台，所以用 MessageBoxW(MB_ICONERROR) 说清随包数据缺在哪并 os.Exit(1)，触发点是 main() 里 loadAssets() 的失败。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L49-L52",
+          "version": "repo-lines-v1:sha256:318c43413f73e411c0df44366852ea80c4761555f1ee05c60e3446459f879be5:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGY3ODhmMTYzZWZlN2Y1OGUyNTIwMjI4OTAwZThlNDAwODhiOWYxZWExZmU0YzMzY2FkZjNiNTY0YTQ0NDc4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjZGE4MmRhNjA2MjM4ZTA1ZTYyMzk5NTY5YzVlZTAzOTkzNDE5NjQ4YWU1ZDQzYTJiZjhjZDYzNDdmODI2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2E1ZmJmNGFlZjkzZjNmNWFiMTQ3MDg5MGNjZDMzNzYxYjQzZDc0YjNlYjcxODdkOTAyNmQwYmU4OWFhY2RiMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNlZDczNjRkNDI1NGY4YWUyNDY0NTYxZTkzMGQxN2I5ZWNkMTRiNzc1N2JjM2JjNmQ2ZmI3YmU1ODNiMTBiZCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/startup.go#L39-L50",
+          "version": "repo-lines-v1:sha256:60ff1e1159eda21b24feb8dc29df3150de45fc1d2fe310459e030758010591cd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllZWYwY2U1OWRiZTIxNGI1YjVlODRlMWU1NTE2ODFhMTMwMTU1NTIyNzEwNTNiNWRiNWRmMmViOWQxYTUzMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgzN2JlOTVkOGIwNDYwNzFiMTM4NGFkZGY3YzM2YzY0YTc5MzRkYWY4YzJhNzg2Mjc1Y2RiOWFiZDA1MmE5OTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_320807542b22468a800e9f1724f4cb5f",
+      "statement": "随包资产分两类读取：启动期由 loadAssets→loadAssetsFrom 把 sigils.lang.json、chara.lang.json、skill_status.json 与 skill.zh/en/ja/ko.json 一次装进内存（任意一份缺失都是启动失败）；sigils.json 与 sigils.chara.json 每次调用按需重读 exeDir()\\assets\\。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L100-L124",
+          "version": "repo-lines-v1:sha256:d54c5837dcdd403a5544f062fce50739a8226c344509e1817608dc9316d8d70d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2Mzg4MTM4MjEwNmE2ZDUxNjdlOTc1ZWZmNGRjNWY4YjdkMDM5M2U3MDM5M2Q4OGVmZDFlZmM0ZGU5MGM2MzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE3Y2M5NzkxMTA3MWZmNTAyNjdkM2NmMGIxNDc0MjkyODJhN2Q5NjU2ZTAzMjI5N2I0ZThmNzE0YzU0NTQ1MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFjYTU4ZDQ4ODA4YTEzMWQ1NWQ4MzFjMTgwZjcwYmI1Y2FjZTg1NTk0NzA0MDFkMzllNzkzMDZkODhlOWFmMmYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L126-L162",
+          "version": "repo-lines-v1:sha256:c3d4e94fbd3138585a4f1990042b874f725490c2e02e6cdd6fe26918bca1bcaa:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1Mzk4Mzc5MmEzMzhmNjY5MjUzNDNmNmJiZTRjMGVlNWQwZmMzYzkxMGI5MWNmOTkyMWI1ZTY3MDQ3MmMxMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE2MzFiNmUyY2EwN2Q4YmFmMGViNDRlNzQ5ZGJmNDkwYjM5MmUzYTUzNGVmNjEwMjI3NzExNDZjZGY5YWYxYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwN2YyNmQxZTMxMmYwOGM4NGQwY2UzNGE3MWNkYjAzYzg1ZGViYjQ5MmQyYjBmMTdmNzNmY2NjOWY0YjJiZDMifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L44-L50",
+          "version": "repo-lines-v1:sha256:3d562215b928f470277bcdb0386b49f3b8ac29aaae8e939473421b1a2de0ac16:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTA0ZDMyNjI5NDNiNDQzODUxYzY4NmE0ODczZDE2OTJlZWE2OGM0NmY1MWE1NGEyMmYzMmRmMzEyMzdjZmEyNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzc3YWU1YTg1MTZkYmQ0Y2Y2YTUzNWY5YzU5Mzk0OTJkYmQzZThhY2YxNjIwYjQwMWEwY2NjZWI5OGE4ODEyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGUyM2UwZmExMWFkODI3YjM4ZTJjOGM3YTE5MzRhM2NjODUyNTk1ZDQzMTI2NTAyODc0ZTAzYzM1YTI0YTg1MyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_572d9e4faccc4d6eb373881b2f424648",
+      "statement": "loadAssetsFrom(dir) 的目录参数是测试缝：assets_test.go 的 TestMain 用它装源码树的 assets/（测试进程的 exeDir() 是 go test 的临时目录），并把整个测试进程的 LOCALAPPDATA 指向临时目录，否则防抖那记定时器会落到真实的用户配置目录。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/assets_test.go#L9-L28",
+          "version": "repo-lines-v1:sha256:2b72d919306615e86ad9443660382d171469b56e41a77690b75d862efb83f7bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4ZmU3NDI3NmI5YzkzZmJhZmI2MDFhYzM0ZWZmOTBlNTk0OWE2ZjkwOGEwOWZjMzM2YzlmMWQ3Y2U2MzcyYTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiYjA4YzVhZjUzMGE1NTZkNzdmNzZhZTY3NDI5ZDU0YjU2NWM0NzgzZmIzZWQ0YzNjNjI0OWMwZmEwNDU4Y2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMzZTljYzQ5MGMxMDE3OTYwOGZiMGI1MmViMjZkMDM2NGRiYjM3Zjg0YzMxYjQ1MDhmMzZlNjg3Zjk4YjhiZWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2ef39f4d5c4b4d21be781f506a51d3bc",
+      "statement": "窗口标题 toolWindowTitle 与 wmActivate(0x8010)、wmToggle(0x8012) 是跨层协议常量：托管侧按同一字符串 FindWindow 找窗口并 post 这两个值，SigilLoadout/sharedconstants_test.go 负责对拍；0x8011 只在工具进程内 post，没有第二处声明，因此不在对拍名单里。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L42-L44",
+          "version": "repo-lines-v1:sha256:2a731a82cea0d21b93fcef99202a6dfaab3154c4217c000f9f633dd5a1844d04:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjBlYjEyMTZmMzdmN2MwNjQ5MGI4YTFhNjY2NTUzN2EwMjdlMDY5NDQyY2NjZTYzNjA2M2E3Y2E3ODAwYmJkZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGYwMDc1OTM2MmFmMTEyM2I3NDBjNzc1NmY3YWU1ZDg1ZGEwYTA3ZDA2Mzk1MzgwZWE5ZGRkNWUxMTBlMWIxOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjhmYWMwYWI5ZTQ5NjU3NTUyMmU2ZTQ4NDBmYzA5OGE4ODUyNTMzMTQ0ODdkYThjMWQ2Nzk4ZmJjZjMwM2M4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmM1ZWNkNjZkMDBkZTNhMTI1MWFmOGI0NGU0ZDFjMmYyMjMyNGQ0NWU5NThlZmQ2MTcxZmIzMzU2ODEwMDYyOCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L109-L129",
+          "version": "repo-lines-v1:sha256:a73ac4de1f25ea397089a2890f05ead6c0c2f4b1c2985b50000d1f86171ec0d6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5YmJhMDVmODQxZTk5NDJlMDVlOWZhNjQ1NzdhNWVkZmIyMDZmNTFkNzBkNGZlZGEwNmUxNWM0ZGYxODJiYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEzYjk4ZjljNzY0ZjYwZjFiOTNiNjk3YzU1ZjhlYmEwZjk1OTBjNjliMmU0NDA2OWIwNGI3YTQyZmRiYWZlZTIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/win32.go#L17-L25",
+          "version": "repo-lines-v1:sha256:d75e84f2dd2253656c7b2b69dfc04d4f717a8d424328d70458b0af7380c563e9:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjFhODBmZmYyMDM1M2U4OTZjYmZhMDNkOWY4NDUxZTE4YjIxMDk0OWQyYWUzZDQ0MGUyZmVmMWM4OWMwZjU3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjc5M2RkM2IyMmJmNDJmNWFhM2M0YWQ5ZmFmNWRiNWZhMzE5ZWJhYzhkODgxOTg4ZWQ1M2VhZDM0YTE3M2MyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjljZmM0MmE3M2MxNmE4M2U4MGJhNWQ4ZjQ5NGQ5YmQ4YzQ2NjA2YjlhYWY3ZGE0OWZkOWQ4Mjk5YjA2YjVmOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_197bb3034f3749da974196791b906e8b",
+      "statement": "win32.go 只放 Win32 依赖（DLL/proc 声明、EX 样式与消息常量、薄包装 findToolWindow/foregroundWindow/isGameWindow/nextForegroundWindow/debugf）且不持有状态机语义；windowstate.go 是状态机的唯一所有者，持有 toolHidden/returnFocusTo/quitting 并实现 fakeHide/hideNow/revealTool/hideToTray/handleWndMsg。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/win32.go#L13-L13",
+          "version": "repo-lines-v1:sha256:43d9de950361311ca6608058bbad097aae9db04c2b7d12bf8d4a9307e38f0d41:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDNkOWRlOTUwMzYxMzExY2E2NjA4MDU4YmJhZDA5N2FhZTlkYjA0YzJiN2QxMmJmOGQ0YTkzMDdlMzhmMGQ0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDNkOWRlOTUwMzYxMzExY2E2NjA4MDU4YmJhZDA5N2FhZTlkYjA0YzJiN2QxMmJmOGQ0YTkzMDdlMzhmMGQ0MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGMxNjViNDg4YmRiYzQxMmVlYWRlZWE3Nzg0YTQ5MzFjZWI4Yjc3MzI1OWE1Mjc0Y2Q0YmUxNDMxM2JmOGFmMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc5M2RkM2IyMmJmNDJmNWFhM2M0YWQ5ZmFmNWRiNWZhMzE5ZWJhYzhkODgxOTg4ZWQ1M2VhZDM0YTE3M2MyZSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L8-L8",
+          "version": "repo-lines-v1:sha256:bd5bcc021aa18582b41e916745ee3eb29486052d6fc904f0712728517ebeeeaf:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmQ1YmNjMDIxYWExODU4MmI0MWU5MTY3NDVlZTNlYjI5NDg2MDUyZDZmYzkwNGYwNzEyNzI4NTE3ZWJlZWVhZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmQ1YmNjMDIxYWExODU4MmI0MWU5MTY3NDVlZTNlYjI5NDg2MDUyZDZmYzkwNGYwNzEyNzI4NTE3ZWJlZWVhZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzllZGQ3MmJhNmI0MDA4M2NlOTUyNjlmYTU2ZmNmM2FjMWJkOTgyMjFhYTY2MjFhNjgzZjdkNTYzMmJiMjFkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzIzYWNhZGFjYzFkMzJjOGIzMzVhNjExNmRmODg5MmQyZGI4NDdhZTBlODI0NDkyYWU2MjgxMDNlZjEyMjAwNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_97da3b086bc34ae7b3f73dfd18b5dfd0",
+      "statement": "假隐藏不隐藏窗口外框：加 WS_EX_LAYERED|WS_EX_TOOLWINDOW|WS_EX_TRANSPARENT 并清掉 WS_EX_APPWINDOW，整窗 alpha 置 0，EnableWindow(FALSE) 禁用输入；WebView 继续渲染所以再显出时不白闪，代价是 IsWindowVisible 再也分不出可见与假隐藏，判断只能读 toolHidden。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L10-L10",
+          "version": "repo-lines-v1:sha256:82c98ca04d672cfa02626666100056c9525b36b93d5c2503c67d3d4b61a8ad2b:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODJjOThjYTA0ZDY3MmNmYTAyNjI2NjY2MTAwMDU2Yzk1MjViMzZiOTNkNWMyNTAzYzY3ZDNkNGI2MWE4YWQyYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODJjOThjYTA0ZDY3MmNmYTAyNjI2NjY2MTAwMDU2Yzk1MjViMzZiOTNkNWMyNTAzYzY3ZDNkNGI2MWE4YWQyYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjY1M2NmYjM0ZjQ1NjRkMzY1ZWU3MGYzMzkyZGYxOTExMTY4YmJmMWMwZmZjN2E5ZTVhYjM0OWM4ZGJmOGZlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2FlYzFjOTdkNWI2YmExMDE3NDE3YmZlYmY3ODk0ZWNiOGI4ZTMzZDI0ZTJiMTJlZmFhNWE5MTg1YWU1YzMyZSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L24-L35",
+          "version": "repo-lines-v1:sha256:7a32366f70765231af2904fb3aed14c196cc3d603da728c097817cee24c2f1f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ2MDE0NjFhMTU2NGNhZTY1ODI3NDg0MzBkYzViY2JjNjU4ODk5N2U0MDlmNDA4YzU0Mjk2YTU3M2FlYzM4NzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2OTY0YTE0MGY4NzY0ZjNiYWFlMWE4ODE3ODg0OGEyMjFmZGVhMzk5MWE2ZGZhMDU1OTcwYzExNjViNmZkNTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU3ZWZjNDE1MGNjY2VlODFhOGM5MmIzYmFhMjNlMjk2ZTUxYTEyOGNmNThjN2VlZGVkMWRjOTJhZThlMjU1ZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiOWFlYWFmMGU0NDEwOTU4ODI2YzhkNjkwYzYzOTY2MTNhNzcyZTYzYjNkOWE4ZTdkM2NhZTFhN2QyYjMyM2MifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L66-L69",
+          "version": "repo-lines-v1:sha256:b9eb6f82fe197274570e80ab721d137a20852da95360da34a45a2026972140d8:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGVmZWE3NjBlOWQ2YjQyYjllOWRkMzQxYjJmZTQ2YjljN2UzOWYzOTZkZjc0MGZkYWJiMjk0NzA2MzI5YmM4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmVlMWFmYWZmY2FjZWM0NjEyMGY5ZjM0NmMyMmI2MjNhYzU3ZmVhODIxN2Y4MjkwMDNkMmU5NGYzMzhlYTYyMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODU0M2ExNmFhMzkyMWUxNjczZGY0NWZjMDNmMmVlN2M0OWM0ZWMzZmE3ZWMwZjY1NWIwOWE3NjAxNzQ5ZDA3NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f5357f44c57c45bea74f07693e27a2d4",
+      "statement": "fakeHide 只把 0x8011 post 到窗口自己的 UI 线程（真正的动作在 hideNow 里），因为 SetForegroundWindow 等的是窗口自身线程而它正阻塞在这个调用里；工具内部的入口是 MinimiseApp→hideToTray。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L24-L28",
+          "version": "repo-lines-v1:sha256:6f5cdad241ac17347544faf2239b8a28053a77f7d1b8aeb63fbb5e9289f6ca9c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiNjVmZGY3MWJjM2RkZjVkYTdhZGVmMTZmY2FhOTI4ZTIzNmUzZjhmODg3NjNkYTU1ODcwOGYzMjA3YTIyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTE1MzM3ZTMyMzk4ZjkzMTBkYThjMjNlNGQ4NTI3OWMxNTNkYjYwYjI1NzQyM2M3MDI4NzU0NWJhMTEyY2UzOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmMxYTY4YTVjODkxOWUyMDA3MTdmZTVmYzAyNjg2ZWM4ZGI2NjYwZjIzOTBmNGE3YWZlYThhN2RkZWJhOWNjMSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/win32.go#L17-L17",
+          "version": "repo-lines-v1:sha256:21a80fff20353e896cbfa03d9f8451e18b210949d2ae3d440e2fef1c89c0f57a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjFhODBmZmYyMDM1M2U4OTZjYmZhMDNkOWY4NDUxZTE4YjIxMDk0OWQyYWUzZDQ0MGUyZmVmMWM4OWMwZjU3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjFhODBmZmYyMDM1M2U4OTZjYmZhMDNkOWY4NDUxZTE4YjIxMDk0OWQyYWUzZDQ0MGUyZmVmMWM4OWMwZjU3YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjc5M2RkM2IyMmJmNDJmNWFhM2M0YWQ5ZmFmNWRiNWZhMzE5ZWJhYzhkODgxOTg4ZWQ1M2VhZDM0YTE3M2MyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZThkN2FkOGEzNTE1MmNkMmMwZTVjYmVjZjM1Nzc3NGNlYjFhODM0MTE0ZTQ1OTUzNzFmZDZjZGE3MWJlNjhjMiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L24-L27",
+          "version": "repo-lines-v1:sha256:2929fe833e1ea0f0e8b1cb4535ded2f4f9c36e4aedfb9268561f4597eaa26594:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDYwMTQ2MWExNTY0Y2FlNjU4Mjc0ODQzMGRjNWJjYmM2NTg4OTk3ZTQwOWY0MDhjNTQyOTZhNTczYWVjMzg3NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTdlZmM0MTUwY2NjZWU4MWE4YzkyYjNiYWEyM2UyOTZlNTFhMTI4Y2Y1OGM3ZWVkZWQxZGM5MmFlOGUyNTVkZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDY4ZWJmNmE0MjkwNGZlYTVhZDIxOTBlNDE5M2NhM2Y1N2NmMTMwNDk1ZTZlZjdiY2Y0ZGJkM2YzNzM3Y2U1OSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L83-L87",
+          "version": "repo-lines-v1:sha256:552eb1769453797c11064ca09b687021e5420e0056963507fc1d3054b826dd4d:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzY0ZDk1NzIxMzIyZGYzMjMzZTdmOWM0ZmVlM2I3YmU1ZTEwNzI0NzBmM2Q3MzhhM2RiMDJlOWZhNTAxZjA3ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjkxMmZiYzQyYTBhYWZlNDcxY2RhMWI0Njk2ZGY0ZDNiZDc0ZmNjNDllOTVjNDQwYzZhZmE4YWY5ZDNhYzMxYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTM4NWU5MDNmZWM1NDVmZjNjZGY0NzcwYzljMmE1MzdhNTk1MTRjZjZlNzk3OTJhMDUyYjU3MGY4NjBhMWMyMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_781b14643b794b16a336839d127b6a7b",
+      "statement": "焦点归还的顺序是不变量：先 returnFocusTo.Swap(0) 取走目标（为 0 时回落到 nextForegroundWindow 沿 Z 序找第一个可见/启用/带标题的顶层窗口，最多 16 步），再 SetForegroundWindow，最后才 EnableWindow(FALSE)——反过来就没有设置前台的权限了。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/win32.go#L88-L111",
+          "version": "repo-lines-v1:sha256:d41a3ef336241a3cd267d19b393e7b7ec8bce9ce987ec1f40a0853aab2462edb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5NDAyODA2NGQ0ZmIzZDcyZWZhZjgyYTVmYzYxYzI2ZTI0NWQxYzA5NDQyZTQ3Y2EzOGM4MzdlMjEwNWZjMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg1YzQwMmNlNDI3NTM5MGZiYTVmMDM5ZDExN2QzZjRiZTUyOGM1YzFkYWMxMDJiNTRjNDEyY2U3MmQ1YTcyZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkyZTZlMjA1MjAwMzY2ODRhNzZiOGI3ZTI1ZDBiMGVjY2I3ZWJmZWMzNjFmOTc4Y2Y4ZGIwZTM0N2RmYzU0MTYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L36-L48",
+          "version": "repo-lines-v1:sha256:d0c57e8c00bd0f799377125ade2ab6f5a0560942b7593deebf6a9e09e722e613:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlN2RhMTA0MzkxNmM1MWNjZDRhOTc4MmVjNTg0YjQxNDJmMmIxNDNmYTRjY2NhNTc4MjNkN2MyZjViMDgxZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkNjdhMWUzMDQ2MWVkZmQyNTlkNWUzMTlkZTFkOTc4MjQwYTRlMDQ5OTQyMWZmZTA2YzNhYmJiYjUwYjNjYzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkNmIwOWE4MDI3ZTAzNDA4MWRmMmYwMDU5YmFkZGNiMDA2OWRhNzJiNTVlYTk1ZWQ5ZTc1YWM3Mzg5ZmZjZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4N2UyMDcxNTBhNWI0YWE1YjAzMTIzMWMxMmEyNGI4ZjQ5M2UyY2M5MjE1ZDRhMjkyOGE0YjgyMzFkYzgwMzgifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L66-L66",
+          "version": "repo-lines-v1:sha256:4efea760e9d6b42b9e9dd341b2fe46b9c7e39f396df740fdabb294706329bc8d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGVmZWE3NjBlOWQ2YjQyYjllOWRkMzQxYjJmZTQ2YjljN2UzOWYzOTZkZjc0MGZkYWJiMjk0NzA2MzI5YmM4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGVmZWE3NjBlOWQ2YjQyYjllOWRkMzQxYjJmZTQ2YjljN2UzOWYzOTZkZjc0MGZkYWJiMjk0NzA2MzI5YmM4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmVlMWFmYWZmY2FjZWM0NjEyMGY5ZjM0NmMyMmI2MjNhYzU3ZmVhODIxN2Y4MjkwMDNkMmU5NGYzMzhlYTYyMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjc3N2RmODUzNGE5NTJhZmUwNTNjNTM2NjhiODI1YzAzZGI0ZmJhYTZiNTkzMjQ5MDkzNzNlZTVjZWM1MmYyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_07cd9fa08a9849be888a8a06539d0998",
+      "statement": "0x8010 与 0x8012 只在当时的前台窗口非 0 且不是工具自己时才覆盖 returnFocusTo，否则保留上一个目标；这正是「可见时按热键收起」仍能把焦点送回游戏的原因。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L107-L127",
+          "version": "repo-lines-v1:sha256:1608a39c92829b70ffe5fe33cb20f81fe4a47137407a6f08fd6738e9592ac403:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY4OTVmMzQ5ZTgyOTY0ZjczMjMwNmJhYmM4YTAyNzY0MjEwOTllNmNlOGE2NWNkMzllMjQxN2NjNzBlNjIwMDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0ZWZjNDk0MThkMjZkY2YxMjliMjJhNmFhMjExMDhjZWVjMzc2NzdhMzJkMDhlOWQ1ZmVlMzVkZGE2NmJiOWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjZjg2OGJlNTI4NDNjZDk1Y2RiMzM3MzViNTliZGU4YzcwNmZlZmQ3YzY2N2ZhOTBiZmY5ZDdlZjYxY2QyNmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxOWFlYTc1ODk0MjA2NmI3NDM3MTIzNmNlYjZhMzEzZGNjYzAzNTMzYmM0NDFjZGNiZDU0YThiM2I1NWI4ZWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6e11e54a4784345807269820204fb83",
+      "statement": "光标隐藏点击只在同时满足「被游戏召唤」与「目标窗口属于 granblue_fantasy_relink.exe」时重放：SetForegroundWindow 成功后异步 mouse_event 按下/抬起各一次（间隔 20ms）；isGameWindow 用 OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)+QueryFullProcessImageNameW 比对映像名，直接打开的工具从不注入。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/win32.go#L125-L147",
+          "version": "repo-lines-v1:sha256:e738e4d376c3f362f2f634b6120632d64427ba80689e09403749f1daffb941db:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2EyYTFlZWZmZmRlMzU1MWJmYTZkMTFhM2VjZjFhNjgzMGZhNjc4ZmZiYTgwNTYxNjU0OTQwNTUxYTc4ZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YmI3ZWNmY2E5Y2U2MGY0ZTBkODZkNzIxOTc0ZTFiODAyZTllYzJmNDE1MDQ1YTNiZTNlMmYyYmNlZWMxYTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L50-L61",
+          "version": "repo-lines-v1:sha256:33cacc2de39371746b443a67ac0836d4f3718768b1f673cc427a3ac526cf2a1b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5YTYwN2Q1NjA1YjRmNTkzOWY3MzI1ZDJhZDYxODlkMzM3YWE3NDQ2ZGNlNDZjYzM0ZGI4NTdmODVmN2U5MjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2ODA2ZjE1NWM1YWMxYWUyNzIyY2EwNmYyYWM5Y2FkY2I4ODFiOTEyM2NiNjI0YTNjMTA0NzViNDQ0OWRjMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ1NjMwMzUzNTM1ODIyMzc3YjRiODk1MzIzMmZiOTkyMzBjYzAyZmVjYTU0MzdjZGFiZDE2MmRlOTIyOTBmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJhYjc1MDRjMDQzYmRjYjM5YTU1Yjc5ZDNmYWM2ZjNjY2QwODZmZmFhMTAxMDViNTQ2NmFlNTNmNzM3MjE3OGQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8cc20bfbe5c346518cf73f018e6064ef",
+      "statement": "handleWndMsg 的消息映射：WM_CLOSE(0x0010) 在非退出流程下假隐藏并返回已处理，quitting 为真时交回默认处理；0x8010 记前台窗口→必要时 revealTool→Restore/Show/Focus；0x8012 记前台窗口后按 toolHidden 决定呼出或收起；win==nil 或其它消息一律未处理。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L89-L137",
+          "version": "repo-lines-v1:sha256:ae39f4b4bb4da72e071365a35e1711ed4707f0dcad6d2e1feb3ec07259a4e0d9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhYzYyYzkzMzViOWNlOTA0N2NiM2EzZDEyY2Q5Y2I5ZjIwYjQzMmVhYjljN2FiNzUxNGFkMDcwZDgxNTY1ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b77b2133ff8442e083839d857e1f6adc",
+      "statement": "toolHidden、returnFocusTo 与 quitting 都是原子量，因为窗口消息在 UI 线程上处理，而托盘点击在 go trayOnClick() 起的另一个 goroutine 上。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L103-L103",
+          "version": "repo-lines-v1:sha256:e86a11856bce496b5e57bfd09f6d0f855320f08d5e115cd420f93d453858a46e:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTg2YTExODU2YmNlNDk2YjVlNTdiZmQwOWY2ZDBmODU1MzIwZjA4ZDVlMTE1Y2Q0MjBmOTNkNDUzODU4YTQ2ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTg2YTExODU2YmNlNDk2YjVlNTdiZmQwOWY2ZDBmODU1MzIwZjA4ZDVlMTE1Y2Q0MjBmOTNkNDUzODU4YTQ2ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZmOWIwOGE2ZTc5ZGNlOTlhNWZmNGQxZThhMGI4ZGUyYzA2ZWM1OTBkNjlmMjBmYzQ1NTQzMWVkYzM5MGY3MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2NjOWRhMGFhM2Q2NjdjYmRjMGVkMTM2MzQxY2MzZjQzZmMxMWI0YmI5MzliMmM2NTEyYTM3NDc1ZmQwZGNiNiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L11-L19",
+          "version": "repo-lines-v1:sha256:3a7096149d711327f1db7fc6673fe8e3bf8f11eb071819821371612b3cc63cde:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTcwODUxYzI1YWI0MjI0MDNiNTU5MTdlY2NkMzcwOTkxZjIyZWNlZDc4ZjkxZTgxNGJhMGFiY2EwMTE0MzBiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFlMmM4NmFlNTA3YTUzNmRiZGQ5MmQyYzNiZDUyYzk1ZTcxMjRhMGRlMzljMzE1YTdiY2M3MmMzZjgyYWNiOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWJkZWM2YTI2MzNlOWJkYWIwZjFlZTM3MGI4NjUwNDljNzdlZmY5NjFlZThmZDQ4Y2JiMDU5YmQ3MGFhOWMyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDc1ZWU0NTc1NmUyNWI4YTRkMWU4MWExMmNiMGJiYjRlODdkZDMzMDAyN2ZiMTQwMWFiZTMyMGNkMjc1Y2U0NiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fbabf40dde2446748b7aba48e5659c41",
+      "statement": "可视工具是 %LOCALAPPDATA%\\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的写者，托管 mod 是读者并按 mtime 发现变更：写侧要求路径常量与 C# 侧对拍、原子替换、500ms 防抖；两个文件的形状、校验、1 MiB 上限与 mtime 语义归 concepts/config-file-contracts 页。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L163-L169",
+          "version": "repo-lines-v1:sha256:84ec9589ed03e25f432e9b6599e6c018981212dc92af18da923ba9f6f5a2dd14:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE0YzY3NTE1ZGM5YzNhMWJjNzVkZmU5MTVlMTc3ZDM1MGFiZTk5NTI1YTkxNTViMjk5ODViN2I3Zjc5MmExOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmZlZGIyYTliYjk5YzkwMWQ3NzY3NjQ5MmIzYWM5NGY3MjZiZDM0Nzk0ZTEyMmI5NWY2OGE0YzkxODNiMjRiNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWJkMDg1YjQ3NjRhZDlkZmUzMjkxNmQ0MzllZGJmMTQ4ZDY0ZTgwNzhmMzZjOWUzZDZkN2U1NGZiYjM3MmJkMCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L203-L230",
+          "version": "repo-lines-v1:sha256:fb475905478969dd4add2d8bb81ee235bb56675c356b833395ea988e3524b39a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjYTEzNWY5NjNkMGY3ZWM5MTY0YzRmODU3MTkzOTU0M2YzNTkyZjUyM2Q3ZjI3Y2FkNzQyZTBiNGM2NTg5MWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE2MzFiNmUyY2EwN2Q4YmFmMGViNDRlNzQ5ZGJmNDkwYjM5MmUzYTUzNGVmNjEwMjI3NzExNDZjZGY5YWYxYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5NjIwYzUzYWMwNzE0ZThjODBkZGU4N2Y2OWJhMGNjY2MzNDlmYTQ5MDM2NmJkMTVjYjZlNWE2NTI1ZjRiMjcifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L52-L82",
+          "version": "repo-lines-v1:sha256:58cc537d531974322effe1913bf0cc547ce99f11afc9c43d0394c987e6082976:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0ZTQwYWM4M2JlZTkxMzFiMmIzM2Y1NjI1NzVjNmQzMDYzNThhMjUyNTc1ZmQ2ZGViNjAwOWUzZWYyOGRhYTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzY2NmMjVmZmY2ZTQ4YzdmZjRiMzhjZmU1ZGRiYjlhN2FmZjk4ZmFhZjFkZTM4YzgzOTBjOGE1M2JjYTlmMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1ZjM5Y2IwMzBkYTFkZmEyZjgzNzE3MGI1NDI2YjdhYTM3NjI1Yjc2ODU0NzM2YWMxOTYwODZkNjA4YTk4NzgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_351f7785106648808da23b289db92e1e",
+      "statement": "前端自己不写盘：App.tsx 每次编辑把整份载荷交给 SaveLoadout（或编辑列表交给 SaveEdits），Go 侧以 500ms 防抖落盘并在退出时由 flushNow 兜住；定时器触发时的写入已经无法返回给调用方，于是改推 GBFR.SigilLoadout.SaveFailed 事件给前端显示。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/debouncedwrite.go#L53-L68",
+          "version": "repo-lines-v1:sha256:ea54c9f3cf99db74c116cd2774e73ab78727dbad7692ec33fd4ac74d7ffc3b6b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjMmNlYTA1N2E3MDA1MDU0MDhhYzE3NWI5OTcyMDcwZmRlMTlhZTFlYTkyOGE3M2MxZDlmNTMzY2NhNGFjYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0ODg1MGI5OGJhMmQ1YjIwYTBmNGNjNmUzNDVlMzFjMTdmNGYwNmZlZjM5OWFhMDYxNWVlODc1OTE0ODUwM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L34-L39",
+          "version": "repo-lines-v1:sha256:04376b91f565e7e321d1295e2b45084801fe7ba4793a27bb6ce61eee65954f19:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODNkYTY4ODE3Yzc4MDBiM2NlZGNmMjZlYzAyNjhlNzE4MTgyZjQ0Y2NjMDc1YTRhOWU0ODViNWNmODEwNDk5NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNkM2UzNTBkYTA2Y2FjZmIyMjg0MDhmYTQyNTlkYTlmYmU5ZmM0YWZjZGZhYWY2NGMzNDEzNzViNzYxNTM1YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGNiNzQzM2JjYzg3ZmZjYTgzN2M4ODI4ODNjY2RlM2UyOWIyOGYwNDE4ZWNjZWM2Y2VjYmFhMmEzNjYwZDAzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmFjYTVhYzRmYmNmYTY0YjIzOTQ4ZDVhNWQ1ZDI2OWUxOTY5NWQyMWZkYzUzNGFiOGE3YWNhODY0MGYyNTA1NiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L94-L130",
+          "version": "repo-lines-v1:sha256:68e411eef11f2ecbdc392cddc8f0be454338b4d9a7e6517852479ad6097b0d75:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJmNzcxYjNhNjFiYmMwZDVkYWE1YzgwMTE5NmFlYTdhNmU1MDdkNDZmYTA0ZDQ3YzQxNWUxNDc3MDhiMTRjYTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM0MGRkZmQ0NGE3NTQ4NjAzM2M3NzRlMmNmMWE1NDg5NzAyYWM0OTU2OGU2ZDM5YmM0NmZlOTUzMDI4MDI3MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkxNDZlN2FkOGNmOGEwMDljODJlMjI4MzI0NzI1MGJkOTEwYTI4NjBkODkzNzZlYjI3N2MzZDBkNGY2MmM5YmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a3da692d19204746a7999db7f9ceee95",
+      "statement": "Esc 收起路径：App.tsx 在捕获阶段听 keydown/keyup，keydown 时判断焦点是否落在浮层（combobox-content、role=dialog、role=alertdialog、.skill-rows input）并 preventDefault，keyup 且不在浮层时等 150ms 调 MinimiseApp()；推迟到 keyup 是为了不让这一记 keyup 落到已经拿到焦点的游戏窗口上。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L240-L279",
+          "version": "repo-lines-v1:sha256:6773b013479dec4af21767130273524c32b509568f7fb74a5034cdd55edec151:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlNzJhNzg2ZDg1ZTU2ZWRkNTdlODM2NTFmZjQ1NmYyMWY4OTJkNDI1ZDczZWM4NDdiNjM1YTU0N2U5NTE5MzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZjQyMGJkNGZiNzM1NTk3YjBmN2UxOGRhMWIyNjY1ZTM1ODM5ZDJjZDQ2ZDMwZjAxZmVkNzQzMmFkZGVlNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIxNzJkYWIxN2I0ZjRiMjFiNWRhNGRiY2MyZDQzZjRjOGZlOGQzZjRiZDI1NGU5ZmU1NmQ5ZTlkNmUzOWZmYjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiOGJhNDI3ZjBmMWJjYjc1NTJjY2U0ZGUwYzVmODgxZDNjOTY3N2NmNTEwNjg4ZmE3NjlkMTM1YzNkZGVjYzcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_51916086aa5b4c7ea44f6fe854b3fe3c",
+      "statement": "三个页签都 keepMounted，理由之一是因子编辑页的编辑状态活在组件里而后端落盘要等 500ms 防抖：切走就卸载会在防抖窗口内读到还没写下的旧文件，并可能把磁盘上的新值覆盖掉。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L34-L35",
+          "version": "repo-lines-v1:sha256:da0ed4d554c210681f00193d6f9ef356b0d3669b5734a8acf342c3eff5407683:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODNkYTY4ODE3Yzc4MDBiM2NlZGNmMjZlYzAyNjhlNzE4MTgyZjQ0Y2NjMDc1YTRhOWU0ODViNWNmODEwNDk5NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTdmMmFlMWVkYTVjMjM1MTg3YzgwYjE3MDNlYTliZjEzN2M2NDE5MmU3OTUxMWEzMDQxNjk5OGExMjViOGU2OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGNiNzQzM2JjYzg3ZmZjYTgzN2M4ODI4ODNjY2RlM2UyOWIyOGYwNDE4ZWNjZWM2Y2VjYmFhMmEzNjYwZDAzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQ5OTNmZjZmYTg0YTNiMTdjMGUzMTgwMzYzY2RiN2U0YTZjZjg2Y2YzZmFkNWU1YjI2MDQzMDlmMDQ1NzQwMyJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L387-L394",
+          "version": "repo-lines-v1:sha256:182b1f8fe4bdb32575073868a8419390e8c9783d5b543fa45431484d291732bc:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2NjMDVjZTEyODlkOWYyZTgxMmQzY2ZiOGYyMTMxNzJlZTQ5NzFhODM4ZDU5NzFmZWU5ZDQ5MGFkNDZhYTYxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjJkM2FlZmRlYTYyNjExNzcwN2E0ZWViNjUzNDJjZGNhMzg1ZGY1Y2JmMDM2NTczYTZhNmMyZjc3YjA4ZjE4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDdmODQ0NDM2YzdjZWM5MTcxNWMxYTAwYTdlNWMzNWI2YTlkYjVmNTM1Mjc0OGE2Njc3MTIyM2E1ZDU3NWUyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc2MjZlMmFjYTdkOTNhZjIzYjg5NWZjMGU4ZGE0Yzc5OGVhYjdjNDkwODNkZGJjNjk5OGQwNjFmZDAyYmE3YSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c8a5169321e0406a996d01d966919a47",
+      "statement": "两份图标资产的分工：托盘必须用 icon.ico（Wails 对 PNG 会把原图交给 CreateIconFromResourceEx，alpha 被处理坏），同一份 .ico 由 tools/build-release.ps1 经 wails3 generate syso 成为 exe 的链接期资源，所以托盘、标题栏与任务栏是同一张图；go:embed 的 icon.png 在 Windows 上不喂标题栏。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/main.go#L13-L28",
+          "version": "repo-lines-v1:sha256:64809de645c99e99c434b358cdacd6e3629b10a2137b1f3735e2d141539dfa2e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiOWJhMmNmZjQwNDc3NzYxZDQ4MDNhNWM0YzYwMThmOGI2NWNhYmQ4MjRhYzAwOGQxMzYwMWFiZDMxMTA2MWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0OGI2MjAzY2JiYzdjNmM3OTgzNjUyYTlmZmZhMDJjOTgwMjFhZjRhYjM4ZjQ5YzY5ZTYxM2YzOTZlMGI3MWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiMGFiYzVjMDRmNjRhYjUzN2RmMmMwYzU1MGUzMmVmY2FiOTU2N2IzYjczNzM5N2JiOGI4YzUxYTM3YzRiNmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjZGVkNWQxMzlhMWNhMWZkYmQ2ZmZlMTM0OWQ1MzU4MDBiZjI3YmY0OTUxYWZiOWI5MTAzYjY2MTFhMjRkMzEifQ"
+        },
+        {
+          "resource": "repo://tools/build-release.ps1#L163-L177",
+          "version": "repo-lines-v1:sha256:5d7c1ce12d163d475ef391d354eaa65296b170a4e9923fab8bc1b3bca08688ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiZWNmMWRmNGQ2YWViZGI2NThlNGE1MDRmYWQ1ODNhMTJkZWJjMjc5ZTYyNTgyNWYyNWI1NzkxN2VlYzk3NjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzZmE1N2E5MDUzOTJmZjcyYTNkOTQzZjY4MWQwMjQ2ODJhYTNhOWUyMmQ0YWIwNjQ5YjRlN2QwYzJiNjY4YWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmMjYzYjJmNzhjNWQ4MmQzMTI1NGYxZTVkZjgxNzg4Zjg0NDA4NDc1ZWI1NTdkN2MxNTBiYzU2MjZjNzNjYWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e8f2e574314f49fea374ac9074200644",
+      "statement": "debugf 只在 exe 旁的 tool-debug.on 存在时才往同目录的 tool-debug.log 追一行带毫秒时间戳的诊断记录（正式安装从不建这个标记，于是它一直静默）；假隐藏这条路上的每一步都记了一行，这是这个无控制台进程排障的唯一抓手。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/win32.go#L72-L86",
+          "version": "repo-lines-v1:sha256:9a18b9f97956846d6cb5f52843754a47fd811369734c456492917fd5a51316a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE2ZTY4NjIxOTE0ODE1MWE0YTRiMzVjMTc5YTUyYjdhNzZkNTIyZTJkNzYzYTZiYmE0ZGEzMmE4ZGZlOTYwOTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkZjI1ZDlkMzBhMWZjYWM0ZTZjY2E0Y2YyNmFiYThhZDdkMGE3NGEyZjNiNTczYWU3NWQwZWE2Nzk4NDNhMWQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L25-L30",
+          "version": "repo-lines-v1:sha256:dc987381c7406b4480ccc07397663ad811c948e5ee14f5117afcf6dcd664a3c7:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQ5MWM4YjczYmMyMjg0MTc2NTQ4ZDNmNTBkOGJhZTgxNGY1NzQyMzE1MWMyOWRiOGUyZDA0ODE1MGZmNzEzNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFkNThhMzc2NTI3ZTY1YTVmNmQ4NWJmNGU4ODQ4OGRiYThkMjk1OWUwN2ViMGM5NzhkNTcxM2E5YzliOWI5ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDY4ZTI4ZWIyZGQ1ODg2ZTc3NzczOTAyZTc4N2NjNWRmYmE0ZTIzNTllNWZkMGJhNWI4ZTQzZjE4NzBjNDkzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWU1OGJjYmY1NDI4ZGY0MzFhODFiYmIwNTcwMzNmYmUyYjg0OWFhMmY2Y2RiOGI3NTk3YmYwOGM4Yjk2Yzc0YiJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.6.0",
+    "at": "2026-09-23T17:28:03.050Z"
+  }
+}

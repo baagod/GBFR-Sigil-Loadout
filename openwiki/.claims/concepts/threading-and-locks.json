@@ -1,0 +1,374 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:0bb32be33919961c9f301dd254056a52ce4b2103eeed1892142f85dc95a4117a",
+  "claims": [
+    {
+      "id": "claim_9720d2a4072f4790a030582536b2eaf1",
+      "statement": "原生侧两个热路径读者 GetSelection 与 TryGetRuntimeSlot 都在各自的 shared_mutex 下拷贝值后返回（绝不把引用或锁带出去），所以 detour 在游戏线程上既不会被维护拍的写者阻塞，也不会在持锁期间回调游戏代码。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L195-L201",
+          "version": "repo-lines-v1:sha256:c9e9175d3931ed3a40cc8cf2930cd44d105a309b585df11312a9737f5d55f459:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk4YjI2NDVkZmEwYjFkYmVjZjQ5YTJhM2MwOWIxNmJjNzAzZGQ2YWFiNDAwY2E4NGViYzQ0ZWE4MGIyODhiZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDlmOTMwODNjMTk3MTIxYjk4MjcwMGJhOGFmYWJkMTcyMmNmMWQzZTc0MDQ1MDllODBlZmEyNzI0N2Y2MmYwNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L159-L178",
+          "version": "repo-lines-v1:sha256:0ed5a52a93cd3e1c84b1a4d884139ac82f2ebe867d547fe4cb340ac2cf7a96c6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwZDFiZjI5MWFjNTdlNWI5OTk0ZjBhNGU3Mjc1ZGIyYTQyNmY3MDIyYmMxMDYyZmU3MDBmM2IwZGU5YWM1OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0YjQwYWQ1YTE3Y2Q3N2JiMjgwMjJjNzcyYjQ2YmE2ZDQ5ODE4NDM0ZjBiNTlhOGUwY2QzYmZiMjkwZTQ2ZTcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e1db29759e644463a7dc3fae1f696b25",
+      "statement": "InstallDefaultTemplateSelections 是唯一同时持有两把 shared_mutex 的地方，取锁顺序固定为 g_template_mutex → g_selection_mutex（与运行期写者一致）；只在 selection mutex 下遍历模板表就是数据竞争。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L180-L215",
+          "version": "repo-lines-v1:sha256:df2895923bac610d2fe9608218fb6e3e1c1aa14c584737fc019e656c2f8d8caa:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVkZDdkZDk1MjNlYzE2ZDBkMDFlZTQ4MmZmMmY2NTdmNDE4MzcyOTgwYWJhMzZhYjdlMjBlMDgxN2FiM2U1OTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlYTIyNjkyZjY0N2EzNzhkNDUyZTFhOTQ3MjNkYzQyNGEwNmQ1ZDkyMmFiMDQ3MmE4YzY5YTU4MGJiMjhkM2MifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_73af86a2f69541038fb46a7a4b19f1ba",
+      "statement": "不需要锁的共享状态靠“单写者或明确的发布顺序”而不是加锁：g_slot_rva 只在启动时被 ResolveTableSlot 写一次且缓冲区指针每次调用现读（因此不存在缓存失效），g_layout_ready 由 ResolveGameLayout 在写完全局布局之后 release store，ResetGameLayout 只清标志而不动结构体。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L475-L483",
+          "version": "repo-lines-v1:sha256:e94c2854baa61f152020ff7bb8bc4771e16f100c1695a17f8270032133813aef:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODlkZjJjM2IyOWZiYTI1NjZmOGRmNmU4NmY0NWJkMzg3YTZiZTI5MGYwNjAwZWZiYTMzNmQ2NjEzOGI4MjY3MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmQzZDc0YmRlZjhiYTQzNDBhZGU0NTY1MGE2MTE0MmE2MmExOTk3NWJmYmJmMmVlNGMxN2VlMGRhMWNiYzNiMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFiZDA4MDQ0OGUzNTg0YTk4MzY5ZDZjMTkzYmViNTEzZWQ1OGQxYzgxNmRiYTg5Y2RmZWIyZDk2YWNiZGZjNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODg5NDdiZGYzNWM0YzAzMjdmYTRmYjhmMjU0MDg1MWEzZWQxMTIzM2RkM2E5ODc3MjRmNzBiMjhhNWQ0Y2MwZiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L579-L584",
+          "version": "repo-lines-v1:sha256:7b67a79ace09cef7dfaa7ff7466c507903372f5158fe28aabb474e2efcc9b0a6:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc2YTc4NWMxNTU5Mzg4YzA4NzU4ODM0NDEwYjU4YzAxMGVhYzlhZGZjZjFhOTgzYzUwMGRlMDk4YmM0MzA1MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODUzNTFhMDhkMGFkY2YxMGM0NjYyYTk2MjRlYTI1ZTI1YjEyYmIwNjkyYmJhMDhmM2Q5M2E5MTRlZGMxY2E1NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGY1NjcxZjcxZGM2YjUxYWRlMWJjNDhkMmMwMjgwZDJiMTg3ZmU1MDUzNzQyM2UyN2FkNjcyOWYyZmM4ZWJiMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjhlZTMyOGQ5NGJkMGRmYWMwMjUwZWI0MWQ0NmY1MzI4YjAzZDYyYmUxOTQxMzZjOWU1YTY0ZmVkMTdmZjYzMiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L51-L71",
+          "version": "repo-lines-v1:sha256:aaf0f3e174e46c473e6d94ce6ffc8c14d79984090c315ae138ade53494ca7712:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzZTFkZWExN2YxNTcyN2RhMTEzZTc0NjY0NjYzMzM1ZTA5NTViZjkyNjc3MTMxNzU5MWM3ZWIzZmI2N2VjYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkNzQ1ZDY2ZjNmN2ZlNmM4YWI1NGZlNWU4NzlmOThiNTVmNGUzY2M2NzI1MTA4MzZjZGZlMzU3NzgwNGJkMDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY2MDBkZGE2M2E1MzJmNTU3YWE0M2JjYzE2NGU0N2NkYmE0ZmRiYTVmYzc2NzNhOThkMGZlMDA3ZDRhOTFkZGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fc3ddbd9c6294d219dfbeb803d5d0f49",
+      "statement": "一次技能构建在一条线程上同步跑完扩展槽 13…N，所以“本次构建用哪套槽位”用 thread_local 快照（g_tls_build_status / g_tls_build_character / g_tls_build_selection / g_tls_build_has_selection）；代码注释明确禁止改回“以 status 指针为键的授权表”，因为 status 对象轮换且地址跨角色复用，残留授权命中被复用地址会注入旧槽位。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L111-L133",
+          "version": "repo-lines-v1:sha256:de62910d5c145d3a56ecafad159e960c7fb511ee073e6629b68c3d220e629f29:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlNjc3ZDJmOGZkOGU3MzgxOWEwNjg1NWFlMTViZTQ2OGQwY2QxMTAwYWIxMjk3MTkxMGEwODc0NDA4YTc1ODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyZGRlNjc0N2ZlNjdiMDYzZWZlNmRkNDUzOTQyZjI0ZTZlMzBmYmE3YzM1ZmRmYzM4MmRmODBhNDBlZmQ1OGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlZjQxNjk0NzM0ZTg1Mjc5OTJlMGE0NWM2MmM5ZmViYjc4ZDFlNThjMTMwZWM2MWJiODAzZmU1NWMyZDY0NmYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L12-L20",
+          "version": "repo-lines-v1:sha256:dab5f8346ba3c3a6a86b7573d1c1ca8dffb00a217fb4e748acd20297375136cf:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWI3MWJhMGZiN2M1N2E5ZGJiNTAyOWE2ZTQ3MDZlYTdlMGM4MzEyYTIwYTk5OTE2NDRmNWZhYmU3MDBhMzRhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDY2ZGMxZTM0YjExZTc5Zjc1MjFlMDM0YzBmZDc2ZWMyMzE2YzdlMDBlNmU0YjFjMzVjOGQwMDdlNzBjNDg5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTNjMDBmNjg4OGI5MjFlNDYwMTVhMDVlNTRlYjY5MzM1NmJlODc4MGZhMmFmMGFmZjRmYTgyMWIzOTYzM2Y4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGY4MmE3NmQzZTMxMzY3ZTg3MTU2ZTQzOGU4Yzk5ZmMxNzAzYjEyYjIxOTQ0ZDZiYWNiM2Y2OTk3MzY4YmYyYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1765780e23b34243bac5ac9c1562fff1",
+      "statement": "ObserveBuildStart 在扩展槽第一格执行一次构建的全部副作用：快照槽位选择、调 RememberGameBuild 记录“游戏刚在建状态”、并在 context-1 时调 RememberContext1Status 记住这份 status 属于哪一轮队伍装配。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L172-L186",
+          "version": "repo-lines-v1:sha256:825c53b9959976b6d29697236ae5d9de85f28ccda4cabe1c0df17cfcf8e81728:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjYzI1NWUzY2ViMjc0MGUzMWE5MDE3OGUzNTU3MGI5ZjVmNTM5OWVjOGMxYzg1ODQ2ZTIwZjNjZmQyMmM1YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRhOWI1NWYwNWMzNmU0ZGY1MjhkMjRmNjkwOTM3NjA1MWM1YzdlMzYyYTI0ZGFlM2M2ZWQ5ODBkZGNlYmYzMzEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L252-L256",
+          "version": "repo-lines-v1:sha256:6a56ea31837c14721564585b873f56c15b621777b3b1c9161051fd387ae1330c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjU5ZjY3NTc1ODNiNmE4ZmZhOGMxNjRjMzMwZTIyYmM3MTE5M2IyOWQ3YmNhOWUyMjczNGRkYjc1NDVmNjQ4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjY0OWI0YTE0N2NiYWRhNTFmOTQ1YWNmM2QwZDBjYjg2OTJiMjdmMzA3NDM0OWQxMTliMDY2NmUxYTZkZTdhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDIzYjg1MWY0ZmY2YjQ2NzYzY2IyZDVlZmIxZDg0NzQzNTliNzA5MDI2YzQyMmQxZDFkZWI2MGNkYTg4ZWFhMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTIxMWQ2NzBlN2IzODllMTlmZmFlOTUzNWM5NTFiYWVlYmRmZWM0YmFhMTI2OTcwODQyZGZkMzRjMzZiN2ZlZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_25153fe6dd1649af9ecaa1c781b993e9",
+      "statement": "自然贡献统计帧是 thread_local 的，并且比对 status + character_hash + context_mode + next_slot 四项，任一项不符即整帧作废；只有扩展槽最后一格（slot_index 等于 GetExpandedInternalSlotCount() 减一）才结算，且结算前重读一次身份确认，避免把别的构建/别的对象的复制记成本次的 9/9 确认。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L34-L51",
+          "version": "repo-lines-v1:sha256:b0fa8263e8e9ad28452e61d5cb6f6f802fa20bb54cbe3c4f9ef503f4365cd318:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkNGFlZDc5YWY4NjNiYTJlOWMyMzljM2I1MWZkNTY1YmIyNjU0ZGNlNzBjZjM0NjU2NDY0OTIzY2U0NGIyZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIxZTk3NzA4NDIxMjEyM2M0NTM5MmM0NTIzNDU3MmYyZjg5OWNjYTZmMTMzMzk2NWM1M2YyNDQzMzBlNzMwZGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhMGVhZDM1YjlhNjhmNGMxMDlmN2FkYmMzMjQzNGUzYzFiNzQ5NDcyZjBkNTczYzY2NDVhYWYwOTQ3MzUzODcifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L53-L109",
+          "version": "repo-lines-v1:sha256:4f79e534297b0a44b54ef3973def9d2fe4c543500f3a719d1d08f41e08584fce:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwZmY5ZDFjNmFkNWEwMTk5ODU3MjZlZGQzNzJiMDMwMWIxNzZkODczMmIyNTNhMWRjZjc3Nzc0MzY2OGMwOWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNhZGEzZjVmMjY3NTI4YzQ3MTE0YmUzMDE1NjBjMzAxZDg3ZmRiMTgxMzEzZTRmNTQ4YTkwZGI1NTZiNGMxODIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgyMTkwY2Y5NmM3YWM0M2VjODNhYjJjMWVjYjUxMjY4NDFkN2QwYWJkNmYyZGRkZGFkNGUxMmEzZmE2YjkwNmIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e7915770b9134cdcab84cca1d89844f5",
+      "statement": "ActiveCallGuard 只包住 detour 的函数体（进入加一、退出减一，acq_rel）；拆卸时最多等 5 秒让两个计数归零，超时则把钩子留着不释放；归零后只 reset() inline hook，刻意不 reset mid hook，因为 safetyhook 的 stub 在 detour 返回后还要执行收尾指令。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L150-L158",
+          "version": "repo-lines-v1:sha256:9df62955587a869375cb56b96f9bff5576d0e0412370754d123cf7f967da03f2:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQyNDE1MzgzZjNiOGUwN2Y5MmQxZjJlYjU2NGQ1ZDUyY2I5MTBjNmVlNDZjMjA3ZGRiMDI2ZGMyMzkxNDNmYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWExZDFhNjMzOTAyMjljNzk4MzQ3ZTgzYTA0MDU0NDFjOTQwMDAzNTI4NGFkMTY4YzFiZjZjZGYxZDcwYTM3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmFhMGRjYmUzNDgwM2UxMWUxZjMzOWVlMTI2ZmQ4MGE4Njk1Y2UwYThkZjdiMzIzNzlmMDcwYTc0MTZlMjM4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2Y4ZmYyMzRkMjQ0NzdmM2NhYTI5YjAzOGFhYThjMDE1ZTZmYjIyNzA3MzlhMDY0YWE0ZDc3NzY3YzQ2NmQ0NSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L362-L385",
+          "version": "repo-lines-v1:sha256:e0c80839d7275960268c7d5cf7c7fcbc9bed4fc73b22bbca1cfe2c2a5734b6ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwZmM5MTkzZTJhMjhlZmUwNDJmMjg0NmYwMWFjNDFkYTliN2RkNGViOTEwYWU2M2NlMjUxNjg4MjRiMjZiNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMxZGMxNTVlNGIzNzViZjE4MjRjMGEyN2E2NzQ3OGU2MTJjMTg4OTVmNTEwYzE1ODI1N2VlNzdhYTFlN2MzMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlhYjk4NzBhZjYyZDI5OTljYzU1NmM4YTI0ZDk2NjYzMTM4YTRjMTJjMThiN2FlYjU3NjFhNjgzODczYjZiZjAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_973a5769c08d4d6caf2603a77aa5513e",
+      "statement": "拆卸与回滚都先恢复两条技能循环上限字节、再 disable 两个钩子：detour 活着时 slot 大于等于 13 的请求仍被挡住，顺序反过来会留出窗口让原始 13 格 getter 被问到界外。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L337-L361",
+          "version": "repo-lines-v1:sha256:80a7fa432f2a2a82b1cee113fad4f7d40e703a086ec85625279f345735df8e64:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEzZDBhMTU1YWVmOWYzMDhhNWFkZGNmZjlhYTM2ZTIwY2I0OThiNzgzYWVkOGY0Y2RkYTE2NDU3MDNjZWYzMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwNTFlODFjYzBjZGY1Njg1ZmIyN2U4YmE4MTdkZTYxOWRlZDlhNzM0YzRhYTk0ZWU4MmNkNzBlYTgyNDQ0ZWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2ZDBhYzRjOGM1NWYyYTM3YWI4OGUxZTYxNGMzZGE1YTEyOTI0YzkyNWVjYjJiOGM2YTg5NmFkM2NmNTAyNzcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_0527c084c78a4488b68a73c9126bcfc4",
+      "statement": "g_shutting_down 是每个入口的第一道闸，DllMain 的 DLL_PROCESS_DETACH 也只置这一个标志：此后 ApplyLoadout 返回 0、WriteSkillStatusTable 返回 GBFR20_TABLE_NOT_READY、两个 detour 把扩展槽请求当成没有注入（原生 13 格以内的请求本来就直接转发，不受这道闸影响）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/dllmain.cpp#L3-L11",
+          "version": "repo-lines-v1:sha256:302f95d33c9bd2a0cd31d19411700f4788e114ef563417e7ed44b05f863d4fe1:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmVjNzM1ZmEwMDgwY2RhZjExMmQ3ZjU1ZGU5YzhmMGNhYWYzZTk4NzNmM2NlNmM0NTdhZDE2ZTMwNDE1MGNhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTdlNjg2NTdhZDNhY2VkMTlhNDRhYmRkZjhhYzNlZjNhNDRmMWFkMzEzNDkyNTcwM2QzNWYwZGZjNWYyNjIwZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L126-L132",
+          "version": "repo-lines-v1:sha256:02e199800e530117bfa3a1b7e51117a3b6c79787b816a33c4161e20137567f2d:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDNlZWYzMzkxYWExZjQzNzAwNjRiYWU3OWJjMDk1Y2QxMmI1ZTZjNGFlYWEyZjEwNzA1NDg3ZWNlNDUxMzIzYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDRiZjc3MjcxZjJmNWIwNjhlZTM2MmZmMTQxYTc5MDM5MWVjMmE2ZmZlYjVlYjBkZTJjYjNhZDM4MWU3ODVkYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTllNzYzNTVjZjExOTk0ODBjM2Y5OTgzNmIxNDg2Yzg0MWQ4OTFmYWFkOTA0YzYwOGUwOTMwMjJkMzc1N2FlZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWVkOGUzMGFlMDBmNjFjZjUxY2NjNzA2ZmVjZjE1NWVmODYyN2Y5Nzg4MDEzZWZjNjhiZTUwNTcwNjY4YjhhOSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L246-L250",
+          "version": "repo-lines-v1:sha256:a9cf8528e462dfbaa4995e68af54790473a088ea01cba068ad8ac807794acd97:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZjY2U3ODgyMmMxOTYzMTM0YTlhM2E5Y2U3ZTM2YmY5NmIwODNjNTg4MjI2N2JkYWFhYjM1Nzk3NmY3MWMyYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzAwNmFlMzNhMzZmYmM2ODZjMzMzMTM2YzEwYjdjNDFlZDBhZTQwYTVlOGVhYjkyYjkzYTEzYTQwMDk4ZDVkYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjdlMjIxOTU1ZDdiNDNkZGJhY2NlMWJiMjJiNWMyMDQ5NGU2M2Y1ZGIxNjFjYmY1YjNkOGIyYjFkMTllOGZiNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTAwNTE5YTVlNDBiNzA5ZDE0YjM1OGRlYTdkYTNlZDdkZDQ3NTJjODY2NDJkMGYyYTk1ZjM3MDY4OWJmYzg2NyJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L265-L285",
+          "version": "repo-lines-v1:sha256:c5646089c98941d1eec1b2d704126a71bfe5d6cf20e19bb03ba8b5b06d9316b4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3YzU1ZjQwN2Q3NWViOWMyNjE1NDU2MTUxMjBkNmVmMjM3YWU5ODdhNjEyN2UwN2FiYmJkYTU1ZTQ0NzJlOTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRiNmM4MDM1MjlmYzkxZWVjMjkzODk3NTRiMDhhMDQ1Y2JjMGNlM2IwYTk5NDBiNjZhMzE3ODk4ZjQxZTUyZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzZjM3MDJkMjdhNGQ5YWRlZjJiMzgyMmE4MGQ4MDdkODY0YjU4YjQ5MTY0YjZhZWMwZjViYWM0MGUzNGRiYzAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1e80ea549bb74e24a55204ea6b515df7",
+      "statement": "热重建的闸门 TryClaimRebuildNow 有副作用（CAS 认领并把 500 毫秒节流窗口推后），判据依次是 60 秒失败冷却、250 毫秒游戏构建静默、CAS 节流、队伍名单非空、以及换队后 2000 毫秒禁重建；前两条之外的节流与“游戏正在建”两类跳过刻意静默，其余跳过各记一行日志。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L22-L36",
+          "version": "repo-lines-v1:sha256:cd0f022df23ccfc1833f2454d8b429480925a607b006a337156f149837bbab8a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkZDc1MDIyOTNlMDc4MmFmZmZjNjM0YTdiZjM0Yjg4MWE4NTNiZTZjNzA0M2FiZjU5NjljOTJhYjlhOTYxYzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM2ZmQ1MjFjYzA4MGVkMWMwOWI1NjJhOGY5NThlZjg0NzMzMjU3ZGJiMGE1NDExNTc2Y2E4ZTA3ZTIzYTNlNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlOTI3ZWM1M2Y2ZTJiMzE5MWMxZGZlMTBmMzM3NTFhZjZiNDUxMGM4ZWM4ZDA0MzFkMGUxNDM3MGJkZjBjNjEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L96-L136",
+          "version": "repo-lines-v1:sha256:8ba39f5b20d221c4b48b11eecc08c13fc7d10ddd2a3d5fdb8ffa48add2fc86ef:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExYmQwODA0NDhlMzU4NGE5ODM2OWQ2YzE5M2JlYjUxM2VkNThkMWM4MTZkYmE4OWNkZmViMmQ5NmFjYmRmYzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEyMTg1MGRjY2UxNDU3MThkM2EzODVjYzQ4MGNlM2VhMGViMzkzZTEyZjIyZTg5YTgzMzAxNzBmOWI4NTRmN2QifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_af21dec40c10417dafe0e2fc274aaad6",
+      "statement": "RebuildPartyStatusesOnce 只重建 pass_id 等于当前轮的记录：换人/切场景时被移出的人那份 status 已被游戏拆掉，而身份残留仍在、SafeReadStatusIdentity 照样通过，重建它就是戳已释放内存（2026-09-21 物证：移出队友后仍拿旧指针重建，ok=0，28 秒后崩）；这条路径必须有，因为战斗里游戏自己不会重建角色状态（实测 4 分 09 秒零次构建）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L145-L192",
+          "version": "repo-lines-v1:sha256:f3578997764eaa0b225ca4a1002bf2a563661f6e8cb6d41fd7e95aded04d4111:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYwNTNhYWY2M2VhYzc1MTQxOTNjYTFhMWExNzA0MzlhOGQzNDgxZmM2YjI0N2Y5MGYwZDVhNWY0NDA4Y2M0YTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiMjBmOGVhNDI5NmVmNzFkNWYyMzEzNTBlNWE3MTFkOTQ2YmUxNjZlNWZmNTMzMDZiNjhhMDNlYzA4OTY3ZDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4e94f6c768114fa4bd72a71f45da0064",
+      "statement": "单次重建失败就把 g_hot_rebuild_cooldown_until_ms 置为当前时间加 60 秒并停止补刀，依据是 ok=0 之后的对象已处于可疑状态、崩溃都跟在 30~60 秒内；每人只调一次、角色之间 Sleep(50) 推进。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/safe_game_access.cpp#L127-L134",
+          "version": "repo-lines-v1:sha256:be6991adcd5115daf583f43ef9ff2e1a1398d97c1bf01ffcd64e60b939a29e75:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWQ4YjhkNGQ4ZTkyYTExYTI1N2FhMGViYWVhMzAzMzhhODJlYjlkN2ViY2Q2ZGJlMDk2YzQ0YzVkMDVlOGQxYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGY0MmIzMDY0NWQ3MGViZDU4YTUxNzY1ODMwMTlhNjViMTk1ZmYzZTA1ZTIyMTkzMzY4ZmRlNWE2NTkxMjZmZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGRjMWE5YjUxZTlkMGNkODc4MmZjNzc0M2JiMjE5MzAwMzYyMWQ1MWM3MWZhOGU3MmJkZGFhYjNmNTBhM2FiYyJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L184-L191",
+          "version": "repo-lines-v1:sha256:f459af97e13e7d125e92a361b3eabd05385ab0badb2d5857bac0c0bddadab401:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2E0MzZlN2ZlMDllMjRjYjIyMjI3MDgxOGE4NjY2YzE4YWVhOTIxZDQyZGNlOWYzNjI2MmE3MmMwYjMwMWE1ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjI1YmMwYTAwM2RiMmQzY2FjMjdlM2E5NjIzMDRhODg4MDdkNzQ5M2I1OWIwY2EyNjc4Y2E3YmNjM2JkMjE3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDlmOTMwODNjMTk3MTIxYjk4MjcwMGJhOGFmYWJkMTcyMmNmMWQzZTc0MDQ1MDllODBlZmEyNzI0N2Y2MmYwNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a1108235874d429ea0f4ae4fbb3e07c4",
+      "statement": "队伍装配轮次只在游戏自己的 context-1 构建之间推进（两次游戏构建间隔超过 kAssemblyWindowMs=1000 毫秒才算新的一轮），我们自己的重建调用由 thread_local g_tls_hot_rebuild_build 标出、不切轮；出战队伍名单就是 g_latest_context1_status 的键集，没有第二份。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L8-L84",
+          "version": "repo-lines-v1:sha256:41dc6ccb125d114d55f0e85ef9f0d73439f2f429f5ad9ce26592a239dd9fc85e:eyJzZWxlY3RlZExpbmVDb3VudCI6NzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNjdhMTE5ZWUyNDVmZTdiYmFiYTg0NWUxZmZjNGQwZmJiZWUzNDI5OGU3MWNkOGQ3YTQyYTE0N2ViNTc2OGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdlZTdiYTg3ZmNmZWQ4NjcwZGI0MjJkNTc3N2U4ZjIwYWJmZGVmYTNlZmY1ZTljMWRmZWU0M2NkNjNmYTI4YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlMmYwYzBkMmI4YzQ0ZDNjODVjMTM5YzBhZTZlYWU2OGQ1ZGZhNmZiODY3NzA0ZjZjMDEwNzIyYTEzZmQ3OTYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d55a6ef5658941a5b788927dc70725e7",
+      "statement": "唯一会动游戏活对象的调用链是：托管 250 毫秒维护拍 → LoadoutConfig.Tick → NativeCore.ApplyLoadout → GBFR20_ApplyLoadout → ApplyLoadout → PublishTemplateSelections → RebuildPartyStatusesOnce → SafeInvokeStatusRebuild；GBFR20_ApplyLoadout 是普通 DllImport，没有编组回游戏线程的机制，所以避让只能靠时间戳判据推断。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L217-L225",
+          "version": "repo-lines-v1:sha256:5e1788d447b08f9f6b8d039b4fce779f1315e491102e3bdf69d8ef08591301a4:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzA4M2U1YWE5OTQyODNlMDdjNzUyOTk4ZWRiMDYzN2FlNWZjZGY2MTEzYjBiMDQ5OWJjZjBiNDQ5YmE0ZTgzYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTIyNjEzNDJkMzZjZDYwYTI1Yzc4MTliZjU0ZGJkMjU0NTQ1NDQ0YjZiNTgyMTEwMTU5ODIzOTA4N2UxY2U5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjNmYjM0NzBlZmU1NjA1Yjg5YmFmNzgxNWM2N2JjYzkyOTcxMmYwYTAxZDA2NmU1ZmFiNTJkZDEzOTI2ZDEzZCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L294-L316",
+          "version": "repo-lines-v1:sha256:21d9baa8d55cc4142e15a3c957ef1cadec6f6984d510a5da27c7d096308380c8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5Y2E4OTFiZmY3YWMxZjdjZWFhZTQwZWYwNTEwNjZiZTllZmU0N2I0ZTQyODFlODZjMzE5YmUyYzU1ZWJjZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmYWM0ZTQzNjMwYWJmNjhjM2E0YTc1NzNmZDRjNDMwMDhiYTc5OGRkNzZjMzc1OWVlZWY1M2U2Y2ZmOGQyZTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4NTU3NzU2OGFjMzVkNjA4MzBjZjkyNWJlYjIyYmFiZmZmZGY4MGMzNWJmZDQ1YTEyZTg4ZmRiYTMwNTY5NGQifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L103-L123",
+          "version": "repo-lines-v1:sha256:45d9eae2c4ad6e31c282017091bf2f775918ce7744f137315c5f8b68c5a7f050:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkYjllODJjYWU3NDZmMTM1YzdhOGRkYTI5YzJhOTBjMDMxYWJlMGIzYjdjNjUyMjM2NzY0MTI4YjQzZDU2NmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMTgzZTU0NGRiN2VjYjk0Yjg1ODUzMjE0MjU2ZDUzYzk4NmE5YjE3ZTg2YjUzZjEyYjE3Njc0Y2ZmYWMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5MDM5YjVkY2E2ZGQ4MWY1OWQ5OTM4ZjE3ZDZkMDQyY2JkYmIzNzhiYzYyOGUxYWUxNWJjMGQxNzgwODg1MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NDdmYWMxNGU0NDMxMzA5MGJhYzBkODhjNmEwOWVlNzQ0MGY2OTFhOWIzYjQzYjY2MDU3ZDk2ZGQ0NjM5YjUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/NativeCore.Interop.cs#L46-L51",
+          "version": "repo-lines-v1:sha256:ad416d55b26e33a3783285e2a84da39609c04afb509a87cb8982b17149a221e7:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJlMTM5ZDU3Yjc0M2ZlOGE3Y2YwYzYyZjljYTAwYWVmZDc0MjU0ZTI5MTY3OTFjNmI5MDFjYjQyZDI0ZjU1MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2QwNDA4MmYzMmU5ODFmMTgyNjVmMTYwNWE5NGI1NjU5MjA2ZTAwNDE0ZmNhZmQyMDE3N2QxZWQ3NjAyZjg3NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjI0ZWM1MGViZWFlOTc1NDExOWZmZGU1Y2NjZjQ1OWU5YzgwNDliZDE3NDRiZDQxOGRlZDM2NmY2ZmNiODQzYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODIxZWFmNjY4NDEyM2Y0NjUyYTAwZmFjNmVkODA3NmUzMDA3MDQwY2MyZmI5NGJhNTk1ZjVkODhjOGNmNTJjMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1b64d72c0ebd4f79bf7b983b0f1692a8",
+      "statement": "托管的 250 毫秒维护拍用 Interlocked.Exchange(ref _ticking, 1) 单飞，且三个阶段（LoadoutConfig.Tick、SigilEditorFeature.Tick、Hotkey.Tick）都统一被这一个守卫挡住、整段套在 try/catch 里，因为定时器回调不串行、而三个阶段各自都把“漏掉一拍”当成让过去。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L103-L123",
+          "version": "repo-lines-v1:sha256:45d9eae2c4ad6e31c282017091bf2f775918ce7744f137315c5f8b68c5a7f050:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkYjllODJjYWU3NDZmMTM1YzdhOGRkYTI5YzJhOTBjMDMxYWJlMGIzYjdjNjUyMjM2NzY0MTI4YjQzZDU2NmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMTgzZTU0NGRiN2VjYjk0Yjg1ODUzMjE0MjU2ZDUzYzk4NmE5YjE3ZTg2YjUzZjEyYjE3Njc0Y2ZmYWMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5MDM5YjVkY2E2ZGQ4MWY1OWQ5OTM4ZjE3ZDZkMDQyY2JkYmIzNzhiYzYyOGUxYWUxNWJjMGQxNzgwODg1MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NDdmYWMxNGU0NDMxMzA5MGJhYzBkODhjNmEwOWVlNzQ0MGY2OTFhOWIzYjQzYjY2MDU3ZDk2ZGQ0NjM5YjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c37fe0571ba6472dbc68f92f85983464",
+      "statement": "FileStamp 提供两种互不可换的版本门语义：LoadoutConfig 用 Changed()（无论成败都认领，失败保留上一份配置、同一份坏配置不再每 250 毫秒重报），SigilEditorFeature 用 Pending() + MarkApplied()（只有在原生确实改写了行或内存里已是这一版字节时才推进，读不出表与原生拒写都让那一版继续欠着）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L31-L45",
+          "version": "repo-lines-v1:sha256:f6f0bf7420a27a1335785341d31f2abe12056f4ca77e63bd64ea01ab634fc669:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1ZmIyZjc5MGNkMWM2YzZmMTBjMTI4NmQ5MzY1MWM4ODFkMTQ4NTQ4OWMyODExOWRhODBmMTYwYmM3NTBhYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwMGYzOGE1M2MxMzUwMTdkMTBkZGEwZmE0NjJhNjczY2JlN2VlMDZlMjVmNTdhZGQ4ZTAyNDVlN2Q5MmM0YzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwNzQ0MzY3N2FiMjExOTQ2Mjk3ZTFkNGZkOWYxOGE4NTY0OTE1YzI5MjM4MWEyNWMzMjY3ZGVhYjZhNDA1ZWUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L153-L174",
+          "version": "repo-lines-v1:sha256:ba575484282420bcec212626ea792b351b06d0e63da8afa0f84c10bd9dc753f0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmMWQ0NzcyZjllOGYyZmYwZTU0NzdhOTI1MGE5NmJhOTQxOTM4NjUyNzI2ZjA2MTViNDk3MTI3Y2YyMTVjYmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFmNTI5YzBjMzUwMDU0MTlmZDRmMjRlYWM5Mjk5MGZmMzc2MTdlOGNjOGY1MGQ5NzQwOTBhYmIzNmNmMjUyNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmMjFjZjQ2NzNmODA5NzMyZGQxY2Y0M2JkNWUxYzY0YzBjODM3ZmQ3Zjg4Y2I1NTM2ZjEzZGQzOGFhODU0OWYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L249-L279",
+          "version": "repo-lines-v1:sha256:18963badd873acf928ebfc7e4269ba4455017e1653a245acd0533c425561bfc5:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxZWI5MWFlZTc5NGNlMDAzYzU3MDMzOGJhMTlkMWQ1NmY5MzdkMzE3OTg2ZTExN2E0OTIxYjZiYmRkNWQ5ZTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyZDhmMTYyYzg0NWUxNTNmMmY3NzIwNGMwMzI4YzRkNDBjMGQwODJkZjI1OWQyODFmZDY3NTlhNjkyNzkyODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiYjc1MTBiZDFmZDViNTdhYTdkZDFmYWEyMjNiNTZmYjU3MzExNDAwNzRjYTk1ZmU3MWUwOGIwMzRiNGY2NzkifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/UserConfig.cs#L28-L64",
+          "version": "repo-lines-v1:sha256:e7a7380f8c74fbdfaa2db7bf9c2e5c59e732736a07a1ee4acb8c45fb33d72d6c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMTk3YjE5MDQ4M2YxYjcwZDQxNDEwNmFlNjEyYzk5ODdlMjczMjY3MDE1MGJjYTBjMmM5NzRmNzkzYzBhMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlNTQ3OTFmMDZiODQwZTUyOTA0YjE3ODJkY2E5NWVkMzAzYzUyOGM0N2Q4ZmNjZDE5YTI3MzM3ODEzZmY1ODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5OThhYzg5YjA1MjYzZTA5NzYxY2IxODRlNmMxMTBjMzg5ZDVjMGI5YmRiNjAwNzY5ODIxOTQ2ZjNhYzg2M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff3e5cc057a341dfa57e25385d392e93",
+      "statement": "编辑列表的热应用有一条顺序纪律：启动那次的版本号必须在读内容之前取、造表之后再复查一次 mtime（变了就整版作废不推进版本），否则会用较新的版本号标记较旧的内容而静默丢编辑；同版本重试按 RetryIntervalMs=5000 节流并复用上一次留下的候选表，避免每次从归档重建 328 KB。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L181-L243",
+          "version": "repo-lines-v1:sha256:bdbb1b94e2b3a407b77e3174b32fcc9e8c6852a1277c11d4e0d8ccbe0c0b9ebd:eyJzZWxlY3RlZExpbmVDb3VudCI6NjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ2YWRlNjZhMGRjNGU2YjMzMDA1MGFmODU4ZDY1ZjMxYzBiOGJlYjNkMjRmMDZkODk3NzBiY2YxZDI0YjMyYzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlM2QwNGY5Y2U4ZjRkOWE5MDM3ZmM4ODdmMGVlMWNiYTk5NTdiMTg4ZDQ4NGYzMzJkMThmZjc0NzA5MDg3MDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5ZGQ2NmI4N2NhODE1MjVhZDk5NWU4NjAwNmY0ZmRkNzdjMTQ5NDNiMTgyNTQyMzc4M2M5YjdjODI4NmE1MWYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L78-L120",
+          "version": "repo-lines-v1:sha256:b8df9f96305e166dfa624f450080ab3c20e06aeff4c1865661897c8135c074f9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2M2MzYTc2Y2QzMTNjYmNhOTA4YTcxYjM1NTM5ZjBkOGE2ZTM0OGU5NTRhNmM0ZGZlMDhhOTdiNDhmYjhiMjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjMzI3MGQ0ZTdmZTU0NjM0OGI4MDI5N2NiNmNlMjg4NTZmYzdhOTI3ZDdmMzBiYjlkYWZlMzZlMzUzYjlkNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ2NzM4YTA3OWFjNmZmNjljODJkMWJlMWViNDE0OGU2ZGVkNzM0NzgyMjJhYzA1MDgwYjY5NGY2ZTAyNWEyNGQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_52d65bd15ce64d01914385cf8154da3b",
+      "statement": "可视工具的两个 service 共用 debouncedWriter 骨架：待写只有一份、每次提交替换待写并重启定时器、落盘只在 mu 内发生，写失败时把待写放回并推给前端（saveFailedEvent），因此一连串编辑只换来一次落盘且落盘的永远是屏幕上最后的状态。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/debouncedwrite.go#L11-L68",
+          "version": "repo-lines-v1:sha256:95b7b893323f415d2cdf551fd18199411684ee5a30d94ff1dc90d62b0377fc07:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiZDk3ODA2ZmJhNDAwM2UzYzRmMjQyYTcxOGI2NGUwYmQ4ODc3YjJkMzhmYmE2OWRkZDA3ODY0ZjM1YmFjMzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlYzk5NzU5NDQ5YmI4MTVjMTI3ODY1MzJjYjZiM2NiNTEwMWI2NjE5OGQxYzQ5NjQzZTY4ZWJkZjQ3MzMxZTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L212-L239",
+          "version": "repo-lines-v1:sha256:5bc91f2418dfa493b09769d797e771dd0d4298b90c367ac8ecf572259965aa6d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjYjJmZmIzNTc5MWZkY2FkMDcxYmI0OTA0YTc1MjJmZmZjZTdlYjA5NjFiMDZhYmUzZjQ3YjBlNjM4OTVhOTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4NDU0NzBkY2EwYTAxOWVkOGJlYzhlNzY4YzQzZmRiNDA2N2JmZjEzY2FiYzJkNWIxMmNkYzEwNGE4ODBjMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljYjU2OTQ1NmYxNzkwZDMwZWEzMjdmZGY2Nzk1MThmYzAxNTE3MjZmNTU3MDc3NWM1ZWZlMTYwZWFhOGQ5NzQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_efbb202f1b2f47c6a465f2ccbf93e059",
+      "statement": "两份配置文件的落盘一律走 writeFileAtomic（同目录唯一临时文件 + rename），使运行中的 mod 不可能读到半截 JSON，且并发的两次保存不会共用中转文件；TestConcurrentSavesNeverTearTheFile 断言并发保存之后磁盘上必须是某一次完整保存的逐字内容。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/atomicwrite.go#L9-L38",
+          "version": "repo-lines-v1:sha256:be26a457c23eb36bfbde772e1fa28c345381d80ac0ebd6a0f1117d53211bb3a1:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzNGEwMjkyMDc4NjYzY2M1ZDFmYWFlOTFhNTIxODc1ZWExMWFiMDAwMzdiNDkzYTdkNzljYjg5ZDEyZDYxMjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkYTFkNzkxNDgwOWUzNDk5ZDQ1NzNlOGJmZTU4MjZhZTA4MmVhMmUyYTE0ZGI3Y2MxNDE3MjU3N2M2YTczNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU3YjA0Njg1NDE3NjQ4MzMyMGU3YzQyYjE5YjY3YWZmOGM4ZDhkNTJmYTI5M2JhMDdlNWJhNmU5NjA1MGIyOGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice_test.go#L211-L246",
+          "version": "repo-lines-v1:sha256:2787ae19e703ac711f28c102574dd830bb0270381c69ed95c6b37c2daa6862be:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkYjQxNTZhYzMwMDIwNzlmODQ5ZGJjMDEyODkyMWU5OTM5ZjFkZmRkZjUyMzQ4ZmVjNWU1YjBkMDc0YzFmN2EifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c5b40a4ea3d44783bb785ac82d49f08a",
+      "statement": "可视工具把两个 service 的 flushNow 都注册在 app.OnShutdown 上，把防抖窗口里压着的那份交出去；缺了它，窗口在防抖窗口里关掉就等于丢最后一次编辑。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L241-L242",
+          "version": "repo-lines-v1:sha256:0e7790bcc3ff1b88bf432a255c9a18040fec268e791d4ca151c656c3f77fe2de:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTIyZmVlMWI1OTI2NzIxZDZkZDE5YmZmNGY0ZDk5NWJiNmFlOWEzOWQwYWNkMTg3NTk4MDEwNWUwZGQ1MjZlMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWZmMjgzMzlkOTAzYjJmMTQ1Mjg3MDY5NDUzZDY5YjNjZDE4ZDVmNzY2MDhlMTQyMjczZDJhM2ZjNDgyYjZjMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTU3MDZhMDE2YzM4YjFhZDViYWJlMzFiZDg1NDlmNTYyMjRiYTE1MjU4MjNjZDE5ZjM3OTZmYzYyZmUwMzAwNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L232-L233",
+          "version": "repo-lines-v1:sha256:b10dcd2e7ba490409accf18d62273787dde1c47e169e31120c5edac7b0b8a9e5:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTIyZmVlMWI1OTI2NzIxZDZkZDE5YmZmNGY0ZDk5NWJiNmFlOWEzOWQwYWNkMTg3NTk4MDEwNWUwZGQ1MjZlMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFkYTlmMjEzZDczMjQ4ZWFkNTQ4Njk2ZDZkNzAzYjdkOTZiNzhlZTQ3ODY0MGRmMjZhNzczMWZhZDdhNDliNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTllYWI2OTEyNmE2MzM0NmFiMTMxNTlkM2I5MGUyNzkxNzFiMjM1OWY5MjdmYWYyZDY2OThjMTU0M2UzM2E2OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L89-L96",
+          "version": "repo-lines-v1:sha256:4d49bfc7eb947c7562955a5c2fa4064c2d0c55ee38c0899c8f73c4bd8891ea58:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTk1MzczYjhkMmJhMzM1NjUxYWJkOGEzMTIwMGFlOTgyNmRlNGUyYTcyMDA5MjI1NTVhMDA2NDRmYmQ1ZTZjMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWNlYzA4ZmU5YjFmMWE1YWFiYzVmYzM0NmIyMzI4YmMxYjcwYjYwZTIwODhiMzUyMzkzN2QxOTJkZjViMmNjNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzkzOGIzMjU2NGVmNTcxNGFhMWQ3NzBmMmJkNDYxMDkzNTg1MmE4YTIzZjQ1MmI4OTU5MDdiZGJlMDNjYWQyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjlkNGU4M2YzOWQyZjEwOGVlNTM0NGI1MmI1MWIwYzI4ZDVjZWMxMzE2YjBjOTI3NWRlYTRkNDkwZmM1OWE0YiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_1a9d62fbf3ff4f37ab1f5e9d63734e5a",
+      "statement": "GuardAbi 把所有可能抛的导出包成“拒绝值 + 一行原因”，各导出取最保守的拒绝值（GBFR20_WriteSkillStatusTable 兜底为唯一“写之后”的码 GBFR20_TABLE_WRITE_FAILED）；会抛的内部实现（ApplyLoadout、SetRuntimeMessage）刻意不标 noexcept，因为标了 throw 会在函数出口先变成 std::terminate。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L263-L267",
+          "version": "repo-lines-v1:sha256:f19cd5885216b731305cef9b4b8d3869629a6a974bb47ce559dae21c56cebfa6:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjA1ZTg5NzVlNjZjMTk4NDAyZWZlOWEzZGMwMjc3Nzc0ZjVjZGZjNWFiYzI0YjM4MmFhYzFmZjgwMjVlMzQ0MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTgwMTg1MDJmZDY1ZTRiMTA0ZDJjZTcwNTVkNWE0NmRmNDNjYzMwYTUxZWMxOGNiZjA3NTI3MzAxY2QyOGMwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGUxYWU3MWM3YmE1MzBlODUyMjk5OTZjZjZmMTMyYmVlYTViMzVjNDJlMzM0OTM1YjNiNDljMjc4ZmFhZTU5NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTlkMmQzMDIxNzFlYjM2YTY5YTc1NTM5ZGQwY2IxNjMxMGE0ZGJhMWRjYzQ2ZTM5MDQ0MGU1ZGRlMTRhYzIzYiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L155-L160",
+          "version": "repo-lines-v1:sha256:90f229fb9f2a41c48b5967c61bab465e2553530df1b80e202e4c4cd2594219e1:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmNhNmU4NDlmNTIwMjQxNGFlODFkNmU3ZjlkNTEzOTk2ZGE5YjkxNTNhNWM3NjZkN2ZiMGVhYzY0NjQ3YjMzNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmE3YzkzOTk2ZTYxNTJjMTkxM2ExYTA0NTU2M2E1NTk4MmFmYjNiMTA4MmE4Nzk3Mzc4YWYwOWFkYzZiYWMzYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L7-L18",
+          "version": "repo-lines-v1:sha256:2c69eda13f8df6e424d4168c01f701915679dca6ea5201500bd96045814719dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjYTVhM2UzNDRkM2ZkOTdjYjhjZjQwYTY0ZTNlMTJlMTRjOTkzMzZjMjhkMGU0MzcwZDBmMzUxNDgyYzA4MDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjOWJhZWNiMjVjZjNjN2M3ZWRhM2M4MjMxY2YzNmE5MTg3NjY0ZjExNmVlNzE0YWEwMWRhNjVmYjgzNjhmNDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0MzVhNmI3MzExNzBjYzFjOTlhMTcxMWJjNDIyZGM0ODdhNWFlYTBiNGM1YTc1N2JhN2M0OGEwZmMyNWJlODkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8083e2d873fb4d99ba3c65afff53315d",
+      "statement": "日志桥两侧各自兜异常：原生 Log 声明为 noexcept 并真的不抛（格式化失败退化成不带时间戳的原文，宿主回调单独兜），托管侧 ForwardNativeLog 整段 try/catch 且回调委托由静态字段持有不回收，因为异常展开回原生钩子代码会顺着 detour 炸进游戏。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp#L28-L53",
+          "version": "repo-lines-v1:sha256:658f357b3f7095274f763db62ecf3cdee88883f2032ba763375fd311be3b0c3f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiOGI2MWFiYWE3YWVmYTA3ZmQ3OTg1ZjVhYTBkZjZmOTg2MTcxNzE4ODcyMTk0N2QzNGIyODU1OGM4MGM2ZWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMwNDI3MGZlM2NhNTc4MWFiMDhkYzBmNjcyZGZiYjYxZmUzZDdiODFmNjI5YjY1MTA3NDFhYjljNjljODkxNTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZlNzE0MWE3Yjk5YzIzNTQyZTczNDA3YmQ3NjlkNmFmYjA2YjAwYzM1YjM3OWI4NTNiYjhjOGRlOTQzMzRhNTQifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/NativeCore.cs#L116-L148",
+          "version": "repo-lines-v1:sha256:52eb36e11f42f67fc89c9e0fd29ad0d4e311795c925bc874d36db935d540572c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiMDU4MGRkZDM5OTNkN2UxMzY2NDhlMmQ0Njc1MzAzMzVlZjFlNzA3OTE5YjEyZGQ3NTgxMjFiMGE3YTA0NGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkZDRhNWZlY2E5YjdkY2ZlYmRiZjkwZDhjYjJmMjZiMjQxNmE2MDE0YWJiYWI5MDVhZWY0YTliOTg0YTdmNGQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_480070901a574057addc06d794c7f14f",
+      "statement": "托管侧 Mod.Dispose() 无条件调用 NativeCore.Shutdown()（并用 try/catch 吞掉异常），而 GBFR20_Shutdown 用 g_shutdown_complete.exchange 保证 ShutdownHooks 只跑一次——这样任何失败路径都不会把已经装好的原生钩子留在游戏进程里。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L38-L44",
+          "version": "repo-lines-v1:sha256:b09479de83113648e4b4926746a8838e2c739ceeb664d755f6e2cd427e41b075:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODFkNWIxNDJlYjUwNTQyYmRjMWRlODI2MzVhY2NkZDdlNTRmOTg1MzNlMGIxNDk3NmI1NGY1OTdlODNlMDdmOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGZhYjcxMGRkZjc4NTllNTc1NzY0YTkxM2EwMDJjNzQ1ODVmZmE3MDAxNTEwY2I4ODExZGE4M2QyY2Y3NGIzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzk0ZDMyN2NlMjBlN2UzMzliYzljNWE0ZGUwNmYyN2JkMDI4ODM2MzA2Njg0YzU3YjQyNDMyNTk2OTJmMDRjZSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L169-L192",
+          "version": "repo-lines-v1:sha256:d97a0ec99afe35889473c6d14691c46868d6ef5e3ffa7e885e7ea29b5aca6a09:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwYzY4NzZlMDE0YzI3YzllMmZmYjJlYzJiOWVhZGJhZGJlNWIzNDMyNTQzYWUwZDRkZGE2OWNlZTMyOWQ5MmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1NDBlMTg0Y2YxOGY5MTYyZjYyNDc5MTY3MTRkMWJlZWJjMmMwMTk5YTk2MDFjNzUzZmNkMWE2Y2U2ZTdmNTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/NativeCore.cs#L94-L101",
+          "version": "repo-lines-v1:sha256:0a8a0b828eee61af876d9a7ad837a332cef411bb2c5fd0ad842ddd38a8c21ecd:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzQ4Yjk3OGVhNzFhOTkxMTgwZWUwMDM4MDViNWJlYTZkYmFiNDZlYzQ3OTBiNDE3ZmNiMDU3NjVkMGUzYmU2NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDEzYWYxYmI2MjU5MWMwOWFiOTBlMjhlNjg0ZDgxYzYyZDhkZjI1ODNhMDhiODhmNWM1NTYzYWY4MmY4NGM4NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmJlYWYyY2MxOTkwNzIzZTU5M2NlZmRkMzE2MGEyNzhjMTdhNzkyNTQ5NzFiYzFkN2Y4MWRiNmY1ODUxZWQ1OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d7c392e501f045849b8c69a40b4ce24f",
+      "statement": "这些并发不变量的自动化覆盖很窄：Go 侧只覆盖防抖与原子替换（TestSaveEditsWaitsForTheEditingToStop、TestSaveEditsSurvivesAWriteItCannotMake、TestConcurrentSavesNeverTearTheFile），原生侧唯一的离线闸门 tests/NativeLayoutHarness 只验证布局解析与逐字节复验，不碰锁序、TLS 快照、在途计数或热重建闸门，所以后者只能靠真机日志验证。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice_test.go#L122-L150",
+          "version": "repo-lines-v1:sha256:963700259dac447e3341da4f9f62c9416ccf0daf993a3037006c07ddf9998c00:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzYzhjODdlNTc4NGY3YmM2ZDRhNTJkNTQ5YTdkZjQ3MGY5MmExNGNiYTdkNzkxNWI5ZWFjZWM5M2Y2NjUxNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmYjAzOTk4ODdiZWY3ZTdlN2NhYzI0MjIxMTExZGUwNmQ4MWVkMmNmYTczZmQ1YTJiNmM1MjQ3Y2FiZDk0MjgifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice_test.go#L73-L120",
+          "version": "repo-lines-v1:sha256:2823fff4e58000927fb11511e303928a75273c9d1d54a0b8b1448c8363f19302:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0NTZkMGU2MmI3ZjA2MmUxYzQyZDdiMDI3MjYzYTlhN2QzOWEwZGM0MDY1MDY1ODA1N2YyNTlhMmY4YjIyM2EifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice_test.go#L211-L246",
+          "version": "repo-lines-v1:sha256:2787ae19e703ac711f28c102574dd830bb0270381c69ed95c6b37c2daa6862be:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkYjQxNTZhYzMwMDIwNzlmODQ5ZGJjMDEyODkyMWU5OTM5ZjFkZmRkZjUyMzQ4ZmVjNWU1YjBkMDc0YzFmN2EifQ"
+        },
+        {
+          "resource": "repo://tests/NativeLayoutHarness/run.ps1#L1-L9",
+          "version": "repo-lines-v1:sha256:f8d3b6909d1c54629785359974da22b5bbef64a65524ba1672578588851f83cb:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjkwNTdiMjA5OTk0Njc0N2RkMjVhMWI1MDJkYmQ5YWE5NTJkZjhmZDU4YWNjZmRlNDNjMzBjNzhiMjdiYmQ1OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWYyZDBjZTE4NjA3ODE1NjhiZTA0NDk5MGNiZjY4ZGM0NzlmZTA3MjcxMTMwZTg5ZjFkNDIwNmJkOGJmYmVkNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2NkYmY5MDVlODJjM2Y5YzZlMTFkYmNmN2UzMTYyN2QyMWI2NWM3YzkzYzY5YjU4OGJmMWI2MmEwN2U4ODUyNSJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.6.0",
+    "at": "2026-09-23T17:28:03.050Z"
+  }
+}

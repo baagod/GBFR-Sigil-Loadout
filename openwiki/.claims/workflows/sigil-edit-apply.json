@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7519d46d09bf02673e291a1f919d8964ee4a7ec6e0a4cd6de491ac80f13b18dd",
+  "claims": [
+    {
+      "id": "claim_77c68ef08cd2418db5ec072bb5243c16",
+      "statement": "编辑器把\"一条编辑\"定义成\"勾选了，或十个参槽里有一个不是 null\"（isEdit），并让所有进出列表的路径都经过 asEdits——先 trimGameValues 再 filter(isEdit)——所以列表、sigiledits.json 与托管侧对\"什么算编辑\"的看法一致；组件里另写一遍这条规则曾导致\"清空最后一个数值顺手撤销了用户勾上的那一下\"。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L340-L359",
+          "version": "repo-lines-v1:sha256:b1f097e5be1e1ac64c1abf96601900bace8b4ed373d2ac011d4f8d28c5b2e215:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmODU2NDkwN2M0OWM4ZGFiZGUzZTI0Y2FkMjdiMjE4OTJlN2M5NGE3ZmYxZmU2NzBjMDlhMWVmNzllNmNjZjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhZDRkZjkxZDljZTlmZjk0Y2ZiNDAwNjZiZjhmNWFlMmYyYzI5Y2FkNmU4OTZlMmI0ZjBhNTBlNGM2Y2Q1ZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0M2QxZTVkZTU0ODVkZTA5MDVkOTk1MDUwMWMxNDBiNzQyNmI0MGY4ZmNlOTc3ODUxMzZiNjIxM2MxNTdhZDYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.test.ts#L210-L246",
+          "version": "repo-lines-v1:sha256:a74dd0fa07daa925e361bc5f5c297d921b27ab3fb55f2dc5961b63ec8ddc4ac0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1YjAzYmE4YmJiNmU1NmJlNTAwYjc0MDdhZDk5NWE3MWNjMGI5MTI0YjVhYWRiNWVjMjM3YjBkNmRjYjNjNTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZjViNDBiMTU4NDU3ZDE3ODY0ZjIxNzkwNzg2ZGQ1YTJlY2RiNjRiNjZhNjUxZjc4OGQ0ZTI1Y2QzMzAzZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ1MDEwMDdjNzFjMzk1NTMwMjI1MGNiMTI5MTdmYWQ3NThkNDMzZTIyMGVjYWQxMDQ1M2YxNjg5ZTBiM2ZiODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI0ZmZhOTM1MzcyOTFlZTliNjY3MmIzMmY3YzVhNzkyNDU2NWQzMjEyOTUwNmVmZTljNWVlYWQwYWMyNjU5MWIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L46-L72",
+          "version": "repo-lines-v1:sha256:b920f477c8a6234b735e3ac5e8508d61080fca57266760b40803a1d7d2b731ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyNGFmNTgxYjBkOTIyNDY5MDU3ZThjZWJmMzVlNjNmMGM4YWFjOTk4MjkwYjgzY2EyMTQ0YmM1ZmQ5NGVkNDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlNWMxNjk4YTk5N2QxYzRmNGQzNTA2OTlhNjRhZjE2OGFmN2Q5M2EzN2NhZTg0MWRkNjYzNWNkNTdiZDgwZjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1MDllNGZjMzA1ZGY5ODRmMjc0OTIyMTQwNjY4ODNiOGFmM2E4ZDljZmVjNTIwNDZjNmU0YTc0NDBiOGM4MTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1NmQ2YjZhNDg4NmI0YzBmM2UwZDhkMDk4ZGYwYWVlZGE3ZWFjODMxYWNjYzYzMjlhNjI5YWUzYTdjNTYwODMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a7c1d57e7a1f4fe584d671929edaf2c4",
+      "statement": "trimGameValues 把与该等级游戏原值相等的参槽置为 null（原值取自随包资产 skill_status.json），使\"只是把游戏自己的数字抄进框里\"不算输入；表里没有该等级（手工添加的记录）时保留数值。它同时让旧格式文件读回正确语义——null 出现之前，旧版本为了让整行能写回去会把每个参槽都填上游戏原值。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.test.ts#L248-L267",
+          "version": "repo-lines-v1:sha256:5ded7f4d59afa5f31212c2e1f17cee467909347de4a0cf3682926cd61e003e1b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2ZGVlZTZkYzIyZGExYTU3OTMxOWExNDk4ZWExM2M3NmUwNjBkZjY3NmE3ZjNkYTJkYzE0ODYwYWI5ZDEzMGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZjViNDBiMTU4NDU3ZDE3ODY0ZjIxNzkwNzg2ZGQ1YTJlY2RiNjRiNjZhNjUxZjc4OGQ0ZTI1Y2QzMzAzZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ1MDEwMDdjNzFjMzk1NTMwMjI1MGNiMTI5MTdmYWQ3NThkNDMzZTIyMGVjYWQxMDQ1M2YxNjg5ZTBiM2ZiODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkOGIxYTY5MmZhMzA1MDE5NzgyNjcwY2RjMmU4NGVjZjNmMTZiNWY1OWIzOGJjOGY5MmJkYjdjNmIxY2YzZjQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L52-L60",
+          "version": "repo-lines-v1:sha256:2243f43ab2152c87b9594aa08e9ab1b71d409136cb95314cd2bbeafcee7bbbb1:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDVkNWFiYWNhMjI2ODBhZTk1MzM2NzAwZGY3NjYzNjE5N2E3Y2I2YzAwNGY0Y2Q3OWFjMWIxZmQyZjBhYzRhNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTU4YzQxYzI2NDVmZWMxZjA5ZGMzNTRhNTIwYTJlZTFlM2Y3YmVmOTIzZDNhYjBkNDQxOWYyYWRjYTE1MGNiMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDM3ZmY0YmRmZTgzOTRmYzMyMDBjODU0NjViOTViZDc0ZjE3YTY1NWVjMTkxYzRkNzk0NjkzYTA0ZjhlNjUyNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTJhZjllYjk2MmEwYzA5NzliMmE5Y2M5NTcwNjdjY2RiOTMxN2E0MzQ2ZWY2NWIyYzhkMTAwYmFkN2EzNDEzZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_664e7dac1fee43409760c876d01867fb",
+      "statement": "一个地址（key#level）最多一条编辑是整条链路的显式不变量：dedupe 留最后一条已启用的记录、该地址没有启用记录时留最后一条，理由是托管侧 PatchRows 按列表顺序逐条写、同一地址上游戏最终拿到最后一条已启用的；面板的编辑态本身就是按地址索引的 Map，这一不变量由容器结构保证。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L339-L364",
+          "version": "repo-lines-v1:sha256:8ff109e67740aafe22be36ef697d58951b6851ba599a999110df3e3bb32d9501:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmMWEwYjhiNjUzNmU2Yjg1NmQzZjJhOWM2MDI3ZGIwM2JkNDVmMDhlMDNiNzYyZmNhZDczMjViYWY0YTE2MWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM0ZjE3NzUxNWY0NTJmMmE4NzIxNWVmNmU2MGU4OTZhZWZjZDY1ZTU1YzgzYzllYTBkZDU1YmQ4ZjI1NjllOWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhMTM3YzU3NWEzYWEyOTAwYWM5YjA0ZGQ5OWZlYWNmODQxMmM2ZWVkZjk0ZTRiYjU0OTg3NzZjNGIzMTE2NjYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L65-L68",
+          "version": "repo-lines-v1:sha256:29191493549830e72c998687beb04f444fbdf056f053efbded3d7b01d21b2ef3:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzVjZWJkMGQzOWU0NTM3MzIwM2NlYWY2MDZhZjRhYjc5OTY2NTFiZmY5MGFkOTFmMTllMTJkZjM5ZDY1ZmUwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGMxOTMyMzA2ZmZlN2QxYjFjMGI5MzA3MjEzZDgzNDM2ZjMyN2E5YjQ5Y2VjMWVjMGFlNjI4ZTE2MTRkNzA3YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzlhNmM3OGI3NzUwNjUyNWI3ZTlhNzkxMmQyMzIzMDcwNjY1ODc4OWQ2MDkxZDU0NmIyMjM5Yzg5ZWI4MGMwOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDUyYjQ5YzkwMGJhMTllZmE4ZWZjZjM5MDM3ZjRhMGFkNTYwN2RhZjk4MDY2NTU0YzZjZWVjOGIzN2E3MDg0MCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L42-L43",
+          "version": "repo-lines-v1:sha256:6fabf3bbbe9c72f8e47cc711bc2ff4e380d0a013470b19d812b2cb852e497ea0:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjNkNmJiZmYwMmVlMzc1YjliMmE5NGI5YzI2YTk1NTlhMjI3MzJmODZkOTNlNjI4YjBkYjk2YmE5MDJiNzU1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjc1NjIyYmRiMWE4MWYxOWM5NDBkYWYwYjJjNDkzYzQ0MDA5MjcwZThjMzE0OTAwMjk2ZTRlODhlNDY3ZWMyYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDVmMzJmOTQ5NTU2OGVhNTlhZjhhYWJjNmNjNmUxMjMzMTdjMGQ5MWZiN2ZiY2RjMWJmYzk0M2I0ODI2NGE0MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDVjMDUzNDM1ZjQ3Mjc1OTM5OGIwOGY2NDMyOTliMmUwNmE4MGRkOGJmMWQxY2E2ZDhjMmM5NTcwOGVlYTEzOCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L77-L99",
+          "version": "repo-lines-v1:sha256:2a31a97fa0f9ab17aa8e3c614f09eb58ac951669fbd864ea722cfc014e7e897d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjNmJhODE3N2E5NjI0ZjA4OWJlYTVmMGRiMThmODY4NzYwNGZjYzk3NTRkMzYzNmUwNGFhYmFlMDRlMWYyMjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyMmZhYTUzNWJkMmVhM2Q1MmU3NDFlZDQ1NDQzNWI3ZmU0OWU4MzU4NmU5NDNkOThkODJiYmZiMjRkMWY1YzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExMzNhYzIxNzk5MjdlOWRmYjQxYTE0ODAzYmQ1YzJlMzRhNTVlNWNhNDliNGQwNTIzNzI3MGUzYmM2MThjZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ2MzQxNTM0NDE1ZTIzMzE0NjRiNzAzNDExZTdlNzYxNTRjY2I4ZDAwMzNlNDlmZDE2NTE1ZDk1YmM0MGUxMDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c328229bac9542778f602c49fa30e9c5",
+      "statement": "一条编辑的十个参槽按位置对应 LevelValue1..10，null 表示保留游戏原值而不是 0：只写用户设过的数字，所以本工具一无所知的参槽不可能被一份陈旧副本覆盖。补齐到正好十个的动作在写盘与读取两侧各做一次（Go 的 padValues、C# Config.Load 把显式 values: null 规整成十个 null），线格式形状因此稳定。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Config.cs#L78-L81",
+          "version": "repo-lines-v1:sha256:601f52da1492c8ac7f080a187ed207c01fd6eb1959c65ad08ed14e137ec7d8dd:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWE3MzVjZDQ4OWU2YjdiMGQyMjRiMzUxN2YwZWNiN2M5M2MwNGEzZGM3ZTMyZGE5M2JlN2Q3ZjUzZTcwMTg1ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTJhYTNmOWQ5NGZjYjU2ZTQ1OTBmNDBjOWY1NDU4OTg5ZDZmODBiMTY4NzQ2NjQ4ZmM0ZmZiNWMxNWQ5OWMzOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmJmZmY3ZTk1OTY2ZjEyOWYyNDRjOTBmNWM3YWQ1Nzg3MTQ0NzJiOTljMzM4YWY2NWQ3OTAzOWVhMDljMWEyYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTRhODc1M2U2MWY5YjEwNmViMmIwMmQ3MDlkZWYxMzdkYTU2YTRlOGNkNGQ1NzQ1MGZiYTBjYWY4MGI5YTM4ZCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Config.cs#L9-L32",
+          "version": "repo-lines-v1:sha256:da6199d4a5c69414f86574f070a576794aaf147d7d1c39185a710e1209d72c7f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczYjg5ZDQ2ZDM5ZGVlYTg1OWI4Zjg1YThiNzU2YTJkMDFjODIzNWViZjcxZDRhZjFhYjllZTllMzdlMmJkMDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhMThlYWRlMmEwZjc2ZDgzZjY5MTRmOTUzMDAwYjI4ZDA5Y2UwMGUyMDIwNDY1ZjdjNWY0MmY2MmNkYWRiNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFmZmFkY2YwYjM2ZDY0NDIzZDhkZjBjMWUwMDkzOTA4MDI5YzNmM2NhMTA1NDU0YmIzYzNmYTdlZDA2NTc2YmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUxZDljNDQ5MjVmMDk3MmI4Y2RiMjdkMDFiNTIyNTM5MzIwNGNhNDFiYmExYTRhMWU5NmVjNjhiNWQ5OWE4ZTAifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L14-L24",
+          "version": "repo-lines-v1:sha256:39b43dc7b2a94210fb0fedd7d09368b2f706e290fdf9c3e2f5114b0aaf6f7474:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyNjAzNTliZjdmOThmZTk3MWMzYTVmNjY0ZGJhMTA2ZGVhMTc2MzlmNWM3MTIzZTFkY2FhM2Q0YmI0MTEwNjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc5ZWRkNzJiYTZiNDAwODNjZTk1MjY5ZmE1NmZjZjNhYzFiZDk4MjIxYWE2NjIxYTY4M2Y3ZDU2MzJiYjIxZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2NjI5YjQzOWY2YmM3MGI2ODMyYzFhYzlmNWQwYjViNmE5ZDdiZGY3YmI1ZDBjNDA0NDBjOGU1MTU5NmI4OGMifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L155-L161",
+          "version": "repo-lines-v1:sha256:35ce910f1a92c4caa74596163578af53fff9c61c7d725b475074225e1b20de99:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODY5MzI0NDIwNTM1YTVhZjBhOTI2YjNhMWZiYTBjMDM4Y2Q3N2JiMjI1YWIxNGEwZTdjOGEzYTIzNjMzZTQ1NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGQ5Mjc2MGFkMGRhYjkwZWUxNWUzNjUxMzhkZjY3ZTM4MTcyMDI0NTE2ODIxOGJjOGE1MzYwZGM0Zjk1MDMyNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2RlMDg4NTc5ZDYyNDMzMzlmODg0ZmNkNDZkNzZmMDRmZTI5MDhlYzRhYjg3YTc4MjQ5ZGRhYjFkNDE4NDZiNyJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice_test.go#L39-L71",
+          "version": "repo-lines-v1:sha256:a184529822f18fb76c2cdae49a15ba7b54ef75b7bcc5e286df9481837139f5e2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiYzkyMmY1MzM2NjkyMjMxZDhkZTk1MGQ1NWRiODEwZDBkNTNlYWU5OWUzNzljNzEwY2RjNGNhYjFmNzZmYTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEzZDA0ZjZkNWZiYTA2YjQ5Y2U0NWVmZTBjYzIxY2M4MjBiOTQ2MGRiOTUzYTFlNDBlNmE1MDc4ZWQ0MmMwYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI3MGMzYmM5ZTExYWE5NzU4YjI0ODBmNWE2YWRmM2QwM2NjMDBkZmYyNDcwYTU3YmUxMzZlN2E0MGM0MWY4ZDcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fcc5a455c495461d9b92d1583a0f300b",
+      "statement": "前端每次编辑都把整份列表交给后端 SaveEdits 并且不等答复（后端返回不了有意义的状态）；列表还没读回来之前绝不写盘（editListRead），因为后端会整体替换列表，交出一份残缺列表会抹掉用户其余编辑。这一页还刻意 keepMounted：卸载再挂回会在防抖窗口内读到旧文件，屏幕上的新数字消失且旧列表随后覆盖磁盘上的新值。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L387-L394",
+          "version": "repo-lines-v1:sha256:182b1f8fe4bdb32575073868a8419390e8c9783d5b543fa45431484d291732bc:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2NjMDVjZTEyODlkOWYyZTgxMmQzY2ZiOGYyMTMxNzJlZTQ5NzFhODM4ZDU5NzFmZWU5ZDQ5MGFkNDZhYTYxNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjJkM2FlZmRlYTYyNjExNzcwN2E0ZWViNjUzNDJjZGNhMzg1ZGY1Y2JmMDM2NTczYTZhNmMyZjc3YjA4ZjE4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDdmODQ0NDM2YzdjZWM5MTcxNWMxYTAwYTdlNWMzNWI2YTlkYjVmNTM1Mjc0OGE2Njc3MTIyM2E1ZDU3NWUyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc2MjZlMmFjYTdkOTNhZjIzYjg5NWZjMGU4ZGE0Yzc5OGVhYjdjNDkwODNkZGJjNjk5OGQwNjFmZDAyYmE3YSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L340-L359",
+          "version": "repo-lines-v1:sha256:b1f097e5be1e1ac64c1abf96601900bace8b4ed373d2ac011d4f8d28c5b2e215:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmODU2NDkwN2M0OWM4ZGFiZGUzZTI0Y2FkMjdiMjE4OTJlN2M5NGE3ZmYxZmU2NzBjMDlhMWVmNzllNmNjZjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhZDRkZjkxZDljZTlmZjk0Y2ZiNDAwNjZiZjhmNWFlMmYyYzI5Y2FkNmU4OTZlMmI0ZjBhNTBlNGM2Y2Q1ZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0M2QxZTVkZTU0ODVkZTA5MDVkOTk1MDUwMWMxNDBiNzQyNmI0MGY4ZmNlOTc3ODUxMzZiNjIxM2MxNTdhZDYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L73-L76",
+          "version": "repo-lines-v1:sha256:f58714452594ae6805114f4f09bb92218c8116f249296533184fa4c85384ed5d:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmQ3OGUwODhkNWMzYzQwZTk2MjhhNjcxNjA3NjM5ZjY3NTU3OGNkNTE5Zjk2NTcyZmY1Nzc5NTE5YjQ5ZTZlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmNmNDY3MjI2YWY4YTg1ZjU3NzUwY2JjYWRjYjMzMDNiYzAwODMzNjVlNjlmNTgzYzJhNThkOGYwZDUwODRhZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTZmM2MzY2NkOTAzNmRjYmFkMDQ4YmI3NjEyMmZjZTJlZDg0MWNlZWFhZGEyYTE4OWZjMjNjN2YzOGQxYWNkZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDhhOTU2NzFmMzU3ODg0YWM2YzA0NWIyZTgyNWMwZTkzMDc3OTQwZmIwNmQzOTZiNzk1MWM5MmY5YmZmNGMyNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a830b5635a0b46a3b50ddc0f169fd044",
+      "statement": "落盘是 500ms 尾沿防抖：SaveEdits 只补齐参槽并把列表交给 debouncedWriter，写入发生在编辑停下来之后，因此一串连续按键只换来一次写入、写出的永远是屏幕上最后的状态；窗口可能在防抖窗口里就被关掉，所以 OnShutdown(editService.flushNow) 交出还压着的那份。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/debouncedwrite.go#L23-L45",
+          "version": "repo-lines-v1:sha256:53034c3ac0dad6a6353b158d5b375af3c36d33dbd6a5ae04a3fe86789976f006:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwZjk2MTliNmIwOWE2MTQ2MjBkYzA5YmY5ZDMzZDkxZWNjNDcxNzNlZWRmMWUyNGJkZGU4YmE5NDIxMWZiZGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyNzY0ZGY1NTJkYWFkNTE4NDNjMWIzYjM0OGJlOTc1OTYzMTQyNTNjYmY2MmY2YjlhZGYxNmQ5NmRlY2VhNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlY2E4M2FlMzM0YmM0ZGJkYmE4YzZjOTM0YjBlZGE5M2ZiNjQ1OWQ2OGFkZDI0OGQ3MGJjY2M5ZmM5NTJmZDAifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L212-L239",
+          "version": "repo-lines-v1:sha256:5bc91f2418dfa493b09769d797e771dd0d4298b90c367ac8ecf572259965aa6d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjYjJmZmIzNTc5MWZkY2FkMDcxYmI0OTA0YTc1MjJmZmZjZTdlYjA5NjFiMDZhYmUzZjQ3YjBlNjM4OTVhOTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4NDU0NzBkY2EwYTAxOWVkOGJlYzhlNzY4YzQzZmRiNDA2N2JmZjEzY2FiYzJkNWIxMmNkYzEwNGE4ODBjMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljYjU2OTQ1NmYxNzkwZDMwZWEzMjdmZGY2Nzk1MThmYzAxNTE3MjZmNTU3MDc3NWM1ZWZlMTYwZWFhOGQ5NzQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L31-L35",
+          "version": "repo-lines-v1:sha256:800edfaf2fa30d9de66c1328c73e310d90fbae70476c43b4d983837c47b2b1fd:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDZkOWFjMjVlMDgxZGE5N2MyOGMwNjM0MGI4NDExMzRiNmU4NGRjMzQxZmE1M2IyZjNhMDNlZDM3MDUzM2YzYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTdmMmFlMWVkYTVjMjM1MTg3YzgwYjE3MDNlYTliZjEzN2M2NDE5MmU3OTUxMWEzMDQxNjk5OGExMjViOGU2OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmIyNTAxYjQ2ZDM5NWZkNTk5ZDkzODdlNjM2ZGJkNTVkODFlNWUzNDNjODFiZDg1ZTg5MjI5ZTg0NGVhMGE0YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQ5OTNmZjZmYTg0YTNiMTdjMGUzMTgwMzYzY2RiN2U0YTZjZjg2Y2YzZmFkNWU1YjI2MDQzMDlmMDQ1NzQwMyJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L89-L93",
+          "version": "repo-lines-v1:sha256:81b2a0b923ab16da80c3cabc62200882eccd5d4e6643485c7c7610032de29400:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTk1MzczYjhkMmJhMzM1NjUxYWJkOGEzMTIwMGFlOTgyNmRlNGUyYTcyMDA5MjI1NTVhMDA2NDRmYmQ1ZTZjMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjU0NWRlNjdiOTdjYmEyYWYxOGI1ODM3MzExN2ZhN2JiZmMwZWE0MjQzMTU5ODkwNjI3NzU5YmE0NmQ1YmY1OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzkzOGIzMjU2NGVmNTcxNGFhMWQ3NzBmMmJkNDYxMDkzNTg1MmE4YTIzZjQ1MmI4OTU5MDdiZGJlMDNjYWQyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGYwZWFiYTE2YmEzZGFmZGM0NWY2M2U1NWIxYTc1NWM0OTM5YzNiZGU1YTQwZTQ5OTIwOTY3NDU3NWY1ZTZhZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_78b44d881f7b410b89bcd8bbabfd7de1",
+      "statement": "写盘是同目录临时文件 + rename 的原子写，所以运行中的 mod 永远读不到\"读到半截\"的 JSON；防抖定时器回调里的写失败已经没有调用方可以返回错误，于是把待写放回（一次瞬时 IO 失败不等于永久丢失）、记日志、并通过 GBFR.SigilLoadout.SaveFailed 事件推给前端，前端用与立即失败相同的对话框显示它。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/atomicwrite.go#L9-L39",
+          "version": "repo-lines-v1:sha256:d81c46e92eb01d3cbe3b0703c6f368547ad5827944aab47e777c2b0b1c9a83d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzNGEwMjkyMDc4NjYzY2M1ZDFmYWFlOTFhNTIxODc1ZWExMWFiMDAwMzdiNDkzYTdkNzljYjg5ZDEyZDYxMjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU3YjA0Njg1NDE3NjQ4MzMyMGU3YzQyYjE5YjY3YWZmOGM4ZDhkNTJmYTI5M2JhMDdlNWJhNmU5NjA1MGIyOGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/debouncedwrite.go#L53-L68",
+          "version": "repo-lines-v1:sha256:ea54c9f3cf99db74c116cd2774e73ab78727dbad7692ec33fd4ac74d7ffc3b6b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjMmNlYTA1N2E3MDA1MDU0MDhhYzE3NWI5OTcyMDcwZmRlMTlhZTFlYTkyOGE3M2MxZDlmNTMzY2NhNGFjYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0ODg1MGI5OGJhMmQ1YjIwYTBmNGNjNmUzNDVlMzFjMTdmNGYwNmZlZjM5OWFhMDYxNWVlODc1OTE0ODUwM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L37-L39",
+          "version": "repo-lines-v1:sha256:f558264faad97e78c77fe365be0fa153b8f9443afd5eeb90cdd401eeee9a8f05:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzgwZWQ3NTQzZWIxZTNkOGNkZjM3ZjJlNjJiOTliODFlN2UxYTU5Yzg1NDI3YTIxYzg1NWY3YjMzZDFlMDljMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWNkM2UzNTBkYTA2Y2FjZmIyMjg0MDhmYTQyNTlkYTlmYmU5ZmM0YWZjZGZhYWY2NGMzNDEzNzViNzYxNTM1YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWZkYWNmZjRkOWZmNTA0MmQ2MTQ3MGRmMTViOWQ4MDgzNTk2ZjBjYzI1MjQ2ZjkyYjM3NzQ5MTVmOTkwNjRjZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmFjYTVhYzRmYmNmYTY0YjIzOTQ4ZDVhNWQ1ZDI2OWUxOTY5NWQyMWZkYzUzNGFiOGE3YWNhODY0MGYyNTA1NiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L180-L186",
+          "version": "repo-lines-v1:sha256:0ac1518144cb3d4bf7ba9520e7d34426d11ad90db33765b79b8fb996361a5250:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTQxYTZhZDI0YTg3ZDU2NGY1ZWUyZGE3NGFiYjdhMWZjYzkwZmJlMDI3YzFkN2ZhYzgwOTAwOTkwYTgzOWE3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODRlNDIwOGNkNmZmYjhjNGEzNTQ3YjJmNTRhZGExOTk3OGMzZjM2NWU3OGY5NTAyZWY1MTQ1Y2RkMmFhODU0MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWQ3NWE4YTQ0ZGEzOTFlY2E4MmE4MjNiODMzOTFmMGJjYWY5MDY4YmE3MzIzNmI2NDE4ZmJiMjE5Y2E0NDIwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjNjZjgzOWRlYTQ1MTk3MDZiYTc4OWYyZTBhYmUwZDVmYmYzN2Y3MjNkMmRiYzQ2NzAzZTk0M2NlMmZjMjc5NCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L39-L44",
+          "version": "repo-lines-v1:sha256:9d0fd06a76cfe903f83e723e73f3bd864d48d1b5bceec5e865573e8d63d73f66:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3N2E2Y2Q0ZGI0Yzg5Zjk2MjQwY2ViZWFhZmRkNThiN2QwYzM0MmYwYzVkZWYxNWExN2ZmM2U3YmJiMmZhYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTUxOWRjZjAxNDI3YWJlZjQ0MWViMjE0M2UzMzljYzQ2YjZiOWNkNGUyNTEzMDgwOWZlZTc3NTc4OTZhODUwZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTk2MzZkNmQxNWU2Mzc4ZWVlZjBkZmY3ZTgzNzYyMTgzYTQ3ZWRmYjEwNDUxYjRlOGMwYzI1NWZiY2U2YmZjNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjgyNzY5NDJiNzVlMDA4YTgyN2U2MzQ3NWY0OTUwMGQ3Y2EyNDIxNDMxOGUxMmMxNzkzNDhkZWQwMmNjYWIwMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_706d660ffbb24f47a4f664fcd04b22bf",
+      "statement": "编辑列表的缺席语义被刻意区分：nil（前端传 null）是完全不写盘，空列表是写出一份\"所有编辑都关掉了\"的文件（对 mod 即撤销全部编辑）；读取侧文件不存在读成空列表且不创建文件（没有内置起始编辑，否则打开可视工具本身就是一次对游戏的改动），而存在却读不出或解析不了是错误而不是空列表（否则一次误触按键会把这份空覆盖回用户的编辑）。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L171-L229",
+          "version": "repo-lines-v1:sha256:ae4c3bea01866b85b7126b88c2c2671c0e18f9e933f12ce1639e2d792f818bdf:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0OGYxNGJjOGE0ZDU3Mzc4ZGY5NzA5NDFhZDNhMzMwZTc5NDA1MTM1MGY5ZTUxMDMyYmMyNTMzZThhY2NjYTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNzhhNDMyMTc1MzRlZThkYzA0YzQyNjZjNjg1OWJjNmUxNzczMzAzZGYyY2E3OGMxMTkyMzZkMzUzNWU5YjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkzODUxNDJiNzgzMGE5ZTQxYWZmYmE2ZTA1NTg5MTYzNmFjYjFhMGExMjQzMGEzNTM1NWFiODI0OTU4ZDlkMGEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice_test.go#L191-L243",
+          "version": "repo-lines-v1:sha256:3a4b34f0af86a3682d262384102e866130a8130fde28ef9dcd8df60365600e00:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3MGUzY2Y1YTcwOWZmNGY3Mzc5YTM0ZDJmMDY2ODFhNTdjMDA3MWU2ZDViZTRhYzc0ZDBmNmVlNzcyZjY0OGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0NWNhYzc4Yzk4Yzk5MjRkNWQ1OGQ5YjIzODZkOWEzMzlmZDFmYjE2OWI5MmU2ZDQwODdjMGVkYzU2NTdmNzIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczZTc1M2M3ZGE2MTIyYmFjNjM1YmMxZjNkYTA3ZDVkZTE3YTc1ZDQxZGQ3ZjQ4YzBjNTMwYWYyMDA3OTU0ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwODliMmRhYWY2MGUzYWIzZTdlMWRjMDYxZDA4NmU0OGQ0ZDQwZjExMDY4YWY2NWY5ZGU5YmZlMDI2NjRiMzgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7a998331900d48e88293d8434eeeeacc",
+      "statement": "托管侧唯一的时间来源是宿主每 250ms 的 System.Threading.Timer，每拍依次调 LoadoutConfig.Tick、SigilEditorFeature.Tick、Hotkey.Tick，并用 _ticking 标志丢掉重叠的拍（定时器回调不串行）。250ms 不是量而是投递节奏：数值要到下一场战斗才生效，它换掉的是一条阻塞在 WaitOne 的线程和一个内核事件对象。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L103-L123",
+          "version": "repo-lines-v1:sha256:45d9eae2c4ad6e31c282017091bf2f775918ce7744f137315c5f8b68c5a7f050:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkYjllODJjYWU3NDZmMTM1YzdhOGRkYTI5YzJhOTBjMDMxYWJlMGIzYjdjNjUyMjM2NzY0MTI4YjQzZDU2NmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMTgzZTU0NGRiN2VjYjk0Yjg1ODUzMjE0MjU2ZDUzYzk4NmE5YjE3ZTg2YjUzZjEyYjE3Njc0Y2ZmYWMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5MDM5YjVkY2E2ZGQ4MWY1OWQ5OTM4ZjE3ZDZkMDQyY2JkYmIzNzhiYzYyOGUxYWUxNWJjMGQxNzgwODg1MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NDdmYWMxNGU0NDMxMzA5MGJhYzBkODhjNmEwOWVlNzQ0MGY2OTFhOWIzYjQzYjY2MDU3ZDk2ZGQ0NjM5YjUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L18-L28",
+          "version": "repo-lines-v1:sha256:4eece660effb5c7c3daa330fd6f9bde86e42d716d8ded1b7a43a7c44cd5762b7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwZWY3MmM0YjY2MDExNjEzOWRkMTM2OTljOWQxYjFhNzY1NGVmZDUyZjVkNzdjOGU2NjEwMTg1ODI5YzQwZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3N2E4ZWZhNDllYjU1MTc2NzI1NGE0NzQyYTcxM2FhMGUyYzcxZWFkOTljMzE0YmQ0NTZjMzg4ZGMyZWZhZmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJhOWE0ZDI1ZDU0MzFhMDg3OTQ5MjQwMzM4Zjg3NWQ2NzY0Y2ExODY0NDk1ZmZiYmZhYzEwMWVlYzllNzUxYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3NGUyNTE0NGM1NTQwOTg5MjA5ODNmNTZlNzhiYmFiMTQxYzVhNjFhOGY4NGY4MmJiZjZjODhmNmYyNThkM2MifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L149-L174",
+          "version": "repo-lines-v1:sha256:f66f4299e84c0075d21f5ba38301c0498330b689d1ed3b8db7c74cf3e1bb718b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ4MGVhYTY2ZTVlMzFjNjE1ODAyN2Q3NjQwYzdkYTRhMjNjNDhiNDM1NGQ1MWM1ZDk1YzExMDdkNDBhYTU2Y2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmMjFjZjQ2NzNmODA5NzMyZGQxY2Y0M2JkNWUxYzY0YzBjODM3ZmQ3Zjg4Y2I1NTM2ZjEzZGQzOGFhODU0OWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_06669f28b2474acbaf71d6fb24e5c137",
+      "statement": "因子编辑用 FileStamp 的\"确认生效\"那一款版本门（Now 取版本、Pending 判断、MarkApplied 在确实生效后宣告），所以失败后 Pending 仍为真、不需要\"重试\"这件事单独存在。Bootstrap 里版本号必须在读内容之前取，并在造表之后复查文件是否又变了；变了就不写也不推进版本，否则会用旧内容配上新版本号把一版编辑静默吃掉。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L78-L126",
+          "version": "repo-lines-v1:sha256:17e029186dd4faa570fc9e02c11aca98da805c526b63ef6ed42d57f0ebc7bf80:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2M2MzYTc2Y2QzMTNjYmNhOTA4YTcxYjM1NTM5ZjBkOGE2ZTM0OGU5NTRhNmM0ZGZlMDhhOTdiNDhmYjhiMjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjMzI3MGQ0ZTdmZTU0NjM0OGI4MDI5N2NiNmNlMjg4NTZmYzdhOTI3ZDdmMzBiYjlkYWZlMzZlMzUzYjlkNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmYWU4ODY0NWU3M2Y5Y2NhODZiOTU1ODcxM2ZmMmQwNGRkNzhkYWM4ZTVlNWE3NTAyMTZjZWY4YWQwOTE1ZTEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/UserConfig.cs#L28-L64",
+          "version": "repo-lines-v1:sha256:e7a7380f8c74fbdfaa2db7bf9c2e5c59e732736a07a1ee4acb8c45fb33d72d6c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMTk3YjE5MDQ4M2YxYjcwZDQxNDEwNmFlNjEyYzk5ODdlMjczMjY3MDE1MGJjYTBjMmM5NzRmNzkzYzBhMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlNTQ3OTFmMDZiODQwZTUyOTA0YjE3ODJkY2E5NWVkMzAzYzUyOGM0N2Q4ZmNjZDE5YTI3MzM3ODEzZmY1ODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5OThhYzg5YjA1MjYzZTA5NzYxY2IxODRlNmMxMTBjMzg5ZDVjMGI5YmRiNjAwNzY5ODIxOTQ2ZjNhYzg2M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_66f40c12d81b44148c119522e659e2d2",
+      "statement": "造表的输入是 IDataManager.GetArchiveFile(\"system/table/skill_status.tbl\")——权威那份表来自游戏自己的归档——并先过 HasPatchableLayout 形状预检，不过就一个字节都不进游戏；PatchRows 逐条跳过未启用、key 还不是 8 位十六进制、level < 1 的记录各记一行；PatchRow 只把非 null 且有限的数值写进对应参槽（手改文件写出的 ±Infinity 会保持游戏原值并记一行）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L308-L336",
+          "version": "repo-lines-v1:sha256:1209b966a96054e2a5482b9b3a9e10288116f6908624a41b9ef6ab66db4cc75e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI1MjE5M2YxMzc0YzBkMTBmMzZhM2MwNjdjZGRiNjM3YTNkY2Y0NTZiYzRhOTZmYjAxNjE1Mjg4OGZhNzM0NjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNiN2U1YzY1NWE1NjgxMzUwZDZkOThhNDBiM2FiYWQ4MGRmZjZiYjEwOTU1MmE3ZjhmYjdlZWZjMGYwY2JhYzIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L338-L364",
+          "version": "repo-lines-v1:sha256:7e4e10b6d9d38ef7ffcf97cd9086f3cdf21622b3e0de8bc60fccb16d60daba8a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0OGJhNmMwY2JjMTQxN2Y0N2RiNDMyNzc2Y2E1NWRlNjg2ZTkyNjgyMmQwYjg5ZTM0ZGUzOGY0YTE0OTlhZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkYWRkOThiMjJhOGQyYTUzNjgwOGY4MTdjNWU2YzdlZDgzNjhiM2QxZTQ5Y2YwMGQ2YzJhNGJiYjJlM2E4NjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhMTM3YzU3NWEzYWEyOTAwYWM5YjA0ZGQ5OWZlYWNmODQxMmM2ZWVkZjk0ZTRiYjU0OTg3NzZjNGIzMTE2NjYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L408-L466",
+          "version": "repo-lines-v1:sha256:eab654f22e00627ee9baf0df401f9d3cb1115b824f20e91564698c5789a5dec0:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY5ODFkZWYwNWI5YzVmYTc3NDVjODMwZjU4OWRlOTQ5NDVmNGMwMjkyM2ZmMmM3Njk5ODYwZWZmNzg4NmM0M2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmMzJkZDRlMWRmZGE2N2NiN2Q1ZTkxNDMyYTI0Zjk4OTJiMTVlYmFjYTNjZDBjMWIyMWJkMzI0OTA1NDRkY2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5ca5dbb368334dfda6bdd9a8f37cc60b",
+      "statement": "逐行\"这一行的值\"日志的基线是上一次建出来的那份表（_retryTable 优先，否则 _currentTable），不是刚读出来的归档：归档里永远是原始值，\"变了\"必然成立，于是改一个输入框就会把整张编辑表重打一遍（实测 6 条 = 12 行）；两份都没有时取补丁前的值，于是全部会打出来。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L428-L466",
+          "version": "repo-lines-v1:sha256:3dfb7d7c1f06082ffd5ae29f7e9faae2d1cc55668a7cc657fe806a9df858533b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxOTU0NmEyNGM4ZmEyN2Q3ODk1YmE4MDBlODEwODljZTkwYjZjMDFmNzBmY2UxZmRkMjk5MGM4M2RkNDFlMTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0OWJjYzM1NDU3N2YwMjM3YmMzMGVkMjM4NTZjNGJiMTc0MmQ2NmRlNTU3ZmZjNWVmNTI1MGY3MzcyYzE4ZDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmMzJkZDRlMWRmZGE2N2NiN2Q1ZTkxNDMyYTI0Zjk4OTJiMTVlYmFjYTNjZDBjMWIyMWJkMzI0OTA1NDRkY2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_44797b001c8f4691ab91e9c41e317335",
+      "statement": "Publish 是唯一交给游戏的路径，且顺序不能换：先重新注册（AddOrUpdateExternalFile 再 UpdateIndex）——游戏读档、开界面时会重新解析这张表，不重新注册那些解析会用旧值把行重建出来、当场抹掉实时编辑——再做原生内存写；注册抛异常只记一行、不拦住内存写。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L245-L279",
+          "version": "repo-lines-v1:sha256:7661ab7971ad320a75caf5ea519559184f4c723424712e93a49007d3441d4b27:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIxMjA4NTUzNDhhNmRhNTVmNzIxMTA0MTdkOWZjNWI0NGI5YTk0YjE5YTI3NDFmMTM1NTUwN2M1ZGUwYjIyOGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiYjc1MTBiZDFmZDViNTdhYTdkZDFmYWEyMjNiNTZmYjU3MzExNDAwNzRjYTk1ZmU3MWUwOGIwMzRiNGY2NzkifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L366-L379",
+          "version": "repo-lines-v1:sha256:023565b27255adcd9a8c118d2a702361e13c42d13769057e4b563242f943f523:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkMjdkZmQ2MDVkMjM4YjA3YTYwOGIwMzE1ZDEwNWIzYTIyYjZiZjA2MmU5OWEyMGQxZjI1MmMwODAzZmYyYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYwZTA5MDM2YjBhNDA5MjZhNWM2MjIwZTUwOTM4OWJmZDhlOWQyYmY4ZjUwYmZlZGUyMGZmYmM0YzUzN2EwYmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_89a9b5eea78d4fee9e020c42afe8e90d",
+      "statement": "一版的 mtime 只在两处被宣告处理完：原生写入返回 ≥ 0 之后，以及\"这份表与上次交上去的逐字节相同\"那条捷径（内存里已经是这一版的字节，确实处理完了）。不标记那条捷径的话 Pending 永远为真，而它又让\"同版本\"这个节流条件失效，于是每 250ms 白重建一次表；基线未知（启动那次没产出表）时不比，让那一拍照常做一遍原生写。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L226-L243",
+          "version": "repo-lines-v1:sha256:0992c3762abb0338ca54d4d0adaaccc7e1e100e89eeda4726a8eafec4b33ddb2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3MjMzZTA2NjBhNmJjMGUwZDgyOTEyOGZlMWJjOGE5YTdhM2JmYTBlMWQxYjc3MGM0NGJjY2M4ZjJlM2M4NjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzMzhmZDI4MWYxMDY0NzIxODQzZDM0ZjA3OGNjYzJjNGNjNjk4M2U1YzgyYmQ4MmJlZjk5MjYxZWQwNmNmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5ZGQ2NmI4N2NhODE1MjVhZDk5NWU4NjAwNmY0ZmRkNzdjMTQ5NDNiMTgyNTQyMzc4M2M5YjdjODI4NmE1MWYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L272-L279",
+          "version": "repo-lines-v1:sha256:de2dd161c3f3f7f9af991bc317e84155aa968750e6dc3500d2d8e4ddd74582a6:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDU4M2U1MGExOGYwYWIyYzFiMGJhODM3YjBhMjhhMWUyMjQwNGE3YWFjOWJlMGEzODFlZDQ3MmVmOGNhMTQ1MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGFjYzVkODQzYTEzNzdiMjBjNzU1YjQwNDA3ZDMyZDg2YmZiODRmNjJmOWQ5ZTUxNGE3YTQzNzQ2YTQxMzM4NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmJiNzUxMGJkMWZkNWI1N2FhN2RkMWZhYTIyM2I1NmZiNTczMTE0MDA3NGNhOTVmZTcxZTA4YjAzNGI0ZjY3OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d663a120c7464566ae183e2f660a55bc",
+      "statement": "拒写不推进版本，于是下一拍的 mtime 门还会放行——重试就是这一条机制本身。同版本重试复用上次拒写留下的候选表（_retryTable / _retryTableStamp，省掉一次 328 KB 归档读与逐行比较），并按 RetryIntervalMs = 5000 节流（只节流同版本重试：文件一变立刻处理，第一次尝试不节流）；同一版本只报一次（_quiet = stamp == _loggedAttemptUtc 让 LogAttempt 静默，版本一变重新开口），原生侧的 refused 日志也只在其拒绝码变化或中间成功过一次之后再报。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L126-L153",
+          "version": "repo-lines-v1:sha256:b22e4944366517a1d82a649204dfe3496f1112f7fef7c45a8406c12f31ebc486:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzZWVmMzM5MWFhMWY0MzcwMDY0YmFlNzliYzA5NWNkMTJiNWU2YzRhZWFhMmYxMDcwNTQ4N2VjZTQ1MTMyM2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2ODM0YzYwYmNlZGU2N2UwZjEyMmYxMGU5MjY4ZTkzNWJjMTRmZjM1ODQxODY5M2MzZTExMjFmMTFmNzY2NGIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L164-L200",
+          "version": "repo-lines-v1:sha256:42a25adb3f72600863a1aac966dc38d2a93410ef802931e8d5f7d6744a8c6b8a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNDhiYjU4MzMwZGIwNmE4MmI3ZDU5OWFlZjU5NTllOGRjNjRmN2UzYTA3NWZhMWZlZWU1NjUwNzU0NDIyNjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4NzAyYTA5YjBhYmE0OWM0N2Q2YTM0M2QwMWI4NzE1ZDQ2ZWQxOGNkZTM3N2RhZjJjZjJmNmE2OTdhZDkzODUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L219-L224",
+          "version": "repo-lines-v1:sha256:388d42196807bb1d77b11add88cd20f66e8b4256a067382bfa87e4978d4fa196:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTE4MDIwNWYwZjEwY2ZkNWYwYTA2YjJhNzY0NmY4YWMyYTU5NTg0YWNmNjdhMzQ4NjcxMTE5MGUyM2RjZTdmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjMzOGZkMjgxZjEwNjQ3MjE4NDNkMzRmMDc4Y2NjMmM0Y2M2OTgzZTVjODJiZDgyYmVmOTkyNjFlZDA2Y2YyMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDk1MDE4MzRhYWJlZDFjZDc2ZGU1MDVhNjNmZDRmZTkxZjAyMTQxYzE2MTAwYWE3OGJkM2Q1NmFlN2JjMTRhMCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L263-L270",
+          "version": "repo-lines-v1:sha256:7e4ac7886edfc39a2329df9a76b924064bad503a55a14989e350d8ff829afff4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTE3YmJkZGI0YWRjMmNmYWJhZTEzNTE2NjZlMzI3MzVlN2MyY2M3ZGQxZjIxZGZlM2ZhZjcwYTJjNThhYTU2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjczYTMyODc2ODczMzM3OTM0ZGM4OGQ1NmQyNjExZjQ3N2RhZGM4ZjNmZmQ1NzM0MDgzYzJhYTcwY2ExYjg1YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGJkZTZiMTlmZTM0NDk2MTY3NDUzZmI0ZGNlNjAzMGQxYjcxZjUzMmU4ZmRiY2Y3N2IwOTlmZWRhNjAzNGM5MCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L42-L56",
+          "version": "repo-lines-v1:sha256:a3ee70667f44ca3e6bcb37099da02df9cfc4b275f15e8bd9d85758c96d4e29de:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NzVlZGRlNTBkNmIzMWIzZmZhMmVkODg3NTNiZjEyMmQ0Yzg3NDg2YmExODUxMzdkODU1YmRhMWY3NWY2NDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxZWUzZmE4MTkwMjc0ZmRiY2ExMTNjMmVjOWE5NTM1MGUxNDQ4MTgzOGJkMDQ1MTNlY2M3NmRlZmRlOTdkYTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2OGNmNTVkM2FhNGU3ZTAzNTI3OTVmODAwODViY2VhOGEzOTU3ZDU5MTQyZjJlMzBjM2EwNDkwMjE0ODg4NWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjMWNjYzRmMzM4NTVkMTQwMTQ3ODNjZGZiMGUzYmNhMDlhMTFhOTFjNGU0MzM1ZWU2NTE5MjU1YzI4YzQwZDQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f5d4f4135de749f5826ff2839aefada1",
+      "statement": "启动那次写与运行中的热应用是同一个操作：Bootstrap 把刚建好的表作为 bootTable 交给同一个 TryApply，走 TryApply 而不是 Apply 是为了顺带登记\"这一版我已经说过了\"，否则第一次 Tick 会把这同一版当成新版本、既不静默也不节流而白重试一次。启动时游戏通常还没把表读进内存（那被写成分钟级的事），于是那次内存写通常先被拒——编辑已存进文件并重新注册，靠 5 秒节流的重试直到就地写成功。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L176-L196",
+          "version": "repo-lines-v1:sha256:7fb1952995d9cbf8dc466ab5f871c66f096611d0cbb39cb3b0b5f18cad64aeef:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjNjlkMjYyOThiNWIxMDM3ZDg5N2Q1Yzc0OWY1NmY4ODBlMDcxNmI2YTBiZDM1Mjk0Mjg5ZGU1YmYwYjdlNTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkOTYwYTM0MDVhZTVkY2NiMTJhM2NiYjAwYzA3MDcxNmE1MDgwNDBjNzYwYjVhMjlhOTMxODc4YTIwNmMxMGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkZjg5YjMxMmVlMTZkZTgzMTI1MTI1NTAxZjAzM2Y4YWE2YzQ3NTI5MWQ4OWYyNzY0NzMzMDEyYTY2NDVlODUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L45-L51",
+          "version": "repo-lines-v1:sha256:cc944d8b3d1eb15c505c9969194c63db45603051cc63d31a2c1013380263f404:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2ZhNWI1OWI0NGQxYzdjYmI2Y2U3NWRkNDRmMDBjOTZkNjhhNzIwNWM1YTFmMmE5YWFlOTA4MjlhOTQwMWM1MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjMwODhlM2FjYWZhNzQzMDY3YjExZGY3NDJmNTcxZGVhMmE5YmY0N2FiMjc0NDk1MGNiMTY0YmFlNjdhYjMwMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTYyNDc3MzdiYzFkZjk2NzI4MzMzMTEwYjBjY2MyOGVkMjlmMGQyNDgzMjQyZDE2ZDAzNjdmZDBlOWJiNTczYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTZmNGYxNGVlYTdiOGY5ZWUyNTU1MmRlMjI2Y2NlZjEyODA4YjM3MjkyODVlZjE5ZDBhOTM4MDRkMjgwN2Q5OCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L64-L126",
+          "version": "repo-lines-v1:sha256:c5f2823e58638b5de00edf91bedd6f50490f20a30cbad6531f7de2d48a94312f:eyJzZWxlY3RlZExpbmVDb3VudCI6NjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzMzUxNzE0NmJjM2QyOGU4MmI3NTI1MWNhZjg4MDI4ZWUwNmQ5NTkwYjkzZmQ5ZGFmNTQyNjRjODU2YzZjMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmYWU4ODY0NWU3M2Y5Y2NhODZiOTU1ODcxM2ZmMmQwNGRkNzhkYWM4ZTVlNWE3NTAyMTZjZWY4YWQwOTE1ZTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_675d87ffd881410ca6147132421c4010",
+      "statement": "写内存这一步的职责边界：托管侧既不持有活表地址也不扫内存，只把整张表交给原生；原生用启动时从语义锚点解出的槽现读游戏活表的缓冲区地址，过完闸门后只逐行改写内容真的不一样的 52 字节行，返回实际改写的行数（0 = 内存里已一致）或负数拒绝码。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L167-L184",
+          "version": "repo-lines-v1:sha256:ac53fe2c07c8f4b085adabb522fa9bafac9d2428a8f0480d73e071cd20176323:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhmYTgzNDNlOTQ4ZDM4Y2E0MzgwYTJiZjgyMzQ5NzE1YjYyMWI1OGRkMTg3Y2ZiMzU4OWY1NmNiNmQyM2E1ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExYmQwODA0NDhlMzU4NGE5ODM2OWQ2YzE5M2JlYjUxM2VkNThkMWM4MTZkYmE4OWNkZmViMmQ5NmFjYmRmYzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRhZjhlNDRlOGUxZjIzMTc1NjFiMzg0NDljNDE2ZWRhYTg3ODVmMWE2MDdiYjM3ZDBiYmRhMzQyYjcyMzg5NTIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L236-L262",
+          "version": "repo-lines-v1:sha256:91f81b486007d8b169ebc4daed8c2300ae82676e3efee58159084e028b656651:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzZmQ3ZTg2YmY0YzhmZGEwNGE1NGEwNzdjZWNmYTNmM2VkODdjNzIyNGYxYmViMmE1YTZmNGUxYjk1ZjExMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM3ZjJhNzJhNmUxYWE3Njg5MWNiZmI4OTZiMDY4ZDIzYmE3OWU5YmRmYWE5YjZhYWQ0ZDRmODljYmIyOGRhM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L55-L71",
+          "version": "repo-lines-v1:sha256:e094f5c93e2dfa3a694a7ecf3cc949147bee9b32279b1c5eb5034a774c5ec3cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiN2JlZjIxZjdhZjBiZTUzYzI5ZTA1ZWVkZDZjMDMyZTYyYzM3ZGNkYmNmZTJlZGQwYjQ1ZjVkODhiNTc5OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlmNmE3ZTVhNGRmYTRiNTE5Yjc5MGJhODU3NTcwNmUxYzE1MzdmZTBiNGE0NGYyMDA3YzExODE2NTllZTViOGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY2MDBkZGE2M2E1MzJmNTU3YWE0M2JjYzE2NGU0N2NkYmE0ZmRiYTVmYzc2NzNhOThkMGZlMDA3ZDRhOTFkZGUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/NativeCore.Interop.cs#L52-L66",
+          "version": "repo-lines-v1:sha256:0be0e509661d11569d5e126e0dcf3e4120ee51826b82eb0dfff595c97f4db5b9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlhZmI2MThkMWNiMDE4NmRlMjhjNjVlODAzMjYwNmFhN2Y5YjIyMTJhYjcwMWUzZTdkZjhjNWE3NGJiZTE4NDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5MTg5MmVjOThiNmIyNzM2ZjJiN2Y0MTU2NDg1ZWU2ZmZjODFhMTFhM2NhNjhjOWM0NDM5MmU4ZDc0NGU3NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bee7ed511fc9437ab830267d59baf229",
+      "statement": "IDataManager 是可选依赖：未接上时每拍重试且只在第一次记一行；一旦接上 Bootstrap 就置 _started 不再重跑，其后表造不出来（归档读不出来、或布局不是本构建认识的那一种）也什么都不写——版本没推进，所以 Tick 的 mtime 门下一拍照样放行。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L96-L101",
+          "version": "repo-lines-v1:sha256:16316b92a3c3c960bfb9cb4347ca6a3dc485e1d1cc86b1cf9964594f6f1145bb:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGZjM2NlNDYzYzFkNzc4NzYxMTgwMDRiZmZhMTUyZDY0Y2MzODI0M2EyMDBlYmJjN2IxNjRlZDU2ZTViZjBmZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjUxOTM0ZGViMWJhNjBhYjM5YjI1N2RlNTJhOTQ2NDc4YzRiNTczOWUzN2E2ZDQ2NDljNDAzMTUyODVjNGI3YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzFhZGMwN2VkOWY2MDFhYzFjYTBmNzBjY2FhNTM1MjdjYjFhODAzMGQ3YWJiYjU4MWY0ZmVjZWFjMDBiMzdmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjQ1YWE4MjI4ZjhlYmZiNjUwNDM1MDJjOTU3MDA2OWJmM2E4ZGYzMzkyYmNhOGMxNjI1NmE3NDcxMDVmZTRkZiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L76-L147",
+          "version": "repo-lines-v1:sha256:9bdc633264a16ea509d78523b89d032081773d83d7293c5f788ffa4fc7dd6669:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhhNTljNWNlMjBkNmViZjYyYmYyY2MzZmQ1MjQ1MDExOWNkYmVmY2I4Yjk0YWFiOWIxYzc5ODY5MzQ0NmE2OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0NTFjNzAwMGQzOTRjNTBiOTk4MDcyODIxMWY3OWI0OGNiNWU3MzgxOGYyMDE5ZWFlZjhlMDI4OTcxOTUxZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhmZGU5ZGUyOWMxNzIwNDUyMTE3NDgzMzFmMWVlODgzNGE3NTBiYzc5OWZlYjYxNjA4YWYzODYxMGNmZDJiMzAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d5882ab393ce42e286fa88fb9ce3e71d",
+      "statement": "卸载安全：Dispose 置 _stopped，Apply 第一件事就是看它——卸载之后宿主那一拍仍可能叫起一次应用（定时器不保证回调已经跑完），那一次会被跳过并记 hot apply: skipped - the feature has been disposed，而不是继续往游戏内存里写。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L202-L217",
+          "version": "repo-lines-v1:sha256:b06541243cfefb3b75bb7fde29d1710ec80da48420ef72e7bb83bcde37ecf1b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0YzdiYWExMWVkYmViODE3YWM4N2QzMjI1MDUzYTMyZDNhYjJjMjk4YjJmNDA3YTU4ZmRhYzU2NmQ3Y2VjMDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY2MDljYmRmNWM4ZDUzMzQwZmJmM2MxYjA5YTIyMmQ5ZTQxNzU2OTYwOTBmODYzNTgzNTU0MmU5Nzg0YjBjOTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4ZWYyZGNkODUzYjU0MmJjYjIzYzY4ZWMxMDRjYWM5OTM2NjU4Nzc1Y2YwNDBkZTQ0MmY2MGUyYzU5ZjA3NzgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff8bb22725bd4b99935124854602c7dd",
+      "statement": "\"说明实时更新、实际效果下一场战斗开始生效、无需重启\"是玩家文档的承诺，源码支持的是这条链路的两半：编辑只改活表里的 LevelValue 字节（就地写成功后游戏再读这张表拿到的就是新数字，链路里没有别的机制参与说明的更新），而\"表已经被改写\"与术语表定义的\"可见\"（游戏已把新值算进角色状态）是两件事。这条承诺只在原生就地写成功时成立：拒写时内存一个字节都没变，编辑要等游戏下一次解析或重启才落地。",
+      "evidence": [
+        {
+          "resource": "repo://CONTEXT.md#L36-L44",
+          "version": "repo-lines-v1:sha256:44448c1dfbb0f0a6cbdde27bd43250da24930c722f09569b7e97531051845f0d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzZlMGMxMmE3Zjg2YTY4MThkZDBhZjFjNTlkOGM1NTI3MmIyNjg0YTAwNzAyNDNiZDA2NDg2ZWJlYzYxOGE0YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2ViNzAyNTc1OTNkYTA2ZjY4MmEzZGRkYTU0YTlkMjYwZDRmYzUxNGY2NDUyMzdmNWNhNzRiMDhmOGRhNjFhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWEwNjBiMjVjYTNjZWJhNzcyMWRjNzhiMWUwMDk3NWZiMWYzY2UzMjRlYjU2MTEwOWU1NDM2MjQzYTg1MjVlYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGFlYjU1OWU4YmFjYmIzODBkOTYzNDFjYjcyOGIzMDQ5YjQ1YzRiOTc5OTI4MzUzYjZhNDg3OTM0NDY0YjcwNiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/README.md#L19-L29",
+          "version": "repo-lines-v1:sha256:714c6c33c15de4c7c072cd3e54a8e4b1e718023d60fba38ae2cefcf1247e62a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVkNzEyMDVjOWY2ZjA3NWI0MDk5NGNmYzU4MjJiNjEzOWQxY2MwOTU1NTI4Zjc3NGQ1YmFhZjNmZTVjYzMyNWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxNDdiNGI5Zjk1ZDI2ZmIyNzBkZTgwNTg0MDhiYWI3OWJhOTU0MzllYTAyMDA3MjhmOTlmZTljZjdiN2FmMmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgxY2E2OTM0ODcyNzZjN2QyNmVkODJiZmQ1MTE2M2MyMDZjMjAyNzJmZmMyZGQ2MjM2YWRlMjJiOGVlOTJlZDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwYTViOTk4Yzk2MjVkZjYyYjVhOGQ2NDk0NWNmNmE0MTYxNDQ0Y2JkN2FkMmUwMjFkM2ZkYmFjOTQ3YjAzOGUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L258-L277",
+          "version": "repo-lines-v1:sha256:72da97cd7ea305a613a88874cbc367a3a22173f316dc56012fe3ad3905f0d6d5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0OGIyMTdlMTVkYWNhOTkxODM5YTAyZGM4MjUzNDVkYmE5MzliNjgyOWE3NzQ3NWNlZjdmZTJkMDk3MzBmOWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0ZTVkNGM5NTNjOTU5MWFlZWU0ZmZkMWYwOTA0ODFjODI0MjQ0MGUyMzhhMzcwNmExMmNmYThkOWJiMTNhMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU4ZTUzODBlOWFiZmZmYzc2ZDdmOTk0NjE1MTQxZDIyM2E5OWJlNzdjNWYxZjM3NTBkYjIzODc3ZDNlNjg2YzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4MGVhYTY2ZTVlMzFjNjE1ODAyN2Q3NjQwYzdkYTRhMjNjNDhiNDM1NGQ1MWM1ZDk1YzExMDdkNDBhYTU2Y2YifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_726c4fff744441c39dd5dbfce890b847",
+      "statement": "参槽的含义只能从游戏自己的文案读出来：随包资产 skill.<lang>.json 的 explain 分段里 {N} 就是 LevelValue(N+1)，工具把 {N} 改写成从 1 开始数的 {N+1} 才与十个输入框对得上。而这条链路上有两个不同的数据来源：工具显示的起始数值与\"什么算没动过\"的判定参照随包 skill_status.json，真正被改写的表来自游戏归档，两份漂开时占位符显示的数字与游戏原值会对不上。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L312-L336",
+          "version": "repo-lines-v1:sha256:f1a7b1f5a44d721b01667f9e9732fb75d9b31b08be3cfd27a124b1e84c5ed5cc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1ZTA3ZTU2MzZlNDllOTE0NDFkODljNmQxOTgxOGM0Yzk0ZGVmMTBkYTgzY2NkZjY5M2ExZTk4Nzc2NzVhYmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJmMGIyNjk0NzI2ODE0ZjUwNDBhYzY1YjEwMjhiYzc5ODc2NjYxYjkxNGExYmI1ZGY1NTRmMTQ4MjM0NTk2NjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNiN2U1YzY1NWE1NjgxMzUwZDZkOThhNDBiM2FiYWQ4MGRmZjZiYjEwOTU1MmE3ZjhmYjdlZWZjMGYwY2JhYzIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice.go#L85-L101",
+          "version": "repo-lines-v1:sha256:b1fa01607de6c4a0ac87fed431b72ad2fbe66d38945ef411ea67aae5361f7bd1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE0MDExNTQyNWViYWRlNjhhNjcxZWE1ODBjOTNlYWZiZTgwMGU1OTgwYjcxZmE5M2M4MGZhNjc4ZWVkM2I1YmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYzc4MmJlYjFjN2ViZWI3OTlhMDQ3NDhjZTlhZjc2ZWNlNmViMjQ5NmNmNjJjY2Q1MjdmODZjZDRhOTVlYjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY5ZmZlMjRjMWQ4ODY4N2ZlZjViY2NhNTUxOTE0M2ZhMWVhNWRmNzRhY2FlOWYzYmI0N2I3YmM2YThhMmNjMWUifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L21-L32",
+          "version": "repo-lines-v1:sha256:5ec04c850b0abbf125e7b768eb49700bb0c65a57fadccb8586fde35b4c234f78:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1ZDVhYmFjYTIyNjgwYWU5NTMzNjcwMGRmNzY2MzYxOTdhN2NiNmMwMDRmNGNkNzlhYzFiMWZkMmYwYWM0YTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxZDNhMzRiMzkxNWIzYzg2OTYyZjAyZWIzOTZiMzM0MDcxOWZlYWQ2YjViN2U0YzNlOWRjYzIzNDIxMTJkY2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhMmJkM2ZhZTFhNDhhODJlNGQ5YTY0YTA1ZWMwNTkwYWYzNGYyN2VlMTkzMTdiMzVjZjhkMDRhN2FmMTJkMDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmMWQzMWVkYjk2OWMxOWZkNjRjNzJjYjdmNWRjNDk0Y2NiYWQ0YmM0ZjE0MzIyMzUxYzE3NWZjMTE0N2M2MmIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L248-L257",
+          "version": "repo-lines-v1:sha256:90b99711db6320a90070a106bd85b3800f3cb1ae384560dcc1d4128e96c1f8ba:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjNmJhODE3N2E5NjI0ZjA4OWJlYTVmMGRiMThmODY4NzYwNGZjYzk3NTRkMzYzNmUwNGFhYmFlMDRlMWYyMjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkOGNlMjgxZTFkNTY2ZGVmOTE1YzVjYjcyNjFlYjI1ODI0Zjg5MmI5NTA0ZTE0ZTczMmU2Mzg3NmQ5ZDZkNWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZiYTVhNmFkZmViMzdjNDllZjBhZTNlMmFmOTViY2YzNmMwNjU2NGRjNzI3YjU0NzVkMzZlMzRmNWExNzkzMTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8eafc1dddb3e42f8b7c2dafd42e1a1bc",
+      "statement": "这条链路的跨层字面量各有两处以上声明并被 sharedconstants_test.go 对拍：参槽数 10 在 C#/Go/TS 三处、sigiledits.json 的五个成员名（edits/enabled/key/level/values）各两处、编辑列表文件名两处、保存失败事件名 Go 与前端各一份；机制上每条声明必须正好匹配一次且比较大小写不敏感，而它是\"漂了立刻红\"，不是\"契约已证明\"。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L153-L201",
+          "version": "repo-lines-v1:sha256:b91fdd47669c859dac8e777b37d885ebfd223bd9702038b37d5fc5978b84a6cb:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE0YmRkZDVmOGM1Mjc4ZTg0OTFkOTBlM2RiOGI0Y2ZhYmZjZGFlMmU5MDI4MTA3NTZiMTg4MDhiYmU5OTEyNTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1NGEzZjUwNGVkZDI4ODY0ZWZlNDA3YjgwZjE2ZmI3NjZjYTZiMzIwN2M2MWU1NDg4MGIxNDI2ZDY3YTRhNjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlM2FmOGI3ZjI2ZGJlZTU0NzhiZDY5MTFhNzkxNTFmZTNmNmE1NDdmOGU1NDczMzA4OGZkMThiZDdhNmUwNzYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L204-L222",
+          "version": "repo-lines-v1:sha256:7bda65ea4f8a9bd637868117235f77099fd3e349f26929d61fb7b461f3c3746e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4OWExOTMyZjRmMmVhOGM2YzFhMTg0NGE2NDNmODhkNWE5NjIxMGIxMTdhNzRhYzMyOWQzYzAwNDRjNzljYTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFhM2UxMGI2ZDUxNzRhMTA1MzBhNDI3OTk1YWM4N2I1ZmQyYjBiMWI4Y2ZiMjA0ODUwZTdiMjY3NGM5NTJjMjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L78-L85",
+          "version": "repo-lines-v1:sha256:6b4c2ccf159a1164cdce5c006459f78d6893d58ed4755bed271affb6d0a1b16b:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjM2MGZjNTg4NjY1YjQ5OTk4NTEwZjlmMmNjYmM4OTE0N2VmOTQ5ZWQwNDMxNTUzYTk0NzU1Nzg4NDA2ZTUyZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDQyZGI3N2ZiYWJhYThjMmQ4M2UyNTFkNmI2NDNhYWQxNjA1ODRmNGZlOTUwYmU2OWY3NjQ0MmZhNzQ4ZGJkOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_12b387dac2aa444da5b597fb75881675",
+      "statement": "验证覆盖面在这条链路上有一个明确的空洞：前端规则（isEdit/asEdits/trimGameValues/dedupe）与 Go 侧写盘、读取、防抖（用 testing/synctest 把尾沿语义变成关于代码的陈述）都有自动化测试，而托管 C# 那半——Bootstrap/Tick/Apply/Publish 的时序、候选表复用、节流与\"同版本只报一次\"——没有任何测试工程（解决方案里只有原生与托管两个项目），只能在真机日志里取证。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR-Sigil-Loadout.sln#L5-L11",
+          "version": "repo-lines-v1:sha256:f90704ed655851c4f900fe7cdae0ce65cc4ca96d03a1caf6c95967d3652fd844:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTM1MzBiMjExZTBjMDZiNWEzZGQ0ZTdiYTg5OGY3MjI4YWVkODEzZGZiNjU3MmZjYzk5ZmVlYTc4ZGFjMzY0NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWU3NGZkOTVkNTkzNzg4N2YzM2VjNjM4ZjVmMzY0YWRiNWViMmIyZTk0YjkxMWJhZGYzNjFhMTk0NzIxYTJkOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzc1YzcxZGVlZTFkZDQ4YWFkYmM3NDIxOWZmNDNhMGQzNjVmY2IwZWI0N2IxYjg5ODE1ZmFmYjJkNWY1NmRhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2I1N2RkNTRkM2ZkY2QyMDY2ZDRhM2M5MDU4OTY3MWNkYjZjNmI0ZDk5NGJkMTY2ZDZjMGU1YjQ2MGRiZDE3MyJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/editservice_test.go#L73-L140",
+          "version": "repo-lines-v1:sha256:ab2403cafb9c94aceb6e6de7e18705305837ed0cf8d416820da8e4b91080b619:eyJzZWxlY3RlZExpbmVDb3VudCI6NjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxOTQ1OGVjYzU3MWY5ODg2ZmU4ZDQxOThhZjcwMTA1ZjNkOWM5MTZkMGY2OWQ0ODhkYjk2MDczNjFhOTQ5YjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlMWFlMjI4NGM1MDJjNGZkYzdlZThlYjZlYTMxNmEwMGU0ODk3OWJkYWRlZTk3M2E5ZTk4YjNmM2Y4MjZhNTQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.test.ts#L174-L267",
+          "version": "repo-lines-v1:sha256:7a8fc6a10cda363dfe66d0ca6fd037400bb364a7e49055653fb6db64730793bc:eyJzZWxlY3RlZExpbmVDb3VudCI6OTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1MWI4MTMwMDg2NzhiNzI0OWQ1NWM3ZDJiNzRiZmJlMzBhOWYxMjY5YjE3OWQ3ZjVkZWM0M2U5YjAzYmUzZDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZjViNDBiMTU4NDU3ZDE3ODY0ZjIxNzkwNzg2ZGQ1YTJlY2RiNjRiNjZhNjUxZjc4OGQ0ZTI1Y2QzMzAzZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ1MDEwMDdjNzFjMzk1NTMwMjI1MGNiMTI5MTdmYWQ3NThkNDMzZTIyMGVjYWQxMDQ1M2YxNjg5ZTBiM2ZiODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkOGIxYTY5MmZhMzA1MDE5NzgyNjcwY2RjMmU4NGVjZjNmMTZiNWY1OWIzOGJjOGY5MmJkYjdjNmIxY2YzZjQifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.6.0",
+    "at": "2026-09-23T17:28:03.050Z"
+  }
+}

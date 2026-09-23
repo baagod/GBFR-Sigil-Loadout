@@ -1,0 +1,205 @@
+---
+type: testing
+title: 验证地图：测试与门禁各护什么
+description: 仓库里三套可跑的测试（SigilLoadout 包测试、前端 vitest 纯逻辑测试、NativeLayoutHarness 离线布局回归）各自保护的不变量、运行方式与依赖条件，只在 tools\build-release.ps1 里执行的门禁与它们的跳过条件，以及这套验证明确证明不了的东西（真机效果、钩子实际落点、性能与崩溃、托管 C# 无测试）。
+tags: [testing, verification, gates, go-test, vitest, native-harness]
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-23T17:28:03.050Z
+sources:
+  - id: openwiki-source-6d4b4e707b8d60b6ccfa3425
+    resource: repo://.github/workflows/openwiki-update.yml
+  - id: openwiki-source-8037e2358a2c4f9b2c722a11
+    resource: repo://AGENTS.md
+  - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
+    resource: repo://GBFR-Sigil-Loadout.sln
+  - id: openwiki-source-7cf4dbc095c47542aea2f4b9
+    resource: repo://SigilLoadout/assets_test.go
+  - id: openwiki-source-88642e4d88b55d7e1f093294
+    resource: repo://SigilLoadout/atomicwrite.go
+  - id: openwiki-source-ff81cfda9438c99d833cc560
+    resource: repo://SigilLoadout/debouncedwrite.go
+  - id: openwiki-source-b9c22e133921c44c4cf0895b
+    resource: repo://SigilLoadout/editservice_test.go
+  - id: openwiki-source-9e45365fcf44633af4489b2c
+    resource: repo://SigilLoadout/editservice.go
+  - id: openwiki-source-df2192c06b0ec71699fdac08
+    resource: repo://SigilLoadout/frontend/package.json
+  - id: openwiki-source-c47140156ddd80fe7b801b56
+    resource: repo://SigilLoadout/frontend/src/exclusive.test.ts
+  - id: openwiki-source-35bfa15a0bffce3055471ebd
+    resource: repo://SigilLoadout/frontend/src/index.test.ts
+  - id: openwiki-source-00406d1c826c7d1ff3bde8c3
+    resource: repo://SigilLoadout/frontend/src/model.ts
+  - id: openwiki-source-c44d7ff9667bd1df7bc748e4
+    resource: repo://SigilLoadout/frontend/src/skills.test.ts
+  - id: openwiki-source-d598ed9d8aa0ee15a7fbb629
+    resource: repo://SigilLoadout/frontend/src/skills.ts
+  - id: openwiki-source-a56bf21419a4cd39540e5ed0
+    resource: repo://SigilLoadout/frontend/src/variant.test.ts
+  - id: openwiki-source-4f89faf1fec1d8e8809ed737
+    resource: repo://SigilLoadout/frontend/vite.config.ts
+  - id: openwiki-source-aa73d08d0f491bdb952bdffc
+    resource: repo://SigilLoadout/go.mod
+  - id: openwiki-source-a877d6a19260cf861fd5bddf
+    resource: repo://SigilLoadout/loadoutservice_test.go
+  - id: openwiki-source-47cff6e6e142f07c1c683a7b
+    resource: repo://SigilLoadout/loadoutservice.go
+  - id: openwiki-source-202d158ec41182431f814976
+    resource: repo://SigilLoadout/sharedconstants_test.go
+  - id: openwiki-source-97c4458d1932befc35ac1122
+    resource: repo://tests/NativeLayoutHarness/program.cpp
+  - id: openwiki-source-67c7703ac3037912246261f8
+    resource: repo://tests/NativeLayoutHarness/run.ps1
+  - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
+    resource: repo://tools/build-release.ps1
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+---
+
+# 验证地图：测试与门禁各护什么
+
+这套仓库**没有任何 CI 跑测试**：`.github\workflows\` 下只有 OpenWiki 的每日更新任务。所以"跑测试"这件事被强制的地方只有一处——`tools\build-release.ps1` 的工具链阶段。其余时候，跑什么由改动落在哪里决定。
+
+本文回答三个问题：**改完该跑什么、它到底保证什么、它保证不了什么。**
+
+## 三套测试与一个空洞
+
+| 套件 | 代码位置 | 怎么跑 | 依赖 |
+| --- | --- | --- | --- |
+| Go 包测试（4 个文件，包 `main`） | `SigilLoadout\*_test.go` | 在 `SigilLoadout\` 里 `go test ./...` | 源码树里的 `SigilLoadout\assets\`（九份）在场；不需要游戏 exe；`-race` 另需 gcc |
+| 前端纯逻辑测试（4 个文件） | `SigilLoadout\frontend\src\*.test.ts` | `npm --prefix SigilLoadout\frontend test`（= `vitest run`） | 已装好的 `frontend\node_modules`；`index.test.ts` 直接读入库的 `assets\sigils.json` |
+| 离线布局回归 | `tests\NativeLayoutHarness\`（`program.cpp` + `run.ps1`） | `pwsh -File tests\NativeLayoutHarness\run.ps1 -Exe "<游戏 exe>"` | MSVC（脚本自己找 `vcvars64.bat` 并调 `cl.exe`）；游戏 exe 路径由 `-Exe` 或 `$env:GBFR_EXE` 给，缺了就打印 SKIP 后退出 0 |
+| **托管 C#（`GBFR.SigilLoadout.dll`）** | — | — | **没有测试工程**：解决方案里只有原生工程与托管工程两个项目 |
+
+Go 测试的工作目录是**包目录**（`SigilLoadout\`），文件路径都相对它；前端测试读资产用的是相对测试文件自己的 `new URL("../../assets/sigils.json", import.meta.url)`，所以与当前工作目录无关。
+
+```mermaid
+flowchart TD
+    Q{"这次改动落在哪"} --> A["跨语言常量 / 协议字面量 / 资产表"]
+    Q --> B["写盘 · 校验 · 防抖 · 编辑列表"]
+    Q --> C["前端规则 skills.ts / model.ts"]
+    Q --> D["layout_resolver.cpp"]
+    Q --> E["托管 C# 与游戏内行为"]
+    A --> G1["go test ./..."]
+    B --> G1
+    C --> G2["vitest run"]
+    D --> G3["NativeLayoutHarness 需 MSVC 与 GBFR_EXE"]
+    E --> G4["没有自动化证据 只能看日志与真机"]
+```
+
+每档改动对应的套件；最后一档是任何套件都不覆盖的部分。
+
+## Go 包测试：一个包、四个文件
+
+### 所有 Go 测试共享的沙箱（`assets_test.go`）
+
+`TestMain` 在两件事上替所有用例把环境铺好，两条都有具体来历：
+
+- `os.Setenv("LOCALAPPDATA", <临时目录>)`，而且是**整个测试进程**级别（不是 `t.Setenv`）。原因是写盘是防抖的：`SaveLoadout` 之后要过 500ms 才真正触发写入，而 `t.Setenv` 在测试函数结束时就还原——那记定时器会落到**真实的** `%LOCALAPPDATA%\GBFRSigilLoadout` 里。
+- `loadAssetsFrom("assets")` 从源码树把随包数据装进来一次。生产路径是 `exeDir()\assets\`，而测试进程的 `exeDir()` 是 `go test` 的临时目录，那里没有 `assets\`。
+
+### `sharedconstants_test.go`：跨语言常量对拍
+
+这些值分别在 C# / Go / TS / C++ 里声明，写错**不会编译失败**，只在游戏里表现成错值——这类错误最难查，所以值得钉住。覆盖的组：`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash`、`LevelValueCount`、用户配置目录名、两个配置文件名、两条窗口消息、工具窗口标题、`skill_status` 的表头/行/行内 Key 偏移、`sigiledits.json` 的五个成员名、保存失败事件名。
+
+机制上有四个细节，读它时值得知道：
+
+1. **每条声明必须正好匹配一次**（`len(matches) != 1` 即报错）。正则写松了就会对着文件里第一个碰巧像它的东西比，比出来仍然是绿的——假绿比红更贵。这也是为什么几个成员名的正则锚在 `type SigilSkill struct {` 上：`json:"key"` 在本包里合法地出现两次（`SigilSkill` 与 `SkillInfo`，两个不同的文件格式）。
+2. **Go 的声明属于包、不属于文件**，所以 `"*.go"` 表示把包内所有非测试源文件拼起来找——一次纯粹的文件搬移不该让断言变红。
+3. 比较是**大小写不敏感**的（`strings.EqualFold`）。
+4. 文件被改名或搬走是**硬失败**（`t.Fatalf`），不是静默跳过。
+
+**它是"漂了立刻红"，不是"边界已证明"。** 它只证明这些字面量当前两两相等，下面这些一个字都没说：`loadout.json` 的成员名完全不在范围内（C# 是 `TryGetProperty("…")`、Go 是 struct tag，改一边能编译、全部测试绿）；只有大小写不同的漂移会被 `EqualFold` 放过，而两个 JSON 格式都大小写敏感；它比字面量、不比推导（目录名比的是 `GBFRSigilLoadout` 这个字符串，没人比"C# 用 `SpecialFolder.LocalApplicationData`、Go 用环境变量 `LOCALAPPDATA`"这层对应）；名字精确到文件的组只在**那一个文件**里找，在别的文件里再加一份副本不会被发现。所以绿不等于契约已证明，文档表和对拍两边都得维护。
+
+### `loadoutservice_test.go`：写盘与服务不变量
+
+| 用例 | 护住的不变量 |
+| --- | --- |
+| `TestUserCfgDirMatchesModPath` | `userCfgDir()` 必须落在 `%LOCALAPPDATA%\<userCfgDirName>`——mod 读的就是这里 |
+| `TestValidateSlotsTreatsMissingEnabledAsEnabled` | **缺 `enabled` 与 `enabled:true` 同义**。这里曾经用 `bool`，于是同一份文件 Go 数出 0 个启用、mod 数出十几个，结果是"存盘成功、游戏里什么都没变" |
+| `TestValidateSlots` | 结构违规当场拒：items 只能 1–2 项、第二项 hash 不能空、等级不能负、启用行上限 `MaxSlots`、空 items、缺 gem、缺主技能 hash。同时钉住两条**刻意的合法值**：`"slots": []` 与"等级超过 cap"（cap 属于每条技能自己，只有前端与 mod 知道，写死一个数就是同一规则的第三份副本） |
+| `TestSaveLoadoutWritesAndLeavesNoTempFiles` | 落盘内容与提交的字节**逐字节相同**，且目录里除了 `loadout.json` 不留任何 `.tmp` 中转文件 |
+| `TestSaveLoadoutRejectsInvalidWithoutTouchingDisk` / `...RejectsTheOldBareArrayShape` / `...RejectsAnObjectWithoutSlots` | 被拒的保存在任何目录或文件建出来**之前**就中止——磁盘上不留痕迹。旧版本的裸数组形状与"缺 `slots` 成员"都必须当场报错，而不是被翻译成"空配置"写下去（后者会把一份读不出来的旧文件静默变成"配置被清空"） |
+| `TestSaveLoadoutDefersTheWrite` / `...WritesOnlyTheLatestSubmission` | 防抖的尾沿语义：没到点不落盘（这正是"退出时 `flushNow` 兜住最后一次编辑"能成立的前提）、只落盘**最后**交上来的那一份、且待写在 flush 时是被"取走"的（第二次 flush 找不到东西） |
+| `TestConcurrentSavesNeverTearTheFile` | 16 路并发保存之后，磁盘上必须是**某一次完整保存**的内容（`writeFileAtomic` 的同目录唯一临时名 + rename；直接 `O_TRUNC` 会留下"读到半截"的窗口） |
+| `TestGemNamesCoverTheTableInEveryUILanguage` | 四种界面语言的 `sigils.lang.json` 与 `sigils.json` **按 hash 一一覆盖**，且 `sigils.json` 不再带 `name`/`zh`（名字只属于语言文件）；`ja` 至少有一条与 `en` 不同，防止"把英文抄了一遍" |
+| `TestCharaNamesCoverTheExclusiveTableInEveryUILanguage` | `chara.lang.json` 覆盖 `sigils.chara.json` 的每个 PL 码，且每行必须是**三槽齐全**的角色条目 |
+
+### `editservice_test.go`：编辑列表的读、写、防抖，以及资产一致性
+
+这一半的测试都跑在 `hermeticHome` 里（`USERPROFILE` / `HOME` / `LOCALAPPDATA` 全部指向一次性目录），位置本身走实现同一批常量（`localConfig` 用 `userCfgDirName` + `editListName`），**不做同一份事实的第三份手抄**。
+
+- **写**：`TestSaveEditsWritesConfigWhereTheModReadsIt` 断言列表能反序列化回来、未被输入过的参槽在文件里就是 `null` 这个词（正是它告诉 mod 那一部分保持原样）。
+- **防抖**：`TestSaveEditsWaitsForTheEditingToStop` 用 `testing/synctest` 气泡把这件事从"关于时钟的陈述"变成"关于代码的陈述"——第二次编辑必须重启窗口，安静下来之后落地的必须是最后一次状态。一个不再重启定时器的实现会在这里失败，而不是在一台碰巧很慢的机器上蒙混过关。
+- **写失败**：`TestSaveEditsSurvivesAWriteItCannotMake` 用一个普通文件占住配置文件夹的位置，让每一次 mkdir 与写入都必然失败。断言三件事：失败被记进日志（`creating the config folder`）、**待写被放回**（挪开挡路的东西后同一个 `flushNow` 就能写下去，因为不编辑直接退出时那是它唯一的机会）、以及"没有 app 可通知"那条分支也能走完（测试进程里没有窗口）。
+- **读**：文件不存在 → 空列表，且**不创建**文件（面板在应用启动时就挂载，一份内置的起始编辑会让"打开可视工具"本身就是一次对游戏的改动）；存在但解析不了 → 报错并**点出文件名**（显示成空列表看起来和"什么都没打开"一模一样，而下一次按键就会把这份空覆盖回用户的编辑）；`{"edits":[]}` 与 `{}` 都读成空列表，且到线格式上必须是 `[]` 而不是 `null`；旧拼写（`Edits`/`Enabled`/…）的文件既不读取也不改写——"从头来过"是既定形状，下一次保存写出当前格式。
+- **参槽归一**：`TestPadValuesAlwaysGivesTenSlots` 钉住短列表用 `nil` 补齐、长列表截断到 10。
+- **线格式（手写契约）**：`TestWireShapeStaysTuples` 按**字节**钉住资产里的 `[等级, 数值]` / `[等级, 文案]` 元组形状。这是手写契约里没有别的机械校验的那一条：`MarshalJSON` 一旦丢失或退回结构体字段语义，Go 测试与前端 `tsc` 都会全绿，而 `App.tsx` 的 `as Record<…>` 会静默收下 `{Level, Text}`，用户看到的只是空 tooltip 与 0 占位。
+- **资产不变量**：四张语言表与数值表的键集必须一致（`TestSkillTablesAgree`）、并且真的翻译过（`TestSkillTablesAreTranslated`）；未知语言回落到非空表（探针刻意用 `de`——游戏文本里有它，界面语言没有）；每个技能每个等级行都带齐 10 个参槽；等级升序、≥1、且每行至少有一个非零值；`TestKnownSkillRows` 用黑龙的咒印（`06719232`）钉住"只有带数字的等级进资产"（它 1–14 级全是零，所以那些行根本不在资产里）；`TestExcludedRowsAreGone` 断言四个并非真技能的行不出现在任何一张表里。
+- **无事可做的 flush**：`TestFlushWithNothingPendingDoesNothing` 把文件删掉后再 flush，它不该回来。
+
+`testing/synctest` 是较新的标准库，`go.mod` 声明的是 `go 1.27.0`——工具链太旧的机器连编译都过不去，这比测试失败更早暴露。
+
+## 前端 vitest：只有纯逻辑，且刻意薄
+
+前端测试跑在纯 node 环境里，没有 `jsdom`、没有 `@testing-library`。原因是规则本身就不在组件里：`skills.ts` 的文件头写明"凡是由值单独决定的部分都在这，不碰 React 也不碰 DOM，所以能独立测试"。决定 `sigiledits.json` 最终内容的正是这些规则，所以一张表比再来一张截图值钱。
+
+| 测试文件 | 被测试的模块 | 护住什么 |
+| --- | --- | --- |
+| `index.test.ts` | `model.ts` | **跑入库的真实 `sigils.json`**（不是手搓夹具——夹具会和 App 的构造各自漂移）。断言派生索引（每个主下拉取值都有显示名、`lot` 里都是普通可作副的技能、唯一持有的组没有合法副技能、缺失 cap 回落 `DEFAULT_LEVEL`、`gemOf` 给出真实物品 hash、池族写池版 hash）与落盘载荷（空槽不写进文件、解析不出的主因子**整行跳过**、主/副技能的 items 形状、`exclusive` 全空时不写这个成员） |
+| `variant.test.ts` | `model.ts` | 载入 → 保存的**变体往返**：界面用组键、`loadout.json` 记物品 hash，不留住后者就分不出同一组里"名字不同的两个变体"（钳蟹的共鸣 `1C4D37E4` 与永恒钳蟹因子 `426AD20E` 共享技能 `082033CB`），以及保留的变体与副技能冲突时交回固定副技能规则 |
+| `exclusive.test.ts` | `model.ts` | 专属因子页唯一的规则：槽写成 `[因子物品 hash, 技能 hash]`，**标签取前者、状态键取后者**（写反那次正是回归现场，后果是整页三个标签退化成裸 hash）；名字缺失时显示 hash 而不是换一种语言；重新打开是**删掉那个键**而不是写 `true`；关一个槽要写到共享同一 PL 码的每个角色上；形状不完整的记录被丢掉；不是数组就抛（调用方转成界面错误提示） |
+| `skills.test.ts` | `skills.ts` | 输入框的按键状态机与"什么算编辑"：`0.5` 曾经以 `5` 写进表里（`"0."` 被当成数字，在小数点敲下那一刻就被提交）；拒绝科学计数法与超过 6+6 位的数字（粘进来的 309 位数会被提交成 `Infinity`，JSON 拒绝写它，之后每次保存都带着对话框失败）；非法按键整键丢弃而不是清空框；清空输入框 = 那一个槽变回 `null`（游戏自己的值）；`stepValue` 的上界；每个地址最多一条编辑（`dedupe` 留最后一条已启用的，一条都没有时留最后一条）；勾选本身就是编辑，所以**清空最后一个数值不该撤销用户勾上的那一下**（勾选同时是置顶排序的键，那个 bug 会让整行当场掉下去）；`trimGameValues` 把"只是把游戏自己的数字抄进槽里"的旧文件读回成未编辑；`levelsOf` 显示游戏真实的行、开着置顶；`parentState` 按**这一行显示的等级数**算全选/半选（按记录数算会让"11 个等级只开 1 个"读成全选）；`matches` 同时匹配名字与 hash；`explainAt` 按等级取分段（越界取最前/最后一段）；`slotLabel` 把槽号写成从 1 开始的 `{N}` 并去掉 `{0:.1f}` 这类格式与 `<d>` 标记 |
+
+组件（`App.tsx`、`SkillRow.tsx`、`SigilEditorPanel.tsx`）**没有单元测试**：它们的规则已经被抽到上面两个模块里，剩下的渲染与事件只能人工在工具/浏览器里点。
+
+## NativeLayoutHarness：离线布局解析与 fail-closed 反证
+
+`tests\NativeLayoutHarness\program.cpp` 是唯一覆盖原生侧的测试，它做三件事，全部**不启动游戏**：
+
+1. `ResolveGameLayout()` 必须成功——真实 exe 里那些锚点还认得出来；
+2. `RevalidateGameLayout()` 必须过——解析结果在字节上自证；
+3. 把一个 hook 点上的字节翻一位 ⇒ `RevalidateGameLayout()` **必须失败**——证明 fail-closed 真的会拒（随后 `ResetGameLayout()`）。
+
+它**刻意不硬编码任何期望地址**：游戏一更新就能直接跑。真正保护"锚点跑偏"的是第 2 步，它比的是那些位置上的实际字节。实现上，它把 PE32+ exe 按段映射进一块 `SizeOfImage` 大小的缓冲——解析器看到的就是"加载后"的样子——并为生产代码用到的那几个外部符号（`g_image_base`、`g_layout_ready`、`g_hooks_ready`、`g_game_layout`、`Log`、`SetRuntimeMessage`）提供定义，其余 extern 声明没被引用就不用给。
+
+`run.ps1` 的流程：用 `vswhere` 找到 VS，从 `vcvars64.bat` 把环境导进本进程（不经过 `cmd` 的引号嵌套），用参数数组调 `cl.exe` 把 `program.cpp` + `src\layout_resolver.cpp` + `src\safe_game_access.cpp` 编到 `%TEMP%\NativeLayoutHarness.exe`，然后跑它。跳过条件是刻意设计的：游戏 exe 路径是本机环境、不入库，闸门必须能在任何机器上跑，所以没给 `-Exe` / `$env:GBFR_EXE` 时它打印 `NATIVE_LAYOUT=SKIP` 并以 0 退出。
+
+## 只在 `tools\build-release.ps1` 里跑的门禁
+
+下面这些**没有任何独立的本地入口**——不跑发布脚本就没人跑它们：
+
+| 门禁 | 为什么它在发布链里 |
+| --- | --- |
+| `wails3 generate bindings` → `npm run typecheck` → `npm test` → `npm run build` | 顺序不可换：`bindings` 是 gitignore 的生成物而 `App.tsx` 直接 import 它；**vite 只抹掉类型、不做检查**，后面的步骤都不会发现类型错误；带着红的测试集发出去的就是没检查过的版本 |
+| 图标在场检查 → `wails3 generate syso` | Windows 只认链接期资源（`.syso`），而 `.syso` 要 `.ico` |
+| `go vet ./...` → `go test`（可选 `-race`）→ `go build` | — |
+| `go test -race` | **需要 gcc**：`-race` 需要 cgo、cgo 需要 gcc，而工位上 gcc 通常不在 PATH 上。脚本在几个常见位置找一遍，找不到就退回 `go test ./...` 并**明说**跳过竞态检测，不静默降级。`CGO_ENABLED=1` 只在这一条命令上生效再还原（否则 `go build` 出来的 exe 会凭空多出一个 libc 依赖） |
+| 布局回归 harness | 只在 `$env:GBFR_EXE` 有值时调用，否则打印 `layout harness: skipped` |
+| 包内必需清单（13 项） | 清单**故意独立**，不从源目录或 csproj 派生——派生的清单与它们共享同一个真相，于是"忘了加"和"被误删"两种漏法都查不到。漏一份资产 = 发一个启动即报错的工具 |
+| legacy `ExtraSigilSlots*` 产物、可变配置 `GBFR.SigilLoadoutConfig.ini/.pending` | 前者混进包里意味着两套槽位逻辑同时生效；后者**故意 fail closed 而不是替你删掉**，因为"它为什么会进包"才是要看见的信息 |
+| generated-asset gate | 原生编译刚重写过**入库的** `SigilLoadout\assets\sigils.chara.json`，所以打包前查 `git status --porcelain -- SigilLoadout/assets/sigils.chara.json`：有输出即失败（改动必须进仓库）。检出里没有 `.git` 时明说跳过，**不假装跑过** |
+
+当前检出里存在 `dist\.build-complete`（内容为版本号），说明这条链在本机至少跑完过一次，那些门禁都通过过。但它不告诉你 `-race` 是否真的开了——gcc 缺失时脚本只打印一行跳过。
+
+## 这套验证的工作方式：先写复现它的测试
+
+`AGENTS.md` 把验证倾向写成了两条硬要求：**"添加验证：为无效输入写测试，然后让它们通过"** 与 **"修复 bug：写复现它的测试，然后让它通过"**；OpenWiki 段另加一条"优先用能证明改动行为的最窄的安静验证，并保留完整的失败输出"。
+
+所以测试文件里普遍留着"这个用例是那一次回归"的注释，它们本身就是这套验证的记录：`0.5` 被写成 `5`、清空输入框顺手撤销了勾选、`parentState` 按记录数算导致半选态永不出现、缺 `enabled` 被读成禁用、旧版本的裸数组被翻译成空配置、旧拼写文件被读成空列表、`exclusive` 的槽下标写反、粘进长数字被提交成 `Infinity`。
+
+## 这套验证证明不了什么
+
+必须诚实写出来的四类空洞：
+
+1. **真机游戏内效果**。改完因子数值后是"游戏内描述同步更新、实际效果下一次战斗生效"这类行为，任何套件都不碰游戏进程：harness 只把 exe 静态映射进内存，Go 与前端测试只碰文件与内存里的值。
+2. **钩子的实际落点**。`skill_apply_loop_limit_immediate_rva`、`skill_fetch_path_rva` 这些 RVA 只在真机里才有意义；harness 证明的是"这些锚点在这个 exe 里还认得出来、且字节复验能拒绝被改坏的映像"，不是"钩子挂对了位置"。
+3. **性能与崩溃**。帧率影响、原生崩溃、Wails 窗口行为、托盘与热键，全部只在游戏/工具实际运行时暴露。
+4. **托管侧与若干原生路径没有离线证据**。托管 C# 没有测试工程，`LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察；harness 只编译 `layout_resolver.cpp` 与 `safe_game_access.cpp`，**不含 `table_slot.cpp`**——所以锚点命中数、可写段判定、以及写活表的每一道闸（各拒绝码）都只能靠真机日志。Go 的 `-race` 也只覆盖 Go 侧并发（例如并发保存），不覆盖托管侧与原生侧的竞态。
+
+## 相关页面
+
+- 两个配置文件、跨语言常量的对拍范围与缺口：[两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)
+- `skill_status` 行布局的对拍项与该路径的实证缺口：[skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)
+- harness 保护的那段解析：[语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md)
+- 门禁在流水线里的顺序与理由：[构建、发布与部署链](/openwiki/operations/build-and-release.md)
