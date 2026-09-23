@@ -43,6 +43,7 @@ inline constexpr int kNativeInternalSlotCount = 13;
 // 每个角色模板的 slot 0/1/2 是 mod 注入的专属槽（T1/T2/战气，各一个因子；
 // 玩家配置只填它们之后的槽位）。虚拟槽总数 = kBuiltinExclusiveSlotCount + 配置数。
 inline constexpr int kBuiltinExclusiveSlotCount = 3;
+// 必须容得下 kBuiltinExclusiveSlotCount + 托管侧 MaxSlots（有测试钉着）：不够的话多出来的槽会被截断。
 inline constexpr int kVirtualSlotCapacity = 24;
 // 角色限制表（哪个角色戴哪个专属 gem）由 src/exclusive_table.inc 编译进来，
 // 所以运行期没有数据文件要读，启动时也没有可 fail closed 的东西。

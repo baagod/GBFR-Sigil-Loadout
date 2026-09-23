@@ -1,4 +1,4 @@
-export const MAX_SLOTS = 12
+export const MAX_SLOTS = 16
 /** 不知道 cap 时的因子/技能等级回落值（对应 C# 的 DefaultLevel）。 */
 export const DEFAULT_LEVEL = 15
 
@@ -170,7 +170,7 @@ export function resolveMainGem(
 
 /** 至少补到 MAX_SLOTS 行，用户只管往里填。存档多出来的行照传：交给 Go/C# 校验去拒，
  * 不在这里静默截断（下次自动保存就是数据丢失）。 */
-export function pad12(slots: Slot[]): Slot[] {
+export function padSlots(slots: Slot[]): Slot[] {
     const out = [...slots]
     while (out.length < MAX_SLOTS) out.push(emptySlot())
     return out

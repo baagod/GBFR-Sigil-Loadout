@@ -114,11 +114,16 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
-  <!-- 专属表是生成物（唯一数据源 = gen 的 game/sigils/exclusive.go 里的 exclusiveSources）：每次编译前重生成，
-       所以 src\exclusive_table.inc 不入库，也不需要"生成物是否过期"的门禁。
-       gen 是仓库旁的共享生成器（..\..\gen）：本仓库不放任何生成脚本。
-       这次调用需要 Go（gen 是个 Go 工程）。 -->
-  <Target Name="GenerateExclusiveTable" BeforeTargets="ClCompile">
+  <!-- 两份产物都来自 gen 的 exclusive 子命令；Inputs/Outputs 让 MSBuild 只在源比产物新时才跑它
+       （新克隆没有 .inc 时也会跑）：
+         src\exclusive_table.inc                     编译输入（#include，不入库）
+         ..\SigilLoadout\assets\sigils.chara.json    随包资产（入库）
+       Inputs 必须逐条列文件：MSBuild 不展开这里的通配符。 -->
+  <Target Name="GenerateExclusiveTable" BeforeTargets="ClCompile"
+          Inputs="$(MSBuildProjectDirectory)\..\..\gen\main.go;$(MSBuildProjectDirectory)\..\..\gen\game\sigils\exclusive.go;$(MSBuildProjectDirectory)\..\..\gen\game\sigils\sigils.go;$(MSBuildProjectDirectory)\..\..\gen\game\sigils\json.go;$(MSBuildProjectDirectory)\..\SigilLoadout\assets\sigils.json"
+          Outputs="$(MSBuildProjectDirectory)\src\exclusive_table.inc;$(MSBuildProjectDirectory)\..\SigilLoadout\assets\sigils.chara.json">
     <Exec Command="go run . exclusive -mod &quot;$(MSBuildProjectDirectory)\..&quot;" WorkingDirectory="$(MSBuildProjectDirectory)\..\..\gen" />
+    <!-- gen 内容没变时不写文件，产物 mtime 于是永远落后于源、MSBuild 会一直判过期：这里只推时间戳，不动内容。 -->
+    <Touch Files="$(MSBuildProjectDirectory)\src\exclusive_table.inc;$(MSBuildProjectDirectory)\..\SigilLoadout\assets\sigils.chara.json" />
   </Target>
 </Project>

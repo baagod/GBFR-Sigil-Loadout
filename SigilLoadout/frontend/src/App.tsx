@@ -11,7 +11,7 @@ import {
     buildSigilIndex,
     configToSlots,
     itemRowsOf,
-    pad12,
+    padSlots,
     parseExclusiveTable,
     parseSigilRows,
     sanitizeExclusiveState,
@@ -51,6 +51,11 @@ function failureText(failure: Failure, t: Messages): string {
 // 因子编辑不套它——那一页自带内边距与滚动。
 const LOADOUT_PANEL = "min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-gutter:stable]"
 
+// 通用页的表头待在滚动盒**外面**，否则下滚时它跟着走。它和行共用一套列，所以滚动条那条沟槽也得
+// 让出来：`overflow-y-hidden` 让它成为滚动容器，`scrollbar-gutter: stable` 才会为它预留——少了
+// 这一步表头会比行宽出一个滚动条，列就对不齐了。
+const LOADOUT_HEADER = "shrink-0 overflow-y-hidden px-4 [scrollbar-gutter:stable]"
+
 // 每语言的显示名表在 Go 侧只在启动时读一次（main.go 的 loadAssets），之后不再变，所以缓存住：
 // 换语言命中缓存就同步落地，标签与外层文字同一帧换掉——否则要先显示旧名字、等 IPC 回来再跳一次。
 const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string> }>()
@@ -60,7 +65,7 @@ export default function App() {
     const [sigils, setSigils] = useState<Sigil[]>([])
     const [slots, setSlots] = useState<Slot[]>([])
     // 配置读回来了没有。没读回来就**绝不写盘**：读取失败时槽位被铺成空数组（见加载那段的
-    // setSlots(pad12([]))），此刻交出去的载荷会把磁盘上那份完整的配置整体替换掉。
+    // setSlots(padSlots([]))），此刻交出去的载荷会把磁盘上那份完整的配置整体替换掉。
     const [loadoutRead, setLoadoutRead] = useState(false)
     const [failure, setFailure] = useState<Failure | null>(null)
     const [tab, setTab] = useState<TabKey>("general")
@@ -151,7 +156,7 @@ export default function App() {
             } catch (e) {
                 setFailure({kind: "config", error: e})
                 // 读不出来也要铺满行：屏幕上 0 行看起来像什么都没发生。
-                setSlots(pad12([]))
+                setSlots(padSlots([]))
             }
 
             try {
@@ -215,7 +220,7 @@ export default function App() {
             exclusive?: unknown
         }
         if (LANGS.includes(cfg.lang as Lang)) setLang(cfg.lang as Lang)
-        setSlots(pad12(configToSlots(cfg, sigilTable, skillTable)))
+        setSlots(padSlots(configToSlots(cfg, sigilTable, skillTable)))
         setExclusiveState(sanitizeExclusiveState(cfg.exclusive))
     }
 
@@ -349,26 +354,31 @@ export default function App() {
                     </div>
                 )}
                 {/*
-                    配装那两页各自是滚动盒子（见 LOADOUT_PANEL），也没有"不在这一页就整块不渲染"的分支。
-                    两页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow（每行两个 Base UI 下拉）——
-                    切页于是只剩显示/隐藏，代价是三页启动时都挂上（专属页 29 行，可忽略）。
+                    配装那两页各自是滚动盒子（见 LOADOUT_PANEL；通用页的表头在它之外，见 LOADOUT_HEADER），
+                    也没有"不在这一页就整块不渲染"的分支。两页都 keepMounted：否则每次切页都要卸载/重挂
+                    10 行 SlotRow（每行两个 Base UI 下拉）——切页于是只剩显示/隐藏，代价是三页启动时都挂上
+                    （专属页 29 行，可忽略）。
                 */}
-                <TabsPanel value="general" keepMounted className={`${LOADOUT_PANEL} py-3`}>
-                    <div className={HEADER_ROW}>
-                        <div className="pl-0.5 pr-3">
-                            {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
-                            {slots.length > 0 && (
-                                <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
-                            )}
+                <TabsPanel value="general" keepMounted className="flex min-h-0 flex-1 flex-col pb-3">
+                    <div className={`${LOADOUT_HEADER} pt-3`}>
+                        <div className={HEADER_ROW}>
+                            <div className="pl-0.5 pr-3">
+                                {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
+                                {slots.length > 0 && (
+                                    <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
+                                )}
+                            </div>
+                            <div>#</div>
+                            <div className="pr-2 pl-[11px]">{t.headerPrimary}</div>
+                            <div className="pl-[21px]">{t.headerSecondary}</div>
                         </div>
-                        <div>#</div>
-                        <div className="pr-2 pl-[11px]">{t.headerPrimary}</div>
-                        <div className="pl-[21px]">{t.headerSecondary}</div>
                     </div>
 
-                    {slots.map((slot, row) => (
-                        <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
-                    ))}
+                    <div className={LOADOUT_PANEL}>
+                        {slots.map((slot, row) => (
+                            <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
+                        ))}
+                    </div>
                 </TabsPanel>
                 <TabsPanel value="exclusive" keepMounted className={LOADOUT_PANEL}>
                     <ExclusivePanel

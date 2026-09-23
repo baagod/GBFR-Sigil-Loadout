@@ -76,8 +76,8 @@ func TestValidateSlots(t *testing.T) {
 		}}, false},
 		{"negative level", []loadoutSlot{slot("9A60FBF0", "B5FF9FD3", -1, 15)}, false},
 		{"too many slots", many, false},
-		{"exactly 12 slots", manySlots(MaxSlots), true},
-		{"13 rows one disabled", oneDisabled, true},
+		{"exactly MaxSlots slots", manySlots(MaxSlots), true},
+		{"one row over MaxSlots, one disabled", oneDisabled, true},
 		{"empty items", []loadoutSlot{{}}, false},
 		{"missing gem", []loadoutSlot{slot("", "", 15, 0)}, false},
 		{"missing main hash", []loadoutSlot{{

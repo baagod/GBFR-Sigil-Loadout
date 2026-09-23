@@ -24,8 +24,8 @@ internal static class LoadoutConfig {
 
     // 与 Native/native_internal.h 的 kUnwornCharacterHash 保持同步（0x887AE0B0）
     private const uint UnwornCharacterHash = 0x887AE0B0;
-    // 与 SigilLoadout/loadoutservice.go 的 MaxSlots 保持同步
-    private const int MaxSlots = 12; // 保守上限（槽位更多有失稳风险）
+    // 与 SigilLoadout/loadoutservice.go 的 MaxSlots 保持同步（虚拟槽总数 = 3 个内置专属 + 这个数）。
+    private const int MaxSlots = 16;
     private const int DefaultLevel = 15;
 
     private static readonly FileStamp Stamp = new(ConfigFile);

@@ -8,8 +8,8 @@ import (
 	jsonv2 "encoding/json/v2"
 )
 
-// MaxSlots 只限制**启用**的槽数，与托管侧校验器（LoadoutConfig.ParseAndValidate）一致。
-const MaxSlots = 12
+// MaxSlots 只限制**启用**的槽数（与 LoadoutConfig.ParseAndValidate 一致）；原生容量必须容得下它。
+const MaxSlots = 16
 
 // LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json——都在 exe 旁），把玩家配置写到
 // LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新冲不掉它）。落盘形状由前端给

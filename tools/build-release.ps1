@@ -48,36 +48,34 @@ $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 # 跑完了的构建——只比 mtime 的话，"失败构建留下的上一次产物"拦不住（那就会被装上去）。
 $completionMarker = Join-Path $distRoot '.build-complete'
 
-# --- 发布一致性闸门 -----------------------------------------------------------
-# sigils.json 随包发布：缺席的话工具起来就没有因子表。
-$sigilsPath = Join-Path $root 'SigilLoadout\assets\sigils.json'
-if (-not (Test-Path -LiteralPath $sigilsPath)) {
-    throw "sigils.json is missing: $sigilsPath"
-}
-
-# --- 数据新鲜度闸门 -----------------------------------------------------------
-# sigils.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   数据源是仓库旁共享 gen 里的 gen\output\sigils.xlsx：审阅表是生成物，不入任何仓库。
-# 只比对本仓库里入库的那一份，不需要游戏数据在场。生成器的两份产物待遇不同：`src\exclusive_table.inc`
-# 不入库（.gitignore），是构建中间产物；`SigilLoadout\assets\sigils.chara.json` **入库、随包**，却由
-# 同一次构建重写——所以它另有一道收尾门禁（见文件末尾的 generated-asset gate）。
+# --- 随包数据（assets\）-------------------------------------------------------
+# 九份资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
+# 现成的同名文件，再没有才让 gen 全出一遍（gen 在仓库旁 ..\gen）。
+$assetsDir = Join-Path $root 'SigilLoadout\assets'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
-$sigilsXlsx = Join-Path $genDir 'output\sigils.xlsx'
-if (-not (Test-Path -LiteralPath $sigilsXlsx)) {
-    throw "sigils.json freshness source is missing: $sigilsXlsx（审阅表在 gen 里生成，不入库；先 cd gen && go run . sigils，不得跳过一致性检查）"
-}
-# 生成器住在仓库**外面**（..\gen，不入本仓库），与其让 `go run` 报一句看不懂的错，不如在这里说清原因。
-if (-not (Test-Path -LiteralPath (Join-Path $genDir 'main.go'))) {
-    throw "共享生成器不在 $genDir（它不在本仓库里）。sigils.json 的一致性门禁靠它运行，所以本仓库无法单独完成一次发布构建：把 gen\ 放回仓库旁，或在有它的机器上构建。"
-}
-Push-Location $genDir
-try {
-    & go run . sigils-json $sigilsXlsx $sigilsPath --check
-    if ($LASTEXITCODE -ne 0) {
-        throw 'sigils.json 与 gen\output\sigils.xlsx 不一致：先跑 gen 的 go run . sigils（审阅表在 gen\output\）'
+$assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.json',
+    'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json')
+foreach ($name in $assets) {
+    $asset = Join-Path $assetsDir $name
+    if (Test-Path -LiteralPath $asset) { continue }
+
+    $prebuilt = Join-Path $genDir "output\$name"
+    if (Test-Path -LiteralPath $prebuilt) {
+        Copy-Item -LiteralPath $prebuilt -Destination $asset -Force
+        Write-Output "assets\${name} <- gen\output"
+        continue
     }
-} finally {
-    Pop-Location
+
+    if (-not (Test-Path -LiteralPath (Join-Path $genDir 'main.go'))) {
+        throw "随包数据缺 ${name}，而生成器不在 $genDir（它不在本仓库里）：补进 SigilLoadout\assets\，或把 gen\ 放回仓库旁。"
+    }
+    Push-Location $genDir
+    try {
+        & go run . export -mod $root
+        if ($LASTEXITCODE -ne 0) { throw 'gen export failed; the packaged assets are still incomplete.' }
+    } finally { Pop-Location }
+    if (-not (Test-Path -LiteralPath $asset)) { throw "gen export 之后仍然没有 assets\${name}。" }
+    Write-Output "assets\${name} <- gen export"
 }
 
 $msbuild = $null
@@ -343,23 +341,6 @@ $packagedConfig = $packagedFiles |
     Select-Object -First 1
 if ($packagedConfig) {
     throw "Mutable config state must be runtime-created and was packaged unexpectedly: $($packagedConfig.FullName)"
-}
-
-# --- 生成资产门禁 -------------------------------------------------------------
-# 上面那些门禁跑完之后，构建还会在 native 编译前重跑生成器（vcxproj 的 GenerateExclusiveTable），
-# 而它重写的是**入库**的 sigils.chara.json。改写本身不是错误（说明 $chars 变了），但那份改动必须在
-# 仓库里，否则随包发布的就是一份没进仓库的数据（文件既是生成物又是入库数据，这个问题现在不可见）。
-# 只查这一处，别把开发中的其它改动也算进来。
-$gitDir = Join-Path $root '.git'
-if (Test-Path -LiteralPath $gitDir) {
-    $generatedDiff = & git -C $root status --porcelain -- 'SigilLoadout/assets/sigils.chara.json'
-    if ($generatedDiff) {
-        throw "sigils.chara.json 与入库版本不一致（这次构建重写了它）：$generatedDiff 把它一起提交，或撤销 gen 的 sigils/exclusive.go 里引起改写的改动。"
-    }
-}
-else {
-    # 不装作跑过了：没有 .git 的检出（比如解压出来的源码包）查不出"入库的那份"是什么。
-    Write-Output "generated-asset gate: skipped (no .git in $root, so 'uncommitted' has no meaning here)."
 }
 
 Compress-Archive -LiteralPath $packageDir -DestinationPath $zipPath -CompressionLevel Optimal
