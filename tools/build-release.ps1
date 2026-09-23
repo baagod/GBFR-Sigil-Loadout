@@ -221,6 +221,16 @@ try {
     Pop-Location
 }
 
+# --- 布局解析回归（离线）------------------------------------------------------
+# 拿真实游戏 exe 跑一遍生产解析器：解析成功 + 逐字节复验 + "改坏一个字节必须被拒"。它护的是
+# layout_resolver.cpp——仓库里最危险的那段代码；改它或游戏更新时，这是唯一能在本地给出答案的东西。
+# 没设 GBFR_EXE 就跳过：exe 路径是本机环境、不入库，闸门要在任何机器上都能跑。
+if ($env:GBFR_EXE) {
+    & pwsh -NoProfile -File (Join-Path $root 'tests\NativeLayoutHarness\run.ps1') -Exe $env:GBFR_EXE
+    if ($LASTEXITCODE -ne 0) { throw "Layout harness failed with exit code $LASTEXITCODE." }
+}
+else { Write-Output 'layout harness: skipped (set GBFR_EXE to run it).' }
+
 # 随包数据只有一份：SigilLoadout\assets\。工具按 exeDir()\assets\ 找它，所以从源码目录直接跑与跑
 # 打包出来的那份用的是同一布局——这里不需要任何"开发副本"，以前那一步同步已经删掉。
 foreach ($staleData in @('sigils.json', 'sigils.chara.json')) {
