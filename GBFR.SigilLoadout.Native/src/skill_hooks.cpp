@@ -376,7 +376,10 @@ void DisableGameplayHooksAndRestore() noexcept {
       SwitchToThread();
    }
 
-   g_skill_fetch_hook.reset();
+   // 刻意不 reset() 那个 mid hook：ActiveCallGuard 只包住 detour 的函数体（见 OnSkillFetch），而
+   // safetyhook 的 stub 在 destination 返回之后还要跑收尾指令再跳 trampoline——计数器先归零，
+   // reset() 就会 VirtualFree 掉线程仍在执行的那几页。disable() 已经把目标字节还原了，留几页到
+   // 进程退出是安全的；下面的 inline hook 不在此列，它的 call<>() 持有 disable() 也要的那把锁。
    g_get_gem_hook.reset();
    ResetGameLayout();
 }

@@ -469,7 +469,6 @@ bool TryGetCodeSection(CodeSectionView& view) noexcept {
    view.rva = image.code_rva;
    view.size = image.code_size;
    view.image_size = image.size;
-   view.timestamp = image.nt->FileHeader.TimeDateStamp;
    return true;
 }
 

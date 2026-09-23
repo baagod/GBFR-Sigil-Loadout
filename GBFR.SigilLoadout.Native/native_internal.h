@@ -208,7 +208,6 @@ struct CodeSectionView {
    uintptr_t rva = 0;
    size_t size = 0;
    uintptr_t image_size = 0;
-   uint32_t timestamp = 0;
 };
 
 bool TryGetCodeSection(CodeSectionView& view) noexcept;
