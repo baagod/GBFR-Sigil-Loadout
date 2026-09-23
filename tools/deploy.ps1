@@ -75,13 +75,19 @@ function Start-SigilLoadout {
 
 Stop-SigilLoadout
 
-# 4. 替换部署目录。
+# 4. 替换部署目录。先整份拷进同级的新目录，成功了才删旧的：直接"先删后拷"的话，中途任何失败
+#    （包不全、文件被占、Copy-Item 抛错）都会让用户的 mod 目录消失或只拷贝一半，没有退路。
 $targetDir = Split-Path -Parent $Target
+New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+$staged = "$Target.new"
+if (Test-Path -LiteralPath $staged) {
+    Remove-Item -LiteralPath $staged -Recurse -Force
+}
+Copy-Item -Path $source -Destination $staged -Recurse -Force
 if (Test-Path -LiteralPath $Target) {
     Remove-Item -LiteralPath $Target -Recurse -Force
 }
-New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
-Copy-Item -Path $source -Destination $targetDir -Recurse -Force
+Rename-Item -LiteralPath $staged -NewName (Split-Path -Leaf $Target)
 
 # 5. 从刚部署好的那份重开编辑工具。若第一次启动没活下来（残留实例还占着 mutex），全停掉再来一次。
 if (-not (Start-SigilLoadout)) {

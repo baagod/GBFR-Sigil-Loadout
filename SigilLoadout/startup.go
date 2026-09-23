@@ -17,8 +17,9 @@ import (
 // 故意不 Close——命名对象活到进程退出，而这正是这个判据需要的时间窗。
 func ensureSingleInstance() {
 	name, _ := syscall.UTF16PtrFromString(mutexName)
-	namePtr := uintptr(unsafe.Pointer(name))
-	handle, _, cerr := procCreateMutexW.Call(0, 0, namePtr)
+	// 转换必须内联在实参里：uintptr 不是 GC 引用，存进变量后 name 可能被判为已死，
+	// 那块 UTF-16 缓冲会在真正调用之前被回收。
+	handle, _, cerr := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(name)))
 	if handle == 0 {
 		log.Printf("single-instance: mutex create failed (handle=0), continuing without lock")
 		return

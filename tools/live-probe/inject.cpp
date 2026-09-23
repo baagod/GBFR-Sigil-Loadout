@@ -63,6 +63,7 @@ int wmain(int argc, wchar_t** argv)
    if (!WriteProcessMemory(process, remote, argv[2], bytes, nullptr))
    {
       wprintf(L"WriteProcessMemory failed: %lu\n", GetLastError());
+      VirtualFreeEx(process, remote, 0, MEM_RELEASE);
       CloseHandle(process);
       return 6;
    }
@@ -74,15 +75,25 @@ int wmain(int argc, wchar_t** argv)
    if (thread == nullptr)
    {
       wprintf(L"CreateRemoteThread failed: %lu\n", GetLastError());
+      VirtualFreeEx(process, remote, 0, MEM_RELEASE);
       CloseHandle(process);
       return 7;
    }
 
-   WaitForSingleObject(thread, 10000);
+   // 线程还在跑的时候那块路径缓冲不能释放；等它结束（或超时）之后再放，并把这个等待的结果当
+   // 判据——超时的注入并没有完成，不能报成功。
+   const DWORD waited = WaitForSingleObject(thread, 10000);
    DWORD exit_code = 0;
    GetExitCodeThread(thread, &exit_code);
-   wprintf(L"injected into pid %lu (LoadLibraryW returned 0x%lX)\n", pid, exit_code);
    CloseHandle(thread);
+   VirtualFreeEx(process, remote, 0, MEM_RELEASE);
    CloseHandle(process);
+   if (waited == WAIT_TIMEOUT)
+   {
+      wprintf(L"injection timed out after 10s; LoadLibraryW has not returned (thread exit code 0x%lX)\n",
+              exit_code);
+      return 9;
+   }
+   wprintf(L"injected into pid %lu (LoadLibraryW returned 0x%lX)\n", pid, exit_code);
    return exit_code == 0 ? 8 : 0;
 }

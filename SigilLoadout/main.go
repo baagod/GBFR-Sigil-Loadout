@@ -88,6 +88,9 @@ func main() {
 	// 因子编辑页的写入带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
 	// 否则最后一次编辑就丢了。
 	app.OnShutdown(editService.flushNow)
+	// 关机时要先立这个标志：cleanup() 里的 shutdownTasks 跑在 window.Close() 之前，否则下面那记
+	// WM_CLOSE 会被当成"用户点了 X"而改成假隐藏（见 windowstate.go 的 quitting）。
+	app.OnShutdown(func() { quitting.Store(true) })
 
 	tray := app.SystemTray.New()
 	tray.SetIcon(trayIconBytes)
@@ -98,7 +101,8 @@ func main() {
 	menu := application.NewMenu()
 	menu.Add("Exit").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
-	tray.Show()
+	// 这里刻意不调 tray.Show()：app.Run() 之前 SystemTray 的 impl 还是 nil，Show() 立刻返回，
+	// 图标是平台自己 run 时挂上的——留着只会伪装成一条它给不了的可见性保证。
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

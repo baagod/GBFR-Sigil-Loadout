@@ -14,6 +14,11 @@ var toolHidden atomic.Bool
 // mod 只在游戏是前台窗口时响应热键，没有这一步，下一次按 F1 就被忽略。
 var returnFocusTo atomic.Uintptr
 
+// quitting 由关机流程置位（见 main.go 的 OnShutdown）。Wails 的 cleanup() 会挨个 window.Close()
+// → WM_CLOSE；若我们照常答"已处理"，框架那套干净收尾（标记销毁、WebView2 ShuttingDown、DefWindowProc）
+// 就永远不跑，窗口改成假隐藏——退出时还会去抢前台游戏窗口，并注入那一记合成点击。
+var quitting atomic.Bool
+
 // fakeHide 隐藏窗口而不隐藏 WebView2：外框保持 shown 但全透明（alpha 0 = 鼠标穿透）、禁用输入
 // （顺带把焦点移走）、脱离任务栏/Alt-Tab（WS_EX_TOOLWINDOW）。WebView 照旧渲染，所以之后再显出
 // 来不会白闪，也根本没有 ShowWindow 那一下切换。真正的动作跑在 UI 线程（见 wmFakeHide / hideNow）。
@@ -90,6 +95,10 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 	}
 	switch msg {
 	case 0x0010: // WM_CLOSE：假隐藏到托盘（WebView 保持活着）
+		if quitting.Load() {
+			// 这是框架在关机（cleanup → window.Close()），不是用户点 X：交回默认处理，让它真的销毁窗口。
+			return 0, false
+		}
 		debugf("WM_CLOSE hwnd=%d", hwnd)
 		fakeHide(hwnd)
 		return 0, true

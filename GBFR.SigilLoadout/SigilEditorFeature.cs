@@ -162,10 +162,10 @@ internal sealed class SigilEditorFeature {
         if (!_stamp.Pending(current))
             return;
 
-        // 还没成功过时按 RetryIntervalMs 节流：原生拒写会在自己那句日志里打字，托管侧的静默
-        // 管不到它，所以重试频率就是日志频率。文件变了要立刻处理，那一版不算节流。
+        // 同版本的重试按 RetryIntervalMs 节流（第一次尝试与 _loggedAttemptUtc 的初值不同，所以
+        // 第一次不节流）；文件变了要立刻处理，那一版不算节流。
         long now = Environment.TickCount64;
-        bool sameVersionRetry = _currentTable is null && current == _loggedAttemptUtc;
+        bool sameVersionRetry = current == _loggedAttemptUtc;
         if (sameVersionRetry && now - _lastAttemptMs < RetryIntervalMs)
             return;
         _lastAttemptMs = now;
@@ -232,6 +232,9 @@ internal sealed class SigilEditorFeature {
         // 只是捷径：这份和上次交上去的逐字节一样就什么都不做。基线未知（启动那次没产出表）就不比，
         // 让这一拍照常做一遍——代价是一次原生写入，换来的是不必再维护"游戏手里那份"这个第二份事实。
         if (_currentTable is not null && newTable.AsSpan().SequenceEqual(_currentTable)) {
+            // 内存里已经是这一版的字节，所以这一版**确实处理完了**。不标记的话 Pending 永远为真，
+            // 而这条捷径又让 Tick 的节流条件（同版本）失效，于是每 250ms 白重建一次这张表。
+            _stamp.MarkApplied(stamp);
             LogAttempt("hot apply: the edit list matches what is already in memory; nothing to do");
             return;
         }
