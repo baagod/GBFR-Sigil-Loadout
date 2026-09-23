@@ -14,9 +14,8 @@ var toolHidden atomic.Bool
 // mod 只在游戏是前台窗口时响应热键，没有这一步，下一次按 F1 就被忽略。
 var returnFocusTo atomic.Uintptr
 
-// quitting 由关机流程置位（见 main.go 的 OnShutdown）。Wails 的 cleanup() 会挨个 window.Close()
-// → WM_CLOSE；若我们照常答"已处理"，框架那套干净收尾（标记销毁、WebView2 ShuttingDown、DefWindowProc）
-// 就永远不跑，窗口改成假隐藏——退出时还会去抢前台游戏窗口，并注入那一记合成点击。
+// quitting 由关机流程置位（见 main.go 的 OnShutdown）。Wails 的 cleanup() 会挨个 window.Close() →
+// WM_CLOSE；照常答"已处理"的话框架的干净收尾永远不跑，改成假隐藏（顺带在退出时抢游戏前台 + 注入点击）。
 var quitting atomic.Bool
 
 // fakeHide 隐藏窗口而不隐藏 WebView2：外框保持 shown 但全透明（alpha 0 = 鼠标穿透）、禁用输入

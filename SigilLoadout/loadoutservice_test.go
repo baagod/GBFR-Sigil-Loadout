@@ -157,8 +157,7 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 }
 
 /*
-防抖：还没到点就不落盘——这正是"退出时 flushNow 兜住最后一次编辑"能成立的前提（旧契约把防抖放在
-前端，后端根本不知道有未落盘的编辑，退出时无从兜起）。
+防抖：还没到点就不落盘——这正是"退出时 flushNow 兜住最后一次编辑"能成立的前提。
 */
 func TestSaveLoadoutDefersTheWrite(t *testing.T) {
 	dir := t.TempDir()
@@ -182,10 +181,7 @@ func TestSaveLoadoutDefersTheWrite(t *testing.T) {
 	}
 }
 
-/*
-写盘只有 SaveLoadout 一个出口，而防抖只落盘**最后**交上来的那一份：中途的若干次提交只替换待写，
-不会各自 rename 一次，所以磁盘上永远不会留下被后来者取代的旧状态。
-*/
+/* 写盘只有 SaveLoadout 一个出口，而防抖只落盘**最后**交上来的那一份：中途的提交只替换待写。 */
 func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)

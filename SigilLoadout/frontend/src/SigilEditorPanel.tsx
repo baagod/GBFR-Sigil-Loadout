@@ -70,8 +70,8 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
   // 大多数只有一段，少数中途换措辞（见 explainAt）。
   const [texts, setTexts] = useState<Record<string, SkillText>>({});
   const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
-  // 初始列表读过没有。没读过就**绝不写盘**：读取失败时 edits 是空的，此时任何一次 commit 交出去的
-  // 都是一份残缺列表，而后端是整体替换（见 editservice.go 里那条注释）——用户的编辑会被清掉。
+  // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的残缺列表会被后端整体替换
+  // （同 editservice.go 的那条注释），用户的其余编辑就没了。
   const [editListRead, setEditListRead] = useState(false);
   const [error, setError] = useState<{ title: string; detail: string } | null>(null);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -351,8 +351,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     打断用户的失败回来。
   */
   function commit(next: Map<string, SigilSkill>) {
-    // 列表还没读回来（正在读，或者读失败了）就不写：此刻 next 只含用户刚动的那一条，交出去
-    // 等于拿它整体替换掉磁盘上那份完整的列表。
+    // 列表还没读回来就不写，理由见上面 editListRead 的声明。
     if (!editListRead) return;
     // 状态本身就是按地址去重的容器，不必再跑一遍 dedupe。归一化仍走 asEdits，好让"同一条
     // 记录连着两次提交"得到逐字节相同的结果。

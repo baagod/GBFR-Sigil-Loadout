@@ -26,10 +26,9 @@ foreach ($sanity in @('GBFR.SigilLoadout.dll', 'SigilLoadout.exe')) {
     }
 }
 
-# 1b. And it must be the product of a build that ran to completion. "包存在且完整"不等于"它就是当前源码
-#     的产物"：构建失败时 dist 会原封不动留着上一次的产物，脚本照样装上去并报"成功"（踩过一次）。
-#     判据是 build-release.ps1 落下的完成标记——它在打包开始时被删、所有闸门通过后才写，所以半截
-#     构建根本不会留下它。再和仓库声明的版本对一次账，顺带拦住"跨版本拿错 dist"。
+# 1b. And it must be the product of a build that ran to completion："包存在且完整"不等于"它就是当前源码
+#     的产物"——构建失败时 dist 会原封不动留着上一次的产物，脚本照样装上去并报"成功"（踩过一次）。
+#     判据是 build-release.ps1 在打包开始时删、所有闸门通过后才写的完成标记，再加上与声明版本的对账。
 $completionMarker = Join-Path (Split-Path -Parent $source) '.build-complete'
 if (-not (Test-Path -LiteralPath $completionMarker -PathType Leaf)) {
     throw "No build-completion marker at $completionMarker - this dist is not the product of a finished build. Run build-release.ps1."
@@ -85,8 +84,7 @@ function Start-SigilLoadout {
 
 Stop-SigilLoadout
 
-# 4. 替换部署目录。先整份拷进同级的新目录，成功了才删旧的：直接"先删后拷"的话，中途任何失败
-#    （包不全、文件被占、Copy-Item 抛错）都会让用户的 mod 目录消失或只拷贝一半，没有退路。
+# 4. 替换部署目录：先整份拷进同级新目录，成功了才删旧的（"先删后拷"中途失败就没有退路）。
 $targetDir = Split-Path -Parent $Target
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 $staged = "$Target.new"

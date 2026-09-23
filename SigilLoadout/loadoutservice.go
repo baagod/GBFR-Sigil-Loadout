@@ -24,9 +24,8 @@ const MaxSlots = 12
 // { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] }——只认这一种形状，
 // 别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
-	// 写盘只有 SaveLoadout 这一个出口。它保管着防抖尚未写出的那份配置：每次调用都替换这份并重启
-	// 定时器，于是落盘的永远是屏幕上最后的状态，绝不会是若干次编辑的混合——与 EditService 同一套
-	// 契约（同样 500ms、退出时同样由 flushNow 兜住，见 main.go 里的两个 OnShutdown）。
+	// 写盘只有 SaveLoadout 这一个出口，它保管着防抖尚未写出的那份配置：每次调用都替换这份并重启
+	// 定时器，落盘的永远是屏幕上最后的状态。与 EditService 同一套契约（同样 500ms + flushNow）。
 	mu      sync.Mutex
 	pending []byte
 	timer   *time.Timer
@@ -225,8 +224,7 @@ func validateSlots(slots []loadoutSlot) error {
 	return nil
 }
 
-// SaveLoadout 接过一份玩家配置（mod 读的那种形状）。形状或取值不当**当场**报错（前端要靠这个错误
-// 弹框）；能接受的进待写并重启防抖定时器，落盘发生在编辑停下来之后（见结构体注释）。
+// SaveLoadout 接过一份玩家配置。形状/取值不当**当场**报错（前端靠它弹框）；能接受的只进待写。
 func (s *LoadoutService) SaveLoadout(config string) error {
 	var c struct {
 		Lang      string                    `json:"lang"`
@@ -257,15 +255,13 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 	return nil
 }
 
-// flush 是防抖触发时执行的：编辑已经停止，把待写的那份落盘。名字与语义同 EditService。
 func (s *LoadoutService) flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.writeLocked()
 }
 
-// flushNow 立即落盘，用于关闭流程（main.go 的 OnShutdown）：窗口可能在防抖窗口里就关掉，而刚做的
-// 那次编辑才是用户想留下的。已经写过的不在待写里，所以这里什么也找不到、不会写第二遍。
+// flushNow 供关闭流程用：窗口可能在防抖窗口里就关掉，而刚做的那次编辑才是用户想留下的。
 func (s *LoadoutService) flushNow() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -275,8 +271,7 @@ func (s *LoadoutService) flushNow() {
 	s.writeLocked()
 }
 
-// writeLocked 取出待写的那份并原子落盘（temp + rename，所以 mod 每 250ms 看一次 mtime 也不会看到
-// 半截文件）；取走而不是读取，关闭流程因此不会写第二遍。调用方持有 s.mu。
+// writeLocked 取出待写的那份并原子落盘；取走而不是读取，关闭流程因此不会写第二遍（调用方持有 s.mu）。
 func (s *LoadoutService) writeLocked() {
 	payload := s.pending
 	s.pending = nil
@@ -287,8 +282,7 @@ func (s *LoadoutService) writeLocked() {
 		// 放回待写：一次瞬时 IO 失败不该变成永久丢失，下一次防抖或退出时的 flushNow 就是重试。
 		s.pending = payload
 		log.Printf("loadout: %v", err)
-		// 防抖之后的失败已经没有调用方可以返回，只能推给前端（与 EditService 同一个事件）；
-		// 测试里 application.Get() 是 nil，没有前端可通知。
+		// 这个失败已经没有调用方可以返回，只能推给前端（与 EditService 同一个事件）。
 		if app := application.Get(); app != nil {
 			app.Event.Emit(saveFailedEvent, err.Error())
 		}

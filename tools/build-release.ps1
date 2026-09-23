@@ -363,7 +363,6 @@ else {
 
 Compress-Archive -LiteralPath $packageDir -DestinationPath $zipPath -CompressionLevel Optimal
 
-# 到这里所有闸门都过了、zip 也出来了，才落完成标记（内容就是版本号，deploy 拿去和仓库声明对账）。
 Set-Content -LiteralPath $completionMarker -Value $Version -NoNewline
 
 Write-Output "Reloaded-II package: $packageDir"
