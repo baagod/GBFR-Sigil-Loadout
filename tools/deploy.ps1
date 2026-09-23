@@ -26,10 +26,23 @@ foreach ($sanity in @('GBFR.SigilLoadout.dll', 'SigilLoadout.exe')) {
     }
 }
 
-# 1b. And it must not be stale. "包存在且完整"不等于"它就是当前源码的产物"：构建失败时 dist 会原封
-#     不动留着上一次的产物，脚本照样装上去并报"成功"（踩过一次）。只比**参与构建的输入**（三个单元
-#     的源码），不比工具脚本和文档——那些改了并不需要重新构建，算进来只会让这道闸门在无关改动上
-#     挡路，久了就会被绕过。前端产物由 go:embed 编进 SigilLoadout.exe，所以它也跟着 SigilLoadout\ 走。
+# 1b. And it must be the product of a build that ran to completion. "包存在且完整"不等于"它就是当前源码
+#     的产物"：构建失败时 dist 会原封不动留着上一次的产物，脚本照样装上去并报"成功"（踩过一次）。
+#     判据是 build-release.ps1 落下的完成标记——它在打包开始时被删、所有闸门通过后才写，所以半截
+#     构建根本不会留下它。再和仓库声明的版本对一次账，顺带拦住"跨版本拿错 dist"。
+$completionMarker = Join-Path (Split-Path -Parent $source) '.build-complete'
+if (-not (Test-Path -LiteralPath $completionMarker -PathType Leaf)) {
+    throw "No build-completion marker at $completionMarker - this dist is not the product of a finished build. Run build-release.ps1."
+}
+$builtVersion = (Get-Content -LiteralPath $completionMarker -Raw).Trim()
+$declaredVersion = (Get-Content -LiteralPath (Join-Path $root 'GBFR.SigilLoadout\ModConfig.json') -Raw | ConvertFrom-Json).ModVersion
+if ($builtVersion -ne $declaredVersion) {
+    throw "dist was built as version '$builtVersion' but the repo declares '$declaredVersion'. Run build-release.ps1."
+}
+
+#     再比时间：只比**参与构建的输入**（三个单元的源码），不比工具脚本和文档——那些改了并不需要
+#     重新构建，算进来只会让这道闸门在无关改动上挡路，久了就会被绕过。前端产物由 go:embed 编进
+#     SigilLoadout.exe，所以它也跟着 SigilLoadout\ 走。
 $buildInputs = @(
     Join-Path $root 'GBFR.SigilLoadout'
     Join-Path $root 'GBFR.SigilLoadout.Native'
@@ -42,12 +55,9 @@ $newestSource = @(
     }
 ) | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
 
-$newestBuilt = @(Get-ChildItem -LiteralPath $source -Recurse -File) |
-    Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-
-if ($newestSource -and $newestBuilt -and $newestSource.LastWriteTimeUtc -gt $newestBuilt.LastWriteTimeUtc) {
+if ($newestSource -and $newestSource.LastWriteTimeUtc -gt (Get-Item -LiteralPath $completionMarker).LastWriteTimeUtc) {
     $newestRel = $newestSource.FullName.Substring($root.Length + 1)
-    throw "The built package is older than the sources ($newestRel is newer than everything in dist). Run build-release.ps1 before deploying."
+    throw "The sources changed after the last build ($newestRel is newer than the completion marker). Run build-release.ps1 before deploying."
 }
 
 # 2. 游戏必须已关闭：它的 mod DLL 是从 Mods 目录加载的。

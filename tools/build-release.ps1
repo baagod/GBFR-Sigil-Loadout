@@ -47,6 +47,9 @@ $managedOutput = Join-Path $root "GBFR.SigilLoadout\bin\$Configuration"
 $distRoot = Join-Path $root 'dist'
 $packageDir = Join-Path $distRoot 'GBFR.SigilLoadout'
 $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
+# 构建完成标记：打包一开始就删掉、**所有闸门通过之后**才写。deploy.ps1 靠它判断 dist 是不是一次
+# 跑完了的构建——只比 mtime 的话，"失败构建留下的上一次产物"拦不住。
+$completionMarker = Join-Path $distRoot '.build-complete'
 
 # --- 发布一致性闸门 -----------------------------------------------------------
 # sigils.json 是工具读的数据源，随包发布，必须在场，否则工具起来就没有因子表。
@@ -265,6 +268,7 @@ if (Test-Path -LiteralPath $packageDir) {
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
+Remove-Item -LiteralPath $completionMarker -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $packageDir | Out-Null
 Copy-Item -Path (Join-Path $managedOutput '*') -Destination $packageDir -Recurse -Force
 
@@ -358,6 +362,9 @@ else {
 }
 
 Compress-Archive -LiteralPath $packageDir -DestinationPath $zipPath -CompressionLevel Optimal
+
+# 到这里所有闸门都过了、zip 也出来了，才落完成标记（内容就是版本号，deploy 拿去和仓库声明对账）。
+Set-Content -LiteralPath $completionMarker -Value $Version -NoNewline
 
 Write-Output "Reloaded-II package: $packageDir"
 Write-Output "ZIP: $zipPath"
