@@ -172,9 +172,14 @@ bool TryGetRuntimeSlot(
       out = entry.slots[static_cast<size_t>(virtual_slot)];
       return out.gem_id != 0;
    }
-   catch (...) {
+   catch (const std::exception& ex) {
+      Log(std::format("TryGetRuntimeSlot: threw ({}); treated as no gem in this slot.", ex.what()));
+      return false;
    }
-   return false;
+   catch (...) {
+      Log("TryGetRuntimeSlot: threw a non-std exception; treated as no gem in this slot.");
+      return false;
+   }
 }
 
 void InstallDefaultTemplateSelections() {
@@ -220,7 +225,7 @@ void InstallDefaultTemplateSelections() {
 //
 // 配装改动只做两件事：换掉选择（对所有角色），然后对 **已知的出战角色** 各重建一次——不重建的话
 // 改动要等到下一次开战才会进战斗状态（游戏不会在战斗中途重建 context-1）。
-void PublishTemplateSelections() noexcept {
+void PublishTemplateSelections() {
    InstallDefaultTemplateSelections();
    RebuildPartyStatusesOnce();
 }
@@ -257,7 +262,7 @@ bool TryCopyTemplateGem(
 
 bool ApplyLoadout(
    const TemplateGemSlot* slots, int32_t slot_count,
-   const GBFR20_ExclusiveOverride* overrides, int32_t override_count) noexcept {
+   const GBFR20_ExclusiveOverride* overrides, int32_t override_count) {
    // 玩家配置只填 kBuiltinExclusiveSlotCount 之后的通用槽；slot 0/1/2 由专属表加
    // 它们的开关按角色组装。nullptr = 没有玩家配置 -> 玩家行数为零，于是下面通用槽
    // 循环是擦除而不是填充。

@@ -211,7 +211,7 @@ struct CodeSectionView {
 };
 
 bool TryGetCodeSection(CodeSectionView& view) noexcept;
-void Log(const std::string& message);
+void Log(const std::string& message) noexcept;
 // 各阶段在调用点用 GetTickCount64 计时，完成时记一行日志（含耗时）；失败是
 // 显式的，所以卡住的启动能靠最后一个完成的阶段定位。
 void CompleteStartupPhase(std::string_view phase, uint64_t started_at_ms, bool succeeded);
@@ -260,12 +260,14 @@ std::array<uint32_t, kVirtualSlotCapacity> GetSelection(uint32_t character_hash)
 
 bool TryGetRuntimeSlot(uint32_t character_hash, int virtual_slot, TemplateGemSlot& out) noexcept;
 void InitializeRuntimeTemplates();
+// 会抛（std::format / std::string / lock）：它们由 ABI 边界的守卫兜住，所以**不能**标 noexcept——
+// 标了的话 throw 会在函数出口先变成 std::terminate，守卫根本来不及接。
 bool ApplyLoadout(
    const TemplateGemSlot* slots, int32_t slot_count,
-   const GBFR20_ExclusiveOverride* overrides, int32_t override_count) noexcept;
+   const GBFR20_ExclusiveOverride* overrides, int32_t override_count);
 void InstallDefaultTemplateSelections();
 // 模板表变过之后必须做的事，只有这一个入口（发布选择 + 排一次状态重建）。
-void PublishTemplateSelections() noexcept;
+void PublishTemplateSelections();
 bool TryCopyTemplateGem(uint32_t character_hash, uint32_t selected_slot_id, void* output) noexcept;
 bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept;
 

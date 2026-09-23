@@ -25,20 +25,30 @@ int GetExpandedInternalSlotCount() noexcept {
    return kNativeInternalSlotCount + GetVirtualSlotCount();
 }
 
-void Log(const std::string& message) {
-   SYSTEMTIME time{};
-   GetLocalTime(&time);
-   const std::string line = std::format(
-      "[{:02}:{:02}:{:02}.{:03}] [GBFR Sigil Loadout Native] {}\n",
-      time.wHour,
-      time.wMinute,
-      time.wSecond,
-      time.wMilliseconds,
-      message);
-   OutputDebugStringA(line.c_str());
-   if (const GBFR20_LogCallback callback = g_log_callback.load(std::memory_order_acquire);
-       callback != nullptr) {
-      callback(message.c_str());
+// 日志绝不允许抛：所有失败路径都在用它、catch 块里也在用它，而它自己抛出去就会顺着 ABI 边界炸掉
+// 游戏。所以格式化失败退化成不带时间戳的原文；宿主的回调单独兜（那是宿主自己的代码）。
+void Log(const std::string& message) noexcept {
+   try {
+      SYSTEMTIME time{};
+      GetLocalTime(&time);
+      const std::string line = std::format(
+         "[{:02}:{:02}:{:02}.{:03}] [GBFR Sigil Loadout Native] {}\n",
+         time.wHour,
+         time.wMinute,
+         time.wSecond,
+         time.wMilliseconds,
+         message);
+      OutputDebugStringA(line.c_str());
+   }
+   catch (...) {
+   }
+   try {
+      if (const GBFR20_LogCallback callback = g_log_callback.load(std::memory_order_acquire);
+          callback != nullptr) {
+         callback(message.c_str());
+      }
+   }
+   catch (...) {
    }
 }
 

@@ -4,6 +4,20 @@
 
 using namespace gbfr::native;
 
+// ABI 边界：异常绝不能跨出 extern "C"——契约（native_api.h）里没有这一项，抛出去就是 std::terminate
+// 带走游戏。可能抛的导出都从这里走：throw 变成"拒绝值 + 一行原因"。Log 自己是 noexcept，所以在这里
+// 记录原因是安全的；GetAbiVersion / SetLogCallback 证得了不会抛，不走这条。
+template <typename Fn, typename T>
+T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
+   try {
+      return body();
+   }
+   catch (...) {
+      Log(std::format("{}: threw; reported as a refusal.", what));
+      return refusal;
+   }
+}
+
 uint32_t GBFR20_CALL GBFR20_GetAbiVersion() {
    return GBFR20_ABI_VERSION;
 }
@@ -13,33 +27,42 @@ void GBFR20_CALL GBFR20_SetLogCallback(GBFR20_LogCallback callback) {
 }
 
 int32_t GBFR20_CALL GBFR20_Initialize() {
-   if (g_shutting_down.load(std::memory_order_acquire))
-      return 0;
-   EnsureInitialized();
-   return g_hooks_ready.load(std::memory_order_acquire) ? 1 : 0;
+   // EnsureInitialized 会分配、加锁，所以整条走守卫：抛了就是"没初始化成功"（0）。
+   return GuardAbi("GBFR20_Initialize", int32_t{0}, [] {
+      if (g_shutting_down.load(std::memory_order_acquire))
+         return int32_t{0};
+      EnsureInitialized();
+      return g_hooks_ready.load(std::memory_order_acquire) ? int32_t{1} : int32_t{0};
+   });
 }
 
 void GBFR20_CALL GBFR20_Shutdown() {
-   if (g_shutdown_complete.exchange(true, std::memory_order_acq_rel))
-      return;
-   ShutdownHooks();
+   GuardAbi("GBFR20_Shutdown", 0, [] {
+      if (!g_shutdown_complete.exchange(true, std::memory_order_acq_rel))
+         ShutdownHooks();
+      return 0;
+   });
 }
 
 uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(char* buffer, uint32_t buffer_size) {
-   std::string message; {
-      std::scoped_lock lock(g_message_mutex);
-      message = g_runtime_message;
-   }
-   const size_t required_size = message.size() + 1;
-   if (buffer != nullptr && buffer_size != 0) {
-      const size_t copy_size = std::min<size_t>(message.size(), buffer_size - 1);
-      std::memcpy(buffer, message.data(), copy_size);
-      buffer[copy_size] = '\0';
-   }
-   return required_size > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(required_size);
+   // std::string 的拷贝会分配；抛了就当作"没有消息"（0）——这份消息本身只是诊断信息。
+   return GuardAbi("GBFR20_CopyRuntimeMessage", uint32_t{0}, [&] {
+      std::string message; {
+         std::scoped_lock lock(g_message_mutex);
+         message = g_runtime_message;
+      }
+      const size_t required_size = message.size() + 1;
+      if (buffer != nullptr && buffer_size != 0) {
+         const size_t copy_size = std::min<size_t>(message.size(), buffer_size - 1);
+         std::memcpy(buffer, message.data(), copy_size);
+         buffer[copy_size] = '\0';
+      }
+      return required_size > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(required_size);
+   });
 }
 
-int32_t GBFR20_CALL GBFR20_ApplyLoadout(
+// 内部实现可抛（Log/format/分配），所以导出只负责把它包进 ABI 守卫。
+static int32_t ApplyLoadoutEntry(
    const GBFR20_TemplateSlot* slots, uint32_t slot_count,
    const GBFR20_ExclusiveOverride* overrides, uint32_t override_count) {
    // 一个调用带两张调用方持有的表，守卫都在这里：关机中拒绝、计数越界拒绝、然后懒初始化并
@@ -71,6 +94,14 @@ int32_t GBFR20_CALL GBFR20_ApplyLoadout(
    return applied ? 1 : 0;
 }
 
+int32_t GBFR20_CALL GBFR20_ApplyLoadout(
+   const GBFR20_TemplateSlot* slots, uint32_t slot_count,
+   const GBFR20_ExclusiveOverride* overrides, uint32_t override_count) {
+   return GuardAbi("GBFR20_ApplyLoadout", int32_t{0}, [&] {
+      return ApplyLoadoutEntry(slots, slot_count, overrides, override_count);
+   });
+}
+
 // 拒绝码的人话解释只有这一处：托管层那边只记"被拒 + 码"。每一个码都要在这里有一句，
 // 否则 default 会把一个具体的失败说成另一件事。
 static const char* SkillStatusRefusalReason(int32_t code) {
@@ -94,7 +125,7 @@ static const char* SkillStatusRefusalReason(int32_t code) {
    }
 }
 
-int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t length) {
+static int32_t WriteSkillStatusTableEntry(const uint8_t* table, uint32_t length) {
    if (g_shutting_down.load(std::memory_order_acquire))
       return GBFR20_TABLE_NOT_READY;
    // 刻意**不**要求 g_hooks_ready：写的是数据管理器供给的那张表，与钩子装没装成无关，而
@@ -121,4 +152,11 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
       last_refusal.store(std::numeric_limits<int32_t>::min(), std::memory_order_release);
    }
    return result;
+}
+
+int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t length) {
+   // 守卫里的兜底取 -7：它是"写之后"的码，语义上最保守（表可能只更新了一部分）。
+   return GuardAbi("GBFR20_WriteSkillStatusTable", GBFR20_TABLE_WRITE_FAILED, [&] {
+      return WriteSkillStatusTableEntry(table, length);
+   });
 }

@@ -125,7 +125,13 @@ bool TryLoadVirtualSkillSelection(
       selection = GetSelection(identity.character_hash);
       return CountSelectedSlots(selection) != 0;
    }
+   catch (const std::exception& ex) {
+      Log(std::format("virtual skill selection: threw ({}); treated as no selection.", ex.what()));
+      selection = {};
+      return false;
+   }
    catch (...) {
+      Log("virtual skill selection: threw a non-std exception; treated as no selection.");
       selection = {};
       return false;
    }
