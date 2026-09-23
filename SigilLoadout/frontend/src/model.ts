@@ -4,8 +4,7 @@ export const DEFAULT_LEVEL = 15
 
 export interface Slot {
     mainHash: string
-    /** 载入时存档里那个 gem hash：主下拉的值是组键，只有它能记住组里选的是哪个变体。
-     * 空 = 没有可保留的变体。 */
+    /** 存档里那个 gem hash：主下拉的值是组键，只有它能记住组里选的是哪个变体。空 = 没有可保留的变体。 */
     mainGem: string
     mainLevel: number
     secHash: string
@@ -13,8 +12,8 @@ export interface Slot {
     enabled: boolean
 }
 
-/** loadout.json 里槽位 items 的一项（文件形状）。level 可省，手改的文件会漏（回落
- * DEFAULT_LEVEL）。旧版本还会写 zh/en，mod 从不读、名字也不是数据。 */
+/** loadout.json 里槽位 items 的一项（文件形状）。level 可省（手改的文件会漏，回落
+ * DEFAULT_LEVEL）；旧版本写的 zh/en，mod 从不读、名字也不是数据。 */
 export interface SavedItem {
     gem?: string
     hash?: string
@@ -83,7 +82,7 @@ export type ExclusiveState = Record<string, Record<string, boolean>>
 const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"])
 
 /** 净化读进来的 "exclusive"：丢掉原型键与非 `false` 的值，手写的文件因此不能污染编辑器状态。
- * 这个形状只记**被关掉的槽**：`true` 与"没提到"是同一件事，收下它下一次自动保存就会原样写回文件。 */
+ * 这个形状只记**被关掉的槽**：收下 `true`，下一次自动保存就会把它原样写回文件。 */
 export function sanitizeExclusiveState(raw: unknown): ExclusiveState | undefined {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined
     const out: ExclusiveState = {}
@@ -133,10 +132,9 @@ const emptySlot = (): Slot => ({
 
 /** 把存档（新数组格式）归一成 Slot[]。
  *
- * 存档存的是 gem hash，下拉的值是**组键**（`skill1`），这里把前者翻成后者；表里没有的
- * gem 保留原值（下次保存会被丢弃，编辑里显示为空）。名字按语言变，不能当身份。
+ * 存档存的是 gem hash，下拉的值是**组键**（`skill1`），这里把前者翻成后者。名字按语言变，不能当身份。
  *
- * 等级按表里的 cap 夹住，手改出的越界值不会让 mod 拒掉文件。 */
+ * 等级按表里的 cap 夹住；表里没有的 gem 保留原值（下次保存会被丢弃，编辑里显示为空）。 */
 export function configToSlots(
     parsed: { slots?: unknown },
     sigils: Sigil[],
@@ -157,9 +155,8 @@ export function configToSlots(
 /** 保存时这个主因子该写成哪个 gem hash（主下拉的值是组键，不是物品）。
  *
  * 顺序即优先级：存档已指名的变体（preferred，且仍与副技能相容）→ 池版 → 固定副技能那版
- * → 组里第一行。第一档必需：一个组里可以有**名字不同**的两个变体（钳蟹的共鸣 / 永恒钳蟹
- * 因子），丢了它，没被碰过的那一行也会被静默改写。固定副技能不写进 loadout.json（mod 从
- * gem 自己推），所以它对应的 secHash 是空。 */
+ * → 组里第一行。第一档必需：一个组里可以有**名字不同**的两个变体，丢了它，没被碰过的那一行
+ * 也会被静默改写。固定副技能不写进 loadout.json（mod 从 gem 自己推），所以它对应的 secHash 是空。 */
 export function resolveMainGem(
     variants: Sigil[],
     pool: { poolHash: string; lot: Set<string> } | undefined,
@@ -181,7 +178,6 @@ export function pad12(slots: Slot[]): Slot[] {
     return out
 }
 
-/** 把存下的等级夹到表里的 cap。 */
 const clampLevel = (level: number, cap: number | undefined) =>
     cap === undefined ? level : Math.max(0, Math.min(level, cap))
 
@@ -256,7 +252,7 @@ export function buildSigilIndex(
 ): SigilIndex {
     const skillByName = new Map(skills.map((tr) => [tr.hash, tr]))
 
-    // 主因子按技能分组：名字按语言变、不能当键。
+    // 主因子按技能分组：名字按语言变，不能当键。
     const grouped = new Map<string, Sigil[]>()
     for (const s of sigils) {
         const key = s.skill1 || s.hash
@@ -270,11 +266,11 @@ export function buildSigilIndex(
         .filter(([, variants]) => variants.some((v) => v.player === ""))
         .map(([key]) => key)
 
-    // 显示名来自命名该技能的那一行物品（技能字典首行胜出，App 建 skills 时已剔除专属行）。
+    // 显示名来自命名该技能的那一行物品（技能字典首行胜出）。
     const labels: Record<string, string> = {}
     for (const tr of skills) labels[tr.hash] = names[tr.gem] ?? tr.hash
 
-    // 池族：池版那一行 + 它声明的合法副列表（lot）。gemOf 用它决定写池版还是固定版。
+    // 池族：池版那一行 + 它声明的合法副列表（lot）。
     const poolOf = new Map<string, { poolHash: string; lot: Set<string> }>()
     for (const [key, variants] of grouped) {
         const pool = variants.find((v) => v.lot && v.lot.length > 0)

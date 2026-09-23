@@ -168,7 +168,7 @@ bool MatchesBytes(uintptr_t address, const std::array<uint8_t, Size>& expected) 
 }
 
 // 运行期长度版本：表驱动的预检长度只有运行时才知道。**不能**套上面那个模板——它的长度来自
-// 数组类型，套过去会连缓冲尾部的垃圾一起比（128 字节的表在真机上永远不匹配）。SEH 逐字同上。
+// 数组类型，套过去会连缓冲尾部的垃圾一起比（128 字节的表在真机上永远不匹配）。
 inline bool MatchesBytesAt(uintptr_t address, const uint8_t* expected, size_t size) noexcept {
     __try {
         return std::memcmp(reinterpret_cast<const void*>(address), expected, size) == 0;
@@ -203,7 +203,7 @@ int GetVirtualSlotCount() noexcept;
 int GetExpandedInternalSlotCount() noexcept;
 bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept;
 // 游戏自己的代码段（PE 视图的唯一持有者仍是 layout_resolver.cpp：先按名字找 `.text`，
-// 找不到才取最大的可执行段）。锚点扫描要的三个量就是它 + 映像大小 + PE 指纹。
+// 找不到才取最大的可执行段）。
 struct CodeSectionView {
     uintptr_t rva = 0;
     size_t size = 0;

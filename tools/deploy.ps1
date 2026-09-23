@@ -5,7 +5,6 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# 本脚本住在 tools\ 里，仓库根是它的上一层。
 $root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $root 'dist\GBFR.SigilLoadout'
 
@@ -39,8 +38,8 @@ if ($builtVersion -ne $declaredVersion) {
     throw "dist was built as version '$builtVersion' but the repo declares '$declaredVersion'. Run build-release.ps1."
 }
 
-#     再比时间：只比**参与构建的输入**（三个单元的源码），不比工具脚本和文档——那些改了并不需要
-#     重新构建，算进来只会让这道闸门在无关改动上挡路，久了就会被绕过。前端产物由 go:embed 编进
+#     再比时间：只比**参与构建的输入**（三个单元的源码），不比工具脚本和文档——那些改了并不需要重新
+#     构建，算进来只会让这道闸门在无关改动上挡路，久了就会被绕过。前端产物由 go:embed 编进
 #     SigilLoadout.exe，所以它也跟着 SigilLoadout\ 走。
 $buildInputs = @(
     Join-Path $root 'GBFR.SigilLoadout'

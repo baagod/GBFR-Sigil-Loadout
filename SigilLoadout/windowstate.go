@@ -117,7 +117,7 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 			fakeHide(hwnd)
 		}
 		return 0, true
-	case wmActivate: // 激活：揭示（若处于假隐藏）、还原、显示、聚焦
+	case wmActivate:
 		// 在工具抢走焦点之前记下前台窗口，好让 fakeHide 还回去。
 		if prev := foregroundWindow(); prev != 0 && prev != hwnd {
 			returnFocusTo.Store(prev)

@@ -5,7 +5,7 @@
 using namespace gbfr::native;
 
 // ABI 边界：异常绝不能跨出 extern "C"（契约里没有这一项，抛出去就是 std::terminate 带走游戏）。
-// 可能抛的导出都从这里走：throw 变成"拒绝值 + 一行原因"。Log 是 noexcept，所以这里记录原因安全。
+// 可能抛的导出都从这里走：throw 变成"拒绝值 + 一行原因"。
 template <typename Fn, typename T>
 T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
     try {
@@ -83,8 +83,7 @@ static int32_t ApplyLoadoutEntry(
     EnsureInitialized();
     if (!g_hooks_ready.load(std::memory_order_acquire))
         return 0;
-    // 与原生 TemplateGemSlot 布局一致（pack 1、字段顺序一致、0x18 字节）；
-    // 只读，从不修改。
+    // 与原生 TemplateGemSlot 布局一致（见 native_internal.h）；只读，从不修改。
     const bool applied = ApplyLoadout(
         reinterpret_cast<const TemplateGemSlot*>(slots),
         static_cast<int32_t>(slot_count),

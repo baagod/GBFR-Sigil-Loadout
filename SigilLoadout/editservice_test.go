@@ -498,7 +498,6 @@ func TestExcludedRowsAreGone(t *testing.T) {
 	}
 }
 
-// writeFile 写一个测试用的文件，顺带把目录建出来。
 func writeFile(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

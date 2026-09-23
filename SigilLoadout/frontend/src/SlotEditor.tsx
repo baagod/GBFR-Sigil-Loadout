@@ -18,7 +18,7 @@ const GRID_COLS =
 export const HEADER_ROW = `${GRID_COLS} min-h-[44px] border-b text-sm font-medium text-foreground`
 const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
 
-/** 夹在 min/max 之间的等级输入框，右侧带一个灰色的 "/ max"。 */
+/** 等级输入框，右侧带一个灰色的 "/ max"。 */
 function LevelInput({
     value,
     max,

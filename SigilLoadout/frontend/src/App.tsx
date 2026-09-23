@@ -117,7 +117,7 @@ export default function App() {
     }, [loadoutRead])
 
     // 编辑必须先把新值放进 latest.current 再保存：处理器里 setState 要等它返回后才提交，那时读到的还是
-    // 上一次的状态，落盘就永远慢一次（最后一次勾选就是这么丢的）。防抖住在 Go 侧，退出时由 flushNow 兜住。
+    // 上一次的状态，落盘就永远慢一次（最后一次勾选就是这么丢的）。
     const edit = useCallback(
         (patch: { slots?: Slot[]; exclusiveState?: ExclusiveState; lang?: Lang }) => {
             latest.current = {...latest.current, ...patch}

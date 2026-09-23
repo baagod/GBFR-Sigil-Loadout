@@ -10,13 +10,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# 本脚本住在 tools\ 里，仓库根是它的上一层。
 $root = Split-Path -Parent $PSScriptRoot
 
 # --- 版本号：唯一权威源 -------------------------------------------------------
-# ModConfig.json 是版本号的唯一权威源：脚本以前自带一个默认字面量，于是有了两个真相源，而前端的
-# package.json / package-lock.json 根本没人管，工具里显示的版本可以一直停在旧值上。
-# 现在 -Version 只是发布时的可选覆盖手段。
+# ModConfig.json 是版本号的唯一权威源：脚本以前自带默认字面量，于是有了两个真相源，而前端的
+# package.json / package-lock.json 根本没人管，工具显示的版本可以一直停在旧值上。现在 -Version
+# 只是发布时的可选覆盖手段。
 $manifestVersion = (Get-Content -LiteralPath (
     Join-Path $root 'GBFR.SigilLoadout\ModConfig.json') -Raw | ConvertFrom-Json).ModVersion
 if (-not $Version) {
@@ -48,7 +47,7 @@ $distRoot = Join-Path $root 'dist'
 $packageDir = Join-Path $distRoot 'GBFR.SigilLoadout'
 $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 # 构建完成标记：打包一开始就删掉、**所有闸门通过之后**才写。deploy.ps1 靠它判断 dist 是不是一次
-# 跑完了的构建——只比 mtime 的话，"失败构建留下的上一次产物"拦不住。
+# 跑完了的构建——只比 mtime 的话，"失败构建留下的上一次产物"拦不住（那就会被装上去）。
 $completionMarker = Join-Path $distRoot '.build-complete'
 
 # --- 发布一致性闸门 -----------------------------------------------------------
@@ -232,7 +231,7 @@ if ($env:GBFR_EXE) {
 else { Write-Output 'layout harness: skipped (set GBFR_EXE to run it).' }
 
 # 随包数据只有一份：SigilLoadout\assets\。工具按 exeDir()\assets\ 找它，所以从源码目录直接跑与跑
-# 打包出来的那份用的是同一布局——这里不需要任何"开发副本"，以前那一步同步已经删掉。
+# 打包出来的那份用的是同一布局——以前那一步"开发副本"同步已经删掉。
 foreach ($staleData in @('sigils.json', 'sigils.chara.json')) {
     $staleCopy = Join-Path $toolDir $staleData
     if (Test-Path -LiteralPath $staleCopy) {

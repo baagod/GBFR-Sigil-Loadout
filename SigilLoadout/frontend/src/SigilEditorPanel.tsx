@@ -482,7 +482,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
             {/*
                 写入失败值得打断用户——编辑没有落到磁盘上，而原因通常要用户自己处理
                 （sigiledits.json 被别的程序锁住、文件夹不可写）。两种失败都落到这里：立即失败，
-                以及后端推送的防抖失败。关闭只是关闭：消息留到下一条失败把它替换掉，淡出时仍有东西可画。
+                以及后端推送的防抖失败。
             */}
             <AlertDialog
                 open={errorOpen}

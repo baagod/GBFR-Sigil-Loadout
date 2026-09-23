@@ -45,8 +45,8 @@ inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
 /*
     语义锚点表：每个锚点命中处到它那几个 RVA 的偏移只写在这里。
 
-    这些偏移在流水线里被用三次（认领 RVA / 读循环上限或解 call / 最终预检）。以前三处各写一遍
-    同一组数字、只靠字段名手工配对——改了一处却漏了另一处，不会有任何东西报错。
+    这些偏移在流水线里被用三次（认领 RVA / 读循环上限或解 call / 最终预检），以前三处各写一遍同一组
+    数字、只靠字段名手工配对——改了一处漏了另一处不会有任何东西报错。
 */
 struct AnchorOffsets {
     uintptr_t loop_limit_immediate = 0;
@@ -246,7 +246,7 @@ bool MatchesBytesAtRva(
 }
 
 // SEH 版比较（表里的形状是运行期 span）：**不能**套上面那个模板——它按数组类型的长度比，
-// 会连缓冲尾部的垃圾一起比。拷贝本身受 RangeInsideImage 保护，比较走 MatchesBytesAt。
+// 会连缓冲尾部的垃圾一起比。
 bool MatchesPreflight(
     const ImageView& image,
     uintptr_t rva,

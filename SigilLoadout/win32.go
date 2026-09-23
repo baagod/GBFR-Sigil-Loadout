@@ -12,7 +12,6 @@ import (
 
 // 这一文件只放 Win32 依赖（DLL/proc 声明、窗口与常量及其薄包装），不持有状态机语义——那在 windowstate.go。
 
-// mutexName 供 ensureSingleInstance 使用。
 const mutexName = "Local\\GBFRSigilLoadout"
 
 // fakeHide 必须 post 到 UI 线程：SetForegroundWindow 等的是窗口自身线程，而它正阻塞在这个调用里。
@@ -111,7 +110,7 @@ func nextForegroundWindow(hwnd uintptr) uintptr {
 	return 0
 }
 
-// findToolWindow 返回工具主窗口的 handle（0 = 没找到）。
+// findToolWindow 没找到时返回 0。
 func findToolWindow() uintptr {
 	title, _ := syscall.UTF16PtrFromString(toolWindowTitle)
 	hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(title)))

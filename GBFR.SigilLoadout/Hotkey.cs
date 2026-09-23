@@ -10,7 +10,6 @@ namespace GBFR.SigilLoadout;
 /// </summary>
 internal static class Hotkey {
     private const int WmHotkey = 0x0312;
-    // 托盘与"工具没开"的兜底命令：显示/还原/聚焦。
     private const int WmActivate = 0x8010;
     // 游戏内热键的开关命令：工具据此"可见就收、不可见就呼出"。
     private const int WmToggle = 0x8012;
@@ -224,7 +223,6 @@ internal static class Hotkey {
             log("SigilLoadout.exe not found in the mod directory.");
             return;
         }
-        // 工具自己算数据目录（exeDir）；不需要参数。
         using var process = Process.Start(new ProcessStartInfo(toolPath) {
             UseShellExecute = true,
         });
@@ -245,9 +243,7 @@ internal static class Hotkey {
             ? ((OverlayHotkey)virtualKey).ToString()
             : $"0x{virtualKey:X2}";
 
-    /// <summary>
-    /// 轮询到给定虚拟键不再按下为止（最多 400 ms），好让热键的 key-up 在游戏还握着输入时被消费掉。
-    /// </summary>
+    /// <summary>轮询到给定虚拟键不再按下为止（最多 400 ms），好让 key-up 在游戏还握着输入时被消费掉。</summary>
     private static void WaitForKeyRelease(int vk) {
         for (int i = 0; i < 40; i++) {
             if ((GetAsyncKeyState(vk) & 0x8000) == 0)

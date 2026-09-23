@@ -6,9 +6,9 @@ namespace GBFR.SigilLoadout;
 /// <summary>
 /// 一条技能状态覆盖：改哪一行，以及要写哪些 LevelValue 槽位。
 ///
-/// <see cref="Values"/> 按位置对应 LevelValue1..10，即技能自己的描述里写作 {0}、{1} … 的那些槽位。
-/// null 让槽位保持游戏原样：只写数字，所以本工具一无所知的槽位不可能用游戏表的旧副本盖掉这一行。
-/// 描述是槽位含义唯一可得的线索，所以这里不给它建模。
+/// <see cref="Values"/> 按位置对应 LevelValue1..10，即技能描述里写作 {0}、{1} … 的那些槽位；null 让
+/// 槽位保持游戏原样：只写数字，所以本工具一无所知的槽位不可能被游戏表的旧副本盖掉。槽位含义唯一
+/// 可得的线索是描述本身，所以这里不给它建模。
 ///
 /// 每个属性都要写明自己的 JSON 成员名：读取是严格的，这四个拼写就是文件格式，省掉特性就只能
 /// 依赖有意关掉的大小写折叠（Config.Options）。
@@ -44,8 +44,8 @@ public class Config {
 
     private static readonly JsonSerializerOptions Options = new() {
         // 名字就是契约：不折叠、不猜。只有**外层**形状算错误——edits 里每条记录的成员名由
-        // SigilSkill 的 [JsonPropertyName] 决定，认不出的成员读成默认值，由 PatchRows 逐条报
-        // "跳过"：那是看得见的结果，不是"整份文件读不出来"。
+        // SigilSkill 的 [JsonPropertyName] 决定，认不出的成员读成默认值，由 PatchRows 逐条
+        // 报"跳过"，而不是"整份文件读不出来"。
     };
 
     /// <summary>

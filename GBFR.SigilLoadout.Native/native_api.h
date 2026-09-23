@@ -19,7 +19,7 @@
 constexpr uint32_t GBFR20_ABI_VERSION = 20;
 
 // GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）：成功返回实际改写的行数，所以 0 与正数
-// 留给成功；每条在原生日志里都带一句人话的原因。
+// 留给成功。
 constexpr int32_t GBFR20_TABLE_NOT_READY = -1;              // 原生核心没初始化好，或正在关机
 constexpr int32_t GBFR20_TABLE_SLOT_UNRESOLVED = -2;        // 锚点没解析出槽（见 src/table_slot.cpp）
 constexpr int32_t GBFR20_TABLE_BUFFER_UNREADABLE = -3;      // 槽里没有指针，或那块内存不可写
@@ -31,7 +31,6 @@ constexpr int32_t GBFR20_TABLE_WRITE_FAILED = -7;           // 写的时候崩�
 using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 
 #pragma pack(push, 1)
-// 原生 TemplateGemSlot 的 ABI 镜像（字段顺序一致，pack 1）。
 struct GBFR20_TemplateSlot {
     uint32_t gem_id;
     uint32_t skill1;

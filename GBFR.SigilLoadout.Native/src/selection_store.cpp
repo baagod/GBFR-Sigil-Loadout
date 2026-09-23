@@ -68,7 +68,7 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status) {
     }
     // 记录两次都要做，**日志只说一遍**：一次构建会被 apply 与 category 两条循环各问一次扩展槽，
     // 于是这个函数对同一次构建连着进来两次、参数完全相同——原来每个构建刷两行一模一样的
-    // "ctx1 build"，实测占整份日志的 43%。所以说一行的条件是"这一份记录真的变了"。
+    // "ctx1 build"，实测占整份日志的 43%。所以说一行的条件就是"这一份记录真的变了"。
     if (!unchanged)
         Log(std::format(
             "ctx1 build: char=0x{:08X} status=0x{:X} pass={}{}{}{}",

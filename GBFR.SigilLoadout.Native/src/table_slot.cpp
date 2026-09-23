@@ -74,10 +74,10 @@ int32_t TryGetLiveTableBuffer(uintptr_t& buffer) noexcept {
     这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用显式 mask
     字符串；两套并存，各自只服务一个文件）。
 
-    这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是
-    自动成立的——加一条新 pattern 时如果里面有一个 0 是想精确匹配的 0，匹配会静默变宽，
-    而变宽的后果是"命中数 != 1"，于是 fail-closed（游戏照常启动、hook 不装、只有日志说得出
-    原因）。所以改这三条 pattern 时**逐个数字对一遍**，别只改个数。
+    这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是自动成立
+    的——加新 pattern 时若有一个 0 是想精确匹配的 0，匹配会静默变宽，而变宽的后果是"命中数 != 1"，
+    于是 fail-closed（游戏照常启动、hook 不装、只有日志说得出原因）。所以改这三条 pattern 时
+    **逐个数字对一遍**，别只改个数。
 */
 template <size_t Size>
 size_t CountMatches(
@@ -188,8 +188,6 @@ void ResolveTableSlot() {
     if (g_slot_rva.load(std::memory_order_acquire) != 0 || g_image_base == 0)
         return;
 
-    // 代码段来自 layout_resolver 的 PE 视图——它才是"映像里哪一段是代码"的唯一持有者
-    // （先按名字找 `.text`，找不到才取最大的可执行段）。
     CodeSectionView code{};
     if (!TryGetCodeSection(code)) {
         Log("Table slot: the game image's code section could not be resolved; nothing resolved.");
@@ -232,9 +230,6 @@ void ResolveTableSlot() {
     }
 
     g_slot_rva.store(slot_rva, std::memory_order_release);
-    // 只报解析出来的那个槽。三个锚点 RVA、PE 时间戳、以及"槽 + 8"的缓冲区指针都不报：后者的
-    // 偏移上面刚断言过（buffer_pointer_rva != slot_rva + 8），loaded 地址就是 g_image_base + 这个
-    // RVA——全是可推导的，报出来只是噪音；需要时由上面那几条失败分支说清楚。
     Log(std::format("Table slot: resolved slot=0x{:X}.", slot_rva));
 }
 

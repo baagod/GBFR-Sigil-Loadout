@@ -61,8 +61,8 @@ public sealed class Mod : IMod {
 
             string modDirectory = loader.GetDirectoryForModId(ModId);
             Directory.CreateDirectory(modDirectory);
-            // 日志**追加**写（不再每次启动清空），位置就在 mod 目录（惯例、好找）。
-            // 单份上限 4 MB，超了把当前份挪成 .1（只留一代）。只有更新 mod 那一次会丢历史，正常。
+            // 日志**追加**写（不再每次启动清空），位置就在 mod 目录（惯例、好找）。单份上限 4 MB，
+            // 超了把当前份挪成 .1（只留一代）——只有更新 mod 那一次会丢历史，正常。
             string logPath = Path.Combine(modDirectory, "GBFR.SigilLoadout.log");
             try {
                 FileInfo existing = new(logPath);
@@ -158,7 +158,7 @@ public sealed class Mod : IMod {
             logger?.WriteLine(line);
         }
         catch {
-            // 外部日志器出错不能影响 mod 生命周期。
+            // 外部日志器出错同样不能影响 mod 生命周期。
         }
     }
 

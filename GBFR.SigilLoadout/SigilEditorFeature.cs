@@ -465,7 +465,6 @@ internal sealed class SigilEditorFeature {
         return false;
     }
 
-    /// <summary>一行那十个 LevelValue 槽位，给上面那行日志用。</summary>
     private static string RowValues(byte[] data, int row) =>
         string.Join(" / ", Enumerable.Range(0, SigilSkill.LevelValueCount)
             .Select(i => BitConverter.ToSingle(data, row + i * 4)));

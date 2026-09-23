@@ -26,9 +26,7 @@ interface SkillPickerProps {
     placeholder: string
     /** 在最前面加一个"无"（空 value）选项——副技能用。 */
     noneOption?: boolean
-    /** 搜索框的 placeholder（"搜索" / "Search"）。 */
     searchPlaceholder: string
-    /** 列表为空时的文案（"无匹配因子" / "No matching sigils"）。 */
     emptyLabel: string
     /** 禁用这个下拉（如还没选主因子时的副技能）。 */
     disabled?: boolean

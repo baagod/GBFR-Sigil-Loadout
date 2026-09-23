@@ -90,7 +90,7 @@ function ValueSlots({
 
     const vanillaOf = (i: number) => defaults?.[i] ?? 0;
 
-    // 步进：没碰过的槽从游戏自己的数值起步，步进会替换掉半输入的内容（从那一刻起这个框要的就是数字）。
+    // 步进：没碰过的槽从游戏自己的数值起步。
     const step = (index: number, delta: -1 | 1) => {
         setHalfTyped(({ [index]: _dropped, ...rest }) => rest);
         onChange(withSlot(values, index, stepValue(values[index] ?? vanillaOf(index), delta)));

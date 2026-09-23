@@ -11,9 +11,8 @@ import (
 // MaxSlots 只限制**启用**的槽数，与托管侧校验器（LoadoutConfig.ParseAndValidate）一致。
 const MaxSlots = 12
 
-// LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json——都在 exe 旁），
-// 把玩家配置写到 LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新
-// 不会冲掉它）。它写出的 loadout.json 是
+// LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json——都在 exe 旁），把玩家配置写到
+// LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新冲不掉它）。它写出的 loadout.json 是
 // { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] }——只认这一种形状，
 // 别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
@@ -82,7 +81,7 @@ func readModFile(relative string) (string, error) {
 	return string(data), nil
 }
 
-// readAssetMap 读随包数据里的一份并解成以哈希为 Key 的 map（`assets\` 下九份，一份都不嵌）。
+// readAssetMap 读随包数据里的一份并解成以哈希为 Key 的 map。
 // dir 由调用方给（生产是 exeDir()\assets\，测试是源码树的 assets\，测试进程的 exeDir 是临时目录）；
 // 错误里带上路径——缺文件时唯一要看的就是"缺的是哪一份"。
 func readAssetMap[T any](dir, name string) (map[string]T, error) {

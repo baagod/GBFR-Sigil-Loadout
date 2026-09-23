@@ -42,7 +42,6 @@ describe("exclusiveSlots", () => {
 });
 
 describe("withExclusiveToggle", () => {
-    // 古兰/姬塔共享 PL0000：一次点击必须写到两个角色 hash 上，否则面板会多出一行。
     const two = ["E7053919", "1234ABCD"];
 
     it("关掉一个槽只写 false，且写到共享这个 PL 码的每个角色上", () => {

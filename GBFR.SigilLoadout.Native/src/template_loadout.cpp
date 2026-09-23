@@ -75,8 +75,7 @@ uint8_t ReadExclusiveStateLocked(uint32_t character_hash) noexcept {
     return iterator->second & ExclusiveAll;
 }
 
-// 每个虚拟槽一个独立因子（0 = T1，1 = T2，2 = 战气）；被关掉的因子留空槽，
-// 其余槽也留空（玩家配装在 ApplyLoadout 里填它们）。
+// 每个虚拟槽一个独立因子（0 = T1，1 = T2，2 = 战气）；玩家配装在 ApplyLoadout 里填通用槽。
 // 要求调用方持有 g_template_mutex，且该角色已注册进 g_character_template_index。
 void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept {
     const auto index = g_character_template_index.find(character.character_hash);
@@ -180,12 +179,11 @@ bool TryGetRuntimeSlot(
 
 void InstallDefaultTemplateSelections() {
     size_t installed = 0; {
-        // 锁顺序：template -> selection（与运行期写者一致）；只在 selection mutex
-        // 下遍历模板表就是数据竞争。
+        // 锁顺序：template -> selection（与运行期写者一致）；只在 selection mutex 下遍历模板表
+        // 就是数据竞争。
         std::unique_lock template_lock(g_template_mutex);
         std::unique_lock lock(g_selection_mutex);
-        // g_virtual_slot_count 由 ApplyLoadout 按 kVirtualSlotCapacity 钳制后发布；
-        // 这里再钳一次，让槽下标保持在范围内。
+        // g_virtual_slot_count 由 ApplyLoadout 按 kVirtualSlotCapacity 钳制后发布；这里再钳一次。
         const int slot_limit = std::min(
             g_virtual_slot_count.load(std::memory_order_acquire), kVirtualSlotCapacity);
         for (const CharacterTemplate& character : g_runtime_templates) {

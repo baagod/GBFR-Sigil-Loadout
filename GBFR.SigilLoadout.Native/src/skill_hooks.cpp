@@ -14,8 +14,7 @@ thread_local NaturalContributionFrame g_tls_natural_contribution{};
 // 构建开始时（第一个扩展槽）快照一次 store，整个构建都读这一份。别改回 "一张以 status 指针为键的
 // 授权表"（曾经有）：残留授权命中被复用的地址会注入旧槽位——status 对象是轮换且地址跨角色复用的。
 thread_local uintptr_t g_tls_build_status = 0;
-// 快照那一版的角色：只比 status 地址不够（地址跨角色复用），"地址相同"不等于"还是同一个角色"。
-// 自然贡献帧比的是四项（status + character_hash + context_mode + next_slot），这条路径此前只比一项。
+// 快照那一版的角色：只比 status 地址不够（见上：地址跨角色复用）。
 thread_local uint32_t g_tls_build_character = 0;
 thread_local std::array<uint32_t, kVirtualSlotCapacity> g_tls_build_selection{};
 thread_local bool g_tls_build_has_selection = false;
@@ -59,6 +58,7 @@ void TrackNaturalContributionResult(
     bool copied) noexcept {
     if (!g_tls_natural_contribution.active)
         return;
+    // 自然贡献帧比的是四项（status + character_hash + context_mode + next_slot）；这条路径此前只比一项。
     if (g_tls_natural_contribution.status != status ||
          g_tls_natural_contribution.identity.character_hash != identity.character_hash ||
          g_tls_natural_contribution.identity.context_mode != identity.context_mode ||

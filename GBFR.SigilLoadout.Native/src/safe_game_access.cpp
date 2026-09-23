@@ -113,7 +113,6 @@ bool SafeInvokeStatusRebuild(
     }
 
     bool rebuild_succeeded = false;
-    // 重建函数会反过来进 detour 再建一遍这份对象：那段里的构建不算"新的一轮队伍装配"。
     g_tls_hot_rebuild_build = true;
     __try {
         reinterpret_cast<void(__fastcall*)(void*)>(g_image_base + g_game_layout.status_rebuild_rva)(
