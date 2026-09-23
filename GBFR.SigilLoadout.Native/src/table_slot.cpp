@@ -17,7 +17,7 @@ namespace {
 // 这 12 字节里没有 rel32、没有 rip 位移，所以它是纯语义锚点：换版本只要这张表还是
 // 52 字节行，这段指令序列就还在。实测 2.0.6 的 77,257,728 字节 .text 里恰好 1 处。
 inline constexpr std::array<uint8_t, 12> kRowLoopSetup = {
-   0x48, 0x6B, 0xFE, 0x34, 0x48, 0x01, 0xDF, 0xC4, 0x41, 0x38, 0x57, 0xC0};
+    0x48, 0x6B, 0xFE, 0x34, 0x48, 0x01, 0xDF, 0xC4, 0x41, 0x38, 0x57, 0xC0};
 
 // 第二步，锚点前 0x800 字节窗口里必须各恰好出现一次的两条发布指令。两条的 rip 位移都是
 // 通配（0 = 通配），解出来的目标才是地址：
@@ -25,14 +25,14 @@ inline constexpr std::array<uint8_t, 12> kRowLoopSetup = {
 //   48 8B 33           mov  rsi, [rbx]           ; rowCount
 //   48 83 C3 08        add  rbx, 8               ; 首行
 inline constexpr std::array<uint8_t, 14> kBufferPointerLoad = {
-   0x48, 0x8B, 0x1D, 0, 0, 0, 0, 0x48, 0x8B, 0x33, 0x48, 0x83, 0xC3, 0x08};
+    0x48, 0x8B, 0x1D, 0, 0, 0, 0, 0x48, 0x8B, 0x33, 0x48, 0x83, 0xC3, 0x08};
 //   48 89 0D disp32    mov     [rip+disp32], rcx  ; 槽首（24 字节槽）
 //   C5 F8 10 45 F0     vmovups xmm0, [rbp-0x10]  ; 刚从文件解析出的表头
 //   C5 F8 11 05 disp32 vmovups [rip+disp32], xmm0; 槽 +8：缓冲区指针
 inline constexpr std::array<uint8_t, 20> kSlotBaseStore = {
-   0x48, 0x89, 0x0D, 0, 0, 0, 0,
-   0xC5, 0xF8, 0x10, 0x45, 0xF0,
-   0xC5, 0xF8, 0x11, 0x05, 0, 0, 0, 0};
+    0x48, 0x89, 0x0D, 0, 0, 0, 0,
+    0xC5, 0xF8, 0x10, 0x45, 0xF0,
+    0xC5, 0xF8, 0x11, 0x05, 0, 0, 0, 0};
 
 // 为什么锚点要配一个窗口：这两条发布指令在 2.0.6 里全段分别出现 37 处和 23 处（同一个函数
 // 里每一张表都有一份），只有落在行循环锚点前面的那一对属于 skill_status。实测真实距离是
@@ -57,212 +57,212 @@ std::atomic_uintptr_t g_slot_rva{0};
 // 每次问都重新读指针，不缓存地址——游戏换掉那份表（重新解析、发布新缓冲区）时下一个
 // 调用就跟上了，所以这里不存在"缓存失效"这个概念。
 int32_t TryGetLiveTableBuffer(uintptr_t& buffer) noexcept {
-   const uintptr_t slot_rva = g_slot_rva.load(std::memory_order_acquire);
-   if (slot_rva == 0)
-      return GBFR20_TABLE_SLOT_UNRESOLVED;
-   const uintptr_t pointer_address = g_image_base + slot_rva + 8;
-   if (!IsGameRange(pointer_address, sizeof(uintptr_t), kReadableProtect))
-      return GBFR20_TABLE_BUFFER_UNREADABLE;
-   uint64_t pointer = 0;
-   if (!SafeReadUint64(pointer_address, pointer) || pointer == 0)
-      return GBFR20_TABLE_BUFFER_UNREADABLE;
-   buffer = static_cast<uintptr_t>(pointer);
-   return 0;
+    const uintptr_t slot_rva = g_slot_rva.load(std::memory_order_acquire);
+    if (slot_rva == 0)
+        return GBFR20_TABLE_SLOT_UNRESOLVED;
+    const uintptr_t pointer_address = g_image_base + slot_rva + 8;
+    if (!IsGameRange(pointer_address, sizeof(uintptr_t), kReadableProtect))
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
+    uint64_t pointer = 0;
+    if (!SafeReadUint64(pointer_address, pointer) || pointer == 0)
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
+    buffer = static_cast<uintptr_t>(pointer);
+    return 0;
 }
 
 /*
-   这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用显式 mask
-   字符串；两套并存，各自只服务一个文件）。
+    这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用显式 mask
+    字符串；两套并存，各自只服务一个文件）。
 
-   这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是
-   自动成立的——加一条新 pattern 时如果里面有一个 0 是想精确匹配的 0，匹配会静默变宽，
-   而变宽的后果是"命中数 != 1"，于是 fail-closed（游戏照常启动、hook 不装、只有日志说得出
-   原因）。所以改这三条 pattern 时**逐个数字对一遍**，别只改个数。
+    这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是
+    自动成立的——加一条新 pattern 时如果里面有一个 0 是想精确匹配的 0，匹配会静默变宽，
+    而变宽的后果是"命中数 != 1"，于是 fail-closed（游戏照常启动、hook 不装、只有日志说得出
+    原因）。所以改这三条 pattern 时**逐个数字对一遍**，别只改个数。
 */
 template <size_t Size>
 size_t CountMatches(
-   const uint8_t* base,
-   size_t size,
-   const std::array<uint8_t, Size>& pattern,
-   uintptr_t base_rva,
-   uintptr_t& first_rva) noexcept {
-   size_t matches = 0;
-   for (size_t offset = 0; offset + Size <= size; ++offset) {
-      bool matched = true;
-      for (size_t index = 0; index < Size; ++index) {
-         const uint8_t expected = pattern[index];
-         if (expected != 0 && base[offset + index] != expected) {
-            matched = false;
-            break;
-         }
-      }
-      if (!matched)
-         continue;
-      if (matches == 0)
-         first_rva = base_rva + offset;
-      ++matches;
-   }
-   return matches;
+    const uint8_t* base,
+    size_t size,
+    const std::array<uint8_t, Size>& pattern,
+    uintptr_t base_rva,
+    uintptr_t& first_rva) noexcept {
+    size_t matches = 0;
+    for (size_t offset = 0; offset + Size <= size; ++offset) {
+        bool matched = true;
+        for (size_t index = 0; index < Size; ++index) {
+            const uint8_t expected = pattern[index];
+            if (expected != 0 && base[offset + index] != expected) {
+                matched = false;
+                break;
+            }
+        }
+        if (!matched)
+            continue;
+        if (matches == 0)
+            first_rva = base_rva + offset;
+        ++matches;
+    }
+    return matches;
 }
 
 struct AnchorSearch {
-   size_t row_loop_matches = 0;
-   uintptr_t row_loop_rva = 0;
-   size_t buffer_load_matches = 0;
-   uintptr_t buffer_load_rva = 0;
-   size_t slot_store_matches = 0;
-   uintptr_t slot_store_rva = 0;
-   // 实际扫过的窗口：min(kAnchorWindowBytes, 锚点之前的字节数)。失败日志要报它而不是那个常量，
-   // 否则锚点靠段首时会报一个从没扫过的宽度，排查时会被引到错的方向。
-   size_t window_bytes = 0;
+    size_t row_loop_matches = 0;
+    uintptr_t row_loop_rva = 0;
+    size_t buffer_load_matches = 0;
+    uintptr_t buffer_load_rva = 0;
+    size_t slot_store_matches = 0;
+    uintptr_t slot_store_rva = 0;
+    // 实际扫过的窗口：min(kAnchorWindowBytes, 锚点之前的字节数)。失败日志要报它而不是那个常量，
+    // 否则锚点靠段首时会报一个从没扫过的宽度，排查时会被引到错的方向。
+    size_t window_bytes = 0;
 };
 
 // .text 扫描单独一个函数：它必须待在 SEH 帧里，而 SEH 帧不能和"需要栈展开的对象"同处
 // 一个函数（MSVC C2712），所以构造消息、拼字符串那些都留在调用方。三个计数各自都要恰好
 // 1，任何一处不是 1 都由调用方 fail closed。
 AnchorSearch SearchAnchorWindow(uintptr_t code_rva, size_t code_size) noexcept {
-   AnchorSearch result{};
-   __try {
-      const uint8_t* code = reinterpret_cast<const uint8_t*>(g_image_base + code_rva);
-      result.row_loop_matches =
-         CountMatches(code, code_size, kRowLoopSetup, code_rva, result.row_loop_rva);
-      if (result.row_loop_matches != 1)
-         return result;
+    AnchorSearch result{};
+    __try {
+        const uint8_t* code = reinterpret_cast<const uint8_t*>(g_image_base + code_rva);
+        result.row_loop_matches =
+            CountMatches(code, code_size, kRowLoopSetup, code_rva, result.row_loop_rva);
+        if (result.row_loop_matches != 1)
+            return result;
 
-      const size_t offset_of_anchor = static_cast<size_t>(result.row_loop_rva - code_rva);
-      const size_t window_size = std::min(kAnchorWindowBytes, offset_of_anchor);
-      if (window_size < kSlotBaseStore.size())
-         return result;
-      result.window_bytes = window_size;
-      const uintptr_t window_rva = result.row_loop_rva - window_size;
-      const uint8_t* window = code + (window_rva - code_rva);
-      result.buffer_load_matches = CountMatches(
-         window, window_size, kBufferPointerLoad, window_rva, result.buffer_load_rva);
-      result.slot_store_matches = CountMatches(
-         window, window_size, kSlotBaseStore, window_rva, result.slot_store_rva);
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER) {
-      return AnchorSearch{};
-   }
-   return result;
+        const size_t offset_of_anchor = static_cast<size_t>(result.row_loop_rva - code_rva);
+        const size_t window_size = std::min(kAnchorWindowBytes, offset_of_anchor);
+        if (window_size < kSlotBaseStore.size())
+            return result;
+        result.window_bytes = window_size;
+        const uintptr_t window_rva = result.row_loop_rva - window_size;
+        const uint8_t* window = code + (window_rva - code_rva);
+        result.buffer_load_matches = CountMatches(
+            window, window_size, kBufferPointerLoad, window_rva, result.buffer_load_rva);
+        result.slot_store_matches = CountMatches(
+            window, window_size, kSlotBaseStore, window_rva, result.slot_store_rva);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return AnchorSearch{};
+    }
+    return result;
 }
 
 // 逐行 Key 比对：这一关既是"确实是同一张表"的实证，又不会随编辑变化——每次应用都过得去。
 // 另开一个函数：SEH 帧里只许有平凡类型，而且不能和"要栈展开的对象"同处一个函数。
 bool SameRowIdentity(const uint8_t* live, const uint8_t* table, uint64_t row_count) noexcept {
-   __try {
-      for (uint64_t row = 0; row < row_count; ++row) {
-         const size_t offset =
-            static_cast<size_t>(kTableHeaderBytes + kTableRowBytes * row + kRowKeyOffset);
-         if (std::memcmp(live + offset, table + offset, sizeof(uint32_t)) != 0)
-            return false;
-      }
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER) {
-      return false;
-   }
-   return true;
+    __try {
+        for (uint64_t row = 0; row < row_count; ++row) {
+            const size_t offset =
+                static_cast<size_t>(kTableHeaderBytes + kTableRowBytes * row + kRowKeyOffset);
+            if (std::memcmp(live + offset, table + offset, sizeof(uint32_t)) != 0)
+                return false;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    return true;
 }
 
 // 逐行写：只写内容真的不一样的行。那 6 条编辑就是 6 行，写窗口于是是 312 字节而不是
 // 328,648 字节——游戏任何时刻撞上"半更新的一行"的窗口小两个数量级。
 int32_t WriteChangedRows(uint8_t* live, const uint8_t* table, uint64_t row_count) noexcept {
-   int32_t written = 0;
-   __try {
-      for (uint64_t row = 0; row < row_count; ++row) {
-         const size_t offset = static_cast<size_t>(kTableHeaderBytes + kTableRowBytes * row);
-         if (std::memcmp(live + offset, table + offset, kTableRowBytes) == 0)
-            continue;
-         std::memcpy(live + offset, table + offset, kTableRowBytes);
-         ++written;
-      }
-   }
-   __except (EXCEPTION_EXECUTE_HANDLER) {
-      return GBFR20_TABLE_WRITE_FAILED;
-   }
-   return written;
+    int32_t written = 0;
+    __try {
+        for (uint64_t row = 0; row < row_count; ++row) {
+            const size_t offset = static_cast<size_t>(kTableHeaderBytes + kTableRowBytes * row);
+            if (std::memcmp(live + offset, table + offset, kTableRowBytes) == 0)
+                continue;
+            std::memcpy(live + offset, table + offset, kTableRowBytes);
+            ++written;
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GBFR20_TABLE_WRITE_FAILED;
+    }
+    return written;
 }
 }
 
 void ResolveTableSlot() {
-   if (g_slot_rva.load(std::memory_order_acquire) != 0 || g_image_base == 0)
-      return;
+    if (g_slot_rva.load(std::memory_order_acquire) != 0 || g_image_base == 0)
+        return;
 
-   // 代码段来自 layout_resolver 的 PE 视图——它才是"映像里哪一段是代码"的唯一持有者
-   // （先按名字找 `.text`，找不到才取最大的可执行段）。
-   CodeSectionView code{};
-   if (!TryGetCodeSection(code)) {
-      Log("Table slot: the game image's code section could not be resolved; nothing resolved.");
-      return;
-   }
+    // 代码段来自 layout_resolver 的 PE 视图——它才是"映像里哪一段是代码"的唯一持有者
+    // （先按名字找 `.text`，找不到才取最大的可执行段）。
+    CodeSectionView code{};
+    if (!TryGetCodeSection(code)) {
+        Log("Table slot: the game image's code section could not be resolved; nothing resolved.");
+        return;
+    }
 
-   const AnchorSearch anchor = SearchAnchorWindow(code.rva, code.size);
-   if (anchor.row_loop_matches != 1 || anchor.buffer_load_matches != 1 ||
-       anchor.slot_store_matches != 1) {
-      Log(std::format(
-         "Table slot: in the code section the skill_status anchor matches are row_loop={}, "
-         "buffer_load={}, slot_store={} (window {} bytes before the anchor); expected exactly one "
-         "of each. This game build is not the one the mod was written for; no slot was resolved.",
-         anchor.row_loop_matches,
-         anchor.buffer_load_matches,
-         anchor.slot_store_matches,
-         anchor.window_bytes));
-      return;
-   }
+    const AnchorSearch anchor = SearchAnchorWindow(code.rva, code.size);
+    if (anchor.row_loop_matches != 1 || anchor.buffer_load_matches != 1 ||
+         anchor.slot_store_matches != 1) {
+        Log(std::format(
+            "Table slot: in the code section the skill_status anchor matches are row_loop={}, "
+            "buffer_load={}, slot_store={} (window {} bytes before the anchor); expected exactly one "
+            "of each. This game build is not the one the mod was written for; no slot was resolved.",
+            anchor.row_loop_matches,
+            anchor.buffer_load_matches,
+            anchor.slot_store_matches,
+            anchor.window_bytes));
+        return;
+    }
 
-   // 两处 RIP 相对位移都解出来再验：槽首那条 mov [rip+d],rcx 与缓冲区指针那条 mov rbx,[rip+d]
-   // 必须正好差 8（槽是 handle@+0 / buffer@+8 / ?@+0x10 三档）。两条锚点都是 `mov r,[rip+d]` /
-   // `mov [rip+d],r`：位移都在指令 +3，指令都长 7 字节；解不出这一对就不认。
-   uintptr_t slot_rva = 0;
-   uintptr_t buffer_pointer_rva = 0;
-   if (!DecodeRipTarget(
-          g_image_base, code.image_size, anchor.slot_store_rva, 3, 7, slot_rva) ||
-       !DecodeRipTarget(
-          g_image_base, code.image_size, anchor.buffer_load_rva, 3, 7, buffer_pointer_rva) ||
-       buffer_pointer_rva != slot_rva + 8) {
-      Log("Table slot: the publish anchors' displacements do not decode to a slot and its +8 "
-          "pointer field; nothing resolved.");
-      return;
-   }
-   if (!IsInWritableImageSection(slot_rva, 24) ||
-       !IsInWritableImageSection(buffer_pointer_rva, sizeof(uintptr_t))) {
-      Log("Table slot: the decoded slot does not lie in a writable image section; nothing "
-          "resolved.");
-      return;
-   }
+    // 两处 RIP 相对位移都解出来再验：槽首那条 mov [rip+d],rcx 与缓冲区指针那条 mov rbx,[rip+d]
+    // 必须正好差 8（槽是 handle@+0 / buffer@+8 / ?@+0x10 三档）。两条锚点都是 `mov r,[rip+d]` /
+    // `mov [rip+d],r`：位移都在指令 +3，指令都长 7 字节；解不出这一对就不认。
+    uintptr_t slot_rva = 0;
+    uintptr_t buffer_pointer_rva = 0;
+    if (!DecodeRipTarget(
+             g_image_base, code.image_size, anchor.slot_store_rva, 3, 7, slot_rva) ||
+         !DecodeRipTarget(
+             g_image_base, code.image_size, anchor.buffer_load_rva, 3, 7, buffer_pointer_rva) ||
+         buffer_pointer_rva != slot_rva + 8) {
+        Log("Table slot: the publish anchors' displacements do not decode to a slot and its +8 "
+             "pointer field; nothing resolved.");
+        return;
+    }
+    if (!IsInWritableImageSection(slot_rva, 24) ||
+         !IsInWritableImageSection(buffer_pointer_rva, sizeof(uintptr_t))) {
+        Log("Table slot: the decoded slot does not lie in a writable image section; nothing "
+             "resolved.");
+        return;
+    }
 
-   g_slot_rva.store(slot_rva, std::memory_order_release);
-   // 只报解析出来的那个槽。三个锚点 RVA、PE 时间戳、以及"槽 + 8"的缓冲区指针都不报：后者的
-   // 偏移上面刚断言过（buffer_pointer_rva != slot_rva + 8），loaded 地址就是 g_image_base + 这个
-   // RVA——全是可推导的，报出来只是噪音；需要时由上面那几条失败分支说清楚。
-   Log(std::format("Table slot: resolved slot=0x{:X}.", slot_rva));
+    g_slot_rva.store(slot_rva, std::memory_order_release);
+    // 只报解析出来的那个槽。三个锚点 RVA、PE 时间戳、以及"槽 + 8"的缓冲区指针都不报：后者的
+    // 偏移上面刚断言过（buffer_pointer_rva != slot_rva + 8），loaded 地址就是 g_image_base + 这个
+    // RVA——全是可推导的，报出来只是噪音；需要时由上面那几条失败分支说清楚。
+    Log(std::format("Table slot: resolved slot=0x{:X}.", slot_rva));
 }
 
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept {
-   // 表的形状由**调用方**给的那张表定义（它来自归档，是权威），原生只检查游戏那份与它一致。
-   // 所以这里没有把行数写死的常量：只要 52 字节/行的关系还在，列布局或行数变了都照样走。
-   if (table == nullptr || length <= kTableHeaderBytes ||
-       (length - kTableHeaderBytes) % kTableRowBytes != 0)
-      return GBFR20_TABLE_LENGTH_UNEXPECTED;
-   const uint64_t supplied_rows = (length - kTableHeaderBytes) / kTableRowBytes;
+    // 表的形状由**调用方**给的那张表定义（它来自归档，是权威），原生只检查游戏那份与它一致。
+    // 所以这里没有把行数写死的常量：只要 52 字节/行的关系还在，列布局或行数变了都照样走。
+    if (table == nullptr || length <= kTableHeaderBytes ||
+         (length - kTableHeaderBytes) % kTableRowBytes != 0)
+        return GBFR20_TABLE_LENGTH_UNEXPECTED;
+    const uint64_t supplied_rows = (length - kTableHeaderBytes) / kTableRowBytes;
 
-   uintptr_t buffer = 0;
-   const int32_t refusal = TryGetLiveTableBuffer(buffer);
-   if (refusal != 0)
-      return refusal;
+    uintptr_t buffer = 0;
+    const int32_t refusal = TryGetLiveTableBuffer(buffer);
+    if (refusal != 0)
+        return refusal;
 
-   // 三道闸全在写之前：任何一条不成立都是一个字节都不写。
-   if (!IsGameRange(buffer, length, kWritableProtect))
-      return GBFR20_TABLE_BUFFER_UNREADABLE;
+    // 三道闸全在写之前：任何一条不成立都是一个字节都不写。
+    if (!IsGameRange(buffer, length, kWritableProtect))
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
 
-   uint64_t row_count = 0;
-   if (!SafeReadUint64(buffer, row_count) || row_count != supplied_rows)
-      return GBFR20_TABLE_ROW_COUNT_INCONSISTENT;
+    uint64_t row_count = 0;
+    if (!SafeReadUint64(buffer, row_count) || row_count != supplied_rows)
+        return GBFR20_TABLE_ROW_COUNT_INCONSISTENT;
 
-   auto* live = reinterpret_cast<uint8_t*>(buffer);
-   if (!SameRowIdentity(live, table, row_count))
-      return GBFR20_TABLE_IDENTITY_MISMATCH;
+    auto* live = reinterpret_cast<uint8_t*>(buffer);
+    if (!SameRowIdentity(live, table, row_count))
+        return GBFR20_TABLE_IDENTITY_MISMATCH;
 
-   return WriteChangedRows(live, table, row_count);
+    return WriteChangedRows(live, table, row_count);
 }
 }

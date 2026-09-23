@@ -33,22 +33,22 @@ using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 #pragma pack(push, 1)
 // 原生 TemplateGemSlot 的 ABI 镜像（字段顺序一致，pack 1）。
 struct GBFR20_TemplateSlot {
-   uint32_t gem_id;
-   uint32_t skill1;
-   int32_t skill1_level;
-   uint32_t skill2;
-   int32_t skill2_level;
-   int32_t sigil_level;
+    uint32_t gem_id;
+    uint32_t skill1;
+    int32_t skill1_level;
+    uint32_t skill2;
+    int32_t skill2_level;
+    int32_t sigil_level;
 };
 
 // 一个专属开关：角色、skill hash、disabled（0/1）。这里不点名 T1 / T2 / 战气
 // ——skill hash *就是*名字，由原生专属表把它映射到槽位。调用方从不发
 // disabled == 0 的条目，所以没出现的角色就是三个专属槽全开。
 struct GBFR20_ExclusiveOverride {
-   uint32_t character_hash;
-   uint32_t skill_hash;
-   uint8_t disabled;
-   uint8_t reserved[3];
+    uint32_t character_hash;
+    uint32_t skill_hash;
+    uint8_t disabled;
+    uint8_t reserved[3];
 };
 #pragma pack(pop)
 
@@ -60,17 +60,17 @@ GBFR20_API void GBFR20_CALL GBFR20_SetLogCallback(GBFR20_LogCallback callback);
 GBFR20_API int32_t GBFR20_CALL GBFR20_Initialize();
 GBFR20_API void GBFR20_CALL GBFR20_Shutdown();
 GBFR20_API uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(
-   char* buffer,
-   uint32_t buffer_size);
+    char* buffer,
+    uint32_t buffer_size);
 // 应用整份玩家配置：通用槽位加按角色的专属开关。任一部分为 nullptr/0 表示
 // "这部分没有"——没有通用槽位 = 只剩内置专属模板；没有 overrides = 专属
 // 全开。合成一个调用而不是两个，因为两部分都收尾于同一个"重新发布表"步骤。
 // 原生侧会复制两张表；由托管侧的 upkeep tick 调用。
 GBFR20_API int32_t GBFR20_CALL GBFR20_ApplyLoadout(
-   const GBFR20_TemplateSlot* slots,
-   uint32_t slot_count,
-   const GBFR20_ExclusiveOverride* overrides,
-   uint32_t override_count);
+    const GBFR20_TemplateSlot* slots,
+    uint32_t slot_count,
+    const GBFR20_ExclusiveOverride* overrides,
+    uint32_t override_count);
 // 把一整张编辑后的 skill_status 表（8 字节行数头 + 52 字节行，正好 `length`
 // 字节）写进游戏已经解析过的那份拷贝，于是编辑无需重启、也无需扫描内存找
 // 这张表即可生效。形状由调用方给的那份表定义（从游戏自己的归档读出），
@@ -88,5 +88,5 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_ApplyLoadout(
 // 对锚点的信任；也是 Key 被别的 mod 改过的表会被拒写而不是覆盖的原因
 // （编辑碰的从来不是 Key）。
 GBFR20_API int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(
-   const uint8_t* table,
-   uint32_t length);
+    const uint8_t* table,
+    uint32_t length);

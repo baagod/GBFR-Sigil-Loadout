@@ -45,17 +45,17 @@ func (s *LoadoutService) GetHotkey() int {
 }
 
 type loadoutItem struct {
-	Gem   string `json:"gem"`   // items[0]: gem（物品）的 hash
-	Hash  string `json:"hash"`  // items[0]: 该物品给的主技能；items[1]: 副技能
+	Gem   string `json:"gem"`  // items[0]: gem（物品）的 hash
+	Hash  string `json:"hash"` // items[0]: 该物品给的主技能；items[1]: 副技能
 	Level int    `json:"level"`
 }
 
 type loadoutSlot struct {
-	Items   []loadoutItem `json:"items"`
+	Items []loadoutItem `json:"items"`
 	// 指针：缺这个成员时 mod 那边算**启用**（LoadoutConfig 的 `!TryGetProperty("enabled", …) || …`），
 	// 前端也是（model.ts 的 `s.enabled !== false`）。用 bool 会得到零值 false，于是同一份文件在这里
 	// 数出 0 个启用、在 mod 那边数出十几个 →"存盘成功、游戏里什么都没变"。
-	Enabled *bool         `json:"enabled"`
+	Enabled *bool `json:"enabled"`
 }
 
 func exeDir() string {
@@ -220,8 +220,8 @@ func validateSlots(slots []loadoutSlot) error {
 // SaveLoadout 接过一份玩家配置。形状/取值不当**当场**报错（前端靠它弹框）；能接受的只进待写。
 func (s *LoadoutService) SaveLoadout(config string) error {
 	var c struct {
-		Lang      string                    `json:"lang"`
-		Slots     []loadoutSlot             `json:"slots"`
+		Lang      string                     `json:"lang"`
+		Slots     []loadoutSlot              `json:"slots"`
 		Exclusive map[string]map[string]bool `json:"exclusive"`
 	}
 	// 只认这一种形状：别的拼写（早期版本的裸数组）在这里就报错，而不是被翻译成"空配置"写下去。

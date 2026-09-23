@@ -28,67 +28,67 @@ namespace {
 
 // 把 PE32+ exe 按段映射进一块 SizeOfImage 大小的缓冲：解析器看到的就是"加载后"的样子。
 std::vector<uint8_t> MapImage(const wchar_t* path) {
-   std::ifstream stream(path, std::ios::binary | std::ios::ate);
-   if (!stream)
-      throw std::runtime_error("打不开这个 exe");
+    std::ifstream stream(path, std::ios::binary | std::ios::ate);
+    if (!stream)
+        throw std::runtime_error("打不开这个 exe");
 
-   std::vector<uint8_t> file(static_cast<size_t>(stream.tellg()));
-   stream.seekg(0);
-   if (!stream.read(reinterpret_cast<char*>(file.data()), static_cast<std::streamsize>(file.size())))
-      throw std::runtime_error("读这个 exe 失败");
+    std::vector<uint8_t> file(static_cast<size_t>(stream.tellg()));
+    stream.seekg(0);
+    if (!stream.read(reinterpret_cast<char*>(file.data()), static_cast<std::streamsize>(file.size())))
+        throw std::runtime_error("读这个 exe 失败");
 
-   const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(file.data());
-   if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0)
-      throw std::runtime_error("不是有效的 PE");
-   const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(file.data() + dos->e_lfanew);
-   if (nt->Signature != IMAGE_NT_SIGNATURE ||
-       nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
-      throw std::runtime_error("不是 PE32+");
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(file.data());
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0)
+        throw std::runtime_error("不是有效的 PE");
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(file.data() + dos->e_lfanew);
+    if (nt->Signature != IMAGE_NT_SIGNATURE ||
+         nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+        throw std::runtime_error("不是 PE32+");
 
-   std::vector<uint8_t> image(nt->OptionalHeader.SizeOfImage);
-   std::memcpy(image.data(), file.data(), nt->OptionalHeader.SizeOfHeaders);
-   const auto* section = IMAGE_FIRST_SECTION(nt);
-   for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index) {
-      std::memcpy(image.data() + section[index].VirtualAddress,
-         file.data() + section[index].PointerToRawData, section[index].SizeOfRawData);
-   }
-   return image;
+    std::vector<uint8_t> image(nt->OptionalHeader.SizeOfImage);
+    std::memcpy(image.data(), file.data(), nt->OptionalHeader.SizeOfHeaders);
+    const auto* section = IMAGE_FIRST_SECTION(nt);
+    for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index) {
+        std::memcpy(image.data() + section[index].VirtualAddress,
+            file.data() + section[index].PointerToRawData, section[index].SizeOfRawData);
+    }
+    return image;
 }
 
 void Require(bool ok, const char* why) {
-   if (!ok)
-      throw std::runtime_error(why);
+    if (!ok)
+        throw std::runtime_error(why);
 }
 
 void CheckLayout(const wchar_t* path) {
-   auto image = MapImage(path);
-   gbfr::native::g_image_base = reinterpret_cast<uintptr_t>(image.data());
+    auto image = MapImage(path);
+    gbfr::native::g_image_base = reinterpret_cast<uintptr_t>(image.data());
 
-   Require(gbfr::native::ResolveGameLayout(),
-      "生产解析器拒绝了这个 exe：锚点对不上（游戏更新了，需要重导）");
-   Require(gbfr::native::RevalidateGameLayout(), "解析结果没过逐字节复验");
+    Require(gbfr::native::ResolveGameLayout(),
+        "生产解析器拒绝了这个 exe：锚点对不上（游戏更新了，需要重导）");
+    Require(gbfr::native::RevalidateGameLayout(), "解析结果没过逐字节复验");
 
-   image[gbfr::native::g_game_layout.skill_fetch_path_rva] ^= 0x01;
-   Require(!gbfr::native::RevalidateGameLayout(),
-      "改坏一个字节后仍然通过——fail-closed 没生效");
-   gbfr::native::ResetGameLayout();
+    image[gbfr::native::g_game_layout.skill_fetch_path_rva] ^= 0x01;
+    Require(!gbfr::native::RevalidateGameLayout(),
+        "改坏一个字节后仍然通过——fail-closed 没生效");
+    gbfr::native::ResetGameLayout();
 
-   std::cout << "NATIVE_LAYOUT=PASS\nNATIVE_LAYOUT_FAIL_CLOSED=PASS\n";
+    std::cout << "NATIVE_LAYOUT=PASS\nNATIVE_LAYOUT_FAIL_CLOSED=PASS\n";
 }
 
 }
 
 int wmain(int argc, wchar_t** argv) {
-   try {
-      if (argc < 2) {
-         std::cout << "NATIVE_LAYOUT=SKIP (未给游戏 exe 路径)\n";
-         return 0;
-      }
-      CheckLayout(argv[1]);
-      return 0;
-   }
-   catch (const std::exception& error) {
-      std::cerr << "NATIVE_LAYOUT=FAIL: " << error.what() << '\n';
-      return 1;
-   }
+    try {
+        if (argc < 2) {
+            std::cout << "NATIVE_LAYOUT=SKIP (未给游戏 exe 路径)\n";
+            return 0;
+        }
+        CheckLayout(argv[1]);
+        return 0;
+    }
+    catch (const std::exception& error) {
+        std::cerr << "NATIVE_LAYOUT=FAIL: " << error.what() << '\n';
+        return 1;
+    }
 }

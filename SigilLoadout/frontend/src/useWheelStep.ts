@@ -10,27 +10,27 @@ import { useEffect, useRef, type RefObject } from "react";
  * live 判断这一滚算不算数（框是不是正被编辑），apply 拿到方向去做步进。
  */
 export function useWheelStep(
-  ref: RefObject<HTMLElement | null>,
-  live: (target: HTMLElement) => boolean,
-  apply: (target: HTMLInputElement, delta: 1 | -1) => void,
-  enabled = true,
+    ref: RefObject<HTMLElement | null>,
+    live: (target: HTMLElement) => boolean,
+    apply: (target: HTMLInputElement, delta: 1 | -1) => void,
+    enabled = true,
 ) {
-  const latest = useRef({ live, apply });
-  latest.current = { live, apply };
+    const latest = useRef({ live, apply });
+    latest.current = { live, apply };
 
-  useEffect(() => {
-    const element = ref.current;
-    if (!element || !enabled) return;
-    const onWheel = (event: WheelEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target || !latest.current.live(target)) return;
-      event.preventDefault();
-      latest.current.apply(
-        target as HTMLInputElement,
-        event.deltaY < 0 ? 1 : -1,
-      );
-    };
-    element.addEventListener("wheel", onWheel, { passive: false });
-    return () => element.removeEventListener("wheel", onWheel);
-  }, [ref, enabled]);
+    useEffect(() => {
+        const element = ref.current;
+        if (!element || !enabled) return;
+        const onWheel = (event: WheelEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target || !latest.current.live(target)) return;
+            event.preventDefault();
+            latest.current.apply(
+                target as HTMLInputElement,
+                event.deltaY < 0 ? 1 : -1,
+            );
+        };
+        element.addEventListener("wheel", onWheel, { passive: false });
+        return () => element.removeEventListener("wheel", onWheel);
+    }, [ref, enabled]);
 }
