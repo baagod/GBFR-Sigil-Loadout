@@ -26,8 +26,6 @@ interface SkillPickerProps {
   placeholder: string
   /** 在最前面加一个"无"（空 value）选项——副技能用。 */
   noneOption?: boolean
-  /** 空选项的标签（"无" / "None"）；只在 noneOption 下用。 */
-  noneLabel?: string
   /** 搜索框的 placeholder（"搜索" / "Search"）。 */
   searchPlaceholder: string
   /** 列表为空时的文案（"无匹配因子" / "No matching sigils"）。 */
@@ -47,7 +45,6 @@ export function SkillPicker({
   labels,
   placeholder,
   noneOption = false,
-  noneLabel = "",
   searchPlaceholder,
   emptyLabel,
   disabled = false,
@@ -57,15 +54,15 @@ export function SkillPicker({
 }: SkillPickerProps) {
   const items: SkillItem[] = useMemo(() => {
     const mapped = skills.map((skill) => ({ value: skill, label: labels?.[skill] ?? skill }))
-    return noneOption ? [{ value: "", label: noneLabel }, ...mapped] : mapped
-  }, [skills, labels, noneOption, noneLabel])
+    return noneOption ? [{ value: "", label: placeholder }, ...mapped] : mapped
+  }, [skills, labels, noneOption, placeholder])
 
   // 不认识的取值（存档里有、下拉不再提供的技能）按它的标签/裸 hash 显示，而不是冒充"无"。
   const selected: SkillItem =
     items.find((item) => item.value === value) ??
     (value !== ""
       ? { value, label: labels?.[value] ?? value }
-      : { value: "", label: noneOption ? noneLabel : placeholder })
+      : { value: "", label: placeholder })
 
   return (
     <Combobox

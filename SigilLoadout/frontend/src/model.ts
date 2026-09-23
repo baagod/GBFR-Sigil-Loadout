@@ -168,7 +168,6 @@ export function resolveMainGem(
   secHash: string,
   preferred: string
 ): string {
-  if (variants.length === 0) return ""
   const kept = preferred === "" ? undefined : variants.find((v) => v.hash === preferred)
   if (kept && (secHash === "" || kept.skill2 === secHash)) return kept.hash
   if (pool && (secHash === "" || pool.lot.has(secHash))) return pool.poolHash

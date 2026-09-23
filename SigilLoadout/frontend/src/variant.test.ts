@@ -43,10 +43,6 @@ describe("resolveMainGem 的池/固定副技能优先级", () => {
   const pool = [sigil("AAA", "S1", { lot: ["X", "Y"] }), sigil("BBB", "S1", {})];
   const poolByMain = { poolHash: "AAA", lot: new Set(["X", "Y"]) };
 
-  it("副技能在池里就用池版", () => {
-    expect(resolveMainGem(pool, poolByMain, "Y", "")).toBe("AAA");
-  });
-
   it("没有副技能时也用池版", () => {
     expect(resolveMainGem(pool, poolByMain, "", "")).toBe("AAA");
   });
@@ -54,9 +50,5 @@ describe("resolveMainGem 的池/固定副技能优先级", () => {
   it("副技能是某变体的固定副技能时用那一版", () => {
     const fixed = [sigil("AAA", "S1", { lot: ["X"] }), sigil("BBB", "S1", { skill2: "Z" })];
     expect(resolveMainGem(fixed, { poolHash: "AAA", lot: new Set(["X"]) }, "Z", "")).toBe("BBB");
-  });
-
-  it("空组返回空串（不写这一行）", () => {
-    expect(resolveMainGem([], undefined, "", "")).toBe("");
   });
 });

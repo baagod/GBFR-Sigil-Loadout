@@ -5,7 +5,7 @@
   排序、保存——要的东西以 props 到达：行数据、指针是否在这一行上、是否展开，以及
   App 那几个回调组成的 context。
 */
-import { Fragment, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { Fragment, useRef, useState, type MouseEvent, type PointerEvent, type ReactElement } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,7 +31,7 @@ import {
 import { useWheelStep } from "./useWheelStep";
 
 /** 一个因子的行和它的各个等级，由列表这样构建出来。 */
-export type Row = {
+type Row = {
   key: string;
   label: string;
   /** 游戏对这个因子本身的一句话；父行读的就是它。 */
@@ -194,6 +194,48 @@ function ValueSlots({
 }
 
 /**
+ * 行与它的说明气泡。等级行与父行共用这一套脚手架：
+ *
+ * - tooltip 是否打开由列表根据指针单独决定（见 useRowTooltip）；留给 base-ui 的是定位，以及它
+ *   需要的两个开关——弹层压在正悬停那一行上方，所以它不能接收指针（否则上面那行永远悬停不到），
+ *   指针在弹层自己的盒子里时它也不能继续打开。
+ * - 在行的上方并居中：每一行都按同样的方式读，而且指针下面的列表永远不会被盖住。比现成的气泡
+ *   更宽，并保留游戏原文里的换行——有些说明是三行参数，单行气泡会把它们截掉。
+ * - 只保留侧向位置的轴（trackCursorAxis="x"），打开/关闭动画都关掉：气泡是在行之间换位置，
+ *   不是被动画带进带出。
+ * - 只在打开时挂载：base-ui 关闭时会先让弹层走完退场（那段残影就是截图里半透明的那一层，位置
+ *   还停在弹层被夹住的地方），整块不挂载 = 当帧就没了。
+ *
+ * 触发器由调用点作为 children 传入（base-ui 的 Trigger 靠 context 找 Root，不靠子节点位置）。
+ */
+function RowTooltip({
+  open,
+  disabled,
+  text,
+  children,
+}: {
+  open: boolean;
+  disabled: boolean;
+  text: string;
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip open={open} disabled={disabled} disableHoverablePopup trackCursorAxis="x">
+      {children}
+      {open && (
+        <TooltipContent
+          side="top"
+          align="center"
+          className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
+        >
+          {text}
+        </TooltipContent>
+      )}
+    </Tooltip>
+  );
+}
+
+/**
  * 因子的一个等级：勾选框（勾选它就是在该等级开始一条编辑）、等级号、十个槽，以及该因子自己
  * 的 tooltip——说明覆盖整行，行上任何地方都是合理的询问位置。
  */
@@ -217,19 +259,10 @@ function LevelRow({
   const id = addressOf(row.key, level);
 
   return (
-    <Tooltip
-      open={hovered}
-      disabled={!notation}
-      disableHoverablePopup
-      trackCursorAxis="x"
-    >
+    <RowTooltip open={hovered} disabled={!notation} text={notation}>
       {/*
         触发器是整行，勾选框也在内：说明在行上任何地方都值得一问，而切换等级时指针本来就在
         勾选框上。
-
-        tooltip 是否打开由列表根据指针单独决定（见 useRowTooltip）。留给 base-ui 的是定位，
-        以及它需要的两个开关：弹层压在正悬停那一行上方的那一行上，所以它不能接收指针（否则
-        上面那行永远悬停不到），指针在弹层自己的盒子里时它也不能继续打开。
 
         用 div，而不是触发器默认渲染的 button：这一行里有数值框和勾选框，交互内容不能住在
         button 里面。
@@ -281,25 +314,7 @@ function LevelRow({
           onChange={(values) => ctx.updateLevel(row.key, level, { values: values })}
         />
       </TooltipTrigger>
-      {/*
-        因子的说明，在行的上方并居中：每一行都按同样的方式读，而且指针下面的列表永远不会被
-        盖住。比现成的气泡更宽，并保留游戏原文里的换行——有些说明是三行参数，单行气泡会把它们
-        截掉。打开和关闭动画都关掉了：气泡是在行之间换位置，不是被动画带进带出。
-      */}
-      {/*
-        只在打开时挂载。base-ui 关闭时会先让弹层走完退场（那段残影就是截图里半透明的那一层，
-        位置还停在弹层被夹住的地方），整块不挂载 = 当帧就没了。
-      */}
-      {hovered && (
-        <TooltipContent
-          side="top"
-          align="center"
-          className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
-        >
-          {notation}
-        </TooltipContent>
-      )}
-    </Tooltip>
+    </RowTooltip>
   );
 }
 
@@ -340,11 +355,10 @@ export function SkillRow({
 
   return (
     <>
-      <Tooltip
+      <RowTooltip
         open={hoveredId === row.key}
         disabled={!row.summary}
-        disableHoverablePopup
-        trackCursorAxis="x"
+        text={row.summary}
       >
         <TooltipTrigger
           data-row={row.key}
@@ -418,16 +432,7 @@ export function SkillRow({
             )}
           </span>
         </TooltipTrigger>
-        {hoveredId === row.key && (
-          <TooltipContent
-            side="top"
-            align="center"
-            className="max-w-md items-start whitespace-pre-line data-open:animate-none data-closed:animate-none"
-          >
-            {row.summary}
-          </TooltipContent>
-        )}
-      </Tooltip>
+      </RowTooltip>
 
       {isOpen &&
         row.levels.map((level) => (

@@ -137,7 +137,6 @@ export const SlotRow = memo(function SlotRow({
           invalid={secIllegal}
           placeholder={t.none}
           noneOption
-          noneLabel={t.none}
           searchPlaceholder={t.searchSigil}
           emptyLabel={t.noMatch}
           disabled={!mainValid}

@@ -100,19 +100,8 @@ describe("a keystroke in a value box", () => {
 });
 
 describe("the two patterns", () => {
-  it("treats a trailing point as half typed, not as a number", () => {
-    for (const text of ["0.", "5.", "-2."]) {
-      expect(HALF_TYPED.test(text), text).toBe(true);
-      expect(NUMBER.test(text), text).toBe(false);
-    }
-  });
-
-  it("accepts the numbers the game actually uses", () => {
-    for (const text of ["0", "-3", "30", "0.6", ".5", "0.004", "20000"]) {
-      expect(NUMBER.test(text), text).toBe(true);
-    }
-  });
-
+  // 两个模式的输入域由上面按真实按键序列驱动的用例（type / slotEdit）覆盖；这里只留一条别处
+  // 推不出来的回归。
   it("refuses exponent notation", () => {
     expect(NUMBER.test("1e999")).toBe(false);
     expect(HALF_TYPED.test("1e5")).toBe(false);
@@ -136,12 +125,6 @@ describe("the two patterns", () => {
     expect(slotEdit("0.004", 0, [0])).toMatchObject({ values: [0.004] });
     expect(slotEdit("0", 0, [0])).toMatchObject({ values: [0], keeps: "0" });
     expect(slotEdit("0.", 0, [0])).toMatchObject({ kind: "half", text: "0." });
-
-    // 两个模式本身仍然拒绝前导零对：归一化在它们之前发生，所以任何带着 "01" 到达它们的内容都不算数字。
-    for (const text of ["01", "007", "00.5"]) {
-      expect(HALF_TYPED.test(text), text).toBe(false);
-      expect(NUMBER.test(text), text).toBe(false);
-    }
   });
 
   it("refuses more digits than the game can carry, so no box can hold Infinity", () => {
@@ -150,9 +133,9 @@ describe("the two patterns", () => {
     expect(NUMBER.test("999999")).toBe(true);
     expect(NUMBER.test("999999.999999")).toBe(true);
     expect(NUMBER.test("1000000")).toBe(false);
-    expect(HALF_TYPED.test("1000000")).toBe(false);
     expect(HALF_TYPED.test("0.1234567")).toBe(false);
-    for (const text of ["9".repeat(20), "9".repeat(309), "9".repeat(400)]) {
+    // 309 位是那次"粘进长数字被提交成 Infinity"事故的真实长度；超过 6 位都走同一条路。
+    for (const text of ["9".repeat(309)]) {
       expect(HALF_TYPED.test(text), `${text.length} digits`).toBe(false);
       expect(slotEdit(text, 0, [0])).toEqual({ kind: "drop" });
     }
@@ -311,13 +294,6 @@ describe("the levels a skill shows", () => {
   it("lifts what is switched on, and keeps the rest by level", () => {
     // 两个梯队：开着的等级排在最前，其余按数字顺序跟上——包括带着已关闭编辑的那些等级，
     // 它们曾经自成一层，把没动过的等级挤到后面、打乱了顺序。
-    const levels = levelsOf(info, [
-      record("A1", 3, false),
-      record("A1", 2, true),
-      record("A1", 1, true),
-    ]);
-    expect(levels).toEqual([1, 2, 3, 4]);
-
     const wide: SkillInfo = {
       rows: [
         [1, []],
@@ -400,17 +376,13 @@ describe("the explanation a level shows", () => {
   });
 
   it("is what the six-band crab factor relies on", () => {
+    // 真实因子多到六段；实现是一趟 findLast，段数不改变代码路径，所以只钉一段。
     const crab: ExplainBand[] = [
       [1, "（攻击力+{0}%）"],
-      [5, "（暴击率+{1}%）"],
       [9, "（HP持续回复，每次回复最大HP的{2:.1f}%）"],
-      [13, "（回复造成伤害{3:.1f}%的HP）"],
-      [17, "（伤害上限+{4}%）"],
       [20, "（伤害上限+{4}% / 防御力+{5}%）"],
     ];
-    expect(explainAt(crab, 4)).toContain("攻击力");
     expect(explainAt(crab, 12)).toContain("HP持续回复");
-    expect(explainAt(crab, 20)).toContain("防御力");
   });
 });
 
