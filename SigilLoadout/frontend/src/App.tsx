@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -63,7 +63,11 @@ export default function App() {
   // 落盘要读"当前"状态，而定时器是在某一次渲染里排的，所以状态从 ref 取而不是让
   // 闭包捕获。
   const latest = useRef({ slots, index, lang, exclusiveState })
-  latest.current = { slots, index, lang, exclusiveState }
+  // 渲染期写 ref 是 React 明令禁止的（会把一次从未提交的渲染里的值发布出去）。挪进 layout effect：
+  // 它在 paint 之前跑，而读这个 ref 的 saveNow 只由定时器与事件触发，所以读到的永远是已提交的那一份。
+  useLayoutEffect(() => {
+    latest.current = { slots, index, lang, exclusiveState }
+  }, [slots, index, lang, exclusiveState])
 
   /*
     自动保存只由**编辑**触发，不由状态变化触发。

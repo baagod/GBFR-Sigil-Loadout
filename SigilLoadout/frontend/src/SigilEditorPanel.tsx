@@ -70,6 +70,9 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
   // 大多数只有一段，少数中途换措辞（见 explainAt）。
   const [texts, setTexts] = useState<Record<string, SkillText>>({});
   const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
+  // 初始列表读过没有。没读过就**绝不写盘**：读取失败时 edits 是空的，此时任何一次 commit 交出去的
+  // 都是一份残缺列表，而后端是整体替换（见 editservice.go 里那条注释）——用户的编辑会被清掉。
+  const [editListRead, setEditListRead] = useState(false);
   const [error, setError] = useState<{ title: string; detail: string } | null>(null);
   const [errorOpen, setErrorOpen] = useState(false);
   // 哪些因子是展开的。数值只落在一个等级上的因子没有可展开的东西，所以只有跨多个等级的
@@ -112,14 +115,22 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
       setTexts(hit);
       return;
     }
+    let cancelled = false;
     // 整个语言一次调用，名字、概要、说明都从这一份里读，切换语言不会让它们各自描述不同的表。
     Call.ByName(`${SERVICE}.SkillMap`, lang)
       .then((map) => {
+        if (cancelled) return;
         const entry = (map ?? {}) as Record<string, SkillText>;
         textCache.set(lang, entry);
         setTexts(entry);
       })
-      .catch((err) => showError({ title: t.readFailed, detail: String(err) }));
+      .catch((err) => {
+        if (cancelled) return;
+        showError({ title: t.readFailed, detail: String(err) });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [lang]);
 
   async function loadAll() {
@@ -158,6 +169,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     const loaded = dedupe(asEdits(raw, skillTable ?? {}));
     setEdits(new Map(loaded.map((record) => [addressOf(record.key, record.level), record])));
     setSkills(skillTable ?? {});
+    setEditListRead(true);
   }
 
   useEffect(() => {
@@ -339,6 +351,9 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     打断用户的失败回来。
   */
   function commit(next: Map<string, SigilSkill>) {
+    // 列表还没读回来（正在读，或者读失败了）就不写：此刻 next 只含用户刚动的那一条，交出去
+    // 等于拿它整体替换掉磁盘上那份完整的列表。
+    if (!editListRead) return;
     // 状态本身就是按地址去重的容器，不必再跑一遍 dedupe。归一化仍走 asEdits，好让"同一条
     // 记录连着两次提交"得到逐字节相同的结果。
     const kept = asEdits([...next.values()], skills);
