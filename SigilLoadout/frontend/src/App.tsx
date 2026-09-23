@@ -43,6 +43,10 @@ export default function App() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [sigils, setSigils] = useState<Sigil[]>([])
   const [slots, setSlots] = useState<Slot[]>([])
+  // 配置读回来了没有。没读回来就**绝不写盘**：读取失败时槽位被铺成空数组（见加载那段的
+  // setSlots(pad12([]))），此刻任何一次编辑交出去的都是"所有配装都空"，而保存是整体替换——
+  // 磁盘上那份完整的配置会被清掉（2026-09-23 真丢过一次）。
+  const [loadoutRead, setLoadoutRead] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [tab, setTab] = useState<TabKey>("general")
   const [exclusiveTable, setExclusiveTable] = useState<Exclusive[]>([])
@@ -78,6 +82,7 @@ export default function App() {
   // 防抖住在 Go 侧（LoadoutService）：这里每改一下就交一份，后端替换待写并重启定时器，退出时由
   // OnShutdown 的 flushNow 兜住。
   const saveNow = useCallback(async () => {
+    if (!loadoutRead) return
     const current = latest.current
     if (current.index.mainKeys.length === 0 || current.index.skillHashes.length === 0) {
       setFailure({ kind: "tables" })
@@ -95,7 +100,7 @@ export default function App() {
     } catch (e) {
       setFailure({ kind: "save", error: e })
     }
-  }, [])
+  }, [loadoutRead])
 
   useEffect(() => {
     void (async () => {
@@ -119,6 +124,7 @@ export default function App() {
 
       try {
         applyConfig(JSON.parse(await LoadConfig()), sigilTable, skillTable)
+        setLoadoutRead(true)
       } catch (e) {
         setFailure({ kind: "config", error: e })
         // 读不出来也要铺满行：屏幕上 0 行看起来像什么都没发生。
