@@ -98,9 +98,12 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
 	cfg := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
-	if err := (&LoadoutService{}).SaveLoadout(cfg); err != nil {
+	svc := &LoadoutService{}
+	if err := svc.SaveLoadout(cfg); err != nil {
 		t.Fatalf("SaveLoadout: %v", err)
 	}
+	// 落盘是防抖的（契约见 LoadoutService），测试不等那 500ms，直接压出来。
+	svc.flushNow()
 	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -130,6 +133,7 @@ func TestSaveLoadoutOverwritesExisting(t *testing.T) {
 	if err := svc.SaveLoadout(second); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
+	svc.flushNow()
 	data, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
@@ -153,33 +157,58 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 }
 
 /*
-写盘只有 SaveLoadout 一个出口，而它会被并发调用：防抖挡不住"一次写盘比防抖窗口还慢"（杀软扫
-%LOCALAPPDATA%）。序号在提交时取、写盘前比一次，磁盘上就不会留下被后来者取代的旧状态。
+防抖：还没到点就不落盘——这正是"退出时 flushNow 兜住最后一次编辑"能成立的前提（旧契约把防抖放在
+前端，后端根本不知道有未落盘的编辑，退出时无从兜起）。
 */
-func TestSaveLoadoutDropsASupersededSave(t *testing.T) {
+func TestSaveLoadoutDefersTheWrite(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	svc := &LoadoutService{}
+	cfg := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
+	if err := svc.SaveLoadout(cfg); err != nil {
+		t.Fatalf("SaveLoadout: %v", err)
+	}
+	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a debounced save must not reach the disk yet (stat err=%v)", err)
+	}
+	svc.flushNow()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("flushNow must land the pending config: %v", err)
+	}
+	if string(data) != cfg {
+		t.Errorf("stored config = %q, want %q", data, cfg)
+	}
+}
+
+/*
+写盘只有 SaveLoadout 一个出口，而防抖只落盘**最后**交上来的那一份：中途的若干次提交只替换待写，
+不会各自 rename 一次，所以磁盘上永远不会留下被后来者取代的旧状态。
+*/
+func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)
 	svc := &LoadoutService{}
 	stale := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
 	current := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","hash":"9A60FBF0","level":10}],"enabled":true}]}`
-	// 第 7 号已经提交（比如那一次正卡在慢写里），第 3 号就已经过期。
-	svc.submitted.Store(7)
-	if err := svc.writeSubmitted(3, stale); err != nil {
-		t.Fatalf("a superseded save is not an error: %v", err)
+	if err := svc.SaveLoadout(stale); err != nil {
+		t.Fatalf("first save: %v", err)
 	}
-	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("a superseded save must not reach the disk (stat err=%v)", err)
+	if err := svc.SaveLoadout(current); err != nil {
+		t.Fatalf("second save: %v", err)
 	}
-	if err := svc.writeSubmitted(7, current); err != nil {
-		t.Fatalf("the current save must land: %v", err)
-	}
-	raw, err := os.ReadFile(path)
+	svc.flushNow()
+	raw, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
 	}
 	if string(raw) != current {
 		t.Errorf("stored config = %q, want %q", raw, current)
+	}
+	// 待写是被取走而不是被读取的：第二次 flushNow 找不到东西，也就不会写第二遍。
+	if svc.pending != nil {
+		t.Errorf("flushNow left something pending: %q", svc.pending)
 	}
 }
 
@@ -206,6 +235,7 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 		}(payload)
 	}
 	wg.Wait()
+	svc.flushNow()
 
 	raw, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
 	if err != nil {

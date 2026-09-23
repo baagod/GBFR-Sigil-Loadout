@@ -59,9 +59,8 @@ export default function App() {
   // 因子表的一切派生关系构造一次（可脱离 React 测试）。
   const index = useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])
 
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  // 落盘要读"当前"状态，而定时器是在某一次渲染里排的，所以状态从 ref 取而不是让
-  // 闭包捕获。
+  // 落盘要读"当前"状态，而这个回调刻意不带响应式依赖（由编辑处理器触发，闭包里的值会过期），
+  // 所以状态从 ref 取而不是让闭包捕获。
   const latest = useRef({ slots, index, lang, exclusiveState })
   // 渲染期写 ref 是 React 明令禁止的（会把一次从未提交的渲染里的值发布出去）。挪进 layout effect：
   // 它在 paint 之前跑，而读这个 ref 的 saveNow 只由定时器与事件触发，所以读到的永远是已提交的那一份。
@@ -77,6 +76,10 @@ export default function App() {
     迁移就是这么把用户配置改坏的）。现在没有旗标：加载不调用任何编辑处理器，排不出保存。
   */
   // 落盘：状态全部从 latest.current 读，所以这个回调没有响应式依赖，也不会读到旧值。
+  //
+  // 防抖住在 Go 侧（LoadoutService，与 EditService 同一套 500ms 契约）：这里每改一下就交一份，
+  // 后端替换待写并重启定时器，退出时由 OnShutdown 的 flushNow 兜住。前端自己防抖的话，后端根本
+  // 不知道有未落盘的编辑，托盘退出就会丢掉最后一次改动。
   const saveNow = useCallback(async () => {
     const current = latest.current
     if (current.index.mainKeys.length === 0 || current.index.skillHashes.length === 0) {
@@ -96,11 +99,6 @@ export default function App() {
       setFailure({ kind: "save", error: e })
     }
   }, [])
-
-  const scheduleSave = useCallback(() => {
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => void saveNow(), 300)
-  }, [saveNow])
 
   useEffect(() => {
     void (async () => {
@@ -178,9 +176,9 @@ export default function App() {
   const updateSlot = useCallback(
     (row: number, patch: Partial<Slot>) => {
       setSlots((prev) => prev.map((slot, i) => (i === row ? { ...slot, ...patch } : slot)))
-      scheduleSave()
+      void saveNow()
     },
-    [scheduleSave]
+    [saveNow]
   )
 
   /**
@@ -203,7 +201,7 @@ export default function App() {
   const allEnabled = slots.every((s) => s.enabled)
   const toggleAll = () => {
     setSlots((prev) => prev.map((slot) => ({ ...slot, enabled: !allEnabled })))
-    scheduleSave()
+    void saveNow()
   }
 
   // 落到文件里的键是**角色 hash**（身份），不是 PL 码：古兰/姬塔共享 PL0000，所以一次点击
@@ -212,7 +210,7 @@ export default function App() {
   const updateExclusive = (player: string, skillHash: string, value: boolean) => {
     const charaHashes = exclusiveTable.filter((e) => e.player === player).map((e) => e.hash)
     setExclusiveState((prev) => withExclusiveToggle(prev, charaHashes, skillHash, value))
-    scheduleSave()
+    void saveNow()
   }
 
   // 隐藏键就是 mod 的菜单热键（默认 F1，可配置，mod 把它发布在 tool-hotkey.txt）。按在这里
@@ -315,7 +313,7 @@ export default function App() {
                 lang={option}
                 onClick={() => {
                   setLang(option) // 语言也存在 loadout.json 里，所以这也是一次编辑
-                  scheduleSave()
+                  void saveNow()
                 }}
               >
                 {LANG_LABEL[option]}

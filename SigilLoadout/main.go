@@ -51,14 +51,15 @@ func main() {
 		fatalDialog(err)
 	}
 
-	// 编辑列表的防抖住在 service 里，所以关闭钩子要的正是同一个实例。
+	// 两个 service 的防抖都住在实例里，所以关闭钩子要的正是同一个实例（见下面两个 OnShutdown）。
+	loadoutService := &LoadoutService{}
 	editService := &EditService{}
 
 	app = application.New(application.Options{
 		Name: "SigilLoadout",
 		Icon: appIconBytes,
 		Services: []application.Service{
-			application.NewService(&LoadoutService{}),
+			application.NewService(loadoutService),
 			application.NewService(editService),
 		},
 		Assets: application.AssetOptions{
@@ -88,6 +89,9 @@ func main() {
 	// 因子编辑页的写入带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
 	// 否则最后一次编辑就丢了。
 	app.OnShutdown(editService.flushNow)
+	// 配装配置同样改成防抖写了（见 LoadoutService），退出时也要把压着的那份发出去，否则托盘退出会
+	// 丢掉最后一个编辑。
+	app.OnShutdown(loadoutService.flushNow)
 	// 关机时要先立这个标志：cleanup() 里的 shutdownTasks 跑在 window.Close() 之前，否则下面那记
 	// WM_CLOSE 会被当成"用户点了 X"而改成假隐藏（见 windowstate.go 的 quitting）。
 	app.OnShutdown(func() { quitting.Store(true) })
