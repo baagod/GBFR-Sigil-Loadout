@@ -10,6 +10,10 @@ namespace GBFR.SigilLoadout;
 /// </summary>
 internal static class Hotkey {
     private const int WmHotkey = 0x0312;
+    // 托盘与"工具没开"的兜底命令：显示/还原/聚焦。
+    private const int WmActivate = 0x8010;
+    // 游戏内热键的开关命令：工具据此"可见就收、不可见就呼出"。
+    private const int WmToggle = 0x8012;
     private const int HwndMessage = -3;
     private const int HotkeyId = 0x47B1;
     private const uint ModNoRepeat = 0x4000;
@@ -97,7 +101,6 @@ internal static class Hotkey {
         _virtualKey = virtualKey;
         _log = log;
         _wasDown = false;
-        PublishHotkey(virtualKey);
 
         _threadExit = false;
         var thread = new Thread(HotkeyLoop) {
@@ -106,21 +109,6 @@ internal static class Hotkey {
         };
         _hotkeyThread = thread;
         thread.Start();
-    }
-
-    /// <summary>
-    /// 把当前虚拟键发布到工具 exe 旁边，好让编辑器用同一个键把自己藏起来（不依赖 Reloaded-II
-    /// 把自己的用户配置存在哪）。
-    /// </summary>
-    private static void PublishHotkey(int virtualKey) {
-        try {
-            File.WriteAllText(
-                Path.Combine(_modDirectory, "tool-hotkey.txt"),
-                virtualKey.ToString());
-        }
-        catch {
-            // 只是给工具侧的提示；mod 热键照常工作。
-        }
     }
 
     /// <summary>拆掉消息窗口和线程（由 Mod.Dispose 调）。</summary>
@@ -161,7 +149,7 @@ internal static class Hotkey {
             if (msg.Message == WmHotkey) {
                 if (_threadExit)
                     break; // Shutdown 已开始：丢掉在途的热键消息
-                if (IsGameForeground()) {
+                if (IsGameOrToolForeground()) {
                     try {
                         // 先等按键抬起：同一个键的 key-up 不能落到启动器窗口上（那会被当成工具内的隐藏）。
                         WaitForKeyRelease(_virtualKey);
@@ -187,12 +175,16 @@ internal static class Hotkey {
             return;
 
         bool down = (GetAsyncKeyState(_virtualKey) & 0x8000) != 0;
-        if (down && !_wasDown && IsGameForeground())
+        if (down && !_wasDown && IsGameOrToolForeground())
             TryLaunchTool(log);
         _wasDown = down;
     }
 
-    private static bool IsGameForeground() {
+    /// <summary>
+    /// 前台是不是游戏**或工具自己**。工具被呼出后自己就是前台（mod 那记 SetForegroundWindow 的作用），
+    /// 此时同一个按键必须还能把它收起来；而 F2 这类无修饰键在别的程序里太常见，不该被全局抢走。
+    /// </summary>
+    private static bool IsGameOrToolForeground() {
         IntPtr foreground = GetForegroundWindow();
         if (foreground == IntPtr.Zero)
             return false;
@@ -200,8 +192,11 @@ internal static class Hotkey {
         try {
             using var process = Process.GetProcessById((int)processId);
             return string.Equals(
-                process.ProcessName, "granblue_fantasy_relink",
-                StringComparison.OrdinalIgnoreCase);
+                       process.ProcessName, "granblue_fantasy_relink",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(
+                       process.ProcessName, "SigilLoadout",
+                       StringComparison.OrdinalIgnoreCase);
         }
         catch {
             return false;
@@ -218,8 +213,9 @@ internal static class Hotkey {
             }
         }
         if (existing != IntPtr.Zero) {
-            ActivateWindow(existing);
-            log("Loadout tool is already running; brought to foreground.");
+            // 热键是开关：工具可见就收起来，不可见就呼出（当前是哪一态由工具自己持有）。
+            ActivateWindow(existing, toggle: true);
+            log("Loadout tool is already running; toggled.");
             return;
         }
 
@@ -261,12 +257,12 @@ internal static class Hotkey {
     }
 
     /// <summary>
-    /// 请求工具显示/还原/聚焦自己（WM_APP+0x10；假隐藏和最小化状态由工具处理），然后取前台权限。
+    /// 请求工具切换自己（0x8012 = 热键开关）或显示自己（0x8010 = 托盘/兜底），然后取前台权限。
     /// SetForegroundWindow 必须跑在热键这个进程里：Windows 把 RegisterHotKey 的这次按下当成用户输入，
-    /// 激活权是给这个进程的。
+    /// 激活权是给这个进程的。收起那一半由工具把焦点还给游戏，此时对已禁用的窗口调它会失败——正是想要的。
     /// </summary>
-    private static void ActivateWindow(IntPtr hWnd) {
-        PostMessage(hWnd, 0x8010, IntPtr.Zero, IntPtr.Zero);
+    private static void ActivateWindow(IntPtr hWnd, bool toggle = false) {
+        PostMessage(hWnd, (uint)(toggle ? WmToggle : WmActivate), IntPtr.Zero, IntPtr.Zero);
         Thread.Sleep(80);
         SetForegroundWindow(hWnd);
     }

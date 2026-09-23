@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	jsonv2 "encoding/json/v2"
 )
@@ -13,8 +11,8 @@ import (
 // MaxSlots 只限制**启用**的槽数，与托管侧校验器（LoadoutConfig.ParseAndValidate）一致。
 const MaxSlots = 12
 
-// LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json、tool-hotkey.txt——
-// 都在 exe 旁），把玩家配置写到 LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新
+// LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json——都在 exe 旁），
+// 把玩家配置写到 LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新
 // 不会冲掉它）。它写出的 loadout.json 是
 // { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] }——只认这一种形状，
 // 别的拼写都不接受，所以 items[0] 必须带技能 hash。
@@ -28,20 +26,6 @@ type LoadoutService struct {
 // 由工具自己的热键调用；X 按钮走 main.go 的 WndProc 拦截器直接假隐藏。
 func (s *LoadoutService) MinimiseApp() {
 	hideToTray()
-}
-
-// defaultHotkeyVK 是 F1：mod 没播报热键时的回落值（跨层协议常量：model.ts 的 DEFAULT_HIDE_KEY）。
-const defaultHotkeyVK = 0x70
-
-// GetHotkey 返回配置的菜单热键虚拟键码，由 mod 写在 exe 旁的 tool-hotkey.txt 里（运行期交接，
-// 不是随包数据，所以不在 assets/ 下）；文件缺失或读不出时回落 F1 (0x70)。
-func (s *LoadoutService) GetHotkey() int {
-	// 读不出来时 data 是空串、Atoi 也失败，两条路汇到同一个回落值，不必分开写。
-	data, _ := readModFile("tool-hotkey.txt")
-	if vk, err := strconv.Atoi(strings.TrimSpace(data)); err == nil && vk > 0 {
-		return vk
-	}
-	return defaultHotkeyVK
 }
 
 type loadoutItem struct {

@@ -18,8 +18,11 @@ const mutexName = "Local\\GBFRSigilLoadout"
 // fakeHide 必须 post 到 UI 线程：SetForegroundWindow 等的是窗口自身线程，而它正阻塞在这个调用里。
 const wmFakeHide = 0x8011
 
-// 由托盘、游戏内热键与第二个实例 post 的唯一激活命令（C# 侧也 post 同一个值）。
+// 由托盘与"工具没开"的兜底 post 的激活命令：显示/还原/聚焦（C# 侧也 post 同一个值）。
 const wmActivate = 0x8010
+
+// 由游戏内热键 post 的开关命令：工具可见就收、不可见就呼出（状态在 windowstate.go 的 toolHidden）。
+const wmToggle = 0x8012
 
 // GW_HWNDNEXT：Z 序里的下一个窗口。
 const gwHwndNext = 2

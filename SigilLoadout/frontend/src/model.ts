@@ -1,8 +1,6 @@
 export const MAX_SLOTS = 12 // 编辑器固定显示的行数
 /** 不知道 cap 时的因子/技能等级回落值（对应 C# 的 DefaultLevel）。 */
 export const DEFAULT_LEVEL = 15
-/** tool-hotkey.txt 读不到时的菜单热键回落值（F1）。 */
-export const DEFAULT_HIDE_KEY = 0x70
 
 export interface Slot {
     mainHash: string

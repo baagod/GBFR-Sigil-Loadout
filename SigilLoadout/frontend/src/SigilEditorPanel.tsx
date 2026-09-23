@@ -97,18 +97,14 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
 
     const t = messages[lang];
 
-    /*
-        显示一次失败既记下它，也打开对话框。关闭只是关闭：消息留在 state 里好让退场动画仍有
-        东西可画——关掉时清空会让对话框在整个淡出过程中一片空白。
-    */
+    // 显示一次失败既记下它，也打开对话框。关闭只是关闭：
+    // 消息留在 state 里好让退场动画仍有东西可画——关掉时清空会让对话框在整个淡出过程中一片空白。
     function showError(next: { title: string; detail: string }) {
         setError(next);
         setErrorOpen(true);
     }
 
-    /*
-        因子的名字和说明来自游戏针对所选语言的自有文本。编辑列表与语言无关，这里刻意不动它。
-    */
+    // 因子的名字和说明来自游戏针对所选语言的自有文本。编辑列表与语言无关，这里刻意不动它。
     useEffect(() => {
         const hit = textCache.get(lang);
         if (hit) {

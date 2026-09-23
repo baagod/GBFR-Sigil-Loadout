@@ -47,7 +47,7 @@ function LevelInput({
     )
 
     return (
-        <InputGroup ref={groupRef} className="w-20 shrink-0">
+        <InputGroup ref={groupRef} className="h-8 w-20 shrink-0">
             <InputGroupInput
                 ref={inputRef}
                 type="number"
@@ -64,7 +64,7 @@ function LevelInput({
                     onLevel(n)
                     if (e.target.value !== String(n)) e.target.value = String(n)
                 }}
-                className="py-0 pb-px text-center leading-[36px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="h-8 py-0 pb-px text-center leading-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <InputGroupAddon align="inline-end" className="text-[#a0a0a0] tabular-nums">
                 / {max}

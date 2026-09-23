@@ -89,8 +89,8 @@ export function SkillPicker({
                         }}
                         className={
                             invalid
-                                ? "min-w-0 flex-1 justify-between border-destructive font-normal text-destructive"
-                                : "min-w-0 flex-1 justify-between font-normal"
+                                ? "h-8 min-w-0 flex-1 justify-between border-destructive font-normal text-destructive"
+                                : "h-8 min-w-0 flex-1 justify-between font-normal"
                         }
                     >
                         <ComboboxValue />

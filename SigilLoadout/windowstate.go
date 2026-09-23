@@ -104,6 +104,19 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 	case wmFakeHide:
 		hideNow(hwnd)
 		return 0, true
+	case wmToggle: // 游戏内热键：开关。焦点两边各自处理——显出时工具抢前台，收起时还给游戏。
+		if prev := foregroundWindow(); prev != 0 && prev != hwnd {
+			returnFocusTo.Store(prev)
+		}
+		if toolHidden.Load() {
+			revealTool(hwnd)
+			win.Restore()
+			win.Show()
+			win.Focus()
+		} else {
+			fakeHide(hwnd)
+		}
+		return 0, true
 	case wmActivate: // 激活：揭示（若处于假隐藏）、还原、显示、聚焦
 		// 在工具抢走焦点之前记下前台窗口，好让 fakeHide 还回去。
 		if prev := foregroundWindow(); prev != 0 && prev != hwnd {

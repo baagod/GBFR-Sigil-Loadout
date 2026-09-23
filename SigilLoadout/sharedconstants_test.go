@@ -76,14 +76,6 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			},
 		},
 		{
-			name: "可视工具隐藏键的回落值",
-			decls: []decl{
-				{"C#", "../GBFR.SigilLoadout/HotkeyConfig.cs", regexp.MustCompile(`\bF1 = (0x[0-9A-Fa-f]+)`)},
-				{"Go", "loadoutservice.go", regexp.MustCompile(`defaultHotkeyVK = (0x[0-9A-Fa-f]+)`)},
-				{"TS", "frontend/src/model.ts", regexp.MustCompile(`DEFAULT_HIDE_KEY = (0x[0-9A-Fa-f]+)`)},
-			},
-		},
-		{
 			name: "LevelValue 参槽数",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`LevelValueCount = (\d+)`)},
@@ -124,15 +116,15 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 		{
 			name: "激活 / 显示消息（WM_APP+0x10）",
 			decls: []decl{
-				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`PostMessage\(hWnd, (0x[0-9A-Fa-f]+)`)},
+				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`WmActivate = (0x[0-9A-Fa-f]+)`)},
 				{"Go", "*.go", regexp.MustCompile(`const wmActivate = (0x[0-9A-Fa-f]+)`)},
 			},
 		},
 		{
-			name: "热键播报文件名（mod 写、可视工具读）",
+			name: "游戏内热键的开关消息（WM_APP+0x12）",
 			decls: []decl{
-				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`Path\.Combine\(_modDirectory, "(tool-hotkey\.txt)"\)`)},
-				{"Go", "loadoutservice.go", regexp.MustCompile(`readModFile\("(tool-hotkey\.txt)"\)`)},
+				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`WmToggle = (0x[0-9A-Fa-f]+)`)},
+				{"Go", "*.go", regexp.MustCompile(`const wmToggle = (0x[0-9A-Fa-f]+)`)},
 			},
 		},
 		// skill_status 的行布局：托管侧与原生各存一份（两个二进制）。拷错一个的后果是"行错位 /

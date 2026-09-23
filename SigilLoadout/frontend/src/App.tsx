@@ -3,11 +3,10 @@ import {Button} from "@/components/ui/button"
 import {ButtonGroup} from "@/components/ui/button-group"
 import {Checkbox} from "@/components/ui/checkbox"
 import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
-import {LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
+import {LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
 import {messages, type Messages} from "./messages"
 import {LANGS, LANG_LABEL, initialLang, type Lang} from "./lang"
 import {
-    DEFAULT_HIDE_KEY,
     buildLoadoutPayload,
     buildSigilIndex,
     configToSlots,
@@ -71,7 +70,6 @@ export default function App() {
     const [names, setNames] = useState<Record<string, string>>({})
     // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页的行标签。
     const [charaNames, setCharaNames] = useState<Record<string, string>>({})
-    const [hideKey, setHideKey] = useState(DEFAULT_HIDE_KEY)
     const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
     // 整个可视工具一份文案（messages.ts）；换成别的语言只是换一个索引。
     const t = messages[lang]
@@ -137,7 +135,6 @@ export default function App() {
             // 并按 cap 夹等级）。
             const exclusives = LoadExclusives()
             exclusives.catch(() => {}) // 稍后才 await 它；先挂上处理，免得出现未处理拒绝
-            const hotkey = GetHotkey().catch(() => DEFAULT_HIDE_KEY)
 
             let sigilTable: Sigil[] = []
             let skillTable: Skill[] = []
@@ -165,8 +162,6 @@ export default function App() {
             } catch (e) {
                 setFailure({kind: "exclusive", error: e})
             }
-
-            setHideKey(await hotkey)
         })()
         // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态。这里也刻意不读 t——文案在渲染时由
         // failureText 取，所以没有语言依赖会把这一跑重新触发。
@@ -242,15 +237,13 @@ export default function App() {
         edit({exclusiveState: withExclusiveToggle(latest.current.exclusiveState, charaHashes, skillHash, value)})
     }
 
-    // 隐藏键就是 mod 的菜单热键（默认 F1，可配置，mod 把它发布在 tool-hotkey.txt）。按在这里
-    // 是收起窗口，按在游戏里是把工具叫回来。隐藏推迟到 keyup 之后，这次按键才被这里完全吃掉、
-    // 不会漏给游戏窗口。Escape 同样隐藏，**除非**焦点在浮层（下拉列表/对话框）里：那里它归浮层，
-    // 只关浮层。浮层判断在 keydown 做（Base UI 会在 keydown 期间卸载弹层，keyup 就看不到它了），
-    // 结果留给 keyup 用。
+    // Esc 隐藏到托盘，**除非**焦点在浮层（下拉列表/对话框）里：那里它归浮层，只关浮层。浮层判断在
+    // keydown 做（Base UI 会在 keydown 期间卸载弹层，keyup 就看不到它了），结果留给 keyup 用。
+    // 推迟到 keyup 才藏：keydown 就藏掉的话，这一记 keyup 会落到游戏窗口上。
+    // 菜单热键不在这里处理：它是 mod 的全局注册，按一下就是开关这个窗口（见 windowstate.go 的 wmToggle）。
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined
         let overlayEscOnKeyDown = false
-        const hideKeyPressed = (e: KeyboardEvent) => e.keyCode === hideKey
         const isInOverlay = (e: KeyboardEvent) =>
             !!(e.target as HTMLElement | null)?.closest?.(
                 // Esc 归谁：打开的浮层，以及因子编辑页里的数值框——那一页把 Esc 定义成"放开这个框"
@@ -258,22 +251,18 @@ export default function App() {
                 '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .skill-rows input'
             )
         const onKeyDown = (e: KeyboardEvent) => {
-            if (!hideKeyPressed(e) && e.key !== "Escape") return
-            if (e.key === "Escape") {
-                // 两条路都赋值：丢一次 keyup 不能把下一次 Esc 也吞掉。
-                overlayEscOnKeyDown = isInOverlay(e)
-                if (overlayEscOnKeyDown) return
-            }
+            if (e.key !== "Escape") return
+            // 两条路都赋值：丢一次 keyup 不能把下一次 Esc 也吞掉。
+            overlayEscOnKeyDown = isInOverlay(e)
+            if (overlayEscOnKeyDown) return
             clearTimeout(timer)
             e.preventDefault()
         }
         const onKeyUp = (e: KeyboardEvent) => {
-            if (!hideKeyPressed(e) && e.key !== "Escape") return
-            if (e.key === "Escape") {
-                if (overlayEscOnKeyDown) {
-                    overlayEscOnKeyDown = false
-                    return
-                }
+            if (e.key !== "Escape") return
+            if (overlayEscOnKeyDown) {
+                overlayEscOnKeyDown = false
+                return
             }
             clearTimeout(timer)
             timer = setTimeout(() => void MinimiseApp(), 150)
@@ -287,7 +276,7 @@ export default function App() {
             document.removeEventListener("keyup", onKeyUp, true)
             clearTimeout(timer)
         }
-    }, [hideKey])
+    }, [])
 
     /*
         窗口失活时 :focus / :focus-visible 会被判掉，而 DOM 焦点还在框里：切到游戏改完再回来接着
