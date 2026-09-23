@@ -8,6 +8,15 @@
 
 与用户意见相左时，深入考虑用户提案，非强行找对立点。而是能结合正在探索的方向，或思维突破，提出更加精妙的可能方案。
 
+## Git 禁令
+
+1. **严禁 Git 提交**：只有当用户明确说出 “提交 / 提交代码” 时才能执行 `git add / git commit` 命令。
+2. 执行 `git add . & git diff --cached`，确认已排除忽略项，调用 `git-commit` skill（非 MCP）提交；
+
+## 快速上手
+
+先读 `openwiki/quickstart.md`（仓库地图）；领域术语查 `CONTEXT.md`；符号与调用链查 `mcp:codegraph`。
+
 ## 约束
 
 - **始终保持中文回复**，即使调用的 **Skill** 说明是英文。
