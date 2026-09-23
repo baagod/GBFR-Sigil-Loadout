@@ -1,15 +1,32 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Tabs, TabsList, TabsPanel, TabsTrigger } from "@/components/ui/tabs"
-import { LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames } from "../bindings/sigilloadout/loadoutservice"
-import { messages, type Messages } from "./messages"
-import { LANGS, LANG_LABEL, initialLang, type Lang } from "./lang"
-import { DEFAULT_HIDE_KEY, buildLoadoutPayload, buildSigilIndex, configToSlots, itemRowsOf, pad12, parseExclusiveTable, parseSigilRows, sanitizeExclusiveState, skillTableOf, withExclusiveToggle, type Exclusive, type ExclusiveState, type Sigil, type Slot, type Skill } from "./model"
-import { SlotRow, HEADER_ROW } from "./SlotEditor"
-import { ExclusivePanel } from "./ExclusivePanel"
-import { SigilEditorPanel } from "./SigilEditorPanel"
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
+import {Button} from "@/components/ui/button"
+import {ButtonGroup} from "@/components/ui/button-group"
+import {Checkbox} from "@/components/ui/checkbox"
+import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
+import {LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, GetHotkey, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
+import {messages, type Messages} from "./messages"
+import {LANGS, LANG_LABEL, initialLang, type Lang} from "./lang"
+import {
+    DEFAULT_HIDE_KEY,
+    buildLoadoutPayload,
+    buildSigilIndex,
+    configToSlots,
+    itemRowsOf,
+    pad12,
+    parseExclusiveTable,
+    parseSigilRows,
+    sanitizeExclusiveState,
+    skillTableOf,
+    withExclusiveToggle,
+    type Exclusive,
+    type ExclusiveState,
+    type Sigil,
+    type Slot,
+    type Skill
+} from "./model"
+import {SlotRow, HEADER_ROW} from "./SlotEditor"
+import {ExclusivePanel} from "./ExclusivePanel"
+import {SigilEditorPanel} from "./SigilEditorPanel"
 
 type TabKey = "general" | "exclusive" | "sigilEditor"
 
@@ -63,10 +80,10 @@ export default function App() {
     const index = useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])
 
     // 落盘要读"当前"状态，而这个回调刻意不带响应式依赖（闭包里的值会过期），所以从 ref 取。
-    const latest = useRef({ slots, index, lang, exclusiveState })
+    const latest = useRef({slots, index, lang, exclusiveState})
     // 渲染期写 ref 是 React 明令禁止的（会把一次从未提交的渲染里的值发布出去），挪进 layout effect。
     useLayoutEffect(() => {
-        latest.current = { slots, index, lang, exclusiveState }
+        latest.current = {slots, index, lang, exclusiveState}
     }, [slots, index, lang, exclusiveState])
 
     /*
@@ -84,7 +101,7 @@ export default function App() {
         if (!loadoutRead) return
         const current = latest.current
         if (current.index.mainKeys.length === 0 || current.index.skillHashes.length === 0) {
-            setFailure({ kind: "tables" })
+            setFailure({kind: "tables"})
             return
         }
         try {
@@ -97,9 +114,22 @@ export default function App() {
             await SaveLoadout(JSON.stringify(payload, null, 2))
             setFailure((prev) => (prev?.kind === "save" ? null : prev))
         } catch (e) {
-            setFailure({ kind: "save", error: e })
+            setFailure({kind: "save", error: e})
         }
     }, [loadoutRead])
+
+    // 编辑必须先把新值放进 latest.current 再保存：处理器里 setState 要等它返回后才提交，那时读到的还是
+    // 上一次的状态，落盘就永远慢一次（最后一次勾选就是这么丢的）。防抖住在 Go 侧，退出时由 flushNow 兜住。
+    const edit = useCallback(
+        (patch: { slots?: Slot[]; exclusiveState?: ExclusiveState; lang?: Lang }) => {
+            latest.current = {...latest.current, ...patch}
+            if (patch.slots) setSlots(patch.slots)
+            if (patch.exclusiveState) setExclusiveState(patch.exclusiveState)
+            if (patch.lang) setLang(patch.lang)
+            void saveNow()
+        },
+        [saveNow]
+    )
 
     useEffect(() => {
         void (async () => {
@@ -118,14 +148,14 @@ export default function App() {
                 setSkills(skillTable)
                 setSigils(sigilTable)
             } catch (e) {
-                setFailure({ kind: "sigil", error: e })
+                setFailure({kind: "sigil", error: e})
             }
 
             try {
                 applyConfig(JSON.parse(await LoadConfig()), sigilTable, skillTable)
                 setLoadoutRead(true)
             } catch (e) {
-                setFailure({ kind: "config", error: e })
+                setFailure({kind: "config", error: e})
                 // 读不出来也要铺满行：屏幕上 0 行看起来像什么都没发生。
                 setSlots(pad12([]))
             }
@@ -133,7 +163,7 @@ export default function App() {
             try {
                 setExclusiveTable(parseExclusiveTable(JSON.parse(await exclusives)))
             } catch (e) {
-                setFailure({ kind: "exclusive", error: e })
+                setFailure({kind: "exclusive", error: e})
             }
 
             setHideKey(await hotkey)
@@ -160,7 +190,7 @@ export default function App() {
         Promise.all([GemNames(lang), CharaNames(lang)])
             .then(([gems, charas]) => {
                 if (cancelled) return
-                const entry = { names: gems ?? {}, charas: charas ?? {} }
+                const entry = {names: gems ?? {}, charas: charas ?? {}}
                 nameCache.set(lang, entry)
                 setNames(entry.names)
                 setCharaNames(entry.charas)
@@ -177,10 +207,9 @@ export default function App() {
 
     const updateSlot = useCallback(
         (row: number, patch: Partial<Slot>) => {
-            setSlots((prev) => prev.map((slot, i) => (i === row ? { ...slot, ...patch } : slot)))
-            void saveNow()
+            edit({slots: latest.current.slots.map((slot, i) => (i === row ? {...slot, ...patch} : slot))})
         },
-        [saveNow]
+        [edit]
     )
 
     /**
@@ -202,8 +231,7 @@ export default function App() {
     // 表头勾选框：全选 / 全不选（官方 Table 的写法）。
     const allEnabled = slots.every((s) => s.enabled)
     const toggleAll = () => {
-        setSlots((prev) => prev.map((slot) => ({ ...slot, enabled: !allEnabled })))
-        void saveNow()
+        edit({slots: latest.current.slots.map((slot) => ({...slot, enabled: !allEnabled}))})
     }
 
     // 落到文件里的键是**角色 hash**（身份），不是 PL 码：古兰/姬塔共享 PL0000，所以一次点击
@@ -211,8 +239,7 @@ export default function App() {
     // 在 model.ts 的 withExclusiveToggle 里，那里能单独测。
     const updateExclusive = (player: string, skillHash: string, value: boolean) => {
         const charaHashes = exclusiveTable.filter((e) => e.player === player).map((e) => e.hash)
-        setExclusiveState((prev) => withExclusiveToggle(prev, charaHashes, skillHash, value))
-        void saveNow()
+        edit({exclusiveState: withExclusiveToggle(latest.current.exclusiveState, charaHashes, skillHash, value)})
     }
 
     // 隐藏键就是 mod 的菜单热键（默认 F1，可配置，mod 把它发布在 tool-hotkey.txt）。按在这里
@@ -291,38 +318,38 @@ export default function App() {
                 className="flex min-h-0 flex-1 flex-col gap-0"
             >
                 <div className="flex h-[60px] shrink-0 flex-col justify-center border-b bg-background px-4">
-                <div className="flex items-center justify-between gap-3">
-                    <TabsList>
-                        <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
-                        <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
-                        <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
-                    </TabsList>
-                    {/*
+                    <div className="flex items-center justify-between gap-3">
+                        <TabsList>
+                            <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
+                            <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
+                            <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
+                        </TabsList>
+                        {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的
                         icon-sm（正方形、四格等宽）；行内 translate 抵掉按下位移、transition 关掉选中格
                         150ms 的淡出淡入（行内样式优先于 class）；lang 让每个标签按自己的语言选字体，
                         否则字体会跟着文档语言换，切语言时粗细就变了。
                     */}
-                    <ButtonGroup aria-label={t.langSwitch}>
-                        {LANGS.map((option) => (
-                            <Button
-                                key={option}
-                                size="icon-sm"
-                                style={{ translate: "none", transition: "none" }}
-                                variant={option === lang ? "default" : "outline"}
-                                // default 变体不带边框色（组的外框会断一截），补上 outline 同款。
-                                className={option === lang ? "border-input" : undefined}
-                                lang={option}
-                                onClick={() => {
-                                    setLang(option) // 语言也存在 loadout.json 里，所以这也是一次编辑
-                                    void saveNow()
-                                }}
-                            >
-                                {LANG_LABEL[option]}
-                            </Button>
-                        ))}
-                    </ButtonGroup>
-                </div>
+                        <ButtonGroup aria-label={t.langSwitch}>
+                            {LANGS.map((option) => (
+                                <Button
+                                    key={option}
+                                    size="icon-sm"
+                                    style={{translate: "none", transition: "none"}}
+                                    variant={option === lang ? "default" : "outline"}
+                                    // default 变体不带边框色（组的外框会断一截），补上 outline 同款。
+                                    className={option === lang ? "border-input" : undefined}
+                                    lang={option}
+                                    onClick={() => {
+                                        // 语言也存在 loadout.json 里，所以这也是一次编辑
+                                        edit({lang: option})
+                                    }}
+                                >
+                                    {LANG_LABEL[option]}
+                                </Button>
+                            ))}
+                        </ButtonGroup>
+                    </div>
                 </div>
                 {/*
                     状态条是外壳级的通知，不属于任何一个 Tab：留在这一层，切到因子编辑页时那两页的
@@ -343,21 +370,21 @@ export default function App() {
                 */}
                 {/* 上下 16px 只归这一页：专属因子那页沿用 LOADOUT_PANEL 原本的间距。 */}
                 <TabsPanel value="general" keepMounted className={`${LOADOUT_PANEL} py-4`}>
-                <div className={HEADER_ROW}>
-                    <div className="pl-0.5 pr-3">
-                        {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
-                        {slots.length > 0 && (
-                            <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
-                        )}
+                    <div className={HEADER_ROW}>
+                        <div className="pl-0.5 pr-3">
+                            {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
+                            {slots.length > 0 && (
+                                <Checkbox checked={allEnabled} onCheckedChange={toggleAll} aria-label={t.selectAll} />
+                            )}
+                        </div>
+                        <div>#</div>
+                        <div className="pr-2 pl-[11px]">{t.headerPrimary}</div>
+                        <div className="pl-[21px]">{t.headerSecondary}</div>
                     </div>
-                    <div>#</div>
-                    <div className="pr-2 pl-[11px]">{t.headerPrimary}</div>
-                    <div className="pl-[21px]">{t.headerSecondary}</div>
-                </div>
 
-                {slots.map((slot, row) => (
-                    <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
-                ))}
+                    {slots.map((slot, row) => (
+                        <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
+                    ))}
                 </TabsPanel>
                 <TabsPanel value="exclusive" keepMounted className={LOADOUT_PANEL}>
                     <ExclusivePanel
