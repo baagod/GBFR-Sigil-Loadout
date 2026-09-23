@@ -11,7 +11,7 @@
 ## Git 禁令
 
 1. **严禁 Git 提交**：只有当用户明确说出 “提交 / 提交代码” 时才能执行 `git add / git commit` 命令。
-2. 执行 `git add . & git diff --cached`，确认已排除忽略项，调用 `git-commit` skill（非 MCP）提交；
+2. 执行 `git add . & git diff --cached`，确认忽略项后调用 `/git-commit` skill（非 MCP）提交；
 
 ## 快速上手
 
@@ -20,9 +20,9 @@
 ## 约束
 
 - **始终保持中文回复**，即使调用的 **Skill** 说明是英文。
-- 始终以 `/i-have-adhd` 方式回复对话。
-- **逐一回答所有问题**：当用户一次提出多个问题时，必须逐条回答，若问题之间有关联，先说明关系。
-- **精确修改 ( 字符串替换 )** 文件，禁止 **覆盖重建**。
+- 始终以 `/i-have-adhd` (skill) 方式回复对话。
+- 当用户一次提出多个问题时，必须逐条回答，若问题之间有关联，先说明关系。
+- 每次 **精确修改 ( 字符串替换 )** 文件，禁止 **覆盖重建**。
 
 ## 编码原则
 
@@ -64,19 +64,16 @@
 **只有当明确收到用户发出审查指令时才进入，否则切勿擅自执行。**
 
 1. 当收到 `审查` 指令时执行 `git add .`。
-2. 执行 **自检** + `code-review-and-quality` 后调用 `receiving-code-review`，对接受项直接执行。
-3. 调用 `ponytail-review`，对结果执行 `receiving-code-review`。
-4. 注意 **审查结果** 是否与本 `AGENTS.md` 声明的 `"2. 简洁优先"` 冲突，如有需权衡执行。 
-5. 检测到冗余、死代码和文件等，直接清理。
+2. 执行 **复检** + `code-review-and-quality`，将两次审查结果合并。
+3. 调用 `receiving-code-review` 进行深入验证（而非只复述审查或子代理消息），对接受项直接执行。
+4. 调用 `ponytail-review`，对结果执行 `receiving-code-review`（同上）。
+5. 注意 **审查结果** 是否与本 `AGENTS.md` 声明的 `"2. 简洁优先"` 冲突，如有需权衡执行。 
+6. 检测到冗余、死代码和文件等，直接清理。
 
 ## 技能：按需调用
 
-- 调试及验证页面：使用 `agent-browser --args "--no-sandbox"`（禁用 `playwright`）。
+- 测试页面使用 `agent-browser` cli 工具（禁 `playwright`）。
 - 搜索使用 web-search 和 `skill:agent-reach`。
-- 结构查询（省 token：问图，不逐文件读）：
-  - 谁调用 / 影响面 → MCP 工具 `mcp:codegraph`（自然语言可问，watch 自动同步，返回含 blast radius）；
-  - 模板 `@click` 与 **注释** 不在索引，grep 兜底。
-  - 字 / 术语 / 注释出现在哪 → grep
 
 <!-- OPENWIKI:START -->
 
