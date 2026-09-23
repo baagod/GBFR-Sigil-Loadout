@@ -134,18 +134,12 @@ public sealed class Mod : IMod {
         try {
             string configDirectory = loader.GetModConfigDirectory(ModId);
             HotkeyConfig configuration = (HotkeyConfig)new Configurator(configDirectory).Configurations[0];
-            configuration.ConfigurationUpdated += OnHotkeyConfigurationUpdated;
             Hotkey.Configure(modDirectory, configuration.VirtualKey, Log);
         }
         catch (Exception exception) {
             Log($"Hotkey configuration unavailable: {exception.Message}; falling back to the default F1 hotkey.");
             Hotkey.Configure(modDirectory, (int)OverlayHotkey.F1, Log);
         }
-    }
-
-    private void OnHotkeyConfigurationUpdated(IUpdatableConfigurable configurable) {
-        if (configurable is HotkeyConfig configuration)
-            Hotkey.UpdateHotkey(configuration.VirtualKey);
     }
 
     private void Log(string message) {

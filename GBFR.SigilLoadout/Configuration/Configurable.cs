@@ -5,7 +5,7 @@ using Reloaded.Mod.Interfaces;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-/// <summary>Reloaded-II 配置条目的基类，抄自官方 mod 模板。</summary>
+/// <summary>Reloaded-II 配置条目的基类（官方模板里那套运行期热重载已去掉：实测改热键要重启游戏才生效）。</summary>
 public class Configurable<TParentType> : IUpdatableConfigurable
     where TParentType : Configurable<TParentType>, new() {
     public static JsonSerializerOptions SerializerOptions { get; } = new() {
@@ -13,8 +13,13 @@ public class Configurable<TParentType> : IUpdatableConfigurable
         WriteIndented = true,
     };
 
+    // 接口要求这个事件；本 mod 只在启动时读一次配置、运行期不重载，所以它永不触发（订阅是空操作）。
+    // 用显式访问器：有编译器生成的字段就会挨 CS0414/CS0067 两条"未使用"警告。
     [Browsable(false)]
-    public event Action<IUpdatableConfigurable>? ConfigurationUpdated;
+    public event Action<IUpdatableConfigurable>? ConfigurationUpdated {
+        add { }
+        remove { }
+    }
 
     [JsonIgnore]
     [Browsable(false)]
@@ -24,70 +29,25 @@ public class Configurable<TParentType> : IUpdatableConfigurable
     [Browsable(false)]
     public string? ConfigName { get; private set; }
 
-    [JsonIgnore]
-    [Browsable(false)]
-    private FileSystemWatcher? ConfigWatcher { get; set; }
-
     public Configurable() {
     }
 
     private void Initialize(string filePath, string configName) {
         FilePath = filePath;
         ConfigName = configName;
-        MakeConfigWatcher();
         Save = OnSave;
     }
 
+    // 接口要求这个方法；没有运行期重载就没有要拆的订阅。
     public void DisposeEvents() {
-        ConfigWatcher?.Dispose();
-        ConfigurationUpdated = null;
     }
 
     [JsonIgnore]
     [Browsable(false)]
     public Action? Save { get; private set; }
 
-    [Browsable(false)]
-    private static readonly object _readLock = new();
-
     public static TParentType FromFile(string filePath, string configName) =>
         ReadFrom(filePath, configName);
-
-    private void MakeConfigWatcher() {
-        ConfigWatcher = new FileSystemWatcher(
-            Path.GetDirectoryName(FilePath)!, Path.GetFileName(FilePath)!);
-        ConfigWatcher.Changed += (_, _) => OnConfigurationUpdated();
-        ConfigWatcher.EnableRaisingEvents = true;
-    }
-
-    private void OnConfigurationUpdated() {
-        try {
-            lock (_readLock) {
-                // 重试 250ms、每次隔 2ms：FSW 常常在文件只写了一半时就触发，读到半份 JSON 是常态。
-                // 超时就保留上一份配置——与下面那个 catch 的落点一致。
-                TParentType? reloaded = null;
-                long deadline = Environment.TickCount64 + 250;
-                while (reloaded is null && Environment.TickCount64 < deadline) {
-                    try {
-                        reloaded = ReadFrom(FilePath!, ConfigName!);
-                    }
-                    catch {
-                        Thread.Sleep(2);
-                    }
-                }
-                if (reloaded is null) {
-                    return;
-                }
-                reloaded.ConfigurationUpdated = ConfigurationUpdated;
-                DisposeEvents();
-                reloaded.ConfigurationUpdated?.Invoke(reloaded);
-            }
-        }
-        catch {
-            // 坏掉或只写了一半的配置绝不能跑出这个 FSW 回调：未捕获的异常会把游戏进程带走。
-            // 保留上一份配置。
-        }
-    }
 
     private void OnSave() {
         var parent = (TParentType)this;

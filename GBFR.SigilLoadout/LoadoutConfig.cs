@@ -61,7 +61,7 @@ internal static class LoadoutConfig {
 
         try {
             // 读之前先查大小，超大文件根本不会被读进来。
-            if (new FileInfo(ConfigFile).Length > 1024 * 1024)
+            if (new FileInfo(ConfigFile).Length > Config.MaxBytes)
                 throw new InvalidDataException("loadout.json exceeds 1 MB");
             string json = File.ReadAllText(ConfigFile);
             using JsonDocument doc = JsonDocument.Parse(json);

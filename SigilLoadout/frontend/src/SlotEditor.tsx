@@ -22,14 +22,14 @@ const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
 function LevelInput({
   value,
   max,
-  min = 1,
+  min,
   label,
   onLevel,
   disabled,
 }: {
   value: number
   max: number
-  min?: number
+  min: number
   label: string
   disabled?: boolean
   onLevel: (n: number) => void

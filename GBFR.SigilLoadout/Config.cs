@@ -72,8 +72,8 @@ public class Config {
             throw new InvalidDataException(
                 $"sigiledits.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'undo every edit')");
 
-        var config = doc.RootElement.Deserialize<Config>(Options)
-            ?? throw new InvalidDataException("sigiledits.json is not a JSON object");
+        // 上面三道形状检查已经把"不是 JSON 对象"拒掉了，所以反序列化不会返回 null。
+        var config = doc.RootElement.Deserialize<Config>(Options)!;
 
         // 显式的 "values": null 会盖掉初始化式，之后每个读 Values 的地方都得处理 null；
         // 在这里规整一次，与工具的 padValues 一致。
@@ -83,5 +83,5 @@ public class Config {
         return config;
     }
 
-    private const long MaxBytes = 1 * 1024 * 1024;
+    internal const long MaxBytes = 1 * 1024 * 1024;
 }

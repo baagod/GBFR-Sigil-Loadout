@@ -421,16 +421,20 @@ bool InstallHooks() {
    // 四条失败路径都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，顺序是
    // 有讲究的（见那个函数），而且在一个钩子都没装时是 no-op——它自己以 ResetGameLayout() 收尾。
 
+   // 四条失败路径都要"回滚 gameplay 改动 + 说清为什么"：收在一处，免得漏掉其中一步。
+   const auto fail_installation = [](const char* why) {
+      DisableGameplayHooksAndRestore();
+      SetRuntimeMessage(why);
+      return false;
+   };
+
    {
       auto phase = StartupPhase("required-byte-rva-preflight");
       const bool preflight_ready = RevalidateGameLayout();
       phase.Succeeded(preflight_ready);
-      if (!preflight_ready) {
-         DisableGameplayHooksAndRestore();
-         SetRuntimeMessage(
+      if (!preflight_ready)
+         return fail_installation(
             "Resolved game layout changed before hook installation; no gameplay hook or byte patch was installed.");
-         return false;
-      }
    }
 
    {
@@ -440,11 +444,8 @@ bool InstallHooks() {
             g_image_base + g_game_layout.get_gem_data_by_index_rva),
          reinterpret_cast<void*>(&GetGemDataByIndexDetour));
       phase.Succeeded(static_cast<bool>(g_get_gem_hook));
-      if (!g_get_gem_hook) {
-         DisableGameplayHooksAndRestore();
-         SetRuntimeMessage("Failed to install the GemData getter hook.");
-         return false;
-      }
+      if (!g_get_gem_hook)
+         return fail_installation("Failed to install the GemData getter hook.");
    }
 
    {
@@ -454,23 +455,17 @@ bool InstallHooks() {
             g_image_base + g_game_layout.skill_fetch_path_rva),
          &OnSkillFetch);
       phase.Succeeded(static_cast<bool>(g_skill_fetch_hook));
-      if (!g_skill_fetch_hook) {
-         DisableGameplayHooksAndRestore();
-         SetRuntimeMessage("Failed to install the skill fetch-path hook.");
-         return false;
-      }
+      if (!g_skill_fetch_hook)
+         return fail_installation("Failed to install the skill fetch-path hook.");
    }
 
    {
       auto phase = StartupPhase("skill-loop-limit-patches");
       const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
       phase.Succeeded(loop_patches_ready);
-      if (!loop_patches_ready) {
-         DisableGameplayHooksAndRestore();
-         SetRuntimeMessage(
+      if (!loop_patches_ready)
+         return fail_installation(
             "Failed to patch both native skill loop limits; changes were rolled back.");
-         return false;
-      }
    }
 
    g_hooks_ready.store(true, std::memory_order_release);

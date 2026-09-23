@@ -11,23 +11,12 @@ public class Configurator : IConfiguratorV3 {
     public IUpdatableConfigurable[] Configurations => _configurations ??= MakeConfigurations();
     private IUpdatableConfigurable[]? _configurations;
 
-    private IUpdatableConfigurable[] MakeConfigurations() {
-        var configurations = new IUpdatableConfigurable[] {
+    private IUpdatableConfigurable[] MakeConfigurations() =>
+        new IUpdatableConfigurable[] {
             HotkeyConfig.FromFile(
                 Path.Combine(ConfigFolder!, HotkeyConfig.FileName),
                 HotkeyConfig.ConfigurationName),
         };
-
-        // 数组要跟着启动器"更新时换一份"的行为走。
-        for (int x = 0; x < configurations.Length; x++) {
-            var index = x;
-            configurations[index].ConfigurationUpdated += configurable => {
-                configurations[index] = configurable;
-            };
-        }
-
-        return configurations;
-    }
 
     public Configurator() {
     }

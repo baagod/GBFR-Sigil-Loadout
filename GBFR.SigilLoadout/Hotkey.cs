@@ -89,7 +89,7 @@ internal static class Hotkey {
 
     /// <summary>
     /// 配置热键并启动 message-only 窗口线程。每个 mod 生命周期调一次（Mod.QueueStart 只跑一次）；
-    /// 重新武装一个活着的热键是 UpdateHotkey 的事，线程由 Shutdown 拆掉，所以这里有意不留重入路径。
+    /// 热键读一次配置就定下来（运行期不再改键），线程由 Shutdown 拆掉，所以这里有意不留重入路径。
     /// 别改回"启动时 Process.Start 预热工具进程"：那会触发 .NET fatal（实测）。
     /// </summary>
     internal static void Configure(string modDirectory, int virtualKey, Action<string> log) {
@@ -106,29 +106,6 @@ internal static class Hotkey {
         };
         _hotkeyThread = thread;
         thread.Start();
-    }
-
-    internal static void UpdateHotkey(int virtualKey) {
-        _virtualKey = virtualKey;
-        _wasDown = false;
-        PublishHotkey(virtualKey);
-        if (_messageWindow != IntPtr.Zero) {
-            _hotKeyRegistered = ReregisterHotkey(_messageWindow);
-            _log?.Invoke(
-                _hotKeyRegistered
-                    ? $"Hotkey re-registered to: {HotkeyName(_virtualKey)} (0x{_virtualKey:X2})."
-                    : "Hotkey re-registration failed; fallback polling active.");
-        }
-    }
-
-    /// <summary>
-    /// 用当前虚拟键在消息窗口上重新武装热键；只由 <see cref="UpdateHotkey"/> 调。这里和循环里那次
-    /// 注册都读 <c>_virtualKey</c> 而不是捕获的副本，所以两者中后跑的那个会看到中途换过的键，
-    /// 而注册上的正是它。
-    /// </summary>
-    private static bool ReregisterHotkey(IntPtr window) {
-        UnregisterHotKey(window, HotkeyId);
-        return RegisterHotKey(window, HotkeyId, ModNoRepeat, (uint)_virtualKey);
     }
 
     /// <summary>
@@ -170,9 +147,7 @@ internal static class Hotkey {
             return;
         }
         _hotKeyRegistered = RegisterHotKey(hwnd, HotkeyId, ModNoRepeat, (uint)_virtualKey);
-        // 句柄要排在注册之后发布：UpdateHotkey 一看见非零句柄就会自己再注册一次，抢在注册之前
-        // 发布会让同一对 (窗口, id) 被注册两次——后到的那次失败，把 _hotKeyRegistered 置成 false，
-        // 于是日志谎称"回退轮询生效"（键其实是好的），同一个按键还会走两条路径各启动一次。
+        // 句柄发布出去就等于宣告这对 (窗口, id) 已注册：必须排在注册之后。
         _messageWindow = hwnd;
         _log?.Invoke(
             _hotKeyRegistered

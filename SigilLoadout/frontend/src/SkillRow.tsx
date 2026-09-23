@@ -90,6 +90,12 @@ function ValueSlots({
 
   const vanillaOf = (i: number) => defaults?.[i] ?? 0;
 
+  // 步进：没碰过的槽从游戏自己的数值起步，步进会替换掉半输入的内容（从那一刻起这个框要的就是数字）。
+  const step = (index: number, delta: -1 | 1) => {
+    setHalfTyped(({ [index]: _dropped, ...rest }) => rest);
+    onChange(withSlot(values, index, stepValue(values[index] ?? vanillaOf(index), delta)));
+  };
+
   /*
     滚轮让聚焦的框步进，而列表不能跟着滚——监听器为什么必须是原生的、passive: false 的，
     以及最新数值从哪来，见 useWheelStep。
@@ -108,10 +114,7 @@ function ValueSlots({
         target,
       );
       if (index < 0) return;
-      // 没碰过的槽从游戏自己的数值步进，那正是框里显示的东西。
-      const from = values[index] ?? defaults?.[index] ?? 0;
-      setHalfTyped(({ [index]: _dropped, ...rest }) => rest);
-      onChange(withSlot(values, index, stepValue(from, delta)));
+      step(index, delta);
     },
   );
 
@@ -169,10 +172,7 @@ function ValueSlots({
               if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
               // 否则方向键会把光标移到框的末尾，在一个可滚动的列表上还会顺手把列表也滚了。
               e.preventDefault();
-              // 没碰过的槽从游戏自己的数值步进，那正是它显示的东西。
-              const from = values[i] ?? vanillaOf(i);
-              setHalfTyped(({ [i]: _dropped, ...rest }) => rest);
-              onChange(withSlot(values, i, stepValue(from, e.key === "ArrowUp" ? 1 : -1)));
+              step(i, e.key === "ArrowUp" ? 1 : -1);
             }}
             /*
               裸文本，不是输入域：没有边框、没有底色、没有焦点环。整行读起来就是一行用 |
@@ -318,10 +318,6 @@ export function SkillRow({
   isOpen: boolean;
   ctx: RowContext;
 }) {
-  // 父行说的是"这一整行显示的等级"，不是"碰巧存在几条记录"——规则本身在 skills.ts 里，
-  // 半选态才因此可能出现（11 个等级只开 1 个 = 半选）。
-  const state = parentState(row.levels, row.byLevel);
-
   if (row.levels.length === 1) {
     return (
       <LevelRow
@@ -338,6 +334,9 @@ export function SkillRow({
     父行代表整个因子，自己没有等级，所以它读因子的概要：游戏对整个因子的那句话，而不是某个
     等级的措辞。它下面的各等级行仍保留各自等级的说明。
   */
+  // 父行说的是"这一整行显示的等级"，不是"碰巧存在几条记录"——规则本身在 skills.ts 里，
+  // 半选态才因此可能出现（11 个等级只开 1 个 = 半选）。单等级那条早返回用不到它，所以放在这里。
+  const state = parentState(row.levels, row.byLevel);
 
   return (
     <>
