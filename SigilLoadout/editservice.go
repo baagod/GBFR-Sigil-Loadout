@@ -6,13 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // LevelValueCount 是 skill_status 一行所带的 LevelValue 参槽数量，也就是一次编辑需要几个数字。
@@ -44,12 +40,10 @@ const saveFailedEvent = "GBFR.SigilLoadout.SaveFailed"
 
 // EditService 是 Wails 暴露给前端的后端。
 //
-// 它还保管着防抖尚未写出的那份列表：每次 SaveEdits 都替换列表并重启定时器，所以落盘的永远是
-// 屏幕上最后的状态，绝不会是若干次按键的混合。
+// 落盘是防抖的：SaveEdits 把列表交给 debouncedWriter，编辑停下来之后才写出，所以落盘的永远是屏幕上
+// 最后的状态，绝不会是若干次按键的混合。
 type EditService struct {
-	mu      sync.Mutex
-	pending []SigilSkill
-	timer   *time.Timer
+	writer debouncedWriter[[]SigilSkill]
 }
 
 // LangZH 是被问到一种没有对应表的语言时回退使用的语言。
@@ -230,19 +224,11 @@ func (s *EditService) SaveEdits(edits []SigilSkill) error {
 		edits[i].Values = padValues(edits[i].Values)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.pending = edits
-	if s.timer == nil {
-		s.timer = time.AfterFunc(debounceDelay, s.flush)
-	} else {
-		s.timer.Reset(debounceDelay)
-	}
+	s.writer.submit("sigil edit", writeEdits, edits)
 	return nil
 }
 
-// writeEdits 把列表写到 mod 读它的地方。edits 一定非 nil：唯一调用方 publishLocked 在 nil 时
-// 就已经返回（那里是"没有待写的东西"）。
+// writeEdits 是 EditService 的落盘动作（debouncedWriter 的 write），把列表写到 mod 读它的地方。
 func writeEdits(edits []SigilSkill) error {
 	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))
 	if err != nil {
@@ -252,48 +238,5 @@ func writeEdits(edits []SigilSkill) error {
 	return writeFileAtomic(configPath(), cfgBytes)
 }
 
-// flush 是防抖触发时执行的：编辑已经停止，所以列表发出去。
-// 列表是被取走而不是被读取：随后的关闭流程再取一次就什么也找不到、不会写第二遍，而在取走之后
-// 才触发的定时器也没有东西可发。
-func (s *EditService) flush() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.publishLocked()
-}
-
-// flushNow 立即写出待写的列表，用于关闭流程：窗口可能在防抖窗口内就关掉，而刚敲下的这次编辑
-// 才是用户想留下的。防抖已经写过的列表不再处于待写状态，所以这里什么也找不到，也就什么都不会写。
-func (s *EditService) flushNow() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.timer != nil {
-		s.timer.Stop()
-	}
-	s.publishLocked()
-}
-
-// publishLocked 是列表离开这个可视工具的唯一出口；调用方持有 s.mu。
-//
-// 取走列表和写盘必须在同一个临界区里：分开的话 flush 与 flushNow 可以各取到一份并发地写，而
-// 决定磁盘内容的是最后完成的那个 rename，不是最后提交的那份状态——旧列表可能盖住新列表。
-//
-// 写失败就把列表放回待写（锁在身上，待写必然是空的），并推给前端：这里的失败没有调用方可以回溯，
-// 而一次瞬时 IO 失败（杀软、mod 正好在读这个文件）不该变成永久丢失——下一次防抖或退出时的
-// flushNow 就是重试；一份从未到达磁盘的列表，看起来和 mod 什么都不做一模一样。
-//
-// 成功时什么都不用再做：mod 每 250ms 看一次这个文件的 mtime（SigilEditorFeature.Tick）。
-func (s *EditService) publishLocked() {
-	edits := s.pending
-	s.pending = nil
-	if edits == nil {
-		return
-	}
-	if err := writeEdits(edits); err != nil {
-		s.pending = edits
-		log.Printf("sigil edit: %v", err)
-		// 测试里 application.Get() 是 nil，没有前端可通知。
-		if app := application.Get(); app != nil {
-			app.Event.Emit(saveFailedEvent, err.Error())
-		}
-	}
-}
+// flushNow 见 debouncedWriter：关闭流程要的正是同一个实例（main.go 的 OnShutdown）。
+func (s *EditService) flushNow() { s.writer.flushNow() }

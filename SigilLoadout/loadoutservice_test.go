@@ -116,39 +116,8 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read dir: %v", err)
 	}
-	// 只允许目标文件与它的一代备份；中转文件绝不能留下。
-	for _, entry := range entries {
-		if name := entry.Name(); name != loadoutFileName && name != loadoutFileName+".bak" {
-			t.Errorf("unexpected file beside loadout.json: %s", name)
-		}
-	}
-}
-
-/* 覆盖是原子的，所以旧内容事后无处可寻——一代备份就是把它留下来的地方（真丢过一次）。 */
-func TestSaveLoadoutKeepsThePreviousGeneration(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("LOCALAPPDATA", dir)
-	svc := &LoadoutService{}
-	first := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
-	second := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","hash":"9A60FBF0","level":10}],"enabled":true}]}`
-	if err := svc.SaveLoadout(first); err != nil {
-		t.Fatalf("first save: %v", err)
-	}
-	svc.flushNow()
-	backup := filepath.Join(dir, userCfgDirName, loadoutFileName+".bak")
-	if _, err := os.Stat(backup); !os.IsNotExist(err) {
-		t.Fatalf("the first write has no previous generation to keep (stat err=%v)", err)
-	}
-	if err := svc.SaveLoadout(second); err != nil {
-		t.Fatalf("second save: %v", err)
-	}
-	svc.flushNow()
-	previous, err := os.ReadFile(backup)
-	if err != nil {
-		t.Fatalf("read backup: %v", err)
-	}
-	if string(previous) != first {
-		t.Errorf("backup = %q, want the previous generation %q", previous, first)
+	if len(entries) != 1 || entries[0].Name() != loadoutFileName {
+		t.Errorf("unexpected files beside loadout.json: %v", entries)
 	}
 }
 
@@ -234,8 +203,8 @@ func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 		t.Errorf("stored config = %q, want %q", raw, current)
 	}
 	// 待写是被取走而不是被读取的：第二次 flushNow 找不到东西，也就不会写第二遍。
-	if svc.pending != nil {
-		t.Errorf("flushNow left something pending: %q", svc.pending)
+	if svc.writer.pending != nil {
+		t.Errorf("flushNow left something pending: %q", *svc.writer.pending)
 	}
 }
 

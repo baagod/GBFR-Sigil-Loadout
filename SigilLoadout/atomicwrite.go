@@ -32,22 +32,8 @@ func writeFileAtomic(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
-	keepPreviousCopy(path)
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("replacing %s: %w", path, err)
 	}
 	return nil
-}
-
-// keepPreviousCopy 把即将被替换的那份留成 <name>.bak。
-//
-// 用户配置是手工攒出来的，而覆盖是原子的：旧内容事后无处可寻（2026-09-23 一次由 bug 引起的清空就
-// 毁掉了一份完整的配装）。只读+写副本、不把旧文件 rename 走——mod 每 250ms 读一次这个文件，rename
-// 会让它短暂看不到目标。备份失败不阻止写入：它是安全网，不是前置条件。
-func keepPreviousCopy(path string) {
-	previous, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-	_ = os.WriteFile(path+".bak", previous, 0o644)
 }

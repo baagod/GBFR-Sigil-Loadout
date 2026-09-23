@@ -44,8 +44,7 @@ export default function App() {
   const [sigils, setSigils] = useState<Sigil[]>([])
   const [slots, setSlots] = useState<Slot[]>([])
   // 配置读回来了没有。没读回来就**绝不写盘**：读取失败时槽位被铺成空数组（见加载那段的
-  // setSlots(pad12([]))），此刻任何一次编辑交出去的都是"所有配装都空"，而保存是整体替换——
-  // 磁盘上那份完整的配置会被清掉（2026-09-23 真丢过一次）。
+  // setSlots(pad12([]))），此刻交出去的载荷会把磁盘上那份完整的配置整体替换掉。
   const [loadoutRead, setLoadoutRead] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [tab, setTab] = useState<TabKey>("general")

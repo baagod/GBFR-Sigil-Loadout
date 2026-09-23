@@ -2,17 +2,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	jsonv2 "encoding/json/v2"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // MaxSlots 只限制**启用**的槽数，与托管侧校验器（LoadoutConfig.ParseAndValidate）一致。
@@ -24,11 +19,9 @@ const MaxSlots = 12
 // { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] }——只认这一种形状，
 // 别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
-	// 写盘只有 SaveLoadout 这一个出口，它保管着防抖尚未写出的那份配置：每次调用都替换这份并重启
-	// 定时器，落盘的永远是屏幕上最后的状态。与 EditService 同一套契约（同样 500ms + flushNow）。
-	mu      sync.Mutex
-	pending []byte
-	timer   *time.Timer
+	// 落盘是防抖的，与 EditService 同一套骨架（debouncedWriter）：每次调用都替换待写并重启定时器，
+	// 落盘的永远是屏幕上最后的状态。
+	writer debouncedWriter[[]byte]
 }
 
 // MinimiseApp 把窗口假隐藏到托盘（alpha 0，WebView 保持活着），好让游戏内热键一按就回来。
@@ -244,47 +237,14 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 		return err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.pending = []byte(config)
-	if s.timer == nil {
-		s.timer = time.AfterFunc(debounceDelay, s.flush)
-	} else {
-		s.timer.Reset(debounceDelay)
-	}
+	s.writer.submit("loadout", writeLoadoutFile, []byte(config))
 	return nil
 }
 
-func (s *LoadoutService) flush() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.writeLocked()
+// writeLoadoutFile 是 LoadoutService 的落盘动作（debouncedWriter 的 write）。
+func writeLoadoutFile(payload []byte) error {
+	return writeFileAtomic(filepath.Join(userCfgDir(), loadoutFileName), payload)
 }
 
-// flushNow 供关闭流程用：窗口可能在防抖窗口里就关掉，而刚做的那次编辑才是用户想留下的。
-func (s *LoadoutService) flushNow() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.timer != nil {
-		s.timer.Stop()
-	}
-	s.writeLocked()
-}
-
-// writeLocked 取出待写的那份并原子落盘；取走而不是读取，关闭流程因此不会写第二遍（调用方持有 s.mu）。
-func (s *LoadoutService) writeLocked() {
-	payload := s.pending
-	s.pending = nil
-	if payload == nil {
-		return
-	}
-	if err := writeFileAtomic(filepath.Join(userCfgDir(), loadoutFileName), payload); err != nil {
-		// 放回待写：一次瞬时 IO 失败不该变成永久丢失，下一次防抖或退出时的 flushNow 就是重试。
-		s.pending = payload
-		log.Printf("loadout: %v", err)
-		// 这个失败已经没有调用方可以返回，只能推给前端（与 EditService 同一个事件）。
-		if app := application.Get(); app != nil {
-			app.Event.Emit(saveFailedEvent, err.Error())
-		}
-	}
-}
+// flushNow 见 debouncedWriter：关闭流程要的正是同一个实例（main.go 的 OnShutdown）。
+func (s *LoadoutService) flushNow() { s.writer.flushNow() }

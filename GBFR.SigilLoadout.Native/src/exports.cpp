@@ -4,9 +4,8 @@
 
 using namespace gbfr::native;
 
-// ABI 边界：异常绝不能跨出 extern "C"——契约（native_api.h）里没有这一项，抛出去就是 std::terminate
-// 带走游戏。可能抛的导出都从这里走：throw 变成"拒绝值 + 一行原因"。Log 自己是 noexcept，所以在这里
-// 记录原因是安全的；GetAbiVersion / SetLogCallback 证得了不会抛，不走这条。
+// ABI 边界：异常绝不能跨出 extern "C"（契约里没有这一项，抛出去就是 std::terminate 带走游戏）。
+// 可能抛的导出都从这里走：throw 变成"拒绝值 + 一行原因"。Log 是 noexcept，所以这里记录原因安全。
 template <typename Fn, typename T>
 T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
    try {
@@ -27,7 +26,7 @@ void GBFR20_CALL GBFR20_SetLogCallback(GBFR20_LogCallback callback) {
 }
 
 int32_t GBFR20_CALL GBFR20_Initialize() {
-   // EnsureInitialized 会分配、加锁，所以整条走守卫：抛了就是"没初始化成功"（0）。
+   // EnsureInitialized 会分配、加锁，抛了就是"没初始化成功"（0）。
    return GuardAbi("GBFR20_Initialize", int32_t{0}, [] {
       if (g_shutting_down.load(std::memory_order_acquire))
          return int32_t{0};
@@ -155,7 +154,7 @@ static int32_t WriteSkillStatusTableEntry(const uint8_t* table, uint32_t length)
 }
 
 int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t length) {
-   // 守卫里的兜底取 -7：它是"写之后"的码，语义上最保守（表可能只更新了一部分）。
+   // 兜底取 -7：它是"写之后"的码，最保守（表可能只更新了一部分）。
    return GuardAbi("GBFR20_WriteSkillStatusTable", GBFR20_TABLE_WRITE_FAILED, [&] {
       return WriteSkillStatusTableEntry(table, length);
    });

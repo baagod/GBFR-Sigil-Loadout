@@ -25,8 +25,8 @@ int GetExpandedInternalSlotCount() noexcept {
    return kNativeInternalSlotCount + GetVirtualSlotCount();
 }
 
-// 日志绝不允许抛：所有失败路径都在用它、catch 块里也在用它，而它自己抛出去就会顺着 ABI 边界炸掉
-// 游戏。所以格式化失败退化成不带时间戳的原文；宿主的回调单独兜（那是宿主自己的代码）。
+// 日志绝不允许抛：所有失败路径和 catch 块都在用它，它自己抛出去会顺着 ABI 边界炸掉游戏。所以格式化
+// 失败退化成不带时间戳的原文，宿主的回调单独兜（那是宿主的代码）。
 void Log(const std::string& message) noexcept {
    try {
       SYSTEMTIME time{};

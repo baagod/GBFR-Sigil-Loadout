@@ -172,12 +172,8 @@ bool TryGetRuntimeSlot(
       out = entry.slots[static_cast<size_t>(virtual_slot)];
       return out.gem_id != 0;
    }
-   catch (const std::exception& ex) {
-      Log(std::format("TryGetRuntimeSlot: threw ({}); treated as no gem in this slot.", ex.what()));
-      return false;
-   }
    catch (...) {
-      Log("TryGetRuntimeSlot: threw a non-std exception; treated as no gem in this slot.");
+      Log("TryGetRuntimeSlot: threw; treated as no gem in this slot.");
       return false;
    }
 }
