@@ -1,11 +1,8 @@
 ---
 type: architecture
 title: 托管 mod（C# Reloaded 外壳）
-description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 Reloaded 生命周期与 QueueStart 阶段顺序、250ms 维护拍的串行化与失败隔离、日志双汇与文件轮转、热键配置装配与 F1 回退、NativeCore 门面的 DLL 解析与 ABI 尺寸加偏移双检，以及 LoadoutConfig 与 SigilEditorFeature 共用 FileStamp 时的两种版本门语义。
+description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序、250ms 维护拍的单飞串行化与整拍失败隔离、日志双汇与单代轮转、热键配置装配与 F1 回退、NativeCore 门面的 DLL 解析与 ABI 版本＋结构尺寸/偏移双检（含 NativeCore.Interop.cs 的 P/Invoke 面）、LoadoutConfig 与 SigilEditorFeature 共用 FileStamp 的两种版本门语义，以及由 ModConfig.json 推出的两条结论（两个 ModNativeDll* 皆空串、ModVersion 是唯一权威源）。
 tags: [managed-mod, reloaded-ii, lifecycle, maintenance-tick, fail-closed, interop]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
     resource: repo://GBFR.SigilLoadout.Native/native_api.h
@@ -35,11 +32,16 @@ sources:
     resource: repo://GBFR.SigilLoadout/SigilEditorFeature.cs
   - id: openwiki-source-c21d77428c3f8997d73d3c4d
     resource: repo://GBFR.SigilLoadout/UserConfig.cs
+  - id: openwiki-source-202d158ec41182431f814976
+    resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 托管 mod（C# Reloaded 外壳）
@@ -172,7 +174,7 @@ sequenceDiagram
 三条必须记住的约定：
 
 1. **定时器回调不串行。** 上一拍没跑完，下一拍就会进来。代码用一个 `_ticking` 单飞标志（`Interlocked.Exchange`）统一把重叠的拍丢掉，而不是让每个阶段各防一遍——因为三个阶段本来就把"让过去"当正常情况。新增阶段时，它会继承这条语义：**不能假设自己每 250ms 一定被调到一次**。
-2. **整拍外面套 catch-all。** `try { 三个阶段 } catch { } finally { 清标志 }`：维护拍绝不能把进程带走。于是阶段内部的失败只能靠自己的日志说话，不会升级成异常。
+2. **整拍外面套 catch-all。** `try { 三个阶段 } catch { } finally { 清标志 }`：维护拍绝不能把进程带走。于是阶段内部的失败只能靠自己的日志说话，不会升级成异常——单次失败因此被隔离在阶段内部（`LoadoutConfig` 记 `Invalid loadout.json; kept previous configuration`、`SigilEditorFeature` 记自己那几行、`Hotkey` 只是不再采样），不会有任何一条失败路径跳过清理或升级成启动失败。
 3. **250ms 只是投递节奏，不是量。** 数值要到下一场战斗才生效（术语见 `CONTEXT.md` 的"可见"），因子编辑那条路还用 5s 节流与 mtime 门（见第 7 节）。这个数字换掉的是一条阻塞在 `WaitOne` 的线程和一个内核事件对象。
 
 ## 4. `Dispose`：拆除次序与"无条件关停"
@@ -212,11 +214,26 @@ sequenceDiagram
 
 ## 6. `NativeCore`：最小原生核心门面
 
-这个 `internal static unsafe partial class` 分两个文件：`NativeCore.cs` 是门面逻辑，`NativeCore.Interop.cs` 只放 `DllImport` 声明、两个跨 ABI 结构体，以及布局自检。它派生自的那份原始实现里所有 selector / inventory / preset / input / present API 都已删除——**导出面就是本节各步用到的几个函数**，一个不多。
+这个 `internal static unsafe partial class` 分两个文件：`NativeCore.cs` 是门面逻辑，`NativeCore.Interop.cs` 只放 `DllImport` 声明、两个跨 ABI 结构体，以及布局自检。它派生自的那份原始实现里所有 selector / inventory / preset / input / present API 都已删除——**导出映射就是下面这七个，一个不多**：
+
+| `DllImport` 声明 | 在门面里的用途 |
+| --- | --- |
+| `GBFR20_GetAbiVersion` | `Initialize` 的版本握手 |
+| `GBFR20_SetLogCallback` | 挂上/摘掉原生日志回调（`IntPtr`，托管侧自己用 `Marshal.GetFunctionPointerForDelegate` 取函数指针） |
+| `GBFR20_Initialize` / `GBFR20_Shutdown` | 原生核心生命周期 |
+| `GBFR20_CopyRuntimeMessage` | `GetRuntimeMessage` 的两段式回读（`sbyte*` + `uint` 长度） |
+| `GBFR20_ApplyLoadout` | 通用槽数组 + 专属开关数组各带一个 `uint` 计数 |
+| `GBFR20_WriteSkillStatusTable` | `WriteSkillStatusTable` 的 `fixed` 指针封装 |
+
+三条刻意的约定：
+
+- **库名只有一个来源。** 每个声明的 `DllImport(LibraryName)` 用的都是 `LibraryName = "GBFR.SigilLoadout.Native.dll"` 这个常量，与 `Configure` 拼绝对路径、`ResolveLibrary` 认的名字同源；声明上带 `ExactSpelling = true` 与 `CallingConvention = Cdecl`（对应 `native_api.h` 的 `GBFR20_CALL`），没有 `.def` 文件，也没有 `EntryPoint` 重命名。
+- **两个跨 ABI 结构体都标 `Pack = 1`**，与 `native_api.h` 的 `#pragma pack(push, 1)` 对应。`ExclusiveOverrideNative` 在托管侧把三个保留字节写成 `Reserved0..2` 三个字段（C# 声明不了 `uint8_t reserved[3]`）：偏移断言只到 `Disabled` +0x08，而**尺寸 0x0C 正是这三个字段补出来的**。
+- **数组参数交给封送器**：`ApplyLoadout` 把托管数组与 `(uint)数组长度` 一起交出去，空的一半传 `null` + 0（语义见 6.5 节）。
 
 ### 6.1 DLL 路径绑定与解析
 
-原生 DLL **不**由启动器加载（`ModConfig.json` 的两个 `ModNativeDll*` 都是空串），而是这一层自己按绝对路径 `mod目录\GBFR.SigilLoadout.Native.dll` 加载：
+原生 DLL **不**走启动器的 native 通道：`ModConfig.json` 的两个 `ModNativeDll*`（32 位与 64 位）都是空串，所以启动器不会加载它；这一层自己按绝对路径 `mod目录\GBFR.SigilLoadout.Native.dll` 调 `NativeLibrary.Load` 加载：
 
 - `Configure(modDirectory)` 只做两件事：算出绝对路径存进 `_libraryPath`，以及**一次**注册 `NativeLibrary.SetDllImportResolver`（`Interlocked.Exchange(ref _resolverConfigured, 1)`）。已经绑定到**另一个**路径再调一次会抛 `InvalidOperationException`——这条闸判的是"同一个进程里这份门面只服务一个 mod 目录"。
 - `ResolveLibrary` 只认 `LibraryName` 这一个名字，命中后缓存 `_libraryHandle`（后续 P/Invoke 复用）；`_libraryPath` 为空或文件不存在时抛 `DllNotFoundException`，消息里带路径。
@@ -259,7 +276,7 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 
 ### 6.3 ABI 尺寸 + 偏移双检：为什么两样都要
 
-`NativeCore.AbiVersion = 20` 与原生返回的版本号比对，只挡得住"加载到旧 DLL"。真正跨过 ABI 的是**封送器写出去的字节**，所以 `EnsureAbiLayout` 再对拍一遍：
+`NativeCore.AbiVersion = 20` 与原生返回的版本号（`native_api.h` 的 `GBFR20_ABI_VERSION`）比对，只挡得住"加载到旧 DLL"。真正跨过 ABI 的是**封送器写出去的字节**，所以 `EnsureAbiLayout` 再对拍一遍：
 
 | 结构体 | 期望尺寸 | 逐字段偏移 |
 | --- | --- | --- |
@@ -309,12 +326,21 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - `LoadoutConfig` 是**单次应用**：失败时内存里还留着上一份有效配置，"这一版处理过了"是合理的说法，于是 `Changed()` 当场认领最省事——同一份坏配置每 250ms 重试一次只会把同一个报错灌满日志。错误原因照常报，去重靠"版本变了才说"。
 - `SigilEditorFeature` 的失败是**一个字节都没写**：原生拒写时所谓"上一份"并不是一份可用的新配置，认领等于宣告编辑已生效——编辑会静默丢失且不再重试。所以判据只在 `Publish` 里原生**确实改写了行**之后才由 `MarkApplied` 推进。`FileStamp` 把"取 mtime + 比对 + 认领"收在一处，正是为了让"先认领、再干活"不可能被写反。
 
-`FileStamp` 与 `UserConfig` 的其他约定（`NoFile` = 1601-01-01 与初值 0001-01-01 不同，于是"删了文件"是一版真实的变更；1 MiB 上限；两道门的完整流程图；两个文件的成员级契约）见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。这里只补两条**托管侧**的推论：
+`FileStamp` 与 `UserConfig` 的其他约定（`NoFile` = 1601-01-01 与初值 0001-01-01 不同，于是"删了文件"是一版真实的变更；1 MiB 上限；两道门的完整流程图；两个文件的成员级契约）见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。这里只补三条**托管侧**的推论：
 
 - **文件不存在是一条真实答案，不是错误。** `LoadoutConfig.TryApply` 在 `mtime == UserConfig.NoFile` 时调 `ApplyLoadout(null, null)` 恢复内置模板并**提前 return**——少了这个 return 就会落到后面的读取上，`new FileInfo(...).Length` 必抛，每局多一条假的"保留上一份"。因子编辑那条路把"列表被删掉"读成空列表，于是把未编辑的表发布回去（撤销全部编辑）。
+- **这三个跨语言常量都住在 `LoadoutConfig.cs`**：`MaxSlots = 12`（只数启用的槽；视觉工具与 Go 各自还有一处声明）、`DefaultLevel = 15`（载荷漏写 `level` 时的回落）、`UnwornCharacterHash = 0x887AE0B0`（副技能"未选择"的哨兵，原生 `native_internal.h` 另有一处）。三组都由 `SigilLoadout/sharedconstants_test.go` 对拍——值漂了不会编译失败，只会表现成"存盘成功、游戏里什么都没变"或槽位错位。
 - **这两个文件有意不实现任何 Reloaded 配置接口**：那会让启动器多出一个渲染不了列表的 "Mod configuration" 窗口。所以 `Config` 是纯数据（数据形状与成员名见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)），而热键那份配置走另一套（第 8 节）。
 
+`LoadoutConfig` 的映射本身只认一种形状：`slots[].items[0]` 是因子（`gem` → `GemId`、`hash` → `Skill1`、`level` → 同时写 `Skill1Level` 与 `SigilLevel`），`items[1]` 可选（`hash` → `Skill2`、`level` → `Skill2Level`）；没有副技能时 `Skill2` 填上面那个哨兵、等级 0。`exclusive` 只把值为 `false` 的项变成 override（"没说"就是"开着"），外层键解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` 并忽略——PL 码是可视工具显示用的标签，不是这里的身份。
+
 `SigilEditorFeature` 的生命周期完全寄生在宿主上：它没有自己的日志、配置目录、文件监听或调度器，状态推进由 `Mod` 的维护拍驱动——未接上 `IDataManager` 时每拍重试 `Bootstrap`（只在第一次没拿到时说一句），并且**构造与启动不受 `hooksReady` 影响**。它自己的 `Dispose` 只置 `_stopped`，因为宿主的定时器回调不保证已经跑完；`Apply` 每次开头读这个标志，已卸载就不再动游戏内存。这条"卸载之后还可能有一拍"的风险由共享的并发约定兜住，见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
+
+那条确认生效后才推进的版本门还配了三处细节，缺一个就会退化成"每 250ms 白干一遍"或"用新版本号标记旧内容"：
+
+- **拒写留下候选**：原生返回 `< 0` 时把这一版建好的表存进 `_retryTable`/`_retryTableStamp`，同一版本重试直接复用它，不必再从归档重建（328 KB 读 + 逐行比较）；
+- **逐字节相同的捷径**：新表与已发布的那份相同时什么都不做，但会 `MarkApplied`——内存里已经是这一版的字节，这一版确实处理完了；不标记的话 `Pending` 永远为真，而这条捷径又让 Tick 的"同版本"节流条件失效；
+- **版本号必须先取**：`Bootstrap` 在读取列表与建表**之前**取 mtime，建完表再复查一次；反过来就会拿 T4 的版本号去标记 T1 的内容（内存里是旧内容而编辑静默丢失），中途变了就什么都不写、也不推进版本，交给下一拍。
 
 ## 8. 热键配置装配与回退
 
@@ -323,6 +349,8 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - `Configuration/Configurator.cs` 实现 `IConfiguratorV3`，只暴露一个条目 `HotkeyConfig`（`Configurations[0]`），`TryRunCustomConfiguration()` 返回 `false`——启动器按属性表渲染，没有自定义窗口。`Migrate` 是**空实现**：这份配置只有一个文件、路径每次都由启动器传进来，没有要搬的状态。
 - `Mod.InitializeHotkeyConfiguration` 自己 `new Configurator(loader.GetModConfigDirectory(ModId))` 取 `VirtualKey`，然后 `Hotkey.Configure(modDirectory, virtualKey, Log)`。注意这里有**两份对象、两次读盘**：启动器那一份只用于渲染与保存，托管这一份只为拿一个整数。
 - 任何异常（目录无效、文件读不出来、强转失败）都落到同一句日志：`Hotkey configuration unavailable: …; falling back to the default F1 hotkey.`，然后以 `OverlayHotkey.F1` 配置。fallback 的路径与正常路径**共用同一个 `Hotkey.Configure`**，所以"配置页坏了"不会让热键消失。
+
+`HotkeyConfig` 自己就是这份配置的形状：`FileName = "HotkeyConfig.json"`、`ConfigurationName = "Hotkey / 快捷键"`，唯一的用户可见属性 `MenuHotkey` 带 `[DefaultValue(OverlayHotkey.F1)]` 且初值就是 F1；`OverlayHotkey` 只列 F1..F12 与 Insert / Delete / Home / End（后四个带 `[Display(Name = …)]`，因为启动器表格按枚举名显示）。文件路径不写在类里：`Configurator` 用启动器给的 `ConfigFolder` 调 `HotkeyConfig.FromFile(...)`，基类 `Configurable<TParentType>.ReadFrom` 在文件不存在时 `new` 一个默认实例，并把路径与 `Save` 回调装回对象——所以"第一次启动"与"文件在"是同一个形状，而保存只是把该路径用带 `JsonStringEnumConverter` / `WriteIndented` 的 `SerializerOptions` 写回去。
 
 `HotkeyConfig.VirtualKey` 是这一层最容易看漏的一处：
 
@@ -349,13 +377,13 @@ public int VirtualKey =>
 | `TargetFramework = net8.0-windows`、`AllowUnsafeBlocks = true` | 前者决定了启动器必须带 .NET 8 运行时；后者只服务于 `NativeCore.Interop.cs` 的指针封送 |
 | `Reloaded.Mod.Interfaces 2.5.0`，`ExcludeAssets="runtime"` | 接口类型由启动器在运行期提供，**不随包发布**：托管程序集只有 `GBFR.SigilLoadout.dll` 自己（`bin\Release` 与 `dist\GBFR.SigilLoadout` 里都没有这两份接口 DLL） |
 | `gbfrelink.utility.manager.Interfaces 1.2.0`，`ExcludeAssets="runtime"` | 数据管理器的接口同理；仓库里没有它的源码或程序集，所以"控制器未注册时 `GetController<T>()` 返回空弱引用还是抛异常"在本仓库内看不到（明确的验证缺口，见 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)） |
-| `EnableSourceLink=false`、`IncludeSourceRevisionInInformationalVersion=false`、刻意不写 `<Version>` | 发布 DLL 的元数据里不留 VCS 信息；`ModConfig.json` 是版本号的唯一权威源，`csproj` 不再造第二处 |
+| `EnableSourceLink=false`、`IncludeSourceRevisionInInformationalVersion=false`、刻意不写 `<Version>` | 发布 DLL 的元数据里不留 VCS 信息（`build-release.ps1` 给 Go 加 `-buildvcs=false` 是同一个理由）；`ModConfig.json` 的 `ModVersion` 是版本号的唯一权威源，`csproj` 不再造第二处，发布脚本会拿它与 `-Version` 参数、前端 `package.json` / `package-lock.json` 逐处对拍 |
 | 通配 `..\SigilLoadout\assets\*` 与 `Link` 原生 DLL | 打包用的就是本工程的输出目录，所以随包资产与原生 DLL 靠这里拷进去（`assets\` 只被可视工具读，托管侧不读） |
 
 两条与"验证"有关的实情，改动前必须知道：
 
 - **托管侧（C#）没有测试工程。** 仓库的自动化测试集中在可视工具那一侧（Go 的 `SigilLoadout/*_test.go`、前端测试）与 C++ 的 `tests/NativeLayoutHarness`（离线跑原生布局解析与 fail-closed）；C# 这一半的正确性靠运行期日志与人工验证，门禁只覆盖"构建通过"（`tools/build-release.ps1` 跑 `dotnet restore/clean/build`）。
-- **`NativeCore.AbiVersion` 与 `GBFR20_ABI_VERSION` 这一对没有门禁。** 托管侧的 `20` 是一处字面量，原生侧的 `20` 是另一处，发布脚本的门禁只有版本号对拍与"一个包该有哪些文件"的清单，没有任何脚本或测试比对这两个数。它俩漂了只会在运行期表现成 `ABI mismatch` → 钩子不装（fail-closed，游戏照常）。改 ABI 必须同时改 `native_api.h`、`NativeCore.AbiVersion`、`EnsureAbiLayout` 的期望尺寸与偏移，以及 `NativeCore.Interop.cs` 里的结构体字段顺序。
+- **`NativeCore.AbiVersion` 与 `GBFR20_ABI_VERSION` 这一对没有门禁。** 托管侧的 `20` 是一处字面量，原生侧的 `20` 是另一处；发布脚本的门禁覆盖版本号的多处对拍、随包文件清单、`sigils.json` 的新鲜度与离线布局回归，但没有任何脚本或测试比对这两个数。它俩漂了只会在运行期表现成 `ABI mismatch` → 钩子不装（fail-closed，游戏照常）。改 ABI 必须同时改 `native_api.h`、`NativeCore.AbiVersion`、`EnsureAbiLayout` 的期望尺寸与偏移，以及 `NativeCore.Interop.cs` 里的结构体字段顺序。
 
 ## 10. 改这里之前的检查清单
 

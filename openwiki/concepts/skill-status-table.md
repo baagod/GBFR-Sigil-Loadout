@@ -3,10 +3,9 @@ type: concept
 title: skill_status 表与活表写入闸门
 description: 唯一被真正改写的游戏数据表：8 字节行数头 + 52 字节行的布局与两侧声明、托管侧按 (Key, Level) 打行、原生侧从语义锚点解出游戏发布该表的固定槽并原地写活表、写前五道 fail-closed 闸门与 -1..-7 拒绝码，以及为什么删掉了全内存扫描兜底。
 tags: [skill-status-table, live-table, fail-closed, semantic-anchors, sigil-loadout]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
+  - id: openwiki-source-39c3295efc089133e87a9c80
+    resource: repo://CONTEXT.md
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
     resource: repo://GBFR.SigilLoadout.Native/native_api.h
   - id: openwiki-source-12f2ddddaa65ce032d15e738
@@ -29,12 +28,12 @@ sources:
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T18:50:59.007Z" }
 ---
 
 # skill_status 表与活表写入闸门
 
-`skill_status`（仓库术语表 `CONTEXT.md` 里的**技能表**）是这套 mod 唯一被真正改写的游戏数据表——其余写内存的地方只有两条技能循环上限立即数与钩子字节（见 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）。它的形状是：
+`skill_status` 是这套 mod 唯一被真正改写的游戏数据表——词表 `CONTEXT.md` 里的**活表**指的就是它："游戏已经解析好、正在用的那份技能表。不是文件里的那一份"（本页全篇只用这个词义：从归档读出来的那份是候选，游戏手里那份才是活表）。其余写内存的地方只有两条技能循环上限立即数与钩子字节（见 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）。它的形状是：
 
 ```
 system/table/skill_status.tbl
@@ -117,15 +116,14 @@ system/table/skill_status.tbl
 
    为什么要配一个窗口：这两条指令在 2.0.6 里全段分别出现 37 处和 23 处（同一个函数里每一张表都有一份），只有落在行循环锚点**前面**的那一对属于 `skill_status`。实测真实距离 `0xCA`（load）与 `0xFE`（store）；隔壁 `skill.tbl` 那一对在 `0x836` / `0x86E`，正好在窗口外。取 `0x800` 是"真实距离 8 倍余量 + 刚好把隔壁挡出去"。
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Parse error on line 7: ..." -> G{"两者都在可写映像段内"] G - "否" -> F Expecting 'DIAMOND_STOP', 'TAGEND', 'UNICODE_TEXT', 'TEXT', 'TAGSTART', got 'SQE' -->
-```text
+```mermaid
 flowchart LR
     A["kRowLoopSetup 12 字节：imul rdi,rsi,0x34 + add rdi,rbx + vxorps"] --> B["全 .text 恰好 1 处：skill_status 的行循环"]
     B --> C["锚点前 0x800 窗口内各恰好 1 处：kBufferPointerLoad 与 kSlotBaseStore"]
     C --> D["DecodeRipTarget 解两组 disp32"]
     D --> E{"buffer_pointer_rva == slot_rva + 8"}
     E -- "否" --> F["未解析：此后所有写入都拒 -2"]
-    E -- "是" --> G{"两者都在可写映像段内"]
+    E -- "是" --> G{"两者都在可写映像段内"}
     G -- "否" --> F
     G -- "是" --> H["g_slot_rva 发布槽首 RVA"]
     H --> I["每次写入：从 image_base + g_slot_rva + 8 现读缓冲区指针"]

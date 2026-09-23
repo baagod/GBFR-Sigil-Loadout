@@ -3,9 +3,6 @@ type: concept
 title: 语义锚点与布局解析（fail-closed 的核心）
 description: 原生核心如何从游戏 PE 映像里的三条语义锚点 pattern 认出技能循环与 status notifier，再由锚点内偏移、rel32/rip 解码、立即数与对象偏移推出 ResolvedGameLayout 的十个 RVA、两个身份字段偏移与两个原始循环上限字节，并用九条预检字节与 RevalidateGameLayout 逐字节复验；以及解析失败就什么都不装的语义、显式掩码与"0 = 通配"两套约定的坑、和游戏更新后的重导清单。
 tags: [game-layout, semantic-anchors, pattern-scanning, fail-closed, native-core]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
   - id: openwiki-source-12f2ddddaa65ce032d15e738
     resource: repo://GBFR.SigilLoadout.Native/native_internal.h

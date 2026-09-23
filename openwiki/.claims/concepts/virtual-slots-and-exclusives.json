@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:cb3fc3a9491900c3c5ba3bc0e14df572b92049a86d97524139fafafeb0f632ab",
+  "pageVersion": "sha256:9ea18eae719b4c6b541922bce3b463eaa438c56a9ba93612f50bf057b25ed680",
   "claims": [
     {
       "id": "claim_f46ab99b7d9c418d9bc4dae560db80d2",
@@ -369,10 +369,32 @@
           "version": "repo-lines-v1:sha256:18e10d1df9cc0c15da6958bee8041321e9f44b533b7770a574b32213fe96b589:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDhlNjE2ZGE2NGE2NzI0NWMzNWQ5ZTY0YzQ3NmI4ZmQ1YTM2MTlkZjE1MmY4MWQ1NWEyYjEyNTFjYTg5NzRjNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGU0NjJiZDg1ZWEzNTIyODIyYTlhZDNlYjI0MDk5YjAzMmExYjYyN2JlY2ZkN2M1ODMxZTk5MjdkNGJhYzQwZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGJhMTIyNzhlMzZhMzBhY2JjOWYxZWE5N2JlM2RhYjZlNzcwM2M1NDYwZTEwMWUyNWUwMjM4M2ZjNmU4Zjg3MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOThjNjBjNzE3NjQyNTNlMmE1ZGZmNDMxOTgzMDYyODYwNmFlZGNkZmQ2ZmJhNTBlOTYwMjM3ODEzZTUxOTZjMCJ9"
         }
       ]
+    },
+    {
+      "id": "claim_c0b798d56e364091b96a4fc77c6cd7f9",
+      "statement": "读路径的「构建内一致」由 thread_local 快照保证：只有来自两条技能数据循环的扩展槽第一格（slot_index == kNativeInternalSlotCount）会调用 ObserveBuildStart，把 GetSelection(character_hash) 连同 status 地址与 character_hash 一起存进 g_tls_build_selection，本次构建后续所有槽都读这份快照；命中要求 g_tls_build_status 与 g_tls_build_character 同时匹配（status 地址跨角色复用，只比地址不够）。构建循环之外的读取（界面/效果读这份 status）刻意不走快照，直接取当前 store 的 GetSelection，没有第二条路。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L111-L133",
+          "version": "repo-lines-v1:sha256:de62910d5c145d3a56ecafad159e960c7fb511ee073e6629b68c3d220e629f29:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlNjc3ZDJmOGZkOGU3MzgxOWEwNjg1NWFlMTViZTQ2OGQwY2QxMTAwYWIxMjk3MTkxMGEwODc0NDA4YTc1ODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyZGRlNjc0N2ZlNjdiMDYzZWZlNmRkNDUzOTQyZjI0ZTZlMzBmYmE3YzM1ZmRmYzM4MmRmODBhNDBlZmQ1OGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlZjQxNjk0NzM0ZTg1Mjc5OTJlMGE0NWM2MmM5ZmViYjc4ZDFlNThjMTMwZWM2MWJiODAzZmU1NWMyZDY0NmYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L13-L20",
+          "version": "repo-lines-v1:sha256:f0bd30b0087f97b1e502f774162db1f9a7bd427edc7decb4d5dec1ba80f9c0de:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzA0NmFkNjJmNDAyMzBhYWIyMTliMWY2NjllZGJiMWRkNmI4YjZlNjc1YTM5YjcxOTc0ZmFjZmRjMzZkNjY3OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDY2ZGMxZTM0YjExZTc5Zjc1MjFlMDM0YzBmZDc2ZWMyMzE2YzdlMDBlNmU0YjFjMzVjOGQwMDdlNzBjNDg5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzU0OGU0Y2IzYzMzYjVhZjIzZWQwMGZmMmVhYzM3MjNmYmQwNjNjZWZiYTgyYzU5NjcwZWI4MGU2ZmRjNDRmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGY4MmE3NmQzZTMxMzY3ZTg3MTU2ZTQzOGU4Yzk5ZmMxNzAzYjEyYjIxOTQ0ZDZiYWNiM2Y2OTk3MzY4YmYyYSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L177-L186",
+          "version": "repo-lines-v1:sha256:0efd8f5f5710fcfc2af4688549741ba53bbee9be24637eb63c364e55d8c79deb:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwOThhZjlhMzVjMWI0Y2RiMjQ4MzBiZWFmYzk4OWQ0NWM1NTIyNzA3NmI0MDQ0MzdkZmZlMzZkNTUyYzM5YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhOWVjYzFkMDZmM2I1MDhjYmQ5NzhmNzdhNzRkMmQzNWVkYzQ5ODE4YTc5MWYxOTBjNjExNzk3OGExODdkMTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRhOWI1NWYwNWMzNmU0ZGY1MjhkMjRmNjkwOTM3NjA1MWM1YzdlMzYyYTI0ZGFlM2M2ZWQ5ODBkZGNlYmYzMzEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L252-L256",
+          "version": "repo-lines-v1:sha256:6a56ea31837c14721564585b873f56c15b621777b3b1c9161051fd387ae1330c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjU5ZjY3NTc1ODNiNmE4ZmZhOGMxNjRjMzMwZTIyYmM3MTE5M2IyOWQ3YmNhOWUyMjczNGRkYjc1NDVmNjQ4YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjY0OWI0YTE0N2NiYWRhNTFmOTQ1YWNmM2QwZDBjYjg2OTJiMjdmMzA3NDM0OWQxMTliMDY2NmUxYTZkZTdhNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDIzYjg1MWY0ZmY2YjQ2NzYzY2IyZDVlZmIxZDg0NzQzNTliNzA5MDI2YzQyMmQxZDFkZWI2MGNkYTg4ZWFhMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTIxMWQ2NzBlN2IzODllMTlmZmFlOTUzNWM5NTFiYWVlYmRmZWM0YmFhMTI2OTcwODQyZGZkMzRjMzZiN2ZlZCJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T17:28:03.050Z"
+    "at": "2026-09-23T18:50:59.007Z"
   }
 }

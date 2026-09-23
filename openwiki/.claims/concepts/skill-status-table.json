@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:a46ea865462c772f08d14a49beec83e9f558bfc80a025f28a161689be2dc3176",
+  "pageVersion": "sha256:000f03608690219e13cede348f84653855db175cfaae2170e0c2db4498a2a5dc",
   "claims": [
     {
       "id": "claim_e81a24eea809409ab067978cfdf049ad",
@@ -265,10 +265,24 @@
           "version": "repo-lines-v1:sha256:a17a298279f252e0b57d91d0914e06884a228e867372846628fe60a3890933c8:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODcxZGU5NWU1Y2Q3NGQzZWQ5YTJjNDA3NGU5ODNmMzcyY2I1Zjk5Nzk5YjExZTcwMTNiMjEwZjRkOTE3OTkwMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDNmZDMzOGM4M2M2ZDE5NzAwMjM1MDcxYmM2ZmJiYTJhNmJlNDMxYjZlYThkMjRmODA4N2RiNmY4MjI5ZTMyOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWVkNzQxM2RiMzI3NDNkYmQ0YWVlZGQxNmQ1OTE4MmQ2N2FkNjA0ODBmMDY1ZmMyN2VlODk5ZDkxMjI0MDkwMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzBjMWFlYzdkNTE1ZmIzOGQwMmMyNWNiODNjYTRjODZjMzc3NmU4NTUyZDI3ZTUyNDE3MzIyZjA4ZGRlYzA5NCJ9"
         }
       ]
+    },
+    {
+      "id": "claim_85262e9df2e6486ca79ea174f5d181ee",
+      "statement": "本页术语以仓库词表 CONTEXT.md 为准：其中「活表」指的是游戏已经解析好、正在用的那份技能表（不是文件里的那一份），也就是 GBFR20_WriteSkillStatusTable 原地改写的那份拷贝；从归档读出、按 (Key, Level) 打过行的那份表只是交给原生的候选，由托管侧重新注册为对外供给的文件。",
+      "evidence": [
+        {
+          "resource": "repo://CONTEXT.md#L31-L32",
+          "version": "repo-lines-v1:sha256:87e5c7c97d6b2e657f5ca3a52c05521a09444ee5e55998062e43264649933787:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzZlMGMxMmE3Zjg2YTY4MThkZDBhZjFjNTlkOGM1NTI3MmIyNjg0YTAwNzAyNDNiZDA2NDg2ZWJlYzYxOGE0YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzBlYjI2ZGIyNzAwYzM3YzNhNWUxYjRjZDQxNzU2Zjc2MTFjZDYyZTUwMWViMzg5MWRmMzRlYTQ3MTg0YjcyZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjRjOTY3OTk4ZTlmNjZiMDUwMjg4ODBkZGFlYjFhNjFhYjc0MWIwZWIwMWI2NjhiNjY4NzlhMzAyZmFkOTc1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTdkZTNlYzFhZmI4NjdjOGJjNTAxZWE3ZDc2MGMzMDNkMmVhMGMyMWM5YTdjMmU3NGNkNDBhZmQ0YmJiZTA1ZSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_api.h#L73-L88",
+          "version": "repo-lines-v1:sha256:34859c324ec7300c2a20a194ae555e472801e0cffe4e354bd9408aa563f505bc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjZGZlNDAwZjVhZWQ4N2JjYjk1YjU2YzVmMDJhNzhiMjk5ZDNhMjc0ZDFhMGI0OWMwMjlhZTVjZDM3N2UwOGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkyYjMzZTFiMWM5MjkwNGEzN2Q5OWQwZmYwNTYwYWI3ZGQ1YzJkYjg0OGNmY2M2ODVhYjBjOTU2MTRkZWJjNjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5MjVhYTFkYmE2Nzc0ZmRhMWNhMjcwNDkwNDUyMmQ3YzE3ZmQ3ZTRhMjVhMjgzMzgwMDM4NWFjMzdmNDE3ZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhmNzY2NDA5M2EyNmM5MTJhNDM5MDc3YmMxNjI5OWI3ZGVkYjU5NGMxYzIwMTc0MTZlZWIyZDU0OWJhM2E3NTYifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T17:28:03.050Z"
+    "at": "2026-09-23T18:50:59.007Z"
   }
 }

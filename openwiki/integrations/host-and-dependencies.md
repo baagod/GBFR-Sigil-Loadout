@@ -1,11 +1,8 @@
 ---
 type: integration
 title: 宿主与依赖边界（Reloaded-II / 数据管理器）
-description: 托管 mod 外侧的契约：IMod/IModLoader 各成员与 ModConfig.json 各字段在运行期的实际后果、mod 目录 / mod 配置目录 / 用户配置目录三者的分工与生存期、日志落点与轮转规则，以及 gbfrelink.utility.manager 的 IDataManager 作为唯一表来源（GetArchiveFile / AddOrUpdateExternalFile / UpdateIndex）与它缺席时的降级——含"重新注册 + 就地写内存"为什么两件都要做。
+description: 托管 mod 外侧的两条契约：IMod/IModLoader 各成员与 ModConfig.json 每个字段的字面值、运行期后果与填错症状，mod 目录 / mod 配置目录 / 用户配置目录三者的分工与生存期，日志的两个汇与轮转规则，以及 gbfrelink.utility.manager 的 IDataManager 作为唯一表来源（GetArchiveFile / AddOrUpdateExternalFile / UpdateIndex）与它缺席时的降级。
 tags: [reloaded-ii, host-contract, dependencies, directories, logging, data-manager, degradation]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
   - id: openwiki-source-8037e2358a2c4f9b2c722a11
     resource: repo://AGENTS.md
@@ -13,8 +10,8 @@ sources:
     resource: repo://CONTEXT.md
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
     resource: repo://GBFR.SigilLoadout.Native/native_api.h
-  - id: openwiki-source-ac7bb7c2f4a36fd9a94d83f1
-    resource: repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp
+  - id: openwiki-source-c0bed4f5631a52dfcfe51dd3
+    resource: repo://GBFR.SigilLoadout.Native/src/runtime.cpp
   - id: openwiki-source-ede4f5280f3f8882472c077e
     resource: repo://GBFR.SigilLoadout/Configuration/Configurable.cs
   - id: openwiki-source-d9cc925612842aacff93a408
@@ -37,6 +34,8 @@ sources:
     resource: repo://GBFR.SigilLoadout/SigilEditorFeature.cs
   - id: openwiki-source-c21d77428c3f8997d73d3c4d
     resource: repo://GBFR.SigilLoadout/UserConfig.cs
+  - id: openwiki-source-23775c3de52f3ab95a13cb8b
+    resource: repo://README.md
   - id: openwiki-source-47cff6e6e142f07c1c683a7b
     resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-c7e5cf0f4bafb65a385c950e
@@ -45,13 +44,16 @@ sources:
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 宿主与依赖边界（Reloaded-II / 数据管理器）
 
 <!-- openwiki: broken internal link [/openwiki/concepts/skill_status-table.md] file "/openwiki/concepts/skill_status-table.md" does not exist. Fix the href or restore the target, then delete this comment. -->
-托管那一半（`GBFR.SigilLoadout.dll`）自己没有生命周期、没有调度器、也没有读游戏数据的能力：它的生成、驱动、停机全来自 Reloaded-II，它拿到的游戏数据全来自 gbfrelink.utility.manager。本页讲这两条外侧边界的确切条款——**接口成员与清单字段各自在运行期造成什么后果**、**三个目录分别装什么、能不能活过一次更新**、**日志落在哪**、**数据管理器缺席时到底降级成什么样**。单元内部的职责划分见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)，表布局与活表写入闸门的细节见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill_status-table.md)。
+托管那一半（`GBFR.SigilLoadout.dll`）自己没有生命周期、没有调度器、也没有读游戏数据的能力：它的生成、驱动、停机全来自 Reloaded-II，它拿到的游戏数据全来自数据管理器 gbfrelink.utility.manager。本页讲这两条外侧边界的确切条款——**接口成员与清单字段各自在运行期造成什么后果**、**三个目录分别装什么、能不能活过一次更新**、**日志落在哪**、**数据管理器缺席时到底降级成什么样**。单元内部的职责划分见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)，表布局与活表写入闸门的细节见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill_status-table.md)，从一次编辑到游戏内存的完整链路见 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)。
 
 ## 1. 宿主契约：`IMod` 的六个成员
 
@@ -64,13 +66,13 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
 | `CanSuspend()` | `=> false` | 同上；`Suspend()` / `Resume()` 是空实现（代码注释：不会被调） |
 | `Unload()` | `=> Dispose()` | 与 `Disposing` 属性指向同一个幂等实现 |
 | `Disposing` | `=> Dispose` | 启动器在进程拆卸时经由它收尾 |
-| `Start` 的内部流程 | 见图与下表 | 日志 → 原生核心 → 配装 → 热键 → 因子编辑器 → 维护定时器；任何一步抛异常都记一行 `Initialization failed:` 并转 `Dispose()` |
+| `Start` 的内部流程 | 见图与下表 | 日志 → 原生核心 → 配装 → 热键 → 因子编辑特性（`SigilEditorFeature`） → 维护定时器；任何一步抛异常都记一行 `Initialization failed:` 并转 `Dispose()` |
 
 `Dispose()` 的语义值得单独记住，它有一条刻意的"无条件"：
 
 - 先停维护定时器、`_sigilEditor.Dispose()`、`Hotkey.Shutdown()`；
 - 然后**无条件**调 `NativeCore.Shutdown()`，不再被"全都成功之后才置位"的标志门着。理由在代码注释里：`Initialize` 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，之后的每一步都可能抛异常把控制权交到这里；如果这时不关停，失败路径就会把原生钩子留在游戏里。`Shutdown` 自身异常安全（异常被吞）。
-- 最后释放文件日志。
+- 最后把 `_fileLog` 置 `null` 并释放它（见第 4 节：从此只剩启动器那一个日志汇）。
 
 `_disposed` 保证重复调用无副作用。
 
@@ -82,27 +84,46 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
 Startup phase=<name> state=complete|failed elapsed_ms=<n>.
 ```
 
-阶段名依次为 `native-library-load`（DLL 加载与 ABI 握手，归 `NativeCore`）、`native-core`（`GBFR20_Initialize` 的返回值即 `hooksReady`）、`sigil-editor`、`managed-initialize`。钩子没装成不算启动失败：会额外记一行 `Native core loaded without hooks: <消息>`（消息来自 `GBFR20_CopyRuntimeMessage`），其余功能照常——因子编辑器与原生核心无关。
+阶段名依次为 `native-library-load`（DLL 加载与 ABI 握手，归 `NativeCore`）、`native-core`（`GBFR20_Initialize` 的返回值即 `hooksReady`）、`sigil-editor`、`managed-initialize`。钩子没装成不算启动失败：会额外记一行 `Native core loaded without hooks: <消息>`（消息来自 `GBFR20_CopyRuntimeMessage`），其余功能照常——因子编辑特性与原生核心无关。
 
 ## 2. 宿主契约：`ModConfig.json` 逐字段的实际后果
 
-清单文件只有一处，读它的是启动器（外加发布脚本对版本号的对拍）。下表是**代码里真正会受影响的字段**：
+清单文件只有一处，读它的只有两类东西：启动器，以及发布脚本（唯一读到的字段是版本号）。下表的"字面值"一列是当前仓库里的值，"症状"一列回答"填错会看到什么"。
 
-| 字段（值） | 谁读 | 实际后果 |
-| --- | --- | --- |
-| `ModId: "GBFR.SigilLoadout"` | 启动器；代码里以 `Mod.ModId` 常量复现 | 它是 `loader.GetDirectoryForModId(ModId)` 与 `loader.GetModConfigDirectory(ModId)` 的实参，也是 mod 文件夹名。两处字面量漂了就等于问启动器要另一个目录（仓库里没有门禁钉这一对） |
-| `ModDll: "GBFR.SigilLoadout.dll"` | 启动器 | 入口程序集；`csproj` 的 `AssemblyName` 是同一个名字，两处同样没有门禁 |
-| `ModNativeDll64: ""`（两个都空） | 启动器 | 原生 DLL **不**由启动器加载：`NativeCore.Configure(modDirectory)` + `SetDllImportResolver` 按绝对路径 `mod目录\GBFR.SigilLoadout.Native.dll` 自己 `NativeLibrary.Load`。于是 ABI 握手与结构体布局自检都是本仓库自己的事，不走启动器的 native 加载通道 |
-| `ModVersion: "0.6.0"` | `StartEx` 的参数、发布脚本 | 写进会话日志行 `GBFR Sigil Loadout v0.6.0 (ABI 20)`；`build-release.ps1` 把 `ModConfig.json` 当**版本号唯一权威源**，要求与 `-Version`、`SigilLoadout/frontend/package.json`、`package-lock.json` 一致，并在 `dist` 写 `.build-complete` 供 `deploy.ps1` 回查。`csproj` 刻意不写 `<Version>`，所以托管程序集自身的版本与它无关 |
-| `ModName: "GBFR Sigil Loadout (2.0.5)"` | 启动器列表 UI | 不参与任何运行时分支。括号里的 `2.0.5` 是**游戏版本**标签（原生源码注释与提交信息都这样用它），与本 mod 的 `ModVersion` 是两个量，不要"顺手对齐" |
-| `CanUnload: false` | 启动器 | 与 `Mod.CanUnload()` 是同一事实的两份声明（后者才是运行期判据）；仓库里没有门禁钉这一对 |
-| `SupportedAppId: ["granblue_fantasy_relink.exe"]` | 启动器 | 把加载限定在游戏进程内。因此本 mod 的所有文件系统副作用都发生在游戏进程里，而热键那条链（`Process.GetProcessesByName("SigilLoadout")`、`FindWindow`）是跨进程的 |
-| `ModDependencies: []` | 启动器 | 没有硬依赖：缺任何东西都不拦加载 |
-| `OptionalDependencies: ["gbfrelink.utility.manager"]` | 启动器 | 缺管理器**不拦加载**；代码也**不依赖任何加载顺序**——`SigilEditorFeature` 的注释明说"管理器可能比本 mod 晚加载"，所以取控制器是每拍重试（第 5 节） |
-| `ModIcon: "icon.png"` | 启动器（从 mod 根读） | 发布脚本随包拷一份 `icon.png`；工具窗口/托盘用的是同一张图（工具那份编译进 exe） |
-| `HasExports` / `IsLibrary` / `Tags` / `ProjectUrl` / `ReleaseMetadataFileName` / `PluginData` / `ModR2RManagedDll32/64` | 启动器、发布流程 | 仓库代码里没有任何分支读它们 |
+| 字段（当前字面值） | 谁读 | 运行期后果 | 填错 / 改错的症状 |
+| --- | --- | --- | --- |
+| `ModId: "GBFR.SigilLoadout"` | 启动器；代码里以 `Mod.ModId` 常量复现 | 它是 `loader.GetDirectoryForModId(ModId)` 与 `loader.GetModConfigDirectory(ModId)` 的实参，也是 mod 文件夹名 | 值漂了就等于向启动器要另一个目录（要回来的那个目录是否就是放 DLL 的那一份，取决于启动器的目录策略——本仓库内不可证）。而原生 DLL 只从 `GetDirectoryForModId` 给的那个目录按名字加载（`NativeCore.Configure` + `SetDllImportResolver`），所以最可能的现场是最早那条日志就是 `Initialization failed: … Native core not found: <路径>`，`Dispose` 随即把已就位的部分全拆掉。仓库里没有任何门禁钉住这一对 |
+| `ModName: "GBFR Sigil Loadout (2.0.5)"` | 启动器列表 UI | **不参与任何运行期分支**：仓库里没有代码读 `ModName` | 只影响列表显示。括号里的 `2.0.5` 是名字的一部分，与本 mod 的 `ModVersion`（0.6.0）是两个量——把两者"顺手对齐"会改掉一个既没有读者、也没有门禁的字符串 |
+| `ModAuthor: "baagod"`、`ModDescription: "<中英一段说明>"` | 启动器（列表与详情） | 仓库里没有任何读者 | 改错无人报错 |
+| `ModVersion: "0.6.0"` | `StartEx` 的参数、发布脚本 | 写进会话日志行 `GBFR Sigil Loadout v0.6.0 (ABI 20)`；`build-release.ps1` 把 `ModConfig.json` 当**版本号唯一权威源**，要求与 `-Version`、`SigilLoadout/frontend/package.json`、`package-lock.json` 一致，并把结论写进 `dist\.build-complete` 供 `deploy.ps1` 回查；`csproj` 刻意不写 `<Version>` | 这是清单里**唯一**有门禁的字段：只改一处就发布会被 `throw` 拦住（`Version mismatch` / `… bump it too`）。托管程序集自身的版本与它无关，别去 `csproj` 里找它 |
+| `ModDll: "GBFR.SigilLoadout.dll"` | 启动器 | 入口程序集；`csproj` 的 `AssemblyName` 是同一个名字 | 两处漂了启动器就找不到入口（启动器侧后果不可证）；仓库里同样没有门禁 |
+| `ModIcon: "icon.png"` | 启动器（从 mod 根读） | 列表里的图标；发布清单强制这个文件在包里 | 丢了会被发布门禁拦住（`Required release file was not packaged: …icon.png`） |
+| `ModNativeDll32: ""`、`ModNativeDll64: ""` | 启动器 | **两个都必须保持空串**：原生 DLL 不走启动器的 native 加载通道（理由见下） | 填上任何值就为同一份 DLL 多开一条本仓库未验证的加载通道，而本 mod 自己的加载路径根本不读这两个字段——等于多出一条没人维护的重复加载 |
+| `ModR2RManagedDll32: ""`、`ModR2RManagedDll64: ""` | 启动器 | 没有 ReadyToRun 变体；仓库里没有读者 | 改错无人报错 |
+| `CanUnload: false` | 启动器；代码里 `Mod.CanUnload() => false` | 同一事实的两份声明 | 只改一处不会报错，只会让清单与运行期判据不一致（`CanSuspend` / `Suspend` / `Resume` 同理） |
+| `SupportedAppId: ["granblue_fantasy_relink.exe"]` | 启动器 | 把加载限定在游戏进程内；同一个进程名在原生自身校验与热键前台判定里各出现一次 | 写错或漏掉 = 匹配不到游戏进程（启动器侧后果不可证），而热键那条链会静默失效——三处各写一份字面量，没有对拍 |
+| `ModDependencies: []` | 启动器 | 没有硬依赖：缺任何东西都不拦加载 | 往这里加东西就把"可选"变成"缺就拦"，而本 mod 的代码从不检查依赖是否在场 |
+| `OptionalDependencies: ["gbfrelink.utility.manager"]` | 启动器 | 缺数据管理器**不拦加载**；代码也不依赖加载顺序（注释明说管理器可能比本 mod 晚加载），所以取控制器是每拍重试（第 5 节） | 删掉它只影响启动器的排序/提示；"编辑会不会落地"由取控制器那条重试路径决定，与这里无关 |
+| `Tags: []`、`HasExports: false`、`IsLibrary: false`、`IsUniversalMod: false`、`ReleaseMetadataFileName: "GBFR.SigilLoadout.ReleaseMetadata.json"`、`PluginData: {}`、`ProjectUrl: "https://…"` | 启动器与发布流程 | 仓库代码里没有任何分支读它们；`ReleaseMetadataFileName` 声明的那个文件既不在发布清单里、也没有生成步骤 | 改错无人报错 |
 
-**发布时的门禁只覆盖两件事**：版本号对拍（上表 `ModVersion` 那一行）与"一个包该有哪些文件"的清单（`GBFR.SigilLoadout.dll`、`GBFR.SigilLoadout.Native.dll`、`SigilLoadout.exe`、`icon.png`、`assets\` 下九份）。清单**故意独立**、不从 csproj 或源目录派生，否则"忘了加"和"被误删"都查不出来。清单以外的字段（`ModDll`、`CanUnload`、`SupportedAppId`、`OptionalDependencies`……）没有任何脚本校验——它们的不变量靠"每条声明只有一处"维持。构建与发布的完整流程见 [构建与发布](/openwiki/operations/build-and-release.md)。
+### 为什么两个 `ModNativeDll*` 是空串
+
+它们**故意留空**，因为原生核心不由启动器加载：
+
+1. `csproj` 把 `GBFR.SigilLoadout.Native.dll` 当普通内容文件拷进输出目录（`CopyToOutputDirectory`），发布脚本再把它当必需文件收进包——它和托管 dll 一样，只是 mod 目录里的一个文件；
+2. 运行期由 `NativeCore.Configure(modDirectory)` 记住 `mod目录\GBFR.SigilLoadout.Native.dll` 的绝对路径，并通过 `NativeLibrary.SetDllImportResolver` 在第一次 P/Invoke 时自己 `NativeLibrary.Load`。
+
+于是 ABI 版本握手（`GBFR20_GetAbiVersion` 对上 `NativeCore.AbiVersion`）、结构体封送尺寸自检、以及"找不到 DLL 时抛什么"全部是本仓库自己的事，不走启动器的 native 加载通道。填上 `ModNativeDll64` 会让启动器也去加载同一份 DLL（启动器侧后果在本仓库内不可证）；而本 mod 的加载路径不读这两个字段，所以改动它们对本 mod 的可见行为没有影响——这正是"保持空串"的理由：一条 DLL 只留一条加载路径。
+
+### 启动器侧语义是验证缺口，不是本页的事实
+
+上表"谁读"那一列里凡是写着"启动器"的，**在本仓库内不可证**：`Reloaded.Mod.Interfaces` 只以 `PackageReference … ExcludeAssets="runtime"` 出现（`gbfrelink.utility.manager.Interfaces` 同样），启动器自己的实现——目录怎么定、`CanUnload: false` 被怎么对待、`SupportedAppId` 怎么匹配进程——没有源码或程序集可读。仓库里能钉住的只有**本 mod 这一侧的声明**（字段值，以及它在代码里复现了哪几处），所以那些字段的启动器侧语义是验证缺口。运行期真正可观察的后果只有两条：`ModId` 决定 `loader.GetDirectoryForModId` / `loader.GetModConfigDirectory` 要回来的目录（第 3 节），`ModVersion` 由 `StartEx` 带进来并进会话日志。
+
+### 发布门禁只钉住版本号，不钉字段
+
+与 `ModConfig.json` 有关的门禁只有一条：**版本号对拍**（上表 `ModVersion` 那一行）。清单里其它字段（`ModDll`、`CanUnload`、`SupportedAppId`、`OptionalDependencies`……）没有任何脚本或测试校验——它们的不变量靠"每条声明只有一处可查"维持。
+
+包内"该有哪些文件"是另一件事，由 `build-release.ps1` 里一份独立的 13 项清单持有（托管 dll、原生 dll、工具 exe、`icon.png`、`assets\` 下九份）。那份清单**故意不从 csproj 或源目录派生**，否则"忘了加"和"被误删"两种漏法它都查不出来。它只保证文件在场，与清单字段无关；构建链的其它门禁（数据新鲜度、布局回归、生成资产、遗留产物、可变配置、PDB）见 [构建、发布与部署链](/openwiki/operations/build-and-release.md)。
 
 ## 3. 三个目录，三种生存期
 
@@ -110,7 +131,7 @@ Startup phase=<name> state=complete|failed elapsed_ms=<n>.
 
 | 目录 | 路径从哪来 | 装什么 | 更新 mod 时 |
 | --- | --- | --- | --- |
-| **mod 目录** | `loader.GetDirectoryForModId(ModId)` | `GBFR.SigilLoadout.dll`、`GBFR.SigilLoadout.Native.dll`、`SigilLoadout.exe`、`assets\`、`icon.png`、`ModConfig.json`、`README.md`，以及运行期追加的 `GBFR.SigilLoadout.log`（+ `.1`） | **整份替换**（`deploy.ps1` 是"拷到同级新目录、成功了才删旧的"）。所以任何要活过一次更新的状态都不能放这里 |
+| **mod 目录** | `loader.GetDirectoryForModId(ModId)` | `GBFR.SigilLoadout.dll`、`GBFR.SigilLoadout.Native.dll`、`SigilLoadout.exe`、`assets\`、`icon.png`、`ModConfig.json`、`README.md`，以及运行期追加的 `GBFR.SigilLoadout.log`（+ `.1`） | **整份替换**（`deploy.ps1` 是"拷到同级新目录、成功了才删旧的"）。所以任何要活过一次更新的状态都不能放这里——唯一的例外是那份**追加写**的日志，它随更新丢历史（第 4 节） |
 | **mod 配置目录** | `loader.GetModConfigDirectory(ModId)` | `HotkeyConfig.json`（`HotkeyConfig.FileName`） | 位置与保留策略由启动器决定：mod 只把启动器给的路径转交给 `Configurator`，从不自己拼这个路径 |
 | **用户配置目录** | **mod 自己算**：`UserConfig.FilePath(name)` = `%LOCALAPPDATA%\GBFRSigilLoadout\<name>` | `loadout.json`（配装）、`sigiledits.json`（因子编辑列表）——两者都由可视工具写、mod 只读 | 不受影响。目录名与两个文件名是跨进程协议，Go 那侧各有一处声明、由 `sharedconstants_test.go` 对拍；详见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md) |
 
@@ -130,7 +151,7 @@ flowchart TB
 
 两条推论值得记住：
 
-1. **只有用户配置目录是"两侧各算一次"的协议**，另两个都是向启动器要来的。于是两侧算法漂了（mod 与工具）只会污染用户配置目录，不会污染前两个；反过来，mod 配置目录的迁移完全由启动器驱动，mod 侧 `Configurator.Migrate` 是空实现——因为路径每次都是启动器传进来的。
+1. **只有用户配置目录是"两侧各算一次"的协议**，另两个都是向启动器要来的。于是两侧算法漂了（mod 与工具）只会污染用户配置目录，不会污染前两个；反过来，mod 配置目录的迁移完全由启动器驱动——`Configurator.Migrate` 是个空实现，因为路径每次都由启动器传进来，没有要搬的东西。
 2. `assets\` 只被**可视工具**按 `exeDir()\assets\` 读（九份全读，一份都不嵌进 exe）。托管侧不读它，原生侧的限制表已编译进 DLL。
 
 ### 配置页连接器
@@ -148,14 +169,14 @@ flowchart TB
 
 | 汇 | 位置/形态 | 规则 |
 | --- | --- | --- |
-| 文件 | `mod目录\GBFR.SigilLoadout.log` | **追加**写，`AutoFlush = true`；单份超过 4 MiB 时把当前份删掉旧的 `.1` 再改名为 `.1`（只留一代）。轮转失败被吞掉——最坏情况只是这份日志继续变大 |
-| 启动器 | `ILogger.WriteLine`（`loader.GetLogger()`） | 与文件行完全相同；写失败同样被吞掉 |
+| 文件 | `mod目录\GBFR.SigilLoadout.log` | **追加**写，`AutoFlush = true`；轮转只在**每次启动、打开日志之前**判一次：现有份超过 4 MiB 就把旧的 `.1` 删掉、再把当前份改名成 `.1`（只留一代）。所以单场长会话可以超过 4 MiB。轮转失败被吞掉——最坏情况只是这份日志继续变大 |
+| 启动器 | `ILogger.WriteLine`（`loader.GetLogger()`） | 与文件行完全相同；写失败同样被吞掉。`Dispose` 把 `_fileLog` 置 `null` 之后，只剩这一个汇 |
 
 同一行格式：`[HH:mm:ss.fff] [GBFR Sigil Loadout] <消息>`（`LogTag` 是面向玩家的前缀，`ModId` 保持技术性）。因为文件是跨会话追加的，**每次运行的第一行** `======== Session Start yyyy-MM-dd HH:mm:ss ========` 是"新的一次运行从这里开始"的唯一记号；紧跟着一行 `GBFR Sigil Loadout v<ModVersion> (ABI 20)`。
 
 原生侧的行经 `GBFR20_SetLogCallback` 回传：`NativeCore.ForwardNativeLog` 加上 `Native: ` 前缀转发到同一个 `Log`（回调委托由静态字段持有不回收，免得原生去调一个已释放的函数指针）。
 
-两条硬性约束（代码里都写了理由）：**文件日志与外部日志器出错都绝不影响 mod 生命周期**；`Dispose` 之后再写日志只会写进已释放的 `StreamWriter` 并抛异常被吞。
+两条硬性约束（代码里都写了理由）：**文件日志与外部日志器出错都绝不影响 mod 生命周期**（两处写各自被 catch 吞掉）；`Dispose` 之后再写日志也不会抛——`_fileLog` 已是 `null`，那一行只会进启动器。逐行的读法与"某类症状该搜哪一句"见 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
 
 ## 5. 数据管理器：唯一表来源，且是可选依赖
 
@@ -177,15 +198,17 @@ if (!_loader.GetController<IDataManager>().TryGetTarget(out IDataManager? dm) ||
 
 缺管理器的后果被刻意收在一个功能内：
 
-- `Bootstrap` 在拿不到控制器时直接返回，**一步都不做**：不读表、不改表、不写内存；其余初始化（原生核心、`LoadoutConfig`、热键、维护定时器）完全不受影响。
+- `Bootstrap` 在拿不到控制器时直接返回，**一步都不做**：不读表、不改表、不写内存；其余初始化（原生核心、`LoadoutConfig`、热键、维护定时器）完全不受影响——`Mod` 里那几行注释就是这条边界，因子编辑特性与钩子成没成无关。
 - 日志这一路径上真正会出现的是上面那句"在等它加载"。`TryReadTable` 里那句 `sigil edit FAIL: IDataManager controller not found (is gbfrelink.utility.manager enabled?)` 位于"已经接上之后"的读表路径（`_dm` 非 null 才会走到），所以**整个会话都没有管理器**时并不会出现那一行。
-- 因子编辑器与原生核心互不相干：`NativeCore.Initialize` 的返回值（`hooksReady`）不影响它是否构造与启动；它自己的任何失败都只记日志，绝不把整个 mod 带走。
+- 因子编辑特性自己的任何失败都只记日志，绝不把整个 mod 带走。
 
 接上之后，读表还有一道形状闸门：`GetArchiveFile` 返回 `null`/空 → 记 `GetArchiveFile('…') returned nothing`；形状不是"8 字节头 + 52 字节行"（用整除做预检、不用乘法，避免头部任意值构造出回绕后恰好相等的行数）→ 报出实际字节数、头里声明的行数，并且**什么都不写**。宁可不改，也不把值写进错误的行或行外。
 
+对玩家而言这条降级的可见形态只有一个：**编辑永远不落地**（工具那侧收不到任何通知），而 mod 其余部分照常。逐条日志、拒写与重试的完整读法见 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)。
+
 ## 6. 为什么"重新注册"与"就地写内存"两件都要做
 
-`Publish(table, stamp)` 是**唯一**那条把表交给游戏的路径，启动那次写与运行中的热应用走的是同一条（见下节）。它做两件事，顺序固定：
+`Publish(table, stamp)` 是**唯一**那条把表交给游戏的路径：启动那次写（`Bootstrap` 把刚建好的表交给 `TryApply`）与运行中的热应用（`Tick` 过了 mtime 门再建一次）在 `TryApply` 处汇合，细节见 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)。它做两件事，顺序固定：
 
 ```mermaid
 sequenceDiagram
@@ -228,22 +251,23 @@ sequenceDiagram
 
 1. **顺序是注册在前**：它便宜，而且它（或任何别的触发）引起的那次重解析必须已经看到新值。
 2. **注册失败不拦住内存写**：`RegisterWithManager` 抛异常只记一行 `hot apply: re-register EXCEPTION (continuing with the memory write): …`，然后照常做内存写。
-3. **拒写不是无事发生**：原生返回负数（`-1..-7`，权威定义在 `native_api.h`）表示一个字节都没写（唯一例外是 `-7`，表可能只更新了一部分）。这一层只说自己这层的后果：编辑已写进文件、也重新注册过，**游戏下一次解析会拿到它**。
-
-拒写之后的状态机：候选表留在 `_retryTable`（同一版本重试直接复用它，不必再从归档重建 328 KB 的表），这一版的 mtime **不被标记为已应用**，于是下一次 `Tick` 的 mtime 门还会放行；同一版本的重复失败按 `RetryIntervalMs = 5000` 节流（换文件立刻处理）。250 ms 只是投递节奏——不是量：数值要到下一场战斗才生效，250 ms 换掉的是一条阻塞在 `WaitOne` 的线程和一个内核事件对象。
+3. **拒写不是无事发生**：原生返回负数（`-1..-7`，权威定义在 `native_api.h`）表示一个字节都没写（唯一例外是 `-7`，表可能只更新了一部分）。这一层只说自己这层的后果：编辑已写进文件、也重新注册过，**游戏下一次解析会拿到它**。拒写后这一版的 mtime 不被标记为已应用，候选表留在 `_retryTable` 供同版本重试复用，同一版本的重试按 `RetryIntervalMs = 5000` 节流（文件一变立刻处理）。250 ms 只是投递节奏——不是量：数值要到下一场战斗才生效。
 
 ## 7. 代码里怎么用 vs 文档怎么承诺
 
-玩家文档（随包进 mod 目录的 `GBFR.SigilLoadout/README.md`、仓库根 `README.md`）面向"能不能用"；代码是唯一的行为权威（`AGENTS.md` 的 OpenWiki 段：源码与测试是权威，文档里的未知项只是验证缺口）。三处读写方式不同，值得分开记：
+玩家文档（随包进 mod 目录的 `GBFR.SigilLoadout/README.md`、仓库根 `README.md`）面向"能不能用"；代码是唯一的行为权威（`AGENTS.md` 的 OpenWiki 段：源码与测试是权威，文档里的未知项只是验证缺口）。下面几处的读写方式不同，值得分开记：
 
 | 文档的说法 | 源码的实际行为 | 差异的性质 |
 | --- | --- | --- |
 | "改动时游戏内该因子的说明实时更新；实际效果在下一场战斗开始时生效"、"无需重启，运行中的游戏随即把编辑应用到它已经读进内存的那张表上" | 成立，但**只在原生就地写成功时**。拒写（游戏还没把表读进内存、或这张表与本 mod 认得的那张身份不符）时内存一个字节都没变，编辑已写进文件并重新注册，等游戏下一次解析才落地；日志明说："the edit list is saved and re-registered, so the game picks it up at its next parse" | 文档描述的是成功路径，源码里还有一条**只出现在日志里**的拒写路径（同版本重试 5 秒一次） |
 | "**需要** gbfrelink.utility.manager 才能用这一页"、"没装的话 mod 照常加载，只是编辑器没有表可改——日志里会说一句在等它" | 一致：缺它时托管侧一行都不写，其余功能照常，日志出现"在等它加载"那句 | 一致（但注意工具那一侧收不到任何通知：它不是"这一页不可用"，而是编辑永远不落地） |
 | "它**不带 `.tbl` 文件**……所以能和其他**改表** mod 并存" | 不带 `.tbl` 文件属实；但源码里没有任何与其他改表 mod 的仲裁：它把自己那份 `skill_status.tbl` 注册进管理器的供给集合，并且原生的身份闸门会**逐行比 Key**——Key 被别的 mod 改过的表会被拒写（`-6`）而不是被覆盖 | 文档承诺的是"不覆盖别人的文件"，不是"两个改表 mod 的结果可预测" |
-| 配置界面里 `HotkeyConfig.MenuHotkey` 的描述"Changes apply immediately / 修改实时生效" | **不成立**：热键只在启动时读一次（`InitializeHotkeyConfiguration` → `Hotkey.Configure`），`Configurable` 的 `ConfigurationUpdated` 被实现成永不触发的空操作，注释写明官方那份运行期热重载因为"实测改热键要重启游戏才生效"而被去掉；源码里没有重注册路径 | 冲突，**以源码为准**：改热键需要重启游戏 |
+| 配置界面里 `HotkeyConfig.MenuHotkey` 的描述"Changes apply immediately / 修改实时生效" | **不成立**：热键只在启动时读一次（`InitializeHotkeyConfiguration` → `Hotkey.Configure`，注释写明"热键读一次配置就定下来（运行期不再改键）"），`Configurable` 的 `ConfigurationUpdated` 是永不触发的空操作，注释写明官方那份运行期热重载因为"实测改热键要重启游戏才生效"而被去掉；源码里没有重注册路径 | 冲突，**以源码为准**：改热键需要重启游戏 |
+| 随包 README 末尾那句"构建命令与验证清单在仓库根的 `README.md`"；`tools\build-release.ps1` 注释里的"README「构建与部署」里写了" | **两处指向都已失效**：仓库根 `README.md` 现在是面向玩家的安装 / 使用 / 致谢三节，全文没有一条构建、部署或验证命令（`docs\` 目录为空，也没有第二处承接它们）；随包 README 里唯一还成立的入口是它上一行给的那个 GitHub 仓库链接 | 文档搬家后的残留指向，与源码行为无关：可执行的构建 / 发布说明以 [构建与发布链](/openwiki/operations/build-and-release.md) 为准，验证与门禁清单以 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 为准 |
 
-第一条还有一个语义前提，术语以 `CONTEXT.md` 为准：**"表已经被改写"与"可见"是两件事**——就地写成功只保证游戏手里那份表变了，角色状态要到下一次战斗开始才重算。
+最后一行是这次要记住的落差：随包 README 与发布脚本的注释都还停在"仓库根 README 是构建手册"这个旧前提上，照着它们找命令会一无所获——涉及构建命令、发布门禁与验证清单时，直接看上面链接的两页。
+
+第一条还有一个语义前提，术语以 `CONTEXT.md` 为准：**"表已经被改写"与"可见"是两件事**——就地写成功只保证游戏手里那份**活表**变了，角色状态（游戏已把新值算进角色描述）要到下一次战斗开始才重算。
 
 ## 8. 宿主提供的唯一调度器
 
@@ -255,8 +279,12 @@ sequenceDiagram
 
 ## 9. 改这里之前的检查清单
 
-- 动 `ModConfig.json` 的 `ModId` / `ModDll`：同时改 `Mod.ModId` / `csproj` 的 `AssemblyName`——没有脚本会替你发现。
+- 动 `ModConfig.json` 的 `ModId` / `ModDll`：同时改 `Mod.ModId` / `csproj` 的 `AssemblyName`——没有脚本会替你发现；`ModId` 漂了最可能的现场是"原生 DLL 找不到"。
+- 动 `ModName`：它没有读者，但括号里那个 `2.0.5` 不是 `ModVersion`；两者不是同一个量，别顺手对齐。
+- 别给 `ModNativeDll32/64` 填值：那会给同一份 DLL 多开一条未经本仓库验证的加载通道，而本 mod 的加载路径不读这两个字段。
+- 动 `SupportedAppId` 或改名游戏进程：同一个进程名还写在原生自身校验与热键前台判定里，三处都要跟上。
 - 动 `CanUnload`：它是"清单 + `Mod.CanUnload()`"两份声明，只改一处不会报错，只会让启动器与你自己的声明不一致。
 - 想在托管侧读游戏数据：目前唯一的入口是 `IDataManager`，而且它可能是缺席的；任何新的读取都必须回答"管理器不在时怎么办"。
-- 想把可变状态写进 mod 目录：不行，那个目录每次更新被整份替换。
+- 想把可变状态写进 mod 目录：不行，那个目录每次更新被整份替换（追加写的日志是唯一例外，且它随更新丢历史）。
 - 想让热键/配置改完立刻生效：现在没有这条路径；加它就要回到 `ConfigurationUpdated` 上（那份空操作是刻意的）。
+- 想补"构建 / 部署 / 验证"的说明：别往仓库根 `README.md` 里加——它现在是玩家页；随包 README 末尾那句与 `tools\build-release.ps1` 的注释都还指着它的旧构建章节，是两处待修的失效指向。

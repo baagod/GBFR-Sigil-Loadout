@@ -3,9 +3,6 @@ type: concept
 title: 虚拟槽位、模板因子与专属开关
 description: 槽位模型与合成因子的数据来源：本体 13 个内部槽之后接 3 个角色专属槽（T1/T2/战气）再加玩家通用槽，虚拟槽总数与扩展内部槽号、模板 slot-id 取 0xFE000000 高位区间而不与库存 id 冲突的原因、专属表如何经 gen 编译进 DLL、专属开关以 skill hash 传递与"整体替换"语义、古兰/姬塔的角色兼容规则、kUnwornCharacterHash 哨兵、容量 24 的两道边界与超容量截断语义。
 tags: [virtual-slots, sigil-loadout, exclusive-table, slot-mapping, abi, native-core]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -39,7 +36,7 @@ sources:
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T18:50:59.007Z" }
 ---
 
 # 虚拟槽位、模板因子与专属开关
@@ -106,25 +103,24 @@ flowchart LR
 
 发布路径：专属行与配置行进同一个模板表，非空槽统一发布成 `0xFE000000 + v`；空槽不发。
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Parse error on line 11: ...d Detour->>Loop: 返回 0，这一格不注入 Expecting '+', '-', '()', 'ACTOR', got 'loop' -->
-```text
+```mermaid
 sequenceDiagram
-    participant Loop as 游戏技能循环
+    participant GameLoop as 游戏技能循环
     participant Detour as detour
     participant Sel as 选择表或 TLS 构建快照
     participant Tpl as TryCopyTemplateGem
     participant Status as 角色 status 的槽位
-    Loop->>Detour: 问 slot_index 等于 13 加 j
+    GameLoop->>Detour: 问 slot_index 等于 13 加 j
     Detour->>Sel: 按 character_hash 取选择表
     Sel-->>Detour: selected_slot_id
     alt selected_slot_id 为 0 或不是模板 id
-        Detour-->>Loop: 返回 0，这一格不注入
+        Detour-->>GameLoop: 返回 0，这一格不注入
     else 模板 id
         Detour->>Tpl: 按 character_hash 与虚拟索引取模板槽
         Note over Tpl: gem_id 为 0 或角色不兼容也返回 false
         Tpl-->>Detour: 合成 GemData
         Detour->>Status: SafeCopyToOutput
-        Detour-->>Loop: 返回 1
+        Detour-->>GameLoop: 返回 1
     end
 ```
 
@@ -133,7 +129,7 @@ sequenceDiagram
 读侧还有三件事值得记住（细节在 [游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）：
 
 - `slot_index < 13` 直接转发原始 getter；`slot_index >= GetExpandedInternalSlotCount()` 返回 0 而**不**转发——原始 getter 只有 13 格，转过去就是读它自己数组的边界之外。
-- 一次构建的第一格（扩展槽第一格）会快照一次选择表进 thread_local，本次构建的所有槽都读这份快照，所以"游戏正在建状态时改配装"不会得到半新半旧的角色。
+- 来自两条技能数据循环的扩展槽第一格（= 一次构建的开始）会把选择表快照进 thread_local，本次构建的所有槽都读这份快照，所以"游戏正在建状态时改配装"不会得到半新半旧的角色；构建循环之外的读取（界面或效果去读这份 status）刻意**不**走快照，直接读当前那张表——没有第二条路。
 - `TryGetRuntimeSlot` 以 `g_virtual_slot_count` 为闸：收窄配装之后，残留的旧槽数据不会被服务。运行期确认（"虚拟槽真的进了角色状态"）是 `expected`/`injected` 那对计数：期望值 = 选择表里非零槽的数量，只对 context-1 计数，全中才报一次 confirmed。
 
 ## 3. 为什么模板 slot-id 取高位区间

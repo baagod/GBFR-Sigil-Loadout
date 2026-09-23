@@ -1,13 +1,16 @@
 ---
-type: "参考"
-title: "日志与故障定位"
-openwiki_generated: true
+type: operations
+title: 日志与故障定位
+description: 这套 mod 的三类日志落点（mod 目录下 GBFR.SigilLoadout.log 的追加写与 4 MiB 单代轮转、Reloaded-II 的 ILogger、原生侧只写 OutputDebugStringA 与宿主回调，没有独立原生日志文件）、阶段行/运行消息/去重规则三个契约，以及五类典型症状（游戏里没生效、钩子未装、活表拒写、工具起不来、配置坏文件）各自的「先看哪一行、再看哪一行、决定性判据」，另含工具侧 tool-debug.on 标记开关默认静默的开启方式与钉住这些契约的测试。
+tags: [logging, diagnostics, troubleshooting, log-rotation, failure-localization, operations]
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
+    at: 2026-09-23T20:50:35.513Z
 sources:
   - id: openwiki-source-0b100d4f3734fcb50250a654
     resource: repo://GBFR.SigilLoadout.Native/src/exports.cpp
+  - id: openwiki-source-55749b90df038aa1de3c69ee
+    resource: repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp
   - id: openwiki-source-e7cdf3e18900c767e95da9e3
     resource: repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp
   - id: openwiki-source-c0bed4f5631a52dfcfe51dd3
@@ -58,31 +61,33 @@ sources:
     resource: repo://tests/NativeLayoutHarness/run.ps1
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
 ---
-
 
 # 日志与故障定位
 
-这套 mod 的失败几乎都是 **fail-soft**：钩子装不上不会拦住游戏，原生拒写不会抛异常，配置读坏不会弹窗（见 [托管 mod](/openwiki/architecture/managed-mod.md)）。于是"为什么没生效"的答案基本只存在于一行日志里。本页只回答操作问题：日志在哪、一行长什么样、某类症状该搜哪一句、那一句意味着什么、下一步做什么。
+这套 mod 的失败几乎都是 **fail-soft**：钩子装不上不会拦住游戏，原生拒写不抛异常，配置读坏不弹窗（见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)）。于是"为什么没生效"的答案基本只存在于一行日志里。
 
-行里的关键字（`Startup phase=`、`refused`、`ctx1 build`、`party+`、`hot rebuild: skipped`）在两侧实现里就是字面量，可以原样粘进搜索框。
+本页按**症状**组织，不按文件组织：每一类症状给一条「**先看哪一行 → 再看哪一行 → 决定性判据**」的定位顺序，再附该症状可能出现的全部行与它们的含义。行里的关键字（`Startup phase=`、`refused`、`hot apply:`、`ctx1 build`、`party+`、`hot rebuild: skipped`）在实现里就是字面量，可以原样粘进搜索框。
 
-## 1. 读哪一份文件
+## 1. 三类日志落点：先确认在看哪一份
 
 | 汇 | 位置与形态 | 谁写进去 |
 | --- | --- | --- |
-| 文件（唯一要看的） | `mod目录\GBFR.SigilLoadout.log`，**追加**写、`AutoFlush`；行格式 `[HH:mm:ss.fff] [GBFR Sigil Loadout] <消息>` | 托管侧唯一的 `Log`，以及经回调转发进来的原生行 |
-| 启动器 | Reloaded-II 的 `ILogger.WriteLine`（同一行） | 同上，异常被吞 |
-| 调试器 | `OutputDebugStringA`，原生那一份自带 `[HH:mm:ss.mmm] [GBFR Sigil Loadout Native] ` | 原生 `Log` 自己 |
+| 文件（唯一要看的） | `mod目录\GBFR.SigilLoadout.log`，**追加**写、`AutoFlush`；行格式 `[HH:mm:ss.fff] [GBFR Sigil Loadout] <消息>` | 托管侧唯一的 `Log`（`Mod.Log`），以及经回调转发进来的原生行 |
+| 启动器 | Reloaded-II 的 `ILogger.WriteLine`（同一行文本） | 同上，写失败被吞 |
+| 调试器 | `OutputDebugStringA`，**只有这一份**带原生自己的时间戳与 `[GBFR Sigil Loadout Native]` 前缀 | 原生 `Log` 自己 |
 
-三条关于这份文件的规则：
+**原生侧没有独立的日志文件**：它只往 `OutputDebugStringA` 写一份、再调宿主注册的回调（见下一节）。要找原生说的话，就在托管那份文件里搜 `Native: `。
+
+四条关于这份文件的规则：
 
 - **单份上限 4 MiB，只留一代。** 打开之前先看现有长度，超了就删掉旧的 `.1`、把当前份改名成 `GBFR.SigilLoadout.log.1`；轮转失败被 catch 掉（最坏是这份继续变大）。轮转只在**每次启动**判一次，所以单场长会话可以超过 4 MiB。
-- **mod 目录每次更新会被整份替换**，历史因此随更新丢一次。正因文件跨会话追加，`======== Session Start yyyy-MM-dd HH:mm:ss ========` 是"这次运行从这里开始"的唯一记号，紧随的 `GBFR Sigil Loadout v<版本> (ABI 20)` 用来确认跑的是哪一版。
+- **mod 目录每次更新会被整份替换**，历史因此随更新丢一次。正因文件跨会话追加，`======== Session Start yyyy-MM-dd HH:mm:ss ========` 是"这次运行从这里开始"的唯一记号，紧随的 `GBFR Sigil Loadout v<版本> (ABI 20)` 用来确认跑的是哪一版。用户配置不在 mod 目录，而在 `%LOCALAPPDATA%\GBFRSigilLoadout`（见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)）。
+- **日志文件本身是初始化路径上的硬依赖**：轮转失败会被吞，但 `StreamWriter` 建不出来（目录不可写、文件被独占）会直接走 `QueueStart` 的兜底 catch，打一行 `Initialization failed: <异常>` 然后 `Dispose()`——此时 mod 不再工作，而那一行只可能出现在 Reloaded-II 的 `ILogger` 里，因为文件汇还没建起来。
 - **关停之后原生日志不再进文件**：`NativeCore.Shutdown` 在 `finally` 里把回调置 0，之后原生再说什么只有调试器能看到。
 
-## 2. 原生日志是怎么进到这份文件里的
+## 2. 原生行是怎么进到这份文件里的
 
 ```mermaid
 flowchart TD
@@ -97,12 +102,15 @@ flowchart TD
 
 原生行与托管行走同一个汇；原生的时间戳只出现在调试器那一份里。
 
-两个必须记住的点：
+三个必须记住的点：
 
 - 回调拿到的消息是**原文**，托管侧统一加 `Native: ` 前缀，所以文件里原生行长这样：`[12:34:56.789] [GBFR Sigil Loadout] Native: Startup phase=native-initialize state=complete elapsed_ms=812.`。搜 `Native: Startup phase=` 就能只看原生的阶段行。
-- 转发回调本身被静态字段持有（委托被回收之后原生就在调已释放的函数指针），转发体内所有异常都吞掉——诊断回调绝不让异常展开回原生钩子代码。
+- 转发回调本身被静态字段持有（委托被回收之后原生就在调已释放的函数指针），转发体内所有异常都吞掉——诊断回调绝不让异常展开回原生钩子代码（见 [原生核心（C++ DLL）](/openwiki/architecture/native-core.md)）。
+- 原生 `Log` 自己也保证不抛：格式化失败退化成不带时间戳的原文，宿主回调那一份单独兜。
 
-## 3. 阶段行：唯一的启动契约
+## 3. 两个契约：阶段行与运行消息
+
+### 3.1 阶段行是唯一的启动契约
 
 ```text
 Startup phase=<阶段> state=complete|failed elapsed_ms=<n>.
@@ -139,7 +147,7 @@ sequenceDiagram
 | --- | --- | --- |
 | 托管 | `native-library-load` | DLL 加载、ABI 握手、`EnsureAbiLayout` 自检；失败后紧跟 `Initialization failed: …`。**它发在调 `GBFR20_Initialize` 之前**，只量了这三步 |
 | 原生 | `executable-validation` | 进程名必须是 `granblue_fantasy_relink.exe` |
-| 原生 | `semantic-layout-resolution` | 布局解析；具体断在哪一阶段要看运行消息 |
+| 原生 | `semantic-layout-resolution` | 布局解析失败时：解析链的哪一步看运行消息里的 `… failed at <阶段>`，哪一条预检看 `layout preflight FAILED` 行 |
 | 原生 | `template-selection-install` | 数据编译进来，固定 `complete` |
 | 原生 | `native-hook-install` | 内含四个子阶段（下表） |
 | 原生 | `native-initialize` | 原生整条链的收尾，`state` 就是钩子成没成 |
@@ -148,63 +156,114 @@ sequenceDiagram
 | 托管 | `managed-initialize` | 整条 `QueueStart` |
 | 原生子阶段 | `required-byte-rva-preflight`、`gem-data-getter-hook`、`skill-fetch-hook`、`skill-loop-limit-patches` | `InstallHooks` 的四步；任一步失败即回滚字节与已装钩子 |
 
-原生子阶段由一个 RAII 对象报：析构时报 `state=failed`，调用点显式 `Succeeded()` 才报 `complete`。所以阶段体抛异常（工程按 `/EHa` 编译）时，栈展开也会留下"崩在哪个阶段"。反过来说，"某一阶段行缺失"里包含一条真实信息：那次运行根本没走到那里。
+原生子阶段由一个 RAII 对象上报：析构时若没人报过就报 `state=failed`，调用点则显式调 `Succeeded(<布尔结果>)` 把实际结果写成 `complete`/`failed`。所以阶段体抛异常（工程按 `/EHa` 编译）时，栈展开也会留下"崩在哪个阶段"的阶段行。反过来说，"某一阶段行缺失"里包含一条真实信息：那次运行根本没走到那里。
 
 `elapsed_ms` 两侧各用各的时钟（原生 `GetTickCount64`，托管 `Stopwatch`），只适合比较同一侧相邻行的相对量级。
 
-## 4. 运行消息（`GBFR20_CopyRuntimeMessage`）
+### 3.2 运行消息（`GBFR20_CopyRuntimeMessage`）
 
 - 原生 `SetRuntimeMessage` 做两件事：先把消息 `Log` 出去，再在 mutex 下存进 `g_runtime_message`。所以**消息本身总是会出现在日志里**（以原生行的形式）。
 - 托管侧只在 `hooksReady == false` 时回读一次，打出一行 `Native core loaded without hooks: <消息>`。回读是两段式：先 `GBFR20_CopyRuntimeMessage(nullptr, 0)` 问需要多少字节（含结尾 NUL；异常 → 0），上限 64 KiB，返回值 `<= 1` 视为空。
-- 于是**同一句原因会出现两次**：一次原生行（`Native: Game layout resolution failed at …`），一次托管行（`Native core loaded without hooks: Game layout resolution failed at …`）。要看"钩子为什么没装"，直接读后一行——它就在 `Startup phase=native-core state=failed` 下面。
+- 于是**同一句原因会出现两次**：一次原生行（`Native: Game layout resolution failed at resolved layout final validation; gameplay hooks were not installed and persisted sigil selections were left unchanged.`），一次托管行（`Native core loaded without hooks: ` 加同一句）。要看"钩子为什么没装"，直接读后一行——它就在 `Startup phase=native-core state=failed` 下面。
 - 运行消息是**单人份**、只保存最近一条。健康会话里它最后往往被实战确认消息（`Skill contribution confirmed for 0x…`）覆盖，所以不要指望任何时刻都能回读到 `Native hooks installed: N virtual slots.`——那一句只有它刚被 `SetRuntimeMessage` 写下的那一次在日志里。
 
-### 为什么那行没出现：去重规则
+### 3.3 缺一行往往就是设计：去重规则
 
-这套日志刻意留白，缺一行往往就是设计。搜不到某行之前先对照：
+这套日志刻意留白。搜不到某行之前先对照：
 
 | 去重规则 | 涉及的行 | 什么时候才会有 |
 | --- | --- | --- |
 | 拒绝码变了才报 | `WriteSkillStatusTable: refused (<码>): <原因>` | 与上一次报过的码不同；中间成功过一次会清零，下一次拒写值得再报 |
-| 同一版文件只报一次 | `hot apply: …`、`sigil edit: …`、`sigil edit FAIL: …` 系列 | `sigiledits.json` 的 mtime 变了才重新开口；同版重试全程静默 |
-| 版本门无条件认领 | `Invalid loadout.json; kept previous configuration: …`、`Applied custom loadout, slots=N.` | `loadout.json` 每次 mtime 变化只处理一次，成败一样 |
+| 同一版文件只报一次 | `hot apply: …`、`sigil edit: …`、`sigil edit FAIL: …` 系列 | `sigiledits.json` 的 mtime 变了才重新开口；同版重试全程静默（另有 5 秒节流） |
+| 版本门无条件认领 | `Invalid loadout.json; kept previous configuration: …`、`Applied custom loadout, slots=<n>.` | `loadout.json` 每次 mtime 变化只处理一次，成败一样 |
 | 数量变了才报 | `Installed built-in template loadout selections=…` | 装出来的槽位总数与上次不同 |
 | 记录真变了才报 | `ctx1 build: …`、`party+ …` | 一次构建会被两条循环各问一次，只有第一份记录打印；见过的角色不再打印 |
 | 进程内只报一次 | `sigil edit: IDataManager is not available yet; …` | 第一次没拿到数据管理器时 |
+| 每会话只报一次 | `Skill contribution confirmed for 0x…: <n>/<m> virtual sigils reached the context-1 status.` | 第一次实战确认；`incomplete` 那一条**每次都报** |
 | 节流窗口刻意静默 | `hot rebuild` 那一组 | 节流 CAS 命中时不打印（每个 tick 都可能命中）；其他跳过原因各有自己一行 |
 
 推论：**"还在拒写"这件事在日志里看不出来**。想确认现在还拒不拒，在工具里再存一次并看是否出现 `hot apply: SUCCESS`。
 
-## 5. 五类典型故障
+## 4. 症状：游戏里没生效
 
-每张表是"症状 → 该搜的日志行 → 含义 → 下一步"。尖括号是占位符，不是字面量。
+**症状**：mod 装好了、游戏里也没崩，但虚拟槽位或改过的因子数值看起来没变化。
 
-### 5.1 钩子未装
+**先看哪一行 → 再看哪一行 → 判据**
 
-症状：进游戏后虚拟槽位不生效（预配的角色专属槽没出现），且搜不到 `Native hooks installed:`。
+1. **先**看这次运行的开头两行（`======== Session Start …`、`GBFR Sigil Loadout v… (ABI 20)`）：确认这段日志属于哪一次运行、跑的是哪一版——文件是跨会话追加的。
+2. **再**搜 `Startup phase=`：`native-core state=complete` 还是 `failed`。**判据**：`failed` 就没有虚拟槽位，直接转 §5。
+3. **再看**钩子装成之后那两条正面判据：`Native: Native hooks installed: <n> virtual slots.`（这次扩到几个虚拟槽）与 `Installed built-in template loadout selections=<n>. …; inventory-independent.`（内置专属模板装出几个槽）。
+4. **如果只是因子数值没变**，搜 `hot apply:`。**判据**：出现 `hot apply: SUCCESS - rows=<n> …` 说明表已被改写；只有 `hot apply: the native write was refused (<码>)` 就转 §6；连 `hot apply` 都没有说明这一版根本没造出表（看 `sigil edit: …` 系列）。
+5. **判据（时序）**：因子编辑的**描述**与**实际效果**是两件事——表被改写后游戏里对应的因子描述立刻更新，而**实际效果要到下一次战斗开始时生效**（见 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)）。所以"描述变了、伤害没变"不是故障；"描述也没变"才是表没被改写。
+6. **判据（虚拟槽位）**：进一次战斗后搜 `Skill contribution confirmed for 0x…: <n>/<m> virtual sigils reached the context-1 status.`——这是虚拟槽位真的进了角色状态的证据，每会话只报一次。它的 `incomplete` 版本**每次都报**，说明有槽位没进去：看 `hot rebuild` 是否被跳过（§9）、配装是否超容量。
+
+其余相关行：
 
 | 该搜的日志行 | 含义 | 下一步 |
 | --- | --- | --- |
-| `Startup phase=native-core state=failed` | `GBFR20_Initialize` 返回 0。mod 照常加载，配装与因子编辑仍然工作 | 往上找第一条 `state=failed` 的原生阶段行 |
-| `Native core loaded without hooks: <运行消息>` | 原生给出的失败原因 | 按消息分流 |
+| `Native: Layout resolved and validated from semantic anchors (PE 0x…).` + `Native:   getter=0x… SystemData=0x…` | 布局解析成功，括号里那个 PE 时间戳就是这次匹配上的游戏构建 | 记录它；游戏更新后对不上就是重导信号，见 [语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md) |
+| `Applied custom loadout, slots=<n>.` | 玩家配置被接受并应用 | 是否"可见"还要等下一场战斗；链路见 [工作流：配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md) |
+| `Native: ApplyLoadout: counts out of range (slots <n> > 24, overrides <m> > 96); rejected.` | 调用方给的计数越界（上界是虚拟槽容量 24 与运行时模板容量 32 × 3），原生直接拒 | 配置或工具写的载荷不对 |
+| `Skill contribution incomplete for 0x…: <n>/<m> virtual sigils reached the context-1 status.` | 有虚拟槽位没能进入 context-1 状态 | 看同拍的 `hot rebuild` 与配装容量 |
+| `virtual skill selection: threw; treated as no selection.` / `TryGetRuntimeSlot: threw; treated as no gem in this slot.` | 运行期兜底异常，这一次当成"没有选择/没有因子" | 出现即异常路径，见 [工作流：游戏侧注入运行期（detour 与循环上限）](/openwiki/workflows/skill-injection-runtime.md) |
+
+### 4.1 子症状：因子编辑一直不生效（数据管理器还没接上）
+
+因子编辑要用的表来自 `gbfrelink.utility.manager`，而那是**可选依赖**，可能比本 mod 晚加载。所以"接上了吗"是这条链上第一个判据：
+
+| 该搜的日志行 | 含义 | 下一步 |
+| --- | --- | --- |
+| `sigil edit: IDataManager is not available yet; the edit list waits for gbfrelink.utility.manager to load` | 可选依赖还没加载；这句**只说一次** | 确认 gbfrelink.utility.manager 已装且启用；只要它出现，维护拍每 250 ms 会重试直到接上 |
+| `sigil edit: IDataManager attached` | 接上了 | 之后才可能有 `hot apply` 系列 |
+| `sigil edit FAIL: IDataManager controller not found (is gbfrelink.utility.manager enabled?)` | 这一拍想读表，但手上没有管理器 | 同第一行 |
+| `sigil edit FAIL: GetArchiveFile('system/table/skill_status.tbl') returned nothing` | 管理器在，但归档里取不到这张表 | 游戏数据或依赖版本问题 |
+| `sigil edit: nothing applied - the table could not be read, or its layout is not the one this build patches (see the lines above)` | 这一版没造出表（特性已"启动过"，但每一拍仍会重来） | 读它上方的 FAIL 行 |
+| `sigil edit: there is no edit list yet, or it could not be read (see the line above); nothing applied and the table was not written back` | 列表不存在也读不出来 | 区分"文件被删"（空列表，见 §8）与"读坏了" |
+
+编辑列表本身读不出来是另一回事（`sigil edit: list load failed: …`，见 §8）。
+
+## 5. 症状：钩子未装
+
+**症状**：进游戏后虚拟槽位不生效（预配的角色专属槽没出现），且搜不到 `Native hooks installed:`。
+
+**先看哪一行 → 再看哪一行 → 判据**
+
+1. **先**搜 `Startup phase=native-core state=failed`。**判据**：这是托管的判据行，`GBFR20_Initialize` 返回了 0。mod 本身照常加载，因子编辑（活表写入不要求钩子）仍可能成功，但虚拟槽位不会有——配装应用会被原生拒（`Native rejected the custom loadout; kept previous configuration.`），因为 `GBFR20_ApplyLoadout` 以 `hooks_ready` 为前置条件。
+2. **再**读它下面那一行 `Native core loaded without hooks: <运行消息>`。**判据**：这句就是原生给出的失败原因，按它分流到下表。
+3. **然后**按原因往上找**最后一条** `state=failed` 的原生阶段行（`executable-validation` / `semantic-layout-resolution` / `native-hook-install` 或它的四个子阶段之一），它告诉你断在链路的哪一步。
+
+| 该搜的日志行 | 含义 | 下一步 |
+| --- | --- | --- |
 | `Startup phase=native-library-load state=failed` + `Initialization failed: …` | DLL 加载 / ABI 握手 / 布局自检没过 | `Native core not found: <路径>` → 装包不全；`Native ABI mismatch: managed 20, native <x>.` 或 `ABI layout mismatch: …` → 两边 DLL 不是同一版 |
-| `Startup phase=executable-validation state=failed` | 进程不是 `granblue_fantasy_relink.exe` | 确认注入到了游戏本体 |
-| `layout preflight FAILED: rva=0x… preflight_offset=0x… checked_at=0x… bytes=…` | 布局解析停在**具体哪一条**预检上 | 游戏构建变了，见 [语义锚点与布局解析](/openwiki/concepts/game-layout-anchors.md) |
+| `Startup phase=executable-validation state=failed` + `This native core only supports granblue_fantasy_relink.exe.` | 进程不是 `granblue_fantasy_relink.exe` | 确认注入到了游戏本体 |
+| `Startup phase=semantic-layout-resolution state=failed` | 布局解析失败；这一行本身只说明失败发生在解析阶段 | 解析链的哪一步看运行消息里的 `Game layout resolution failed at <阶段>`，哪一条预检看下面那行 `layout preflight FAILED` |
+| `Native:   layout preflight FAILED: rva=0x… preflight_offset=0x… checked_at=0x… bytes=…` | 布局解析停在**具体哪一条**预检上 | 游戏构建变了，见 [语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md) |
 | `Startup phase=gem-data-getter-hook state=failed`（或另外三个子阶段之一） | `InstallHooks` 在这一步失败；循环上限字节与已装钩子已回滚 | 运行消息里是同一个原因（如 `Failed to install the GemData getter hook.`） |
-| `Table slot: resolved slot=0x…`（成功）/ `Table slot: …; nothing resolved.`（失败，四条各指一步） | 活表槽的解析结果。**它与钩子成没成无关**——`ResolveTableSlot` 排在装钩子之前，失败只记日志不中止 | 失败会让活表写入永远是 -2，见 5.2 |
+| `Native: Hook rollback: failed to restore the skill-apply loop limit.` / `…the skill-category loop limit.` | 回滚本身也没成：那个循环上限字节仍停在扩展值 | 关机重启前别再热重建；这是"回滚不完整"的唯一记号 |
+| `Native: Hook teardown timed out waiting for in-flight calls; hooks left installed.` | 关机时在途 detour 没排空，宁可留着钩子也不释放活调用还在跑的内存 | 只出现在退出路径，正常关停不该有 |
+| `Native: Table slot: resolved slot=0x…`（成功）/ 四条 `Table slot: …nothing resolved.`（失败） | 活表槽的解析结果。**它与钩子成没成无关**——`ResolveTableSlot` 排在装钩子之前，失败只记日志不中止 | 失败会让活表写入永远是 `-2`，见 §6 |
 
-布局失败时 `Startup phase=semantic-layout-resolution state=failed` 也在，但"断在哪一阶段"那句话只在运行消息里。
+运行消息的具体取值（都在原生侧拼好，再经托管那行透出）：`Could not resolve the game executable path.`、`This native core only supports granblue_fantasy_relink.exe.`、`Game layout resolution failed at <阶段>; gameplay hooks were not installed and persisted sigil selections were left unchanged.`、`Resolved game layout changed before hook installation; no gameplay hook or byte patch was installed.`、`Failed to install the GemData getter hook.`、`Failed to install the skill fetch-path hook.`、`Failed to patch both native skill loop limits; changes were rolled back.`
 
-### 5.2 活表拒写
+## 6. 症状：活表拒写
 
-症状：工具里改了因子数值、文件也存了，游戏里没变。术语上这是"活表"没被改写，见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)。
+**症状**：在工具里改了因子数值、文件也存了，游戏里没变。术语上这是"活表"没被改写，见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)。
+
+**先看哪一行 → 再看哪一行 → 判据**
+
+1. **先**搜 `hot apply:`。**判据**：`hot apply: SUCCESS - rows=<n> …` 是"这一版处理完了"的**唯一**记号；只要没有它，这一版就还没生效。
+2. **再**看那一行拒写：`hot apply: the native write was refused (<码>); the edit list is saved and re-registered, so the game picks it up at its next parse`。托管层只说本层后果：没写进内存，但列表已存盘、已重新注册。
+3. **然后**在它上方找原生行 `Native: WriteSkillStatusTable: refused (<码>): <人话原因>`，拿码与原因（**只在码变化时出现一次**）。**判据**：按下面的码表分流。
+4. **如果连 `hot apply:` 都没有**，说明这一版根本没造出表，转 §4.1 与 §8 的 `sigil edit: …` 系列（最常见的是 `sigil edit: IDataManager is not available yet; …`）。
 
 | 该搜的日志行 | 含义 | 下一步 |
 | --- | --- | --- |
-| `hot apply: the native write was refused (<码>); the edit list is saved and re-registered, so the game picks it up at its next parse` | 托管层只说本层后果：没写进内存，但表已存盘且已重新注册 | 看紧跟其上的原生行拿码和原因 |
-| `WriteSkillStatusTable: refused (<码>): <人话原因>` | 码 + 原因；**只在码变化时出现一次** | 按码分流 |
+| `hot apply: the native write was refused (<码>); …` | 托管层只说本层后果：没写进内存，但表已存盘且已重新注册 | 看紧跟其上的原生行拿码和原因 |
+| `Native: WriteSkillStatusTable: refused (<码>): <人话原因>` | 码 + 原因；只在码变化时出现一次 | 按码分流 |
 | `hot apply: SUCCESS - rows=<n> of the game's own table rewritten in place at its boot slot in <ms> ms` | 真的写进去了，`<n>` 是改写的 52 字节行数 | 这是"这一版处理完了"的唯一记号 |
 | `sigil edit FAIL: system/table/skill_status.tbl is not the 8-byte header + 52-byte row table this mod patches: <字节数> bytes, header rows=<行数>. Nothing applied.` | 传入表形状不对（托管侧预检，早于原生） | 游戏表布局变了 |
+| `hot apply: nothing to apply - the table could not be read, or its layout is not the one this build patches (see the lines above)` | 这一版没造出表 | 读它上方的 FAIL 行 |
+| `hot apply: the edit list matches what is already in memory; nothing to do` | 字节与已交上去的那份完全相同，跳过 | 正常；这一版也算处理完了 |
 
 | 码 | 含义 | 下一步 |
 | --- | --- | --- |
@@ -216,92 +275,93 @@ sequenceDiagram
 | -6 `IDENTITY_MISMATCH` | 逐行 `Key` 对不上（Key 被别的 mod 改过，或表换了） | 别覆盖，查冲突的改表 mod |
 | -7 `WRITE_FAILED` | 写的过程中崩了，表**可能只更新了一部分** | 唯一"写之后"的码，按最保守处理 |
 
-拒写期间托管侧每 5 秒重试一次（250ms 一拍没意义），候选表被复用所以不必每次从归档重建 328 KB；这些重试**不产生日志**。
+拒写期间托管侧每 5 秒重试一次（250 ms 一拍没意义，而每次尝试都会走一遍原生写入），候选表被复用所以不必每次从归档重建 328 KB；同版重试**不产生日志**（原生也只在码变化时开口）。
 
-### 5.3 IDataManager 未就绪
+## 7. 症状：工具起不来
 
-症状：因子编辑一直不生效；日志里没有 `sigil edit: IDataManager attached`。
+**症状**：双击 `SigilLoadout.exe` 什么都不发生，或弹一个红叉对话框；也可能是"热键呼不出来"。
 
-| 该搜的日志行 | 含义 | 下一步 |
+**先看哪一行 → 再看哪一行 → 判据**
+
+1. **先**看屏幕上有没有对话框。**判据**：有对话框就说明是**随包数据**（启动期读的那七份）缺了或不是合法 JSON，工具随即 `exit 1`——`-H windowsgui` 没有控制台，写 stderr 没人看得见，所以这是它唯一的出口。对话框正文：`随包数据读不到，工具无法启动：` + 具体错误 + `它应当与 SigilLoadout.exe 一起放在 assets\ 下。`
+2. **如果窗口能开、只是呼不出来**，看 mod 侧日志里的热键几行（它们进的是 `GBFR.SigilLoadout.log`，不是工具日志）。**判据**：`Hotkey registered: … via RegisterHotKey.` 说明注册成功；`RegisterHotKey unavailable (key may be taken); fallback polling active.` 说明该键被别的程序占用、退回 250 ms 轮询，这段期间仍可用；`Hotkey message window creation failed; fallback polling active.` 则连兜底轮询都没有。
+3. **再看**按热键那一刻的两行：`Launched loadout editor tool.`（真的起了进程）或 `SigilLoadout.exe not found in the mod directory.`（装包不全，mod 目录里没有它）或 `Loadout tool is already running; toggled.`（已经开着，这次只是把窗口收/放，见 [工作流：热键呼出/收起可视工具（F1 到窗口显隐的完整链路）](/openwiki/workflows/hotkey-summon.md)）。
+4. **判据（第二次启动）**：再点一次 exe 不会弹错、也不会留下任何日志——第二个实例检测到 `Local\GBFRSigilLoadout` 已存在，就把已有窗口 `ShowWindow(SW_SHOW)` + post `0x8010` + `SetForegroundWindow`，然后 `os.Exit(0)`。可观察的结果只有"已经开着的那个窗口被拉到前台"。
+
+| 该搜的日志行 / 现象 | 含义 | 下一步 |
 | --- | --- | --- |
-| `sigil edit: IDataManager is not available yet; the edit list waits for gbfrelink.utility.manager to load` | 可选依赖还没加载；这句只说一次 | 确认 gbfrelink.utility.manager 已装且启用；只要它出现，维护拍每 250ms 会一直重试 |
-| `sigil edit: IDataManager attached` | 接上了 | 之后才可能有 `hot apply` 系列 |
-| `sigil edit FAIL: IDataManager controller not found (is gbfrelink.utility.manager enabled?)` | 这一拍想读表，但手上没有管理器 | 同第一行 |
-| `sigil edit FAIL: GetArchiveFile('system/table/skill_status.tbl') returned nothing` | 管理器在，但归档里取不到这张表 | 游戏数据或依赖版本问题 |
-| `sigil edit: nothing applied - the table could not be read, or its layout is not the one this build patches (see the lines above)` | 这一版没造出表 | 读它上方的 FAIL 行；特性已"启动过"，但每一拍仍会重来 |
-
-编辑列表本身读不出来是另一回事（`sigil edit: list load failed: …`，见 5.5）。
-
-### 5.4 资产缺失
-
-症状：双击 `SigilLoadout.exe` 弹一个红叉对话框，然后什么都不发生——`-H windowsgui` 没有控制台，写到 stderr 没人看得见。
-
-| 该搜的日志行 | 含义 | 下一步 |
-| --- | --- | --- |
-| 对话框正文：`随包数据读不到，工具无法启动：` + 具体错误 + `它应当与 SigilLoadout.exe 一起放在 assets\ 下。` | 启动期要读的七份之一读不到或不是合法 JSON；工具随即 `exit 1` | 错误文本里带着出错路径（`读随包数据 <路径>: …`）或 `随包数据 <名字> 不是合法 JSON: …` |
-| 工具窗口里的失败提示（无日志行） | `sigils.json` / `sigils.chara.json` 是**按需读**的，失败不弹对话框、也不进任何日志 | 在这两个文件上找原因：它们在 `assets\` 下 |
-| `SigilLoadout.exe not found in the mod directory.` | 热键或托盘想拉起工具，但 mod 目录里没有它 | 装包不全 |
+| 对话框正文 `随包数据读不到，工具无法启动：` + `它应当与 SigilLoadout.exe 一起放在 assets\ 下。` | 启动期要读的七份之一读不到或不是合法 JSON；工具随即 `exit 1` | 错误文本里带着出错路径（`读随包数据 <路径>: …`）或 `随包数据 <名字> 不是合法 JSON: …` |
+| 工具窗口里的失败提示（**无日志行、无对话框**） | `sigils.json` / `sigils.chara.json` 是**按需读**的，失败不弹对话框、也不进任何日志 | 在这两个文件上找原因：它们在 `assets\` 下 |
+| `Hotkey configuration unavailable: <消息>; falling back to the default F1 hotkey.` | 热键配置读不出来 | 不影响其它功能，F1 仍可用 |
+| `SigilLoadout.exe not found in the mod directory.` | 热键想拉起工具，但 mod 目录里没有它 | 装包不全 |
 | `Native core not found: <路径>`（出现在 `Initialization failed: …` 里） | 原生 DLL 缺失或路径不对 | 装包不全 |
-| `sigil edit FAIL: GetArchiveFile(…) returned nothing` | 游戏归档侧取不到表 | 见 5.3 |
+| 工具关于窗口状态的诊断 | 默认完全静默 | 建一个 `tool-debug.on` 打开，见 §10 |
 
-随包数据一共九份，启动时读**七份**（`sigils.lang.json`、`chara.lang.json`、`skill_status.json`，以及 `skill.<zh|en|ja|ko>.json` 四份），另两份按需读。
+随包数据一共九份，启动时读**七份**（`sigils.lang.json`、`chara.lang.json`、`skill_status.json`，以及 `skill.<zh|en|ja|ko>.json` 四份），另两份（`sigils.json`、`sigils.chara.json`）按需读。
 
-### 5.5 配置坏文件
+## 8. 症状：配置坏文件
 
-两个 JSON 的失败语义**不一样**：`loadout.json` 坏了就"保留上一份有效配置"，`sigiledits.json` 坏了就"什么都不写"（绝不把一份不完整的表盖进游戏）。两者都是同一版只报一次。
+两个 JSON 的失败语义**不一样**：`loadout.json` 坏了就"保留上一份有效配置"，`sigiledits.json` 坏了就"什么都不写"（绝不把一份不完整的表盖进游戏）。两者的去重机制也不同：前者靠版本门的**认领**（`Changed()` 无论随后成败都推进版本），所以同一份坏配置只报一次、不会被 250 ms 一拍反复重灌；后者只在**确实写进游戏内存后**才推进版本，所以失败的那一版下一拍还会重试，但同版重试静默（5 秒节流）。
+
+**先看哪一行 → 再看哪一行 → 判据**
+
+1. **先**搜这一版有没有被报到：`Invalid loadout.json; kept previous configuration: <消息>` 或 `sigil edit: list load failed: <异常>`。**判据**：前者保留上一份配置，后者这一拍什么都不写；两条都只报一次。
+2. **再**看逐条的跳过原因：`sigil edit:   skip (…)` 与 `sigil edit:   <KEY> L<LEVEL>: row not found` 系列。**判据**：`sigil edit: no edit reached a row (<n> enabled); not writing the table back` 说明列表读到了，但一条都没落到行上——真因就在它上面那几行里。
+3. **判据（文件被删）**：`loadout.json removed; restored the built-in exclusive template.` 是**真实答案**而不是错误：删掉配装文件等于"只剩内置专属模板"。`sigil edit: no edit list yet at <路径> (the tool writes it there)` 同理，它也是"工具从没跑过"的记号。
 
 | 该搜的日志行 | 含义 | 下一步 |
 | --- | --- | --- |
-| `Invalid loadout.json; kept previous configuration: <消息>` | 形状 / 大小（>1 MB）/ JSON 坏；上一份有效配置继续生效 | 修或删 `%LOCALAPPDATA%\GBFRSigilLoadout\loadout.json` |
-| `loadout.json removed; restored the built-in exclusive template.` | 文件被删是**真实答案**（= 只剩内置专属模板），不是错误 | 无需处理 |
+| `Invalid loadout.json; kept previous configuration: <消息>` | 形状 / 大小（> 1 MB）/ JSON 坏；上一份有效配置继续生效 | 修或删 `%LOCALAPPDATA%\GBFRSigilLoadout\loadout.json` |
+| `loadout.json removed; restored the built-in exclusive template.` | 文件被删是真实答案（= 只剩内置专属模板） | 无需处理 |
 | `loadout.json has no general slots; built-in exclusive template active.` | 配置存在但通用槽为空 | 正常 |
-| `Native rejected the custom loadout; kept previous configuration.` | 原生拒绝了这次应用（如计数越界） | 结合紧邻的原生行定位 |
+| `Native rejected the custom loadout; kept previous configuration.` | 原生拒绝了这次应用（如计数越界，上方有 `Native: ApplyLoadout: counts out of range …`；钩子未装成时这一句没有对应的原生行） | 结合紧邻的原生行与 `Startup phase=native-core` 定位 |
 | `Applied custom loadout, slots=<n>.` | 应用成功 | 是否"可见"还要等下一场战斗 |
-| `exclusive: '<键>' is not a character hash; ignored.` / `has a non-hash skill key '<键>'; ignored.` | `exclusive` 里用了显示标签之类的非 hash 键 | 用角色 hash / 技能 hash |
+| `exclusive: '<键>' is not a character hash; ignored.` / `exclusive: '<角色键>' has a non-hash skill key '<键>'; ignored.` | `exclusive` 里用了显示标签之类的非 hash 键 | 用角色 hash / 技能 hash，见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md) |
 | `sigil edit: list load failed: <异常>` | `sigiledits.json` 读不出来（不是 JSON 对象、没有 `edits` 成员、`edits` 不是数组、超过 1 MB） | 修文件；这一拍什么都不写，下一拍还会重试 |
 | `sigil edit: no edit list yet at <路径> (the tool writes it there)` | 文件还不存在 | 用工具存一次；这也是"工具从没跑过"的记号 |
 | `sigil edit: no edit reached a row (<n> enabled); not writing the table back` | 列表读到了，但一条都没落到行上 | 往上找逐条的跳过原因 |
-| `sigil edit:   skip (disabled)` / `skip (key is not an 8-digit hex hash yet)` / `skip (level <n> is below the first level)` / `<KEY> L<LEVEL>: row not found` / `slot <n> is not a finite number (<值>)` | 逐条被跳过的原因 | 按行修 `sigiledits.json` |
-| `Hotkey configuration unavailable: <消息>; falling back to the default F1 hotkey.` | 热键配置读不出来 | 不影响其它功能，F1 仍可用 |
-| `RegisterHotKey unavailable (key may be taken); fallback polling active.` | 该键被别的程序占用，退回 250ms 轮询 | 换一个键 |
+| `sigil edit:   skip (disabled): <哈希>` / `skip (key is not an 8-digit hex hash yet): <键>` / `skip (level <n> is below the first level): <键>` / `<KEY> L<LEVEL>: row not found` / `<KEY> L<LEVEL>: slot <n> is not a finite number (<值>); left as the game has it` | 逐条被跳过的原因 | 按行修 `sigiledits.json` |
+| `sigil edit: the edit list changed while the table was being built; it will be applied on the next tick` | 建表期间文件又变了，这一版作废（不推进版本） | 无需处理：下一拍按新版本重来 |
+| `Hotkey configuration unavailable: <消息>; falling back to the default F1 hotkey.` / `RegisterHotKey unavailable (key may be taken); fallback polling active.` | 热键配置读不出来，或该键被占用 | 换一个键；不影响其它功能 |
 
-## 6. 配装热重建：跳过与失败的行
+## 9. 附：配装热重建那一组行
 
-这一组行来自维护拍驱动的状态重建，是第二条高频日志来源。跳过大多**是正常的**——改动仍会在游戏下一次自然构建时落地。
+这一组行来自维护拍驱动的状态重建（配装改动除换选择外，还会对**已知的出战角色**各重建一次），是第二条高频日志来源。跳过大多**是正常的**——改动仍会在游戏下一次自然构建时落地（战斗中游戏不会自己重建 context-1，所以这条热重建是战斗里唯一的落地机会，见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)）。
 
 | 该搜的日志行 | 含义 | 下一步 |
 | --- | --- | --- |
-| `hot rebuild: skipped (game is building)` | 游戏此刻正在建状态（250ms 静默窗内） | 正常；同一份 status 被两边同时碰就是竞态 |
+| `hot rebuild: skipped (game is building)` | 游戏此刻正在建状态（250 ms 静默窗内） | 正常；同一份 status 被两边同时碰就是竞态 |
 | `hot rebuild: skipped (party changed just now)` | 换人 / 切场景后 2 秒内 | 正常，实测崩溃都发生在这个窗口里 |
 | `hot rebuild: skipped (cooling down after a failed rebuild)` | 上一次重建失败后的 60 秒冷却 | 等冷却；反复出现就看 `status rebuild:` |
-| `hot rebuild: no party known yet; skipped` | 还没认出队伍 | 进场景 / 战斗后会出现 `ctx1 build`、`party+` |
+| `hot rebuild: no party known yet; skipped` | 还没认出队伍 | 进场景 / 战斗后会出现 `ctx1 build`、`party+`；注意这一条也会推掉那 500 ms 节流 |
 | `hot rebuild: char=0x… skipped (left the party: assembly <a> < <b>)` | 这份 status 属于上一轮装配，游戏已把它拆掉 | 正常：不去戳内存垃圾 |
+| `hot rebuild: char=0x… skipped (no context-1 status seen)` | 队伍名单里有、但没记到它那份对象 | 正常，等游戏自己构建 |
 | `hot rebuild: char=0x… status=0x… pass=… ok=0` + `hot rebuild: cooling down 60s (a rebuild failed)` | 重建调用失败 | 真因看同一拍的 `status rebuild:` 行 |
-| `status rebuild: refused before the call (identity mismatch)` / `the game's rebuild raised; the object was probably gone` / `identity changed after the call` | 三种失败原因：身份不符 / 重建抛异常 / 重建后身份变了 | 都表示对象已不可信，进入 60 秒冷却 |
-| `ctx1 build: char=0x… status=0x… pass=…` | 观察到一次 context-1（在场那份）构建；记录真变了才打印 | 这是"游戏认出了这个角色在场"的证据 |
+| `status rebuild: refused before the call (identity mismatch) (char=0x… status=0x…)` / `the game's rebuild raised; the object was probably gone …` / `identity changed after the call …` | 三种失败原因：身份不符 / 重建抛异常 / 重建后身份变了 | 都表示对象已不可信，进入 60 秒冷却 |
+| `ctx1 build: char=0x… status=0x… pass=…`（可带 ` (new object)`、` (via our rebuild)`、` (new party member)`） | 观察到一次 context-1（在场那份）构建；记录真变了才打印 | 这是"游戏认出了这个角色在场"的证据 |
 | `party+ char=0x… (<n> known)` | 首次见到某个角色 | 队伍名单在增长 |
-| `Skill contribution confirmed for 0x…: <n>/<m> virtual sigils reached the context-1 status.` | 虚拟槽位真的进了角色状态；每会话只报一次 | 健康会话里出现一次即可 |
-| `Skill contribution incomplete for 0x…: <n>/<m> …` | 有槽位没进去；**每次**都报 | 看 `hot rebuild` 是否被跳过、配装是否超容量 |
 
-## 7. 可视工具：诊断默认静默，以及怎么打开
+节流窗口（CAS 认领 500 ms）命中时**刻意静默**：每个 tick 都可能命中，写日志只会把有信息量的跳过淹掉。
+
+## 10. 工具侧窗口诊断：默认静默，以及怎么打开
 
 工具的窗口状态诊断走一个**标记文件开关**：
 
-- `debugf` 每次调用先看 `exeDir()\tool-debug.on` 是否存在；不存在立即返回，不存在就什么文件都不产生。存在则向同目录 `tool-debug.log` 追加一行 `HH:MM:SS.mmm <消息>`。
+- `debugf` 每次调用先看 `exeDir()\tool-debug.on` 是否存在；不存在立即返回——**什么文件都不产生**。存在才向同目录 `tool-debug.log` 追加一行 `HH:MM:SS.mmm <消息>`。
 - **为什么默认静默**：正式安装从不创建那个标记，所以玩家永远不会在 mod 目录里多出诊断文件（mod 目录每次更新会被整份替换，也不适合放可变状态）。
 - **怎么打开**：在 `SigilLoadout.exe` 旁边（也就是 mod 目录）建一个**空文件** `tool-debug.on`。内容不参与判断（只看存不存在），也**不需要重启**——每次调用都重新判定；删掉即恢复静默，`tool-debug.log` 是追加写的，自己删即可。
 - **打开后能读到什么**：假隐藏 / 显出这条链上的每一步，例如 `fakeHide post hwnd=… target=…`、`hideNow hwnd=… fg=… target=…`、`pre-setfg fg=… target=…`、`SetForegroundWindow(<hwnd>) ret=… err=… fgNow=…`、`replay cursor-hiding click (hold)`、`EnableWindow ret=…`、`revealTool hwnd=…`、`WM_CLOSE hwnd=…`、`0x8010 prev=… hidden=…`。
 - **它不含单实例与托盘那几行**：那几处走标准库 `log`，而 exe 以 `-H windowsgui` 编译、全代码里没有任何 `log.SetOutput`，所以正式构建里那几行无处可见。
 - 写不进日志文件时静默返回；实现是每次调用 OpenFile + Close，适合窗口事件这种低频量，别往里塞高频采样。
 
-单实例与关闭路径：
+单实例与关闭路径（这两条决定了"为什么点了没反应"）：
 
-- 单实例判据是 `CreateMutexW("Local\\GBFRSigilLoadout")` 返回 `ERROR_ALREADY_EXISTS`。第二次启动找到已有窗口 → `ShowWindow(SW_SHOW)` + post `0x8010` + `SetForegroundWindow` → `os.Exit(0)`。它**不持有**互斥体（没有 `WaitForSingleObject`、也不 `ReleaseMutex`），句柄刻意不关——命名对象要活到进程退出才满足这个判据；创建失败只记一行然后继续跑。可观察的结果只有"已经开着的窗口被拉到前台"。
+- 单实例判据是 `CreateMutexW("Local\\GBFRSigilLoadout")` 返回 `ERROR_ALREADY_EXISTS`。第二个实例只把已存在的窗口 `ShowWindow(SW_SHOW)` + post `0x8010` + `SetForegroundWindow`，然后 `os.Exit(0)`。它**不持有**互斥体（没有 `WaitForSingleObject`、也不 `ReleaseMutex`），句柄刻意不关——命名对象要活到进程退出才满足这个判据；创建失败只记一行然后继续跑。
 - 关闭路径要防的是防抖里压着的那份编辑：`app.OnShutdown` 注册了两个 `flushNow`（编辑列表与配装各一个），并且必须在 `window.Close()` 之前置 `quitting`，否则那记 `WM_CLOSE` 会被当成"用户点了 X"改道成假隐藏（`windowstate.go` 是这条状态机的唯一所有者）。
-- 写盘失败的可见通道**不在日志里**：`debouncedWriter` 把待写放回、`log.Printf`（GUI 构建里看不到），再向前端发 `GBFR.SigilLoadout.SaveFailed` 事件 → 工具窗口里弹失败对话框。所以看到"保存失败"提示时，别去翻 `tool-debug.log`。
+- 写盘失败的可见通道**不在日志里**：`debouncedWriter` 把待写放回、`log.Printf`（GUI 构建里看不到，行形如 `sigil edit: creating the config folder <路径>: …`），再向前端发 `GBFR.SigilLoadout.SaveFailed` 事件 → 工具窗口里弹失败对话框。所以看到"保存失败"提示时，别去翻 `tool-debug.log`，那确实是唯一一条用户可见的通道。
 
-## 8. 这些契约由谁钉住
+## 11. 这些契约由谁钉住
 
-- `SigilLoadout/sharedconstants_test.go` 对拍两份字面量：窗口标题（mod 靠它找窗口）、三条窗口消息、用户配置目录与两个文件名、以及 `GBFR.SigilLoadout.SaveFailed` 事件名（Go 发、前端收——只改一边不会编译失败，只会让那张失败对话框永远不弹）。
+- `SigilLoadout/sharedconstants_test.go` 对拍跨语言声明的字面量（C# / Go / TS / C++ 各写一份，写错**不会编译失败**）：窗口标题（mod 靠它找窗口）、两条窗口消息（`0x8010` 激活 / `0x8012` 开关）、用户配置目录与两个文件名、`sigiledits.json` 的成员名，以及 `GBFR.SigilLoadout.SaveFailed` 事件名（Go 发、前端收——只改一边不会编译失败，只会让那张失败对话框永远不弹）。
 - `SigilLoadout/editservice_test.go` 的写失败用例：写入做不成时那行必须落进日志（测试直接抓 `log` 输出），并且待写必须放回——没有后续编辑而直接退出时，`flushNow` 是它唯一的机会。
-- `tests/NativeLayoutHarness` 用真实游戏 exe 验布局解析与 fail-closed（改坏一个 hook 字节必须让复验失败）；不给 `GBFR_EXE` 时它打印 `NATIVE_LAYOUT=SKIP` 并以 0 退出，所以它是一条可跳过的门禁，见 [构建、发布与部署链](/openwiki/operations/build-and-release.md)。
+- `tests/NativeLayoutHarness` 用真实游戏 exe 验布局解析与 fail-closed（改坏一个 hook 字节必须让复验失败，成功时打印 `NATIVE_LAYOUT=PASS` 与 `NATIVE_LAYOUT_FAIL_CLOSED=PASS`）；不给 `GBFR_EXE` 时 `run.ps1` 打印 `NATIVE_LAYOUT=SKIP (未给 -Exe / $env:GBFR_EXE)` 并以 0 退出，所以它是一条可跳过的门禁，见 [构建、发布与部署链](/openwiki/operations/build-and-release.md) 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。

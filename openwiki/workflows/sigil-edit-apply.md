@@ -1,11 +1,8 @@
 ---
 type: workflow
 title: 工作流：因子数值编辑与热应用
-description: 因子数值从一次按键到游戏活表的端到端链路：编辑器里"什么算一条编辑"（isEdit/trimGameValues/dedupe 的不变量、十个参槽与 null 语义）、sigiledits.json 的 500ms 防抖原子写、托管宿主 Tick 的 mtime 门与 5s 重试节流、从 IDataManager 读归档 skill_status.tbl 过形状预检后按 (Key, Level) 打行、RegisterWithManager 重新注册、再交给原生原地写活表；含"说明实时更新而实际效果下一场战斗生效"与拒写/候选表复用两条路径。
+description: 因子数值从一次按键到游戏活表的端到端链路：可视工具里"什么算一条编辑"（isEdit/trimGameValues/dedupe 的不变量、十个参槽与 null 语义）、sigiledits.json 的 500ms 防抖原子写、托管宿主 Tick 的 mtime 门与 5s 重试节流、从 IDataManager 读归档 skill_status.tbl 过形状预检后按 (Key, Level) 打行、RegisterWithManager 重新注册、再交给原生原地写活表；含"说明实时更新而实际效果下一场战斗生效"与拒写/候选表复用两条路径。
 tags: [workflow, sigil-edits, hot-apply, debounce, mtime-gate, retry, skill-status-table]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
   - id: openwiki-source-39c3295efc089133e87a9c80
     resource: repo://CONTEXT.md
@@ -47,7 +44,10 @@ sources:
     resource: repo://SigilLoadout/main.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 工作流：因子数值编辑与热应用
@@ -118,7 +118,7 @@ sequenceDiagram
 - **`asEdits`**：先 `trimGameValues` 再 `filter(isEdit)`——列表、`sigiledits.json` 和游戏三边对"什么算编辑"的看法一致，全靠它是唯一的闸口。组件里再写一遍那条规则曾经导致"清空最后一个数值顺手把用户勾上的那一下也撤销了"。
 - **`dedupe`**：**一个地址（`key#level`）最多一条编辑**。`PatchRows` 按列表顺序逐条写，同一地址上游戏最终拿到的是最后一条已启用的——所以去重留最后一条已启用的，该地址一条已启用的都没有时留最后一条（不论启用与否）。面板的编辑态本身就是按地址索引的 `Map`，这个不变量于是由容器结构保证，没有路径需要手工整体重建。
 
-十个参槽按位置对应 `LevelValue1..10`，`null` 的意思是**保留游戏原值**，不是 0。为什么不能写全值：本工具对绝大多数参槽一无所知（参槽含义的唯一线索是游戏自己的说明文案），把"工具看到的那份表"整套写下去就会用一份陈旧副本覆盖掉它没编辑过的槽位。补齐到正好十个的动作在两侧各做一次（Go 的 `padValues`、C# 的 `Config.Load`），所以线格式的形状稳定：短一截或没有 `values` 的文件读出来是十个 `null`，写出去也永远是十项。
+十个参槽按位置对应 `LevelValue1..10`，`null` 的意思是**保留游戏原值**，不是 0。为什么不能写全值：可视工具对绝大多数参槽一无所知（参槽含义的唯一线索是游戏自己的说明文案），把"可视工具看到的那份表"整套写下去就会用一份陈旧副本覆盖掉它没编辑过的槽位。补齐到正好十个的动作在两侧各做一次（Go 的 `padValues`、C# 的 `Config.Load`），所以线格式的形状稳定：短一截或没有 `values` 的文件读出来是十个 `null`，写出去也永远是十项。
 
 面板侧还有两条容易踩空的规则：
 
@@ -134,7 +134,7 @@ sequenceDiagram
 - **失败重投**：写入发生在定时器回调里，已经没有调用方可以返回错误。失败时把待写**放回**（一次瞬时 IO 失败不该变成永久丢失）、记日志、并通过 `GBFR.SigilLoadout.SaveFailed` 事件推给前端；前端用与立即失败相同的对话框显示它。事件名是跨层协议常量，两侧各写一份字面量，改名必须同时改两处。
 - **关窗兜底**：`app.OnShutdown(editService.flushNow)`。窗口可能在防抖窗口里就被关掉，而刚做的那次编辑才是用户想留下的。
 
-`nil`（前端传 `null`）与空列表**不是同一件事**：前者是"这次什么都没交"（不写盘），后者是写出一份"所有编辑都关掉了"的文件——对 mod 而言就是撤销全部编辑。读取侧对称地分三种情况：文件不存在 = 空列表（没有内置的起始编辑，否则"打开可视工具"本身就是一次对游戏的改动）；存在但读不出或解析不了 = **错误**而不是空列表（把坏文件显示成空列表，正是某次误触按键把这份空覆盖回用户编辑内容的方式）；`{"edits":[]}` = 真实答案。
+`nil`（前端传 `null`）与空列表**不是同一件事**，而托管侧的读法把两者的差别变成硬后果：空列表写出的是一份 `edits: []` 的文件，读出来就是"所有编辑都关掉了"——对 mod 而言就是撤销全部编辑；`nil` 是"这次什么都没交"，而 `nil` 切片在线格式上写作 `null` 而不是 `[]`（`LoadEdits` 的归一化注释写着这一点），托管侧又把"`edits` 不是数组"（`null` 也算）判成**读不出来**，于是那一版什么都不应用，绝不会被当成"撤销全部编辑"。读取侧对称地分三种情况：文件不存在 = 空列表（没有内置的起始编辑，否则"打开可视工具"本身就是一次对游戏的改动）；存在但读不出或解析不了 = **错误**而不是空列表（把坏文件显示成空列表，正是某次误触按键把这份空覆盖回用户编辑内容的方式）；`{"edits":[]}` = 真实答案。
 
 ## 三、托管侧：mtime 门与 250ms 维护拍
 
@@ -144,7 +144,7 @@ sequenceDiagram
 
 `Tick` 的判据只有三行：
 
-1. 管理器还没接上 → 回到 `Bootstrap`（管理器是**可选**依赖，可能比本 mod 晚加载，所以每拍重试，只在第一次说一句"在等它"）。
+1. 数据管理器（`IDataManager`）还没接上 → 回到 `Bootstrap`（它是**可选**依赖，可能比本 mod 晚加载，所以每拍重试，只在第一次说一句"在等它"）。
 2. `Pending` 为假 → 什么都不做。
 3. 同一版本的重试按 `RetryIntervalMs = 5000` 节流（第一次尝试不节流；文件一变立刻处理，那一版不算节流）。
 
@@ -152,7 +152,9 @@ sequenceDiagram
 
 - **版本号必须在读内容之前取**。反过来就会出现"内容来自 T1、版本号来自 T4"，而 T1→T4 之间落盘的那次保存会被 `MarkApplied(T4)` 判成已生效——内存里却是旧内容，编辑静默丢失且不再重试。
 - **造表期间文件又变了就不写、也不推进版本**，让 `Tick` 按新版本重来。
-- **管理器接上了但表造不出来**（归档读不出来、或布局不是本构建认识的那一种）就什么都不写；`_started` 已置上，此后由 `Tick` 的 mtime 门继续（版本没推进，所以下一拍照样放行）。
+- **数据管理器接上了但表造不出来**（归档读不出来、或布局不是本构建认识的那一种）就什么都不写；`_started` 已置上，此后由 `Tick` 的 mtime 门继续（版本没推进，所以下一拍照样放行）。
+
+列表为空（或文件根本不存在）时两条路径的后果**不同**：启动那次什么都不写——`PatchRows` 返回 0 就提前返回，日志还把"还没有编辑列表"与"没有一条编辑落到行上"分成两句——而运行中的热应用把缺失的文件当成空列表，交出去的因此是一份**未编辑的**表：删掉 `sigiledits.json` 就是把已经生效的编辑从活表里撤销（与 `loadout.json` 同一种反应）。启动那一拍只是跳过、版本没推进，所以下一拍的 mtime 门照样放行，那份原表终究会被交出去——两条路径只在第一拍上不同。
 
 ## 四、造表：从归档读、验形状、按 (Key, Level) 打行
 
@@ -213,13 +215,14 @@ flowchart TD
 
 ## 六、为什么"说明实时更新、实际效果下一场战斗生效"
 
-玩家文档（`GBFR.SigilLoadout/README.md`）承诺：改动时游戏内该因子的**说明**实时更新，**实际效果**在下一场战斗开始时生效；无需重启。源码支持的是这条链路的**两半**：
+玩家文档（`GBFR.SigilLoadout/README.md`）承诺：改动时游戏内该因子的**说明**实时更新，**实际效果**在下一场战斗开始时生效；**无需重启**，运行中的游戏随即把编辑应用到它已经读进内存的那张表上。源码支持的是这条链路的两半——而每一半对应到哪几句源码可以一一指出：
 
-- 编辑只碰活表里的 `LevelValue1..10` 字节（`Key`、`Level` 等字段从不写），所以就地写成功后游戏读这张表拿到的就是新数字——玩家文档说的"说明实时更新"就是这一半，链路里没有别的机制参与它。
-- 角色身上的数值是另一份数据：术语表把"表已经被改写"与"**可见**"（游戏已经把新值算进了角色状态）明确分成两件事，托管侧自己的注释也把这一点写成"数值要到下一场战斗才生效"。这也是 250ms 维护拍"不是个量"的原因。
-- 这条承诺**只在原生就地写成功时成立**。拒写时内存一个字节都没变，编辑已写进文件并重新注册，要等游戏下一次解析或重启才落地——这条路径只出现在日志里（`the edit list is saved and re-registered, so the game picks it up at its next parse`），见 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
+- 编辑只碰活表里的 `LevelValue1..10` 字节（`PatchRow` 按 `(Key, Level)` 定位那一行，`Key`、`Level` 等字段从不写），所以就地写成功后游戏读这张表拿到的就是新数字——玩家文档说的"说明实时更新"就是这一半，链路里没有别的机制参与它。
+- **"表已经被改写"不是"可见"**：术语表把前者与"**可见**"（游戏已经把新值算进了**角色描述**）明确分成两件事，而"可见"与"实际生效"又是两件事。于是就地写成功只保证游戏手里那份（活）表变了：角色身上的数值要到下一次战斗才重算。托管侧自己的注释也把这一点写成"数值要到下一场战斗才生效"，这也是 250ms 维护拍"不是个量"的原因。
+- 这条承诺**只在原生就地写成功时成立**。拒写时内存一个字节都没变（原生那一段注释写明了"拒写的代价只是这一局内存不变"），编辑已写进文件并重新注册，要等游戏下一次解析或重启才落地——这条路径只出现在日志里（`the edit list is saved and re-registered, so the game picks it up at its next parse`），见 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
+- 玩家文档"**不带 `.tbl` 文件**：表从游戏封包中读出、在内存里改写，所以能和其他**改表** mod 并存"这一条同样与源码一致：造表的输入永远是 `IDataManager.GetArchiveFile("system/table/skill_status.tbl")` 的返回值，mod 目录里没有表文件，原生改写的也是游戏自己已解析的那块缓冲区。
 
-参槽的含义也只能从游戏自己的说明里读出来：随包资产 `skill.<lang>.json` 的 `explain` 分段里 `{N}` 就是 `LevelValue(N+1)`，工具把 `{N}` 改写成从 1 开始数的 `{N+1}` 才和十个输入框对得上。注意两侧数据来源不同：工具显示的起始数值与"什么算没动过"参照的是随包 `skill_status.json`，真正被改写的表来自归档——资产漂移时，占位符显示的数字与游戏原值会对不上（见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)）。
+参槽的含义也只能从游戏自己的说明里读出来：随包资产 `skill.<lang>.json` 的 `explain` 分段里 `{N}` 就是 `LevelValue(N+1)`，可视工具把 `{N}` 改写成从 1 开始数的 `{N+1}` 才和十个输入框对得上。注意两侧数据来源不同：可视工具显示的起始数值与"什么算没动过"参照的是随包 `skill_status.json`，真正被改写的表来自归档——资产漂移时，占位符显示的数字与游戏原值会对不上（见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)）。
 
 ## 七、失败与运维读法
 
@@ -227,7 +230,7 @@ flowchart TD
 
 | 日志 | 含义 |
 | --- | --- |
-| `sigil edit: IDataManager is not available yet; the edit list waits for gbfrelink.utility.manager to load` | 管理器缺席，编辑永远不会落地（只在第一次说一句） |
+| `sigil edit: IDataManager is not available yet; the edit list waits for gbfrelink.utility.manager to load` | 数据管理器缺席，编辑在它加载之前不会落地（只在第一次说一句） |
 | `sigil edit: N enabled` / `skip (…)` / `KEY L15 @0x…: …` | 读到的列表与逐条的落点，以及每条编辑最终写进那一行的十个值 |
 | `sigil edit FAIL: system/table/skill_status.tbl is not the 8-byte header + 52-byte row table this mod patches: … bytes, header rows=…` | 形状预检没过，一个字节都没改 |
 | `hot apply: the native write was refused (码); the edit list is saved and re-registered, …` | 拒写（同版本只报一次），5 秒后重试 |

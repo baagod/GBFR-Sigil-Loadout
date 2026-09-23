@@ -3,9 +3,6 @@ type: concept
 title: 两个配置文件与跨语言常量契约
 description: 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、形状校验责任的划分、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 对拍的范围与它证明不了的东西。
 tags: [configuration, file-format, cross-language, contract, mtime, validation]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T17:28:03.050Z
 sources:
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
     resource: repo://GBFR-Sigil-Loadout.sln
@@ -29,6 +26,8 @@ sources:
     resource: repo://SigilLoadout/editservice_test.go
   - id: openwiki-source-9e45365fcf44633af4489b2c
     resource: repo://SigilLoadout/editservice.go
+  - id: openwiki-source-35bfa15a0bffce3055471ebd
+    resource: repo://SigilLoadout/frontend/src/index.test.ts
   - id: openwiki-source-00406d1c826c7d1ff3bde8c3
     resource: repo://SigilLoadout/frontend/src/model.ts
   - id: openwiki-source-a877d6a19260cf861fd5bddf
@@ -37,7 +36,10 @@ sources:
     resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 两个配置文件与跨语言常量契约
@@ -73,6 +75,7 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
 - **为什么不放在 mod 目录**：mod 目录每次更新会被整个替换，要活过一次更新的东西都不能放在那里（`UserConfig` 的类注释）。
 - **为什么 Go 不回落到 `os.UserConfigDir()`**：它在 Windows 返回 `%APPDATA%`（Roaming），与 C# 的 `LocalApplicationData` 是两个目录，于是两侧各自看得见一个「自己的」配置文件而互不干扰——症状是配置完全没生效、编辑永远不落地，且**两边都不报错**。
 - **为什么目录名与文件名「各只有一处声明」**：两侧算的是同一个字符串，中间没有任何协商点，所以每一处常量只能有一个出处，否则「改了一边」既没有编译错误、也没有运行时报错，只有一道对拍能发现。
+- **谁创建目录**：只有写入侧。`writeFileAtomic` 在写之前 `MkdirAll` 出 `%LOCALAPPDATA%\GBFRSigilLoadout`，所以首次保存不需要用户先建目录；两个读取侧（`LoadoutConfig`、`Config.Load`）只读，从不创建、也从不写。
 
 ### 每个常量的声明位置与漂了的表现
 
@@ -121,7 +124,7 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
 | `slots[].items` | 前端 | 必需、数组、长度 ≥ 1；只读 `items[0]` 与 `items[1]` | Go 在存盘时拒掉长度 > 2（`items must have 1 or 2 entries`）；手改的文件绕过 Go 之后，第 3 项及以后被 C# **静默忽略** |
 | `items[0].gem` | 前端（`buildLoadoutPayload` 解析出的物品 hash） | `GetProperty("gem")`，非十六进制或为 0 → `slot N: bad sigil hash` | 成员缺失会让 `GetProperty` 直接抛 `KeyNotFoundException`，落进外层 catch 变成通用的 `Invalid loadout.json; kept previous configuration: …` |
 | `items[0].hash` | 前端（主技能 hash） | 必需（`TryGetProperty`），缺失 → `slot N: main item carries no skill hash` | 拼错成别的名字 = 同一句话。**这是 mod 不再持有因子表的直接后果**：主技能只能随载荷走 |
-| `items[1].hash` | 前端（有副技能才写） | 可选；有就解析，非十六进制 → `bad secondary skill hash` | 缺失即「没有副技能」，不会报错 |
+| `items[1].hash` | 前端（有副技能才写） | 只有**整个 `items[1]` 不存在**才等于「没有副技能」；这一项存在就必须带 `hash`（`GetProperty` 缺成员直接抛 `KeyNotFoundException` → 整份文件被拒），非十六进制 → `bad secondary skill hash` | 手改出的 `{"level":15}` 第二项会被判成坏文件（不是「没有副技能」）；Go 侧同样在存盘前拒掉 `items[1].hash` 为空的载荷（`second item hash is empty`） |
 | `items[*].level` | 前端（已夹在自己的 cap 内） | 缺失 → `DefaultLevel`（15）；负数 → `must not be negative`；上界不判 | 漏写 `level` 时工具与游戏必须落回同一个数，这正是 `DefaultLevel` 被对拍的原因 |
 | `slots[].enabled` | 前端（永远显式写） | `!TryGetProperty("enabled", …) \|\| GetBoolean()` —— **缺成员算启用** | 见下面那条真实回归 |
 | `exclusive` | 前端（只写**关掉**的槽） | 只把值为 `false` 的项变成 override；外层键解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` | 成员名拼错 = C# 当它不存在 = 所有专属开关静默失效（三槽全开）。PL 码不是这里的身份，所以按 PL 码写的键会被忽略并记日志 |
@@ -241,4 +244,4 @@ flowchart TD
 | **同侧重复或搬移不一定红** | 名字精确到文件的组（如 `loadoutservice.go` 里的 `MaxSlots`）只在**那一个文件**里找：在别的文件里再加一份副本不会被发现，而这一份正好会与另一份漂移 |
 | **比的是字面量，不是行为** | 「空数组 ≠ 缺成员」「缺 `enabled` = 启用」「坏文件保留上一份」「1 MiB 上限」「两种 mtime 门」全都不在它的结论里 |
 
-行为那一半由别的东西守住：Go 侧有 `TestValidateSlots*`、`TestSaveLoadout*`（含被拒的保存不碰磁盘、并发保存不撕裂文件、防抖只落最后一份）、`TestLoadEdits*`（空列表 vs 解析不了、旧拼写、`[]` 而不是 `null`）、`TestPadValuesAlwaysGivesTenSlots`、`TestUserCfgDirMatchesModPath` 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 里列出的其余套件。**托管侧没有测试工程**（解决方案里只有原生工程与托管工程），所以 `LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察——这也是「文档表」和这道对拍必须同时维护、谁都不能替代谁的原因。
+行为那一半由别的东西守住：Go 侧有 `TestValidateSlots*`、`TestSaveLoadout*`（含被拒的保存不碰磁盘、并发保存不撕裂文件、防抖只落最后一份）、`TestLoadEdits*`（空列表 vs 解析不了、旧拼写、`[]` 而不是 `null`）、`TestPadValuesAlwaysGivesTenSlots`、`TestUserCfgDirMatchesModPath` 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 里列出的其余套件；前端有 `frontend/src/index.test.ts` 的「落盘载荷」一组，钉住 `buildLoadoutPayload` 写出的形状（空槽不写进文件、没有副技能就不写第二项、副技能带自己的等级、`enabled` 原样保留、`exclusive` 全空时不写这个成员）与 cap 缺失时回落到 `DEFAULT_LEVEL`。**托管侧没有测试工程**（解决方案里只有原生工程与托管工程），所以 `LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察——这也是「文档表」和这道对拍必须同时维护、谁都不能替代谁的原因。
