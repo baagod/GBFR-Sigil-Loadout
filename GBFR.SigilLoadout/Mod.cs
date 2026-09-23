@@ -24,7 +24,6 @@ public sealed class Mod : IMod {
     private SigilEditorFeature? _sigilEditor;
     private bool _disposed;
     private int _startRequested;
-    // 1 = 一拍维护正在进行。定时器回调不串行，见下面那条 Timer。
     private int _ticking;
 
     public Action Disposing => Dispose;
@@ -61,8 +60,7 @@ public sealed class Mod : IMod {
 
             string modDirectory = loader.GetDirectoryForModId(ModId);
             Directory.CreateDirectory(modDirectory);
-            // 日志**追加**写（不再每次启动清空），位置就在 mod 目录（惯例、好找）。单份上限 4 MB，
-            // 超了把当前份挪成 .1（只留一代）——只有更新 mod 那一次会丢历史，正常。
+            // 轮转只留一代，所以只有更新 mod 那一次会丢历史（可接受）。
             string logPath = Path.Combine(modDirectory, "GBFR.SigilLoadout.log");
             try {
                 FileInfo existing = new(logPath);
@@ -177,8 +175,8 @@ public sealed class Mod : IMod {
         _sigilEditor = null;
         Hotkey.Shutdown();
         // 无条件关停。Initialize 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，
-        // 之后的每一步都可能抛异常把控制权交到这里。以前这个调用被一个"全都成功之后才置位"的标志
-        // 门着，失败路径就会把原生钩子留在游戏里。Shutdown 自身异常安全。
+        // 之后的每一步都可能抛异常把控制权交到这里，所以不能拿"是否走到最后一步"门着它。
+        // Shutdown 自身异常安全。
         try {
             NativeCore.Shutdown();
         }

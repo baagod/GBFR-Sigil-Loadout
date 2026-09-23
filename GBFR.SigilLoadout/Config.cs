@@ -23,11 +23,9 @@ public class SigilSkill {
     [JsonPropertyName("key")]
     public string Key { get; set; } = "";
 
-    /// <summary>行的 Level 字段：游戏显示的那个等级，也是编辑落点。</summary>
     [JsonPropertyName("level")]
     public int Level { get; set; } = 15;
 
-    /// <summary>LevelValue1..10，按序；null 表示不动那个槽位。</summary>
     [JsonPropertyName("values")]
     public float?[] Values { get; set; } = new float?[LevelValueCount];
 }

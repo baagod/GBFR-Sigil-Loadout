@@ -21,7 +21,7 @@ constexpr PatternView MakePattern(
 }
 
 // 布局预检字节表：每个已认领的 RVA 都必须以这些字节开头，否则整套 gameplay hook 不装
-//（fail-closed）。只有本文件用它们。
+//（fail-closed）。
 inline constexpr std::array<uint8_t, 16> kSkillApplyLoopPreflight = {
     0xFF, 0xC7, 0x83, 0xFF, 0x0D, 0x0F, 0x84, 0xB7,
     0x00, 0x00, 0x00, 0xC5, 0xF8, 0x11, 0x75, 0xF0};
@@ -43,10 +43,8 @@ inline constexpr std::array<uint8_t, 12> kStatusNotifierPreflight = {
     0x41, 0x56, 0x56, 0x57, 0x53, 0x48, 0x83, 0xEC, 0x38, 0x44, 0x89, 0xC6};
 
 /*
-    语义锚点表：每个锚点命中处到它那几个 RVA 的偏移只写在这里。
-
-    这些偏移在流水线里被用三次（认领 RVA / 读循环上限或解 call / 最终预检），以前三处各写一遍同一组
-    数字、只靠字段名手工配对——改了一处漏了另一处不会有任何东西报错。
+    语义锚点表：每个锚点命中处到它那几个 RVA 的偏移只写在这里——认领 RVA 与最终预检都从这里
+    读：各写一遍就只会靠字段名手工配对，改了一处漏了另一处不会有任何东西报错。
 */
 struct AnchorOffsets {
     uintptr_t loop_limit_immediate = 0;
@@ -56,11 +54,10 @@ struct AnchorOffsets {
     uintptr_t category_getter_return = 0;
 };
 
-// 偏移取自原流水线：apply_loop +4 / +0x29，category_loop +6 / +0x1E / +0x60 / +0x6E。
 inline constexpr AnchorOffsets kApplyLoopAnchors{4, 0x29, 0, 0, 0};
 inline constexpr AnchorOffsets kCategoryLoopAnchors{6, 0, 0x1E, 0x60, 0x6E};
 
-// notifier 命中处本身就是 status_notifier_rva（偏移 0），它的字段偏移另算（见读身份那段）。
+// notifier 命中处本身就是 status_notifier_rva；它的字段偏移另算（见读身份那段）。
 inline constexpr uintptr_t kNotifierRvaOffset = 0;
 inline constexpr uintptr_t kNotifierCharacterOpcodeOffset = 0x45;
 
@@ -300,7 +297,6 @@ bool FindUniquePattern(
         }
         if (!matched)
             continue;
-        // 第二处命中就够判定"不唯一"，不必数完，也就不必把命中存进数组。
         if (++found > 1)
             return false;
         match = begin + offset;

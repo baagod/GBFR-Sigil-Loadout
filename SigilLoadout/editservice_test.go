@@ -258,9 +258,8 @@ func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 }
 
 /*
-只有一种格式、一个读取器：来自 Key 还写作大写那个构建的文件既不会被读取，也不会被改写。它读作空
-列表——这正是用户在格式变更时要的行为——而下一次保存写出当前格式。这个测试特意把它钉成一个决定，
-而不是一次意外。
+只有一种格式、一个读取器：成员名大写的写法读作空列表（格式变更时该有的行为），既不被读取也不被
+改写，下一次保存写出当前格式。这里钉的是一个决定，不是一次意外。
 */
 func TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling(t *testing.T) {
 	hermeticHome(t)

@@ -4,10 +4,6 @@ using System.Runtime.InteropServices;
 
 namespace GBFR.SigilLoadout;
 
-/// <summary>
-/// 最小原生核心门面：ABI 检查、日志汇、初始化、关停与运行时消息回读。它派生自的那份原始实现里
-/// 所有 selector/inventory/preset/input/present API 都已删除。
-/// </summary>
 internal static unsafe partial class NativeCore {
     internal const int AbiVersion = 20;
 

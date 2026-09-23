@@ -8,14 +8,14 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $root 'dist\GBFR.SigilLoadout'
 
-# 0. 拒绝不是 mod 目录的目标：下面的替换是一次递归删除，所以 -Target 敲错绝不能打到无关路径。
+# 0. 下面的替换是一次递归删除：-Target 敲错绝不能打到无关路径。
 $resolvedTarget = [IO.Path]::GetFullPath($Target).TrimEnd('\')
 if (-not $resolvedTarget.EndsWith('\GBFR.SigilLoadout', [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to deploy to a path that is not the mod folder: $Target"
 }
 
-# 1. The built package must exist. "该有哪些文件"由 build-release.ps1 的清单把关（那份清单只有一个
-#    持有者）；这里只问**它是不是一个包**——构建中途失败会在 dist 留下一个半成品目录，装上去就是坏的。
+# 1. "该有哪些文件"由 build-release.ps1 的清单把关（那份清单只有一个持有者）；这里只问**它是不是
+#    一个包**——构建中途失败会在 dist 留下一个半成品目录，装上去就是坏的。
 if (-not (Test-Path -LiteralPath $source -PathType Container)) {
     throw "No built package at $source. Run build-release.ps1 first."
 }
@@ -25,9 +25,9 @@ foreach ($sanity in @('GBFR.SigilLoadout.dll', 'SigilLoadout.exe')) {
     }
 }
 
-# 1b. And it must be the product of a build that ran to completion："包存在且完整"不等于"它就是当前源码
-#     的产物"——构建失败时 dist 会原封不动留着上一次的产物，脚本照样装上去并报"成功"（踩过一次）。
-#     判据是 build-release.ps1 在打包开始时删、所有闸门通过后才写的完成标记，再加上与声明版本的对账。
+# 1b. "包存在且完整"不等于"它就是当前源码的产物"——构建失败时 dist 会原封不动留着上一次的产物，
+#     脚本照样装上去并报"成功"。判据是 build-release.ps1 在打包开始时删、所有闸门通过后才写的
+#     完成标记，再加上与声明版本的对账。
 $completionMarker = Join-Path (Split-Path -Parent $source) '.build-complete'
 if (-not (Test-Path -LiteralPath $completionMarker -PathType Leaf)) {
     throw "No build-completion marker at $completionMarker - this dist is not the product of a finished build. Run build-release.ps1."
@@ -74,7 +74,6 @@ function Stop-SigilLoadout {
     }
 }
 
-# 从部署好的那份启动，并报告它是否活过了启动。
 function Start-SigilLoadout {
     Start-Process -FilePath (Join-Path $Target 'SigilLoadout.exe')
     Start-Sleep -Seconds 3
@@ -83,7 +82,7 @@ function Start-SigilLoadout {
 
 Stop-SigilLoadout
 
-# 4. 替换部署目录：先整份拷进同级新目录，成功了才删旧的（"先删后拷"中途失败就没有退路）。
+# 4. 先整份拷进同级新目录、成功了才删旧的："先删后拷"中途失败就没有退路。
 $targetDir = Split-Path -Parent $Target
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 $staged = "$Target.new"
@@ -96,7 +95,7 @@ if (Test-Path -LiteralPath $Target) {
 }
 Rename-Item -LiteralPath $staged -NewName (Split-Path -Leaf $Target)
 
-# 5. 从刚部署好的那份重开编辑工具。若第一次启动没活下来（残留实例还占着 mutex），全停掉再来一次。
+# 5. 第一次启动没活下来，多半是残留实例还占着 mutex：全停掉再来一次。
 if (-not (Start-SigilLoadout)) {
     Stop-SigilLoadout
     if (-not (Start-SigilLoadout)) {

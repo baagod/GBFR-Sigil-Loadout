@@ -5,8 +5,7 @@ namespace GBFR.SigilLoadout;
 
 /// <summary>
 /// Windows 级热键，走 RegisterHotKey（消息驱动：零采样、零丢失）：后台线程上一个隐藏的
-/// message-only 窗口收 WM_HOTKEY，把配装编辑器工具带到前台。旧的 250 ms 轮询只在注册失败时
-/// 留作回退。
+/// message-only 窗口收 WM_HOTKEY，把配装编辑器工具带到前台。注册失败时回退到 250 ms 轮询。
 /// </summary>
 internal static class Hotkey {
     private const int WmHotkey = 0x0312;
@@ -110,7 +109,6 @@ internal static class Hotkey {
         thread.Start();
     }
 
-    /// <summary>拆掉消息窗口和线程（由 Mod.Dispose 调）。</summary>
     internal static void Shutdown() {
         _threadExit = true;
         IntPtr hwnd = _messageWindow;
@@ -168,7 +166,6 @@ internal static class Hotkey {
         DestroyWindow(hwnd);
     }
 
-    /// <summary>旧轮询回退，只在 RegisterHotKey 失败时生效。</summary>
     internal static void Tick(Action<string> log) {
         if (_virtualKey < 0 || _modDirectory.Length == 0 || _hotKeyRegistered)
             return;

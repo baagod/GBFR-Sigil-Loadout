@@ -14,12 +14,9 @@
 // skill_status 表写进游戏自己解析出的那份拷贝，其地址由原生侧从语义锚点
 // 解出（托管侧不持有也不扫描它；见 src/table_slot.cpp）。专属开关以
 // **skill hash** 传递：slot 表归原生所有，托管侧无需按角色维护一张表。
-// 它派生自的原始版本中，selector/inventory/preset/input/present/state
-// 这些 API 已全部删除。
 constexpr uint32_t GBFR20_ABI_VERSION = 20;
 
-// GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）：成功返回实际改写的行数，所以 0 与正数
-// 留给成功。
+// GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）。
 constexpr int32_t GBFR20_TABLE_NOT_READY = -1;              // 原生核心没初始化好，或正在关机
 constexpr int32_t GBFR20_TABLE_SLOT_UNRESOLVED = -2;        // 锚点没解析出槽（见 src/table_slot.cpp）
 constexpr int32_t GBFR20_TABLE_BUFFER_UNREADABLE = -3;      // 槽里没有指针，或那块内存不可写
@@ -40,9 +37,8 @@ struct GBFR20_TemplateSlot {
     int32_t sigil_level;
 };
 
-// 一个专属开关：角色、skill hash、disabled（0/1）。这里不点名 T1 / T2 / 战气
-// ——skill hash *就是*名字，由原生专属表把它映射到槽位。调用方从不发
-// disabled == 0 的条目，所以没出现的角色就是三个专属槽全开。
+// 这里不点名 T1 / T2 / 战气——skill hash *就是*名字，由原生专属表映射到槽位。调用方
+// 从不发 disabled == 0 的条目，所以没出现的角色就是三个专属槽全开。
 struct GBFR20_ExclusiveOverride {
     uint32_t character_hash;
     uint32_t skill_hash;
@@ -81,11 +77,11 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_ApplyLoadout(
 //         到这张表没有第二条路：调用方已经把它建好的表重新注册过，所以编辑会在
 //         游戏下一次解析时落地（或重启之后）。
 //
-// 闸门顺序如下，每道都 fail-closed：启动时锚点解出了槽 -> 槽里的指针非空 ->
-// 整段内存已提交且可写 -> 缓冲区的行数与传入表的一致 -> 逐行 Key 也一致
-// （是身份，不只是形状）。Key 检查让"这是同一张表"成为可验证的事实，而不是
-// 对锚点的信任；也是 Key 被别的 mod 改过的表会被拒写而不是覆盖的原因
-// （编辑碰的从来不是 Key）。
+// 闸门顺序（每道都 fail-closed）：槽已在启动时解出 -> 槽里的指针非空 -> 整段
+// 内存已提交且可写 -> 缓冲区的行数与传入表的一致 -> 逐行 Key 也一致（是身份，
+// 不只是形状）。Key 检查让"这是同一张表"成为可验证的事实，而不是对锚点的
+// 信任；也是 Key 被别的 mod 改过的表会被拒写而不是覆盖的原因（编辑碰的从来
+// 不是 Key）。
 GBFR20_API int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(
     const uint8_t* table,
     uint32_t length);

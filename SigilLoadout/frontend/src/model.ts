@@ -1,4 +1,4 @@
-export const MAX_SLOTS = 12 // 编辑器固定显示的行数
+export const MAX_SLOTS = 12
 /** 不知道 cap 时的因子/技能等级回落值（对应 C# 的 DefaultLevel）。 */
 export const DEFAULT_LEVEL = 15
 
@@ -13,7 +13,7 @@ export interface Slot {
 }
 
 /** loadout.json 里槽位 items 的一项（文件形状）。level 可省（手改的文件会漏，回落
- * DEFAULT_LEVEL）；旧版本写的 zh/en，mod 从不读、名字也不是数据。 */
+ * DEFAULT_LEVEL）；名字不是数据（身份是 hash），文件里带的名字字段一律不读。 */
 export interface SavedItem {
     gem?: string
     hash?: string
@@ -130,9 +130,7 @@ const emptySlot = (): Slot => ({
     enabled: true,
 })
 
-/** 把存档（新数组格式）归一成 Slot[]。
- *
- * 存档存的是 gem hash，下拉的值是**组键**（`skill1`），这里把前者翻成后者。名字按语言变，不能当身份。
+/** 存档存的是 gem hash，下拉的值是**组键**（`skill1`），这里把前者翻成后者。名字按语言变，不能当身份。
  *
  * 等级按表里的 cap 夹住；表里没有的 gem 保留原值（下次保存会被丢弃，编辑里显示为空）。 */
 export function configToSlots(
@@ -194,10 +192,9 @@ export function skillTableOf(rows: SigilRow[]): Skill[] {
     const byHash = new Map<string, Skill>()
     for (const s of rows) {
         if (!s.skill1 || byHash.has(s.skill1)) continue
-        if (s.player) continue // 专属因子的技能永不出现在技能下拉里
+        if (s.player) continue
         byHash.set(s.skill1, {
             hash: s.skill1,
-            // 显示名来自命名它那一行的物品名。
             gem: s.hash ?? "",
             cap: s.cap ?? DEFAULT_LEVEL,
         })
@@ -326,13 +323,11 @@ export function buildSigilIndex(
     }
 }
 
-/** loadout.json 存一个槽的形状。 */
 export interface SavedSlot {
     items: SavedItem[]
     enabled: boolean
 }
 
-/** loadout.json 的内容。 */
 export interface LoadoutPayload {
     lang: string
     slots: SavedSlot[]

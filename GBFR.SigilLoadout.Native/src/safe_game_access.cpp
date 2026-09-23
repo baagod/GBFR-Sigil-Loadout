@@ -1,7 +1,6 @@
 #include "../native_internal.h"
 
 namespace gbfr::native {
-// 我们自己的重建调用正在游戏线程上跑（重建函数反过来进 detour）。
 thread_local bool g_tls_hot_rebuild_build = false;
 
 namespace {
@@ -49,8 +48,7 @@ bool SafeReadUint64(uintptr_t address, uint64_t& value) noexcept {
 }
 
 bool IsGameRange(uintptr_t address, size_t size, uint32_t required_protect) noexcept {
-    // 一次 VirtualQuery 只答一个区域，而"整表"可能跨好几个（328,648 字节实测就跨了），
-    // 所以一个区域一个区域往前走。
+    // 一次 VirtualQuery 只答一个区域，而"整表"可能跨好几个，所以一个区域一个区域往前走。
     uintptr_t current = address;
     size_t remaining = size;
     while (remaining > 0) {
@@ -125,9 +123,8 @@ bool SafeInvokeStatusRebuild(
     g_tls_hot_rebuild_build = false;
 
     if (!rebuild_succeeded) {
-        // 2026-09-21 崩溃物证：ok=0 之后 20~30 秒 AV（0xc0000005、读 0x19、偏移 0x9318C3，
-        // 故障点 mov rcx,[r9] / cmp byte [rcx+0x19],0 而 rcx=0）——所以闸判的是对象还新不新，
-        // 不是指针记不记得住。冷却 60 秒撤不掉这一步，真正的修法是**别让这个调用发生**（见轮次闸）。
+        // 这个失败就是"对象已经没了"：AV 出在读该对象字段的指令上。所以闸判的是对象还新不新，
+        // 不是指针记不记得住——冷却 60 秒撤不掉这一步，真正的修法是**别让这个调用发生**（见轮次闸）。
         LogRebuildProblem(
             "the game's rebuild raised; the object was probably gone", character_hash, status);
         return false;

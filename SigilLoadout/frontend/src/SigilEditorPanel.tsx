@@ -53,12 +53,6 @@ function useDebounced<T>(value: T, delay = 150): T {
     return settled;
 }
 
-/*
-    “因子编辑”这一页：行、说明、搜索、语言都在。它是个 Tab，不自己钉住整个窗口。
-
-    根节点按这一页排出来的宽度（888 DIP）设了下限，外面那一层面板负责横向滚动，所以窗口更窄
-    时列是被滚动条推到视野外，而不是被裁掉。
-*/
 // 每语言的文本表同样在 Go 侧只读一次，缓存住：命中就同步落地，换语言不再等一次 IPC。
 const textCache = new Map<Lang, Record<string, SkillText>>();
 
@@ -66,8 +60,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     // 编辑态按**地址**（因子哈希 + 等级）索引：一个地址一条，这个不变量由容器本身保证，
     // 所以没有路径需要手工去重或整体重建列表。
     const [edits, setEdits] = useState<Map<string, SigilSkill>>(new Map());
-    // 所选语言对每个因子的说法：名字、概要，以及共享同一段说明的那些连续等级——
-    // 大多数只有一段，少数中途换措辞（见 explainAt）。
+    // 所选语言对每个因子的文本；说明的分段读法见 explainAt。
     const [texts, setTexts] = useState<Record<string, SkillText>>({});
     const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
     // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的残缺列表会被后端整体替换
@@ -75,8 +68,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     const [editListRead, setEditListRead] = useState(false);
     const [error, setError] = useState<{ title: string; detail: string } | null>(null);
     const [errorOpen, setErrorOpen] = useState(false);
-    // 哪些因子是展开的。数值只落在一个等级上的因子没有可展开的东西，所以只有跨多个等级的
-    // 因子会进到这里。
+    // 只有跨多个等级的因子会进到这里：只落在一个等级上的没有可展开的东西。
     const [open, setOpen] = useState<Set<string>>(new Set());
     // 列表上的 tooltip 指向哪一行：整套"指针下那一行"的状态与重放都在 useRowTooltip 里，
     // 它是列表这一层唯一的共同状态——行只拿 hoveredRow 跟自己的 id 比一比。
@@ -193,7 +185,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         const records = [...edits.values()];
         // 两个层级上都是打开的内容排最前：有启用等级的因子排在其余因子之上，因子内部启用的
         // 等级排在它的其他行之上——打开的内容就是游戏正在生效的东西，必须最先被找到。
-        // 状态已按地址去重，这里按因子哈希再分一层，供 rows 与各行使用。
         const byKey = new Map<string, SigilSkill[]>();
         for (const record of records) {
             const held = byKey.get(record.key);
@@ -229,7 +220,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                     levels: levelsOf(info, records),
                 };
             })
-            // 搜索按名字，或按表和 sigiledits.json 给因子编键的 hash——手动把某一行调出来靠后者。
             .filter((row) => matches(row.label, row.key, needle))
             .sort(
                 (a, b) =>
@@ -347,7 +337,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         打断用户的失败回来。
     */
     function commit(next: Map<string, SigilSkill>) {
-        // 列表还没读回来就不写，理由见上面 editListRead 的声明。
+        // 列表还没读回来就不写；不写盘的理由见 editListRead 的声明。
         if (!editListRead) return;
         // 状态本身就是按地址去重的容器，不必再跑一遍 dedupe。归一化仍走 asEdits，好让"同一条
         // 记录连着两次提交"得到逐字节相同的结果。
@@ -386,6 +376,8 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         isControl,
     };
 
+    // min-w-[888px] 是本页排出来的宽度：外面那一层面板负责横向滚动，所以窗口更窄时列是被
+    // 滚动条推到视野外，而不是被裁掉。
     return (
         <div className="flex h-full min-h-0 min-w-[888px] flex-col px-5 pt-4 pb-6">
             {/*
@@ -430,9 +422,8 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                 </div>
 
                 {/*
-                    语言开关不在这里：整个可视工具只有外壳右上角那一组。这一页原来带着自己的三个按钮，
-                    合并成"因子编辑" Tab 之后，同一窗口里放两套互不同步的语言状态只会让人困惑，
-                    那一组连同它自己的 localStorage 一起删掉了，语言由 App 传进来。
+                    语言开关不在这里：整个可视工具只有外壳右上角那一组，语言由 App 传进来。
+                    同一窗口里放两套互不同步的语言状态只会让人困惑。
                 */}
             </div>
 
@@ -496,7 +487,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                             {error?.detail}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    {/* 现成的页脚和按钮：sm 断点以下纵向排列，按钮自己撑开，我们不设自己的宽度。 */}
                     <AlertDialogFooter>
                         <AlertDialogAction onClick={() => setErrorOpen(false)}>{t.ok}</AlertDialogAction>
                     </AlertDialogFooter>

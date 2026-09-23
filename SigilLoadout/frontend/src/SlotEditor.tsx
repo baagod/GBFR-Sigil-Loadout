@@ -10,15 +10,12 @@ import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "./model"
 import type { Messages } from "./messages"
 import { useWheelStep } from "./useWheelStep"
 
-/* 两侧列固定，因子列吃掉全部剩余宽度。
-     启用列按内容自适应（勾选框 16px）左右留 2 / 12px；序号列固定 28px、单元格不带内间距。 */
 const GRID_COLS =
     "grid grid-cols-[auto_1.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"
 
 export const HEADER_ROW = `${GRID_COLS} min-h-[44px] border-b text-sm font-medium text-foreground`
 const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
 
-/** 等级输入框，右侧带一个灰色的 "/ max"。 */
 function LevelInput({
     value,
     max,
@@ -82,7 +79,7 @@ export const SlotRow = memo(function SlotRow({
 }: {
     row: number
     slot: Slot
-    /** 因子表的派生索引（下拉取值、显示名、上限、合法副集合）——一个对象替代七个 prop。 */
+    /** 因子表的派生索引——一个对象替代七个 prop。 */
     sigils: SigilIndex
     t: Messages
     updateSlot: (i: number, patch: Partial<Slot>) => void

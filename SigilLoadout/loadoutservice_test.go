@@ -40,8 +40,8 @@ func TestUserCfgDirMatchesModPath(t *testing.T) {
 
 // 缺 enabled 与 enabled:true 同义——mod（LoadoutConfig.ParseAndValidate 的
 // `!TryGetProperty("enabled", …) || …`）和前端（model.ts 的 `s.enabled !== false`）都这么认。
-// 这里曾经用 bool（零值 false），于是同一份文件在 Go 数出 0 个启用、在 mod 那边数出十几个，
-// 结果是"存盘成功、游戏里什么都没变"。
+// 这里必须用指针：bool 的零值会把"缺成员"读成 false，于是同一份文件在 Go 数出 0 个启用、在 mod
+// 那边数出十几个，结果是"存盘成功、游戏里什么都没变"。
 func TestValidateSlotsTreatsMissingEnabledAsEnabled(t *testing.T) {
 	slots := manySlots(MaxSlots + 1)
 	for i := range slots {
@@ -246,8 +246,8 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 }
 
 /*
-只认当前形状：早期版本的裸数组（[ { items, enabled } ]）不再被翻译成"空配置"写下去，而是当场
-报错——翻译过的写法会把一份读不出来的旧文件静默变成"没有任何参槽"落盘，用户看到的是配置被清空。
+只认当前形状：裸数组（[ { items, enabled } ]）在这里当场报错，而不是被翻译成"空配置"写下去——
+翻译过的写法会把一份读不出来的文件静默变成"没有任何参槽"落盘，用户看到的是配置被清空。
 */
 func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {
 	dir := t.TempDir()

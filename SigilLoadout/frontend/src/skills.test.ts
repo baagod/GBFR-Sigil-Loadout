@@ -1,9 +1,6 @@
 /*
     列表赖以为生的规则，直接驱动而不是过浏览器：决定 sigiledits.json 最终内容的正是这些规则，
     所以这里的一张表比再来一张截图值钱。
-
-    第一块是促使写下这个文件的那次回归：输入 0.5 曾经以 5 写进表里，因为 "0." 被当成数字、
-    在小数点敲下的那一刻就被提交（半成品文本也一并清掉）。
 */
 import { describe, expect, it } from "vitest";
 import {
@@ -134,7 +131,7 @@ describe("the two patterns", () => {
         expect(NUMBER.test("999999.999999")).toBe(true);
         expect(NUMBER.test("1000000")).toBe(false);
         expect(HALF_TYPED.test("0.1234567")).toBe(false);
-        // 309 位是那次"粘进长数字被提交成 Infinity"事故的真实长度；超过 6 位都走同一条路。
+        // 长度取自真实粘贴过的超长数字；超过 6 位都走同一条路。
         for (const text of ["9".repeat(309)]) {
             expect(HALF_TYPED.test(text), `${text.length} digits`).toBe(false);
             expect(slotEdit(text, 0, [0])).toEqual({ kind: "drop" });
@@ -227,9 +224,8 @@ describe("what counts as an edit", () => {
     /*
         上面三条说的是规则，下面两条说的是"清空输入框"这件事**只能**按那条规则走。
 
-        asEdits 是唯一的闸口（见 skills.ts），而这正是它此前没有测试的一个情形：面板里曾经另有一条
-        只按"还有没有数字"判断的规则，于是清空输入框会顺手把用户勾上的那一下也撤销掉——勾选同时
-        也是置顶排序的键，所以那一行还会当场掉下去。
+        asEdits 是唯一的闸口（见 skills.ts）：面板若自己按"还有没有数字"判断，清空输入框就会顺手
+        把用户勾上的那一下也撤销掉——勾选同时也是置顶排序的键，那一行还会当场掉下去。
     */
     it("清空最后一个数值不会撤销用户勾上的那一下", () => {
         // 勾选是"把它送进游戏"的那个动作；清空输入框只是把数值还给游戏自己的值。所以这条记录仍然是
@@ -249,7 +245,7 @@ describe("the game's own numbers are not inputs", () => {
     const vanilla = [10, 3, 20, 0, 0, 0, 0, 0, 0, 0];
 
     it("takes the level's own number back out of a slot", () => {
-        // 旧版本写下的内容：为了让行能写回去，每个槽都填上了游戏的那一行。这些副本不算编辑——
+        // 有的文件每个槽都填着游戏的那一行（为了让行能写回去）。这些副本不算编辑——
         // 把它们当数值显示会读起来像十个槽都被输入过。
         expect(trimGameValues(pad([10, 3, 20]), vanilla)).toEqual(pad([]));
     });
@@ -292,8 +288,8 @@ describe("the levels a skill shows", () => {
     });
 
     it("lifts what is switched on, and keeps the rest by level", () => {
-        // 两个梯队：开着的等级排在最前，其余按数字顺序跟上——包括带着已关闭编辑的那些等级，
-        // 它们曾经自成一层，把没动过的等级挤到后面、打乱了顺序。
+        // 两个梯队：开着的等级排在最前，其余按数字顺序跟上——带着已关闭编辑的那些等级也算"其余"，
+        // 不自成一档。
         const wide: SkillInfo = {
             rows: [
                 [1, []],
@@ -330,7 +326,7 @@ describe("父行的勾选态", () => {
         expect(parentState(levels, new Map())).toBe("none");
         expect(parentState(levels, on(levels))).toBe("all");
         // 十一个等级只开了一个：按"记录数"算会读成全选（一条记录，开的正是它），半选态就永远
-        // 不出现——本次修的就是这个。
+        // 不出现。
         const eleven = Array.from({ length: 11 }, (_, i) => i + 1);
         expect(parentState(eleven, on([1]))).toBe("some");
         // 1 开着、2 有一条关着的记录，3、4 没有任何记录
@@ -358,7 +354,7 @@ describe("the explanation a level shows", () => {
     ];
 
     it("reads the band the level falls in", () => {
-        // 这个功能就是为这条抱怨而生的：1 级以前会说"灼热免疫"，因为当时只保留最高那一行的文本。
+        // 读的是该等级落进的那一段，而不是最高那一行的文本：取后者的话 1 级会显示"灼热免疫"。
         expect(explainAt(resistance, 1)).toBe("受到的伤害-{0}%");
         expect(explainAt(resistance, 29)).toBe("受到的伤害-{0}%");
         expect(explainAt(resistance, 30)).toBe("灼热免疫");

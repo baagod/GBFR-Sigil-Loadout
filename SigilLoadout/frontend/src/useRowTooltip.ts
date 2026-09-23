@@ -59,7 +59,6 @@ export function useRowTooltip<T extends HTMLElement>() {
         if (row) replayHover(row, true)
     }
 
-    /* 一次勾选之后：放回滚动偏移，并把 tooltip 重新指向此刻指针下的那一行。 */
     useLayoutEffect(() => {
         if (heldScroll.current === null) return
         if (listBox.current) listBox.current.scrollTop = heldScroll.current

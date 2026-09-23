@@ -71,10 +71,9 @@ export default function App() {
     // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页的行标签。
     const [charaNames, setCharaNames] = useState<Record<string, string>>({})
     const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
-    // 整个可视工具一份文案（messages.ts）；换成别的语言只是换一个索引。
     const t = messages[lang]
 
-    // 因子表的一切派生关系构造一次（可脱离 React 测试）。
+    // 派生逻辑在 model.ts，可脱离 React 单测。
     const index = useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])
 
     // 落盘要读"当前"状态，而这个回调刻意不带响应式依赖（闭包里的值会过期），所以从 ref 取。
@@ -88,11 +87,9 @@ export default function App() {
         自动保存只由**编辑**触发，不由状态变化触发。
 
         挂在 [slots, lang, exclusiveState] 上的版本只能靠一个一次性旗标去赌"哪次状态更新先把它
-        消费掉"，加载中任何一次额外的 setState 都会让启动变成一次写盘（旧版本那次 exclusive
-        迁移就是这么把用户配置改坏的）。现在没有旗标：加载不调用任何编辑处理器，排不出保存。
+        消费掉"，加载中任何一次额外的 setState 都会让启动变成一次写盘。这里没有旗标：加载不调用
+        任何编辑处理器，排不出保存。
     */
-    // 落盘：状态全部从 latest.current 读，所以这个回调没有响应式依赖，也不会读到旧值。
-    //
     // 防抖住在 Go 侧（LoadoutService）：这里每改一下就交一份，后端替换待写并重启定时器，退出时由
     // OnShutdown 的 flushNow 兜住。
     const saveNow = useCallback(async () => {
@@ -117,7 +114,7 @@ export default function App() {
     }, [loadoutRead])
 
     // 编辑必须先把新值放进 latest.current 再保存：处理器里 setState 要等它返回后才提交，那时读到的还是
-    // 上一次的状态，落盘就永远慢一次（最后一次勾选就是这么丢的）。
+    // 上一次的状态，落盘就永远慢一次。
     const edit = useCallback(
         (patch: { slots?: Slot[]; exclusiveState?: ExclusiveState; lang?: Lang }) => {
             latest.current = {...latest.current, ...patch}
@@ -208,9 +205,8 @@ export default function App() {
     )
 
     /**
-     * 把存档读进编辑器状态。键就是文件里的键，编辑器不再把 exclusive 翻译成别的形状：
-     * 旧版本那一步迁移只读 legacy.t1/t2/war，于是"角色 hash 作键 + 当前形状"的条目会被整条
-     * 改写成全开（false 静默变 true），随后自动保存写回磁盘——用户的开关状态就这么没了。
+     * 把存档读进编辑器状态。键就是文件里的键，编辑器**不做形状迁移**：认不出当前形状的迁移会把
+     * 条目整条改写成全开（false 静默变 true），随后自动保存写回磁盘，用户的开关状态就这么没了。
      */
     const applyConfig = (parsed: unknown, sigilTable: Sigil[], skillTable: Skill[]) => {
         const cfg = (parsed ?? {}) as {
@@ -223,7 +219,7 @@ export default function App() {
         setExclusiveState(sanitizeExclusiveState(cfg.exclusive))
     }
 
-    // 表头勾选框：全选 / 全不选（官方 Table 的写法）。
+    // 表头全选框沿用官方 Table 的写法。
     const allEnabled = slots.every((s) => s.enabled)
     const toggleAll = () => {
         edit({slots: latest.current.slots.map((slot) => ({...slot, enabled: !allEnabled}))})
@@ -342,7 +338,7 @@ export default function App() {
                 </div>
                 {/*
                     状态条是外壳级的通知，不属于任何一个 Tab：留在这一层，切到因子编辑页时那两页的
-                    "没保存成功"才不会被静默吞掉。全部失败都走这一条通道，屏幕上不可能出现两条矛盾提示。
+                    "没保存成功"才不会被静默吞掉。
                 */}
                 {failure && (
                     <div
@@ -357,8 +353,7 @@ export default function App() {
                     两页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow（每行两个 Base UI 下拉）——
                     切页于是只剩显示/隐藏，代价是三页启动时都挂上（专属页 29 行，可忽略）。
                 */}
-                {/* 上下 16px 只归这一页：专属因子那页沿用 LOADOUT_PANEL 原本的间距。 */}
-                <TabsPanel value="general" keepMounted className={`${LOADOUT_PANEL} py-4`}>
+                <TabsPanel value="general" keepMounted className={`${LOADOUT_PANEL} py-3`}>
                     <div className={HEADER_ROW}>
                         <div className="pl-0.5 pr-3">
                             {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}

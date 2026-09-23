@@ -19,7 +19,7 @@ namespace GBFR.SigilLoadout;
 /// 只做形状校验：JSON 坏掉、缺技能 hash、等级不对、槽位太多。
 /// </summary>
 internal static class LoadoutConfig {
-    // 配装配置的路径：可视工具写、这里读。文件名字面量只出现在这一处（有一道对拍断言盯着它）。
+    // 文件名字面量只出现在这一处（有一道对拍断言盯着它）。
     private static readonly string ConfigFile = UserConfig.FilePath("loadout.json");
 
     // 与 Native/native_internal.h 的 kUnwornCharacterHash 保持同步（0x887AE0B0）
@@ -28,7 +28,6 @@ internal static class LoadoutConfig {
     private const int MaxSlots = 12; // 保守上限（槽位更多有失稳风险）
     private const int DefaultLevel = 15;
 
-    // 版本门。本类用它的"认领"那一半（Changed）：见 Tick 里为什么有意无条件认领。
     private static readonly FileStamp Stamp = new(ConfigFile);
 
     internal static void Initialize(Action<string> log) {
@@ -44,10 +43,6 @@ internal static class LoadoutConfig {
         TryApply(log, mtime);
     }
 
-    /// <summary>
-    /// 按 <paramref name="mtime"/> 这一版应用配置。本类有意无条件认领（见 <see cref="Tick"/>），所以
-    /// 成功与失败之后一样：都等下一版。
-    /// </summary>
     private static void TryApply(Action<string> log, DateTime mtime) {
         if (mtime == UserConfig.NoFile) {
             // 两半都给 null：没有通用槽 = 内置模板，没有开关 = 专属全开。
@@ -67,7 +62,7 @@ internal static class LoadoutConfig {
             var overrides = ParseExclusiveOverrides(doc.RootElement, log);
             var slots = ParseAndValidate(doc.RootElement);
             // 一次调用交两半：通用槽 + 专属开关。两半都落在原生同一个"重新发布"步骤上，
-            // 所以分成两次（v17 的形状）只会让同一张表被发布、被打印两遍。
+            // 所以分成两次只会让同一张表被发布、被打印两遍。
             bool ok;
             if (slots.Count == 0) {
                 // 存在（哪怕是空的）配置就等于"没有内置通用槽"：只留专属开关。

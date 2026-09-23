@@ -1,6 +1,4 @@
 /*
-    行本身：一个因子的行、它各个等级的行，以及一个等级持有的十个数值框。
-
     它们住在这里而不是 App 里，因为它们是列表标记的主体，而且都不需要知道列表如何过滤、
     排序、保存——要的东西以 props 到达：行数据、指针是否在这一行上、是否展开，以及
     App 那几个回调组成的 context。
@@ -30,7 +28,6 @@ import {
 } from "./skills";
 import { useWheelStep } from "./useWheelStep";
 
-/** 一个因子的行和它的各个等级，由列表这样构建出来。 */
 type Row = {
     key: string;
     label: string;
@@ -42,10 +39,7 @@ type Row = {
     levels: number[];
 };
 
-/**
- * 一行需要从列表拿到的东西：文案、因子的说明文本、tooltip 依赖的两个指针处理函数，以及
- * 一行可以请求的编辑。作为一个对象传下去，上面的标记就不必背着十来个 props 走来走去。
- */
+/** 一行需要从列表拿到的一切：打包成一个对象传下去，上面的标记就不必背着十来个 props 走来走去。 */
 export type RowContext = {
     t: Messages;
     notationOf: (key: string, level: number) => string;
@@ -84,8 +78,7 @@ function ValueSlots({
     onChange: (values: (number | null)[]) => void;
 }) {
     // 编辑中的框正在显示的文本，前提是它与已提交数字渲染出来的样子不同："-" 和 "0." 是通往
-    // 一个数字的中间状态，输入过的数字也保留自己那串文本（0.004 在输入途中不能渲染成 0）。
-    // 在 blur 时丢弃，那时框回到渲染数字的样子。
+    // 一个数字的中间状态，输入过的数字也保留自己那串文本，在 blur 时丢弃。
     const [halfTyped, setHalfTyped] = useState<Record<number, string>>({});
 
     const vanillaOf = (i: number) => defaults?.[i] ?? 0;
@@ -98,9 +91,7 @@ function ValueSlots({
 
     /*
         滚轮让聚焦的框步进，而列表不能跟着滚——监听器为什么必须是原生的、passive: false 的，
-        以及最新数值从哪来，见 useWheelStep。
-
-        是哪个框按位置判断：这一行里正好只有这些槽，不必为此把索引带进 DOM。
+        以及最新数值从哪来，见 useWheelStep。是哪个框按位置判断：这一行里正好只有这些槽。
     */
     const host = useRef<HTMLDivElement>(null);
     useWheelStep(
@@ -121,11 +112,10 @@ function ValueSlots({
     return (
         // 行里唯一有弹性的部分：名字和等级用不完的都归数值，它们平分这点空间。
         //
-        // 外层不加 cursor-text：每个框自带，I 形光标因此正好标出接受输入的那些框，而每个框都能
-        // 输入——还没有编辑的等级把游戏的数值显示为占位符，第一次敲键就开始一条编辑。
+        // 外层不加 cursor-text：每个框自带，I 形光标因此正好标出可编辑的那几个框。
         //
-        // 自己不加右内边距：最后一个框在行的末端结束，十个框平分整行。展开箭头那一列不构成加它的
-        // 理由——箭头只存在于父行上，而父行不带任何数值。
+        // 自己不加右内边距：最后一个框在行的末端结束，十个框平分整行；父行没有数值，所以展开
+        // 箭头那一列不构成加它的理由。
         <div ref={host} className="flex min-w-0 flex-1 items-center">
             {Array.from({ length: SLOTS }, (_, i) => (
                 <Fragment key={i}>
@@ -138,12 +128,9 @@ function ValueSlots({
                         inputMode="decimal"
                         aria-label={`${label} Lv${level} ${valueLabel} ${i + 1}`}
                         placeholder={String(vanillaOf(i))}
-                        // 空就是"游戏的数值留着"：槽在有人输入之前是 null，这个框不必和默认值比较就知道
-                        // 这一点——而手写进 sigiledits.json 的数字会按它本来的值显示。
+                        // 手写进 sigiledits.json 的数字按它本来的值显示。
                         value={halfTyped[i] ?? (values[i] === null ? "" : String(values[i]))}
                         onChange={(e) => {
-                            // 一次敲键意味着什么——丢弃、半输入状态，还是一个要提交的数字——由 skills.ts
-                            // 决定，那里能用测试逐个按键驱动它。
                             const edit = slotEdit(e.target.value, i, values);
                             if (edit.kind === "drop") return;
                             if (edit.kind === "half") {
@@ -151,7 +138,7 @@ function ValueSlots({
                                 return;
                             }
                             // 数字已提交，但框会保留输入的那串文本直到离开它：一个数字的前缀往往本身也是
-                            // 数字（0.0、0.00），用已提交的数字渲染这个框会吃掉后面输入的内容——0.004 曾变成 4。
+                            // 数字（0.0、0.00），用已提交的数字渲染这个框会吃掉后面输入的内容：0.004 变成 4。
                             setHalfTyped(({ [i]: _dropped, ...rest }) =>
                                 edit.keeps ? { ...rest, [i]: edit.keeps } : rest,
                             );
@@ -175,12 +162,11 @@ function ValueSlots({
                             step(i, e.key === "ArrowUp" ? 1 : -1);
                         }}
                         /*
-                            裸文本，不是输入域：没有边框、没有底色、没有焦点环。整行读起来就是一行用 |
-                            隔开的数字，唯一的装饰是正在编辑的槽上一层很淡的底色，让光标有个落脚处。
+                            裸文本，不是输入域：整行读起来就是一行用 | 隔开的数字，唯一的装饰是正在编辑的槽
+                            上一层很淡的底色，让光标有个落脚处。
 
-                            框就是行高：行自己没有内边距，所以标出聚焦槽的那层底色从上到下盖满整行，点在这条
-                            带子上的任何地方都落进框里。因子的行和各等级的行因此一样高（多等级那一行是 h-11，
-                            也是同一个原因）。
+                            框就是行高（父行与各等级行都是 h-11）：行自己没有内边距，所以聚焦槽的底色从上到
+                            下盖满整行，点在这条带子上的任何地方都落进框里。
 
                             每个框都能输入，无论该等级是否打开：还没有编辑的等级把游戏的数值显示为占位符，
                             第一次敲键或步进就开始这条编辑。所以没有需要绕开的禁用态——只有占位符。
@@ -203,8 +189,7 @@ function ValueSlots({
  *   更宽，并保留游戏原文里的换行——有些说明是三行参数，单行气泡会把它们截掉。
  * - 只保留侧向位置的轴（trackCursorAxis="x"），打开/关闭动画都关掉：气泡是在行之间换位置，
  *   不是被动画带进带出。
- * - 只在打开时挂载：base-ui 关闭时会先让弹层走完退场（那段残影就是截图里半透明的那一层，位置
- *   还停在弹层被夹住的地方），整块不挂载 = 当帧就没了。
+ * - 只在打开时挂载：base-ui 关闭时会先让弹层走完退场动画，整块不挂载 = 当帧就没了。
  *
  * 触发器由调用点作为 children 传入（base-ui 的 Trigger 靠 context 找 Root，不靠子节点位置）。
  */
@@ -235,10 +220,6 @@ function RowTooltip({
     );
 }
 
-/**
- * 因子的一个等级：勾选框（勾选它就是在该等级开始一条编辑）、等级号、十个槽，以及该因子自己
- * 的 tooltip——说明覆盖整行，行上任何地方都是合理的询问位置。
- */
 function LevelRow({
     row,
     level,
@@ -252,8 +233,7 @@ function LevelRow({
     hovered: boolean;
     ctx: RowContext;
 }) {
-    // 它自己等级的措辞，而不是整个因子的：某个抗性在 29 级前读作"受到的伤害-{1}%"，30 级读作
-    // "…免疫"，这一行就是其中之一（见 explainAt）。
+    // 它自己等级的措辞，而不是整个因子的（分级读法见 explainAt）。
     const notation = ctx.notationOf(row.key, level);
     const record = row.byLevel.get(level);
     const id = addressOf(row.key, level);

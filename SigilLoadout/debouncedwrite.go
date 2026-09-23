@@ -20,7 +20,6 @@ type debouncedWriter[T any] struct {
 	write   func(T) error
 }
 
-// submit 记下待写的那份并（重启）防抖定时器，所以一串连续编辑只换来一次落盘。
 func (w *debouncedWriter[T]) submit(label string, write func(T) error, value T) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -50,7 +49,7 @@ func (w *debouncedWriter[T]) flush() {
 	w.flushLocked()
 }
 
-// flushLocked 取走待写的那份并落盘（调用方持有 w.mu）。
+// 调用方持有 w.mu。
 func (w *debouncedWriter[T]) flushLocked() {
 	value := w.pending
 	w.pending = nil

@@ -23,7 +23,6 @@ const wmActivate = 0x8010
 // 由游戏内热键 post 的开关命令：工具可见就收、不可见就呼出（状态在 windowstate.go 的 toolHidden）。
 const wmToggle = 0x8012
 
-// GW_HWNDNEXT：Z 序里的下一个窗口。
 const gwHwndNext = 2
 
 // 用来重放游戏自己那记「首击隐藏光标」的 mouse_event flags。
@@ -70,8 +69,7 @@ const (
 // GWL_EXSTYLE (-20)，写作 uintptr：Go 常量放不下负的 uintptr。
 var gwlExStyle = ^uintptr(0) - 19
 
-// debugf 往 exe 旁的 tool-debug.log 追一行诊断，且只在 tool-debug.on 存在时——正式安装从不建
-// 这个标记，于是它一直静默。
+// 只在 exe 旁存在 tool-debug.on 时才写日志：正式安装从不建这个标记，所以一直静默。
 func debugf(format string, args ...any) {
 	dir := exeDir()
 	if _, err := os.Stat(filepath.Join(dir, "tool-debug.on")); err != nil {
@@ -85,9 +83,8 @@ func debugf(format string, args ...any) {
 	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
 }
 
-// nextForegroundWindow 从 hwnd 沿 Z 序向下找第一个可见、启用、带标题的顶层窗口——也就是工具
-// 抢到前台前用户最可能用的那个（没有则 0）。直接打开工具时需要它（没有 0x8010 召唤，什么都没
-// 记住）：Windows 会把隐藏/禁用的窗口继续当作前台窗口。
+// 直接打开工具时（没有 0x8010 召唤，什么都没记住）得自己挑一个把焦点还回去的窗口：Windows 会把
+// 隐藏/禁用的窗口继续当作前台窗口，所以只能沿 Z 序往下找（找不到返回 0）。
 func nextForegroundWindow(hwnd uintptr) uintptr {
 	next := hwnd
 	for range 16 {

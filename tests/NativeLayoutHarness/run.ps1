@@ -1,11 +1,8 @@
 <#
-  离线跑一遍布局解析回归，不需要开游戏：
-    ① ResolveGameLayout() 必须成功——真实 exe 里锚点还认得出来
-    ② RevalidateGameLayout() 必须过——解析结果在字节上自证
-    ③ 改坏一个 hook 字节 ⇒ RevalidateGameLayout() 必须失败（证明 fail-closed 真的会拒）
+  离线布局解析回归：断言清单见 program.cpp 头部。
 
-  用法: pwsh -File tests\NativeLayoutHarness\run.ps1 -Exe "D:\...\granblue_fantasy_relink.exe"
-        不给 -Exe 时读 $env:GBFR_EXE；两者都没有就打印 SKIP 并以 0 退出——闸门因此能在任何机器上跑。
+  用法: pwsh -File tests\NativeLayoutHarness\run.ps1 -Exe <游戏 exe>；省略时读 $env:GBFR_EXE，
+        两者都没有就打印 SKIP 并以 0 退出——闸门因此能在任何机器上跑。
 #>
 [CmdletBinding()]
 param([string]$Exe = $env:GBFR_EXE)

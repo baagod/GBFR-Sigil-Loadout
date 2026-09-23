@@ -5,7 +5,7 @@ using Reloaded.Mod.Interfaces;
 
 namespace GBFR.SigilLoadout.Configuration;
 
-/// <summary>Reloaded-II 配置条目的基类（官方模板里那套运行期热重载已去掉：实测改热键要重启游戏才生效）。</summary>
+/// <summary>Reloaded-II 配置条目的基类（刻意不做运行期热重载：实测改热键要重启游戏才生效）。</summary>
 public class Configurable<TParentType> : IUpdatableConfigurable
     where TParentType : Configurable<TParentType>, new() {
     public static JsonSerializerOptions SerializerOptions { get; } = new() {

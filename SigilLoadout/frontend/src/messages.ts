@@ -21,10 +21,8 @@ const zh = {
     reload: "重新载入",
     /** 两个因子下拉的搜索框：写 Hex 也能搜。 */
     searchSigil: "搜索因子 | Hex",
-    /** 两个因子下拉的"筛不出来"。 */
     noMatch: "无匹配因子",
 
-    // 配装页
     headerPrimary: "主因子",
     headerSecondary: "副因子",
     selectAll: "全选/全不选",

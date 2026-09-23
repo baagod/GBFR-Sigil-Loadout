@@ -72,8 +72,8 @@ struct TemplateGemSlot {
     int32_t sigil_level = 0; // 显示用的 sigil 等级（V+ = 15）
 };
 
-// 与 GBFR20_TemplateSlot（native_api.h）的布局契约：字段顺序与 pack 一致；
-// ABI 路径只经 reinterpret_cast 读。
+// 与 GBFR20_TemplateSlot（native_api.h）的布局契约：ABI 路径只经
+// reinterpret_cast 读。
 static_assert(sizeof(TemplateGemSlot) == sizeof(GBFR20_TemplateSlot));
 static_assert(offsetof(TemplateGemSlot, gem_id) == offsetof(GBFR20_TemplateSlot, gem_id));
 static_assert(offsetof(TemplateGemSlot, skill1) == offsetof(GBFR20_TemplateSlot, skill1));
@@ -112,10 +112,9 @@ static_assert(!IsCharacterCompatible(0x18E2F9F9, kDjeetaCharacterHash));
 // 等于把实现细节当模块接口发布。
 
 // 游戏那份 GemData 的布局。**它不跨 ABI**：穿过边界的只有 GBFR20_TemplateSlot 与
-// GBFR20_ExclusiveOverride，没有任何导出函数收发这个类型（原先挂在 native_api.h 里，会让
-// 读那份"ABI 契约"的人误以为它跨边界）。
+// GBFR20_ExclusiveOverride，没有任何导出函数收发这个类型。
 //
-// 九个 32 位字段：自然对齐与 pack(1) 同为 0x24，所以不需要 pack 指令。
+// 自然对齐与 pack(1) 同为 0x24，所以不需要 pack 指令。
 struct GemData {
     uint32_t skill1 = 0;
     int32_t skill1_level = 0;
@@ -167,8 +166,8 @@ bool MatchesBytes(uintptr_t address, const std::array<uint8_t, Size>& expected) 
     }
 }
 
-// 运行期长度版本：表驱动的预检长度只有运行时才知道。**不能**套上面那个模板——它的长度来自
-// 数组类型，套过去会连缓冲尾部的垃圾一起比（128 字节的表在真机上永远不匹配）。
+// 运行期长度版本。**不能**套上面那个模板——它的长度来自数组类型，套过去会连缓冲尾部
+// 的垃圾一起比（128 字节的表在真机上永远不匹配）。
 inline bool MatchesBytesAt(uintptr_t address, const uint8_t* expected, size_t size) noexcept {
     __try {
         return std::memcmp(reinterpret_cast<const void*>(address), expected, size) == 0;
@@ -202,8 +201,8 @@ extern thread_local NaturalContributionFrame g_tls_natural_contribution;
 int GetVirtualSlotCount() noexcept;
 int GetExpandedInternalSlotCount() noexcept;
 bool IsInWritableImageSection(uintptr_t rva, size_t size) noexcept;
-// 游戏自己的代码段（PE 视图的唯一持有者仍是 layout_resolver.cpp：先按名字找 `.text`，
-// 找不到才取最大的可执行段）。
+// PE 视图的唯一持有者仍是 layout_resolver.cpp：先按名字找 `.text`，
+// 找不到才取最大的可执行段。
 struct CodeSectionView {
     uintptr_t rva = 0;
     size_t size = 0;
@@ -212,8 +211,7 @@ struct CodeSectionView {
 
 bool TryGetCodeSection(CodeSectionView& view) noexcept;
 void Log(const std::string& message) noexcept;
-// 各阶段在调用点用 GetTickCount64 计时，完成时记一行日志（含耗时）；失败是
-// 显式的，所以卡住的启动能靠最后一个完成的阶段定位。
+// 失败是显式的，所以卡住的启动能靠最后一个完成的阶段定位。
 void CompleteStartupPhase(std::string_view phase, uint64_t started_at_ms, bool succeeded);
 void SetRuntimeMessage(std::string message);
 
@@ -243,13 +241,13 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status);
 // 游戏刚自己建过一次状态（detour 里记）：热重建据此避让，别和游戏同时碰一份 status。
 void RememberGameBuild();
 // 最近一次 context-1 构建：status + 它属哪一轮队伍装配。热重建只碰 pass_id == 当前轮的记录
-// ——上一轮的对象在换人/切场景时已被游戏拆掉，重建它就是戳内存垃圾（2026-09-21 崩溃）。
+// ——上一轮的对象在换人/切场景时已被游戏拆掉，重建它就是戳内存垃圾。
 bool LatestContext1Status(uint32_t character_hash, uintptr_t& status, uint32_t& pass_id);
 // 我们自己的重建调用正在游戏线程上跑（重建函数会反过来进 detour）：这段里观察到的构建
 // 不算"新的一轮队伍装配"，否则被打断的那一轮成员会被误判为过期。
 extern thread_local bool g_tls_hot_rebuild_build;
 // 配装改动后对**已知的出战角色**各调一次游戏的状态重建函数：每人一次、不重试、队伍刚变过
-// 两秒内不调。（旧版危险之处：1 秒一次、整场不停、目标跟着装备页选中的人跑。）
+// 两秒内不调。
 void RebuildPartyStatusesOnce();
 bool SafeCopyToOutput(const GemData& source, void* destination) noexcept;
 bool SafeInvokeStatusRebuild(uintptr_t status, uint32_t character_hash) noexcept;
@@ -266,7 +264,7 @@ bool ApplyLoadout(
     const TemplateGemSlot* slots, int32_t slot_count,
     const GBFR20_ExclusiveOverride* overrides, int32_t override_count);
 void InstallDefaultTemplateSelections();
-// 模板表变过之后必须做的事，只有这一个入口（发布选择 + 排一次状态重建）。
+// 模板表变过之后必须做的事，只有这一个入口。
 void PublishTemplateSelections();
 bool TryCopyTemplateGem(uint32_t character_hash, uint32_t selected_slot_id, void* output) noexcept;
 bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept;
@@ -278,11 +276,9 @@ void ShutdownHooks();
 bool InstallHooks();
 void Initialize();
 void EnsureInitialized();
-// 从语义锚点解析游戏发布 skill_status 表的那个固定槽，把**槽首** RVA 缓存在 src/table_slot.cpp
-//（缓冲区指针字段在槽首 +8，每次调用现算，不另存）。失败只记日志、不影响其余初始化；热应用
-// 没有第二条路，只会拒写。
+// 从语义锚点解析游戏发布 skill_status 表的那个固定槽，把**槽首** RVA 缓存在 src/table_slot.cpp。
+// 失败只记日志、不影响其余初始化；热应用没有第二条路，只会拒写。
 void ResolveTableSlot();
-// GBFR20_WriteSkillStatusTable 的实现：>= 0 是改写的行数，< 0 是 native_api.h 里的拒绝码
-//（写之前的每一道闸都不动内存）。
+// GBFR20_WriteSkillStatusTable 的实现（返回值语义见 native_api.h）。
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept;
 }

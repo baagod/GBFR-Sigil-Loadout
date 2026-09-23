@@ -11,8 +11,8 @@ std::atomic_uint32_t g_active_getter_calls{0};
 std::atomic_uint32_t g_active_mid_calls{0};
 thread_local NaturalContributionFrame g_tls_natural_contribution{};
 // 一次构建 = 一条线程上同步跑完扩展槽 13…N，所以 "本次构建用哪套槽位" 只要 thread_local：
-// 构建开始时（第一个扩展槽）快照一次 store，整个构建都读这一份。别改回 "一张以 status 指针为键的
-// 授权表"（曾经有）：残留授权命中被复用的地址会注入旧槽位——status 对象是轮换且地址跨角色复用的。
+// 构建开始时（第一个扩展槽）快照一次 store，整个构建都读这一份。别改回"以 status 地址为键的
+// 授权表"：status 对象是轮换的、地址跨角色复用，残留授权会命中复用地址并注入旧槽位。
 thread_local uintptr_t g_tls_build_status = 0;
 // 快照那一版的角色：只比 status 地址不够（见上：地址跨角色复用）。
 thread_local uint32_t g_tls_build_character = 0;
@@ -20,7 +20,6 @@ thread_local std::array<uint32_t, kVirtualSlotCapacity> g_tls_build_selection{};
 thread_local bool g_tls_build_has_selection = false;
 
 namespace {
-// 会话级一次性标志；只有这个翻译单元用。
 std::atomic_bool g_live_confirmation_reported{false};
 
 uint32_t CountSelectedSlots(
@@ -58,7 +57,6 @@ void TrackNaturalContributionResult(
     bool copied) noexcept {
     if (!g_tls_natural_contribution.active)
         return;
-    // 自然贡献帧比的是四项（status + character_hash + context_mode + next_slot）；这条路径此前只比一项。
     if (g_tls_natural_contribution.status != status ||
          g_tls_natural_contribution.identity.character_hash != identity.character_hash ||
          g_tls_natural_contribution.identity.context_mode != identity.context_mode ||
@@ -87,7 +85,7 @@ void TrackNaturalContributionResult(
         final_identity.character_hash == identity.character_hash &&
         final_identity.context_mode == identity.context_mode;
     if (final_valid) {
-        // 实战确认每会话只记一次：健康的配装每场战斗都重复 9/9。下面那些失败仍每次
+        // 实战确认每会话只记一次：健康的配装每场战斗都重复同样的确认。下面那些失败仍每次
         // 报 N/M。
         if (!g_live_confirmation_reported.exchange(true, std::memory_order_acq_rel))
             SetRuntimeMessage(std::format(
@@ -186,9 +184,8 @@ void ObserveBuildStart(const GemCall& call) {
 }
 
 /*
-    读选择表、挑出这一格要的那个模板 gem，可选地把结果并进自然贡献的统计。来自技能数据循环时
-    读的是构建开头那份快照（构建内不变），否则按当前身份现查。`selection` 由调用方持有——
-    BeginNaturalContributionTracking 会把它记进 TLS 帧，所以它必须活过这次复制。
+    `selection` 由调用方持有——BeginNaturalContributionTracking 会把它记进 TLS 帧，所以它
+    必须活过这次复制。
 */
 uint8_t LoadSelectionAndCopy(
     const GemCall& call,
@@ -294,10 +291,7 @@ void OnSkillFetch(safetyhook::Context& context) {
 
 namespace {
 /*
-    启动阶段计时：把"记开始时间 -> 干活 -> 报一行 phase 日志"收成两行：
-
-        { auto phase = StartupPhase("gem-data-getter-hook");
-          ...install...; phase.Succeeded(installed); }
+    启动阶段计时：构造记下开始时间，Succeeded 报一行 phase 日志。
 
     上报由调用点显式触发，**不是**靠析构兜底：忘了调 Succeeded，析构报出来的 false 就是日志里
     一条**假的失败**，比缺一行更难查。
@@ -317,7 +311,6 @@ public:
     StartupPhase(const StartupPhase&) = delete;
     StartupPhase& operator=(const StartupPhase&) = delete;
 
-    // 析构即上报；显式调过 Succeeded 之后不再报。
     ~StartupPhase() {
         if (!_reported)
             CompleteStartupPhase(_name, _started, false);
@@ -408,7 +401,6 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept {
     if (!WriteByte(g_image_base + apply_limit_rva, expanded_slot_count))
         return false;
     if (!WriteByte(g_image_base + category_limit_rva, expanded_slot_count)) {
-        // 把第一个字节回滚到它原来的值，两条循环就保持一致。
         (void)WriteByte(g_image_base + apply_limit_rva, previous_apply_limit);
         return false;
     }
@@ -416,12 +408,9 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept {
 }
 
 bool InstallHooks() {
-    // 每个阶段在自己的作用域里：计时、上报、以及"失败就回滚并返回"。
-    //
     // 四条失败路径都走 DisableGameplayHooksAndRestore：它先恢复循环上限字节、再拆钩子，顺序是
     // 有讲究的（见那个函数），而且在一个钩子都没装时是 no-op——它自己以 ResetGameLayout() 收尾。
-
-    // 四条失败路径都要"回滚 gameplay 改动 + 说清为什么"：收在一处，免得漏掉其中一步。
+    // 回滚 + 说清为什么收在这一个 lambda 里，免得漏掉其中一步。
     const auto fail_installation = [](const char* why) {
         DisableGameplayHooksAndRestore();
         SetRuntimeMessage(why);

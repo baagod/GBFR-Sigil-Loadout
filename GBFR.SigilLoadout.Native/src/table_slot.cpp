@@ -4,9 +4,9 @@
 
 namespace gbfr::native {
 namespace {
-// 这里删掉过一版"全内存扫描"兜底（TableLocator）：它在这套机制上线后一次都没跑过，而且证明
-// 不了唯一重要的事——"这块缓冲区就是游戏在用的那块"静态证不出来。**不要再加回来**：拒写的代价
-// 只是这一局内存不变（编辑在游戏下一次解析或重启后照样生效），而扫描是 5~6 秒的慢路径。
+// **不要再加"全内存扫描"兜底**：它证明不了唯一重要的事——"这块缓冲区就是游戏在用的那块"
+// 静态证不出来；而拒写的代价只是这一局内存不变（编辑在游戏下一次解析或重启后照样生效），
+// 扫描却是 5~6 秒的慢路径。
 //
 // 定位分两步，靠语义而不是靠地址常量。
 //
@@ -15,7 +15,7 @@ namespace {
 //   48 01 DF           add  rdi, rbx              ; + rows
 //   C4 41 38 57 C0     vxorps xmm8, xmm8, xmm8
 // 这 12 字节里没有 rel32、没有 rip 位移，所以它是纯语义锚点：换版本只要这张表还是
-// 52 字节行，这段指令序列就还在。实测 2.0.6 的 77,257,728 字节 .text 里恰好 1 处。
+// 52 字节行，这段指令序列就还在。
 inline constexpr std::array<uint8_t, 12> kRowLoopSetup = {
     0x48, 0x6B, 0xFE, 0x34, 0x48, 0x01, 0xDF, 0xC4, 0x41, 0x38, 0x57, 0xC0};
 
@@ -34,14 +34,13 @@ inline constexpr std::array<uint8_t, 20> kSlotBaseStore = {
     0xC5, 0xF8, 0x10, 0x45, 0xF0,
     0xC5, 0xF8, 0x11, 0x05, 0, 0, 0, 0};
 
-// 为什么锚点要配一个窗口：这两条发布指令在 2.0.6 里全段分别出现 37 处和 23 处（同一个函数
-// 里每一张表都有一份），只有落在行循环锚点前面的那一对属于 skill_status。实测真实距离是
-// 0xCA（load）和 0xFE（store），隔壁 skill.tbl 的那一对在 0x836 和 0x86E（正好在窗口外）。
-// 窗口取 0x800：真实距离有 8 倍余量，又刚好把隔壁那张表挡出去。
+// 为什么锚点要配一个窗口：这两条发布指令同一个函数里每一张表都有一份，只有落在行循环锚点
+// 前面的那一对属于 skill_status。窗口取 0x800：对真实距离有充裕余量，又刚好把隔壁那张表
+// 挡出去。
 inline constexpr size_t kAnchorWindowBytes = 0x800;
 
-// skill_status.tbl 的文件头大小与行步长：8 字节行数头，然后 52 字节行
-//（见 GBFR.SigilLoadout/SigilEditorFeature.cs，数字一致）。
+// skill_status.tbl 的文件头大小与行步长必须与托管侧解析同一份归档的实现一致
+//（见 GBFR.SigilLoadout/SigilEditorFeature.cs）。
 inline constexpr uint64_t kTableHeaderBytes = 8;
 inline constexpr uint64_t kTableRowBytes = 52;
 // 行里 Key 的位置（相对行首）：编辑只碰 LevelValue1..10 与 Level，从不碰 Key，
@@ -52,7 +51,7 @@ inline constexpr uint64_t kRowKeyOffset = 40;
 // 不必另存一份；单写者、读者只 load，所以一个原子量就够，不需要锁。
 std::atomic_uintptr_t g_slot_rva{0};
 
-// 从槽里取出游戏那份活表的缓冲区地址（0 = 取到了，负数 = 拒绝码）。
+// 取到返回 0，否则返回 native_api.h 里的拒绝码（负数）。
 //
 // 每次问都重新读指针，不缓存地址——游戏换掉那份表（重新解析、发布新缓冲区）时下一个
 // 调用就跟上了，所以这里不存在"缓存失效"这个概念。
@@ -71,8 +70,7 @@ int32_t TryGetLiveTableBuffer(uintptr_t& buffer) noexcept {
 }
 
 /*
-    这里扫字节用的是"0 = 通配"这一套约定（layout_resolver.cpp 的 kXxxPattern 用显式 mask
-    字符串；两套并存，各自只服务一个文件）。
+    这里扫字节用的是"0 = 通配"这一套约定（另一套是显式 mask 字符串，见 layout_resolver.cpp）。
 
     这个约定的成立有个**前提**：pattern 里每个 0 字节都必须落在"该通配"的位置上。它不是自动成立
     的——加新 pattern 时若有一个 0 是想精确匹配的 0，匹配会静默变宽，而变宽的后果是"命中数 != 1"，
@@ -112,8 +110,8 @@ struct AnchorSearch {
     uintptr_t buffer_load_rva = 0;
     size_t slot_store_matches = 0;
     uintptr_t slot_store_rva = 0;
-    // 实际扫过的窗口：min(kAnchorWindowBytes, 锚点之前的字节数)。失败日志要报它而不是那个常量，
-    // 否则锚点靠段首时会报一个从没扫过的宽度，排查时会被引到错的方向。
+    // 实际扫过的窗口宽度：失败日志要报它而不是那个常量，否则锚点靠段首时会报一个从没扫过的
+    // 宽度，排查时会被引到错的方向。
     size_t window_bytes = 0;
 };
 
@@ -164,8 +162,7 @@ bool SameRowIdentity(const uint8_t* live, const uint8_t* table, uint64_t row_cou
     return true;
 }
 
-// 逐行写：只写内容真的不一样的行。那 6 条编辑就是 6 行，写窗口于是是 312 字节而不是
-// 328,648 字节——游戏任何时刻撞上"半更新的一行"的窗口小两个数量级。
+// 逐行写：只碰真的变了的那几行，游戏任何时刻撞上"半更新的一行"的窗口就小得多。
 int32_t WriteChangedRows(uint8_t* live, const uint8_t* table, uint64_t row_count) noexcept {
     int32_t written = 0;
     __try {
@@ -235,7 +232,6 @@ void ResolveTableSlot() {
 
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept {
     // 表的形状由**调用方**给的那张表定义（它来自归档，是权威），原生只检查游戏那份与它一致。
-    // 所以这里没有把行数写死的常量：只要 52 字节/行的关系还在，列布局或行数变了都照样走。
     if (table == nullptr || length <= kTableHeaderBytes ||
          (length - kTableHeaderBytes) % kTableRowBytes != 0)
         return GBFR20_TABLE_LENGTH_UNEXPECTED;

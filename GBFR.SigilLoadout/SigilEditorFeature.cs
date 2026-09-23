@@ -5,7 +5,7 @@ namespace GBFR.SigilLoadout;
 
 /// <summary>
 /// 按用户编辑的 sigiledits.json 改写 skill_status.tbl 的行：启动时改一份表交给 IDataManager，
-/// 运行中直接覆写游戏内存里那份已解析的表。它没有自己的配置目录、文件名或 win32 具名事件——
+/// 运行中直接覆写游戏内存里那份已解析的表。它没有自己的配置目录或 win32 具名事件——
 /// 日志、生命周期与"什么时候该重新应用"都跟着宿主走，由宿主 250ms 的 tick 驱动
 /// （见 <see cref="Tick"/>；启动那次写与运行中的热应用是同一个操作，见 <see cref="Publish"/>）。
 ///
@@ -28,8 +28,7 @@ internal sealed class SigilEditorFeature {
 
     private const string ConfigFileName = "sigiledits.json";
 
-    // 编辑列表住在 mod 自己的用户配置目录里（见 UserConfig），和配装 loadout.json 挨着：
-    // 可视工具写、这里读。改动由下面 Tick() 的 mtime 门发现。
+    // 编辑列表住在用户配置目录里（见 UserConfig），和配装 loadout.json 挨着：可视工具写、这里读。
     private static readonly string ConfigFile = UserConfig.FilePath(ConfigFileName);
 
     // 编辑器要用的表来自 gbfrelink.utility.manager，而那是**可选**依赖：管理器可能比本 mod
@@ -39,7 +38,6 @@ internal sealed class SigilEditorFeature {
     private IDataManager? _dm;
     private byte[]? _currentTable;
     private bool _started;
-    // 最近一次已经往日志里说过的那一版，以及"现在这一趟是静默重试吗"。
     private DateTime _loggedAttemptUtc;
     private bool _quiet;
     // 还没成功过时的重试间隔，以及上一次尝试的时刻（Environment.TickCount64）。
@@ -49,7 +47,6 @@ internal sealed class SigilEditorFeature {
     // 拉到 5s 只剩十几行；已成功过的路径走 mtime 门，不受影响。
     private const long RetryIntervalMs = 5000;
     private long _lastAttemptMs;
-    // 上一次拒写留下的候选表与它对应的文件版本：同版本重试直接复用，不重建。
     private byte[]? _retryTable;
     private DateTime _retryTableStamp;
     private int _stopped;
@@ -62,19 +59,13 @@ internal sealed class SigilEditorFeature {
     public SigilEditorFeature(Action<string> log) => _log = log;
 
     /// <summary>
-    /// 读编辑列表、改出表、交给 IDataManager，并把热应用接起来。任何一步失败都只记日志：这项功能
-    /// 坏掉不该把整个 mod 带走。
+    /// 任何一步失败都只记日志：这项功能坏掉不该把整个 mod 带走。
     /// </summary>
     public void Start(IModLoader loader) {
         _loader = loader;
         Bootstrap();
     }
 
-    /// <summary>
-    /// 只跑一次（<c>_started</c>）：还没接上 IDataManager 时由 <see cref="Tick"/> 再来叫；接上了但没
-    /// 造出表（归档读不出来、或布局是本构建不认识的）也由 Tick 重试；一旦交出去过一份表，之后只由
-    /// mtime 门驱动。
-    /// </summary>
     private void Bootstrap() {
         if (_started || !TryAttachManager())
             return;
@@ -119,16 +110,13 @@ internal sealed class SigilEditorFeature {
             TryApply(stamp, table);
         }
         catch (Exception ex) {
-            // 说清这一行意味着什么：表还没交出去（_currentTable 为 null），而 Tick 之后每一拍都会
-            // 再来一次 Bootstrap，所以这只是"这一次没成"，不是这一半被关掉。
+            // 说清这一行意味着什么：表还没交出去（_currentTable 为 null），而 _started 已置上，
+            // 之后由版本门驱动的 Tick 会再来一次——所以这只是"这一次没成"，不是这一半被关掉。
             _log("sigil edit EXCEPTION during the boot write (the hot apply will retry): " + ex);
         }
     }
 
-    /// <summary>
-    /// 拿 IDataManager。管理器是可选依赖、可能比我们晚加载，所以每次 Tick 都重试；只在第一次没拿到
-    /// 时说一句话，免得刷屏。
-    /// </summary>
+    /// <summary>只在第一次没拿到时说一句话，免得每拍都刷屏。</summary>
     private bool TryAttachManager() {
         if (_dm is not null)
             return true;
@@ -147,7 +135,6 @@ internal sealed class SigilEditorFeature {
     }
 
     /// <summary>
-    /// 宿主每 250ms 调一次：还没接上 IDataManager 就再试；接上了，看编辑列表的文件时间变了没有。
     /// 250ms 不是个量（数值要到下一场战斗才生效），它换掉的是一条阻塞在 WaitOne 的线程和一个内核事件对象。
     /// </summary>
     public void Tick() {
@@ -202,13 +189,6 @@ internal sealed class SigilEditorFeature {
     /// <summary>置上停止标志——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。</summary>
     public void Dispose() => Interlocked.Exchange(ref _stopped, 1);
 
-    /// <summary>
-    /// 把表应用到内存里。<paramref name="bootTable"/> 非空表示这份表已经建好、就是这一版的，
-    /// 不必再读配置与归档（启动那次走这里）；为 null 时按磁盘上的编辑列表现建。
-    ///
-    /// <paramref name="stamp"/> 是这一版的 mtime：**只有真的写进游戏内存了**才标记"已应用"——
-    /// 读不出表或原生拒写都提前 return，那一版还欠着，下一拍会再来。
-    /// </summary>
     private void Apply(DateTime stamp, byte[]? bootTable = null) {
         // 卸载之后（Dispose 置了 _stopped）不再动内存：宿主的定时器不保证回调已经跑完。
         if (Volatile.Read(ref _stopped) != 0) {
@@ -243,8 +223,8 @@ internal sealed class SigilEditorFeature {
     }
 
     /// <summary>
-    /// 唯一那条交给游戏的路径：先重新注册，再让原生按行原地写进游戏已解析的那份表。返回"真的写进去了吗"；
-    /// 没写进去就留下候选（<see cref="_retryTable"/>），同一版重试不必再从归档重建（328 KB）。
+    /// 唯一那条交给游戏的路径。返回"真的写进去了吗"；没写进去就留下候选（<see cref="_retryTable"/>），
+    /// 同一版重试不必再从归档重建（328 KB）。
     /// </summary>
     private bool Publish(byte[] table, DateTime stamp) {
         // 注册在前：它便宜，而且游戏若真的重新解析送达的文件，那次解析也必须看到新值。
@@ -279,8 +259,8 @@ internal sealed class SigilEditorFeature {
     }
 
     /// <summary>
-    /// 按 <paramref name="config"/> 造出表的字节：原表，叠上启用的那些编辑；造不出来返回 null 并说明
-    /// 原因。启动那次写与热应用走同一条路径，布局检查、行格式、报原因的日志都只有一处。
+    /// 按 <paramref name="config"/> 造出表的字节；造不出来返回 null 并说明原因。启动那次写与热应用
+    /// 走同一条路径，布局检查、行格式、报原因的日志都只有一处。
     /// </summary>
     private byte[]? BuildEditedTable(Config config, out int applied) {
         byte[]? file = TryReadTable();
@@ -305,10 +285,6 @@ internal sealed class SigilEditorFeature {
         return BuildEditedTable(config, out _);
     }
 
-    /// <summary>
-    /// 从游戏归档里取出没动过的表；取不到就返回 null 并说明原因：没有数据管理器、没拿到东西，或者
-    /// 这是本套偏移量描述不了的布局。
-    /// </summary>
     private byte[]? TryReadTable() {
         if (_dm is null) {
             LogAttempt("sigil edit FAIL: IDataManager controller not found (is gbfrelink.utility.manager enabled?)");
@@ -335,7 +311,6 @@ internal sealed class SigilEditorFeature {
         return file;
     }
 
-    /// <summary>把 <paramref name="config"/> 里启用的编辑原地写进 <paramref name="file"/>，返回落下去几条。</summary>
     private int PatchRows(byte[] file, Config config) {
         int applied = 0;
         foreach (SigilSkill edit in config.Edits) {
@@ -421,10 +396,6 @@ internal sealed class SigilEditorFeature {
                declaredRows == body / RowSize && body % RowSize == 0;
     }
 
-    /// <summary>
-    /// 按 52 字节的步长走这张表，匹配 (Key, Level)，把 <paramref name="values"/> 写进 LevelValue1..N。null
-    /// 的槽位保持游戏的原样：只写用户设过的数字，所以没人碰过的槽位不可能被旧副本盖掉。
-    /// </summary>
     private bool PatchRow(byte[] data, uint key, uint level, float?[] values) {
         for (int row = FileHeaderSize; row <= data.Length - RowSize; row += RowSize) {
             if (BitConverter.ToUInt32(data, row + KeyOffset) != key)
@@ -454,7 +425,7 @@ internal sealed class SigilEditorFeature {
             }
 
             // 只在**这一行相对上一次真的变了**时才说一行：这一行现在是什么值。不报 "was"：它恒等于归档里
-            // 的游戏原值，而"上一次是多少"上一条同位置的日志已经说过，两者对不上（实测踩过）。
+            // 的游戏原值，而"上一次是多少"上一条同位置的日志已经说过，两者对不上。
             string after = RowValues(data, row);
             if (after != before)
                 LogAttempt($"sigil edit:   {key:X8} L{level} @0x{row:X}: {after}");

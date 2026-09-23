@@ -64,11 +64,10 @@ uint32_t GBFR20_CALL GBFR20_CopyRuntimeMessage(char* buffer, uint32_t buffer_siz
 static int32_t ApplyLoadoutEntry(
     const GBFR20_TemplateSlot* slots, uint32_t slot_count,
     const GBFR20_ExclusiveOverride* overrides, uint32_t override_count) {
-    // 一个调用带两张调用方持有的表，守卫都在这里：关机中拒绝、计数越界拒绝、然后懒初始化并
-    // 要求钩子已装；任一条不成立都以 0 报告失败。
+    // 一个调用带两张调用方持有的表，所以两道边界检查都在这里：任一条不成立都以 0 报告失败。
     //
     // 上界不是形式：下面按调用方的计数逐个读那两块内存，而专属开关没有自己的容器大小可依——
-    // 一个凭空来的计数会一路读到调用方数组之外。上界取"专属表角色数 × 每角色三个专属槽"。
+    // 一个凭空来的计数会一路读到调用方数组之外。
     constexpr int32_t kMaxTemplateSlots = static_cast<int32_t>(kVirtualSlotCapacity);
     constexpr int32_t kMaxExclusiveOverrides =
         static_cast<int32_t>(kRuntimeTemplateCapacity) * 3;
@@ -130,11 +129,9 @@ static int32_t WriteSkillStatusTableEntry(const uint8_t* table, uint32_t length)
     // ResolveTableSlot 本来就排在装钩子之前。槽没解析出来时下面返回 SLOT_UNRESOLVED：拒写、
     // 一个字节都不动——编辑没丢（表已经重新注册过），只是要等游戏下一次解析或重启。
     EnsureInitialized();
-    // 上一次报出来的拒绝码；同一种拒写只报一次：
-    //
-    // 拒写每 5 秒重试一次，而游戏把那张表读进内存之前**必然**一直是 -3——这条消息于是逐字
-    // 相同，实测 3 行只差时间戳。这里只说一次"为什么没写进去"，真正的结论由托管侧那句
-    // SUCCESS / 拒写承担。拒绝码换了（或中间成功过一次）才再报。
+    // 上一次报出来的拒绝码。同一种拒写只报一次：拒写每 5 秒重试一次，而游戏把那张表读进内存
+    // 之前**必然**一直是 -3——这条消息于是逐字相同。这里只说一次"为什么没写进去"，真正的结论
+    // 由托管侧那句 SUCCESS / 拒写承担。拒绝码换了（或中间成功过一次）才再报。
     static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
 
     const int32_t result = WriteSkillStatusTable(table, length);

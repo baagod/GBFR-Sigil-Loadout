@@ -57,7 +57,6 @@ internal sealed class FileStamp {
     /// </summary>
     internal DateTime Now() => UserConfig.Stamp(_path);
 
-    /// <summary>这一版还没被应用过。失败之后仍然为 true，于是调用方下一拍会再试。</summary>
     internal bool Pending(DateTime current) => current != _applied;
 
     /// <summary>在**确实生效之后**调一次，宣告这一版处理完了。</summary>

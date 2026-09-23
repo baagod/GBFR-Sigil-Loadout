@@ -39,7 +39,6 @@ func hideNow(hwnd uintptr) {
 	target := returnFocusTo.Swap(0)
 	summoned := target != 0
 	if target == 0 {
-		// 没被召唤就打开（托盘/资源管理器）：回落到 Z 序里下一个窗口。
 		target = nextForegroundWindow(hwnd)
 	}
 	if target != 0 && target != hwnd {
@@ -68,7 +67,6 @@ func hideNow(hwnd uintptr) {
 	toolHidden.Store(true)
 }
 
-// revealTool 撤销 fakeHide（由 0x8010 激活处理调用）。
 func revealTool(hwnd uintptr) {
 	debugf("revealTool hwnd=%d", hwnd)
 	exStyle, _, _ := procGetWindowLong.Call(hwnd, gwlExStyle)
@@ -79,15 +77,13 @@ func revealTool(hwnd uintptr) {
 	toolHidden.Store(false)
 }
 
-// hideToTray 假隐藏工具（由工具内热键 / Escape 调用）。
 func hideToTray() {
 	if hwnd := findToolWindow(); hwnd != 0 {
 		fakeHide(hwnd)
 	}
 }
 
-// handleWndMsg 过滤我们在意的窗口消息：WM_CLOSE（X 按钮）假隐藏窗口，0x8010（托盘 / 游戏内热键
-// / 第二个实例）是唯一的激活命令。
+// 0x8010（托盘 / 游戏内热键 / 第二个实例）是唯一的激活命令。
 func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 	if win == nil {
 		return 0, false
@@ -104,7 +100,7 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 	case wmFakeHide:
 		hideNow(hwnd)
 		return 0, true
-	case wmToggle: // 游戏内热键：开关。焦点两边各自处理——显出时工具抢前台，收起时还给游戏。
+	case wmToggle: // 焦点两边各自处理——显出时工具抢前台，收起时还给游戏。
 		if prev := foregroundWindow(); prev != 0 && prev != hwnd {
 			returnFocusTo.Store(prev)
 		}

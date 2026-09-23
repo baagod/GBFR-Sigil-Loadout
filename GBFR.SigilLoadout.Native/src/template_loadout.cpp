@@ -7,11 +7,8 @@ namespace {
 // 内置角色专属模板：每个可玩角色保留它的三个专属 sigil 槽（slot 0 = T1 因子，
 // slot 1 = T2 因子，slot 2 = 战气；每槽一个独立因子，不做觉醒+合并）。被关掉的
 // 因子留空槽，空档由 InstallDefaultTemplateSelections 跳过。通用槽（3+）只来自
-// 玩家的 loadout.json。gem/技能在构建时由 gen 的 `exclusive` 子命令从 sigils.json 生成。
+// 玩家的 loadout.json。
 //
-// 重要："没有第二个技能"的 gem 必须用 skill2 = kUnwornCharacterHash
-//（0x887AE0B0，游戏认的"未选中"哨兵值），**不是** 0。skill2 = 0 会让游戏在
-// 完整 sigil 列表里多渲染一条空的 Lv1 条目（2026-09-02 在 ER 2.0.5 观察到）。
 // skill1_level 与 sigil_level 相互独立：前者是技能效果等级，后者是 sigil 在
 // 列表里的显示等级。
 //
@@ -38,9 +35,9 @@ struct CharacterExclusiveLoadout {
 // 跑它，所以 .inc 是构建中间产物、不入库——改数据去改 gen\game\sigils\exclusive.go。
 #include "exclusive_table.inc"
 
-// 这个 gem 属于哪个角色：直接在**已经编译进来的注入表**里找，不另存一张"限制表"（唯一调用点
+// 直接在**已经编译进来的注入表**里找，不另存一张"限制表"（唯一调用点
 // TryCopyTemplateGem 只会看到注入表自己的 gem）。生成时已核对它与 sigils.json 的 character 列
-// 一致（84 个不重复 gem，0 处不一致）。古兰/姬塔共用同 3 个 gem：谁先出现返回谁，由
+// 一致。古兰/姬塔共用同 3 个 gem：谁先出现返回谁，由
 // IsCharacterCompatible 认这一对。
 uint32_t RequiredCharacterForGem(uint32_t gem_hash) noexcept {
     for (const CharacterExclusiveLoadout& row : kCharacterExclusives) {
@@ -50,8 +47,7 @@ uint32_t RequiredCharacterForGem(uint32_t gem_hash) noexcept {
     return 0;
 }
 
-// character_hash -> g_runtime_templates 的下标（InitializeRuntimeTemplates 里
-// 建一次、从不重排，所以热路径 getter 是 O(1)）。
+// InitializeRuntimeTemplates 里建一次、从不重排，所以热路径 getter 是 O(1)。
 std::unordered_map<uint32_t, size_t> g_character_template_index;
 // 按角色的专属开关（缺失 = ExclusiveAll），由 g_template_mutex 保护；
 // 由 GBFR20_ApplyLoadout 写入。
@@ -75,7 +71,6 @@ uint8_t ReadExclusiveStateLocked(uint32_t character_hash) noexcept {
     return iterator->second & ExclusiveAll;
 }
 
-// 每个虚拟槽一个独立因子（0 = T1，1 = T2，2 = 战气）；玩家配装在 ApplyLoadout 里填通用槽。
 // 要求调用方持有 g_template_mutex，且该角色已注册进 g_character_template_index。
 void ApplyExclusiveStateLocked(CharacterTemplate& character) noexcept {
     const auto index = g_character_template_index.find(character.character_hash);
@@ -193,7 +188,7 @@ void InstallDefaultTemplateSelections() {
             slots.fill(0);
             for (int index = 0; index < slot_limit; ++index) {
                 if (character.slots[static_cast<size_t>(index)].gem_id == 0)
-                    continue; // 被关掉的专属槽留空档。
+                    continue;
                 slots[static_cast<size_t>(index)] = MakeTemplateSlotId(index);
                 ++installed;
             }
@@ -214,8 +209,7 @@ void InstallDefaultTemplateSelections() {
         layout));
 }
 
-// 模板表变过之后必须做的事，只有这一个入口（以前三个调用点各拼一遍同一序列，而"钩子还没装好
-// 就不排重建"这个条件只写在其中两个里）。
+// 模板表变过之后必须做的事，只有这一个入口（发布选择 + 排一次重建）。
 //
 // 配装改动只做两件事：换掉选择（对所有角色），然后对 **已知的出战角色** 各重建一次——不重建的话
 // 改动要等到下一次开战才会进战斗状态（游戏不会在战斗中途重建 context-1）。
@@ -261,8 +255,7 @@ bool ApplyLoadout(
     // 它们的开关按角色组装。nullptr = 没有玩家配置 -> 玩家行数为零，于是下面通用槽
     // 循环是擦除而不是填充。
     //
-    // 两半一起来，是因为它们落在同一个"重新发布"步骤上：最后只发布一次（v17 分成两个导出，
-    // 代价是每份配置把同一张表发布并打印两遍）。
+    // 两半一起来，是因为它们落在同一个"重新发布"步骤上：分成两次只会让同一张表被发布并打印两遍。
     const int32_t requested = slots == nullptr ? 0 : std::max(slot_count, 0);
     const int32_t effective_count =
         std::min(requested, kVirtualSlotCapacity - kBuiltinExclusiveSlotCount);
@@ -298,8 +291,6 @@ bool ApplyLoadout(
             if (character.character_hash == 0)
                 continue;
             ApplyExclusiveStateLocked(character);
-            // effective_count == 0 时每次迭代都走 TemplateGemSlot{} 分支，于是擦除和
-            // 填充是同一个循环。
             for (int32_t slot_index = kBuiltinExclusiveSlotCount;
                   slot_index < kVirtualSlotCapacity; ++slot_index) {
                 const int32_t config_index =

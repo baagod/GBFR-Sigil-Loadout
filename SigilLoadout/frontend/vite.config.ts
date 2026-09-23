@@ -4,7 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 import wails from "@wailsio/runtime/plugins/vite";
 import { fileURLToPath, URL } from "node:url";
 
-// https://vitejs.dev/config/
 export default defineConfig({
     server: {
         host: "127.0.0.1",

@@ -13,9 +13,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
 # --- 版本号：唯一权威源 -------------------------------------------------------
-# ModConfig.json 是版本号的唯一权威源：脚本以前自带默认字面量，于是有了两个真相源，而前端的
-# package.json / package-lock.json 根本没人管，工具显示的版本可以一直停在旧值上。现在 -Version
-# 只是发布时的可选覆盖手段。
+# ModConfig.json 是版本号的唯一权威源；-Version 只是发布时的可选覆盖手段。
 $manifestVersion = (Get-Content -LiteralPath (
     Join-Path $root 'GBFR.SigilLoadout\ModConfig.json') -Raw | ConvertFrom-Json).ModVersion
 if (-not $Version) {
@@ -51,8 +49,7 @@ $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 $completionMarker = Join-Path $distRoot '.build-complete'
 
 # --- 发布一致性闸门 -----------------------------------------------------------
-# sigils.json 是工具读的数据源，随包发布，必须在场，否则工具起来就没有因子表。
-# 「character 行必须正好 87 条」那道门**已删**：mod 侧已经没有这个数字，"gem → 角色"由编译进去的注入表派生。
+# sigils.json 随包发布：缺席的话工具起来就没有因子表。
 $sigilsPath = Join-Path $root 'SigilLoadout\assets\sigils.json'
 if (-not (Test-Path -LiteralPath $sigilsPath)) {
     throw "sigils.json is missing: $sigilsPath"
@@ -60,8 +57,7 @@ if (-not (Test-Path -LiteralPath $sigilsPath)) {
 
 # --- 数据新鲜度闸门 -----------------------------------------------------------
 # sigils.json 必须与数据源一致；不一致 = 忘了跑生成器（构建不自动生成，避免每次重建数据源）。
-#   sigils.json  <- gen\output\sigils.xlsx（共享 gen 的 `go run . sigils-json`；审阅表 sigils.xlsx
-#   与 texts.xlsx 同待遇，都是生成物，住在 gen\output\ 且不入任何仓库）
+#   数据源是仓库旁共享 gen 里的 gen\output\sigils.xlsx：审阅表是生成物，不入任何仓库。
 # 只比对本仓库里入库的那一份，不需要游戏数据在场。生成器的两份产物待遇不同：`src\exclusive_table.inc`
 # 不入库（.gitignore），是构建中间产物；`SigilLoadout\assets\sigils.chara.json` **入库、随包**，却由
 # 同一次构建重写——所以它另有一道收尾门禁（见文件末尾的 generated-asset gate）。
@@ -137,7 +133,6 @@ if ($LASTEXITCODE -ne 0) {
     throw "Managed build failed with exit code $LASTEXITCODE."
 }
 
-# 配装编辑工具：Wails v3 构建（GUI 子系统，前端 dist 编进去）。
 $toolDir = Join-Path $root 'SigilLoadout'
 Push-Location $toolDir
 try {
@@ -160,9 +155,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend build failed with exit code $LASTEXITCODE."
     }
-    # SigilLoadout.exe 的程序图标。Windows 只认链接期资源（.syso），而 .syso 要 .ico：
-    # SigilLoadout\icon.ico 就是那份手工资产（10 档，由游戏原生 137px 技能图标格逐档准备），
-    # 托盘 go:embed 的也是同一份（见 SigilLoadout\main.go），所以不再需要生成器。
+    # Windows 只认链接期资源（.syso），而 .syso 由 .ico 生成；同一份 .ico 也喂托盘（说明见 SigilLoadout\main.go）。
     $iconPng = Join-Path $toolDir 'icon.png'
     if (-not (Test-Path -LiteralPath $iconPng)) {
         throw "Tool icon is missing: $iconPng"
@@ -175,8 +168,6 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Windows resource (.syso) generation failed with exit code $LASTEXITCODE."
     }
-    # 用 -buildvcs=false 的理由和 csproj 把 SourceLink 与提交版本排出托管元数据一样：否则 Go 会
-    # 把提交 sha 和一个 "modified" 标记盖进去。
     & go vet ./...
     if ($LASTEXITCODE -ne 0) {
         throw "Tool go vet failed with exit code $LASTEXITCODE."
@@ -212,6 +203,8 @@ try {
     if ($testExit -ne 0) {
         throw "Tool Go tests failed with exit code $testExit."
     }
+    # 用 -buildvcs=false 的理由和 csproj 把 SourceLink 与提交版本排出托管元数据一样：否则 Go 会
+    # 把提交 sha 和一个 "modified" 标记盖进去。
     & go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o SigilLoadout.exe .
     if ($LASTEXITCODE -ne 0) {
         throw "Tool build failed with exit code $LASTEXITCODE."
@@ -221,7 +214,7 @@ try {
 }
 
 # --- 布局解析回归（离线）------------------------------------------------------
-# 拿真实游戏 exe 跑一遍生产解析器：解析成功 + 逐字节复验 + "改坏一个字节必须被拒"。它护的是
+# 拿真实游戏 exe 跑一遍生产解析器（断言见 harness 的 program.cpp 头部）。它护的是
 # layout_resolver.cpp——仓库里最危险的那段代码；改它或游戏更新时，这是唯一能在本地给出答案的东西。
 # 没设 GBFR_EXE 就跳过：exe 路径是本机环境、不入库，闸门要在任何机器上都能跑。
 if ($env:GBFR_EXE) {
@@ -231,7 +224,7 @@ if ($env:GBFR_EXE) {
 else { Write-Output 'layout harness: skipped (set GBFR_EXE to run it).' }
 
 # 随包数据只有一份：SigilLoadout\assets\。工具按 exeDir()\assets\ 找它，所以从源码目录直接跑与跑
-# 打包出来的那份用的是同一布局——以前那一步"开发副本"同步已经删掉。
+# 打包出来的那份用的是同一布局。
 foreach ($staleData in @('sigils.json', 'sigils.chara.json')) {
     $staleCopy = Join-Path $toolDir $staleData
     if (Test-Path -LiteralPath $staleCopy) {
@@ -255,8 +248,7 @@ if (-not $resolvedPackage.StartsWith($resolvedDist, [StringComparison]::OrdinalI
     throw "Refusing to clean a package path outside dist: $packageDir"
 }
 
-# 强杀正在跑的编辑工具：它锁着 dist\GBFR.SigilLoadout\SigilLoadout.exe，会让下面那次递归清理
-# dist 失败。脚本末尾会重新打开工具。
+# 工具锁着 dist 里的 SigilLoadout.exe，会让下面那次递归清理失败（脚本末尾会重新打开它）。
 $loadoutProcesses = Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue
 if ($loadoutProcesses) {
     $loadoutProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -291,14 +283,14 @@ Copy-Item -Path $toolExe -Destination $packageDir -Force
 # 托盘/exe 是同一张图（工具那份是编译进 SigilLoadout.exe 的）。
 Copy-Item -Path (Join-Path $toolDir 'icon.png') -Destination $packageDir -Force
 
-# 必需的发布文件——「一个包该有哪些文件」只有这一份持有者；deploy.ps1 不再抄一份（它只问
-# "这到底是不是一个包"）。sigils.json 由 csproj 拷进输出目录。
+# 必需的发布文件——「一个包该有哪些文件」只有这一份持有者（deploy.ps1 只问"这到底是不是一个包"）。
+# sigils.json 由 csproj 拷进输出目录。
 foreach ($requiredFile in @(
     'GBFR.SigilLoadout.dll',
     'GBFR.SigilLoadout.Native.dll',
     'SigilLoadout.exe',
     'icon.png',
-    # 随包数据九份一份不嵌（工具按 exeDir()\assets\ 读），漏一份就等于发一个启动即报错的工具。
+    # 漏一份就等于发一个启动即报错的工具。
     # 名单**故意独立**，不从源目录或 csproj 派生：派生的清单与它们共享同一个真相，于是"忘了加"和
     # "被误删"两种漏法它都查不到（实测过：藏掉一份资产，派生版门禁退出码仍是 0）。
     'assets\sigils.json',

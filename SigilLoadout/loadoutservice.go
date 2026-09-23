@@ -12,17 +12,14 @@ import (
 const MaxSlots = 12
 
 // LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json——都在 exe 旁），把玩家配置写到
-// LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新冲不掉它）。它写出的 loadout.json 是
-// { lang, slots: [ { items: [ {gem, hash, level}, {hash, level}? ], enabled } ] }——只认这一种形状，
-// 别的拼写都不接受，所以 items[0] 必须带技能 hash。
+// LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新冲不掉它）。落盘形状由前端给
+// （model.ts 的 buildLoadoutPayload）：只认这一种，别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
-	// 落盘是防抖的，与 EditService 同一套骨架（debouncedWriter）：每次调用都替换待写并重启定时器，
-	// 落盘的永远是屏幕上最后的状态。
 	writer debouncedWriter[[]byte]
 }
 
-// MinimiseApp 把窗口假隐藏到托盘（alpha 0，WebView 保持活着），好让游戏内热键一按就回来。
-// 由工具自己的热键调用；X 按钮走 main.go 的 WndProc 拦截器直接假隐藏。
+// 由工具自己的热键调用，好让游戏内热键一按就把窗口收回来；X 按钮走 main.go 的 WndProc 拦截器
+// 直接假隐藏。
 func (s *LoadoutService) MinimiseApp() {
 	hideToTray()
 }
@@ -72,7 +69,7 @@ func userCfgDir() string {
 // 落点），打包后是 mod 目录下的 assets\——**同一个布局，没有第二种**，所以不需要"开发副本"。
 const assetsDir = "assets"
 
-// readModFile 读一个相对 exe 目录的文件（mod 目录每次更新都会被换掉；用户配置另住在 userCfgDir）。
+// readModFile 每次都从 exe 旁读：mod 目录每次更新都会被换掉（用户配置另住在 userCfgDir）。
 func readModFile(relative string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(exeDir(), relative))
 	if err != nil {
@@ -81,7 +78,6 @@ func readModFile(relative string) (string, error) {
 	return string(data), nil
 }
 
-// readAssetMap 读随包数据里的一份并解成以哈希为 Key 的 map。
 // dir 由调用方给（生产是 exeDir()\assets\，测试是源码树的 assets\，测试进程的 exeDir 是临时目录）；
 // 错误里带上路径——缺文件时唯一要看的就是"缺的是哪一份"。
 func readAssetMap[T any](dir, name string) (map[string]T, error) {
@@ -142,7 +138,7 @@ func (s *LoadoutService) CharaNames(lang string) map[string]string {
 	return pick(lang, charaNamesByLang)
 }
 
-// LoadConfig 从用户目录返回玩家配置；还没有配置时返回一份空配置（编辑器从零开始——没有内置预设）。
+// LoadConfig 在没有配置时返回一份空配置：编辑器从零开始，没有内置预设。
 func (s *LoadoutService) LoadConfig() (string, error) {
 	data, err := os.ReadFile(filepath.Join(userCfgDir(), loadoutFileName))
 	if err != nil {
@@ -207,7 +203,8 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 		Slots     []loadoutSlot              `json:"slots"`
 		Exclusive map[string]map[string]bool `json:"exclusive"`
 	}
-	// 只认这一种形状：别的拼写（早期版本的裸数组）在这里就报错，而不是被翻译成"空配置"写下去。
+	// 只认这一种形状，别的拼写在这里就报错：翻译成"空配置"再写下去，就是把一份读不出来的文件静默
+	// 变成"没有任何参槽"落盘，用户看到的是配置被清空。
 	if err := jsonv2.Unmarshal([]byte(config), &c); err != nil {
 		return err
 	}
@@ -224,10 +221,8 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 	return nil
 }
 
-// writeLoadoutFile 是 LoadoutService 的落盘动作（debouncedWriter 的 write）。
 func writeLoadoutFile(payload []byte) error {
 	return writeFileAtomic(filepath.Join(userCfgDir(), loadoutFileName), payload)
 }
 
-// flushNow 见 debouncedWriter：关闭流程要的正是同一个实例（main.go 的 OnShutdown）。
 func (s *LoadoutService) flushNow() { s.writer.flushNow() }

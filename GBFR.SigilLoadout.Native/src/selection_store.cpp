@@ -14,9 +14,8 @@ struct Context1Record {
     uint32_t pass_id = 0;
 };
 std::unordered_map<uint32_t, Context1Record> g_latest_context1_status;
-// 当前轮次号。游戏自己的人一轮装配是**连续**建出来的（实测同一轮内相邻不到 1 ms），所以用
-// "距离上一次游戏构建的空档"切轮：空档够大 = 新的一轮。我们自己的重建调用不切轮，只把目标
-// 角色留在当前轮里。
+// 当前轮次号。游戏自己的人一轮装配是**连续**建出来的，所以用"距离上一次游戏构建的空档"切轮：
+// 空档够大 = 新的一轮。我们自己的重建调用不切轮，只把目标角色留在当前轮里。
 std::atomic_uint32_t g_context1_pass_id{0};
 std::atomic_uint64_t g_last_game_context1_ms{0};
 inline constexpr uint64_t kAssemblyWindowMs = 1000;
@@ -26,11 +25,11 @@ std::atomic_uint64_t g_party_changed_ms{0};
 // 游戏最近一次自己建状态的时间（detour 里记）。热重建只在"游戏此刻没在建"时动手：我们的调用
 // 和游戏自己的构建同时碰一份 status 就是竞态（崩溃前的 ok=0 都出在这种重叠里）。窗口必须短——
 // 游戏建状态时是**连续**调 detour 的，250 ms 足以识别"正在建"，而"最近 5 秒建过"会挡掉界面上
-// 几乎每一次改动（2026-09-21 实测：4/5 次被跳过）。
+// 几乎每一次改动。
 std::atomic_uint64_t g_last_game_build_ms{0};
 inline constexpr uint64_t kGameBuildQuietMs = 250;
-// 一旦有一次重建没能正常完成（ok=0），冷却 60 秒：那次调用已经把对象留在可疑状态，而崩溃都
-// 跟在 ok=0 之后 30~60 秒。冷却期过了再允许（不是整场报废——那会让人以为功能坏了）。
+// 一旦有一次重建没能正常完成（ok=0），冷却 60 秒：那次调用已经把对象留在可疑状态，之后往往
+// 紧跟着崩溃。冷却期过了再允许（不是整场报废——那会让人以为功能坏了）。
 std::atomic_uint64_t g_hot_rebuild_cooldown_until_ms{0};
 inline constexpr uint64_t kHotRebuildCooldownMs = 60000;
 
@@ -59,7 +58,6 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status) {
         std::scoped_lock lock(g_party_mutex);
         Context1Record& record = g_latest_context1_status[character_hash];
         previous_status = record.status;
-        // 同一个对象、同一轮 = 这次进来没带来新信息（见下面日志那段）。
         unchanged = record.status == status && record.pass_id == pass_id;
         record.status = status;
         record.pass_id = pass_id;
@@ -67,8 +65,8 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status) {
         known_characters = g_latest_context1_status.size();
     }
     // 记录两次都要做，**日志只说一遍**：一次构建会被 apply 与 category 两条循环各问一次扩展槽，
-    // 于是这个函数对同一次构建连着进来两次、参数完全相同——原来每个构建刷两行一模一样的
-    // "ctx1 build"，实测占整份日志的 43%。所以说一行的条件就是"这一份记录真的变了"。
+    // 于是这个函数对同一次构建连着进来两次、参数完全相同。所以说一行的条件就是"这一份记录
+    // 真的变了"。
     if (!unchanged)
         Log(std::format(
             "ctx1 build: char=0x{:08X} status=0x{:X} pass={}{}{}{}",
@@ -78,7 +76,7 @@ void RememberContext1Status(uint32_t character_hash, uintptr_t status) {
             learned_party_member ? " (new party member)" : ""));
     if (learned_party_member) {
         Log(std::format("party+ char=0x{:08X} ({} known)", character_hash, known_characters));
-        // 队伍刚变过：接下来两秒内不许热重建（2026-09-21 三次崩溃都发生在换队友/切场景之后）。
+        // 队伍刚变过：接下来两秒内不许热重建——崩溃都发生在换队友/切场景之后。
         g_party_changed_ms.store(now, std::memory_order_release);
     }
 }
@@ -109,7 +107,7 @@ bool TryClaimRebuildNow(uint64_t now) {
         Log("hot rebuild: skipped (cooling down after a failed rebuild)");
         return false;
     }
-    // 跳过只是"这次不实时"：改动仍会在游戏下一次自然构建时落地（菜单里实测十几秒）。
+    // 跳过只是"这次不实时"：改动仍会在游戏下一次自然构建时落地。
     if (now - g_last_game_build_ms.load(std::memory_order_acquire) < kGameBuildQuietMs) {
         Log("hot rebuild: skipped (game is building)");
         return false;
@@ -136,7 +134,6 @@ bool TryClaimRebuildNow(uint64_t now) {
 }
 
 void RebuildPartyStatusesOnce() {
-    // 前置条件：钩子与语义布局都要在位。
     if (!g_hooks_ready.load(std::memory_order_acquire) ||
          !g_layout_ready.load(std::memory_order_acquire))
         return;
@@ -150,13 +147,12 @@ void RebuildPartyStatusesOnce() {
             party.push_back(character_hash);
     }
 
-    // 只重建**当前这轮队伍装配里建出来的对象**：没有记录 = 从没被观察到在场上；记录的轮次 ≠
-    // 当前轮 = 游戏已重装队伍、这个人不在新队伍里，那份 status 已被游戏拆掉——身份残留还在、
-    // 身份校验照样通过，重建它就是戳内存垃圾（2026-09-21：移出队友后仍拿旧指针重建，ok=0，28 秒后崩）。
+    // 只重建**当前这轮队伍装配里建出来的对象**：记录轮次 ≠ 当前轮 = 游戏已重装队伍、这个人
+    // 不在新队伍里，那份 status 已被游戏拆掉——身份残留还在、身份校验照样通过，重建它就是
+    // 戳内存垃圾。
     //
-    // 这条路必须有：**战斗里游戏自己不会重建角色状态**（实测带满队友进真实副本、整场不改配置，
-    // 4 分 09 秒零次构建；进副本前在城里那 90 秒玩家自己被重建 6 次），所以"等下一场战斗"在
-    // 战斗中永远等不到。它也是本项目唯一会去动游戏活对象的地方。
+    // 这条路必须有：**战斗里游戏自己不会重建角色状态**，所以"等下一场战斗"在战斗中永远等
+    // 不到。它也是本项目唯一会去动游戏活对象的地方。
     const uint32_t current_pass = g_context1_pass_id.load(std::memory_order_acquire);
     for (const uint32_t character_hash : party) {
         uintptr_t latest_status = 0;

@@ -38,8 +38,6 @@ const debounceDelay = 500 * time.Millisecond
 // 里有镜像，两者之间没有任何关联，改名必须同时改两处。
 const saveFailedEvent = "GBFR.SigilLoadout.SaveFailed"
 
-// EditService 是 Wails 暴露给前端的后端。
-//
 // 落盘是防抖的：SaveEdits 把列表交给 debouncedWriter，编辑停下来之后才写出，所以落盘的永远是屏幕上
 // 最后的状态，绝不会是若干次按键的混合。
 type EditService struct {
@@ -49,7 +47,7 @@ type EditService struct {
 // LangZH 是被问到一种没有对应表的语言时回退使用的语言。
 const LangZH = "zh"
 
-// pick 从按语言分好的表里取出某种语言，不认得的回落 LangZH。三条查表路径除此之外没有共同点。
+// 三条查表路径只共用这一条回退，除此之外没有共同点。
 func pick[T any](lang string, tables map[string]T) T {
 	if table, ok := tables[lang]; ok {
 		return table
@@ -90,7 +88,6 @@ type SkillText struct {
 	Explain []ExplainBand `json:"explain"`
 }
 
-// skillTables 把 UI 语言映射到它的文案表，由 loadAssets 从 assets\skill.<lang>.json 装进来；
 // 每种语言里的 Key 都是同一批 8 位十六进制哈希，不同的只是词语。
 var skillTables map[string]map[string]SkillText
 
@@ -131,8 +128,7 @@ type SkillInfo struct {
 	Rows []SkillRow `json:"rows"`
 }
 
-// skillInfo 把技能哈希（游戏管这些行叫 skills）映射到该因子自己的数字和等级，
-// 由 loadAssets 从 assets\skill_status.json 装进来一次。
+// 技能哈希（游戏管这些行叫 skills）-> 该因子自己的数字和等级。
 var skillInfo map[string]SkillInfo
 
 // SkillTable 返回整张 哈希 -> 因子 表，让前端在本地解析某个等级的起始数值，而不是每行发一次调用。
@@ -160,8 +156,6 @@ func padValues(values []*float64) []*float64 {
 	return out
 }
 
-// configPath 是 mod 加载编辑列表用的文件：mod 的用户目录下的 sigiledits.json。
-//
 // 必须走 userCfgDir：os.UserConfigDir 在 Windows 是 %APPDATA%（Roaming），而 C# 那半从
 // LocalApplicationData 算同一个目录——两边算同一个字符串，中间没有任何协商，只能有一处实现。
 func configPath() string {
@@ -174,7 +168,7 @@ func configPath() string {
 // 一份起始编辑会让"打开可视工具"本身就是一次对游戏的改动，用户什么都没点。
 //
 // 存在但读不出或解析不了的文件是错误，而不是空列表：空列表是一个真实状态（所有编辑都关掉了），
-// 而把坏文件显示成空列表，正是某次误触按键把这份空覆盖回用户自己编辑内容的方式。
+// 而把坏文件显示成空列表，会让用户的下一次按键把这份空覆盖回他自己的编辑内容。
 func (s *EditService) LoadEdits() ([]SigilSkill, error) {
 	path := configPath()
 	raw, err := os.ReadFile(path)
@@ -186,12 +180,9 @@ func (s *EditService) LoadEdits() ([]SigilSkill, error) {
 	}
 
 	var cfg Config
-	/*
-	  成员名精确、不做大小写折叠：旧构建的文件（那时 Key 写作 “Edits”/“Enabled”/……）匹配不上
-	  任何成员，读出来就是空列表——这就是“从头来过”的既定形状：下一次保存写出当前格式。
+	// 成员名精确匹配、不做大小写折叠：对不上任何成员的文件读出来就是空列表——"从头来过"的既定形状，
+	// 下一次保存写出当前格式。不认得的成员被忽略而不是报错（json/v2 默认如此）。
 
-	  不认得的成员被忽略而不是报错（json/v2 默认如此），但这不影响上面那条：旧拼写连成员名都对不上。
-	*/
 	if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
@@ -228,7 +219,6 @@ func (s *EditService) SaveEdits(edits []SigilSkill) error {
 	return nil
 }
 
-// writeEdits 是 EditService 的落盘动作（debouncedWriter 的 write），把列表写到 mod 读它的地方。
 func writeEdits(edits []SigilSkill) error {
 	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))
 	if err != nil {
@@ -238,5 +228,4 @@ func writeEdits(edits []SigilSkill) error {
 	return writeFileAtomic(configPath(), cfgBytes)
 }
 
-// flushNow 见 debouncedWriter：关闭流程要的正是同一个实例（main.go 的 OnShutdown）。
 func (s *EditService) flushNow() { s.writer.flushNow() }

@@ -39,7 +39,6 @@ export type SkillText = { name: string; summary: string; explain: ExplainBand[] 
 
 export const SLOTS = 10;
 
-/** 一条编辑写的那行表：每个因子哈希 + 等级对应一个地址。 */
 export const addressOf = (key: string, level: number) => `${key}#${level}`;
 
 /**
@@ -51,7 +50,7 @@ export const isEdit = (record: SigilSkill) =>
 
 /**
  * 把该等级自己的数值从槽里摘出去：槽里放着游戏的值就不算输入，于是置为 null——该数字只作为占位符
- * 显示。这也让旧文件能读对：在 null 出现之前，旧版本为了把行写回去会把每个槽都填上游戏自己的数值。
+ * 显示。有的文件会把游戏那一行整行照抄进槽里（为了让行能写回去），这一步让它们仍然读对。
  * 表里没有的等级（手工添加的记录）保留数值：没有东西可比对，而那些数字很可能正是游戏需要写入的。
  */
 export const trimGameValues = (
@@ -101,7 +100,7 @@ export function dedupe(records: SigilSkill[]): SigilSkill[] {
 /*
     输入框允许出现的内容：可选的开头负号、数字、最多一个小数点——所以 "-"、"0."、 "-.5"
     都是可达状态，而第二个负号、第二个小数点、字母与科学计数法永远进不了框。挡住科学计数法
-    是关键：数字输入框以前会接受 1e999，JSON 把那个值变成 null，可视工具再把它存成 0。
+    是关键：1e999 这类值会被 JSON 变成 null，可视工具再把它存成 0。
 
     这里的位数是整个输入域的上界：小数点前最多 6 位、后最多 6 位，最大能输入 999999.999999。
     永远超不过它的数也不可能变成 Infinity——否则粘进来的 400 位数会被提交成 Infinity，
@@ -232,7 +231,7 @@ export function parentState(
 export const matches = (label: string, key: string, needle: string) =>
     !needle || label.toLowerCase().includes(needle) || key.toLowerCase().includes(needle);
 
-/** 共用同一段说明的一段等级：文本，以及它起始的等级。 */
+/** 共用同一段说明的一段等级。 */
 export type ExplainBand = [level: number, text: string];
 
 /**

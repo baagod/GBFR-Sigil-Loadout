@@ -1,7 +1,7 @@
 /*
     专属因子页的数据只有一条规则：sigils.chara.json 的槽写成 [因子物品 hash, 技能 hash]，
-    两个 hash 各管一头。写下这个文件的那次回归正是把两头对调——names（sigils.lang.json）
-    以因子物品 hash 为键，而状态键是技能 hash，取错下标让整页三个标签退化成裸 hash。
+    两个 hash 各管一头：names（sigils.lang.json）以因子物品 hash 为键，而状态键是技能 hash，
+    取错下标整页三个标签就退化成裸 hash。
 */
 import { describe, expect, it } from "vitest";
 import {
