@@ -8,7 +8,7 @@
 >
 > **仅供单机使用。请合理使用，切勿破坏他人游戏体验。**
 
-**下载**：[Nexus 页面](https://www.nexusmods.com/granbluefantasyrelink/mods/823) / [GitHub Release](https://github.com/baagod/GBFR-Sigil-Loadout/releases)
+**下载**：[Nexus](https://www.nexusmods.com/granbluefantasyrelink/mods/823) / [GitHub Release](https://github.com/baagod/GBFR-Sigil-Loadout/releases)
 
 
 ## 安装
