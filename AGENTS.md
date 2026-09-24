@@ -11,7 +11,7 @@
 ## Git 禁令
 
 1. **严禁 Git 提交**：只有当用户明确说出 “提交 / 提交代码” 时才能执行 `git add / git commit` 命令。
-2. 执行 `git add . & git diff --cached`，确认忽略项后调用 `/git-commit` skill（非 MCP）提交；
+2. 执行 `git add . & git diff --cached`，确认忽略项后调用 `/git-commit`（非 MCP）提交 ( 别管是不是你改的 )；
 
 ## 快速上手
 
