@@ -111,7 +111,7 @@ func toggleActionFor(hidden, selfForeground, gameForeground bool) toggleAction {
 }
 
 // 0x8010（托盘 / 第二个实例）是唯一的激活命令。
-func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
+func handleWndMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
 	if win == nil {
 		return 0, false
 	}
@@ -124,6 +124,14 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 		debugf("WM_CLOSE hwnd=%d", hwnd)
 		fakeHide(hwnd)
 		return 0, true
+	case 0x0112: // WM_SYSCOMMAND：最小化按钮走这条路，不是 WM_CLOSE
+		// 让它和 X 一样假隐藏。真最小化不经过 hideNow，那记"让游戏把光标收起来"的点击就不会重放，
+		// 焦点也不是明确交回去的 —— 所以最小化之后指针留在游戏里（实测）。低 4 位是系统用的，掩掉。
+		if wparam&0xfff0 == 0xf020 { // SC_MINIMIZE
+			debugf("WM_SYSCOMMAND SC_MINIMIZE hwnd=%d", hwnd)
+			fakeHide(hwnd)
+			return 0, true
+		}
 	case wmFakeHide:
 		hideNow(hwnd)
 		return 0, true
