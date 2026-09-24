@@ -6,6 +6,10 @@ tags: [configuration, file-format, cross-language, contract, mtime, validation]
 sources:
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
     resource: repo://GBFR-Sigil-Loadout.sln
+  - id: openwiki-source-12f2ddddaa65ce032d15e738
+    resource: repo://GBFR.SigilLoadout.Native/native_internal.h
+  - id: openwiki-source-ac7bb7c2f4a36fd9a94d83f1
+    resource: repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp
   - id: openwiki-source-6247cffd54f03f03a6fbff36
     resource: repo://GBFR.SigilLoadout/Config.cs
   - id: openwiki-source-d9cc925612842aacff93a408
@@ -36,10 +40,10 @@ sources:
     resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
+    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 两个配置文件与跨语言常量契约
@@ -86,7 +90,7 @@ verified:
 | 用户配置目录名 `GBFRSigilLoadout` | C# `UserConfig.cs`；Go `loadoutservice.go`（`userCfgDirName`） | ✓ | 两侧各写进一个自己的目录：工具「保存成功」，游戏里什么都没变；编辑列表永远读不到。无任何报错 |
 | 配装文件名 `loadout.json` | C# `LoadoutConfig.cs`（`UserConfig.FilePath("loadout.json")`）；Go `loadoutservice.go`（`loadoutFileName`） | ✓ | 同上；而托管侧只有在读不到 `loadout.json`（含从来没写过）时才回到内置专属模板，日志 `loadout.json removed; restored the built-in exclusive template.` |
 | 编辑列表文件名 `sigiledits.json` | C# `SigilEditorFeature.cs`（`ConfigFileName`）；Go `editservice.go`（`editListName`） | ✓ | 同上；日志里会出现 `sigil edit: no edit list yet at …(the tool writes it there)`，而工具那边一切正常 |
-| 启用槽上限 `MaxSlots = 12`（只数启用的行） | C# `LoadoutConfig.cs`；Go `loadoutservice.go`；TS `frontend/src/model.ts`（`MAX_SLOTS`，编辑器固定显示的行数） | ✓ | 三处不等价就会「存盘成功、游戏里什么都没变」：Go/前端允许的那一行被 C# 判成 `more than 12 enabled slots` 而**拒掉整份文件**，旧配置继续生效 |
+| 启用槽上限 `MaxSlots = 16`（只数启用的行） | C# `LoadoutConfig.cs`（`MaxSlots`，注释里写明与 Go 那处同步）；Go `loadoutservice.go`；TS `frontend/src/model.ts`（`MAX_SLOTS`，同一常数也是编辑器至少显示的行数，见 `padSlots`） | ✓ | 三处不等价就会「存盘成功、游戏里什么都没变」：Go/前端允许的那一行被 C# 判成 `more than 16 enabled slots` 而**拒掉整份文件**，旧配置继续生效 |
 | 缺失 cap 时的回落等级 `DefaultLevel = 15` | C# `LoadoutConfig.cs`；TS `model.ts`（`DEFAULT_LEVEL`） | ✓ | 手改文件漏写 `level` 时，工具与游戏落在不同等级上；前端的 cap 基准也跟着错（`capOfSkill`/`capOfMain`） |
 | 未选副技能的哨兵 `UnwornCharacterHash = 0x887AE0B0` | C# `LoadoutConfig.cs`；C++ `native_internal.h`（`kUnwornCharacterHash`） | ✓ | 槽位错位：某个真实角色 hash 被当成「未选择」，或「未选择」被当成一个真实技能去查表 |
 | 参槽数 `LevelValueCount = 10` | C# `Config.cs`；Go `editservice.go`；TS `frontend/src/skills.ts`（`SLOTS`） | ✓ | 写多一个：托管侧循环的上界是两者的较小值，多出来的数字被**静默忽略**；写少一个：那个槽位永远保持游戏原值，编辑看起来「没生效」 |
@@ -96,6 +100,8 @@ verified:
 | `skill_status` 表头 8 / 行 52 / 行内 Key 偏移 40 | C# `SigilEditorFeature.cs`；C++ `src/table_slot.cpp` | ✓ | 行错位：把数值写进别的行或行外。见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) |
 | 写盘失败事件名 `GBFR.SigilLoadout.SaveFailed` | Go `editservice.go`（`saveFailedEvent`）；TS `SigilEditorPanel.tsx` | ✓ | 防抖写盘失败不再弹对话框，只在工具日志里留一行 |
 | 单文件上限 `Config.MaxBytes = 1 MiB` | 只有 C# `Config.cs` 一处，两个文件共用 | —（没有第二处可漂） | 改它会同时改两个文件的上限；`LoadoutConfig` 那条异常消息里把数字又写成了字符串 `"loadout.json exceeds 1 MB"`，只是文案，不影响行为 |
+
+`MaxSlots` 另有一条**只在原生侧才有**的上界，它不属于跨语言对拍：一张角色模板表只有 `kVirtualSlotCapacity = 24` 个槽，前 `kBuiltinExclusiveSlotCount = 3` 个留给内置专属槽（T1/T2/战气），所以通用槽余量是 21。原生 `ApplyLoadout` 用 `std::min(请求数, 余量)` 处理超出，**截断而不是拒写**——拒写会让整份配置连其余槽位一起失效，比截断更糟；但截断会打一行 `the request asked for general slots=…, which exceeds the … this build supports; only the first … were applied.`，因为「某几个槽位静默不生效」是最难查的症状。`sharedconstants_test.go` 的 `TestVirtualSlotCapacityFitsPlayerSlots` 单独断言 `MaxSlots ≤ 余量`：把三处 `MaxSlots` 一起改大而不动原生容量，对拍全绿，只有这条会红。
 
 ## 2. 校验责任：Go 当场拒，C# 只做形状校验
 
@@ -232,6 +238,8 @@ flowchart TD
 
 覆盖范围就是第 1 节那张表的全部行：`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash`、`LevelValueCount`、目录名、两个文件名、五个 `sigiledits.json` 成员名、窗口标题、两条窗口消息、`skill_status` 的三个布局常量、保存失败事件名。
 
+同一文件里还有第二个测试，它做的**不是**对拍而是容量断言：`TestVirtualSlotCapacityFitsPlayerSlots` 读 `native_internal.h` 的 `kVirtualSlotCapacity` 与 `kBuiltinExclusiveSlotCount`，用它们的差去比 Go 侧的 `MaxSlots`。「三处 `MaxSlots` 是否一样」仍归上面那次对拍，所以两个测试各管一半：一个管「三处相等」，一个管「这个数原生装得下」。
+
 ## 8. 这道门证明不了什么
 
 **绿不等于契约已证明。**`sharedconstants_test.go` 只证明「这些字面量当前两两相等」，下面这些它一个字都没说：
@@ -242,6 +250,7 @@ flowchart TD
 | **只有大小写不同的一种漂移能通过** | `edits` vs `Edits`、`key` vs `Key` 会被 `EqualFold` 判成一致，而两个 JSON 格式都是**大小写敏感**的（C# 有意关掉折叠，Go 侧也精确匹配）。旧拼写文件读成空列表这件事，恰恰是靠 Go 的行为测试而不是靠这道对拍来钉住的 |
 | **只比常量、不比推导** | 目录名比的是字面量「`GBFRSigilLoadout`」，没比基准目录：C# 用 `SpecialFolder.LocalApplicationData`，Go 用环境变量 `LOCALAPPDATA` 且带一个 `exeDir()` 回落。基准漂了（例如有人把 Go 改成 `os.UserConfigDir`），这道门仍然是绿的 |
 | **同侧重复或搬移不一定红** | 名字精确到文件的组（如 `loadoutservice.go` 里的 `MaxSlots`）只在**那一个文件**里找：在别的文件里再加一份副本不会被发现，而这一份正好会与另一份漂移 |
+| **对拍不证明「这个数值是可行的」** | 它只保证三处字面量当前相等。把 `MaxSlots` 三处一起改成 25，对拍仍然全绿，而原生只放得下 21 个通用槽。这条边界由同一文件里的 `TestVirtualSlotCapacityFitsPlayerSlots` 单独守（见第 7 节），不在对拍的结论里 |
 | **比的是字面量，不是行为** | 「空数组 ≠ 缺成员」「缺 `enabled` = 启用」「坏文件保留上一份」「1 MiB 上限」「两种 mtime 门」全都不在它的结论里 |
 
-行为那一半由别的东西守住：Go 侧有 `TestValidateSlots*`、`TestSaveLoadout*`（含被拒的保存不碰磁盘、并发保存不撕裂文件、防抖只落最后一份）、`TestLoadEdits*`（空列表 vs 解析不了、旧拼写、`[]` 而不是 `null`）、`TestPadValuesAlwaysGivesTenSlots`、`TestUserCfgDirMatchesModPath` 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 里列出的其余套件；前端有 `frontend/src/index.test.ts` 的「落盘载荷」一组，钉住 `buildLoadoutPayload` 写出的形状（空槽不写进文件、没有副技能就不写第二项、副技能带自己的等级、`enabled` 原样保留、`exclusive` 全空时不写这个成员）与 cap 缺失时回落到 `DEFAULT_LEVEL`。**托管侧没有测试工程**（解决方案里只有原生工程与托管工程），所以 `LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察——这也是「文档表」和这道对拍必须同时维护、谁都不能替代谁的原因。
+行为那一半由别的东西守住：Go 侧有 `TestValidateSlots*`、`TestSaveLoadout*`（含被拒的保存不碰磁盘、并发保存不撕裂文件、防抖只落最后一份）、`TestLoadEdits*`（空列表 vs 解析不了、旧拼写、`[]` 而不是 `null`）、`TestPadValuesAlwaysGivesTenSlots`、`TestUserCfgDirMatchesModPath`、容量预算那条 `TestVirtualSlotCapacityFitsPlayerSlots` 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 里列出的其余套件；前端有 `frontend/src/index.test.ts` 的「落盘载荷」一组，钉住 `buildLoadoutPayload` 写出的形状（空槽不写进文件、没有副技能就不写第二项、副技能带自己的等级、`enabled` 原样保留、`exclusive` 全空时不写这个成员）与 cap 缺失时回落到 `DEFAULT_LEVEL`。**托管侧没有测试工程**（解决方案里只有原生工程与托管工程），所以 `LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察——这也是「文档表」和这道对拍必须同时维护、谁都不能替代谁的原因。

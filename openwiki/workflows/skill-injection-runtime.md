@@ -3,9 +3,6 @@ type: workflow
 title: 工作流：游戏侧注入运行期（detour 与循环上限）
 description: 虚拟槽位真正进入游戏状态的那条路：getter inline detour 与 skill-fetch mid detour 的入口分类与「谁在什么线程上」、早退闸与合成 GemData 写进输出、两条技能循环上限字节的事务式加宽与拆卸时的反向还原、构建开始快照与自然贡献计数的运行消息（含安装失败向玩家暴露的那几句），以及这条链喂给热重建的两条事实。
 tags: [skill-injection, detour, gameplay-hooks, loop-limit-patch, build-snapshot, hot-rebuild]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
 sources:
   - id: openwiki-source-c562ce49ce23d017d9803e4b
     resource: repo://GBFR.SigilLoadout.Native/src/dllmain.cpp

@@ -1,11 +1,8 @@
 ---
 type: operations
 title: 日志与故障定位
-description: 这套 mod 的三类日志落点（mod 目录下 GBFR.SigilLoadout.log 的追加写与 4 MiB 单代轮转、Reloaded-II 的 ILogger、原生侧只写 OutputDebugStringA 与宿主回调，没有独立原生日志文件）、阶段行/运行消息/去重规则三个契约，以及五类典型症状（游戏里没生效、钩子未装、活表拒写、工具起不来、配置坏文件）各自的「先看哪一行、再看哪一行、决定性判据」，另含工具侧 tool-debug.on 标记开关默认静默的开启方式与钉住这些契约的测试。
+description: 这套 mod 的三类日志落点（mod 目录下 GBFR.SigilLoadout.log 的追加写与 4 MiB 单代轮转、Reloaded-II 的 ILogger、原生侧只写 OutputDebugStringA 与宿主回调，没有独立原生日志文件）、阶段行/运行消息/去重规则三个契约，以及五类典型症状（游戏里没生效、钩子未装、活表拒写、工具起不来、配置坏文件）各自的「先看哪一行、再看哪一行、决定性判据」，另含工具侧 tool-debug.on 标记开关默认静默的开启方式、外壳那条唯一失败通道（failureText 的五个 kind）与必须成对改的两个 SaveFailed 字面量，以及钉住这些契约的测试。
 tags: [logging, diagnostics, troubleshooting, log-rotation, failure-localization, operations]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
 sources:
   - id: openwiki-source-0b100d4f3734fcb50250a654
     resource: repo://GBFR.SigilLoadout.Native/src/exports.cpp
@@ -43,6 +40,8 @@ sources:
     resource: repo://SigilLoadout/editservice_test.go
   - id: openwiki-source-49f1f8d8049b397adb1880a2
     resource: repo://SigilLoadout/frontend/src/App.tsx
+  - id: openwiki-source-feaf623f526a117e9d09327c
+    resource: repo://SigilLoadout/frontend/src/messages.ts
   - id: openwiki-source-d14d5931f805c1b9a18ee717
     resource: repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx
   - id: openwiki-source-47cff6e6e142f07c1c683a7b
@@ -61,7 +60,10 @@ sources:
     resource: repo://tests/NativeLayoutHarness/run.ps1
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 日志与故障定位
@@ -299,6 +301,8 @@ sequenceDiagram
 
 随包数据一共九份，启动时读**七份**（`sigils.lang.json`、`chara.lang.json`、`skill_status.json`，以及 `skill.<zh|en|ja|ko>.json` 四份），另两份（`sigils.json`、`sigils.chara.json`）按需读。
 
+按需读的那两份失败后只落在工具窗口那条状态条上（对应 `sigil` 与 `exclusive` 两个 kind），既不进任何日志、也不弹对话框——状态条上每句话各自意味着什么，见 §10.1。
+
 ## 8. 症状：配置坏文件
 
 两个 JSON 的失败语义**不一样**：`loadout.json` 坏了就"保留上一份有效配置"，`sigiledits.json` 坏了就"什么都不写"（绝不把一份不完整的表盖进游戏）。两者的去重机制也不同：前者靠版本门的**认领**（`Changed()` 无论随后成败都推进版本），所以同一份坏配置只报一次、不会被 250 ms 一拍反复重灌；后者只在**确实写进游戏内存后**才推进版本，所以失败的那一版下一拍还会重试，但同版重试静默（5 秒节流）。
@@ -360,8 +364,31 @@ sequenceDiagram
 - 关闭路径要防的是防抖里压着的那份编辑：`app.OnShutdown` 注册了两个 `flushNow`（编辑列表与配装各一个），并且必须在 `window.Close()` 之前置 `quitting`，否则那记 `WM_CLOSE` 会被当成"用户点了 X"改道成假隐藏（`windowstate.go` 是这条状态机的唯一所有者）。
 - 写盘失败的可见通道**不在日志里**：`debouncedWriter` 把待写放回、`log.Printf`（GUI 构建里看不到，行形如 `sigil edit: creating the config folder <路径>: …`），再向前端发 `GBFR.SigilLoadout.SaveFailed` 事件 → 工具窗口里弹失败对话框。所以看到"保存失败"提示时，别去翻 `tool-debug.log`，那确实是唯一一条用户可见的通道。
 
+### 10.1 工具侧唯一一条失败通道：`failureText` 的五个 kind
+
+工具外壳（`App.tsx`）只有一条失败通道：失败是一个带 `kind` 的状态，由 `failureText` 渲染成 Tab 栏下方那一条 `aria-live` 状态条——谁失败都只是把它写进这里，屏幕上最多显示一条。**它不写日志、也不写 `tool-debug.log`**，所以"工具窗口里那句话"本身就是证据：先按它说的去查那份文件，而不是去找日志。`kind` 只有这五种，各自的屏幕原文在 `messages.ts`（随界面语言变）：
+
+| `kind` | 屏幕上看到的中文 | 谁设置它 | 判据 / 下一步 |
+| --- | --- | --- | --- |
+| `sigil` | `因子表加载失败：<错误>` | 启动时 `LoadSigils()` 失败（`assets\sigils.json` 读不到或解析不了） | 按需读的那一份，见 §7 |
+| `exclusive` | `专属因子表加载失败：<错误>` | 启动时 `LoadExclusives()` 失败（`assets\sigils.chara.json`） | 同上 |
+| `config` | `配装加载失败：<错误>` | `LoadConfig()` 读不回来，或读回来的 `loadout.json` 过不了解析 | 此时前端**绝不写盘**（`loadoutRead` 仍为假），槽位被铺成空数组——屏幕上"空的"不等于磁盘被清空 |
+| `save` | `自动保存失败：<错误>` | `saveNow` 里 `SaveLoadout` **当场**拒绝（形状/取值不当，见 §8） | 这是配装文件的形状问题；修文件，不要找日志 |
+| `tables` | `数据表未加载，无法保存` | `saveNow` 发现因子表还没读回来，于是**拒绝保存**并把这条提示留下 | 真因在 `sigil` 那一条上，先修表 |
+
+只有 `save` 会自己消失：下一次保存成功时 `saveNow` 就把 `save` 清掉（它只清这一种），另外四种要等另一个失败覆盖它、或窗口重开。另有两处最容易误判：
+
+- **因子表读不回来时 `tables` 会顶掉 `sigil`**：你一动手编辑，状态条上真正的那条根因（`因子表加载失败：…`）就被"数据表未加载，无法保存"盖住了。屏幕上只剩后者时，要往上追 `sigil`。
+- **`config` 失败时屏幕空、磁盘还在**：前端在配装读回来之前绝不写盘，所以那份空配装不会被写回，`loadout.json` 仍是原来那份（它坏在哪见 §8）。
+
+状态条之外还有第二个对话框，归因子编辑页自己（标题 `读取失败` / `写入失败`）：
+
+- 它接收编辑列表的读失败（`LoadEdits` / `SkillTable` / 语言文本表）与 `SaveEdits` **当场**拒绝（列表形状完全无法接受）。
+- 它还接收**防抖之后才失败**的写盘：`debouncedWriter.flushLocked` 写失败时把待写放回（下一次防抖或退出时的 `flushNow` 就是重试）、`log.Printf`（GUI 构建里看不到）、再推 `GBFR.SigilLoadout.SaveFailed` 事件；那个事件唯一的监听方就是这个页面，所以连 `loadout.json`（配装）的防抖写失败也弹在这一页的对话框里，`<错误>` 里带着路径与原因。
+- 事件名是**跨语言镜像常量**：Go 侧 `editservice.go` 的 `saveFailedEvent` 与前端 `SigilEditorPanel.tsx` 的 `SAVE_FAILED` 各写一份字面量，**必须同时改**——只改一边不会编译失败，只会让那个对话框永远不弹。
+
 ## 11. 这些契约由谁钉住
 
-- `SigilLoadout/sharedconstants_test.go` 对拍跨语言声明的字面量（C# / Go / TS / C++ 各写一份，写错**不会编译失败**）：窗口标题（mod 靠它找窗口）、两条窗口消息（`0x8010` 激活 / `0x8012` 开关）、用户配置目录与两个文件名、`sigiledits.json` 的成员名，以及 `GBFR.SigilLoadout.SaveFailed` 事件名（Go 发、前端收——只改一边不会编译失败，只会让那张失败对话框永远不弹）。
+- `SigilLoadout/sharedconstants_test.go` 对拍跨语言声明的字面量（C# / Go / TS / C++ 各写一份，写错**不会编译失败**）：窗口标题（mod 靠它找窗口）、两条窗口消息（`0x8010` 激活 / `0x8012` 开关）、用户配置目录与两个文件名、`sigiledits.json` 的成员名，以及 `GBFR.SigilLoadout.SaveFailed` 事件名——它有两份字面量（Go 的 `saveFailedEvent`、前端 `SigilEditorPanel.tsx` 的 `SAVE_FAILED`），Go 发、前端收，只改一边不会编译失败，只会让那张失败对话框永远不弹。
 - `SigilLoadout/editservice_test.go` 的写失败用例：写入做不成时那行必须落进日志（测试直接抓 `log` 输出），并且待写必须放回——没有后续编辑而直接退出时，`flushNow` 是它唯一的机会。
 - `tests/NativeLayoutHarness` 用真实游戏 exe 验布局解析与 fail-closed（改坏一个 hook 字节必须让复验失败，成功时打印 `NATIVE_LAYOUT=PASS` 与 `NATIVE_LAYOUT_FAIL_CLOSED=PASS`）；不给 `GBFR_EXE` 时 `run.ps1` 打印 `NATIVE_LAYOUT=SKIP (未给 -Exe / $env:GBFR_EXE)` 并以 0 退出，所以它是一条可跳过的门禁，见 [构建、发布与部署链](/openwiki/operations/build-and-release.md) 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。

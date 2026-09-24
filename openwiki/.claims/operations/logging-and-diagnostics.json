@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:4cdacef49b4735b7e846ad9b6fbbf6e23ebbef14417ff529b2055970c2504b43",
+  "pageVersion": "sha256:4e442c25a9fe2edce3185f8650ec6ba6cf21349fb16f949385b7cefab1610f68",
   "claims": [
     {
       "id": "claim_abb6d3aec99c44bd827a8bdc41fb0c78",
@@ -247,8 +247,8 @@
       "statement": "可视工具的随包数据九份里七份在启动时读（sigils.lang.json、chara.lang.json、skill_status.json 与 skill.<zh|en|ja|ko>.json），任一份读不到或不是合法 JSON 时以 MessageBox 报“随包数据读不到，工具无法启动：<错误> 它应当与 SigilLoadout.exe 一起放在 assets\\ 下。”然后 exit 1——因为 -H windowsgui 没有控制台，写 stderr 没人看得见；另两份（sigils.json、sigils.chara.json）按需读，失败只表现为工具窗口里的失败提示，不进日志、不弹对话框。",
       "evidence": [
         {
-          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L129-L165",
-          "version": "repo-lines-v1:sha256:a2a24fb8e1091ede856f10b0e952fe6349a1a6b37a863739651b7be2e50ad86b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhODcxMGUwOGJiNmRlZjlmYTdhZDg4M2Y5ZGZhYWViOGE4ODhmNmM3ZDU3NDI0NTEwNzk0YmQ4NTY2Njg4ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZjQyMGJkNGZiNzM1NTk3YjBmN2UxOGRhMWIyNjY1ZTM1ODM5ZDJjZDQ2ZDMwZjAxZmVkNzQzMmFkZGVlNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMTY3YzkyMDQ4NjVhZTJiY2M2MGJhYmYyNmE1MWVkMTI1MTMzY2RhMzdjOGE0YjllMDJjNDJjNDg4ZjljODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxZmMyMzE1NWUyMTA5ZDU2YTgzZmI5ZDMyYWRmNmZkYjBlNWM3MTFhNmMzM2I1ODAzMTQ4MDY2N2IzNjAzYTMifQ"
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L138-L174",
+          "version": "repo-lines-v1:sha256:c83c21994fd90ef53842217fa5340c311dda0e85e1897d85b6a3ccde522e80d4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhODcxMGUwOGJiNmRlZjlmYTdhZDg4M2Y5ZGZhYWViOGE4ODhmNmM3ZDU3NDI0NTEwNzk0YmQ4NTY2Njg4ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZjQyMGJkNGZiNzM1NTk3YjBmN2UxOGRhMWIyNjY1ZTM1ODM5ZDJjZDQ2ZDMwZjAxZmVkNzQzMmFkZGVlNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMTY3YzkyMDQ4NjVhZTJiY2M2MGJhYmYyNmE1MWVkMTI1MTMzY2RhMzdjOGE0YjllMDJjNDJjNDg4ZjljODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxZmMyMzE1NWUyMTA5ZDU2YTgzZmI5ZDMyYWRmNmZkYjBlNWM3MTFhNmMzM2I1ODAzMTQ4MDY2N2IzNjAzYTMifQ"
         },
         {
           "resource": "repo://SigilLoadout/loadoutservice.go#L155-L158",
@@ -280,11 +280,15 @@
     },
     {
       "id": "claim_f41da4a8d7844e639f1c93b54fe998bf",
-      "statement": "工具侧走标准库 log 的几处（单实例判定、托盘点击 panic、防抖写盘失败）在正式构建里实际上无处可见：exe 以 `-H windowsgui` 编译且代码里没有 log.SetOutput 重定向；工具侧唯一用户可见的失败通道是 fatalDialog 的 MessageBox 与 debouncedWriter 写失败时发给前端的 GBFR.SigilLoadout.SaveFailed 事件（前端弹失败对话框）。",
+      "statement": "工具侧走标准库 log 的几处（单实例判定、托盘点击 panic、防抖写盘失败）在正式构建里实际上无处可见：exe 用 -ldflags \"-H windowsgui -s -w\" 链接，而生产代码里没有任何 log.SetOutput 重定向（只有 editservice_test.go 里设过一次）。因此工具侧的失败只走三条用户可见通道：坏安装时 fatalDialog 的 MessageBox、App 窗口里那条状态条（读失败的五个 kind），以及 debouncedWriter 写失败推给前端的 GBFR.SigilLoadout.SaveFailed 事件（前端弹失败对话框）。",
       "evidence": [
         {
           "resource": "repo://SigilLoadout/debouncedwrite.go#L53-L68",
           "version": "repo-lines-v1:sha256:570550930357a551a0c2f6cca80aad380172ecde76aa63d8b3b049c829fef67c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1MDc0NWJjMDMyMTBkNTIyYTJmNGUwZTM5ZjdmM2YwYmQxYjEwNTE1MjRlNDhiYjNiZDcyMWQxZTU5ZDQ5ZDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyZGRhMTIwNTNjMTg1NjcwZjk3M2IxNGRhY2E4NDM4MGJiODc1YWFhOWMyNzViMDJiZjhmM2Q3NmQyOTNlYmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L352-L359",
+          "version": "repo-lines-v1:sha256:3736867d9ac43f84bd5ca8d069be29f2100afdc0339d1c98348ca3fde7939abd:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2VhNWM5ZTIwN2VmZWM2MjM1NTQxNWRmYTkyODIyNTc5NDkxZWNmNWNlYWZiOGYyOGNjYmYxNGZhMDBlNzE2NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODdhN2JmZTA4MzFmY2U3MDgzM2I5ZTk3NWU0YzU3YzkxNzJkMDlhYzc3Yjk1MWM2YmJkYjRhMDIyMWY5NTdlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWI1NTk5Mzg4YjI2YjMzMzc3MmMzYjBmYTg1YTk1MjUzODRmMWU1NDM5OTljMjU2ZjFjMDNlM2NhYWRiNjVkOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Y3NTBiMmIwNzQyNTUwMGIwZmQwYzYzYWRhZTk3NmJlZWUyMjcwOTNhZDkyZTZkNjkyZmM4OWI1NjYyNWY5NiJ9"
         },
         {
           "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L39-L44",
@@ -295,7 +299,7 @@
           "version": "repo-lines-v1:sha256:457aa322d65f54f5deb487f9ce1e05afb714d1337fdb7d140cb214448ea18ac6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllZWYwY2U1OWRiZTIxNGI1YjVlODRlMWU1NTE2ODFhMTMwMTU1NTIyNzEwNTNiNWRiNWRmMmViOWQxYTUzMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L208-L208",
+          "resource": "repo://tools/build-release.ps1#L206-L206",
           "version": "repo-lines-v1:sha256:050a4ec65efc17c9f1cca3f6b04b25fc9f92bee1515549a84756c515b1c074f6:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDUwYTRlYzY1ZWZjMTdjOWYxY2NhM2Y2YjA0YjI1ZmM5ZjkyYmVlMTUxNTU0OWE4NDc1NmM1MTViMWMwNzRmNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDUwYTRlYzY1ZWZjMTdjOWYxY2NhM2Y2YjA0YjI1ZmM5ZjkyYmVlMTUxNTU0OWE4NDc1NmM1MTViMWMwNzRmNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTEyOTJkNmE3NzFjZjZmMjViMDcyMGE4ZmViYThhNzkyNjUzNDdlNTRhZWJlZWMwOTY0NzA2Njg5NjZmMDc0YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJlOTU3NTEwOGY1MzM1Nzc0YTk5ZTYxNzgwZjcyMGYxMGUzMGY5ZmU4MGFlY2ZiNjk0YmUxZTYwM2E1MTM1YSJ9"
         }
       ]
@@ -455,10 +459,80 @@
           "version": "repo-lines-v1:sha256:63af2503b39a861c90f64328119f4dcb95eb15f7f92dd668ca0c828e5db2033d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyZGJjNWQ1YWM4YTBjYTNlOGFiOTVlMzUzZThmNDZmOTg4ZTA1ZTY3ZGI2NWE4ZjgyNDllYWJhNGZiNzViZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwNDU5YmM4NjM4M2QwNzE1N2YxYTkzMDMyNzBiNmIzMDNjYWMyYTk5MmIzMjljNDM1OTI4NDg1OTgxZmUxZDYifQ"
         }
       ]
+    },
+    {
+      "id": "claim_920a85cd7f6545fa9f896145ea3922a4",
+      "statement": "可视工具外壳（App.tsx）只有一条失败通道：一个带 kind 的 Failure 状态，由 failureText 渲染成 Tab 栏下方唯一那条 aria-live 状态条，它既不写日志也不写 tool-debug.log。kind 只有五种且来源固定——assets\\sigils.json 读不到或解析不了记 sigil、assets\\sigils.chara.json 记 exclusive、loadout.json 读不回来记 config、SaveLoadout 当场拒绝记 save、因子表还没读回来时拒绝保存并记 tables；屏幕原文在 messages.ts（因子表加载失败：/ 专属因子表加载失败：/ 配装加载失败：/ 自动保存失败：/ 数据表未加载，无法保存），其中只有 save 会在下一次保存成功时被清掉，而因子表读不回来时 tables 会把更早的 sigil 覆盖掉。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L104-L123",
+          "version": "repo-lines-v1:sha256:257911c08e993c1526f35dd1d741a7d2357f4c93304ecc13c393632ea81d2f80:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3NjRjY2Q3N2FjNDYyZjkyODY4YTFlYmY2N2MxYWE4MGQzZTRiNjM5ODAyMjc3Njc5ZDU2YmZhZTFkYmFmZjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmNTIyNTg4NWJiNDFkM2I1ZWUwNzc3ZTNjNmE5NDlhODMwZmZmY2U4MWQwM2QxNmNhYTU5OWI0YmUzYmVkZTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY3NzE3YjI5MmIxNGQyZjkzYWUwM2IwZWQ5MDJkMzY4Mzk3YzFkMGY2OTU2OWQyODM1N2QzMGM0MTBlMTEyM2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg4M2U4ZjQ0N2FmNTk3YzY4ZmMxNWNhNjMwNWE5MTUxMGEzMTA2ZmVlMzhmNzg0ODAwYjg1NzdmN2IwNmZkOGEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L138-L174",
+          "version": "repo-lines-v1:sha256:c83c21994fd90ef53842217fa5340c311dda0e85e1897d85b6a3ccde522e80d4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhODcxMGUwOGJiNmRlZjlmYTdhZDg4M2Y5ZGZhYWViOGE4ODhmNmM3ZDU3NDI0NTEwNzk0YmQ4NTY2Njg4ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZjQyMGJkNGZiNzM1NTk3YjBmN2UxOGRhMWIyNjY1ZTM1ODM5ZDJjZDQ2ZDMwZjAxZmVkNzQzMmFkZGVlNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMTY3YzkyMDQ4NjVhZTJiY2M2MGJhYmYyNmE1MWVkMTI1MTMzY2RhMzdjOGE0YjllMDJjNDJjNDg4ZjljODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxZmMyMzE1NWUyMTA5ZDU2YTgzZmI5ZDMyYWRmNmZkYjBlNWM3MTFhNmMzM2I1ODAzMTQ4MDY2N2IzNjAzYTMifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L32-L48",
+          "version": "repo-lines-v1:sha256:a26ee4f3f7486ab3696a1deece051c0725b1146a5ff468905edc046454a90f29:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmODRjMGNmODM4YjlmN2RmNTQ4MGUwMWQyMDc0ODUwZTAyOWIxMDFlNmUwYjFjOGMzNDZkMWQyZWJmOGJmOGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiYzc5NGZiZjJlYTVkMDE5ZmYzYzc2OWQ1ZTE4NzllY2UxOTYyYjVjMDQxZTVhNTA4ZDFlMzA5YWI4YzkwM2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0NDZhZjU3NDZiODRiZTA3MjQ0NGJiNDgwMDYwOGQ2NDg4ZTM2NjFlMDU2ZDMzYWFkNzhjNDk3YTFjODFkNTIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L352-L359",
+          "version": "repo-lines-v1:sha256:3736867d9ac43f84bd5ca8d069be29f2100afdc0339d1c98348ca3fde7939abd:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2VhNWM5ZTIwN2VmZWM2MjM1NTQxNWRmYTkyODIyNTc5NDkxZWNmNWNlYWZiOGYyOGNjYmYxNGZhMDBlNzE2NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODdhN2JmZTA4MzFmY2U3MDgzM2I5ZTk3NWU0YzU3YzkxNzJkMDlhYzc3Yjk1MWM2YmJkYjRhMDIyMWY5NTdlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWI1NTk5Mzg4YjI2YjMzMzc3MmMzYjBmYTg1YTk1MjUzODRmMWU1NDM5OTljMjU2ZjFjMDNlM2NhYWRiNjVkOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Y3NTBiMmIwNzQyNTUwMGIwZmQwYzYzYWRhZTk3NmJlZWUyMjcwOTNhZDkyZTZkNjkyZmM4OWI1NjYyNWY5NiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/messages.ts#L32-L36",
+          "version": "repo-lines-v1:sha256:88c0b93405015c491bade7b212cc885acffa85a54e20b7f089a1f4a28976c5db:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTFjZDg2ZTFmOTM5NTM2NDA0MGM4N2ZjMWU2YjExNjQ1M2ViZDJhNTY0ZDg4YjBmNzYwZjIwYzhlNTUwNzE4NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWVkOGQ4M2RiNjdlZDY2MmE2ZDMzMzRiMTY2YzAzNzE1ZTBmNzhjN2IyNzUyMDcxOTc5MTM2ZTI5ZGY0MjAyNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWNkYzJhYTg2YTUzZGQ1NGYzZmYxZTRlYThiZTkxZmIyNzk5NjYyY2E5N2YzYWJhODM4NTgyODZiYTJiN2YxZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDE0Mjc2MjM2MzJiZGEwMmNmMzgwYzAwYjNhYTdkNzM5Y2ZlMjM3MjVlOGI3OTg1YmE0ZDhiMGIyYTc0M2IwNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5d263c87d2ee4ffdaad90c7de2a9506f",
+      "statement": "配装读取失败（config 那一种）时前端把槽位铺成空数组（屏幕上必须有行可看），但 loadoutRead 保持为假，而 saveNow 在它为假时直接返回且不调用 SaveLoadout——所以那份空配装不会被写回磁盘，loadout.json 仍是原来那份，这正是“屏幕空、磁盘还在”的由来。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L104-L106",
+          "version": "repo-lines-v1:sha256:9312c5d690c7caf703acb085aa72473d4e04700abb803c23d833dd7d21f026b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc2NGNjZDc3YWM0NjJmOTI4NjhhMWViZjY3YzFhYTgwZDNlNGI2Mzk4MDIyNzc2NzlkNTZiZmFlMWRiYWZmOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzNhYmUwMmM1MGY2ODhlZmFjODVkMmUxODgyMGY2NjcyNjQ2NjZlMzZmM2Y5NGVlNWY5MzAyZDE5ZDExMWY4MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjc3MTdiMjkyYjE0ZDJmOTNhZTAzYjBlZDkwMmQzNjgzOTdjMWQwZjY5NTY5ZDI4MzU3ZDMwYzQxMGUxMTIzYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGE2OGEyZmFjODI3NDE1MTgxYmE4ODZhOWM1YzQ3MDY3NjYxMjg2NjQ5NDc0MGEyMmMzOGUzODQxMDJjM2M4ZSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L157-L164",
+          "version": "repo-lines-v1:sha256:0934568e3cf96f1c7c4d584be18bc9d1a4bb9b744097a1527a7f6a211d7c9672:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzEyNTM3YmQzOTJkMDE3OTMxZGU5ZDUyNGFiNGQxZDViNzhhNzVhZTY4YzBkOWU5NGQ1ODY0MDZmOGM1ODYwMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTUyMmM0MmNkMTljNmQwM2Q4MDhjNDUyNzIwNTUyODI1YjdlYTFjNWI0OTFiMjE4NTExY2FjNzQxNWNmOWQ5YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWJiNGJiYjk2OWFlNjFlZTBkMmY4ZjE4ZjRjYzMzMmJhMDExOGQ4NzBjYTdjNmMyN2ZmYjZkYzU3Y2E4ODE1ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWRlYTQwZmMyMDg2NTI5YjcyODAzNjZhNDMzZTNmZTA2ZDQ0YTVjNjI3ZWY2NjhlNmRmOTEwOWViNTRhNjg2NSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L71-L73",
+          "version": "repo-lines-v1:sha256:fa487a8cbfee63275f94ea89bb7e0853b9bd8c81c6a8d122a360d3f769df89f3:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE0NWY4Y2Q1OTFiNGY3Yjc3YjJlYTliYjlhOWE0ZmQ4ZjczOTNlODFmY2QwMGM1OTRiOTU3N2M5YzI5YTI0YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTFmYzJmYmIyMzFjNGZmM2FiMmUyZTk1MDEzZjZmZGU0MmNmNjM3MTRhN2VmZmM4YWY2YTAxNWI5OWQxN2FmNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmE4YTQ3MjFkNzVlMGIyYjAwZjI4YmQ3Yjc3OTMxNDkzMDcxMDJmNDNmOGEyYjBjZmUyYjMwMmY3ZGExZDQzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmFmZDNmN2NlOGM2MjBiZWNiMTdiN2NkMDQzZTliY2VhNDY4YTlkNDVhOGIzZDMwMTNjOTExMzIxZjg3OThiNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_0de63af28acf488691166d05a600dc56",
+      "statement": "因子编辑页自己那个失败对话框（标题 读取失败 / 写入失败）承接三类失败：编辑列表与技能文本表的读失败、SaveEdits 当场拒绝、以及防抖之后才失败的写盘经 GBFR.SigilLoadout.SaveFailed 事件推来的那一路；因为该事件在整份前端里只有这一个监听方，连 loadout.json（配装）的防抖写失败也显示在这一页的对话框里。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/debouncedwrite.go#L59-L66",
+          "version": "repo-lines-v1:sha256:f305c809890a4e5181ef8b2f0231c1de4cff859cdf8578dca9caf86ee332a48a:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzk1ZjFiZGU3NzRiOThhZDE0MzNjMzMzZjAxMGE1Y2QyYTBmYmZhY2Q2MGM3N2UyNDRlOWExYzBjMDE2YzZkZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjRlZmM0OTQxOGQyNmRjZjEyOWIyMmE2YWEyMTEwOGNlZWMzNzY3N2EzMmQwOGU5ZDVmZWUzNWRkYTY2YmI5ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2VmMmE2ZmUyNWE4ZmMyZDk4YTkxNDFjNjJjYTBjNmVkOTcxODg0NWZlNzBlMmU0OWI4ZWY1Y2IzNDcyMzQzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDAzOTk0NWY3MTNjZWNjYzJhMmJlOTgxYWI1YzVlZWEzN2Y5NWY5NzY5ZTU3NWNkOGVkOWE5ZmNiYWZkZjA2YSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L115-L128",
+          "version": "repo-lines-v1:sha256:23140ac396ecf8ad1bb303a86d8109633723a52f3acaac6241fafb79d2dacfa0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY5NjdkZTdiMDcyOGQxNTg3ZDA2YjlmZDZiYWNjOGViNDcxODY3MTVmNWZhZWU5MjhiMjMyOWQxZTliZjNhNWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0ODNmZjYwM2NkNDU3NGU1YWQyNGM2YjVjZjY2NjY0YmRkNGJlNDIyYzEzZjg3MmMwNmRlZjI1MDY5NTI3YWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQxNWVlZjNlNzk0MmI1N2E0Njc1M2NhYmQyYTk3OGY0NGFmMDYyMGU3MzE2MzI4NjE5MjQyNDk4NTU5ZGU2MmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU1ZjUyMzRmOGFlZGE0MWQ1ZTkwZDE5ZDQ3YzRmZTk0NTQzMTI2ZTdkYWZiYmYzNjRjY2QxZWIzOWUxYTc4NGYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L162-L178",
+          "version": "repo-lines-v1:sha256:a85549f3c05892384f21cd68125a1f516b941b312ed0ce802fd62be1e176744b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0ZTQyMDhjZDZmZmI4YzRhMzU0N2IyZjU0YWRhMTk5NzhjM2YzNjVlNzhmOTUwMmVmNTE0NWNkZDJhYTg1NDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjMDFiNWUxMTEzZWVjYTdkNWMyM2VjZTFmM2U2MWNiMGE5NTQ3MGM4OWY4ODIzNjkxZDFmMjQyNTI0YTYzM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzY2Y4MzlkZWE0NTE5NzA2YmE3ODlmMmUwYWJlMGQ1ZmJmMzdmNzIzZDJkYmM0NjcwM2U5NDNjZTJmYzI3OTQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L339-L349",
+          "version": "repo-lines-v1:sha256:54f69e293b3312ade4c269ceefd268a04c89295be4fa270445071756494a2af6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmOGQxMTg2YzY5NDRiM2M0MTQzM2ZkMmRlZmUxOTE0YmM1ODBlNGUzMTQzOGE2MGIxN2E5MTExMTMwMGYwNzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlMWMwMWI3YzcwNTRiZWRmMjllZjA0MWQ3M2YxYTk1ODliYjhhOGE3YjI3NTM5MGIxNTlkNDczMjZlYjIwNGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0M2QxZTVkZTU0ODVkZTA5MDVkOTk1MDUwMWMxNDBiNzQyNmI0MGY4ZmNlOTc3ODUxMzZiNjIxM2MxNTdhZDYifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L94-L97",
+          "version": "repo-lines-v1:sha256:b33356f286e77629544b367e8e44e6a37015525efa92ff8b4abcb8fd0c897ba1:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2YzNzYzZjViNWY2MjM1ZGY4MDU2OWZiNWViOWM1NDEzZTIzMDg3MTg3MWY0MjdlZjExNTA4YzdlZjE4ZGNiZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzg5MDZmODc1ZTI5YmI4OGQ2MGI1MDBmYjAwZGYzZjE4MWI3OTZhN2JjNGNlYjY1Y2EzYTZlNzNmNzZhNGJhZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjUxMDA3OTJkM2M4NmFiNTllZTA1MmQ3ZjRlYTQ3N2E4ZmE0YzVlYzE4N2QxNTdhYjdlZWMwYzBiNTI0YTMyMCJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T00:51:14.273Z"
   }
 }

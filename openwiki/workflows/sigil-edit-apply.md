@@ -45,9 +45,6 @@ sources:
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
 generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 工作流：因子数值编辑与热应用

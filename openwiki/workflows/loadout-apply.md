@@ -57,9 +57,6 @@ sources:
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
 generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 工作流：配装从界面到游戏状态

@@ -1,7 +1,7 @@
 ---
 type: operations
 title: 构建、发布与部署链
-description: 从源码到 Reloaded-II 包的两段式操作链——tools\build-release.ps1 的版本对账（ModConfig.json 的 ModVersion 是唯一权威源）、数据门禁、原生到托管的编译顺序、工具链门禁与 13 项打包清单，以及 tools\deploy.ps1 的完成标记、源码时间戳与游戏未运行检查；逐道门禁给出判据行、原样失败信息与跳过条件，并说明仓库根 README.md 已不再承载构建命令。
+description: 从源码到 Reloaded-II 包的两段式操作链——tools\build-release.ps1 的版本对账（ModConfig.json 的 ModVersion 是唯一权威源）、九份随包数据的「在场或补齐」、原生到托管的编译顺序与 vcxproj 里判过期的 gen 生成步骤、工具链门禁、13 项打包清单与 dist\.build-complete 完成标记，以及 tools\deploy.ps1 的完成标记、源码时间戳与游戏未运行检查；逐道门禁给出判据行、它保证什么、原样失败信息与跳过条件，并说明仓库根 README.md 已不再承载构建命令。
 tags: [build, release, deployment, packaging, gates, operations]
 sources:
   - id: openwiki-source-6d4b4e707b8d60b6ccfa3425
@@ -46,17 +46,17 @@ sources:
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
+    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 构建、发布与部署链
 
 这套 mod 的发布是**两个 PowerShell 脚本**，没有别的入口：`tools\build-release.ps1` 把源码编译成 `dist\GBFR.SigilLoadout\` 目录与配套的 `dist\GBFR-Sigil-Loadout-<版本>.zip`，`tools\deploy.ps1` 把那个目录**整份替换**进 Reloaded-II 的 Mods 目录。仓库里**没有 CI 构建或发布工作流**（`.github\workflows\` 下只有 OpenWiki 的每日更新任务），所以整条链都是本机 Windows 操作，并且假定一整条工具链已经装好。
 
-两个脚本共用同一套约定：`$ErrorActionPreference = 'Stop'`，每一步外部命令都查 `$LASTEXITCODE` 并 `throw`，**任一步失败即中止**。仅有的三处"允许跳过"全部在构建侧、而且都会**明说自己跳过了**（`gcc` 缺失时的 `-race`、没有 `GBFR_EXE` 时的布局回归、没有 `.git` 时的生成资产门禁）；部署侧没有任何跳过条件。
+两个脚本共用同一套约定：`$ErrorActionPreference = 'Stop'`，每一步外部命令都查 `$LASTEXITCODE` 并 `throw`，**任一步失败即中止**。仅有的两处"允许跳过"全在构建侧、而且都会**明说自己跳过了**（找不到 `gcc` 时的竞态检测、没有 `GBFR_EXE` 时的布局回归）；部署侧没有任何跳过条件。
 
 ## 怎么跑：前置条件与最短命令
 
@@ -71,7 +71,7 @@ pwsh -File tools\deploy.ps1 -Target "<Reloaded-II>\Mods\GBFR.SigilLoadout"
 
 | 前置 | 谁在用 | 缺了会怎样 |
 | --- | --- | --- |
-| 仓库**旁边**的 `..\gen`（Go 工程，不在本仓库里） | 数据新鲜度对拍（`build-release.ps1:73-81`）、原生编译前生成 `src\exclusive_table.inc`（vcxproj 的 `GenerateExclusiveTable`） | 数据门禁给出「本仓库无法单独完成一次发布构建」并中止；绕过它，原生 DLL 也编不出来 |
+| 仓库**旁边**的 `..\gen`（Go 工程，不在本仓库里） | 补齐缺失的随包资产（先找 `gen\output\`，再在 `gen` 里跑 `go run . export`；`build-release.ps1:51-79`）；原生编译前生成 `src\exclusive_table.inc` 与 `..\SigilLoadout\assets\sigils.chara.json`（vcxproj 的 `GenerateExclusiveTable`） | 有资产缺失时直接抛出，并明说生成器不在本仓库里（要么把那几份文件补进 `SigilLoadout\assets\`，要么把 `gen\` 放回仓库旁）；`src\exclusive_table.inc` 缺席（新克隆必然如此）时，原生那一步会以 MSBuild / `go run` 的原始报错失败，这一条路径没有友好提示 |
 | 带 C++ 工作负载的 **VS 2022 Build Tools**（`MSBuild.exe`、`cl.exe`） | 原生 DLL、布局 harness | `MSBuild was not found. Install Visual Studio 2022 Build Tools with the C++ workload.` |
 | **Go**（PATH 上） | `gen` 的两条子命令、工具的 `go vet`/`go test`/`go build` | 对应那一步退出码非 0 |
 | **Node/npm**，且 `SigilLoadout\frontend\node_modules` 已装好 | 前端 typecheck / vitest / vite build | 脚本里没有安装步骤，这三条命令直接失败 |
@@ -97,55 +97,61 @@ pwsh -File tools\deploy.ps1 -Target "<Reloaded-II>\Mods\GBFR.SigilLoadout"
 
 ```mermaid
 flowchart TD
-    V["版本对账<br/>ModConfig.json 是唯一权威源"] --> PRES["sigils.json 在场门禁"]
-    PRES --> FRESH["gen 数据新鲜度 --check"]
-    FRESH --> NAT["MSBuild /t:Rebuild 原生 DLL<br/>顺带重跑 gen exclusive"]
+    V["版本对账<br/>ModConfig.json 是唯一权威源"] --> A["随包数据：九份资产在场或补齐"]
+    A --> M["定位 MSBuild：vswhere 然后两个固定路径"]
+    M --> NAT["MSBuild 全量重建原生 DLL<br/>生成步骤判过期时才跑 gen exclusive"]
     NAT --> MAN["dotnet restore / clean / build 托管 DLL"]
-    MAN --> TOOLA["wails3 generate bindings"]
-    TOOLA --> TOOLB["typecheck → vitest → vite build"]
-    TOOLB --> TOOLC["icon 在场 → wails3 generate syso"]
-    TOOLC --> TOOLD["go vet → go test 可选 -race → go build"]
-    TOOLD --> HARN["布局回归 NativeLayoutHarness<br/>无 GBFR_EXE 则明示跳过"]
-    HARN --> DIST["重建 dist 包目录"]
-    DIST --> PKG["包内门禁：必需清单 / legacy / 可变配置"]
-    PKG --> GEN["generated-asset gate<br/>sigils.chara.json 必须干净"]
-    GEN --> ART["压缩 zip + 写 .build-complete"]
-    V -.->|"失败即中止"| ABORT["throw<br/>不写完成标记"]
-    FRESH -.-> ABORT
+    MAN --> T1["wails3 generate bindings"]
+    T1 --> T2["typecheck 然后 vitest 然后 vite build"]
+    T2 --> T3["icon.png 与 icon.ico 在场然后 generate syso"]
+    T3 --> T4["go vet"]
+    T4 --> GCC{"gcc 找得到"}
+    GCC -->|"是"| R1["CGO_ENABLED=1 跑 go test -race"]
+    GCC -->|"否：明说跳过竞态检测"| R0["go test 不带 -race"]
+    R1 --> GB["go build 出 SigilLoadout.exe"]
+    R0 --> GB
+    GB --> HX{"GBFR_EXE 已设"}
+    HX -->|"是"| HARN["NativeLayoutHarness 跑真实游戏 exe"]
+    HX -->|"否：明说 skipped"| SKIP["跳过布局回归"]
+    HARN --> CLN["删旧开发副本然后 dist 与包目录边界校验<br/>停掉运行中的工具并等它退出"]
+    SKIP --> CLN
+    CLN --> PKG["重建包目录：拷托管输出加工具 exe 加 icon.png"]
+    PKG --> G["包内门禁：必需清单 13 项 legacy 可变配置"]
+    G --> ART["压缩 zip 然后写 dist 下的 .build-complete"]
+    ART --> DEV["从 dist 启动一次工具，仅开发便利"]
+    V -.->|"任一步失败即中止"| ABORT["throw<br/>不写完成标记"]
+    A -.-> ABORT
     NAT -.-> ABORT
     MAN -.-> ABORT
-    TOOLB -.-> ABORT
-    TOOLD -.-> ABORT
-    PKG -.-> ABORT
-    GEN -.-> ABORT
+    T2 -.-> ABORT
+    G -.-> ABORT
 ```
 
-构建流水线的阶段顺序；每个阶段失败都会 `throw` 中止，`dist\.build-complete` 只在整个链路跑完时才写。
+构建流水线的阶段顺序与两条跳过分支（`gcc` 缺失时的竞态检测、未设 `GBFR_EXE` 时的布局回归）；每个阶段失败都会 `throw` 中止，`dist\.build-complete` 只在整个链路跑完时才写。
 
-### 逐道门禁：判据行、失败信息与跳过条件
+### 逐道步骤：它保证什么、失败怎么响、何时跳过
 
-下表按执行顺序列出构建侧所有门禁。**判据行**是 `tools\build-release.ps1` 里做判断的那几行（行号对应当前脚本），**失败信息**是脚本原样抛出的文本（`N` 表示退出码、`…` 表示被替换进路径或版本号的具体值）。
+下表按执行顺序列出构建侧每一步。**判据行**是 `tools\build-release.ps1` 里做那件事的行号（对应当前脚本），**失败信息**是脚本原样抛出的文本（`N` 表示退出码、`…` 表示被替换进路径、文件名或版本号的具体值）。
 
-| 门禁 | 判据行 | 失败信息（原样） | 跳过条件与处置 |
+| 步骤 | 判据行 | 它保证什么 | 失败怎么响（原样）与跳过条件 |
 | --- | --- | --- | --- |
-| 版本四方一致 | `build-release.ps1:17-38` | `Version mismatch: -Version … but ModConfig.json declares ….` / `SigilLoadout\frontend\package.json declares … but the release is …; bump it too.` / `SigilLoadout\frontend\package-lock.json carries version … time(s); both the root entry and the root-package entry need it. Bump it together with package.json.` | 无跳过；三处版本号一起改 |
-| `assets\sigils.json` 在场 | `:53-56` | `sigils.json is missing: <路径>` | 无跳过；缺了工具起来没有因子表 |
-| `gen\output\sigils.xlsx`（审阅表）在场 | `:64-68` | `sigils.json freshness source is missing: …（审阅表在 gen 里生成，不入库；先 cd gen && go run . sigils，不得跳过一致性检查）` | 无跳过 |
-| `gen\main.go`（共享生成器）在场 | `:69-72` | `共享生成器不在 …（它不在本仓库里）。sigils.json 的一致性门禁靠它运行，所以本仓库无法单独完成一次发布构建：把 gen\ 放回仓库旁，或在有它的机器上构建。` | 无跳过 |
-| 数据与审阅表对拍 | `:73-81` | `sigils.json 与 gen\output\sigils.xlsx 不一致：先跑 gen 的 go run . sigils（审阅表在 gen\output\）` | 无跳过；构建刻意不自动重新生成数据 |
-| MSBuild 可发现 | `:83-104` | `MSBuild was not found. Install Visual Studio 2022 Build Tools with the C++ workload.` | 无跳过（`vswhere` → 两个 BuildTools 固定路径 → 抛错） |
-| 原生全量重建 | `:106-114` | `Native build failed with exit code N.` | 无跳过 |
-| 托管 restore / clean / build | `:118-134` | `Managed restore failed with exit code N.` / `Managed clean failed with exit code N.` / `Managed build failed with exit code N.` | 无跳过；`--ignore-failed-sources -p:NuGetAudit=false` 只为让离线构建保持绿色 |
-| 工具：bindings → typecheck → vitest → vite build | `:140-157` | `Wails bindings generation failed with exit code N.` / `Tool frontend typecheck failed with exit code N.` / `Tool frontend tests failed with exit code N.` / `Tool frontend build failed with exit code N.` | 无跳过，顺序不可换（理由见下） |
-| 图标在场 → 生成 `.syso` | `:159-170` | `Tool icon is missing: …` / `Tool .ico is missing: …` / `Windows resource (.syso) generation failed with exit code N.` | 无跳过 |
-| `go vet` → `go test` → `go build` | `:171-211` | `Tool go vet failed with exit code N.` / `Tool Go tests failed with exit code N.` / `Tool build failed with exit code N.` | 找不到 gcc 时**只**跳过竞态检测并明说：`  gcc not found: tests run without -race (data-race detection skipped).`；想真跑就装 mingw 并放进 PATH |
-| 布局回归 | `:220-224` | `Layout harness failed with exit code N.`（harness 自己抛「生产解析器拒绝了这个 exe：锚点对不上（游戏更新了，需要重导）」之类的错） | 未设 `$env:GBFR_EXE` 时跳过：`layout harness: skipped (set GBFR_EXE to run it).` |
-| dist / 包目录位置安全 | `:240-249` | `Refusing to clean a dist path outside the repository: …` / `Refusing to clean a package path outside dist: …` | 无跳过；后面跟着递归删除 |
-| 工具 exe 已产出 | `:276-280` | `Loadout tool exe was not built: …` | 无跳过；出现这句说明有人加了"清理裸 `go build` 残留"那一步 |
-| 13 项必需文件 | `:286-310` | `Required release file was not packaged: <绝对路径>` | 无跳过 |
-| 无 legacy 产物、无可变配置、不发 PDB | `:312-346` | `Legacy ExtraSigilSlots artifact was packaged: …` / `Mutable config state must be runtime-created and was packaged unexpectedly: …` | 无跳过；`GBFR.SigilLoadout.pdb` 是直接删掉而不是拦 |
-| 生成资产干净 | `:348-363` | `sigils.chara.json 与入库版本不一致（这次构建重写了它）：… 把它一起提交，或撤销 gen 的 sigils/exclusive.go 里引起改动的改动。` | 检出里没有 `.git` 时跳过：`generated-asset gate: skipped (no .git in <仓库根>, so 'uncommitted' has no meaning here).` |
-| 产物与完成标记 | `:365-373` | —（`Compress-Archive` 之后才 `Set-Content` 标记，最后为开发方便从 `dist` 启动一次工具） | 无跳过；标记必须是最后一步 |
+| 版本三方对账 | `:15-39` | 发布版本号只有一个源，且随包的工具前端与 lock 不会停在旧版本上 | `Version mismatch: -Version … but ModConfig.json declares ….` / `SigilLoadout\frontend\package.json declares … but the release is …; bump it too.` / `SigilLoadout\frontend\package-lock.json carries version … time(s); both the root entry and the root-package entry need it. Bump it together with package.json.`；无跳过 |
+| 九份随包数据在场或补齐 | `:51-79` | 编译与打包要用的那九份资产至少有文件在场（缺的当场补，内容一个字节都不比对） | `随包数据缺 <name>，而生成器不在 <gen 绝对路径>（它不在本仓库里）：补进 SigilLoadout\assets\，或把 gen\ 放回仓库旁。` / `gen export failed; the packaged assets are still incomplete.` / `gen export 之后仍然没有 assets\<name>。`；文件已在场时静默 `continue`，补齐成功时打印 `assets\<name> <- gen\output` 或 `assets\<name> <- gen export` |
+| 定位 MSBuild | `:81-102` | 下面那次原生编译有编译工具链可用 | `MSBuild was not found. Install Visual Studio 2022 Build Tools with the C++ workload.`；无跳过（`vswhere` → 两个 BuildTools 固定路径 → 抛错） |
+| 原生全量重建 | `:104-112` | 原生 DLL 是新编的；`src\exclusive_table.inc` 与 `SigilLoadout\assets\sigils.chara.json` 在被 MSBuild 判过期时同时刷新 | `Native build failed with exit code N.`；无跳过（那两条生成步骤是否跑由工程文件的 `Inputs`/`Outputs` 决定，见下文） |
+| 托管 restore / clean / build | `:114-132` | 托管 DLL 是新编的，且离线也能绿 | `Managed restore failed with exit code N.` / `Managed clean failed with exit code N.` / `Managed build failed with exit code N.`；无跳过；`--ignore-failed-sources -p:NuGetAudit=false` 只为让离线构建保持绿色 |
+| 工具链：bindings → typecheck → vitest → vite build | `:134-155` | 类型检查、测试与前端产物按正确顺序过一遍，`frontend\dist` 是 `go:embed` 的输入 | `Wails bindings generation failed with exit code N.` / `Tool frontend typecheck failed with exit code N.` / `Tool frontend tests failed with exit code N.` / `Tool frontend build failed with exit code N.`；无跳过，顺序不可换（理由见下） |
+| 图标在场 → 生成 `.syso` | `:156-168` | exe 的链接期资源由入库的 `.ico` 现生成 | `Tool icon is missing: …` / `Tool .ico is missing: …` / `Windows resource (.syso) generation failed with exit code N.`；无跳过 |
+| `go vet` → `go test` → `go build` | `:169-209` | 工具源码干净、测试通过、产物是 GUI 子系统程序 | `Tool go vet failed with exit code N.` / `Tool Go tests failed with exit code N.` / `Tool build failed with exit code N.`；找不到 gcc 时**只**跳过竞态检测并明说：`  gcc not found: tests run without -race (data-race detection skipped).` |
+| 布局回归 | `:214-222` | 生产布局解析器在这个游戏 exe 上仍认得锚点，且会拒绝被改坏的映像 | `Layout harness failed with exit code N.`（harness 自己也会抛「生产解析器拒绝了这个 exe：锚点对不上（游戏更新了，需要重导）」之类的错）；未设 `$env:GBFR_EXE` 时打印 `layout harness: skipped (set GBFR_EXE to run it).` |
+| 删旧开发副本 | `:224-232` | 随包数据只有 `assets\` 一份，exe 旁边的裸副本不会混进来 | 不抛错：删掉 `SigilLoadout\sigils.json` 与 `SigilLoadout\sigils.chara.json`，各打印一行 `Removed a stale dev copy outside assets\: …`；文件不在就什么都不做 |
+| dist / 包目录位置安全 | `:238-247` | 紧接着的递归删除只会打到仓库内的 dist 与它下面的包目录 | `Refusing to clean a dist path outside the repository: …` / `Refusing to clean a package path outside dist: …`；无跳过 |
+| 停掉正在运行的工具 | `:249-261` | 打包前 `dist\GBFR.SigilLoadout\SigilLoadout.exe` 不再被锁住 | 不抛错：打印 `Stopped the running SigilLoadout.exe so dist can be replaced.`，随后最多轮询等 15 秒 |
+| 重建包目录 | `:263-282` | 包目录是这次构建凭空重建的（旧包目录、同名 zip 与完成标记都已删），产物从托管输出目录整份拷来 | `Loadout tool exe was not built: …`；无跳过 |
+| 必需文件清单 13 项 | `:284-308` | 「一个包该有哪些文件」由这一份清单持有 | `Required release file was not packaged: <绝对路径>`；无跳过 |
+| 删 PDB / 裁 `runtimes\` | `:310-322` | 包里不带托管 PDB，`runtimes\` 只留 `win-x64` | 直接删，不抛错 |
+| legacy 产物与可变配置 | `:324-344` | 两套槽位逻辑不会同时生效；玩家运行期状态不会随包发布 | `Legacy ExtraSigilSlots artifact was packaged: …` / `Mutable config state must be runtime-created and was packaged unexpectedly: …`；无跳过（fail closed 而不是替你删掉） |
+| 压缩 zip + 写完成标记 | `:346-354` | zip 是给玩家的分发形态，标记只在链路真正跑完时才出现 | 无跳过；`Compress-Archive` 之后才 `Set-Content`，最后为开发方便从 dist 启动一次工具 |
 
 ## 版本号的唯一权威源
 
@@ -162,26 +168,32 @@ flowchart TD
 
 一个**没有门禁**的字段：`ModConfig.json` 的 `ModName`（当前值 `"GBFR Sigil Loadout (2.0.5)"`）是启动器列表里显示的名字，由宿主读取——**本仓库没有任何脚本读它**，`build-release.ps1` 从同一个文件里只取 `ModVersion`。所以括号里的 `2.0.5` 与 mod 的发布版本（`0.6.0`）不是同一个量，把它和 `ModVersion`"顺手对齐"是错的；反过来，改显示名时也没有任何构建期检查会拦你。
 
-## 构建前的两道数据门禁
+## 构建前的随包数据：只补缺，不对拍
 
-它们合起来表达一条设计决定：**构建不替你生成数据**。每次发布都重跑生成器会让"数据源"与"审阅过的数据"之间多出一层无人复核的自动改写，所以脚本只做对拍，不一致就拒绝。
+`SigilLoadout\assets\` 下的九份资产（`sigils.json`、`sigils.chara.json`、`sigils.lang.json`、`chara.lang.json`、`skill_status.json`、`skill.zh.json`、`skill.en.json`、`skill.ja.json`、`skill.ko.json`）都是 `gen` 的产物、随包发布。版本对账之后的第一个动作，就是逐份看它们在不在，处置方式是**当场补齐**而不是拒绝发布：
 
-1. **在场**：`SigilLoadout\assets\sigils.json` 必须存在，否则工具起来没有因子表。
-2. **新鲜度**：以仓库**外面**的 `..\gen` 为工作目录跑
-   `go run . sigils-json <...>\gen\output\sigils.xlsx <仓库>\SigilLoadout\assets\sigils.json --check`。
-   不一致 = 忘了跑生成器，报错里直接指路 `go run . sigils`。
-   这一步顺带检查那张审阅表与 `gen\main.go` 是否存在，缺了就说清"共享生成器不在 `..\gen`（它不在本仓库里）……所以本仓库无法单独完成一次发布构建"——而不是让 `go run` 抛一句看不懂的错。
+- **已在场**：什么都不做（`continue`，连一行输出都没有）。
+- **不在场**：先看上游有没有现成的同名文件 `..\gen\output\<name>`，有就 `Copy-Item` 过来并打印 `assets\<name> <- gen\output`。
+- **仍然不在场**：以 `..\gen` 为工作目录跑 `go run . export -mod <仓库根>`，成功后打印 `assets\<name> <- gen export`；退出码非 0 是 `gen export failed; the packaged assets are still incomplete.`，跑完仍然没有那份文件是 `gen export 之后仍然没有 assets\<name>。`
+- **连生成器都没有**（`..\gen\main.go` 不在）时直接抛：`随包数据缺 <name>，而生成器不在 <gen 绝对路径>（它不在本仓库里）：补进 SigilLoadout\assets\，或把 gen\ 放回仓库旁。`
 
-构建侧的数据门禁**只有这三道检查**（在场、审阅表在场、对拍通过）；任何按行数计数的一致性检查都不在这里，生成器产物的完整待遇差异见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
+**在场的文件一个字节都不比对。** 当前脚本里既没有 `go run . sigils-json … --check` 这道新鲜度对拍，也没有审阅表 `gen\output\sigils.xlsx` 的在场检查——入库的 `sigils.json` 与生成器里的数据源是否一致，发布链**没有任何机械证据**。能挡住资产问题的只剩两处，而且都在同一趟构建里：包内九份的在场清单（缺一份就 `Required release file was not packaged`），以及 `go test ./...` 对入库资产做的交叉一致性检查（语言覆盖、元组形状、等级行）。这两处都只证明"入库的那份内部自洽"，不证明它等于生成器里的真相。
+
+所以这条链的语义是"**缺什么补什么**"：`gen` 里那份数据仍然先于本仓库（补进来的东西就是从它那儿来的），但"补进来的这份有没有被人看过"已经没有闸门过问。生成器三类产物的待遇差异见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
 
 ## 三个单元的编译顺序
 
 顺序是 **原生 → 托管 → 工具**，而且不是"随便排的舒服顺序"，两条硬约束都写在工程文件里：
 
 - `GBFR.SigilLoadout.csproj:41-43` 用 `PreserveNewest` 从 `..\GBFR.SigilLoadout.Native\bin\$(Configuration)\` 把原生 DLL 拷进托管输出目录（`GBFR.SigilLoadout.Native.dll`）。先建托管就会拷到**上一次**的原生 DLL——打包用的是托管输出目录，于是发出去的是旧原生核心。
-- `GBFR.SigilLoadout.Native.vcxproj:121-123` 的 `GenerateExclusiveTable` 目标没有 `Condition`、`BeforeTargets="ClCompile"`：只要需要编译，MSBuild 就先在 `..\..\gen` 里跑一次 `go run . exclusive -mod <仓库根>`。这就是"原生 DLL 的编译本身就依赖仓库外的 `gen` 与机器上的 Go"的由来。
+- `GBFR.SigilLoadout.Native.vcxproj:121-127` 的 `GenerateExclusiveTable` 目标 `BeforeTargets="ClCompile"`，并且带 `Inputs`/`Outputs`：五个输入（`..\..\gen\main.go` 与 `gen\game\sigils\` 下的 `exclusive.go`、`sigils.go`、`json.go`，加上 `..\SigilLoadout\assets\sigils.json`）里任一个比两个输出（`src\exclusive_table.inc`、`..\SigilLoadout\assets\sigils.chara.json`）新、或输出缺失时，MSBuild 才在 `..\..\gen` 里跑 `go run . exclusive -mod <仓库根>`；跑完用 `Touch` 把两个输出的时间戳推新——`gen` 内容没变时不写文件，不推时间戳这个目标就会一直判过期。
 
-也就是说 `..\gen` 是**不可绕过的硬前置**，而且它由两处各自独立地要求：数据新鲜度门禁只是**早**、有友好报错的那一处（缺审阅表或 `gen\main.go` 时直接说"本仓库无法单独完成一次发布构建"）；即使绕过它，原生编译也一定会失败，因为 `src\exclusive_table.inc` 是 gitignore 掉的生成物、被 `template_loadout.cpp:36` include，没有 `gen` 就生成不出来，DLL 也就编不出来——那一步没有友好提示，只有 `go run` 的原始报错。
+也就是说 `..\gen` 是**条件性**的硬前置，两个条件彼此独立：
+
+- 九份资产里有任何一份不在场时，构建第一步就要用它（缺 `gen\main.go` 时那句报错会明说生成器不在本仓库里）；
+- `src\exclusive_table.inc` 是 `.gitignore` 列着的生成物、被 `template_loadout.cpp:36` include，而它正是那个目标的输出之一：**输出缺失时目标一定跑**，所以新克隆（`.inc` 从来不在库里）必然要求 `gen` 与机器上的 Go，缺了就只有 `go run` 的原始报错。
+
+反过来，如果九份资产齐全、`src\exclusive_table.inc` 与 `assets\sigils.chara.json` 又都比 `gen` 那几个源新，MSBuild 会直接跳过这个目标、那次构建也就不碰 `gen`——这条路既没有闸门也没有提示，判断它会不会被走到只能看那几个输入与输出的时间戳关系。
 
 原生用 `/t:Rebuild`（强制全量），托管走 `restore --ignore-failed-sources -p:NuGetAudit=false` → `clean` → `build --no-incremental --no-restore`。两处都指向同一件事：**不要拿增量结果当发布产物**。`NuGetAudit=false` 与 `--ignore-failed-sources` 是为了让离线构建保持绿色；漏洞检查是另一条命令（`dotnet list package --vulnerable`），不在发布链里。
 
@@ -220,15 +232,14 @@ flowchart TD
 
 漏一份在必需清单里的文件，报出来的就是 `Required release file was not packaged: <绝对路径>`——该看的是"它为什么没进来"，而不是去改清单迁就目录。
 
-### 生成资产门禁（打包前最后一道）
+### 生成资产：收尾处现在没有门禁
 
-原生编译那一步已经重跑过 `gen exclusive`，而它**重写了入库的** `SigilLoadout\assets\sigils.chara.json`（同一命令的另一样产物 `src\exclusive_table.inc` 则不入库）。改写本身不是错误（说明 `gen` 里的数据源变了），但那份差异**必须进仓库**，否则随包发布的就是一份没人提交过的数据——而"文件既是生成物又是入库数据"这个问题没有别的地方能看见。所以打包前只查这一处：
+`gen exclusive`（原生编译被判过期时才跑的那一步）会**重写入库的** `SigilLoadout\assets\sigils.chara.json`，同一命令的另一样产物 `src\exclusive_table.inc` 则不入库。改写本身不是错误（它说明 `gen` 里的数据源变了），但当前脚本在打包前**没有任何收尾检查**：
 
-```
-git status --porcelain -- SigilLoadout/assets/sigils.chara.json
-```
+- 没有 `git status --porcelain -- SigilLoadout/assets/sigils.chara.json` 那道"改动必须进仓库"的门禁，也没有别的"未提交"检查；
+- 对这份文件唯一的机械保证，就是它在必需清单的 13 项里——只查**在不在**，不查**内容从哪来**。
 
-有输出即失败，报错要求"把它一起提交，或撤销 `gen` 的 `sigils/exclusive.go` 里引起改写的改动"。检出里**没有 `.git`**（例如解压出来的源码包）时，脚本明说跳过——"这里'未提交'没有意义"——**不假装跑过**。
+后果值得记住：`gen` 里数据源变化引起的重写如果没被提交，这次构建照样会把那份没人看过的数据打进包、写完成标记，于是它长着"一次跑完了的构建"的样子。要发现它只能靠包内清单（只查在场）与提交时的人眼。
 
 ## 完成标记与 dist 的生命周期
 
@@ -243,7 +254,7 @@ stateDiagram-v2
     Stuck --> [*]: 目录留在 dist 但没有标记，部署侧一律拒绝
     HalfBuilt --> Finished: 压缩 zip
     Finished --> Finished: 写标记，内容为版本号
-    Finished --> [*]: 下一次构建第一件事就是删掉它
+    Finished --> [*]: 下一次构建走到打包阶段时先删掉它
 ```
 
 `dist\.build-complete` 的状态迁移：标记只在链路跑到最后时才出现，任何中途失败都会留下"有目录、没标记"的状态。
@@ -303,7 +314,7 @@ flowchart TD
 
 ## 刻意不做的事
 
-- **不自动跑 gen 重新生成数据**：构建只拿 `--check` 对拍并拒绝。发布链里没有任何自动改写数据源的步骤。
+- **不比对随包数据的内容**：九份资产只做"在场或补齐"（缺的先从 `gen\output` 拷，再不然在 `gen` 里跑一次 `go run . export`），发布链里没有任何一步把入库那份与生成器里的数据源对拍；也没有一步检查它们有没有被提交。
 - **不为图标留生成器**：`icon.png`（主图）与 `icon.ico`（exe 资源 + 托盘，内含多档尺寸）都是入库的静态资产，只在改图标时手工重出一次；`.syso` 由 `wails3 generate syso` 从 `.ico` 现生成。托盘 `go:embed` 的也是同一份 `.ico`。
 - **不给托管工程加 `<Version>`**：那会再造一处需要与 `ModConfig.json` 同步的版本号；托管程序集自身的版本与发布版本无关。
 - **不清理"同名 go build 残留"**：`go.mod` 的模块名是 `sigilloadout`，而产物叫 `SigilLoadout.exe`——两者只差大小写，Windows 不区分大小写，所以那一步清理删掉的就是产品本身。要做纯编译检查就加 `-o <临时路径>`，别在构建脚本里写清理。

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:a8aa3c82c80e106c0cf2b74c6f751dcdcee9e0cfa2f0879993e908002f66ce4c",
+  "pageVersion": "sha256:35ac49474c56ba0893b8eec1e8f6748f9b077eca50a25d9a984328f1e3a5da7c",
   "claims": [
     {
       "id": "claim_72b52929b7894091a669029f40e5d095",
@@ -468,15 +468,15 @@
     },
     {
       "id": "claim_e6d6d226dad742638da5e8993756a5fb",
-      "statement": "构建期有一处仓库外的依赖：vcxproj 的 GenerateExclusiveTable target 在 ClCompile 之前以 ..\\..\\gen 为工作目录跑 go run . exclusive -mod <仓库根>，所以角色专属表（T1/T2/战气三个槽的 gem 与技能）的唯一数据源是仓库外的 gen，src\\exclusive_table.inc 是构建中间产物（.gitignore 排除、仓库内没有任何生成脚本）；缺 gen 或缺 Go 时编译在这一步直接失败。",
+      "statement": "构建期有一处仓库外的依赖：vcxproj 的 GenerateExclusiveTable target（BeforeTargets=\"ClCompile\"）以 ..\\..\\gen 为工作目录跑 go run . exclusive -mod <仓库根>，所以角色专属表（T1/T2/战气三个槽的 gem 与技能）的唯一数据源是仓库外的 gen，产物 src\\exclusive_table.inc 是构建中间产物（.gitignore 明确排除、仓库内没有任何生成脚本、被 template_loadout.cpp 直接 #include 编成 kCharacterExclusives）；缺 gen 或缺 Go 工具链时这一步会失败、编译中断。",
       "evidence": [
         {
           "resource": "repo://.gitignore#L15-L16",
           "version": "repo-lines-v1:sha256:ddb59f72a2f421ebc5daa88e78cb4fa358af81c61a630c812e25b15e127e862a:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZjZDMyYTJhMjA5NzFkMzIzZjdjNWRhYTljMjk2MjdhNjgzNjZmODYxMWQ0ZWYxMmFjNjk2NWU0NmFiYjA4ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzgwYmQ5NTFmNDBjZDIyZGFlM2M4ODAyYmFkMWNlMzZkZWI0N2NiMWM5OWUwYWFiYTY0ODA0MWQwOTk1ZjM4NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjlmNWU4ZjQ1MGQ2NTk3ZmQ2NGY4ZWRkMGFjNmYwNWE3MDA2MWY3MWIwMzI1YjVlMTJmNzcxNjlmMmU3ZmUyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L123",
-          "version": "repo-lines-v1:sha256:eff89aa8f4c42483fb8ff3c7b1bcd9ff67f450361c81bcf63c1448b42dd75fe2:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFmYjExZmJjMTI3ZTJiYTljYjkyNzhiZWEzMWM2Y2M1ODM3NjlhMTI4MmIyOTFlOTY1MDk0OWJlMzIxMTllMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTcxMGM5MDQ2N2I3NTVjOGI0N2RhZDFhMzM4ZDIyNzA4YzBhZmM2YWMyMDAwMTdmOTdlYTI4OTEwYmNkYTUxMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L121-L127",
+          "version": "repo-lines-v1:sha256:b70945ae77b20bb0e0dada6b395590754984ce67ac252dc57c8053436b23806b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJlMTk5YTRmZmNkNTFhMDBkYzFjNjY2NmIzMDQ5NGM0YmE3ODhjYzU0M2JkYTA0NTdmZDNiYzJjYzJkMTRlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzdmMGIxOTliMzY0ZTA3OTFjOTFmZGY2MmMwOTU0YTVhZWQ5NDY1YTUxZTQyNzk0M2E0Mzg1NjBjOGUyNzQ0NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
         },
         {
           "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L34-L36",
@@ -521,10 +521,110 @@
           "version": "repo-lines-v1:sha256:c812f324fb36c296e04c325de04d51ed4857b35dfa25f0f99632a32c63af2ea3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzZTFkZWExN2YxNTcyN2RhMTEzZTc0NjY0NjYzMzM1ZTA5NTViZjkyNjc3MTMxNzU5MWM3ZWIzZmI2N2VjYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZGM3NWQyOWQxZmY2NTJiYmI2MTEwNDFiMDM2ZmUzZmQ2NmJkODZlZGEwNDZlYjNkNTJiNzYzMjQ3YWNmMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkNzQ1ZDY2ZjNmN2ZlNmM4YWI1NGZlNWU4NzlmOThiNTVmNGUzY2M2NzI1MTA4MzZjZGZlMzU3NzgwNGJkMDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRkODM5YWZhNWU4NTU1M2VmODI0MjdmMjk5NDBkNmIyYTdmZWE3NmY2ZWM3NWJmNTZjNThlZGQ5NDZiZWIwYzgifQ"
         }
       ]
+    },
+    {
+      "id": "claim_96e34c228093491d8965c3db6ecf3b6b",
+      "statement": "GenerateExclusiveTable 带 Inputs/Outputs，因此只在源比产物新（或产物缺一个——新克隆必然缺 .inc）时才跑：Inputs 逐条列出 ..\\..\\gen\\main.go、gen\\game\\sigils\\ 下的 exclusive.go / sigils.go / json.go 与仓库内入库的 ..\\SigilLoadout\\assets\\sigils.json（MSBuild 不展开这里的通配符，只能逐条写文件）；Outputs 是两个待遇不同的产物——src\\exclusive_table.inc（不入库的中间产物）与 ..\\SigilLoadout\\assets\\sigils.chara.json（入库、随包发布，同一条 gen 命令重写它）。",
+      "evidence": [
+        {
+          "resource": "repo://.gitignore#L15-L16",
+          "version": "repo-lines-v1:sha256:ddb59f72a2f421ebc5daa88e78cb4fa358af81c61a630c812e25b15e127e862a:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZjZDMyYTJhMjA5NzFkMzIzZjdjNWRhYTljMjk2MjdhNjgzNjZmODYxMWQ0ZWYxMmFjNjk2NWU0NmFiYjA4ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzgwYmQ5NTFmNDBjZDIyZGFlM2M4ODAyYmFkMWNlMzZkZWI0N2NiMWM5OWUwYWFiYTY0ODA0MWQwOTk1ZjM4NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjlmNWU4ZjQ1MGQ2NTk3ZmQ2NGY4ZWRkMGFjNmYwNWE3MDA2MWY3MWIwMzI1YjVlMTJmNzcxNjlmMmU3ZmUyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L127",
+          "version": "repo-lines-v1:sha256:c888baae3a7996d67db29a3e42858d70983da5852d2876de5c5712a35d179463:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiYzUwOWVlNDkyMTY5Y2M4N2ZhYWM5MzcwYmM1MzBmZjM2NDE5YjkxYzBkNzE0MzBmMDNjY2RkNGQ2NzBjZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5MGUyZmViZWUwMjBlYTM5NjBiZGYwZTFlYWU3ZjEzZDc4NmU5Zjg2NGJkZTZiNWM3OTUyZGM1ODI1YjcyZTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3MTBjOTA0NjdiNzU1YzhiNDdkYWQxYTMzOGQyMjcwOGMwYWZjNmFjMjAwMDE3Zjk3ZWEyODkxMGJjZGE1MTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3OGYyNTBhNWEyYTJjOTJjMjgxYTk3YjUxMzAzNDRkZDlkYjkyNzVjZjBkNGM5ZjhkMWFjYjMzYjg1NzUwMjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_932ccfe9739345bab7c27308341dcd0c",
+      "statement": "GenerateExclusiveTable 尾部的 Touch 只推两个产物的时间戳、不动内容，因为 gen 在内容没变时不写文件，产物 mtime 会永远落后于源、MSBuild 会一直判它过期。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L125-L126",
+          "version": "repo-lines-v1:sha256:19f34eb4f5affd033088dcbb8d5694f062868604e3e24870514da7419223f426:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDg4MjBjYjAyMWZhYmEyZGRkOGNkN2ZhMjkwZjJjYTY0YWJhMTk4Y2ZjNjM4YTZlODgzNjMyNTI1OTFmYjNjOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjZhMmQ5ZWY3MjM2YTY0MzA3ZGJjMjdiZWE4NDdjMjBkZjY3NTBkMWMwYjJlOTY0NjdhOWU2OTU4MzdhMDIzOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjMzMTM2YjI2MTc1YjFjZjQzMzUzNGNkMWIzMDJjNzYxOTVjYmI1ODI5OTI0NWY1MTQ2Yzg3YWM5OTRhYWNjMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2NjZDJiM2Q2YzYwMmJmYmU5NDM5ODU4NWY3NGVlMTVkMzNjYTM4OTRiZDk0MmRkYjg5Y2Q5NjBiZTQ3NTYyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b837791e8c40479babad4695b81ce525",
+      "statement": "原生 DLL 的编译输入只有 src\\ 下十个 .cpp 加两份 vendored 源码 third_party\\safetyhook.cpp 与 third_party\\Zydis.c（后者以 CompileAs C 编译），没有包管理器或需要还原的外部依赖：third_party 只是加进 AdditionalIncludeDirectories，两处针对性警告抑制（safetyhook 关 4834、Zydis 关 4201）是为这两份第三方源码保留的。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L46-L58",
+          "version": "repo-lines-v1:sha256:050944f2ebc1cd20e3dd34eaf00b200452afd317927ed4473b4605fc4fd25667:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzOWJhZjEyOGY2OGY1ODQ2ZWVkZGFmMmExNjQxNjE0MDJiNGJmYjdmMjBmMjc0M2E4ZjVjZTc2YjBkMzU3MWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5NDk4NWRmYzc3NzlhMDk4NDM5N2NkMTg1MDM1NDUxNTM4ZGFiN2QzMWQxNWM0Y2Q0NGNkMWVhZmExNWQzODkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI4MzJkZjcwODA2MTIzNGZlMmZhMzBjMTMzNWQ0MDQ5YzI1NTY0Y2MzZTM5MDE3Y2E2NTJiN2Y4Y2IzZjkxODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhOTZlMDVmNTI1MmY0YmIyNGQxMzQyNjI4MzZmZjI3ZWNkMTcxYjI0NzVkMjQzZGE5NGZkOWFhNzYwM2I5NjcifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L89-L114",
+          "version": "repo-lines-v1:sha256:4753d0d73b3ec5143e6cb35e1fe59f82671b5430cfe8fd101a62c2876e4a69cc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkYmYxNTRiODU1YmFhZTdkZmYzZGJlZmY0OTRkMjk3NDNjMGViYjhhMTc2NWMwNWZmMGEyZTc4ZjFiYzcwN2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlOTk2NGRlNjdjMGIzYjM4ZjcwNGEyYmNlYjQwZjQ4MTQ4YTFiZjhlZjI5ZjRhYWMzYjEwZmU0NzJkNTgwM2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjNzQwYTNhNmQ5MTgzZDQ3YWE3ZDJlYzVkODc4YzFhNDdkOGE3ODMxMzVhMjk0NDM2YzMyZmEyMjI5OGZiODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2NzdmZWEzZjM4OGFjNzc2MzUxZjMwNjlmMWYxNjFiMmUwYTY3M2FjNmRlN2ZiMjJhNTExMmYzNTkzNjhmYjcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9647b25f7dba48329514d5e3e5ee2f1a",
+      "statement": "runtime.cpp 与 runtime_state.cpp 的分工是「编排 vs 状态」：runtime.cpp 只按顺序调用各阶段并计时上报（Initialize）与提供 std::call_once 包装（EnsureInitialized），不定义任何状态；全部进程级全局量与 Log / CompleteStartupPhase / SetRuntimeMessage 三个基元都住在 runtime_state.cpp。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L6-L61",
+          "version": "repo-lines-v1:sha256:9d9530c0327b7f375d0f3e94432b599455f6da2d73f721721eba1fb78b014a02:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3MGRmZDBhOWI5ZTA5MzNiMGE4OGExOGNhMTg4M2ZjZGViNDFiYTk3OWQzZThkZjEzMDg0YTI2NDcwMmUzNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNmZGIyZGZlZmU3YzFmZmFmNTA2ZjhjODE2MTgxY2EzZDMyMjljYmQzOTczODZlYzA2N2Q0MGJhYzE3OTU5MjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp#L6-L72",
+          "version": "repo-lines-v1:sha256:58c3e15d65a13983c7c259f127ec09d7ba2eb6737eea73d63905dc58546b5b77:eyJzZWxlY3RlZExpbmVDb3VudCI6NjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZjMmZjYWQzYjNkNzJlNjVmNTJiZGJlMTkyMTFlZGViYzc0MzBmM2IyZWRjY2I0M2Y1MWY2Y2U0NmE2ZGU0MjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNmZGIyZGZlZmU3YzFmZmFmNTA2ZjhjODE2MTgxY2EzZDMyMjljYmQzOTczODZlYzA2N2Q0MGJhYzE3OTU5MjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_80dfb06dca59457b9cf31574fec6d283",
+      "statement": "每个关注点的全局状态就定义在拥有它的那个翻译单元里，native_internal.h 只放 extern 声明与跨文件契约：template_loadout.cpp 持有 g_runtime_templates / g_exclusive_state / 角色下标表，selection_store.cpp 持有 g_character_selections 与队伍轮次记录，table_slot.cpp 持有 g_slot_rva，skill_hooks.cpp 持有两个 hook 句柄、在途计数与 TLS 构建快照，runtime_state.cpp 持有进程级标志与日志/消息基元（dllmain.cpp、exports.cpp、runtime.cpp 则不定义状态）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L181-L200",
+          "version": "repo-lines-v1:sha256:f7eef23fe2800a01060cd1d5ce3469f23504f2679ceb8d032bbf63eb4080dd41:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4M2U1YmZkMmYwMTc1NzA5Yjg2MDU3MjFjNGMyMGU4OGU4N2ZmOGQyYTRmZDU4ZTBlN2MxNjNmODdmYmZmMzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhlNTE0YTU3OGFmNDJlNTBmNDkxMDQxYjE5N2U2YmMwNGZmZmFlODY4ZDA3ODBkYmQyZDY0Mjg4Zjg2MTk5NGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxYWQ5ZTFjNjdmYjQxMjFlMmI4ZmEyMmE2OTdjNmFlMWJmYTQzY2NjNDA3MGQ3MGNkYzc2MWRhMzQ3OTA1ZjAifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/selection_store.cpp#L4-L36",
+          "version": "repo-lines-v1:sha256:3926b92832a9a3f4c5a100ca10462662dc1f3e0ec140d97b80818a5a34f25a8e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiYzMzMDAyZjAxOWRjZTkzMjY3ZjE3MmI3YTFkZjg2MDMyMzdlODViNmY3OGU1Y2FlYTZmMjBkNjYyZmUyYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzM2YxNmJjYTdkNThmNDRiMzEwM2I5MmUzNDg1ZDIyY2ZiYjM0YmJhZDVlYTNmM2ZhM2I1YTlkY2IyNGVjODkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczOTc5ZjcwMGUwM2UwMDViNjM2ZGMwNDI0YTU3NmYxODRmYmYwYWNiNDZjNWZlZTkxM2EyYzJmNWYzYTU1MWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhlMTEwZTdmM2ExYzgzNjBiYjkyZmM4OTRlNTllZmNlODkxMzE4NjMxMDQxMjNjZWYxZmUwZmI5NmQzNmIyZjQifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L7-L20",
+          "version": "repo-lines-v1:sha256:f323e6828e6573992f8eb7d0a2247ac0aedfb1879e2c3bdf7030991bc30a6979:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMyN2Q3MDY1OWZiNzk0ZGFlNmI1YjEyMTllYjA1ODEzMDY4NmZkYzM1NTUzZTFhZjlkZTlhYmUxNjM2Mjk4ODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2NmRjMWUzNGIxMWU3OWY3NTIxZTAzNGMwZmQ3NmVjMjMxNmM3ZTAwZTZlNGIxYzM1YzhkMDA3ZTcwYzQ4OTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxYTU4OThkZmI4ZmY3OGUxOGY1ZGUwN2EyZmE5YjQ5YjZjYzhmMjVlZDJmMzViNGY5M2Y1YTJlZWUyYTkzZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5OTkwNjQ2OTZjNjVjMmYzNzY3NTM0NDljODQ5NDg0MjhhMjRhMjk2NmFlZGY4NjY5NmMzMWM0NWI5MzY0NzkifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L50-L52",
+          "version": "repo-lines-v1:sha256:8a911704323a46b0483fc24cf459ad3d52f8dc0f7b8c9628d29e68d09166f6f3:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTNlMWRlYTE3ZjE1NzI3ZGExMTNlNzQ2NjQ2NjMzMzVlMDk1NWJmOTI2NzcxMzE3NTkxYzdlYjNmYjY3ZWNiMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODM5M2E2NGFkYWE0YWIxMzkxNGVmMTk0NmQ3NWJjMmIzZWRlOTQ5OWM4YTU3MTBjOGE0MDY4YjQ1NTc3ODMxYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2Q3NDVkNjZmM2Y3ZmU2YzhhYjU0ZmU1ZTg3OWY5OGI1NWY0ZTNjYzY3MjUxMDgzNmNkZmUzNTc3ODA0YmQwNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTRkMzBjNDZkZmNhMmMyOGMwN2NlNGM2MzUxMzk3ZDM0OWE5ZjRjOWI5Y2JjZDdhZmYzMzZlNjg0MDUxMTBmZiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L137-L138",
+          "version": "repo-lines-v1:sha256:98d146d5e8b3d90c339aae250ea908e1527db415d34b67b87f097d4eafda9547:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2U0NmMwOWU2YjM3Y2UyY2MzNGI0NjY0MDg2MTU0MDAxYzU1YTg4MTIyOTlmM2RkOTExODdmYjY2NTU4YWYxNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjg0MzRkNzA0Y2E0NWFiODQ4ZDU2MmM3N2M4OGM5OTVjNTJhYzZlNmM5Yjc2NDhhNzY5MmMyZGRkNjZlOWU1MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGZjNWQ4ZWM3ZDUzYTkxOTMzMjU2NjNkYzBlN2NiZmJkODNlODdkZjc3ZTFjOTY2YjY2NTdmZTY1Nzg0MGUwZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjkzMmRiZDM4Zjg2OWMxN2QwYThiYzZmOGM3NTc2MWIxMzU3Y2NlZTRlMTQ3ODRmZjU1YzA0NWIwZWEyNDNmOCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L51-L54",
+          "version": "repo-lines-v1:sha256:4a0ce637ac0ed7d25f26c7f7aa8e81b7484f144ef5aef5c4f7cd3218d7fc8e9f:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmU3ZjJhOTYwODAxM2Y1ZDM0YWY0ZjdkZjAxZmQ0MDczOTNjMzY2ZWM4NjYxYWRjZDE5YjkzNTQwYTUwNTM5NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWU0YjVkZDUyMjczYTExMmYwNDUyYThiMzIyZGE2YTkxODljMjc3ZTJjODE0ZjM2NzI4ZjQwMTE3NDgwZjJiNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDllODQwY2M2ZTY1OTY5YjQ0ZDQxYjZjNGViZWFkYmZjNGUyMDQzMmFhODAxZGY4ZTFmYjk1ZWE0MTZkY2UyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzhhMmNkZDE5YjNkZGYxNzllNjgwODlhNTQwM2E3Y2M1NzNiNjE1ZDgwMWRiODExZjk5OGQ4MGUxZTQxNDBhMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_22fa5798ed914e15befd1bd8900fab9c",
+      "statement": "翻译单元之间的依赖只有一个方向：table_slot.cpp 复用 layout_resolver.cpp 提供的 PE 视图助手（TryGetCodeSection / IsInWritableImageSection），PE 视图的唯一持有者仍是 layout_resolver.cpp——第二个文件不该再解析一遍映像。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L205-L213",
+          "version": "repo-lines-v1:sha256:16818107c3e20b749ed673713ce39bc7baae38aefb3c9fb08b9c61534696d80e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzQ2ZjE4YTQ2YmUwZDlhMWI4YzM1YmI2NmJlMzYxNjhlZTMyZGM3NjRlZThjMmQwMTY0ZjU3NmYxOGNiNjdhYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTNhOTBjYzJiYTA0MWY3MGJlY2ExNDRiNWU2NWU5MGNkZGZlMTVkNTJlZTM3YTBhYjQxZjc1MTVjMWUxOWVhMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzNmNzQxMzQxZWYzYWZlOGYwYmVhMDJhM2IxZGI1NTYxNjEyYmZlNGRkMTg5NDZmZGI4MzIxYjA0YzkzMjZkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTI3OWIwN2UzMzBiNWZmYTlmNTM4YjlkMjU1YWMxNTcwZjQwMzZhNzAzZjkxNTQ1NDBjYWE2M2MxMjk5NzI3YiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L446-L475",
+          "version": "repo-lines-v1:sha256:15f660ae1f29687b1edd62416cc4d96939a6325758f82d500b355333b0ed28df:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MjZjYjBhNTcxNzdiOGJhMzBiNTQwMTlhZDcyMWY1ZGVlODcwMzMzNzEwNDU5YzZhM2Y0ZWVlNDVhNDhmNGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlYTEzM2IwY2NjNWJiMGMzZTBmMGJiZWRkNTg3MThlMzU2Yjk1ZTJjZjM0MGViMDgxZWJlNWYwMzQ0ZjBmYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhZGVjNjBmNjcwZDg5MmZiY2VkNmM5ZDYzODdjYTNkYjk4YzRiNmU1YjFiMDQyMGVlMzhmMzcxNDliMDM1MGMifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L184-L231",
+          "version": "repo-lines-v1:sha256:eedc74b1e9833b29cd062122d079a3de496215e0f9d795b081b079dff2f1a40f:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2Yzg4ODRjZDM3OWRlYjA0YjUyZGNjM2I4NjAxNDMwOTIzOGI1ZDZhZTIzMGJkNjA0NDJiNDViYWFiMTM0N2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlYTEzM2IwY2NjNWJiMGMzZTBmMGJiZWRkNTg3MThlMzU2Yjk1ZTJjZjM0MGViMDgxZWJlNWYwMzQ0ZjBmYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5ZTViMTI2ODYyNGJjZmI0YTc1YjRkOTAxMDhiODQxNDI3ZDY0ZTY1YjFlYzNiMmVkZWViNDliOWYwODEwYjcifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T00:51:14.273Z"
   }
 }

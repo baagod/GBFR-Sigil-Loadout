@@ -1,12 +1,14 @@
 ---
 type: architecture
-title: 可视工具（Go + Wails）：装配、单实例与窗口状态机
-description: SigilLoadout.exe 的结构：启动顺序（单实例判定、随包资产加载与坏安装出口）、Wails 应用装配（两个 service、go:embed 的前端资产与构建顺序、窗口尺寸约束、托盘与三个关机钩子的先后）、窗口三态显隐状态机（假隐藏/还原、焦点归还、WM_CLOSE 与 0x8010/0x8011/0x8012）、win32.go 与 windowstate.go 的职责边界，以及「防抖 + writeFileAtomic + 退出 flush」这套本进程内的落盘口径。
+title: 可视工具（Go + Wails）：启动外壳、两个服务与窗口状态机
+description: SigilLoadout.exe 这个独立进程的外壳：main 的单实例 mutex 与启动顺序（loadAssets 失败即 fatalDialog）、两个 Wails service 暴露给前端的绑定、各自的 500ms 防抖写与退出 flush、窗口三态显隐与托盘行为（X 是假隐藏）、exeDir()\assets\ 的单一布局（因此禁止 go run .）与 %LOCALAPPDATA%\GBFRSigilLoadout 用户配置目录。
 tags: [architecture, visual-tool, wails, win32, window-state, persistence]
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
+    at: 2026-09-24T00:51:14.273Z
 sources:
+  - id: openwiki-source-12f2ddddaa65ce032d15e738
+    resource: repo://GBFR.SigilLoadout.Native/native_internal.h
   - id: openwiki-source-1687ac29fa6d25687a06387d
     resource: repo://GBFR.SigilLoadout/Hotkey.cs
   - id: openwiki-source-77d89298944beb882bffc37e
@@ -25,6 +27,8 @@ sources:
     resource: repo://SigilLoadout/editservice.go
   - id: openwiki-source-49f1f8d8049b397adb1880a2
     resource: repo://SigilLoadout/frontend/src/App.tsx
+  - id: openwiki-source-d14d5931f805c1b9a18ee717
+    resource: repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx
   - id: openwiki-source-a877d6a19260cf861fd5bddf
     resource: repo://SigilLoadout/loadoutservice_test.go
   - id: openwiki-source-47cff6e6e142f07c1c683a7b
@@ -43,14 +47,14 @@ sources:
     resource: repo://SigilLoadout/windowstate.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 ---
 
-# 可视工具（Go + Wails）：装配、单实例与窗口状态机
+# 可视工具（Go + Wails）：启动外壳、两个服务与窗口状态机
 
 可视工具是三个交付单元里唯一有界面的那个：独立进程里的一个 Wails v3 应用（Go 主程序 + `go:embed` 的 React 前端 + 一个托盘图标），产物就是 mod 目录下的 `SigilLoadout.exe`。它与游戏进程**没有任何进程内联系**——往外只伸两条线：磁盘上两个 JSON（它写、托管 mod 读）和几条 Win32 窗口消息（`0x8010` / `0x8012`，托管侧与工具之间不传任何数据）。两条线的边界在 [系统总览](/openwiki/architecture/overview.md) 里；两个文件的形状、校验与 mtime 语义在 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
 
-这一页讲这个进程自己的四件事：**启动期的两个出口**（单实例判定、坏安装）、**应用装配**（两个 service、嵌入的前端、窗口尺寸、托盘、关机钩子）、**窗口显隐状态机**（假隐藏/还原、焦点归还、X 按钮与热键），以及**写侧那套落盘机制**（防抖、原子替换、退出时兜底）。前端 shell 自己的职责（页签、语言切换、焦点保持、文案表）在 [可视工具前端 shell](/openwiki/architecture/visual-tool-frontend.md)，本页只在两条链交叉的地方记一句结论。
+这一页讲这个进程自己的五件事：**启动期的两个出口**（单实例判定、坏安装）、**应用装配**（两个 service 与它们暴露给前端的绑定、嵌入的前端、窗口尺寸、托盘、关机钩子）、**窗口显隐状态机**（假隐藏/还原、焦点归还、X 按钮与热键）、**写侧那套落盘机制**（防抖、原子替换、退出时兜底），以及它**读写的两个目录**（随包的 `exeDir()\assets\` 与用户配置的 `%LOCALAPPDATA%\GBFRSigilLoadout`）。前端 shell 自己的职责（页签、语言切换、焦点保持、文案表）在 [可视工具前端 shell](/openwiki/architecture/visual-tool-frontend.md)，本页只在两条链交叉的地方记一句结论。
 
 ## 启动顺序：两个出口都排在装配之前
 
@@ -88,9 +92,14 @@ flowchart TD
 
 ### 两个 service 与嵌入式前端
 
-`application.New` 注册两个 Go 侧后端：`LoadoutService`（配装与显示名）与 `EditService`（因子数值编辑）。它们的方法直接成为前端可调的绑定。前端的资产走 `go:embed all:frontend/dist`，由 `AssetFileServerFS(assets)` 作为资源处理器。
+`application.New` 注册两个 Go 侧后端：`LoadoutService`（配装与显示名）与 `EditService`（因子数值编辑）。它们的导出方法就是前端能调用的全部后端面，而前端够到它们的方式有两条：
 
-这条嵌入是**编译期**的，于是引出两条构建期约束：`frontend\dist\`（vite 的产物）与 `frontend\bindings\`（`wails3 generate bindings` 的产物）**都不入库**（见 `SigilLoadout/.gitignore`），而 `App.tsx` 直接从 `../bindings/sigilloadout/loadoutservice` 导入。所以先跑 bindings 生成、再跑 `npm --prefix frontend run build` 是不可省的两步——没有 `frontend\dist\` 时 `go:embed` 匹配不到文件，`go build` 直接失败。发布链的完整顺序（bindings → `typecheck` → 前端测试 → `npm run build` → `wails3 generate syso` → `go vet` → `go test` → `go build`）见 [构建与发布](/openwiki/operations/build-and-release.md)。
+- `LoadoutService` 那七个方法走**生成好的绑定模块**——`App.tsx` 从 `../bindings/sigilloadout/loadoutservice` 直接 `import`（`SaveLoadout`、`LoadConfig`、`MinimiseApp`…）；模块由此处的 Go 方法签名生成，改签名不重新生成就编不过 `typecheck`。
+- `EditService` 那四个方法走**按名调用**：因子编辑面板写的是 `Call.ByName("main.EditService." + 方法名)`（`LoadEdits` / `SaveEdits` / `SkillMap` / `SkillTable`），那个服务名前缀是前端里的手写字面量，与 Go 侧类型之间没有任何编译期检查。同一个面板里 `saveFailedEvent` 的字面量也是照抄一遍（见下文）。
+
+前端的资产走 `go:embed all:frontend/dist`，由 `AssetFileServerFS(assets)` 作为资源处理器。
+
+这条嵌入是**编译期**的，于是引出两条构建期约束：`frontend\dist\`（vite 的产物）与 `frontend\bindings\`（`wails3 generate bindings` 的产物）**都不入库**（见 `SigilLoadout/.gitignore`）。所以先跑 bindings 生成、再跑 `npm --prefix frontend run build` 是不可省的两步——没有 `frontend\dist\` 时 `go:embed` 匹配不到文件，`go build` 直接失败。发布链的完整顺序（bindings → `typecheck` → 前端测试 → `npm run build` → `wails3 generate syso` → `go vet` → `go test` → `go build`）见 [构建与发布](/openwiki/operations/build-and-release.md)。
 
 **随包数据一份都不嵌进 exe**：源码树里 `SigilLoadout\assets\` 与打包后 `<mod>\assets\` 是同一个布局，所以既没有也不需要"开发副本"（见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)）。
 
@@ -109,14 +118,14 @@ Wails v3 的尺寸是**整扇窗口外框（含标题栏）**的 DIP。初值 `W
 | 字面量 | 值 | 为什么它是常量而不是可配置项 |
 | --- | --- | --- |
 | 窗口初值 / 下限 | `888+16` / `760+16` / `840` / `560` | 没有设置文件可承载；下限是"较窄那页不横向滚动"与"还能缩"之间的取舍 |
-| 启用槽上限 `MaxSlots` | `12` | 只数**启用**行；Go / C# / TS 三处对拍。它既不是游戏本体的槽数，也不是虚拟槽容量（24 = 3 专属 + 21 通用），而是"槽位更多有失稳风险"的保守上限——见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md) |
+| 启用槽上限 `MaxSlots` | `16` | 只数**启用**行；Go / C# / TS 三处对拍。它既不是游戏本体的槽数，也不是虚拟槽容量（原生 `kVirtualSlotCapacity` 是 24 = 3 内置专属 + 21 通用），所以**"调大上限"的边界由原生通用槽容量决定**：`TestVirtualSlotCapacityFitsPlayerSlots` 要求它不超过 24 − 3 = 21，超了不会报错、只会被原生静默截断——见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md) |
 | 参槽数 `LevelValueCount` | `10` | 一行技能数值有十个参槽，Go / C# / TS 三处对拍；写多写少都只在游戏里看得出来 |
 | 防抖窗口 `debounceDelay` | `500ms` | 它是"一串按键只换来一次写入"的取舍值，只在工具进程内可见 |
 | 窗口标题 `toolWindowTitle` | `GBFR Sigil Loadout` | 托管侧按同一个字符串 `FindWindow`；改了就要两边同时改 |
 | 两条消息 `wmActivate` / `wmToggle` | `0x8010` / `0x8012` | 同上，托管侧 `Hotkey.cs` 声明的是同一对值 |
 | 互斥体名 `mutexName` | `Local\GBFRSigilLoadout` | 单实例判定的凭据，只在工具进程内可见 |
 
-其中跨语言的那几组由 `SigilLoadout/sharedconstants_test.go` 对拍（`TestSharedConstantsAgreeAcrossLanguages`）：它证明的是"这些字面量当前两两相等"，不是"边界已证明"；`0x8011`（工具进程内 post 的假隐藏命令）没有第二处声明，所以不在对拍名单里。
+其中跨语言的那几组由 `SigilLoadout/sharedconstants_test.go` 对拍（`TestSharedConstantsAgreeAcrossLanguages`）：它证明的是"这些字面量当前两两相等"，不是"边界已证明"。同一道门也钉着本页依赖的另外几组字面量：用户配置目录名、`loadout.json` / `sigiledits.json` 两个文件名、`sigiledits.json` 的五个成员名，以及"保存失败"那个事件名——Go 发、前端收，两边各写一份。唯一的例外是 `0x8011`（工具进程内 post 的假隐藏命令）：它没有第二处声明，所以不在对拍名单里。
 
 ### 托盘与退出
 
@@ -199,7 +208,7 @@ WebView 照旧渲染，所以再显出来**不白闪**，过程中也根本没�
 ### 谁在什么时候调用它
 
 - **前端 Esc**：`App.tsx` 的 Esc 处理最终调绑定的 `MinimiseApp()`，也就是落到下一条那串 `hideToTray` 路径上——这是唯一不由 Win32 消息驱动的隐藏入口。判定细节（捕获阶段监听、浮层选择器、`keyup` 之后再等 150ms）归 [可视工具前端 shell](/openwiki/architecture/visual-tool-frontend.md)。
-- **`MinimiseApp`**：`LoadoutService` 上唯一不碰数据的导出方法，实现就一行 `hideToTray()` → `findToolWindow()` → `fakeHide`。X 按钮不走它，走 `WndProcInterceptor`。
+- **`MinimiseApp`**：`LoadoutService` 上唯一一条与窗口行为有关的绑定，实现就一行 `hideToTray()` → `findToolWindow()` → `fakeHide`（同一 service 的其余绑定全是数据读写）。X 按钮不走它，走 `WndProcInterceptor`。
 - **热键**：托管侧注册全局热键，按一下就 post `0x8012`（开关）；托管侧随后还会在**它自己**的进程里调一次 `SetForegroundWindow`——`RegisterHotKey` 的那次按下被 Windows 当成用户输入，激活权在那个进程手上。收起那一半由工具把焦点还给游戏，此时对已禁用的工具窗口调它会失败，而那正是想要的。
 - **托盘左键**：只在需要时 post `0x8010`，见上文。
 
@@ -227,9 +236,15 @@ WebView 照旧渲染，所以再显出来**不白闪**，过程中也根本没�
 | 知道什么 | 知道"什么时候"写（尾沿防抖、退出时 `flushNow`），不知道写什么格式 | 知道"怎么"写才不会被读到半截，不知道写的是哪个文件的内容 |
 | 谁在用 | 两个 service 各持一个实例（`LoadoutService` 写配装，`EditService` 写编辑列表） | `writeLoadoutFile` 与 `writeEdits` 两个调用点 |
 
-## 随包资产：启动期七份，按需两份
+## 两个目录：随包资产只有一种布局，用户配置住在 LOCALAPPDATA
 
-九份资产一份都不嵌进 exe（嵌了就成了第二套加载机制，而且"换一份数据"必须重编）。路径由 `exeDir()\assets\` 拼出，读法刻意分两类：
+工具读写的东西分两处，各自的路径算法都只有一处实现，而且都刻意不写成"开发模式 / 安装模式"两套：
+
+**随包资产**（`assetsDir` 常量 + `exeDir()`）。九份资产一份都不嵌进 exe（嵌了就成了第二套加载机制，而且"换一份数据"必须重编）。`assetsDir` 就是字面量 `assets`，路径由 `exeDir()\assets\` 拼出，所以**只有一种布局**：源码树里是 `SigilLoadout\assets\`（生成器的落点，原生工程每次编译前也把 `sigils.chara.json` 写回这里），打包后是 `<mod>\assets\`，两者形状完全一致——既没有也不需要"开发副本"，发布链反过来还会把 `SigilLoadout\` 下那种旧式同名副本删掉。
+
+直接后果是一条操作纪律：**不要在 `SigilLoadout\` 里用 `go run .` 启动它**。`exeDir()` 取的是可执行文件所在目录，而 `go run` 把二进制放在临时目录，那里没有 `assets\`：`loadAssets()` 当场失败，用户看到的就是"坏安装"对话框 + 退出码 1（测试进程同理，所以 `loadAssetsFrom(dir)` 留了目录参数这条缝）。要在源码树里跑就先 `go build -o SigilLoadout.exe .`（产物落在 `SigilLoadout\`，与 `assets\` 同级）再运行。
+
+读法刻意分两类：
 
 - **启动期一次装进内存的七份**（`loadAssets()` → `loadAssetsFrom(dir)`）：`sigils.lang.json`、`chara.lang.json`、`skill_status.json`，以及 `skill.zh.json` / `skill.en.json` / `skill.ja.json` / `skill.ko.json`——四份语言表**无条件全部读**，哪怕只用中文。任意一份缺失都在 `main()` 里当场 `fatalDialog`。
 - **按需每次重读的两份**（`readModFile(exeDir()\assets\...)`）：`sigils.json` 与 `sigils.chara.json`。玩家可能替换它们，所以每次调用拿最新的那份，不做缓存。
@@ -237,6 +252,8 @@ WebView 照旧渲染，所以再显出来**不白闪**，过程中也根本没�
 这条"九份不嵌"的约定还有一道发布门禁兜着：`tools/build-release.ps1` 用一份**独立写死**的必需文件名单（刻意不从源目录或 csproj 派生，否则"忘了加"与"被误删"两种漏法它都查不到）检查包里同时有 `SigilLoadout.exe` 与 `assets\` 下那九份，漏一份就构建失败——否则漏掉的那份会变成"装上就弹框退出"的工具。
 
 `loadAssetsFrom(dir)` 的目录参数是给测试用的缝：`assets_test.go` 的 `TestMain` 用它把源码树的 `assets/` 装进来（测试进程的 `exeDir()` 是 `go test` 的临时目录，那里没有 `assets\`），同时把**整个测试进程**的 `LOCALAPPDATA` 指向临时目录——写盘是防抖的（`SaveLoadout` 之后 500ms 才触发），而 `t.Setenv` 在测试结束时就还原，不沙箱的话那记定时器会落到真实的 `%LOCALAPPDATA%\GBFRSigilLoadout`。九份资产各自的形状、读者与漂移后果见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
+
+**用户配置**（`userCfgDir()`）是另一处，工具两个 service 的落盘都落在这里。它用 `%LOCALAPPDATA%` 拼目录名 `GBFRSigilLoadout`（`LOCALAPPDATA` 为空时才回落到 exe 旁），刻意**不**回落到 `os.UserConfigDir()`——那个 API 在 Windows 上返回 Roaming 的 `%AppData%`，而 C# 那半算的是 `Environment.SpecialFolder.LocalApplicationData`。目录名与两个文件名各只有一处声明，由 `sharedconstants_test.go` 与 C# 侧对拍。放在这里的理由是这个位置能活过 mod 目录的整体更新。
 
 ## 写侧：防抖、原子替换、退出兜底
 
@@ -272,7 +289,7 @@ WebView 照旧渲染，所以再显出来**不白闪**，过程中也根本没�
 | 写失败必须把待写放回 | 一次瞬时 IO 失败变成永久丢失（下一次防抖或退出就是重试的机会） |
 | 托盘图标必须是 `.ico` | PNG 会经 `CreateIconFromResourceEx` 被处理坏（alpha 丢失、渲染暗一半） |
 | `frontend\dist` 必须在 `go build` 之前由 vite 产出 | `go:embed all:frontend/dist` 匹配不到文件，工具根本编不出来 |
-| 包里的 `assets\` 必须与 exe 同目录 | 启动期那七份少一份就 `fatalDialog` + 退出码 1；发布门禁的必需文件名单就是为这条挡在发布之前 |
+| 包里的 `assets\` 必须与 exe 同目录 | 启动期那七份少一份就 `fatalDialog` + 退出码 1；`go run .` 就是这个不变量的典型违反形态（`exeDir()` 是临时目录），发布门禁的必需文件名单则把它挡在发布之前 |
 
 降级而不断死的三处：`CreateMutexW` 失败时只记一行日志、无锁继续（可能出现两个实例）；随包数据缺一份则立刻 `fatalDialog` + 退出码 1——"装上却读不到 assets"是坏安装，说清楚比装死好；写盘失败时保留待写并推事件，宁可让用户看到"保存失败"也不静默丢一份编辑。
 

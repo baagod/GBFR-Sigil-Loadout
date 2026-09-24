@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:88b8e5769c9d05c5396a7ac5d3de821c1786129edb5c2bb45dd774710e12648a",
+  "pageVersion": "sha256:a7b0a64f8b4be39108c555a6299e2359948bbe14ebeb27f16bf474800033cfbc",
   "claims": [
     {
       "id": "claim_9720d2a4072f4790a030582536b2eaf1",
@@ -487,10 +487,86 @@
           "version": "repo-lines-v1:sha256:0ed5a52a93cd3e1c84b1a4d884139ac82f2ebe867d547fe4cb340ac2cf7a96c6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwZDFiZjI5MWFjNTdlNWI5OTk0ZjBhNGU3Mjc1ZGIyYTQyNmY3MDIyYmMxMDYyZmU3MDBmM2IwZGU5YWM1OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0YjQwYWQ1YTE3Y2Q3N2JiMjgwMjJjNzcyYjQ2YmE2ZDQ5ODE4NDM0ZjBiNTlhOGUwY2QzYmZiMjkwZTQ2ZTcifQ"
         }
       ]
+    },
+    {
+      "id": "claim_ebbd3a5f93cb45759af786470c7bcf41",
+      "statement": "关停链条上的原子标志必须先置、再拆除：ShutdownHooks 先把 g_shutting_down release store 为真、再清 g_hooks_ready，之后才进 DisableGameplayHooksAndRestore；这两半是配套的——只有在途 detour 看到 g_shutting_down 才会把扩展槽请求立刻退化成 no-op，排空循环才可能在 5 秒内等到 g_active_getter_calls 与 g_active_mid_calls 归零。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/dllmain.cpp#L3-L11",
+          "version": "repo-lines-v1:sha256:302f95d33c9bd2a0cd31d19411700f4788e114ef563417e7ed44b05f863d4fe1:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmVjNzM1ZmEwMDgwY2RhZjExMmQ3ZjU1ZGU5YzhmMGNhYWYzZTk4NzNmM2NlNmM0NTdhZDE2ZTMwNDE1MGNhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTdlNjg2NTdhZDNhY2VkMTlhNDRhYmRkZjhhYzNlZjNhNDRmMWFkMzEzNDkyNTcwM2QzNWYwZGZjNWYyNjIwZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L243-L250",
+          "version": "repo-lines-v1:sha256:6a3e5b43825cc0343cdc7d1edf149e5668b52bc08eaa46a24abc5cb46cc9387a:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWZjY2U3ODgyMmMxOTYzMTM0YTlhM2E5Y2U3ZTM2YmY5NmIwODNjNTg4MjI2N2JkYWFhYjM1Nzk3NmY3MWMyYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzhlNWJlZGIwZTI1NGIxM2YzZmZiYmUwYTY4OTU5NzE3N2RmYzMyMTlhNDcwYjU1YTBjNmYyZDE5NWNlN2I3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjdlMjIxOTU1ZDdiNDNkZGJhY2NlMWJiMjJiNWMyMDQ5NGU2M2Y1ZGIxNjFjYmY1YjNkOGIyYjFkMTllOGZiNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmM5ZWExZTVlMDlhYWY1ZTA5Nzc4NDU3ZDlkZjlmMTAyOTQwZTIzMTIxMjA1MGE1OTNlMzI2ODZlZWQzMTI4ZiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L362-L371",
+          "version": "repo-lines-v1:sha256:547730ba281b053b5ebbab0390000e0ff191e958a0d1ddb19ad675c767df7ff1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjNTgwNjk1YjA2ZTUwMmU3MmVjMGY0NTk1NjdiZGUzZDQzZDM3Y2I1ZWZlZTMyN2EyNTExYmM5NjE2MmFkZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxZWEyNTVlZTE5MzAzY2EyMmU0YjU2MDU5MzEzMmRhZWU3M2Y4MzNhNWU4NzViNjc3YTYwODMxN2VhZjQ4ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlNDQ2OWU2YjVlZjUzZWY0ZGRlNmEwODA3YzY2NjQ2OWVmNTE3YzVmMzdjZDFiNGJjMmMxYjIyZDFiY2IxMTMifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L381-L386",
+          "version": "repo-lines-v1:sha256:877e6bfcb38da65727ffef4d2cdba1b0d1376ef96b0cc7f25816d0b043e0dd22:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTRmY2JmYjlhNDRhYmZiYjdlNmI5NWEzNWY5NjRiYzExNjQ3NTc0MWFiNzc3NGYxNzYxYmMyZmU5ZTY3MDQyZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGVhMTMzYjBjY2M1YmIwYzNlMGYwYmJlZGQ1ODcxOGUzNTZiOTVlMmNmMzQwZWIwODFlYmU1ZjAzNDRmMGZhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjMxODc3N2I4MjEwMzMxNzllMjQ5NTFjYmNlZWYzM2NiMzAyNzNhZmNlODcxZGUyODVhNmMyYmZhNDg5MzMyMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_cdb5f44921a24df6b65b5d31eeb32062",
+      "statement": "跨 ABI 的诊断消息 g_runtime_message 由 g_message_mutex 保护：写者 SetRuntimeMessage 先在锁外 Log 再在 scoped_lock 下替换那个 std::string（日志行因此不与别的线程的 store 相争），读者 GBFR20_CopyRuntimeMessage 在锁内拷成局部 std::string、锁外才 memcpy 给调用方并返回所需长度（buffer_size 为 0 时只报需要多大）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L46-L60",
+          "version": "repo-lines-v1:sha256:82f1a05b645007797258959675d1f6c5e2c790a2ba8a88e8cc983bede7f6cb57:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0MDJhYjdjZTcwNzczNjY4NjcyZWNiZjhjZjc0NWIwMWNmMzhkZjUxYWExNjllZWZlODFkZjI4N2IzMjdjYzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyZDExY2FmNDNlOTdlZjM2OWU2YmVlZDFhMjY4YmQwNTgzOGYyOWI5ZGQyNTRiZjY5YmE2NDg4NDE0NzIzNGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRmYWI3MTBkZGY3ODU5ZTU3NTc2NGE5MTNhMDAyYzc0NTg1ZmZhNzAwMTUxMGNiODgxMWRhODNkMmNmNzRiMzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJhZmZmMTJhYjE2MzdhYWU2MDFkZGI0ZDg4ZThkMmY5ZTVlMjM5NjE2Y2NhN2VjYWQ3ZGYxMTE3YWJiYjUzNWIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp#L15-L16",
+          "version": "repo-lines-v1:sha256:2a66d33ad38b1e101ea9c6ec35cdb9c6676d45f348e462736a8189145211220b:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDJkYzJjYTQwZDM1NWY1MGFmZWVkNmRhMDk1MDc3Y2E4NzFmZmMyNjNhNzkxM2Q2MmQ3NWM3ZDEwMThhY2NjMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTUxMGYwOTc3NzhiMGE5YzBiNDg3YzNhZTNiZTI4YTNmZWVjZTkxNjAzYzk3ZmMwNzQ5MzkzMzA5MzA1ZDA3MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjYwNWFhZmYwNjBkZWRmZWU0MWMwYTM3ZGM3NTU4OWNhYWI5NzAxOThiNWM1MjE1NGNlOGI2ZDk5MTVjNmZiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGUxMTdkNWUyYTdkYzQzNTFjNWMzYmRlYzY0MDY1MzI0Y2EwZjczMzVmNDViMTAwOGJlMmIzMDI0YzA4MmU3NCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp#L67-L72",
+          "version": "repo-lines-v1:sha256:695eaeb7a4635c16fe2f71aa1e54dedfb6d62be27e06b8f325ec6a8752a9b3ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDA1NmVjNDNhZmM2NzI2M2MxMzZhZjJjZjVlMjc2Yjc2ZjNlNjRlODI1YmQ4ZDA1NjIwNjZhODQ1ZDA4Y2I2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODAyY2NhMjNmMzMyNjg2NTU1Mzg2MDU2N2Q4MjcwNzYwZWI2ZWUyNjIzZjM2ODkwYzFlZmQ3ZmY5ODQwYzBiNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a26bc46a3c894c1587a866a1a50d5a4b",
+      "statement": "detour 路径并非“零取锁、零分配”：贡献结算那一格会 std::format 出一行消息并调 SetRuntimeMessage（取 g_message_mutex），失败路径也会 Log。必须成立的是两条纪律——持 g_template_mutex / g_selection_mutex 期间绝不回到游戏代码，且任何锁都不跨越一次游戏调用；g_message_mutex 只包住一次字符串替换，因此不参与 template→selection 那条锁序。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp#L67-L72",
+          "version": "repo-lines-v1:sha256:695eaeb7a4635c16fe2f71aa1e54dedfb6d62be27e06b8f325ec6a8752a9b3ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDA1NmVjNDNhZmM2NzI2M2MxMzZhZjJjZjVlMjc2Yjc2ZjNlNjRlODI1YmQ4ZDA1NjIwNjZhODQ1ZDA4Y2I2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODAyY2NhMjNmMzMyNjg2NTU1Mzg2MDU2N2Q4MjcwNzYwZWI2ZWUyNjIzZjM2ODkwYzFlZmQ3ZmY5ODQwYzBiNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L87-L107",
+          "version": "repo-lines-v1:sha256:92714c72b4928bad82274f21244e80aded80c33efd5ce2fbe4d957611eef4434:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjOGUwYzM1YWExYzMyMjU5ZTA0Yzc5MWMzYTAzZWIxNDdlNDVhYmIxNjU3MjIxYzVlYTFmOWEyYTZmYzFkZjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiZGQ4NWZkZDUyMGI5YjMyM2I5N2U4NWUyZmNlOTUyMGUwMDkwOTQ0M2I1NGI4ZGJmODY5NmEwZmZmYzMwYzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgyMTkwY2Y5NmM3YWM0M2VjODNhYjJjMWVjYjUxMjY4NDFkN2QwYWJkNmYyZGRkZGFkNGUxMmEzZmE2YjkwNmIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L175-L196",
+          "version": "repo-lines-v1:sha256:0df2719a11840d8e2a1c84a16ebcf67d2a2051bdb7b3d76034f6eeffdff259c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVkZDdkZDk1MjNlYzE2ZDBkMDFlZTQ4MmZmMmY2NTdmNDE4MzcyOTgwYWJhMzZhYjdlMjBlMDgxN2FiM2U1OTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkzMWI1Y2RhMDlkNDQ2NzFkNDBjNjEyOGYzNGE5ZTFiMDgzODliNjlkZDI4OGRlNmFiY2Y4MjhjMWYyN2E4MTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_aa2268086dfc4a5baf2e6783a2776959",
+      "statement": "托管侧承担“这一版处理过没有”的那些字段（FileStamp._applied、SigilEditorFeature 的 _lastAttemptMs / _loggedAttemptUtc / _retryTable / _retryTableStamp）都是无锁的普通字段，它们的互斥完全依赖维护拍的 _ticking 单飞：两拍同时进入就会把同一版当新版本处理两次，或把版本号与候选表配错、让那一版被判成已应用。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L101-L121",
+          "version": "repo-lines-v1:sha256:45d9eae2c4ad6e31c282017091bf2f775918ce7744f137315c5f8b68c5a7f050:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkYjllODJjYWU3NDZmMTM1YzdhOGRkYTI5YzJhOTBjMDMxYWJlMGIzYjdjNjUyMjM2NzY0MTI4YjQzZDU2NmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMTgzZTU0NGRiN2VjYjk0Yjg1ODUzMjE0MjU2ZDUzYzk4NmE5YjE3ZTg2YjUzZjEyYjE3Njc0Y2ZmYWMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5MDM5YjVkY2E2ZGQ4MWY1OWQ5OTM4ZjE3ZDZkMDQyY2JkYmIzNzhiYzYyOGUxYWUxNWJjMGQxNzgwODg1MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NDdmYWMxNGU0NDMxMzA5MGJhYzBkODhjNmEwOWVlNzQ0MGY2OTFhOWIzYjQzYjY2MDU3ZDk2ZGQ0NjM5YjUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L41-L57",
+          "version": "repo-lines-v1:sha256:c7cef824ad703cafdabfb3d127cdca4da64aa86d97ab0f17b2511638f87af432:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjMGI2ZWY0ZjQwNDlkOGQ5NzQ0ODNjNjI0YThhMTU1MGU5NGUwYzUwNmYwOTRmZDNkN2RiYTRmZTZkN2FjMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0YWY2NmU2NTQ0YTlkNGRkZGEwM2Y5NzEzNjUyYjE3ZDE1YzZiZTE0YmJjNGQ0ZTAxOGE5Y2IwY2VmYjkwY2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2OGNmNTVkM2FhNGU3ZTAzNTI3OTVmODAwODViY2VhOGEzOTU3ZDU5MTQyZjJlMzBjM2EwNDkwMjE0ODg4NWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzMzUxNzE0NmJjM2QyOGU4MmI3NTI1MWNhZjg4MDI4ZWUwNmQ5NTkwYjkzZmQ5ZGFmNTQyNjRjODU2YzZjMDAifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/UserConfig.cs#L35-L63",
+          "version": "repo-lines-v1:sha256:036841d812e3e05a86f40c0137789c9a2870bca9894f10a66e3f42ee469abcfc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQwZjYzODI4MWNjYjkxMTllOTFkMDRiNTU5ZDU2NmI5YjA4ZDUyYzQ2M2I2ZDc0MWZkNzU5NzFlMGU2ZGNiNWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlNTQ3OTFmMDZiODQwZTUyOTA0YjE3ODJkY2E5NWVkMzAzYzUyOGM0N2Q4ZmNjZDE5YTI3MzM3ODEzZmY1ODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUwOGI2ZDVkYmI3YzZiM2Q0ZjVlYmY3ZWZlNzQ3NzA4NTM1ZWE4MTJmODZkZDc0YWNjNjBhYWU3NWUzOGVkNDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T00:51:14.273Z"
   }
 }

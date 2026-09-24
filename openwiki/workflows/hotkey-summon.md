@@ -23,9 +23,6 @@ sources:
   - id: openwiki-source-46f7ef112800a873cada707b
     resource: repo://SigilLoadout/windowstate.go
 generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
 ---
 
 # 工作流：热键呼出/收起可视工具

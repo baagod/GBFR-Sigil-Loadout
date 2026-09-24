@@ -3,9 +3,6 @@ type: quickstart
 title: Quickstart：任务路由与阅读顺序
 description: 仓库入口页：三个交付二进制（C# 托管 mod、C++ 原生核心、Go + Wails 可视工具）与嵌进可视工具 exe 的 React 前端、仓库外生成器 gen 产出的九份随包数据之间的关系，最短上手路径（跑测试 / 离线布局回归 / 看界面 / 发布），以及按任务路由到六个目录下各系统页与工作流页的对照表。
 tags: [quickstart, onboarding, navigation, routing, boundaries, frontend]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
 sources:
   - id: openwiki-source-6d4b4e707b8d60b6ccfa3425
     resource: repo://.github/workflows/openwiki-update.yml

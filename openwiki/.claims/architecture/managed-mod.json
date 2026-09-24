@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:b5dede604189502414df4c025bc0af6a9410262489170be9530f896794a0d694",
+  "pageVersion": "sha256:25683a48c14d95bf31342a2a5f4245e18b7501bc598e544a5405c8c19330984f",
   "claims": [
     {
       "id": "claim_2b2224e918be4901a0ac96a52af537ea",
@@ -234,7 +234,7 @@
     },
     {
       "id": "claim_1a9d6c76d5bd423e990c571a47714989",
-      "statement": "托管侧的 ABI 版本号是 NativeCore.cs 里的一处字面量 NativeCore.AbiVersion = 20，只在运行期与原生返回的 GBFR20_GetAbiVersion 比对；仓库里没有任何构建或测试门禁钉住它与 native_api.h 的 GBFR20_ABI_VERSION = 20 这一对——发布脚本的门禁覆盖版本号的多处对拍、随包文件清单、sigils.json 新鲜度与离线布局回归，但没有一项比较这两个数；两者漂了只会在运行期表现成 ABI mismatch 导致钩子不装（fail-closed，游戏照常）。",
+      "statement": "托管侧的 ABI 版本号是 NativeCore.cs 里的一处字面量 NativeCore.AbiVersion = 20，只在运行期与原生返回的 GBFR20_GetAbiVersion 比对；仓库里没有任何构建或测试门禁钉住它与 native_api.h 的 GBFR20_ABI_VERSION = 20 这一对——发布脚本 tools/build-release.ps1 的门禁覆盖的是别的东西：ModConfig.json / -Version / 前端 package.json 与 package-lock.json 的版本号逐处对拍、随包资产的在场（缺了先从 gen\\output 拿、再没有才跑 gen export，只保证在场而不比对内容）、一份刻意独立于源码目录的必需发布文件清单（外加 PDB、非 win-x64 的 runtimes、遗留 ExtraSigilSlots 产物与可变配置文件的 fail-closed 检查），以及设了 GBFR_EXE 才跑的离线布局回归；没有任何一项比较这两个数。两者漂了只会在运行期表现成 ABI mismatch 导致钩子不装（fail-closed，游戏照常）。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout.Native/native_api.h#L17-L17",
@@ -249,16 +249,16 @@
           "version": "repo-lines-v1:sha256:cc3ce090855c7a2382efddd87cdcbc6f079face7a6881e7ea7da1693df86c8fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2OTRmZGZjMWFmMjZhZjkyZWQzMmNiZjJjM2U0ZTYzNTg4NDYxN2EzYjkzMTgyN2I5MTA1ZDUxMmQ5NjQwMWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyOGY3ZGMzZGUwMTQxMDVmOGIyYzYyYTY1NmE0NjM4MjUzODg5OTM3MzM5NjZhYTM3OWNlMDY2MzhkNjg1Y2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdiYzRjNjRmZmUwZmJlYzFkZmI2OWVkYTFmNjQ0YmRiNDMxNWZmMzZhOTJkYjBhZjdlMWNiYzU3NTEzMDEyZTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhmOGYyMzVhMTE3MDE5YzMzODM5MTdhNDU2ODU2OWZlMjk3YzQxOWIzYmEyM2ZkZDdmMDQ3YzExNWViMTFkMTkifQ"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L216-L224",
+          "resource": "repo://tools/build-release.ps1#L214-L222",
           "version": "repo-lines-v1:sha256:b6d6f0966564154fd30184e268edac1374a270a30a7c39d6b63b7ee290dc2ce6:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTZhYTZmZjYxNTQxYzViZjliMDE1MjRhMDc0ZWM5MTEzZDJjNWZiNTg1NDNjOTdkZDQ4MzBhYTRjMDA3M2M0YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzU4MTgzMTlkMmIwNDc0ZWQ5NjQ2MTQ3MjQwNjgwN2QwNzNiMGFkMzVhYjlmMjZmMDMwNjU0ZDQzYTRlN2FlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTJjZDRkNDg4NWFlMjA1N2UwMTk1OGEwMmQ1MTIxMDBiMzExM2IwMjg0ZWY3ZWU3ZGEzZmY0NDQzNGVjNmQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2ZmYjBhOWVlZDA2MmQzMGRkMzU3ZmViMDNiZTdhZDdjYzY0YjM5OTZmY2NlYjJmMDdjYzg2MzU2NzA0ZTE0ZiJ9"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L286-L310",
-          "version": "repo-lines-v1:sha256:fb76ed40119a33c334cc1be19ab3d4b56a05bbf2b03564910dbd371c9d4947e9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmYzNjODJiYmM2OWMyNGU1M2U1NmVkNDIyOTA0ZWZmOWQyMzhkODg1ZDYzYjJjZGE1OGI3YTJmZTIxMmI5ZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI3OTJkYTM2NjE4YzVjOTUyNGU3MTdkMjE2YzJlMmQ1ZjAyNzM3NTM4YTk5YmE4MDI2MGZjNjcxYTE2NGM5YWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQyNGM5ZGMyODUzNGRlZWQ4YjdhZGFkYzRmZWNkMDZjNTJhZDg0ZTg2MzE1MjNhMTM5NzkyMDM5YzgwZDIwNDgifQ"
+          "resource": "repo://tools/build-release.ps1#L286-L308",
+          "version": "repo-lines-v1:sha256:ea30fc64a1100d7f1c6b961df8f96bbcbef443d12cfa1771d34bc122f441897c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4ODk0NDgwMzNhZGQwZDE5ZjkxMWNlOTJmNTUzN2E1ZWU3NGJkNDExY2VhNjU3NWEzMjJlN2ExNGE3MjRiODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5OGYwZmFiZWJiMTM3MTAzNTRkNjQ0OWQ4NzU3ZTEwN2NkZWNhMWZlNDI1YzJhOTUyYjYzYmFjMDdjZDlmYWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQyNGM5ZGMyODUzNGRlZWQ4YjdhZGFkYzRmZWNkMDZjNTJhZDg0ZTg2MzE1MjNhMTM5NzkyMDM5YzgwZDIwNDgifQ"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L52-L79",
-          "version": "repo-lines-v1:sha256:5728183c2ec9f5159113b7cd750b27ab194ed179bb866f90e873cef5b9c3e8ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk0ZDU5MGM1ODVmNmZkYTUzYTAzODY4OTliNTM2YjhhODljYWQ5YzlkMzU0NjRmNzYxNzBmNGI5OTkwZWEyMTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhY2JlNmU5ZTQ2NjFiMzA0MWIzNzFkZmM2NmJkYzcxNjY4NzZlMTZmOGUzZmM5NDRmNzFjMTBhOTVlNmFjMTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM4ZTQ5YzdkNDIxMzI2YzllMDM3NTcwZmJlNTg1NDNjYzgyNjNiNjQwYWJmZDk5MjlkZDEyYTJlYTYyYjRiMjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUyY2Q0ZDQ4ODVhZTIwNTdlMDE5NThhMDJkNTEyMTAwYjMxMTNiMDI4NGVmN2VlN2RhM2ZmNDQ0MzRlYzZkNTMifQ"
+          "resource": "repo://tools/build-release.ps1#L51-L79",
+          "version": "repo-lines-v1:sha256:2e0b040a868a360d5ec1c0ec17a5d437476b02ba0a9e9e6c63f04b733bed4ee3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzM2ZhYmM0OGE0YmZiMzI2Yjc0NDY2YjM4OWE5ZGQwZGU0ZjhiZDcyNzQyMzkzZmY3ZTk5YzFmNzM4ZWNiYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjliM2M1MzU3YThjY2ZkOTZjOWU0NGRlYjIyZjhjZTIxMWRhZjdjNTNjM2MxYmZmYmQyNTUyOGYyMDMwOGRjMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NDIyOGJhY2Q5YTE3MDUyNTM2YThjMTE2MmZkNzIwMjYzNjE3ZGNkMGY5MDVjMjNmNzU0YjNhZTMzMmE1NGEifQ"
         }
       ]
     },
@@ -327,8 +327,8 @@
           "version": "repo-lines-v1:sha256:aaed94742b7e1deea4e5a36b2bb8668f0e37357526e64baf5a4c0c02a6ca4af7:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzNTUzMDljNDVlY2Y2MTU2NmUxOWY1YmMwZTI1ZTMxZjVkZDg5YTRjMDJiMGU3ODhkYTJiYWViNzYyZmYwMDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk2NmM0YmY4NWY5OTk2MTA4MmRjMDI1NzBiMWZmNjQ5MzBmMjY5MTI5YjM4NmE0N2ZjOTg4ZGZmYmVlYzM2N2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhYjhiOTQ2Mzk4OWZhOTc4NjRkZWM3M2MxMzExZmE2YWM3OThjY2ZhMWJhMWQ5NjUyOTg1MDc2YWFmNzM5OWUifQ"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L21-L31",
-          "version": "repo-lines-v1:sha256:d7952b25e0195b1782de8dae62529b0bcd34769eac8d5411d4d26ed4f108ca27:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2MWE5ZDZlYTRjNWU1Mjk3ZGMxNGQxMWYzOTEwOWJlMDNkMGJlM2U1NWFlZWQ3NWYwMjkwZDI0NmMyMDVkMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0MGU3MTg3MzIwNjJmZWUzNTFlZjZkNDE1MzI4ZGYyYzBmMzY1M2Y0NDUzYWY2NDgzYTQyMDMyMmMxNDM5M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ5MjVjN2Y5ZDlkYzA0ZDAyODhjY2IxZDk5MTBlZGYxMzg5NTAzYTZhYjQyYzdjYWQ1NjJlZDlkNWQzYWZhNjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5MDFkMzk2YTM1ZjFjNTg0OWY5Y2UzOTk1NDY0OTZkNjNjYjZjNDJkMjlkNGIyNmE5Yjg0NTlhMmY3YjgwNGMifQ"
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L6-L31",
+          "version": "repo-lines-v1:sha256:8169883036856eb4b438b95448d86580e4789de3192f63232bb940aead169cd4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMTk3YjE5MDQ4M2YxYjcwZDQxNDEwNmFlNjEyYzk5ODdlMjczMjY3MDE1MGJjYTBjMmM5NzRmNzkzYzBhMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0MGU3MTg3MzIwNjJmZWUzNTFlZjZkNDE1MzI4ZGYyYzBmMzY1M2Y0NDUzYWY2NDgzYTQyMDMyMmMxNDM5M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2YzQxMzY2MDc1NjkzZWVmNjhlYzc4ZDg3NzZkY2MxYzYyMzhiZmYzYWZiMDMzYjJiNjkxNDkwZDkxZjYwYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5MDFkMzk2YTM1ZjFjNTg0OWY5Y2UzOTk1NDY0OTZkNjNjYjZjNDJkMjlkNGIyNmE5Yjg0NTlhMmY3YjgwNGMifQ"
         }
       ]
     },
@@ -496,15 +496,15 @@
     },
     {
       "id": "claim_e8386552b7244f318f8ac9282c765300",
-      "statement": "LoadoutConfig.cs 持有三个跨语言常量：启用槽上限 MaxSlots = 12（只数启用的槽）、载荷漏写 level 时的回落 DefaultLevel = 15、副技能“未选择”的哨兵 UnwornCharacterHash = 0x887AE0B0（与原生 native_internal.h 的 kUnwornCharacterHash 同步）；MaxSlots 另有 TS 的 MAX_SLOTS 与 Go 的 MaxSlots、DefaultLevel 另有 TS 的 DEFAULT_LEVEL，这三组都由 SigilLoadout/sharedconstants_test.go 对拍——值漂了不会编译失败，只会表现成“存盘成功、游戏里什么都没变”或槽位错位。",
+      "statement": "LoadoutConfig.cs 的类头附近持有三个跨语言常量：启用槽上限 MaxSlots = 16（只数启用的槽）、载荷漏写 level 时的回落 DefaultLevel = 15、副技能“未选择”的哨兵 UnwornCharacterHash = 0x887AE0B0（与原生 native_internal.h 的 kUnwornCharacterHash 同步）；MaxSlots 另有 TS 的 MAX_SLOTS 与 Go loadoutservice.go 的 MaxSlots、DefaultLevel 另有 TS 的 DEFAULT_LEVEL，这三组都由 SigilLoadout/sharedconstants_test.go 对拍（每条声明必须正好匹配一次，再逐组比较）——值漂了不会编译失败，只会表现成“存盘成功、游戏里什么都没变”或槽位错位。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L22-L31",
-          "version": "repo-lines-v1:sha256:bbc17167e9c53cec4a4a850a4bba771898a00bedb653d0667cf155ba13839954:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRlYTkzODM4OGQ5NGQzMmQ2NzkzNzZmMjRkYWUwMWU5MTY4MjY2NjM2YmI1YTBiOGM3MmQ1Yjk1ZDAwMmE0MzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0MGU3MTg3MzIwNjJmZWUzNTFlZjZkNDE1MzI4ZGYyYzBmMzY1M2Y0NDUzYWY2NDgzYTQyMDMyMmMxNDM5M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNjYxOTkxMzJlNzYxYzE1YWIzYjQ5NmVjMWM3ODMxNDZiMTFlNzA2MmQzOGNjMGNiZGE2YTQ2YjUxNDc3NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5MDFkMzk2YTM1ZjFjNTg0OWY5Y2UzOTk1NDY0OTZkNjNjYjZjNDJkMjlkNGIyNmE5Yjg0NTlhMmY3YjgwNGMifQ"
+          "version": "repo-lines-v1:sha256:0f422ec3679936f7d05ac2f6da3954c71e64cc59df8bffa4894bea42ebd12498:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRlYTkzODM4OGQ5NGQzMmQ2NzkzNzZmMjRkYWUwMWU5MTY4MjY2NjM2YmI1YTBiOGM3MmQ1Yjk1ZDAwMmE0MzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0MGU3MTg3MzIwNjJmZWUzNTFlZjZkNDE1MzI4ZGYyYzBmMzY1M2Y0NDUzYWY2NDgzYTQyMDMyMmMxNDM5M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNjYxOTkxMzJlNzYxYzE1YWIzYjQ5NmVjMWM3ODMxNDZiMTFlNzA2MmQzOGNjMGNiZGE2YTQ2YjUxNDc3NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5MDFkMzk2YTM1ZjFjNTg0OWY5Y2UzOTk1NDY0OTZkNjNjYjZjNDJkMjlkNGIyNmE5Yjg0NTlhMmY3YjgwNGMifQ"
         },
         {
-          "resource": "repo://SigilLoadout/sharedconstants_test.go#L56-L85",
-          "version": "repo-lines-v1:sha256:aad6892644beefcd4773ae359f7534eb5ed07aa9d309cc7565f0faba6d678529:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYWQ3Y2MyZGZhZmMyMTc1ZmEyZDk3MDRlMDIwMmY5NDA4M2E5ZGE2OWE1ODViMGIxOGM0OGJlYTIzNjI3NWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmYTYzMmUyM2Q5OGRkODhmNWM5YmQ0MTQ0MmNkZTkzNzkwZDY4NmVjNTMyMjIzNjU3ODQwYmZkMTA0YTRiMGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA0MmRiNzdmYmFiYWE4YzJkODNlMjUxZDZiNjQzYWFkMTYwNTg0ZjRmZTk1MGJlNjlmNzY0NDJmYTc0OGRiZDgifQ"
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L57-L85",
+          "version": "repo-lines-v1:sha256:e249b13250dca099a776417f22f7816a612c5e02d5a98b0914998c3b3a63c5de:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgwMjk2YTNjMDQ3OGYxMTMxZDFjMzQ1ODI0YjA5ZDhjMTMwZDg3NmFkM2Q5Nzc2NjY4ZDIyNjE1YzkzNWIwMzIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmYTYzMmUyM2Q5OGRkODhmNWM5YmQ0MTQ0MmNkZTkzNzkwZDY4NmVjNTMyMjIzNjU3ODQwYmZkMTA0YTRiMGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFiNWI5NTRiMWFmMjU3MzAzYjYzOTU4M2RhNGMxYTA4M2U1N2QxZTNiNzdiYjMxYjM2MWU4NWRmYzY3MzNlYjcifQ"
         }
       ]
     },
@@ -569,10 +569,24 @@
           "version": "repo-lines-v1:sha256:29d878a0f3e7d5da47c5656ea8d3fc16a2c94b345bdf3bd50d010ca4e7f0e4ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4NzhhMDdmNWU3MGFhMjU1NTZlYTAwYWVkZmVhNGRmOWVmOTllZTg2ZDI3NDI3NWUwM2I3ZTk3YjRmY2FkNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MmY0MGU2MzUwODk1YjEwMjJlNzM5YWUxNGFhZjViNDE4YzA1NDg2MzM2YTQ3NmRjZmYwMDJhOTFkMDE2ZjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU5OGNmMjZjYmIwYWM4NmMxOTMxZmFjNWFmOWIzMmFhZjJlMmI0ZTcxYWNiMjU5OGZmOTNmNWUzOTc5NGMwNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFkNWRkNmY2Nzg4NDc2NmZjMjVhMGM5ZTZkMGM0NjM1MjBmOTcxMGI0OTYzMmM5ODJmMGVkMTljNjQzNjRlNjYifQ"
         }
       ]
+    },
+    {
+      "id": "claim_bb5077bb90e3470b846155c9272af60d",
+      "statement": "跨语言常量里带三处声明的只是 MaxSlots 的值本身，它还有第二道独立约束：SigilLoadout/sharedconstants_test.go 的 TestVirtualSlotCapacityFitsPlayerSlots 要求 max(MaxSlots) 不超过原生放得下的通用槽数 kVirtualSlotCapacity − kBuiltinExclusiveSlotCount（= 24 − 3 = 21），因为超出容量的通用槽会被原生静默截断，只有一行日志会说；上调 MaxSlots 的边界因此由原生容量决定，而不是由这个数字本身决定。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L44-L47",
+          "version": "repo-lines-v1:sha256:c5ea66e5fe89fcfc50cf97484d7616d8431b2c39b4c2f5ccaf0cd7a9156d44cc:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQ4NGMxNjNkYzU0OTc3ZjI5Mjk2ZDBlMjNkZjAyYjhhNzMzZTExYjQ4YWUzYTE2NzdmNGU0MDdhNzk0ZGRkNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjBhNzFhZWIzMTRlYjVmN2YyMDdmMjM1MDczNDMxZTFmMTJmYjJiNTFhMGQ0ZDk2MDVjMjE0Y2ZkNDA1ZTcwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzE2Mzg0ZmJkZDA3N2M1Yjk2ZDZkZDhkNDVlMjlkYWY1MmM2NjU5NmExNTMzMTliNDhkNGMzZTlmMzgzOTJmNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDExZWJhZDNmYjcwNTMwYjMxNzMxNThjZTgxNjQ4ZWE2ZjFkOWFhNmNmODkwMzMzOTI1YzliYjA5ZDBiN2FiNCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L226-L251",
+          "version": "repo-lines-v1:sha256:c5449753999b48fdc7462c829a3ea710a55322b666a074b1a6aa2f97e77ec49d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3NzY0MjIyYTkxMzEzNmExMGZjNTJiMDQzMWZhZGI3YWM1NGFiNGE2YTA1MmZmYmJmZDllZTE2M2MyOTYwNTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T00:51:14.273Z"
   }
 }

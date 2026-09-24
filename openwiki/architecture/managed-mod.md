@@ -1,11 +1,13 @@
 ---
 type: architecture
 title: 托管 mod（C# Reloaded 外壳）
-description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序、250ms 维护拍的单飞串行化与整拍失败隔离、日志双汇与单代轮转、热键配置装配与 F1 回退、NativeCore 门面的 DLL 解析与 ABI 版本＋结构尺寸/偏移双检（含 NativeCore.Interop.cs 的 P/Invoke 面）、LoadoutConfig 与 SigilEditorFeature 共用 FileStamp 的两种版本门语义，以及由 ModConfig.json 推出的两条结论（两个 ModNativeDll* 皆空串、ModVersion 是唯一权威源）。
+description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序（含失败回滚）、250ms 维护拍的单飞串行化与整拍失败隔离、日志双汇与单代轮转、热键配置装配与 F1 回退、NativeCore 门面的 DLL 解析与 ABI 版本＋结构尺寸/偏移双检（含 NativeCore.Interop.cs 的 P/Invoke 面）、LoadoutConfig 与 SigilEditorFeature 共用 FileStamp 的两种版本门语义，以及跨语言常量（MaxSlots = 16）各自落在哪一侧、被哪道门对拍。
 tags: [managed-mod, reloaded-ii, lifecycle, maintenance-tick, fail-closed, interop]
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
     resource: repo://GBFR.SigilLoadout.Native/native_api.h
+  - id: openwiki-source-12f2ddddaa65ce032d15e738
+    resource: repo://GBFR.SigilLoadout.Native/native_internal.h
   - id: openwiki-source-6247cffd54f03f03a6fbff36
     resource: repo://GBFR.SigilLoadout/Config.cs
   - id: openwiki-source-ede4f5280f3f8882472c077e
@@ -38,17 +40,22 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
+    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 托管 mod（C# Reloaded 外壳）
 
 `GBFR.SigilLoadout.dll` 是三个交付物里唯一不直接改游戏内存的一个：它没有 overlay UI、没有输入捕获、没有预设存储，也没有 Overlay Broker——原生核心自己经 SafetyHook 装钩子，并自动套用内置模板配装。这层外壳只做四件事：**承载宿主生命周期**、**驱动一拍 250ms 的维护循环**、**转发日志**，以及**读两个由可视工具写下的 JSON**（见 [系统总览](/openwiki/architecture/overview.md) 与 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)）。
 
-它自己也不持有任何游戏侧事实：不缓存地址、不扫内存、不维护按角色的槽表，所以这一半没有"缓存失效"这个概念。状态归属表在 [系统总览](/openwiki/architecture/overview.md)，原生侧的容量与配对规则见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)。
+两条不变量是"这一层为什么能这么薄"的全部理由，改动前先确认没有破坏它们：
+
+- **不持有任何游戏地址。** 活表地址、钩子点、代码段锚点全部由原生核心在 `GBFR20_Initialize` 里解析并保存在自己那边；托管侧交出去的只有结构体数组与字节数组，所以这里不存在"基址变了要重扫/要失效"这类状态。
+- **不维护按角色槽表。** 模板表与专属表都在原生侧；托管侧唯一的"表"是因子编辑那条路从游戏归档里读出来、就地打补丁的 `skill_status` 字节。
+
+状态归属的完整表在 [系统总览](/openwiki/architecture/overview.md)，原生侧的容量与配对规则见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)。
 
 | 托管侧单元 | 职责（一句话） |
 | --- | --- |
@@ -63,7 +70,7 @@ verified:
 
 ABI 导出面的语义（每个导出做什么、拒绝码含义、原生侧生命周期）不在本页：[原生核心（C++ DLL）](/openwiki/architecture/native-core.md) 与 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) 是它们的权威；本页只讲托管侧**怎么用它**。
 
-## 1. 生命周期入口：`IMod` 的六个成员
+## 1. 生命周期：`IMod` 的入口与状态机
 
 启动器只认这几个入口，它们全部落在 `Mod` 一个类里：
 
@@ -75,6 +82,24 @@ ABI 导出面的语义（每个导出做什么、拒绝码含义、原生侧生�
 | `Disposing` | `=> Dispose` | 进程拆卸时启动器经由它收尾 |
 | `CanUnload()` | `=> false` | 原生钩子没法安全卸下，所以不向启动器承诺这个能力 |
 | `CanSuspend()` / `Suspend()` / `Resume()` | `false` / 空 / 空 | `Suspend`/`Resume` 的注释写明"不会被调"；说 `true` 等于承诺一个不存在的暂停语义 |
+
+这两个 `false` 与原生侧的实情对齐：原生钩子一旦装上，就不存在一条托管侧能提供的"安全暂停/安全卸下"路径，返回 `true` 等于向启动器承诺一个做不到的能力。所以托管侧干脆不声明它——启动器因此永远走"要么加载、要么关进程"这条路。
+
+```mermaid
+stateDiagram-v2
+    state "未启动" as Idle
+    state "启动中" as Starting
+    state "运行中" as Running
+    state "已关停" as Stopped
+    [*] --> Idle
+    Idle --> Starting : Start 或 StartEx 抢到 _startRequested
+    Starting --> Running : 四个阶段行都是 complete
+    Starting --> Stopped : 任一步抛异常，记 Initialization failed
+    Running --> Stopped : Unload 或 Disposing
+    Stopped --> [*]
+```
+
+生命周期是一条单向链：`未启动 → 启动中 → 运行中 → 已关停`；失败与正常关停汇入同一个 `Dispose`。
 
 `QueueStart` 的第一条语句就是幂等闸：
 
@@ -326,10 +351,11 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - `LoadoutConfig` 是**单次应用**：失败时内存里还留着上一份有效配置，"这一版处理过了"是合理的说法，于是 `Changed()` 当场认领最省事——同一份坏配置每 250ms 重试一次只会把同一个报错灌满日志。错误原因照常报，去重靠"版本变了才说"。
 - `SigilEditorFeature` 的失败是**一个字节都没写**：原生拒写时所谓"上一份"并不是一份可用的新配置，认领等于宣告编辑已生效——编辑会静默丢失且不再重试。所以判据只在 `Publish` 里原生**确实改写了行**之后才由 `MarkApplied` 推进。`FileStamp` 把"取 mtime + 比对 + 认领"收在一处，正是为了让"先认领、再干活"不可能被写反。
 
-`FileStamp` 与 `UserConfig` 的其他约定（`NoFile` = 1601-01-01 与初值 0001-01-01 不同，于是"删了文件"是一版真实的变更；1 MiB 上限；两道门的完整流程图；两个文件的成员级契约）见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。这里只补三条**托管侧**的推论：
+`FileStamp` 与 `UserConfig` 的其他约定（`NoFile` = 1601-01-01 与初值 0001-01-01 不同，于是"删了文件"是一版真实的变更；1 MiB 上限；两道门的完整流程图；两个文件的成员级契约）见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。这里只补四条**托管侧**的推论：
 
 - **文件不存在是一条真实答案，不是错误。** `LoadoutConfig.TryApply` 在 `mtime == UserConfig.NoFile` 时调 `ApplyLoadout(null, null)` 恢复内置模板并**提前 return**——少了这个 return 就会落到后面的读取上，`new FileInfo(...).Length` 必抛，每局多一条假的"保留上一份"。因子编辑那条路把"列表被删掉"读成空列表，于是把未编辑的表发布回去（撤销全部编辑）。
-- **这三个跨语言常量都住在 `LoadoutConfig.cs`**：`MaxSlots = 12`（只数启用的槽；视觉工具与 Go 各自还有一处声明）、`DefaultLevel = 15`（载荷漏写 `level` 时的回落）、`UnwornCharacterHash = 0x887AE0B0`（副技能"未选择"的哨兵，原生 `native_internal.h` 另有一处）。三组都由 `SigilLoadout/sharedconstants_test.go` 对拍——值漂了不会编译失败，只会表现成"存盘成功、游戏里什么都没变"或槽位错位。
+- **三个跨语言常量都住在 `LoadoutConfig.cs` 的类头附近**：`MaxSlots = 16`（只数启用的槽；TS 的 `MAX_SLOTS` 与 Go 的 `loadoutservice.go` 各自还有一处声明）、`DefaultLevel = 15`（载荷漏写 `level` 时的回落）、`UnwornCharacterHash = 0x887AE0B0`（副技能"未选择"的哨兵，原生 `native_internal.h` 的 `kUnwornCharacterHash` 另有一处）。这三组都由 `SigilLoadout/sharedconstants_test.go` 对拍（每条声明必须**正好**匹配一次，再逐组比较；`FilePath("loadout.json")` 那个文件名字面量也在同一份名单里）。值漂了不会编译失败，只会表现成"存盘成功、游戏里什么都没变"或槽位错位。
+- **`MaxSlots` 还有第二道约束，且它不在 C# 里。** `TestVirtualSlotCapacityFitsPlayerSlots` 要求它不超过原生放得下的通用槽数：`kVirtualSlotCapacity − kBuiltinExclusiveSlotCount`（现在是 24 − 3 = 21）。超了不会报错，只会让多出来的槽被原生静默截断——游戏里少几个因子，只有日志会说。所以"把上限调大"这件事的边界由原生容量决定，不是由这个数字本身决定。
 - **这两个文件有意不实现任何 Reloaded 配置接口**：那会让启动器多出一个渲染不了列表的 "Mod configuration" 窗口。所以 `Config` 是纯数据（数据形状与成员名见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)），而热键那份配置走另一套（第 8 节）。
 
 `LoadoutConfig` 的映射本身只认一种形状：`slots[].items[0]` 是因子（`gem` → `GemId`、`hash` → `Skill1`、`level` → 同时写 `Skill1Level` 与 `SigilLevel`），`items[1]` 可选（`hash` → `Skill2`、`level` → `Skill2Level`）；没有副技能时 `Skill2` 填上面那个哨兵、等级 0。`exclusive` 只把值为 `false` 的项变成 override（"没说"就是"开着"），外层键解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` 并忽略——PL 码是可视工具显示用的标签，不是这里的身份。
@@ -382,8 +408,8 @@ public int VirtualKey =>
 
 两条与"验证"有关的实情，改动前必须知道：
 
-- **托管侧（C#）没有测试工程。** 仓库的自动化测试集中在可视工具那一侧（Go 的 `SigilLoadout/*_test.go`、前端测试）与 C++ 的 `tests/NativeLayoutHarness`（离线跑原生布局解析与 fail-closed）；C# 这一半的正确性靠运行期日志与人工验证，门禁只覆盖"构建通过"（`tools/build-release.ps1` 跑 `dotnet restore/clean/build`）。
-- **`NativeCore.AbiVersion` 与 `GBFR20_ABI_VERSION` 这一对没有门禁。** 托管侧的 `20` 是一处字面量，原生侧的 `20` 是另一处；发布脚本的门禁覆盖版本号的多处对拍、随包文件清单、`sigils.json` 的新鲜度与离线布局回归，但没有任何脚本或测试比对这两个数。它俩漂了只会在运行期表现成 `ABI mismatch` → 钩子不装（fail-closed，游戏照常）。改 ABI 必须同时改 `native_api.h`、`NativeCore.AbiVersion`、`EnsureAbiLayout` 的期望尺寸与偏移，以及 `NativeCore.Interop.cs` 里的结构体字段顺序。
+- **托管侧（C#）没有测试工程。** 仓库里只有一个 `.csproj`（就是本工程）；自动化测试集中在可视工具那一侧（Go 的 `SigilLoadout/*_test.go`、前端测试）与 C++ 的 `tests/NativeLayoutHarness`（离线跑原生布局解析与 fail-closed，而且要在 `tools/build-release.ps1` 里设了 `GBFR_EXE` 才会被调用）。C# 这一半的正确性靠运行期日志与人工验证，门禁只覆盖"构建通过"（`tools/build-release.ps1` 跑 `dotnet restore/clean/build`）。
+- **`NativeCore.AbiVersion` 与 `GBFR20_ABI_VERSION` 这一对没有门禁。** 托管侧的 `20` 是 `NativeCore.cs` 里的一处字面量，原生侧的 `20` 是 `native_api.h` 里另一处。发布脚本的门禁覆盖的是别的东西：`ModConfig.json` / `-Version` / `package.json` / `package-lock.json` 的版本号逐处对拍、随包资产在场（缺了先从 `gen\output` 拿、再没有才跑 `gen export`，**只保证在场、不比对内容**）、一份**故意独立**的必需发布文件清单（外加 PDB、非 `win-x64` 的 `runtimes`、遗留 `ExtraSigilSlots` 产物与可变配置文件的 fail-closed 检查）、以及设了 `GBFR_EXE` 才跑的离线布局回归——没有任何一项比较这两个数。它俩漂了只会在运行期表现成 `Native ABI mismatch: managed 20, native N` → 钩子不装（fail-closed，游戏照常）。改 ABI 必须同时改 `native_api.h`、`NativeCore.AbiVersion`、`EnsureAbiLayout` 的期望尺寸与偏移，以及 `NativeCore.Interop.cs` 里的结构体字段顺序。
 
 ## 10. 改这里之前的检查清单
 
@@ -392,4 +418,5 @@ public int VirtualKey =>
 - **动 `Dispose`**：不要把 `NativeCore.Shutdown()` 重新门到任何"成功"标志后面；也不要指望 `SigilEditorFeature` 的 `_stopped` 之外还能拦住定时器线程。
 - **动 ABI**：见第 9 节末尾那一串同时要改的地方；`EnsureAbiLayout` 的期望值就是 `native_api.h` 的 `static_assert`。
 - **新增一个配置文件**：路径必须经 `UserConfig.FilePath` 推导、版本门必须用 `FileStamp`，并把常量加进 `SigilLoadout/sharedconstants_test.go` 的对拍清单——两侧算同一个字符串而没有任何协商点是这条协议最贵的性质。
+- **改 `MaxSlots`**：C# / TS / Go 三处都要改（对拍只保证它们相等，不保证这个值合理），并用 `TestVirtualSlotCapacityFitsPlayerSlots` 确认它不超过原生通用槽容量——超了不会报错，只会静默截断多出来的槽。
 - **写日志**：一律经 `Mod.Log`（它同时写文件与启动器、两个汇都 fail-soft）；不要在持有 `_logLock` 的路径上重入 `Log`。

@@ -1,8 +1,11 @@
 ---
 type: concept
 title: 语义锚点与布局解析（fail-closed 的核心）
-description: 原生核心如何从游戏 PE 映像里的三条语义锚点 pattern 认出技能循环与 status notifier，再由锚点内偏移、rel32/rip 解码、立即数与对象偏移推出 ResolvedGameLayout 的十个 RVA、两个身份字段偏移与两个原始循环上限字节，并用九条预检字节与 RevalidateGameLayout 逐字节复验；以及解析失败就什么都不装的语义、显式掩码与"0 = 通配"两套约定的坑、和游戏更新后的重导清单。
+description: 原生核心如何用四条 pattern（apply 循环、category 循环、status notifier、getter 体内的 SystemData）从游戏 PE 映像里推出 ResolvedGameLayout 的十个 RVA、两个身份字段偏移与两个原始循环上限字节，用九条预检字节与 RevalidateGameLayout 逐字节复验，并在任何一步不成立时一个钩子、一个字节补丁都不装。
 tags: [game-layout, semantic-anchors, pattern-scanning, fail-closed, native-core]
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T00:51:14.273Z
 sources:
   - id: openwiki-source-12f2ddddaa65ce032d15e738
     resource: repo://GBFR.SigilLoadout.Native/native_internal.h
@@ -18,43 +21,58 @@ sources:
     resource: repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp
   - id: openwiki-source-42938b07dc0796832fb8db72
     resource: repo://GBFR.SigilLoadout.Native/src/table_slot.cpp
+  - id: openwiki-source-ac7bb7c2f4a36fd9a94d83f1
+    resource: repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 ---
 
 # 语义锚点与布局解析（fail-closed 的核心）
 
-这套 mod 不持有任何游戏地址常量。`ResolvedGameLayout` 里的十个 RVA、两个 status 身份字段偏移、两个原始循环上限字节，全部在启动时从游戏自己的 PE 映像里现推：先从 `.text` 里认出三条语义锚点 pattern（唯一命中），再从锚点加固定偏移、解 rel32 call、解 `mov r,[rip+d]`、读立即数与对象偏移，最后用九条预检字节逐条作证。任何一步不成立就 **一个钩子、一个字节补丁都不装**，游戏照常启动，失败原因落在日志与运行消息里。
+这套 mod 不持有任何游戏地址常量。`ResolvedGameLayout` 里的十个 RVA、两个 status 身份字段偏移、两个原始循环上限字节，全部在启动时从游戏自己的 PE 映像里现推：先从代码段里认出四条 pattern（三条语义锚点，加一条落在 getter 函数体内的 SystemData 锚点）并各要求唯一命中，再从锚点加固定偏移、解 rel32 call、解 `mov r,[rip+d]`、读立即数与对象偏移，最后用九条预检字节逐条作证。任何一步不成立就 **一个钩子、一个字节补丁都不装**，游戏照常启动，失败原因落在日志与运行消息里。
 
 这一页讲的就是这条链：锚点长什么样、怎么变成 RVA、怎么复验、坏在哪一步怎么修。布局解析的消费方（钩子装在哪、循环上限怎么用）在[游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)；`Initialize` 的阶段链与失败回滚在[原生核心（C++ DLL）](/openwiki/architecture/native-core.md)；离线回归闸门在[验证地图](/openwiki/testing/verification-map.md)。
 
 ## 输出：`ResolvedGameLayout`
 
-解析基准是 `g_image_base`（`Initialize` 第一行取 `GetModuleHandleW(nullptr)`），所有字段都是 **RVA**，用时现加基址。消费者只有两处：`skill_hooks.cpp`（钩子落点、循环上限、return-address 分类）与 `safe_game_access.cpp`（读身份、调状态重建）。
+解析基准是 `g_image_base`（`Initialize` 第一行取 `GetModuleHandleW(nullptr)`），所有字段都是 **RVA**，用时现加基址。结构体与 `kNativeInternalSlotCount` 声明在 `native_internal.h`，解析、校验、复验都在 `layout_resolver.cpp`。字段消费者只有两个翻译单元：`skill_hooks.cpp`（钩子落点、循环上限、return-address 分类）与 `safe_game_access.cpp`（读身份、调状态重建）；`template_loadout.cpp` 的热路径只消费"布局就绪"这个标志，不读字段。
 
-| 字段 | 怎么来的 | 谁用 |
-| --- | --- | --- |
-| `skill_apply_loop_limit_immediate_rva` | `apply_loop + kApplyLoopAnchors.loop_limit_immediate`（= `+4`），正好指在 `83 FF 0D` 的那个立即数上 | `ApplySkillLoopLimits` 拓宽它、`DisableGameplayHooksAndRestore` 还原它 |
-| `skill_category_loop_limit_immediate_rva` | `category_loop + 6`，指在 `49 83 FD 0D` 的立即数上 | 同上（两条必须同宽，见事务式改写） |
-| `skill_apply_getter_return_rva` | `apply_loop + 0x29` | detour 里拿 `_ReturnAddress()` 与它比对，判定"这次调用来自 apply 循环" |
-| `skill_category_getter_return_rva` | `category_loop + 0x6E` | 同一判定；`OnSkillFetch` 还直接把它写进 `context.rip` |
-| `skill_fetch_path_rva` | `category_loop + 0x1E` | `safetyhook::create_mid` 的落点 |
-| `skill_fetch_call_path_rva` | `category_loop + 0x60` | 目前只解析并预检，没有任何钩子消费它 |
-| `get_gem_data_by_index_rva` | `apply_loop + 0x24` 与 `category_loop + 0x69` 两处 rel32 call 各自解出的目标，且必须**指向同一个函数** | `safetyhook::create_inline` 的落点 |
-| `status_notifier_rva` | notifier 命中处本身（`kNotifierRvaOffset = 0`） | 只有解析期用它读身份偏移；没有钩子 |
-| `status_rebuild_rva` | apply helper 之前至多 16 个 `.pdata` 条目里唯一的那个候选 | `SafeInvokeStatusRebuild` 去调它 |
-| `system_data_global_rva` | getter 函数体内 SystemData 锚点解出的 `mov rdi,[rip+d]` 的目标 | 通过节属性校验后留在布局里并打进日志；目前没有别的消费者 |
-| `status_character_hash_offset` / `status_context_mode_offset` | 从 `8B 81` / `8B 88` 两条 opcode + disp32 配对读出（见下） | `SafeReadStatusIdentity` 每次读身份 |
-| `skill_apply_original_limit` / `skill_category_original_limit` | 解析时从两个立即数字节读到的值，并已要求等于 `kNativeInternalSlotCount`（13） | 回滚上限字节时的还原值 |
+| 字段 | 怎么解出 | 谁消费 | 在九条预检内 |
+| --- | --- | --- | --- |
+| `skill_apply_loop_limit_immediate_rva` | `apply_loop + kApplyLoopAnchors.loop_limit_immediate`（= `+4`），正好指在 `83 FF 0D` 的那个立即数上 | `ApplySkillLoopLimits` 拓宽它、`DisableGameplayHooksAndRestore` 还原它 | 是：`kSkillApplyLoopPreflight`，且 `preflight_offset` 必须 = `4`（检的是锚点本身） |
+| `skill_apply_getter_return_rva` | `apply_loop + 0x29` | detour 里拿 `_ReturnAddress()` 与它比对，判定"这次调用来自 apply 循环" | 是：`kSkillApplyGetterReturnPreflight`，`preflight_offset` = 0 |
+| `skill_category_loop_limit_immediate_rva` | `category_loop + 6`，指在 `49 83 FD 0D` 的立即数上 | 同第一行（两条必须同宽，见事务式改写） | 是：`kSkillCategoryLoopPreflight`，`preflight_offset` 必须 = `6` |
+| `skill_fetch_path_rva` | `category_loop + 0x1E` | `safetyhook::create_mid` 的落点 | 是：`kSkillFetchPreflight` |
+| `skill_fetch_call_path_rva` | `category_loop + 0x60` | **没有消费者**：只解析、只预检 | 是：`kSkillFetchCallPathPreflight` |
+| `skill_category_getter_return_rva` | `category_loop + 0x6E` | 同一 return-address 判定；`OnSkillFetch` 还直接把它写进 `context.rip` | 是：`kSkillCategoryGetterReturnPreflight` |
+| `get_gem_data_by_index_rva` | `apply_loop + 0x24` 与 `category_loop + 0x69` 两处 rel32 call 各自解出的目标，且必须**指向同一个函数** | `safetyhook::create_inline` 的落点 | 是：`kGetterPreflight`（12 字节序言） |
+| `status_rebuild_rva` | apply helper 之前至多 16 个 `.pdata` 条目里唯一的那个候选 | `SafeInvokeStatusRebuild` 去调它 | 是：`kStatusRebuildPreflight` |
+| `status_notifier_rva` | notifier 命中处本身（`kNotifierRvaOffset = 0`） | 只在解析期用它读身份偏移；没有钩子 | 是：`kStatusNotifierPreflight` |
+| `system_data_global_rva` | getter 函数体内 SystemData 锚点解出的 `mov rdi,[rip+d]` 的目标 | **没有别的消费者**：通过节属性校验后留在布局里并打进日志 | **否**——它靠节属性作证：必须落在 `READ \| WRITE` 且**不带** `EXECUTE` 的节里 |
+| `status_character_hash_offset` | notifier `+0x45` 处的 opcode `0x888B`（字节 `8B 88`）之后、`+0x47` 的 disp32 | `SafeReadStatusIdentity` 每次读身份 | **否**——另一套检查：opcode 配对读 + 4 对齐的合理对象偏移 |
+| `status_context_mode_offset` | getter `+0x1F` 处的 opcode `0x818B`（字节 `8B 81`）之后、`+0x21` 的 disp32 | 同上 | **否**——同上 |
+| `skill_apply_original_limit` / `skill_category_original_limit` | 解析时从两个立即数字节读到的值，并已要求等于 `kNativeInternalSlotCount`（13） | 回滚上限字节时的还原值 | 特殊：预检比的是锚点那串字节（其中含这两个立即数），`ValidateResolvedGameLayout` 末尾再把它们读回来与记录值逐一比对 |
 
-这张表里没有一个字面 RVA：写死在源码里的只有 pattern 字节、掩码、锚点内偏移、call-site 偏移、身份解码点和预检字节——全部是**相对量**。所以游戏更新后要重导的是"对着新 exe 对字节"，不是改一个地址常量（见下文「游戏更新了怎么重导」）。
+这张表里没有一行是字面地址：写死在源码里的只有 pattern 字节、掩码、锚点内偏移、call-site 偏移、身份解码点和预检字节——**全部是相对量**。所以游戏更新后要重导的是"对着新 exe 对字节"，而不是改一个地址常量（见下文「游戏更新了怎么重导」）。
 
-## 四条 pattern 与掩码约定
+## 先有 PE 视图：一切读取都先过范围闸
+
+`TryBuildImageView` 是所有解析的第一步，它自己就是一道 fail-closed 闸（失败 stage 名就是 `PE image validation`）：
+
+1. `g_image_base != 0`；
+2. DOS 头 magic 正确，且 `e_lfanew` 落在 `sizeof(IMAGE_DOS_HEADER)` 与 `0x100000 - sizeof(IMAGE_NT_HEADERS64)` 之间——这个上界的用处是"后面几次读都落在已映射的头区域里"，畸形 `e_lfanew` 永远碰不到未映射内存；
+3. NT signature、PE32+ magic、`SizeOfImage` 落在 `0x1000`..`0x20000000`（给这个尺寸一个合理上界）；
+4. 代码段：先按名字找 `.text`，找不到才退回"最大的 `IMAGE_SCN_MEM_EXECUTE` 段"，并要求它的 `VirtualAddress`/`VirtualSize` 落在映像内且非空；
+5. 异常目录（`.pdata`，`IMAGE_DIRECTORY_ENTRY_EXCEPTION`）必须存在、至少容得下一条 `IMAGE_RUNTIME_FUNCTION_ENTRY`、且落在映像内。
+
+此后每次读字节都先过 `RangeInsideImage`（`rva <= size && len <= size - rva`），字节比较一律 SEH 包裹。PE 视图的"所有权"也在这套划分里：`ImageView` / `IsRvaInSection` / `TryBuildImageView` 都是 `layout_resolver.cpp` 匿名命名空间的私货，头文件只对外暴露 `IsInWritableImageSection`、`TryGetCodeSection`（与 `CodeSectionView`）——skill_status 表槽解析（`table_slot.cpp`）复用的就是同一份 `.text` 定义，而 `DecodeRipTarget`（住在 `safe_game_access.cpp`）是布局锚点与槽发布锚点共用的唯一 RIP-rel32 算术（位移在指令 `+d`、指令长 N、目标必须落在映像内）。也就是说"怎么找代码、怎么算 rip 相对寻址"各只有一份实现。
+
+## 四条 pattern 与两套掩码约定
 
 `layout_resolver.cpp` 里共有四条 pattern，全部用**显式掩码字符串**：`'x'` 精确匹配、`'?'` 通配。
 
@@ -70,62 +88,77 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-23T17:28:03.050Z" }
 `FindUniquePattern` 的语义要认清：
 
 - 只在 `image.code_rva` / `image.code_size`（PE 代码段）范围内扫；
-- 先找出掩码里**第一个通配位**，用那个位置上的字节做预筛（一个精确字节的过滤比逐字节比快得多）；整条 pattern 若没有 `'x'`（全通配）直接拒绝；
+- 预筛用的是掩码里**第一个 `'x'`（精确字节）所在位置**：先用那个位置上的字节做过滤，再逐字节比（一个精确字节的过滤比逐字节比快得多）。整条 pattern 若一个 `'x'` 都没有（全通配）直接拒绝——否则预筛无从谈起；
 - 要求**恰好一处命中**：第二处命中出现就立即返回 `false`，不必数完；
 - 它只负责"找唯一命中"，不负责判"这是不是要找的那条指令"。所以通配的位置必须恰好是那种"每台机器都不同"的位移字节，写错就是命中别处或命中不到——而这两种情况都会让解析失败，不会静默装错钩子。
 
-> **坑一（"0 = 通配"那一套）**：仓库里**两套掩码约定并存且刻意不合并**——`layout_resolver.cpp` 用上面的显式 mask，`table_slot.cpp` 的 `CountMatches` 用 **`0 = 通配`**（非 0 才比）。两套的差别正好在"0 是不是通配"：在 `layout_resolver.cpp` 里那些 0 只是占位（匹配时由 `'?'` 决定跳过，字节值根本不读），而 `table_slot.cpp` 里 **0 本身就是通配符**。所以改 `table_slot.cpp` 的三条 pattern 时，**每个 0 都必须落在该通配的位置上**（rip 位移那 3 个字节）；若有一个 0 本来是想精确匹配的 0，匹配会**静默变宽**，后果是"命中数 ≠ 1"，于是 fail-closed：游戏照常启动、槽不解析、之后热应用只会拒写（`GBFR20_TABLE_SLOT_UNRESOLVED`），只有日志说得清原因。改这三条 pattern 时逐个数字对一遍，别只改个数。
+> **坑一（"0 = 通配"那一套）**：仓库里**两套掩码约定并存且刻意不合并**——`layout_resolver.cpp` 用上面的显式 mask，`table_slot.cpp` 的 `CountMatches` 用 **`0 = 通配`**（非 0 才比）。两套的差别正好在"0 是不是通配"：在 `layout_resolver.cpp` 里那些 0 只是占位（匹配时由 `'?'` 决定跳过，字节值根本不读），而 `table_slot.cpp` 里 **0 本身就是通配符**。所以改 `table_slot.cpp` 那三条 pattern（`kRowLoopSetup`、`kBufferPointerLoad`、`kSlotBaseStore`，都写在文件前部；约定说明与 `CountMatches` 紧随其后）时，**每个 0 都必须落在该通配的位置上**（两条发布指令的 rip 位移那几字节）；若有一个 0 本来是想精确匹配的 0，匹配会**静默变宽**，后果是"命中数 ≠ 1"，于是 fail-closed：游戏照常启动、槽不解析（`g_slot_rva` 保持 0）、之后热应用只会拒写（`GBFR20_TABLE_SLOT_UNRESOLVED`），只有日志说得清原因。改这几条 pattern 时逐个数字对一遍，别只改个数。
 
 ## 从锚点到 RVA 的推导链
 
 锚点内偏移只写在一处（`AnchorOffsets`），因为它被用三次：认领 RVA、读循环上限/解 call、最终预检。
 
 ```cpp
+struct AnchorOffsets {
+    uintptr_t loop_limit_immediate = 0;
+    uintptr_t getter_return = 0;
+    uintptr_t fetch_path = 0;
+    uintptr_t fetch_call_path = 0;
+    uintptr_t category_getter_return = 0;
+};
+
 inline constexpr AnchorOffsets kApplyLoopAnchors   {4,    0x29, 0,    0,    0   };
 //                          loop_limit_immediate = 4, getter_return = 0x29
 inline constexpr AnchorOffsets kCategoryLoopAnchors{6,    0,    0x1E, 0x60, 0x6E};
 //                          loop_limit = 6, fetch_path = 0x1E, fetch_call_path = 0x60, category_getter_return = 0x6E
-inline constexpr uintptr_t kNotifierRvaOffset          = 0;
+
+// notifier 命中处本身就是 status_notifier_rva；它的字段偏移另算（见读身份那段）。
+inline constexpr uintptr_t kNotifierRvaOffset = 0;
 inline constexpr uintptr_t kNotifierCharacterOpcodeOffset = 0x45;
 ```
 
 推导分六步，每步都有自己的失败 stage 名：
 
-1. **唯一命中**（`unique semantic anchors`）：三条 pattern 各恰好命中一处，否则 `FailResolution`。
+1. **唯一命中**（`unique semantic anchors`）：三条锚点 pattern 各恰好命中一处，否则 `FailResolution`。（SystemData 那条不在这一步，它只能在自己的函数范围里找。）
 2. **循环/getter 契约**（`skill loop/getter contract`）：两个上限立即数字节读出来必须都等于 `kNativeInternalSlotCount`（13）且彼此相等；`DecodeRel32Call(apply_loop + 0x24)` 与 `DecodeRel32Call(category_loop + 0x69)` 各自解出一个目标，且两者必须相同——**两个独立调用点互相印证**，这就是 getter 的 RVA。
-3. **函数边界**（`runtime-function boundaries`）：getter 必须是 `.pdata` 里某个函数的**起始**（`BeginAddress == getter RVA`）并通过 `kGetterPreflight`（12 字节序言）；`apply_loop` 必须落在某个 runtime function 内（apply helper，后面找状态重建要靠它）。
-4. **状态重建**（`status rebuild call graph`）：在 apply helper **之前至多 16 个** `.pdata` 条目里找候选，候选必须（a）以自己的 `BeginAddress` 开头就匹配 `kStatusRebuildPreflight`，（b）函数体里**至少两处** rel32 call 指向 apply helper 的入口；候选恰好一个才算数。
+3. **函数边界**（`runtime-function boundaries`）：getter 必须是 `.pdata` 里某个函数的**起始**（`BeginAddress == getter RVA`）、落在 `READ | EXECUTE` 节里，并通过 `kGetterPreflight`（12 字节序言）；`apply_loop` 必须落在某个 runtime function 内（apply helper，后面找状态重建要靠它）。
+4. **状态重建**（`status rebuild call graph`）：在 apply helper **之前至多 16 个** `.pdata` 条目里找候选，候选必须（a）以自己的 `BeginAddress` 开头就匹配 `kStatusRebuildPreflight`，（b）函数体里**至少两处** rel32 call 指向 apply helper 的入口（逐字节偏移地数 `E8 rel32`，不靠块结构猜）。候选恰好一个才算数。
 5. **SystemData**（`SystemData getter anchor` / `SystemData/global-array decoding`）：在 getter 自己的 runtime function 范围内唯一命中 `kSystemDataPattern`，解出 `mov rdi,[rip+disp32]` 的目标（必须落在映像内）；再读另外两条指令的 disp32（偏移 `+10` 与 `+17`），两者必须**相等**且是"合理对象偏移"：非 0、`<= 0x200000`、按 `alignof(uintptr_t)`（8）对齐、且 `<= UINT32_MAX - sizeof(uintptr_t)`。
-6. **身份字段偏移**（`status identity offsets`）：`getter + 0x1F` 的 16 位必须是 `0x818B`（即字节 `8B 81` = `mov eax,[rcx+disp32]`），于是 `+0x21` 的 disp32 就是 **context mode 偏移**；`notifier + 0x45` 的 16 位必须是 `0x888B`（字节 `8B 88` = `mov ecx,[rax+disp32]`），于是 `+0x47` 的 disp32 就是 **character hash 偏移**。两个偏移随后还要过同一套"合理对象偏移"检查（这里要求按 `alignof(uint32_t)` = 4 对齐）。
+6. **身份字段偏移**（`status identity offsets` / `status identity offset ranges`）：`getter + 0x1F` 的 16 位必须是 `0x818B`（即字节 `8B 81` = `mov eax,[rcx+disp32]`），于是 `+0x21` 的 disp32 就是 **context mode 偏移**；`notifier + 0x45` 的 16 位必须是 `0x888B`（字节 `8B 88` = `mov ecx,[rax+disp32]`），于是 `+0x47` 的 disp32 就是 **character hash 偏移**。两个偏移随后还要过同一套"合理对象偏移"检查（这里要求按 `alignof(uint32_t)` = 4 对齐）。
+
+第 6 步这两处的"证据强度"刻意不同，值得记住：notifier 那两个 disp32（当前构建里 hash 偏移是 `0x5EA8`）**本身就是 `kNotifierBytes` 里的精确字节**，所以对象布局一改，锚点会先命中不到；而 getter 的 `8B 81`/disp32 不在任何 pattern 里（`kGetterPreflight` 只覆盖序言），只靠 opcode 配对 + 范围检查兜住。改游戏侧对象布局时，前者会在锚点阶段失败，后者会落到 `status identity offsets` —— 两个 stage 名指向的就是这两个不同的原因。
 
 ```mermaid
 flowchart TD
-    IMG["PE 映像：g_image_base、SizeOfImage、.text、.pdata"] --> U["三条 pattern 各恰好命中一处"]
-    U --> OFF["锚点 + AnchorOffsets 内的固定偏移"]
-    OFF --> DEC["解 rel32 call、解 mov r,[rip+d]、读立即数与对象偏移"]
-    DEC --> LAY["ResolvedGameLayout：十个 RVA、两个身份偏移、两个原始上限字节"]
-    LAY --> PF["九条预检字节，加 SystemData 节属性与偏移范围"]
-    PF -- "任一不成立" --> FAIL["FailResolution：清 g_layout_ready，写运行消息，什么都不装"]
-    PF -- "全部通过" --> RDY["g_layout_ready = true"]
-    RDY --> RV["InstallHooks 第一步：RevalidateGameLayout 逐字节复验"]
-    RV -- "失败" --> FAIL
-    RV -- "通过" --> HK["create_inline 与 create_mid，再拓宽两条循环上限字节"]
+    IMG["PE 映像视图：g_image_base 非 0、DOS/NT 头合法、.text 与 .pdata 落在映像内"] --> UNC{"三条锚点 pattern 在代码段内各恰好命中一处"}
+    UNC -->|否| FAIL["FailResolution：ResetGameLayout、写运行消息、什么都不装"]
+    UNC -->|是| DEC{"锚点加 AnchorOffsets 偏移、解 rel32 call、解 mov r,[rip+d]、读立即数与对象偏移"}
+    DEC -->|否| FAIL
+    DEC -->|是| PF{"九条预检字节、SystemData 节属性、身份偏移范围、上限字节读回"}
+    PF -->|否| FAIL
+    PF -->|是| PUB["g_game_layout 发布、g_layout_ready 置 true"]
+    PUB --> RV{"InstallHooks 第一步：RevalidateGameLayout 逐字节复验"}
+    RV -->|否| ROLL["DisableGameplayHooksAndRestore、写运行消息：没有钩子也没有字节补丁"]
+    RV -->|是| HK["create_inline 与 create_mid，再拓宽两条循环上限字节"]
+    HK --> READY["g_hooks_ready 置 true"]
+    FAIL --> NOOP["这台机器上钩子不生效；持久化选择与模板表一个都不动"]
 ```
 
-推导链：锚点 → 偏移/解码 → RVA 结构体 → 预检 → 复验 → 才允许改游戏字节。
+图：从锚点命中到装钩子的判定流；三个"否"分支都汇进同一条 fail-closed 出口——布局不发布，钩子与字节补丁都不装。
 
-`notifier` 这条 pattern 有个容易被忽略的耦合：它里面那段精确字节 `B9 B0 E0 7A 88`（`mov ecx, 0x887AE0B0`）**就是 `kUnwornCharacterHash` 这个哨兵常量本身**。所以哨兵与锚点是绑定的：改哨兵常量就必须同步改 `kNotifierBytes` 与它的掩码，否则 notifier 再也命中不到，整套布局解析随之失败。
+`notifier` 这条 pattern 还有个容易被忽略的耦合：它里面那段精确字节 `B9 B0 E0 7A 88`（`mov ecx, 0x887AE0B0`）**就是 `kUnwornCharacterHash` 这个哨兵常量本身**。所以哨兵与锚点是绑定的：改哨兵常量就必须同步改 `kNotifierBytes` 与它的掩码，否则 notifier 再也命中不到，整套布局解析随之失败。
 
 ## 预检：把"认领"和"作证"写在同一行
 
-`PreflightCheck` 表把每个认领的 RVA 与它的预检字节放在**同一行**（`{rva, expected span, preflight_offset}`），所以"这个 RVA 是这么算出来的"和"它有这串字节"不可能分开改。共九条；`system_data_global_rva` 不在其中，它靠节属性作证（必须落在 `IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE` 且**不带** `IMAGE_SCN_MEM_EXECUTE` 的节里）。
+`PreflightCheck` 表把每个认领的 RVA 与它的预检字节放在**同一行**（`{rva, expected span, preflight_offset}`），所以"这个 RVA 是这么算出来的"和"它有这串字节"不可能分开改。共九条；`system_data_global_rva` 不在其中，它靠节属性作证（`READ | WRITE` 且**不带** `EXECUTE`）。
 
-`preflight_offset` 的规则只有两条例外，其余为 0：两条循环上限 RVA 由"锚点 + delta"得来，而它们的预检验的是**锚点本身**，所以这两条的 `preflight_offset` 必须等于 `kApplyLoopAnchors.loop_limit_immediate` / `kCategoryLoopAnchors.loop_limit_immediate`——写成别的数字就会去比对别处的字节。比对位置是 `rva - preflight_offset`，下溢（`rva < preflight_offset`）在比较之前就被拒。
+`preflight_offset` 的规则只有两条例外，其余为 0：两条循环上限 RVA 由"锚点 + delta"得来，而它们的预检验的是**锚点本身**，所以这两条的 `preflight_offset` 必须等于 `kApplyLoopAnchors.loop_limit_immediate` / `kCategoryLoopAnchors.loop_limit_immediate`——写成别的数字就会去比对别处的字节。比对位置是 `rva - preflight_offset`：`rva < preflight_offset` 在短路求值里先被拒（即便漏过去，`MatchesPreflight` 的 `RangeInsideImage` 也会挡下这个回绕出来的地址）。
 
-两个实现细节：
+三个实现细节：
 
-- 表里的预检是运行期长度的 `std::span`，所以走 `MatchesPreflight`（内部是 `MatchesBytesAt`，SEH 包裹、按传入长度比），而不是按数组类型取长度的 `MatchesBytes<Size>` 模板——后者的长度来自数组类型，一旦长度是运行期得来的，缓冲尾部就会被一起比进去。这条区分在 `native_internal.h` 里对那两个函数是明写的。
+- 表里的预检是运行期长度的 `std::span`，所以走 `MatchesPreflight`（`RangeInsideImage` 之后是 SEH 包裹的 `MatchesBytesAt`，按传入长度比），而不是按数组类型取长度的 `MatchesBytes<Size>` 模板——后者的长度来自数组类型，一旦长度是运行期得来的，缓冲尾部就会被一起比进去。这条区分在 `native_internal.h` 里对那两个函数是明写的（`MatchesBytesAtRva` 那类模板只在固定长度的序言上用：getter、状态重建）。
 - 失败时先逐条打印 `layout preflight FAILED: rva=0x… preflight_offset=0x… checked_at=0x… bytes=…`，再返回 `false`。解析失败只说"在哪个 stage"，这一行才说清是**哪一条**预检、拿哪个地址比的。
+- 预检字节表（含那九条与两套 pattern 用的字节）只住在 `layout_resolver.cpp` 的匿名命名空间里：只那一个翻译单元用，放进共享头等于把实现细节当模块接口发布。
 
 `ValidateResolvedGameLayout` 把上面这些收在一起（预检 + SystemData 节属性 + 两个身份偏移范围 + 两个上限立即数字节读回等于解析时记录的原值），解析时与复验时跑的是**同一个函数**。
 
@@ -158,17 +191,17 @@ bool FailResolution(std::string_view stage) {
 
 成功路径只报两件有用的事：`Layout resolved and validated from semantic anchors (PE 0x{:X}).`（时间戳用来认游戏构建），以及**另起一行**的 `getter=0x… SystemData=0x…`——只有在查"钩子落到别处"这类疑难 session 时才需要，平时扫日志不该被这串地址堵住眼睛。
 
-`ResetGameLayout()` 只把 `g_layout_ready` store 成 `false`，**不清** `ResolvedGameLayout` 结构体：已发布的布局在进程余下时间里保持不变，清空这个平凡结构体会与"刚在关机或安装失败回滚前读到上一份真状态"的读者相争。读者全部用 acquire 读这个标志（`SafeReadStatusIdentity`、`SafeInvokeStatusRebuild`、`ApplySkillLoopLimits`、热重建路径、`DisableGameplayHooksAndRestore` 的还原路径），标志为假时它们全部退化成 no-op 或拒绝，而不是拿一个半截布局去算地址。
+`ResetGameLayout()` 只把 `g_layout_ready` store 成 `false`，**不清** `ResolvedGameLayout` 结构体：已发布的布局在进程余下时间里保持不变，清空这个平凡结构体会与"刚在关机或安装失败回滚前读到上一份真状态"的读者相争。读这个标志的地方全部用 acquire：`RevalidateGameLayout`、`SafeReadStatusIdentity`、`SafeInvokeStatusRebuild`、热重建入口（`RebuildPartyStatusesOnce`）、热路径拓宽上限前的守卫（`ApplyLoadout`）、`DisableGameplayHooksAndRestore` 的还原路径——标志为假时它们全部退化成 no-op 或拒绝，而不是拿一个半截布局去算地址。有一个例外值得记住：`ApplySkillLoopLimits` 自己**不读**这个标志，它两处调用点各自把关——`InstallHooks` 在复验通过之后才调，`ApplyLoadout` 的热路径则在 `g_hooks_ready` 与 `g_layout_ready` 都为真时才调。
 
 ## 游戏更新了怎么重导
 
-**第一步永远是本地跑一遍 harness**：`tests/NativeLayoutHarness`（或 `tools/build-release.ps1`，它在设置了 `GBFR_EXE` 时会调用同一个脚本，失败即抛错、没设置就打印 `layout harness: skipped` 继续）。它拿真实 exe 跑一遍**生产代码**的解析器，输出 `ResolveGameLayout` 是否成功、`RevalidateGameLayout` 是否通过、以及"改坏一个字节后是否被拒"。失败时它抛出的就是"生产解析器拒绝了这个 exe：锚点对不上（游戏更新了，需要重导）"。日志里的失败 stage 与 `layout preflight FAILED` 那行告诉你是哪一环——按 stage 反查上面的推导链六步，就知道该动哪张表。**改这段代码或游戏更新时，harness 是本地唯一能给出答案的东西**：它证伪用真实字节，不依赖任何人的记忆或一张地址表。
+**第一步永远是本地跑一遍 harness**：`tests/NativeLayoutHarness`，或 `tools/build-release.ps1` 里那段布局回归（当前脚本约 L214-L222：它排在 native/managed/工具的构建之后、搬运 assets 与清理 `dist` **之前**；设置了 `$env:GBFR_EXE` 就调用同一个 `run.ps1`，非 0 退出即 `throw "Layout harness failed with exit code N."` 中止发布，没设置就打印 `layout harness: skipped (set GBFR_EXE to run it).` 继续发布）。harness 拿真实 exe 跑一遍**生产代码**的解析器，输出 `ResolveGameLayout` 是否成功、`RevalidateGameLayout` 是否通过、以及"改坏一个字节后是否被拒"。失败时它抛出的就是"生产解析器拒绝了这个 exe：锚点对不上（游戏更新了，需要重导）"。日志里的失败 stage 与 `layout preflight FAILED` 那行告诉你是哪一环——按 stage 反查上面的推导链六步，就知道该动哪张表。**改这段代码或游戏更新时，harness 是本地唯一能给出答案的东西**：它证伪用真实字节，不依赖任何人的记忆或一张地址表。
 
 要重新对的常量（都住在 `layout_resolver.cpp`，只有 `kNativeInternalSlotCount` 在 `native_internal.h`）：
 
 1. **四条 pattern 的字节与掩码**：`kApplyLoopBytes` / `kCategoryLoopBytes` / `kNotifierBytes` / `kSystemDataBytes` 与对应 mask 字符串。掩码里 `'?'` 必须落在真正会变的位移字节上；长度关系由 `MakePattern` 的 `static_assert` 兜住。
 2. **偏移表**：`kApplyLoopAnchors`、`kCategoryLoopAnchors` 两行，以及只以立即数形式写在函数体里的 call-site（`apply_loop + 0x24`、`category_loop + 0x69`）。
-3. **身份解码点**：`getter + 0x1F` / `+0x21` 与 `notifier + kNotifierCharacterOpcodeOffset`（`0x45`）/ `+0x47`，以及两个期望 opcode（`0x818B`、`0x888B`）——opcode 变了说明读偏移的那条指令换了形状。
+3. **身份解码点**：`getter + 0x1F` / `+0x21` 与 `notifier + kNotifierCharacterOpcodeOffset`（`0x45`）/ `+0x47`，以及两个期望 opcode（`0x818B`、`0x888B`）——opcode 变了说明读偏移的那条指令换了形状；对象布局变了则要先改 `kNotifierBytes` 里那段精确的 `mov ecx,[rax+disp32]` 字节。
 4. **九条预检字节**：`kSkillApplyLoopPreflight`、`kSkillApplyGetterReturnPreflight`、`kSkillCategoryLoopPreflight`、`kSkillFetchPreflight`、`kSkillFetchCallPathPreflight`、`kSkillCategoryGetterReturnPreflight`、`kGetterPreflight`、`kStatusRebuildPreflight`、`kStatusNotifierPreflight`，以及两条 `preflight_offset` 必须与偏移表保持一致。
 5. **槽数与它的三处孪生**：`kNativeInternalSlotCount`（13）同时出现在"两个立即数字节必须等于它"、`kApplyLoopBytes` 的第 5 个字节（`0x0D`）、`kCategoryLoopBytes` 的第 7 个字节（`0x0D`）里——游戏原生槽数一变，这三处一起变。
 6. **`GemData` 的布局**（`sizeof == 0x24` 的 `static_assert` 与逐字段偏移）：它不跨 ABI，但字段顺序/大小变了就要跟着对模板合成与读取路径；这类改动**不必**动 ABI 版本号。
@@ -183,6 +216,6 @@ bool FailResolution(std::string_view stage) {
 2. `RevalidateGameLayout()` 必须过（解析结果在字节上自证）；
 3. 把 `skill_fetch_path_rva` 处的一个字节翻一位之后，`RevalidateGameLayout()` **必须**失败——这一条才是"fail-closed 真的会拒"的证明。
 
-它离线编译**生产代码**的 `layout_resolver.cpp` 与 `safe_game_access.cpp`，只 stub 掉 `g_image_base`、`g_layout_ready`、`g_hooks_ready`、`g_game_layout`、`Log`、`SetRuntimeMessage` 这些外部符号；`run.ps1` 用 `cl.exe /std:c++latest /EHa /O2 /utf-8 /Zc:threadSafeInit` 编译（并带上 `third_party` 头目录，因为 `native_internal.h` 含 safetyhook 头）。命令行给 `-Exe` 或环境变量 `GBFR_EXE`；两者都没有就打 `NATIVE_LAYOUT=SKIP` 并以 0 退出——**SKIP 不是通过**，它只是让闸门在任何机器上都能跑。成功时打印 `NATIVE_LAYOUT=PASS` 与 `NATIVE_LAYOUT_FAIL_CLOSED=PASS`。
+它离线编译**生产代码**的 `layout_resolver.cpp` 与 `safe_game_access.cpp`，只 stub 掉 `g_image_base`、`g_layout_ready`、`g_hooks_ready`、`g_game_layout`、`Log`、`SetRuntimeMessage` 这些外部符号；`run.ps1` 用 `cl.exe /std:c++latest /EHa /O2 /utf-8 /Zc:threadSafeInit` 编译（并带上 `third_party` 头目录，因为 `native_internal.h` 含 safetyhook 头）。命令行给 `-Exe` 或环境变量 `GBFR_EXE`；两者都没有就打 `NATIVE_LAYOUT=SKIP` 并以 0 退出——**SKIP 不是通过**，它只是让闸门在任何机器上都能跑。要注意 SKIP 发生在编译**之后**：`run.ps1` 先经 `vswhere` 找 `vcvars64.bat`（找不到就抛错）、再编出 `%TEMP%\NativeLayoutHarness.exe`，最后才判 `-Exe`。所以"在任何机器上都能跑"靠的是 `build-release.ps1` 在没设 `GBFR_EXE` 时根本不调用 `run.ps1`；直接手跑 `run.ps1` 是需要 VS 工具链的。成功时打印 `NATIVE_LAYOUT=PASS` 与 `NATIVE_LAYOUT_FAIL_CLOSED=PASS`。
 
 它覆盖不到的部分要诚实记住：钩子的实际落点与运行时行为（`create_inline` / `create_mid` / 循环上限补丁）、身份的读取路径、状态重建调用、活表写入，都只能在真机游戏里验证。覆盖面与其余套件见[验证地图](/openwiki/testing/verification-map.md)。

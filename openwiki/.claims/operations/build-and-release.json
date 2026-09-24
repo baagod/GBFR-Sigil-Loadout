@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:45b352157469a6171bc2dbf7ed2c5426011dc51a456b776330334217e98a1e86",
+  "pageVersion": "sha256:1cea8b2d000ca44e7f3306443121dd02e939441c87d0f0a5efc146f2ee76ced3",
   "claims": [
     {
       "id": "claim_58a86f97c7cd40a1bc3616f1104514ac",
@@ -46,29 +46,29 @@
     },
     {
       "id": "claim_1562e97562874687943a9383f0d5ba53",
-      "statement": "原生 → 托管 → 工具 的编译顺序由工程文件硬约束：csproj 以 PreserveNewest 从 GBFR.SigilLoadout.Native\\bin\\$(Configuration)\\ 拷贝原生 DLL（先建托管会打进旧原生 DLL），而 vcxproj 的 GenerateExclusiveTable 目标无 Condition 且 BeforeTargets=\"ClCompile\"，使原生编译前必须先成功运行仓库外 gen 的 go run . exclusive -mod <仓库根>。",
+      "statement": "原生 → 托管 → 工具 的编译顺序由工程文件硬约束，而不是解决方案配置：csproj 用 PreserveNewest 从 GBFR.SigilLoadout.Native\\bin\\$(Configuration)\\ 把原生 DLL 拷进托管输出目录（先建托管就会把上一次的原生 DLL 打进包），而 vcxproj 的 GenerateExclusiveTable 目标 BeforeTargets=\"ClCompile\"，使原生编译在需要生成那张表时必须先成功运行仓库外 gen 的 go run . exclusive -mod <仓库根>。",
       "evidence": [
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L123",
-          "version": "repo-lines-v1:sha256:eff89aa8f4c42483fb8ff3c7b1bcd9ff67f450361c81bcf63c1448b42dd75fe2:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFmYjExZmJjMTI3ZTJiYTljYjkyNzhiZWEzMWM2Y2M1ODM3NjlhMTI4MmIyOTFlOTY1MDk0OWJlMzIxMTllMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTcxMGM5MDQ2N2I3NTVjOGI0N2RhZDFhMzM4ZDIyNzA4YzBhZmM2YWMyMDAwMTdmOTdlYTI4OTEwYmNkYTUxMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L121-L127",
+          "version": "repo-lines-v1:sha256:b70945ae77b20bb0e0dada6b395590754984ce67ac252dc57c8053436b23806b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJlMTk5YTRmZmNkNTFhMDBkYzFjNjY2NmIzMDQ5NGM0YmE3ODhjYzU0M2JkYTA0NTdmZDNiYzJjYzJkMTRlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzdmMGIxOTliMzY0ZTA3OTFjOTFmZGY2MmMwOTU0YTVhZWQ5NDY1YTUxZTQyNzk0M2E0Mzg1NjBjOGUyNzQ0NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
         },
         {
           "resource": "repo://GBFR.SigilLoadout/GBFR.SigilLoadout.csproj#L41-L43",
           "version": "repo-lines-v1:sha256:d23ff4751a2d3a31a209f0f9924eb1c51108095cd99193476dd73560e5036f06:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjM5ZmY0OGYxODVmZDg2NTE5M2Y1MTFhOTUyYjdkYmI3NTJhZGI1NWRlYzk3M2ZkZGEwYjdhNWI5NzQ1ZjcwMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTAxMjhiZDllM2Q5NGFlZDM4MmI3ODljNWZjYWFiMzZlZGIxYmY0NGRlNGI5ZTFlMGE2OTk1YTg2YzhhNzVjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTRjNGJlZmJiOTA1NjU1NmNlYjRhODg5YmQ2ODBlOWU2YWE5MzUwODc2MzYyMTIwOTM0YzJhYjBhYzllZTczMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjg5MTIxYTg0ZTE4YTM3MjA5OGJlNDQ3NjA3YjVlZjE0OGVmNDI1NjE4MThjOWFmYWE3ZGM2NjY1YTBjNWMzMCJ9"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L106-L134",
-          "version": "repo-lines-v1:sha256:a54cc088ed8ccab6402b5f484d4d3e23919a879cc4d5b72325baaca267ec6f7d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzM2MwMDRkM2M0ODM5NWVhY2Q1ZDNmYzhiZWQ5MmY1Y2NjZGMzODY0MDc5YmE5Yjk5YTAzNWExNDRiZGI2NjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyYWZjMmM5MGZjMTIwZmNmMzQwYTg0YWZmYThiZTE5NWQyNTNlMzlhYjM1NDEyYjgyZTUxM2NlZmRjNjExMzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmODQxZTVkYTZlYmNmOTM4NjI1Zjc0Y2JmMGU3MzkyNWJhMjk1YmIyNGRjNGFlMzg3OTA5ZWVhMWNiNzY4MTAifQ"
+          "resource": "repo://tools/build-release.ps1#L104-L112",
+          "version": "repo-lines-v1:sha256:1b8f2ab1007bfea5c5f01847234027f5fdec103cdc915cd4930f6b6532f70b8d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzMzYzAwNGQzYzQ4Mzk1ZWFjZDVkM2ZjOGJlZDkyZjVjY2NkYzM4NjQwNzliYTliOTlhMDM1YTE0NGJkYjY2MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTJhZmMyYzkwZmMxMjBmY2YzNDBhODRhZmZhOGJlMTk1ZDI1M2UzOWFiMzU0MTJiODJlNTEzY2VmZGM2MTEzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTg5MDA2OGEwOGNhNWEyZDVlNTI0ZTRhNDVhMWM4NDI4M2U5NzUxOTEwYzViNmY5NzkyOTZlOTZkMzZhODY3YSJ9"
         }
       ]
     },
     {
       "id": "claim_f3a76390b6be438f9d359e8cf9dbbff2",
-      "statement": "构建在编译之前跑两道数据门禁：SigilLoadout\\assets\\sigils.json 必须在场，且以仓库外的 ..\\gen 为工作目录跑 go run . sigils-json <gen\\output\\sigils.xlsx> <sigils.json> --check 必须通过；脚本同时检查审阅表与 gen\\main.go 在场，缺 gen 时直接说明本仓库无法单独完成一次发布构建。构建刻意不自动重新生成数据，只对拍并拒绝，构建侧的数据检查也只有这三道。",
+      "statement": "编译之前对随包数据的处置是「在场或补齐」而不是对拍：九份 assets 已在场就 continue（内容一个字节都不比对），缺的先从 ..\\gen\\output\\<name> 复制并打印 assets\\<name> <- gen\\output，仍然缺才以 ..\\gen 为工作目录跑 go run . export -mod <仓库根>（退出码非 0 抛 gen export failed; the packaged assets are still incomplete.，跑完仍缺抛 gen export 之后仍然没有 assets\\<name>。），缺 gen\\main.go 时抛「随包数据缺 <name>，而生成器不在 <gen 路径>（它不在本仓库里）：补进 SigilLoadout\\assets\\，或把 gen\\ 放回仓库旁。」；脚本里既没有 go run . sigils-json … --check 这道新鲜度对拍，也没有审阅表 gen\\output\\sigils.xlsx 的在场检查，因此入库资产与生成器数据源是否一致在发布链里没有任何机械证据——能挡的只剩包内九份的在场清单与 go test 的交叉一致性检查，二者都只证明入库那份内部自洽。",
       "evidence": [
         {
-          "resource": "repo://tools/build-release.ps1#L51-L81",
-          "version": "repo-lines-v1:sha256:ccc78f429bb8bf46b73b875b2e37d297d60206c5175bb36ae231c0d30bc1e126:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk5Y2Y3YWU1NmVkMmY2ODg3NDE1MGU5ZWYyZGMzNTQyYmMzZjY4Mjc5ZWQ5NzMzMDFhMzYzZGIxZGEyNjNlNzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjliM2M1MzU3YThjY2ZkOTZjOWU0NGRlYjIyZjhjZTIxMWRhZjdjNTNjM2MxYmZmYmQyNTUyOGYyMDMwOGRjMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NDIyOGJhY2Q5YTE3MDUyNTM2YThjMTE2MmZkNzIwMjYzNjE3ZGNkMGY5MDVjMjNmNzU0YjNhZTMzMmE1NGEifQ"
+          "resource": "repo://tools/build-release.ps1#L51-L79",
+          "version": "repo-lines-v1:sha256:2e0b040a868a360d5ec1c0ec17a5d437476b02ba0a9e9e6c63f04b733bed4ee3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzM2ZhYmM0OGE0YmZiMzI2Yjc0NDY2YjM4OWE5ZGQwZGU0ZjhiZDcyNzQyMzkzZmY3ZTk5YzFmNzM4ZWNiYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjliM2M1MzU3YThjY2ZkOTZjOWU0NGRlYjIyZjhjZTIxMWRhZjdjNTNjM2MxYmZmYmQyNTUyOGYyMDMwOGRjMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NDIyOGJhY2Q5YTE3MDUyNTM2YThjMTE2MmZkNzIwMjYzNjE3ZGNkMGY5MDVjMjNmNzU0YjNhZTMzMmE1NGEifQ"
         }
       ]
     },
@@ -231,30 +231,16 @@
       ]
     },
     {
-      "id": "claim_f0df238d71ce4acd889793e5c1d50618",
-      "statement": "打包之前设有一道生成资产门禁：git status --porcelain -- SigilLoadout/assets/sigils.chara.json 有输出即失败，因为原生编译期已用 gen exclusive 重写过这份入库且随包的数据；检出里没有 .git 时脚本明示跳过该门禁而不假装跑过。",
-      "evidence": [
-        {
-          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L123",
-          "version": "repo-lines-v1:sha256:eff89aa8f4c42483fb8ff3c7b1bcd9ff67f450361c81bcf63c1448b42dd75fe2:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFmYjExZmJjMTI3ZTJiYTljYjkyNzhiZWEzMWM2Y2M1ODM3NjlhMTI4MmIyOTFlOTY1MDk0OWJlMzIxMTllMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTcxMGM5MDQ2N2I3NTVjOGI0N2RhZDFhMzM4ZDIyNzA4YzBhZmM2YWMyMDAwMTdmOTdlYTI4OTEwYmNkYTUxMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
-        },
-        {
-          "resource": "repo://tools/build-release.ps1#L348-L363",
-          "version": "repo-lines-v1:sha256:806d709e93dc371ffa55a71e4e2c6b1b3519d6be5051c61773faa061d6c3bfd3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyOWQwZGNkMzlmN2MyODk3N2IwYzFkNmJmOGQ2M2RiZDI4MTE5M2I2YmQ4ZjExOWFmOWNmY2E5MGYxNzZjNzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI0ZmQ2NzlmZTljYjkyMGQyNTFlODJhOTczZmViYmY3OTMyZWZmMmQ0OTk4NGM0Y2JkM2NkZjc1OWM5MDIwMmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI3ZmVlMzNiZmJmYjlmZjc3MWU3ZWRiY2E2NzllMWM3ZTBjODM0M2Q4ZmJjZmVjM2MzZDA3OGE0NjRiOWI3ZmIifQ"
-        }
-      ]
-    },
-    {
       "id": "claim_f387e52ec4d04177bf45611f30ad249f",
       "statement": "dist\\.build-complete 在打包开始时被删除、且只在全部闸门通过之后写入版本号（无换行），zip 名为 dist\\GBFR-Sigil-Loadout-<版本>.zip（用 Compress-Archive 压缩包目录），脚本最后为开发方便从 dist 启动一次打包出来的工具。",
       "evidence": [
         {
-          "resource": "repo://tools/build-release.ps1#L365-L373",
-          "version": "repo-lines-v1:sha256:1d5ff0b0175526ebc8487431a3e2dfb702c127e11526e58f230642b15c8c27e7:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWVjNDNjOGM4MTNjYjU0Njc3OWI3MDVkYzQyMWIzMDVjOGNiZmZiZWRhYjk0ZmUyMzBiYjczYzI0MGJlM2FmMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFlZWQzZDM4M2QzODBjOTFmZGJkMzYxOGFjMmRjMDM0MDI1ODIxNmYzYzdhMGM2ZDQyOGQ3ZTAzMGYyOTY2MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGE0NTUwNjMzOWJiYmNkMmQxYzU0N2U3N2VjYjg1NzY3ZDM2NzNhZTkxZDNlZGY5YTg3NDQ2MGZlNDZjYmI3YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+          "resource": "repo://tools/build-release.ps1#L346-L354",
+          "version": "repo-lines-v1:sha256:1d5ff0b0175526ebc8487431a3e2dfb702c127e11526e58f230642b15c8c27e7:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWVjNDNjOGM4MTNjYjU0Njc3OWI3MDVkYzQyMWIzMDVjOGNiZmZiZWRhYjk0ZmUyMzBiYjczYzI0MGJlM2FmMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFlZWQzZDM4M2QzODBjOTFmZGJkMzYxOGFjMmRjMDM0MDI1ODIxNmYzYzdhMGM2ZDQyOGQ3ZTAzMGYyOTY2MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjRmZDY3OWZlOWNiOTIwZDI1MWU4MmE5NzNmZWJiZjc5MzJlZmYyZDQ5OTg0YzRjYmQzY2RmNzU5YzkwMjAyZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
         },
         {
           "resource": "repo://tools/build-release.ps1#L43-L49",
-          "version": "repo-lines-v1:sha256:10a94083162649167df8f7783140cd67172ff704d31e45a13f6f5afcc8c8e4ff:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODZjYTZjY2Q1ODkzMzczMTVmNGVhZmM2YjZkYWExMDBjMTZkMzEwNGZlOTE5N2Y4ZTA5MWQzOGEwNmIyNzFiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDYwMWViMGFkYTAzNmNkOWU5ZWYzNDNmOGM1Y2VlNmI4NTI3NTlkZmFhOTYyNzUwZmU0NTllZWZlMDZlYzA4OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGY4ZjIzNWExMTcwMTljMzM4MzkxN2E0NTY4NTY5ZmUyOTdjNDE5YjNiYTIzZmRkN2YwNDdjMTE1ZWIxMWQxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGI0Y2Q3ZTY1ZjExZGM3NDc0NGI3MjkzZmIyYjIxY2ZhM2UzZmJiMjE5YWNhOTgyM2ViODA2ZTQ2NTlmOGI0OCJ9"
+          "version": "repo-lines-v1:sha256:10a94083162649167df8f7783140cd67172ff704d31e45a13f6f5afcc8c8e4ff:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODZjYTZjY2Q1ODkzMzczMTVmNGVhZmM2YjZkYWExMDBjMTZkMzEwNGZlOTE5N2Y4ZTA5MWQzOGEwNmIyNzFiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDYwMWViMGFkYTAzNmNkOWU5ZWYzNDNmOGM1Y2VlNmI4NTI3NTlkZmFhOTYyNzUwZmU0NTllZWZlMDZlYzA4OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGY4ZjIzNWExMTcwMTljMzM4MzkxN2E0NTY4NTY5ZmUyOTdjNDE5YjNiYTIzZmRkN2YwNDdjMTE1ZWIxMWQxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjQ3OTM2ZTViYzE0OTRlMzM3OWNjYTBlNmI3YjRmMGZhMmQwOGI1ZDM1NjFmMzAyOTViYWY3NThhMWY3ZWYyZiJ9"
         }
       ]
     },
@@ -336,19 +322,19 @@
     },
     {
       "id": "claim_a51f286a4dd1470f81fd29a695c40249",
-      "statement": "两个脚本共用 fail-fast 约定：build-release.ps1 与 deploy.ps1 都设置 $ErrorActionPreference = 'Stop' 并逐条检查外部命令退出码，任一步失败即中止；仅有的三处允许跳过（-race 缺 gcc、未设 GBFR_EXE 的布局回归、无 .git 的生成资产门禁）都在构建侧、且都会明说自己跳过了。",
+      "statement": "两个脚本共用 fail-fast 约定：build-release.ps1 与 deploy.ps1 都设置 $ErrorActionPreference = 'Stop' 并逐条检查外部命令退出码，任一步失败即中止；仅有的两处允许跳过都在构建侧、且都会明说自己跳过了（找不到 gcc 时退回 go test ./... 并打印 gcc not found: tests run without -race (data-race detection skipped).；未设 GBFR_EXE 时打印 layout harness: skipped (set GBFR_EXE to run it).），部署侧没有任何跳过条件。",
       "evidence": [
         {
           "resource": "repo://tools/build-release.ps1#L11-L11",
           "version": "repo-lines-v1:sha256:ea499ab3357adb8fbc492f0c73b154b4ea883a401ee747473106d8d509899b00:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWE0OTlhYjMzNTdhZGI4ZmJjNDkyZjBjNzNiMTU0YjRlYTg4M2E0MDFlZTc0NzQ3MzEwNmQ4ZDUwOTg5OWIwMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWE0OTlhYjMzNTdhZGI4ZmJjNDkyZjBjNzNiMTU0YjRlYTg4M2E0MDFlZTc0NzQ3MzEwNmQ4ZDUwOTg5OWIwMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTBkYzdjMmE5OWRkOGZmNzI3ODg1YTA0NTA0Y2YxNjlkMmY0YjdlNTNhNzQ2YjVlZjhmOGY0NGVkODE3ZTRkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2JjNGM2NGZmZTBmYmVjMWRmYjY5ZWRhMWY2NDRiZGI0MzE1ZmYzNmE5MmRiMGFmN2UxY2JjNTc1MTMwMTJlNiJ9"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L216-L224",
-          "version": "repo-lines-v1:sha256:b6d6f0966564154fd30184e268edac1374a270a30a7c39d6b63b7ee290dc2ce6:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTZhYTZmZjYxNTQxYzViZjliMDE1MjRhMDc0ZWM5MTEzZDJjNWZiNTg1NDNjOTdkZDQ4MzBhYTRjMDA3M2M0YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzU4MTgzMTlkMmIwNDc0ZWQ5NjQ2MTQ3MjQwNjgwN2QwNzNiMGFkMzVhYjlmMjZmMDMwNjU0ZDQzYTRlN2FlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTJjZDRkNDg4NWFlMjA1N2UwMTk1OGEwMmQ1MTIxMDBiMzExM2IwMjg0ZWY3ZWU3ZGEzZmY0NDQzNGVjNmQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2ZmYjBhOWVlZDA2MmQzMGRkMzU3ZmViMDNiZTdhZDdjYzY0YjM5OTZmY2NlYjJmMDdjYzg2MzU2NzA0ZTE0ZiJ9"
+          "resource": "repo://tools/build-release.ps1#L194-L198",
+          "version": "repo-lines-v1:sha256:9035b015d56a3524f2096406a04df0a6c0d731b944d365f89b4f56ba718e8d05:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjUwMzhhNzYyMjg4OGQzYmE3MjU3MzQyODYxZTgxZjQ2Yzk2ZWVhNWU4Y2I1MGRkNzMwMzQ0NGY4MDRjYjBkNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTY2YzdhZGU3ZGYxMTA0ZDJmM2VjY2Q5ZTllOGQ4MjA3M2Q1NDU5MzY3YTk3MGJjZWRmNGIyMTkyZjU5MjgxNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjY2YTczYmI3NTQyN2NkODlmMjk1ZDY4NjY4ZDFiMjAwYWFhZmViYzA0ODY2ODg5Njg3Y2E2MDE3NjdjMDNlZiJ9"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L348-L363",
-          "version": "repo-lines-v1:sha256:806d709e93dc371ffa55a71e4e2c6b1b3519d6be5051c61773faa061d6c3bfd3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyOWQwZGNkMzlmN2MyODk3N2IwYzFkNmJmOGQ2M2RiZDI4MTE5M2I2YmQ4ZjExOWFmOWNmY2E5MGYxNzZjNzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI0ZmQ2NzlmZTljYjkyMGQyNTFlODJhOTczZmViYmY3OTMyZWZmMmQ0OTk4NGM0Y2JkM2NkZjc1OWM5MDIwMmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI3ZmVlMzNiZmJmYjlmZjc3MWU3ZWRiY2E2NzllMWM3ZTBjODM0M2Q4ZmJjZmVjM2MzZDA3OGE0NjRiOWI3ZmIifQ"
+          "resource": "repo://tools/build-release.ps1#L218-L222",
+          "version": "repo-lines-v1:sha256:3400b49172e898bf1e12c37053467f5e3faee5bed98c945c60dd27a930a8160f:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTkwNTQ3MzNiODA2MGI0MmJkZDNmZjU4N2NiNzQ3OWYyM2ZlNGZkYTQ1NWE0OTk3MGE5NGFhNmFjYzRjMDU5MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzU4MTgzMTlkMmIwNDc0ZWQ5NjQ2MTQ3MjQwNjgwN2QwNzNiMGFkMzVhYjlmMjZmMDMwNjU0ZDQzYTRlN2FlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmE3NmRkMzc3NTc0ZjUyNjZiZDYyOTMwNDUzZmM5ZGQyNWY4ODIwOGMxMGI2YzQ5NGNiYjJmZWM1YmNkNDY1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2ZmYjBhOWVlZDA2MmQzMGRkMzU3ZmViMDNiZTdhZDdjYzY0YjM5OTZmY2NlYjJmMDdjYzg2MzU2NzA0ZTE0ZiJ9"
         },
         {
           "resource": "repo://tools/deploy.ps1#L6-L6",
@@ -422,23 +408,23 @@
     },
     {
       "id": "claim_55a1a9e0a1b84a518c840fc5efcecc6a",
-      "statement": "仓库外的 ..\\gen 是不可绕过的硬前置，并且由两处彼此独立的要求构成：数据门禁在缺审阅表或 gen\\main.go 时给出「本仓库无法单独完成一次发布构建」的明确提示并中止；即使绕过它，原生 DLL 也一定编不出来，因为 src\\exclusive_table.inc 是 gitignore 的生成物、被 template_loadout.cpp include，而 vcxproj 的 GenerateExclusiveTable 无 Condition 地编译前生成它——这一条路径没有友好提示，只有 go run 的原始报错。",
+      "statement": "仓库外的 ..\\gen 是条件性的硬前置，两条彼此独立的路径：任何一份随包资产缺失时构建都会要求它（缺 gen\\main.go 的报错明说生成器不在本仓库里，要么把文件补进 SigilLoadout\\assets\\，要么把 gen\\ 放回仓库旁）；而 src\\exclusive_table.inc 是 .gitignore 列着的生成物、被 template_loadout.cpp include，又是 vcxproj 生成目标的声明输出之一——输出缺失必然触发该目标，所以新克隆（没有 .inc）必须有 gen 与机器上的 Go，缺了只有 MSBuild / go run 的原始报错。反过来，若九份资产齐全且两个输出都比 gen 那几个源新，MSBuild 会跳过该目标，这次构建也就不碰 gen。",
       "evidence": [
         {
           "resource": "repo://.gitignore#L15-L16",
           "version": "repo-lines-v1:sha256:ddb59f72a2f421ebc5daa88e78cb4fa358af81c61a630c812e25b15e127e862a:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZjZDMyYTJhMjA5NzFkMzIzZjdjNWRhYTljMjk2MjdhNjgzNjZmODYxMWQ0ZWYxMmFjNjk2NWU0NmFiYjA4ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzgwYmQ5NTFmNDBjZDIyZGFlM2M4ODAyYmFkMWNlMzZkZWI0N2NiMWM5OWUwYWFiYTY0ODA0MWQwOTk1ZjM4NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjlmNWU4ZjQ1MGQ2NTk3ZmQ2NGY4ZWRkMGFjNmYwNWE3MDA2MWY3MWIwMzI1YjVlMTJmNzcxNjlmMmU3ZmUyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L123",
-          "version": "repo-lines-v1:sha256:eff89aa8f4c42483fb8ff3c7b1bcd9ff67f450361c81bcf63c1448b42dd75fe2:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmFmYjExZmJjMTI3ZTJiYTljYjkyNzhiZWEzMWM2Y2M1ODM3NjlhMTI4MmIyOTFlOTY1MDk0OWJlMzIxMTllMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTcxMGM5MDQ2N2I3NTVjOGI0N2RhZDFhMzM4ZDIyNzA4YzBhZmM2YWMyMDAwMTdmOTdlYTI4OTEwYmNkYTUxMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L121-L127",
+          "version": "repo-lines-v1:sha256:b70945ae77b20bb0e0dada6b395590754984ce67ac252dc57c8053436b23806b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJlMTk5YTRmZmNkNTFhMDBkYzFjNjY2NmIzMDQ5NGM0YmE3ODhjYzU0M2JkYTA0NTdmZDNiYzJjYzJkMTRlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzdmMGIxOTliMzY0ZTA3OTFjOTFmZGY2MmMwOTU0YTVhZWQ5NDY1YTUxZTQyNzk0M2E0Mzg1NjBjOGUyNzQ0NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
         },
         {
           "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L34-L36",
           "version": "repo-lines-v1:sha256:3425ff7ed8292d8484ffa4dad4ccc91d6d37f72231e64305b7d600ea129a8d5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmEzOTRiZTRhNjRiZTM1OGU5YmNmNWUxZGU4MGE4YjVkYTFhZWVmM2JmMjY2Zjk5MDRhNTljZmUzZjJiY2UwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWYzNmJlMDM5MTc5ZWE1MzEyNDJlOThmN2Q2NjEwNjE4NzIzNjFkMzEyMjBmODZmNGE5ZmYyNmZlZWQzYmFhMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDAzZjU3MTM3MzRkYjZhNzg1NDNhZGQyNzA2YjBkZjNjY2U5MDU1NmY5OGNhZjAyNDM0Yzc1N2VjYjI4NDJkZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTIyM2NlOTU3MDk1YmMxOGMwMTllNmU3MjZmZTE4NTY1NTMzZTQ0ZTlmOTE4OWJmNDk5YjUyZGM4ODNkOWRkYSJ9"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L64-L72",
-          "version": "repo-lines-v1:sha256:497ceebd8151942d1a08d376ce8b3208cca728134cb45f44275630531e8eeefb:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWIyNTdmMjE0Yjg4MTcxOWJmNTk2OTY4MmQ4MjlhYTFjMTJkYTE2NDJmODkzYjUzYTg5OGFmNjg4YTEyMmVlYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGM4M2VlOTgwZGQ0ZDBlZTZjZGNmNjIyMTFjZWZjYWExM2RkZWVlYzA3MWQ5ZjA5ODU1OGYxYWFmYjZjYThiMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTVkMjY2MjlkYTc1NWVjN2M2NzQ4ODhlMjM4NzU3YzAwYWNmY2IxNGY5MmNkMzgxODc5ZTkzNTlmNzljNmJjMiJ9"
+          "resource": "repo://tools/build-release.ps1#L69-L70",
+          "version": "repo-lines-v1:sha256:f07c66e89864bf6ccbcf4d370fed4f62a732d035017469abe3fafe68934105c9:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Q4Yzg3NTliNzlhZDBmNjEwYWQ5ZjU2ZGJjZDY2YmVmMzQ2N2VmMDc1MTY4Yjg1NmMwNmQxMGI1OTUzYjE5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWQ3NmRkOTUzOTI5ZjQxYTAwMWE0NGZiMjQ3ZDdiODk3MGMwMjE0NzViNGU3M2VkNzE5Y2UwZjk5NDY1YWFkNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDA2YzFmZjQxMzExODg5ZDBmZmQzOGNlNTUxOTMyODRlNjJiOWY5OWYwMGZjNTcwYTBlYTA2ZjZjNjQ0ZjhlMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTI3NTUzYzI1MzJiMDQ1MDViMjUxMjMxMzY3YWFhNDk1NDQ3Mjk4MzlkMWNlNjQzZTI5MjE0ZTJjZWQ0ODZkZSJ9"
         }
       ]
     },
@@ -489,8 +475,8 @@
       "statement": "tools\\deploy.ps1 的 -Target 默认值是写死的某台机器上的绝对路径（C:\\Users\\baago\\Desktop\\Reloaded-II\\Mods\\GBFR.SigilLoadout），换机器必须显式传参；deploy.ps1 部署的是解包目录 dist\\GBFR.SigilLoadout，不校验 zip——zip 只是给玩家与发布页的分发形态。",
       "evidence": [
         {
-          "resource": "repo://tools/build-release.ps1#L365-L367",
-          "version": "repo-lines-v1:sha256:03a3c727b3e540d835683a44c3a14321f0b526cafb7a678722861c8306d42ef7:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWVjNDNjOGM4MTNjYjU0Njc3OWI3MDVkYzQyMWIzMDVjOGNiZmZiZWRhYjk0ZmUyMzBiYjczYzI0MGJlM2FmMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjg0M2ZhNDE0MjU2MGUwZGEyYWE1MDkxMDM2ZDFjZjg0Nzk2MGY5MmFhODJiYzJjODdiOGQ0YjI2ZjQxODQxZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGE0NTUwNjMzOWJiYmNkMmQxYzU0N2U3N2VjYjg1NzY3ZDM2NzNhZTkxZDNlZGY5YTg3NDQ2MGZlNDZjYmI3YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM0YTk2ZWFkNjFiMzNmZjIxZjExYWYzNWZkYmEwMDNlN2ZkNGM3NjBiNWY5ZDM5MTU4OTgwNDk1ZDgyMDQ3OSJ9"
+          "resource": "repo://tools/build-release.ps1#L350-L351",
+          "version": "repo-lines-v1:sha256:e73737a9f044ec33f496b657cccc2271832fa849b3fc32eb0fce0950f9388029:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTBiMjZhNjk0ODdhMzU4YTg2ODZkMTZiMDJmYzEyYTYxYmJjNTc1YmQwMmUwNDIwNmRhMTBlNTRmMzc5MzA5ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTMyNjdmYjIyZjVjMzQwYTg1YmM3NDk4YTQ4NzY3NTg2MDhhNGQwNTBkNWQzNjY2NzE5MTU3MWYyN2FmYTI2OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjI5ODMwOWE0ZDY5NDBlODFjY2ZhYmQxZWQzNDAwMWNkYjEwOWM4ODg5MmE0MzM1OTY2OTBjYTIwNWQ2OTBkNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjBlOGNiOWI4MzM2ZDg3YmU4NGVlNDA0MGI4ODgxNDU3ZjQ5ZGExYmU1MzJkYjliNzE5MmU1YWJhMjlkNzUwZCJ9"
         },
         {
           "resource": "repo://tools/deploy.ps1#L12-L15",
@@ -515,10 +501,48 @@
           "version": "repo-lines-v1:sha256:fbe66120632c82e916db9a0fc7e1a88bab4693bc071510e7fe756088b0da7110:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4ZTdhOTcyZTBlNzUwNDk5ZTQzMzFkODEyZjNiMWFmZTZiOGE2MWVmY2NmODUzNWY3ZDljNGY2OWZiN2VmNDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU2OTZiMzA2NzU1NDk5NDMwYmRmZTcwMDk4MDZlMDlhODg4MGU0YTM3OGM3MDAyYjliNmQwYjE5YmU0NDM3NmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjczYmZkMTYyYWRmZDc1MDg4Y2Y4YjIzMTc3ZjU1OTlhOTNmYjExYmNlMDU5MTg0MDk3ODgwMjY5MThkYTI2YzIifQ"
         }
       ]
+    },
+    {
+      "id": "claim_297196d13ec24d45ace18ef92a038298",
+      "statement": "发布链里没有任何「未提交」检查：原生那一步（在 MSBuild 判定过期时）会重写入库且随包的 SigilLoadout\\assets\\sigils.chara.json，而构建对这份文件唯一的机械保证是必需清单里的在场检查——数据源变化引起的重写即使没被提交，也会照常进包并写出完成标记。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L121-L127",
+          "version": "repo-lines-v1:sha256:b70945ae77b20bb0e0dada6b395590754984ce67ac252dc57c8053436b23806b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJlMTk5YTRmZmNkNTFhMDBkYzFjNjY2NmIzMDQ5NGM0YmE3ODhjYzU0M2JkYTA0NTdmZDNiYzJjYzJkMTRlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzdmMGIxOTliMzY0ZTA3OTFjOTFmZGY2MmMwOTU0YTVhZWQ5NDY1YTUxZTQyNzk0M2E0Mzg1NjBjOGUyNzQ0NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
+        },
+        {
+          "resource": "repo://tools/build-release.ps1#L286-L308",
+          "version": "repo-lines-v1:sha256:ea30fc64a1100d7f1c6b961df8f96bbcbef443d12cfa1771d34bc122f441897c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4ODk0NDgwMzNhZGQwZDE5ZjkxMWNlOTJmNTUzN2E1ZWU3NGJkNDExY2VhNjU3NWEzMjJlN2ExNGE3MjRiODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5OGYwZmFiZWJiMTM3MTAzNTRkNjQ0OWQ4NzU3ZTEwN2NkZWNhMWZlNDI1YzJhOTUyYjYzYmFjMDdjZDlmYWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQyNGM5ZGMyODUzNGRlZWQ4YjdhZGFkYzRmZWNkMDZjNTJhZDg0ZTg2MzE1MjNhMTM5NzkyMDM5YzgwZDIwNDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ef485b6132a6423887a51c9e0634cb44",
+      "statement": "vcxproj 的 GenerateExclusiveTable 带 Inputs/Outputs，因此是增量目标：只有声明的五个输入（..\\..\\gen\\main.go 与 gen\\game\\sigils\\ 下的 exclusive.go、sigils.go、json.go，以及 ..\\SigilLoadout\\assets\\sigils.json）中任一个比两个声明输出（src\\exclusive_table.inc、..\\SigilLoadout\\assets\\sigils.chara.json）新、或输出缺失时才会跑 go run . exclusive；跑完还用 Touch 推新两个输出的时间戳，因为 gen 内容未变时不写文件，不推时间戳这个目标就会永远判过期。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L127",
+          "version": "repo-lines-v1:sha256:c888baae3a7996d67db29a3e42858d70983da5852d2876de5c5712a35d179463:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiYzUwOWVlNDkyMTY5Y2M4N2ZhYWM5MzcwYmM1MzBmZjM2NDE5YjkxYzBkNzE0MzBmMDNjY2RkNGQ2NzBjZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5MGUyZmViZWUwMjBlYTM5NjBiZGYwZTFlYWU3ZjEzZDc4NmU5Zjg2NGJkZTZiNWM3OTUyZGM1ODI1YjcyZTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3MTBjOTA0NjdiNzU1YzhiNDdkYWQxYTMzOGQyMjcwOGMwYWZjNmFjMjAwMDE3Zjk3ZWEyODkxMGJjZGE1MTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3OGYyNTBhNWEyYTJjOTJjMjgxYTk3YjUxMzAzNDRkZDlkYjkyNzVjZjBkNGM5ZjhkMWFjYjMzYjg1NzUwMjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8cd5357d27b3427499b1673e976abed8",
+      "statement": "构建与部署在删除或替换包目录之前都会强杀正在运行的 SigilLoadout.exe 并轮询等它真正退出（最长 15 秒）而不是固定延时，理由是工具持有单实例 mutex：与这次关闭赛跑的重启只会激活那个正在死掉的窗口然后自己退出。",
+      "evidence": [
+        {
+          "resource": "repo://tools/build-release.ps1#L249-L261",
+          "version": "repo-lines-v1:sha256:1c49cee60e2663b13eb3b69a1ee86b2ddca7cb270a263f3eae42fc26808146ef:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZhNmNkMGVhOGFlMGY1NmVmODk2MmEyN2UwZWZiZWJlMTk3M2I4MzU0Y2U0Y2M2MmExNGVjY2NjZTY2M2FjNzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0N2Y2NzVjODA3YWNkZDkyMDA2ZTc4NTliNTM2ZTM5YjYwZjJkZmI5NDhhYjhhODA3MGRiNmVkOGIxODAwZjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1Y2YzYzhkZDVjMDI4YmM4YWM1OTdjZmQxZWJhYTdkMzQzYTBjM2VjMzM2MTc4NjU0OTI4NmZlNDFiMjdiMzgifQ"
+        },
+        {
+          "resource": "repo://tools/deploy.ps1#L66-L83",
+          "version": "repo-lines-v1:sha256:814be10da0713ba0fdb2b8193218da35ac847a37da81283c153f6dae6148ccf2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRjYTQ3MjAzMjZkZjJlNmZlOGY2OGI5MTBmZmViODEwZGY3MzYwMTY4ZWRkNjVhZjlmYTY3NGRjMjM0MGM5NWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdhZWM4MDQwZTc1MTVkMTQ1MGRkZDIyNjFlZTkwMDE0MmEzYzQyNzE4NGNiZmU5ZmI0MWQwYWNlMjdjNTg4MzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYWQ2NTQ1ODZkNTUxNGFhOWUwMjA4Y2E5NzU4MDMxOGM5NDMxM2Q1YTcxZjQ2NzczMjdhMTBmNjcyYmJmZmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNmNDM1ODFiZGIyM2Q3NDA2NmE0MmZjZWVjZWU0ZWY5NTZkZjlhZGEzZmM2MzMzMjk3NjFlYWUzMDc5NmFlZmQifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T00:51:14.273Z"
   }
 }

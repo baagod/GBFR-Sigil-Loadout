@@ -1,7 +1,7 @@
 ---
 type: concept
 title: 并发、锁序与生命周期守卫
-description: 这套 mod 不让游戏崩掉的不变量集合：template→selection 的锁序与共享锁读者、thread_local 构建快照为何取代「以 status 地址为键的授权表」、ActiveCallGuard 与拆卸时排空在途 detour、热重建的时间戳闸门与 60 秒冷却、托管侧 250ms 单飞维护拍与两种 mtime 版本门、Go 侧防抖写加原子替换与退出 flush，以及 ABI 边界上的异常与输入守卫。
+description: 这套 mod 不让游戏崩掉的不变量集合：template→selection 的锁序与共享锁读者、thread_local 构建快照为何取代「以 status 地址为键的授权表」、ActiveCallGuard 与拆卸时排空在途 detour、「先置 g_shutting_down 再拆除」的关停顺序、热重建的时间戳闸门与 60 秒冷却、托管侧 250ms 单飞维护拍与两种 mtime 版本门、Go 侧防抖写加原子替换与退出 flush，以及 ABI 边界上的异常与输入守卫。
 tags: [concurrency, locking, lifecycle, thread-local, hot-rebuild, sigil-loadout]
 sources:
   - id: openwiki-source-12f2ddddaa65ce032d15e738
@@ -54,10 +54,10 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
+    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 并发、锁序与生命周期守卫
@@ -110,13 +110,16 @@ flowchart TD
 | --- | --- | --- | --- |
 | `g_runtime_templates`、`g_character_template_index`、`g_exclusive_state` | `g_template_mutex`（`shared_mutex`） | `InitializeRuntimeTemplates`、`ApplyLoadout`（都在 `unique_lock` 下） | detour 的 `TryGetRuntimeSlot`（`shared_lock`，拷值返回） |
 | `g_character_selections` | `g_selection_mutex`（`shared_mutex`） | `InstallDefaultTemplateSelections`（`unique_lock`） | detour 的 `GetSelection`（`shared_lock`，返回数组副本） |
-| `g_latest_context1_status` | `g_party_mutex`（`mutex`） | 游戏线程的 `RememberContext1Status` | `LatestContext1Status`、维护拍的 `RebuildPartyStatusesOnce` |
+| `g_latest_context1_status` | `g_party_mutex`（`mutex`） | 游戏线程的 `RememberContext1Status` | `LatestContext1Status`、`TryClaimRebuildNow` 与 `RebuildPartyStatusesOnce` |
+| `g_runtime_message`（跨 ABI 的那份诊断消息） | `g_message_mutex`（`mutex`） | `SetRuntimeMessage`（初始化各阶段、装机失败的收尾、以及 detour 里贡献结算那一格；先锁外 `Log`、再在 `scoped_lock` 下替换字符串） | `GBFR20_CopyRuntimeMessage`（锁内拷成局部 `std::string`，锁外写进调用方缓冲） |
 | `g_context1_pass_id`、`g_last_game_context1_ms`、`g_last_game_build_ms`、`g_hot_rebuild_not_before_ms`、`g_party_changed_ms`、`g_hot_rebuild_cooldown_until_ms` | `std::atomic`（acquire/release 或 CAS） | 游戏线程的 detour、维护拍的重建循环 | 同上两者 |
 | `g_active_getter_calls` / `g_active_mid_calls` | 原子量，无锁 | 两个 detour 的 `ActiveCallGuard` | 关机排空循环 |
 | `g_tls_build_*` / `g_tls_natural_contribution` / `g_tls_hot_rebuild_build` | `thread_local`，本就不共享 | 同线程的 detour，以及同线程上跑的 `SafeInvokeStatusRebuild` | 同线程的 detour |
 | `g_virtual_slot_count`、`g_hooks_ready`、`g_layout_ready`、`g_shutting_down`、`g_shutdown_complete`、`g_slot_rva` | `std::atomic` | `ApplyLoadout`、`InstallHooks`、`ShutdownHooks`、`GBFR20_Shutdown`、`ResolveTableSlot` | 所有入口的第一道闸 |
 
 读这张表要配一句话：**没有一处会去"等游戏"**。detour 在游戏线程上只做"加共享锁、读、拷值、返回"（规则 2），维护拍的那次重建调用则是**同步**跑在定时器线程上（规则 9），于是"我们什么时候动手"只能靠时间戳推断，而不是靠握手。
+
+`g_message_mutex` 是 detour 自己唯一会取的那把额外锁：贡献结算那一格走 `SetRuntimeMessage`，它只在 `scoped_lock` 下替换一个 `std::string`，不跨越任何游戏调用，也不与 `g_template_mutex` / `g_selection_mutex` / `g_party_mutex` 嵌套——所以"锁内不回到游戏代码"这条不变量在所有路径上都成立。它换来的是一句可信的运行时消息：写者在锁外先 `Log`，读者 `GBFR20_CopyRuntimeMessage` 在锁内拷成局部字符串、锁外再 `memcpy` 给调用方，两边的长度口径由它自己返回（`buffer_size` 为 0 时只问需要多大）。
 
 ## 2. 原生侧：锁序 template → selection
 
@@ -132,6 +135,8 @@ flowchart TD
 `GetSelection` 与 `TryGetRuntimeSlot` 都是"加共享锁 → 找键 → 拷一份值出来 → 返回"，调用方拿到的是副本而不是引用（返回 `std::array`、或写进 `TemplateGemSlot& out`）。`g_runtime_templates` 与 `g_character_selections` 的读者因此可以在游戏线程上并发进入，且不会在持锁期间再进游戏代码。两个函数都顺手把异常挡在自己内部（`noexcept` + `catch (...)`，退化成"没有 gem / 没有选择"并记一行），因为它们的调用点就在 detour 里。
 
 - **违反后果（把游戏拖进锁内）**：detour 持锁期间若回调游戏（分配、日志回调、再进 getter，甚至间接触发一次状态重建），持锁时间就不再由我们控制——游戏线程会在同一把锁上与自己相遇，而一旦那条重入路径需要写档（共享档升独占档），就是标准明确不允许的自锁；即使不死锁，技能构建也会开始等维护拍的写者。
+
+**规则 2 的边界**：别把它读成"detour 里一把锁都不取、一次分配都没有"。贡献结算那一格确实会 `std::format` 出一行消息并去取 `g_message_mutex`（见 §1 表），失败路径也会 `Log`。真正的不变量只有两条：**持 `g_template_mutex` / `g_selection_mutex` 期间绝不回到游戏代码**，以及**任何锁都不跨越游戏调用**。改 detour 时按这两条判，而不是按"钩子里不许有锁"判。
 
 **规则 3：不需要锁的状态就只用原子量或 `thread_local`，不额外加锁；前提是"单写者"或"明确的发布顺序"能被指出来。**
 
@@ -205,6 +210,35 @@ struct ActiveCallGuard {
 
 - **违反后果（钩子留在游戏里）**：用"全都成功之后才置位"的标志门住 Shutdown，失败路径就会把原生钩子留在游戏进程里——字节补丁还在、钩子还在，而 mod 已经认为自己在拆卸。
 
+`DllMain` 的 `DLL_PROCESS_DETACH` 是这条链之外的另一条入口，它只置 `g_shutting_down`：进程正在被拆时能做的安全动作只有让在途 detour 立刻退化成 no-op，剩下的释放交给托管侧的 `Dispose`。
+
+关停的完整顺序只在一处，而且每一步都有先后理由（标志先立、上限字节与钩子再拆、在途调用排空之后才释放最后那几页）：
+
+```mermaid
+sequenceDiagram
+    participant Mod as Mod.Dispose
+    participant Core as NativeCore.Shutdown
+    participant Exp as GBFR20_Shutdown
+    participant SH as ShutdownHooks
+    participant Tear as DisableGameplayHooksAndRestore
+    participant Game as 游戏线程上的 detour
+
+    Mod->>Core: 无条件调用，异常只吞掉、调用不跳过
+    Core->>Exp: GBFR20_Shutdown
+    Exp->>Exp: g_shutdown_complete.exchange 为假时才继续，所以只跑一次
+    Exp->>SH: ShutdownHooks
+    SH->>SH: 先 g_shutting_down 置真，再清 g_hooks_ready
+    SH->>Tear: DisableGameplayHooksAndRestore
+    Tear->>Tear: 只回退当前仍等于扩展值的两条循环上限字节
+    Tear->>Tear: disable mid hook 再 disable inline hook
+    Game-->>Tear: 扩展槽请求当场退化成 no-op，在途调用开始退出
+    Tear->>Tear: 等 g_active_getter_calls 与 g_active_mid_calls 归零，最多 5 秒
+    Tear->>Tear: 归零后才 reset inline hook，mid hook 留到进程退出
+    Tear->>Tear: ResetGameLayout 只清 g_layout_ready
+```
+
+关停时序：置标志 → 还原上限字节 → disable → 排空 → 释放，超时则留在"已 disable、未释放"这一步。
+
 ## 5. 热重建：时间戳闸门与轮次记账
 
 **规则 9：配装改动之后只做两件事——换掉选择（对所有角色），然后对已知的出战角色各重建一次状态。这条路径必须有，因为战斗里游戏自己不会重建角色状态。**
@@ -273,7 +307,19 @@ flowchart TD
 
 定时器回调不串行，上一拍没跑完下一拍就会进来。三个阶段（`LoadoutConfig.Tick`、`SigilEditorFeature.Tick`、`Hotkey.Tick`）各自都只把"漏掉一拍"当成让过去，所以在定时器里统一挡住，不必每处各防一遍。整个回调还套在 `try/catch` 里：维护拍绝不能把进程带走。
 
-- **违反后果（同一拍跑两遍）**：`FileStamp._applied`、`SigilEditorFeature` 的 `_lastAttemptMs` / `_loggedAttemptUtc` / `_retryTable` 都是无锁的普通字段，两个 tick 同时跑就会把同一版当成新版本处理两次，或把"内容属于哪一版"记乱（版本号与候选表配错之后，那一版会被判成"已应用"）。原生侧的两次 `ApplyLoadout` 会在 `g_template_mutex` 上串行，但两次 `PublishTemplateSelections` 会撞在同一个 500ms 节流窗口上，第二次**静默**跳过——界面上连改几下时，真正的重建次数就少一次。
+- **违反后果（同一拍跑两遍）**：`FileStamp._applied`、`SigilEditorFeature` 的 `_lastAttemptMs` / `_loggedAttemptUtc` / `_retryTable` / `_retryTableStamp` 都是无锁的普通字段，两个 tick 同时跑就会把同一版当成新版本处理两次，或把"内容属于哪一版"记乱（版本号与候选表配错之后，那一版会被判成"已应用"）。原生侧的两次 `ApplyLoadout` 会在 `g_template_mutex` 上串行，但两次 `PublishTemplateSelections` 会撞在同一个 500ms 节流窗口上，第二次**静默**跳过——界面上连改几下时，真正的重建次数就少一次。
+
+```mermaid
+flowchart TD
+    T["250 毫秒定时器回调"] --> G{"Interlocked.Exchange 把 _ticking 从 0 换成 1 成功"}
+    G -- "否：上一拍还没跑完" --> S["这一拍让过去，直接返回"]
+    G -- "是" --> P["try：LoadoutConfig.Tick → SigilEditorFeature.Tick → Hotkey.Tick"]
+    P --> C["catch：异常被吞掉，维护拍不带走进程"]
+    C --> F["finally：把 _ticking 置回 0"]
+    F --> N["下一拍可以进来"]
+```
+
+一拍的重入保护：`_ticking` 只允许一个 tick 进入三个阶段，退出时无条件放行，所以"漏掉一拍"是唯一的并发表现。
 
 **规则 12：`FileStamp` 的两种语义不能混用——配装用"认领后处理"（`Changed()`），编辑列表用"确认生效才推进"（`Pending()` + `MarkApplied()`）。**
 
@@ -344,6 +390,8 @@ T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
 - **在 `thread_local` 快照上追加匹配项时，只能加不能减**；`status` 与 `character_hash` 两项缺一不可。
 - **新增取锁路径时先问"它和 template → selection 谁在外层"**；`InstallDefaultTemplateSelections` 是唯一同时持两把锁的地方，别造出第二个反序点。往 `g_template_mutex` 下加新状态时，把"要求调用方持锁"写进函数名或注释（`ReadExclusiveStateLocked` / `ApplyExclusiveSwitchesLocked` 就是这么做的）。
 - **detour 的函数体之外不要动在途计数的语义**：计数只承诺"detour 体还没退出来"，`reset()` 的门槛比它更严（见规则 7 的第三条）。
+- **`g_shutting_down` 必须在任何拆卸动作之前置**：它是让在途 detour 立刻退化成 no-op 的那一半，撤掉它排空循环就只能干等超时；往 `ShutdownHooks` 里插新步骤时，插在标志之后、`DisableGameplayHooksAndRestore` 之前或之内都行，插到标志之前不行。
+- **在 detour 里新增锁之前先问"这把锁会不会跨越一次游戏调用"**：`g_message_mutex` 那种只包住一次字符串替换的可以（它不与另外三把锁嵌套），包住游戏调用的不行——那会把游戏线程拖进我们的锁里。
 - **热重建的闸门只许收紧到被实测证明有必要**：每加一条判据都要知道它会挡掉界面上多少次改动（250ms 与 5 秒的对比就是这么定下来的），每减一条都要说明崩溃窗口为什么不再存在。也不要往"唯一会去动游戏活对象"的那条路径之外再加调用。
 - **注释分叉时以代码为准**：`selection_store.cpp` 顶部注释说"游戏正在建"与 CAS 两条跳过都应静默，代码里前者会记一行。改这块时别照抄注释，也别只改注释了事。
 - **配装与编辑列表的 mtime 门不许互换**：一个要"失败就等下一版"，一个要"失败就下一拍再来"。

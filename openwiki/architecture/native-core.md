@@ -1,7 +1,7 @@
 ---
 type: architecture
 title: 原生核心（C++ DLL）
-description: GBFR.SigilLoadout.Native.dll 的结构与契约：它由托管侧 NativeLibrary.Load 载入（不走 Reloaded-II 的原生 DLL 字段）、构建期依赖仓库外的 gen，以及 ABI v20 的导出面与拒绝码、跨 ABI 类型与内部布局的分界、GuardAbi 异常守卫、Initialize 的阶段链与 fail-closed 回滚、运行期状态量与安全内存访问层。
+description: GBFR.SigilLoadout.Native.dll 的结构与契约：它由托管侧 NativeLibrary.Load 载入（不走 Reloaded-II 的原生 DLL 字段）、编译输入与仓库外生成器 gen 的增量依赖，以及 ABI v20 的导出面与拒绝码、跨 ABI 类型与内部布局的分界、GuardAbi 异常守卫、Initialize 的阶段链与 fail-closed 回滚、运行期状态归属、各翻译单元的分工与安全内存访问层。
 tags: [native-core, abi, fail-closed, sigil-loadout, gameplay-hooks]
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
@@ -44,10 +44,10 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-23T20:50:35.513Z
+    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 原生核心（C++ DLL）
@@ -70,9 +70,39 @@ verified:
 
 这条「谁加载」的选择有一个直接后果：**加载与校验是同一段托管代码**。`GBFR20_GetAbiVersion` 的版本比对与 `EnsureAbiLayout` 的尺寸/偏移对拍排在加载之后、`GBFR20_Initialize` 之前，任一项不符就抛异常、整套钩子不装（fail-closed）；原生侧自己不做任何版本协商，它把契约违例一律表达成「拒绝值 + 一行日志」——这正是下面 `GuardAbi` 那条规则存在的理由。
 
-构建期另有一个仓库外的边界：`GBFR.SigilLoadout.Native.vcxproj` 的 `GenerateExclusiveTable` target 在 `ClCompile` 之前跑 `go run . exclusive -mod "$(MSBuildProjectDirectory)\.."`，工作目录是 `..\..\gen`。专属表（角色 → T1 / T2 / 战气三个槽的 gem 与技能）的**唯一数据源因此在仓库外的 gen**（一个 Go 工程），`src\exclusive_table.inc` 是构建中间产物、由 `.gitignore` 排除，本仓库不放任何生成脚本——改数据要改 gen，没有 gen（或没有 Go）时这一步会让编译直接失败。反过来说，两个头文件里没有任何需要生成的东西：ABI 头与内部布局都得手改。
+### 编译输入与仓库外的生成器
+
+`vcxproj` 的编译输入很短：`src\` 下十个 `.cpp`（`dllmain` / `exports` / `runtime` / `runtime_state` / `layout_resolver` / `table_slot` / `skill_hooks` / `template_loadout` / `selection_store` / `safe_game_access`）加两份 vendored 源码 `third_party\safetyhook.cpp` 与 `third_party\Zydis.c`（以 `CompileAs` C 编）。没有包管理器、没有要还原的外部依赖：safetyhook 与 Zydis 都是随仓库带进来的源码，`third_party` 只是加进 `AdditionalIncludeDirectories`。两处警告抑制是给这两份第三方源码开的——`safetyhook.cpp` 关掉 4834（丢弃 `[[nodiscard]]` 返回值），`Zydis.c` 关掉 4201（无名 struct/union 的非标准扩展）。语言标准是 `stdcpplatest`，另有 `/utf-8 /Zc:threadSafeInit` 与 `MultiProcessorCompilation`。
 
 两个配置（Debug / Release）都定义 `GBFR20_NATIVE_EXPORTS`（决定 `GBFR20_API` 展开成 `dllexport` 还是 `dllimport`），也**都以 `/EHa`**（`ExceptionHandling=Async`）编译——「阶段体抛异常能被记成一条失败行」与 SEH 包裹的安全访问这两条路都以它为前提。
+
+构建期还有一处**仓库之外**的边界。vcxproj 末尾的 `GenerateExclusiveTable` target 排在 `ClCompile` 之前：
+
+```xml
+<Target Name="GenerateExclusiveTable" BeforeTargets="ClCompile"
+        Inputs="$(MSBuildProjectDirectory)\..\..\gen\main.go;$(MSBuildProjectDirectory)\..\..\gen\game\sigils\exclusive.go;$(MSBuildProjectDirectory)\..\..\gen\game\sigils\sigils.go;$(MSBuildProjectDirectory)\..\..\gen\game\sigils\json.go;$(MSBuildProjectDirectory)\..\SigilLoadout\assets\sigils.json"
+        Outputs="$(MSBuildProjectDirectory)\src\exclusive_table.inc;$(MSBuildProjectDirectory)\..\SigilLoadout\assets\sigils.chara.json">
+  <Exec Command="go run . exclusive -mod &quot;$(MSBuildProjectDirectory)\..&quot;" WorkingDirectory="$(MSBuildProjectDirectory)\..\..\gen" />
+  <Touch Files="$(MSBuildProjectDirectory)\src\exclusive_table.inc;$(MSBuildProjectDirectory)\..\SigilLoadout\assets\sigils.chara.json" />
+</Target>
+```
+
+`$(MSBuildProjectDirectory)` 是原生工程目录，所以 `WorkingDirectory` 的 `..\..\gen` 与 `-mod` 指向的仓库根都在**仓库旁边**：`gen` 是一个独立 Go 工程，不在本仓库里。
+
+这个 target 带 `Inputs`/`Outputs`，**只在源比产物新时才跑**（产物缺一个也一样会跑——新克隆必然缺 `.inc`）：
+
+| | 内容 |
+| --- | --- |
+| `Inputs` | `..\..\gen\main.go` 与 `..\..\gen\game\sigils\` 下的 `exclusive.go` / `sigils.go` / `json.go`，加仓库内的 `..\SigilLoadout\assets\sigils.json`。MSBuild 不展开这里的通配符，所以只能逐条列文件 |
+| `Outputs` | `src\exclusive_table.inc`（**不入库**：`.gitignore` 明确列了它，构建中间产物）与 `..\SigilLoadout\assets\sigils.chara.json`（**入库**、随包发布） |
+
+target 尾部那个 `Touch` 是给这套增量判断补的一步：gen 在内容没变时不写文件，产物 mtime 于是永远落后于源、MSBuild 会一直判过期——`Touch` 只推两个产物的时间戳，不动内容。
+
+后果分三层：
+
+- **专属表唯一的真源在仓库外。** 角色 → T1 / T2 / 战气三个槽的 gem 与技能全部由 gen 产出（一个 Go 工程），本仓库里没有任何生成脚本；改数据要去改 gen 的 `game\sigils\exclusive.go`，手改 `src\exclusive_table.inc` 下一次编译就没了。同一条命令还重写随包的 `sigils.chara.json`，所以两份产物的待遇不同（`.inc` 不必提交、`.chara.json` 必须提交），细节见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
+- **这一步必须真的跑成功。** `src\exclusive_table.inc` 被 `template_loadout.cpp` 直接 `#include` 编成 `kCharacterExclusives`，没有它连编译都过不去；缺 `gen`（那个 `Exec` 连工作目录都不存在）或缺 Go 工具链时，这里只有 `go run` 的原始报错，编译就此中断。
+- **头文件与它无关。** 两个头文件里没有任何需要生成的东西：ABI 头与内部布局都得手改。
 
 ## ABI v20 导出面
 
@@ -189,12 +219,14 @@ flowchart TD
     F3 --> Z2["返回 0：循环上限字节与已装钩子已回滚"]
 ```
 
+`Initialize` 的阶段链：两个前置门失败即返回 0，表槽解析与钩子安装互不相干。
+
 各阶段的落点：
 
 - **executable-validation**：路径解析不到、或文件名不是 `granblue_fantasy_relink.exe`（`_wcsicmp`，大小写不敏感）就退出。这是唯一对外部环境做校验的阶段。
 - **semantic-layout-resolution**：`ResolveGameLayout()` 失败走 `FailResolution`——`ResetGameLayout()` 只清 `g_layout_ready`（不动那份已发布的结构体），写一条运行消息说明"钩子未安装、持久化的因子选择未被改动"，然后返回 0。整条链上**没有第二处**可以改游戏字节。
 - **template-selection-install**：装内置模板与默认选择，失败路径不存在（数据是编译进来的），阶段行固定为 `complete`。此处钩子还没装，所以 `PublishTemplateSelections` 只发布选择、不排状态重建。
-- **ResolveTableSlot**：刻意排在 `InstallHooks()` **之前**——safetyhook 会改写 `.text`，而槽发布锚点要用没被改写的字节匹配。它成功与否只影响热应用能否写活表（失败 = 之后只会拒写 -2），所以失败只记日志、不拿它当门。
+- **ResolveTableSlot**：刻意排在 `InstallHooks()` **之前**——safetyhook 会改写 `.text`，而槽发布锚点要用没被改写的字节匹配。它成功与否只影响热应用能否写活表（失败 = 之后只会拒写 -2），所以失败只记日志、不拿它当门。**表槽与钩子的成败因此互相独立**：钩子装好了而槽没解出来（或反过来）都是合法结局，前者只让热应用持续拿 -2。
 - **native-hook-install**：见下。
 
 ### InstallHooks 的四个子阶段与统一回滚
@@ -216,6 +248,8 @@ flowchart TD
     X --> Y["刻意不 reset g_skill_fetch_hook：stub 在 detour 返回后还要执行收尾指令"]
     Y --> Q["ResetGameLayout 只清 g_layout_ready"]
 ```
+
+拆卸与关停的顺序：每一步都是为了让下一步不会踩到还在执行的内存。
 
 顺序上的两个讲究，都是"换个顺序就会崩"的那种：
 
@@ -245,6 +279,28 @@ flowchart TD
 | detour 在途计数 | `ActiveCallGuard` 读写 `g_active_getter_calls` / `g_active_mid_calls`；TLS 快照 `g_tls_*` | 拆卸时排空；TLS 用来保证"一次构建用同一套槽位" |
 
 **虚拟槽计数的发布顺序**是一条不变量：`ApplyLoadout` 先把新计数 store 进 `g_virtual_slot_count`，再拓宽游戏的两条循环上限字节，因为 detour 按这个计数给虚拟槽设闸，它必须已经与游戏线程下一轮循环看到的补丁一致；上限字节写失败就把计数回滚成上一次的值。
+
+## 每个翻译单元一行职责
+
+「谁拥有哪份全局状态」与「谁负责哪类游戏交互」在这份代码里是同一个划分：**一个关注点一个 `.cpp`，它的全局量就定义在那个文件里**（`native_internal.h` 只放 `extern` 声明与跨文件契约）。改东西时先按这张表找文件：
+
+| 翻译单元 | 它拥有的东西 |
+| --- | --- |
+| `dllmain.cpp` | 只有 `DllMain`：ATTACH 时 `DisableThreadLibraryCalls`，DETACH 时置 `g_shutting_down`；不拆钩子、不含别的逻辑 |
+| `exports.cpp` | 七个导出的壳、`GuardAbi`、`SkillStatusRefusalReason`（拒绝码的人话只有这一份）、`ApplyLoadoutEntry` 的三道入口闸 |
+| `runtime.cpp` | 阶段链的编排：`Initialize` 按顺序调用各阶段并逐个计时上报，`EnsureInitialized` 的 `std::call_once`。它**不定义任何状态** |
+| `runtime_state.cpp` | 全部进程级全局量（`g_image_base`、三个就绪/关闭标志、`g_log_callback`、运行消息、`g_virtual_slot_count`）与三个基元 `Log` / `CompleteStartupPhase` / `SetRuntimeMessage` |
+| `layout_resolver.cpp` | PE 视图（`TryBuildImageView` / `TryGetCodeSection` / `IsInWritableImageSection`）、锚点模式与预检字节表（含 `MatchesBytes` 的调用点）、`ResolveGameLayout` / `RevalidateGameLayout` / `ResetGameLayout` 与 `FailResolution` |
+| `table_slot.cpp` | 活表发布槽的锚点与 `g_slot_rva`、`ResolveTableSlot`、`WriteSkillStatusTable` 的 -1..-7 闸顺序与逐行写 |
+| `skill_hooks.cpp` | 两个 detour（`GetGemDataByIndexDetour` / `OnSkillFetch`）、在途计数与 TLS 构建快照、`InstallHooks` 的四个子阶段、两条循环上限字节的写入与条件式还原、`ShutdownHooks` / `DisableGameplayHooksAndRestore` |
+| `template_loadout.cpp` | 模板表 `g_runtime_templates` + 专属开关 `g_exclusive_state` + 下标表、`ApplyLoadout`（计数发布顺序、截断、两半合一的发布）、内置选择填充与 `PublishTemplateSelections` |
+| `selection_store.cpp` | 选择表 `g_character_selections`、队伍/轮次记录（`g_latest_context1_status`、pass_id）与热重建的节流/冷却 |
+| `safe_game_access.cpp` | 游戏内存的全部读写与范围判断（见下），外加 `DecodeRipTarget` 这一份共用的 RIP-rel32 解码 |
+| `exclusive_table.inc` | 不是手写的代码，而是构建期生成的 `kCharacterExclusives` 一行行数据 |
+
+跨文件依赖只有一个方向：`table_slot.cpp` 复用的 PE 视图助手（`TryGetCodeSection` / `IsInWritableImageSection`）由 `layout_resolver.cpp` 提供——**PE 视图的唯一持有者是 `layout_resolver.cpp`**，别在第二个文件里再解析一遍映像。
+
+顺带一条顺序上的约束：`runtime.cpp` 把 `ResolveTableSlot()` 摆在 `InstallHooks()` 之前是刻意的（表槽锚点要用没被 safetyhook 改写过的字节），所以这两件事的成败互不牵连——钩子没装成不影响拒写码，槽没解出也不影响钩子安装。
 
 ## 安全内存访问层（`safe_game_access.cpp`）
 
@@ -281,7 +337,7 @@ flowchart TD
 - **布局相关的东西留在 `layout_resolver.cpp`**：预检字节表与偏移表在那里成对出现，`RevalidateGameLayout` 负责逐字节复验；锚点必须在 safetyhook 改写 `.text` 之前解析。
 - **别把"全内存扫描"加回 `table_slot.cpp`。** 那一版兜底一次都没跑过，而且它证明不了唯一重要的事——"这块缓冲区就是游戏在用的那块"静态证不出来；拒写的代价只是这一局内存不变（编辑在游戏下一次解析或重启后照样生效），而扫描是 5~6 秒的慢路径。
 - **不要给 `GemData` 加导出收发**：它不跨 ABI 是这个文件结构的前提。
-- **专属表不在这个仓库里**：要改数据就去改仓库外 gen 的 `game/sigils/exclusive.go`——`src\exclusive_table.inc` 每次编译前被重新生成，直接改它下一次编译就没了。
+- **专属表不在这个仓库里**：要改数据就去改仓库外 gen 的 `game/sigils/exclusive.go`——`src\exclusive_table.inc` 会在下一次编译时被重新生成，直接改它下一次编译就没了；`Inputs`/`Outputs` 只是省掉没必要的重跑，不是把这个依赖变成可选。
 
 ## 这份代码被验证到什么程度
 
