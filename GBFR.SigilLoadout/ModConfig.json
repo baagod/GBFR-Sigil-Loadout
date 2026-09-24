@@ -2,7 +2,7 @@
     "ModId": "GBFR.SigilLoadout",
     "ModName": "GBFR Sigil Loadout (2.0.5)",
     "ModAuthor": "baagod",
-    "ModVersion": "0.6.0",
+    "ModVersion": "0.6.1",
     "ModDescription": "为全角色预装备因子，不占用游戏本体槽位，无需库存、不写存档。可编辑因子技能参数。Pre-equip Sigils for all characters. No native slot usage, no inventory required, no save modifications. Sigil skill parameters are editable.",
     "ModDll": "GBFR.SigilLoadout.dll",
     "ModIcon": "icon.png",
