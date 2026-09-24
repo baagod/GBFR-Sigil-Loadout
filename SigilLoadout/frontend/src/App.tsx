@@ -3,7 +3,8 @@ import {Button} from "@/components/ui/button"
 import {ButtonGroup} from "@/components/ui/button-group"
 import {Checkbox} from "@/components/ui/checkbox"
 import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
-import {LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
+import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
+import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/shellservice"
 import {messages, type Messages} from "./messages"
 import {LANGS, LANG_LABEL, initialLang, type Lang} from "./lang"
 import {
@@ -176,6 +177,13 @@ export default function App() {
     // 文档语言跟着界面语言走：index.html 里写死的那一个只够第一次渲染，读屏软件看的是这个属性。
     useEffect(() => {
         document.documentElement.lang = lang
+    }, [lang])
+
+    // 托盘那个"退出"是 Windows 画的原生菜单，不在 React 树里，所以要把文案推过去。挂载时也要走一次：
+    // 那一刻才刚知道 loadout.json 里存的是哪一种语言，main.go 里的初始文案只撑到这一刻。
+    // 推失败只是那一条不换，不值得打断界面——这个拒绝没有别的观察者，就地吃掉。
+    useEffect(() => {
+        SetTrayExitLabel(messages[lang].trayExit).catch(() => {})
     }, [lang])
 
     // 显示名按语言取（随包的 sigils.lang.json / chara.lang.json）。取不到名字的条目由

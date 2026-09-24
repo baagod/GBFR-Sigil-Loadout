@@ -2,10 +2,10 @@
 
 派生自 [GBFR Extra Sigil Slots](https://github.com/cajoxorize366-oss/GBFR-Extra-Sigil-Slots) 的《碧蓝幻想：Relink》因子配装 mod：**为全角色预装备因子**，不占用游戏本体槽位，无需库存、不写存档。可编辑 **因子技能** 参数。
 
-> **AI 辅助开发声明**：本 mod 由 AI 助手在人类指导下进行编写与 wiki 生成。
-> 
-> mod 不修改任何游戏本体文件，数据仅从归档读出，写进内存，不改存档。
-> 
+> **AI 辅助开发声明：**
+>
+> 本 mod 由 AI 助手在人类指导下进行编写与 wiki 生成。mod 不修改任何游戏本体文件，数据仅从归档读出，写进内存，不改存档。
+>
 > **仅供单机使用。请合理使用，切勿破坏他人游戏体验。**
 
 **下载**：[Nexus 页面](https://www.nexusmods.com/granbluefantasyrelink/mods/823) / [GitHub Release](https://github.com/baagod/GBFR-Sigil-Loadout/releases)

@@ -52,6 +52,12 @@ func main() {
 	// 两个 service 的防抖都住在实例里，所以关闭钩子要的正是同一个实例（见下面两个 OnShutdown）。
 	loadoutService := &LoadoutService{}
 	editService := &EditService{}
+	// 外壳（窗口显隐与托盘）跟载荷数据无关，自成一体（见 shellservice.go）。托盘菜单在这里就造：
+	// NewMenu / NewMenuItem 只碰包内一张表、不碰 globalApplication，所以能在 application.New() 之前造；
+	// "退出"那一条随结构体一起给出，exit 不可能为 nil。文案先用英文——前端要等 WebView 起来、读完
+	// loadout.json 才知道是哪一种语言（见 SetTrayExitLabel），托盘在那之前就可能被右键了。
+	menu := application.NewMenu()
+	shellService := &ShellService{exit: menu.Add("Exit").OnClick(func(*application.Context) { app.Quit() })}
 
 	app = application.New(application.Options{
 		Name: "SigilLoadout",
@@ -59,6 +65,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(loadoutService),
 			application.NewService(editService),
+			application.NewService(shellService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -99,8 +106,6 @@ func main() {
 	tray.AttachWindow(win)
 
 	tray.OnClick(func() { go trayOnClick() })
-	menu := application.NewMenu()
-	menu.Add("Exit").OnClick(func(*application.Context) { app.Quit() })
 	tray.SetMenu(menu)
 	// 这里刻意不调 tray.Show()：app.Run() 之前 SystemTray 的 impl 还是 nil，Show() 立刻返回。
 

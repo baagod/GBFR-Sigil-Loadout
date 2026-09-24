@@ -18,12 +18,6 @@ type LoadoutService struct {
 	writer debouncedWriter[[]byte]
 }
 
-// 由工具自己的热键调用，好让游戏内热键一按就把窗口收回来；X 按钮走 main.go 的 WndProc 拦截器
-// 直接假隐藏。
-func (s *LoadoutService) MinimiseApp() {
-	hideToTray()
-}
-
 type loadoutItem struct {
 	Gem   string `json:"gem"`  // items[0]: gem（物品）的 hash
 	Hash  string `json:"hash"` // items[0]: 该物品给的主技能；items[1]: 副技能
