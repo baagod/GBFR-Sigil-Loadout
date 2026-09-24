@@ -17,7 +17,7 @@ const mutexName = "Local\\GBFRSigilLoadout"
 // fakeHide 必须 post 到 UI 线程：SetForegroundWindow 等的是窗口自身线程，而它正阻塞在这个调用里。
 const wmFakeHide = 0x8011
 
-// 由托盘与"工具没开"的兜底 post 的激活命令：显示/还原/聚焦（C# 侧也 post 同一个值）。
+// 由托盘与"工具没开"的兜底 post 的激活命令：显示/还原/聚焦。只有工具自己发它（mod 侧不发）。
 const wmActivate = 0x8010
 
 // 由游戏内热键 post 的开关命令：工具可见就收、不可见就呼出（状态在 windowstate.go 的 toolHidden）。
@@ -83,8 +83,8 @@ func debugf(format string, args ...any) {
 	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
 }
 
-// 直接打开工具时（没有 0x8010 召唤，什么都没记住）得自己挑一个把焦点还回去的窗口：Windows 会把
-// 隐藏/禁用的窗口继续当作前台窗口，所以只能沿 Z 序往下找（找不到返回 0）。
+// nextForegroundWindow 沿 Z 序往下找"焦点该还回去的窗口"（找不到返回 0）。
+// Windows 会把隐藏/禁用的窗口继续当作前台窗口，所以只能这么找。
 func nextForegroundWindow(hwnd uintptr) uintptr {
 	next := hwnd
 	for range 16 {

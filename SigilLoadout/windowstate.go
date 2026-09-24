@@ -37,7 +37,6 @@ func hideNow(hwnd uintptr) {
 	procSetLayeredWindowAttributes.Call(hwnd, 0, 0, 0x2)
 	// 必须在禁用窗口之前先还回焦点：EnableWindow(FALSE) 会同步移走焦点，之后再想设置前台就没有权限了。
 	target := returnFocusTo.Swap(0)
-	summoned := target != 0
 	if target == 0 {
 		target = nextForegroundWindow(hwnd)
 	}
@@ -47,8 +46,9 @@ func hideNow(hwnd uintptr) {
 			ret, _, err := procSetForegroundWindow.Call(target)
 			debugf("  SetForegroundWindow(%d) ret=%d err=%v fgNow=%d", target, ret, err, foregroundWindow())
 			// 游戏把光标停在那里，只在下一记鼠标按下时才隐藏，所以焦点变化后的第一下点击会被吞掉
-			// （游戏内实测）。只在工具是被游戏召唤出来的时重放这一击——直接打开的工具从不注入。
-			if ret != 0 && summoned && isGameWindow(target) {
+			// ( 游戏内实测 )。判据就是"焦点真的交回给了游戏"：target 由 Z 序兜底找来也一样，
+			// 注入本来只可能打进游戏，而游戏接下来必定吞掉第一击。
+			if ret != 0 && isGameWindow(target) {
 				go func() {
 					// 先给游戏一点时间处理焦点变化，然后按住这么久：轮询会漏掉零长度的点击，1ms 又太短。
 					time.Sleep(20 * time.Millisecond)
@@ -78,12 +78,39 @@ func revealTool(hwnd uintptr) {
 }
 
 func hideToTray() {
+	// 与热键那条路共用同一个 hideNow，所以两条路各留一行日志。
+	debugf("hideToTray (frontend Esc/X)")
 	if hwnd := findToolWindow(); hwnd != 0 {
 		fakeHide(hwnd)
 	}
 }
 
-// 0x8010（托盘 / 游戏内热键 / 第二个实例）是唯一的激活命令。
+// toggleAction 是一记开关命令该做的事。
+type toggleAction int
+
+const (
+	// actionIgnore：在无关的程序里按的，工具不动。
+	actionIgnore toggleAction = iota
+	// actionHide：工具就在用户手上，收起来。
+	actionHide
+	// actionReveal：放行的其余情形，拿出来。
+	actionReveal
+)
+
+// toggleActionFor 报告这一记开关该做什么。放行只有两种情形：工具自己被激活、游戏在前台。
+// 其余（别的程序在前台、工具躺在托盘里）不动——F1 是裸键，不该在无关的地方把工具弹出来。
+func toggleActionFor(hidden, selfForeground, gameForeground bool) toggleAction {
+	switch {
+	case !hidden && selfForeground:
+		return actionHide
+	case selfForeground || gameForeground:
+		return actionReveal
+	default:
+		return actionIgnore
+	}
+}
+
+// 0x8010（托盘 / 第二个实例）是唯一的激活命令。
 func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 	if win == nil {
 		return 0, false
@@ -101,16 +128,28 @@ func handleWndMsg(hwnd uintptr, msg uint32, _, _ uintptr) (uintptr, bool) {
 		hideNow(hwnd)
 		return 0, true
 	case wmToggle: // 焦点两边各自处理——显出时工具抢前台，收起时还给游戏。
-		if prev := foregroundWindow(); prev != 0 && prev != hwnd {
+		// rf = 打的是**存值之前**的 returnFocusTo；存不存由 fg 决定（fg == hwnd 就不存）。
+		prev := foregroundWindow()
+		hidden := toolHidden.Load()
+		selfFront := prev == hwnd
+		gameFront := isGameWindow(prev)
+		action := toggleActionFor(hidden, selfFront, gameFront)
+		debugf("wmToggle hwnd=%d fg=%d hidden=%v rf=%d game=%v -> %v",
+			hwnd, prev, hidden, returnFocusTo.Load(), gameFront, action)
+		if action == actionIgnore {
+			return 0, true
+		}
+		// 在工具抢走焦点之前记下前台窗口，好让 fakeHide 还回去。
+		if prev != 0 && !selfFront {
 			returnFocusTo.Store(prev)
 		}
-		if toolHidden.Load() {
+		if action == actionHide {
+			fakeHide(hwnd)
+		} else {
 			revealTool(hwnd)
 			win.Restore()
 			win.Show()
 			win.Focus()
-		} else {
-			fakeHide(hwnd)
 		}
 		return 0, true
 	case wmActivate:

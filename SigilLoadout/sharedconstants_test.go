@@ -115,13 +115,6 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			},
 		},
 		{
-			name: "激活 / 显示消息（WM_APP+0x10）",
-			decls: []decl{
-				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`WmActivate = (0x[0-9A-Fa-f]+)`)},
-				{"Go", "*.go", regexp.MustCompile(`const wmActivate = (0x[0-9A-Fa-f]+)`)},
-			},
-		},
-		{
 			name: "游戏内热键的开关消息（WM_APP+0x12）",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`WmToggle = (0x[0-9A-Fa-f]+)`)},
