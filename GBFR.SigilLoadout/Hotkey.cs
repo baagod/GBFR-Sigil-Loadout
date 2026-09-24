@@ -86,6 +86,9 @@ internal static class Hotkey {
     private static Thread? _hotkeyThread;
     private static volatile IntPtr _messageWindow;
     private static volatile bool _hotKeyRegistered;
+    // 上一次算出来的期望态：只有它变才动注册状态（否则注册失败会每个维护拍重试 + 刷日志）。
+    // 只在热键线程上读写，所以不需要 volatile。
+    private static bool _wantRegistered;
     private static volatile bool _threadExit;
     private static volatile int _virtualKey = -1;
     private static string _modDirectory = "";
@@ -134,8 +137,7 @@ internal static class Hotkey {
             _log?.Invoke("Hotkey message window creation failed; fallback polling active.");
             return;
         }
-        // 句柄先发布出去：同步请求（Tick 每个维护拍发一条）要能找得到它。注册与否不在这里定——
-        // 只有"前台是我们自己"时才注册，见 SyncRegistration。
+        // 句柄要先发布：Tick 每个维护拍会往它发同步请求；注册与否不在这里定（见 SyncRegistration）。
         _messageWindow = hwnd;
         SyncRegistration();
 
@@ -163,6 +165,7 @@ internal static class Hotkey {
         }
         UnregisterHotKey(hwnd, HotkeyId);
         _hotKeyRegistered = false;
+        _wantRegistered = false;
         // 窗口是循环建的，所以也由它销毁：关停时 join 超时绝不能把消息窗口漏掉
         // （关停路径从不跨线程碰它）。
         DestroyWindow(hwnd);
@@ -228,14 +231,21 @@ internal static class Hotkey {
     /// RegisterHotKey 注册的裸键是**全局独占**的：只要注册着，别的程序就再也收不到这个键。所以只在
     /// 游戏（本进程）或工具自己是前台时才注册——那段时间别的程序本来也没有焦点；一旦切走就立刻放开，
     /// 把键还给它们。
+    ///
+    /// 只在**期望态变化**时动手：否则注册失败（键被别的程序占着）会变成每个维护拍重试一次、每个维护拍
+    /// 刷一条日志。
+    ///
+    /// 注意这条判据与工具侧的放行条件（windowstate.go 的 toggleActionFor）**是同一个条件**，只是工具
+    /// 晚 ≤250ms 看到它：这里管"键归谁"，那里管"按下去做什么"。两侧都不能省。
     /// </summary>
     private static void SyncRegistration() {
         IntPtr hwnd = _messageWindow;
         if (hwnd == IntPtr.Zero)
             return;
         bool want = GameOrToolIsForeground();
-        if (want == _hotKeyRegistered)
+        if (want == _wantRegistered)
             return;
+        _wantRegistered = want;
         if (!want) {
             UnregisterHotKey(hwnd, HotkeyId);
             _hotKeyRegistered = false;

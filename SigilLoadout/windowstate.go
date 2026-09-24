@@ -89,16 +89,17 @@ func hideToTray() {
 type toggleAction int
 
 const (
-	// actionIgnore：在无关的程序里按的，工具不动。
-	actionIgnore toggleAction = iota
-	// actionHide：工具就在用户手上，收起来。
-	actionHide
-	// actionReveal：放行的其余情形，拿出来。
-	actionReveal
+	actionIgnore toggleAction = iota // 在无关的程序里按的，工具不动
+	actionHide                       // 工具就在用户手上，收起来
+	actionReveal                     // 放行的其余情形，拿出来
 )
 
 // toggleActionFor 报告这一记开关该做什么。放行只有两种情形：工具自己被激活、游戏在前台。
 // 其余（别的程序在前台、工具躺在托盘里）不动——F1 是裸键，不该在无关的地方把工具弹出来。
+//
+// 放行条件与 mod 侧"要不要独占这个键"（Hotkey.cs 的 SyncRegistration）是同一个条件，只是这里晚
+// ≤250ms 看到它：注册状态最多滞后一拍，这中间用户可能已经切走。所以这条判据挡的是那一段滞后，
+// 不是冗余，别删。
 func toggleActionFor(hidden, selfForeground, gameForeground bool) toggleAction {
 	switch {
 	case !hidden && selfForeground:
