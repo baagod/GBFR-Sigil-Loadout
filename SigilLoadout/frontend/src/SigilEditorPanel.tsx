@@ -376,21 +376,14 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         isControl,
     };
 
-    // min-w-[888px] 是本页排出来的宽度：外面那一层面板负责横向滚动，所以窗口更窄时列是被
-    // 滚动条推到视野外，而不是被裁掉。
+    // min-w-[888px] 是本页排出来的宽度：外面那一层面板负责横向滚动，
+    // 所以窗口更窄时列是被滚动条推到视野外，而不是被裁掉。
     return (
-        <div className="flex h-full min-h-0 min-w-[888px] flex-col px-5 pt-4 pb-6">
-            {/*
-                列表上方的一条横带：如何从中找到因子，以及语言切换——它一直待在那个角落。
-                下面的一切都归行所有。
-            */}
+        <div className="flex h-full min-h-0 min-w-[888px] flex-col page-padding">
             <div className="flex shrink-0 items-center gap-2 border-b pb-4">
-                {/*
-                    没有标题：搜索框已经说明了这条横带是干什么的，而一个编辑计数会把两件不同的事
-                    ——开着的有哪些、记录一共有几条——混进一个分数里。下面的列表就是整个总目录，
-                    浏览它就是搜索它；输入经过防抖（useDebounced）才到列表，这是两百行列表不会每次
-                    敲键都重建的原因。
-                */}
+                {/* 一个编辑计数会把两件不同的事，开着的有哪些、记录一共有几条，混进一个分数里。
+                    下面的列表就是整个总目录，浏览它就是搜索它；输入经过防抖（useDebounced）才到列表，
+                    这是两百行列表不会每次敲键都重建的原因。*/}
                 <div className="min-w-0 flex-1">
                     <InputGroup>
                         <InputGroupInput
@@ -470,11 +463,9 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                 )}
             </div>
 
-            {/*
-                写入失败值得打断用户——编辑没有落到磁盘上，而原因通常要用户自己处理
-                （sigiledits.json 被别的程序锁住、文件夹不可写）。两种失败都落到这里：立即失败，
-                以及后端推送的防抖失败。
-            */}
+            {/*写入失败值得打断用户——编辑没有落到磁盘上，而原因通常要用户自己处理
+               (sigiledits.json 被别的程序锁住、文件夹不可写)。
+               两种失败都落到这里：立即失败，以及后端推送的防抖失败。*/}
             <AlertDialog
                 open={errorOpen}
                 onOpenChange={setErrorOpen}
@@ -496,6 +487,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     );
 }
 
-/* keepMounted 的一页：memo 住才不会被 App 的重渲染连带（切 Tab 也算）；hover 状态在
-     useRowTooltip 里，不受影响。 */
+/* keepMounted 的一页：memo 住才不会被 App 的重渲染连带（切 Tab 也算）；
+   hover 状态在useRowTooltip 里，不受影响。*/
 export const SigilEditorPanel = memo(SigilEditorPanelBase);

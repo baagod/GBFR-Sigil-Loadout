@@ -223,37 +223,30 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 	}
 }
 
-// TestVirtualSlotCapacityFitsPlayerSlots：原生把 MaxSlots 个通用槽放在 3 个内置专属槽之后；容量不够
-// 不会编译失败，只会让 ApplyLoadout 截断多出来的槽（只有日志会说）。
+// TestVirtualSlotCapacityFitsPlayerSlots：容量不够不会编译失败，只会让 ApplyLoadout 截断多出来的槽
+// （只有日志会说）。三处 MaxSlots 的相等由上面那次对拍负责，所以这里只看原生容不容得下。
 func TestVirtualSlotCapacityFitsPlayerSlots(t *testing.T) {
-	intOf := func(file, pattern string) int {
+	const native = "../GBFR.SigilLoadout.Native/native_internal.h"
+	source, err := os.ReadFile(filepath.FromSlash(native))
+	if err != nil {
+		t.Fatalf("reading %s: %v", native, err)
+	}
+	number := func(pattern string) int {
 		t.Helper()
-		data, err := os.ReadFile(filepath.FromSlash(file))
-		if err != nil {
-			t.Fatalf("reading %s: %v", file, err)
-		}
-		match := regexp.MustCompile(pattern).FindStringSubmatch(string(data))
+		match := regexp.MustCompile(pattern).FindStringSubmatch(string(source))
 		if match == nil {
-			t.Fatalf("%s 里找不到 %s", file, pattern)
+			t.Fatalf("%s 里找不到 %s", native, pattern)
 		}
 		value, err := strconv.Atoi(match[1])
 		if err != nil {
-			t.Fatalf("%s in %s: %v", pattern, file, err)
+			t.Fatalf("%s: %v", pattern, err)
 		}
 		return value
 	}
 
-	const native = "../GBFR.SigilLoadout.Native/native_internal.h"
-	room := intOf(native, `kVirtualSlotCapacity = (\d+)`) -
-		intOf(native, `kBuiltinExclusiveSlotCount = (\d+)`)
-	for _, d := range []struct{ who, file, pattern string }{
-		{"Go", "loadoutservice.go", `const MaxSlots = (\d+)`},
-		{"C#", "../GBFR.SigilLoadout/LoadoutConfig.cs", `MaxSlots = (\d+)`},
-		{"TS", "frontend/src/model.ts", `MAX_SLOTS = (\d+)`},
-	} {
-		if max := intOf(d.file, d.pattern); max > room {
-			t.Errorf("原生只放得下 %d 个通用槽，而 %s 允许 %d 个：多的会被截断，只有日志会说",
-				room, d.who, max)
-		}
+	room := number(`kVirtualSlotCapacity = (\d+)`) -
+		number(`kBuiltinExclusiveSlotCount = (\d+)`)
+	if MaxSlots > room {
+		t.Errorf("原生只放得下 %d 个通用槽，而 MaxSlots = %d：多的会被截断，只有日志会说", room, MaxSlots)
 	}
 }

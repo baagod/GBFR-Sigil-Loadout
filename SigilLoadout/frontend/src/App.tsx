@@ -47,17 +47,21 @@ function failureText(failure: Failure, t: Messages): string {
     }
 }
 
-// 配装那两页共用的滚动盒子：整个面板自己滚，所以每页各留一份滚动位置。
-// 因子编辑不套它——那一页自带内边距与滚动。
-const LOADOUT_PANEL = "min-h-0 flex-1 overflow-y-auto px-4 [scrollbar-gutter:stable]"
+// 行与表头共用的右边距：`pr-4` 是内容与滚动条之间的 16px，
+// `[scrollbar-gutter:stable]` 让滚动条常驻那条沟槽（无论列表是否溢出），
+// 右侧间距于是永远是同一个数。
+const GUTTER = "pr-4 [scrollbar-gutter:stable]"
 
-// 通用页的表头待在滚动盒**外面**，否则下滚时它跟着走。它和行共用一套列，所以滚动条那条沟槽也得
-// 让出来：`overflow-y-hidden` 让它成为滚动容器，`scrollbar-gutter: stable` 才会为它预留——少了
-// 这一步表头会比行宽出一个滚动条，列就对不齐了。
-const LOADOUT_HEADER = "shrink-0 overflow-y-hidden px-4 [scrollbar-gutter:stable]"
+const LOADOUT_FRAME = "flex min-h-0 flex-1 flex-col page-padding"
+
+const LOADOUT_ROWS = `min-h-0 flex-1 overflow-y-auto ${GUTTER}`
+
+// 通用页的表头待在滚动盒**外面**，否则下滚时它跟着走；
+// `overflow-y-hidden` 让它成为滚动容器，沟槽才会为它预留。
+const LOADOUT_HEADER = `shrink-0 overflow-y-hidden ${GUTTER}`
 
 // 每语言的显示名表在 Go 侧只在启动时读一次（main.go 的 loadAssets），之后不再变，所以缓存住：
-// 换语言命中缓存就同步落地，标签与外层文字同一帧换掉——否则要先显示旧名字、等 IPC 回来再跳一次。
+// 换语言命中缓存就同步落地，标签与外层文字同一帧换掉，否则要先显示旧名字、等 IPC 回来再跳一次。
 const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string> }>()
 
 export default function App() {
@@ -354,13 +358,11 @@ export default function App() {
                     </div>
                 )}
                 {/*
-                    配装那两页各自是滚动盒子（见 LOADOUT_PANEL；通用页的表头在它之外，见 LOADOUT_HEADER），
-                    也没有"不在这一页就整块不渲染"的分支。两页都 keepMounted：否则每次切页都要卸载/重挂
-                    10 行 SlotRow（每行两个 Base UI 下拉）——切页于是只剩显示/隐藏，代价是三页启动时都挂上
-                    （专属页 29 行，可忽略）。
+                    两页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow（每行两个 Base UI 下拉）。
+                    切页于是只剩显示/隐藏，代价是三页启动时都挂上（专属页 29 行，可忽略）。
                 */}
-                <TabsPanel value="general" keepMounted className="flex min-h-0 flex-1 flex-col pb-3">
-                    <div className={`${LOADOUT_HEADER} pt-3`}>
+                <TabsPanel value="general" keepMounted className={LOADOUT_FRAME}>
+                    <div className={LOADOUT_HEADER}>
                         <div className={HEADER_ROW}>
                             <div className="pl-0.5 pr-3">
                                 {/* 配置读回来之前不画"全选"：空数组的 every() 是 true，会先勾上再改，看着像闪一下。 */}
@@ -374,20 +376,22 @@ export default function App() {
                         </div>
                     </div>
 
-                    <div className={LOADOUT_PANEL}>
+                    <div className={LOADOUT_ROWS}>
                         {slots.map((slot, row) => (
                             <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
                         ))}
                     </div>
                 </TabsPanel>
-                <TabsPanel value="exclusive" keepMounted className={LOADOUT_PANEL}>
-                    <ExclusivePanel
-                        table={exclusiveTable}
-                        state={exclusiveState}
-                        names={names}
-                        charaNames={charaNames}
-                        onChange={updateExclusive}
-                    />
+                <TabsPanel value="exclusive" keepMounted className={LOADOUT_FRAME}>
+                    <div className={LOADOUT_ROWS}>
+                        <ExclusivePanel
+                            table={exclusiveTable}
+                            state={exclusiveState}
+                            names={names}
+                            charaNames={charaNames}
+                            onChange={updateExclusive}
+                        />
+                    </div>
                 </TabsPanel>
                 {/*
                     keepMounted：这一页的编辑状态活在组件里，而后端落盘要等 500ms 防抖（见

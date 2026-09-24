@@ -157,3 +157,8 @@
             `.skill-rows <数值框的选择器>[data-focus-hold] { @apply bg-muted/50; }`。
         */
 }
+
+/* 三个页签共用的页面内边距 ( 左右=20 上=16 下=24) */
+@utility page-padding {
+    @apply px-5 pt-4 pb-6;
+}

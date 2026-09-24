@@ -114,8 +114,7 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
-  <!-- 两份产物都来自 gen 的 exclusive 子命令；Inputs/Outputs 让 MSBuild 只在源比产物新时才跑它
-       （新克隆没有 .inc 时也会跑）：
+  <!-- Inputs/Outputs 让 MSBuild 只在源比产物新时才跑它（新克隆少了 .inc 时也会跑）：
          src\exclusive_table.inc                     编译输入（#include，不入库）
          ..\SigilLoadout\assets\sigils.chara.json    随包资产（入库）
        Inputs 必须逐条列文件：MSBuild 不展开这里的通配符。 -->
