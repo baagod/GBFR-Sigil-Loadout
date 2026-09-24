@@ -80,12 +80,10 @@ func main() {
 
 	win = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: toolWindowTitle,
-		// Wails v3 的尺寸是整扇窗口外框（含标题栏）的 DIP。最小值取较窄那页的，不是较宽那页的：把下限
-		// 钉在因子编辑页的 888 上，窗口就再也缩不动。低于 888 那页会横向滚动，而不是把列切掉。560 是
-		// 挑的下限、不是量出来的：两页里每个列表都能滚，所以窗口矮了只少几行、不破布局。
-		Width:            888 + 16,
+		// Wails v3 的尺寸是整扇窗口外框（含标题栏）的 DIP：内容再加 16（左右边框）才是外框。
+		Width:            900 + 16,
 		Height:           840,
-		MinWidth:         760 + 16,
+		MinWidth:         900 + 16,
 		MinHeight:        560,
 		URL:              "/",
 		Hidden:           false,

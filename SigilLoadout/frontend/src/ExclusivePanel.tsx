@@ -37,7 +37,7 @@ export function ExclusivePanel({
                         key={e.player}
                         className="flex h-[42px] items-center border-b text-sm last:border-b-0"
                     >
-                        <div className="grid w-full grid-cols-[7rem_1fr_1fr_1fr] items-center gap-x-2">
+                        <div className="grid w-full grid-cols-[142px_1fr_1fr_1fr] items-center gap-x-2">
                             <span className="truncate font-medium">{charaNames[e.player] ?? e.player}</span>
                             {exclusiveSlots(e, names).map(({ skillHash, label }) => (
                                 <label key={skillHash} className="flex min-w-0 items-center gap-1.5">
