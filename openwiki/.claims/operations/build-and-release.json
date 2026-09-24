@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:1cea8b2d000ca44e7f3306443121dd02e939441c87d0f0a5efc146f2ee76ced3",
+  "pageVersion": "sha256:46d668a5552504f16592b2d204cb1484c3802d5616187b8723eadb8199f74e2d",
   "claims": [
     {
       "id": "claim_58a86f97c7cd40a1bc3616f1104514ac",
@@ -539,10 +539,20 @@
           "version": "repo-lines-v1:sha256:814be10da0713ba0fdb2b8193218da35ac847a37da81283c153f6dae6148ccf2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRjYTQ3MjAzMjZkZjJlNmZlOGY2OGI5MTBmZmViODEwZGY3MzYwMTY4ZWRkNjVhZjlmYTY3NGRjMjM0MGM5NWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdhZWM4MDQwZTc1MTVkMTQ1MGRkZDIyNjFlZTkwMDE0MmEzYzQyNzE4NGNiZmU5ZmI0MWQwYWNlMjdjNTg4MzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYWQ2NTQ1ODZkNTUxNGFhOWUwMjA4Y2E5NzU4MDMxOGM5NDMxM2Q1YTcxZjQ2NzczMjdhMTBmNjcyYmJmZmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNmNDM1ODFiZGIyM2Q3NDA2NmE0MmZjZWVjZWU0ZWY5NTZkZjlhZGEzZmM2MzMzMjk3NjFlYWUzMDc5NmFlZmQifQ"
         }
       ]
+    },
+    {
+      "id": "claim_108d01708add4a53b1abc866bb7e40c5",
+      "statement": "GBFR.SigilLoadout.Native.vcxproj 的 GenerateExclusiveTable 目标在注释里声明 Inputs 必须逐条列文件（MSBuild 不在这里展开通配符），所以它的过期判断只覆盖 4 个 gen 源文件路径（main.go、game\\sigils\\exclusive.go、sigils.go、json.go）加 assets\\sigils.json；gen 里新增的源文件不会自动进入这套判断——只改那个新文件不会触发 go run . exclusive 重新生成，必须手工把路径补进 Inputs。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L117-L127",
+          "version": "repo-lines-v1:sha256:c888baae3a7996d67db29a3e42858d70983da5852d2876de5c5712a35d179463:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiYzUwOWVlNDkyMTY5Y2M4N2ZhYWM5MzcwYmM1MzBmZjM2NDE5YjkxYzBkNzE0MzBmMDNjY2RkNGQ2NzBjZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5MGUyZmViZWUwMjBlYTM5NjBiZGYwZTFlYWU3ZjEzZDc4NmU5Zjg2NGJkZTZiNWM3OTUyZGM1ODI1YjcyZTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3MTBjOTA0NjdiNzU1YzhiNDdkYWQxYTMzOGQyMjcwOGMwYWZjNmFjMjAwMDE3Zjk3ZWEyODkxMGJjZGE1MTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3OGYyNTBhNWEyYTJjOTJjMjgxYTk3YjUxMzAzNDRkZDlkYjkyNzVjZjBkNGM5ZjhkMWFjYjMzYjg1NzUwMjMifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

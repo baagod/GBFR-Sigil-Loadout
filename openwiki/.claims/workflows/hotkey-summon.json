@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:3db5401e154d296b9f91b3fb9d2d7e36742af2d467965d9c7e60c712897243ca",
+  "pageVersion": "sha256:443d99c36dcea2db7daa6d30daa9afe48e416cc5f0844d9e67126ef7e363ed0c",
   "claims": [
     {
       "id": "claim_31054e3dab814a3f962d240893b86be0",
@@ -327,10 +327,68 @@
           "version": "repo-lines-v1:sha256:fb859eed16f3e8e30e94f426c1ba43922661777060772a971d3450c0c4d402d2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhNmQyNGI1MTgxMTMyMzBkNDljYTUzNjUwMzUxYjc2ZmE0ZmUxZTU1ODBkYzY5YjBlNWEzZDFmYTI1ZTMyMzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJhNmJjOWNkMmY2YjgzMzFhMmJkMDc4YzRlNDc4ZDMwN2NkMDVjNzViMzUzM2U4YzJkY2VlOTYxOTViMTI1YWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjZjg2OGJlNTI4NDNjZDk1Y2RiMzM3MzViNTliZGU4YzcwNmZlZmQ3YzY2N2ZhOTBiZmY5ZDdlZjYxY2QyNmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUxZmE2ZjIzY2VmYTJhOTU2NWE1NzgyYWU5MGUyMGVjMzllNWE0MzFkNGM3YzE2Nzk3M2M3MDBkZDRhYWQyMDQifQ"
         }
       ]
+    },
+    {
+      "id": "claim_5ff26282a4cc4fc8914bbba3ee2a758a",
+      "statement": "注册成功路径与 250 ms 轮询回退路径对同一颗键的语义不同：注册成功时 key-down 被系统当成热键消费、前台窗口收不到它，按键由消息队列逐次投递所以不丢；回退路径没有任何注册，按键照常送到前台窗口（游戏也会看到同一颗键），mod 只在共用的 250 ms 维护拍上采样 GetAsyncKeyState 的上升沿，所以相邻两拍之间按下又抬起的按键会被整段漏掉且不留日志，采样还要排在同一拍里配装 tick 与因子编辑之后。两端检出之后都走同一个 TryLaunchTool，窗口行为本身没有差别。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L134-L140",
+          "version": "repo-lines-v1:sha256:82d8cb43aa4913607a17088df858c6bc5b737ef5ccbc3dff42339e57848ee4d3:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDg0NzZlZmIwNTc0YWViMWE4MDNiNGEzYzkzYjQyM2MyYTY0MTdkYTc3MTk2YjdkYmQ0MWM5MmQzMmJiZTljZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmI2MjFlNTNjNjY5MTU5ZTRkMzE5Mzc5ZjMxZTFiYmM0MDQ1Nzk2YTA4MmFkNDZmZDZkYjIzNTYyMjk2MTE5ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGNlMjNiMDBjZGU2ZWNlNTljMjFhY2JlYTZhN2Y3OGQyMDJhNWE4ZWNkYTkzMzBhOTc4YWU1NDg5NjYzMDIxMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmEyYjJkNTJmNzZjMDNlN2EwMzcwMjU0ODczZDQwMjcyMzljZWExZjhmN2QyMDZmMGFlODdiMDNhYzE2OTQwNiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L169-L177",
+          "version": "repo-lines-v1:sha256:5d15de4afd1604d3e0095eb6494618de22e45126484ddcde280c6473d4ea0fe2:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2Q1ZWJhMWNmOTA4MGE1ZDczNTM1NmMyNDlmMjhkZjQ0NjkxYWQxN2FkNWE2ZTQ4MjNkNGFjYjQ0NmRlYjVmNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjNhMmRkMGZhZGE4ZmUyZDQzYTExZDMyNGVhN2ZkNDJjYjA3N2NiMDM3NDA4M2Y5ODQ0ZjNlODgwYTNlNmFlYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGQ2M2YzNTY4Zjg0ZDQxZGY4ZGE4ODkwMjAzMTM1ZmM5OGEyMjAwNDZlZDA2YzI0NjIxMjJkYzg1MTRjZjEwZiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L243-L250",
+          "version": "repo-lines-v1:sha256:0fc41ef8d7151d4d56a0b01bc06cbf25877b2e99c67545473b81ba15c86c465b:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjg3NzMwNDU1YTFjZmFjM2I5YzE5ZmJiNWI1NDU1YmU1ZjE2NTQ2MzAyYjRmMmQ2MjdkYzk2NzkyZTdlMmNiZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzgzZTA0YTA1NDhhMDdjZDBmOGI2MWIwMGYzN2ViYmI5MmRjZmVhMjI3NTljMGRkZmI4NWY2NjViMmQ1ZDUwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWI1Mjk1OWQ1MjQ5NjBhNWM2OGIxMjE1OTFiMjMyMDI0NjRmOGMzMGYwNzkwNjU3YWZiZDEwYTE4MDc2NzU4ZCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L101-L121",
+          "version": "repo-lines-v1:sha256:45d9eae2c4ad6e31c282017091bf2f775918ce7744f137315c5f8b68c5a7f050:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkYjllODJjYWU3NDZmMTM1YzdhOGRkYTI5YzJhOTBjMDMxYWJlMGIzYjdjNjUyMjM2NzY0MTI4YjQzZDU2NmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMTgzZTU0NGRiN2VjYjk0Yjg1ODUzMjE0MjU2ZDUzYzk4NmE5YjE3ZTg2YjUzZjEyYjE3Njc0Y2ZmYWMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5MDM5YjVkY2E2ZGQ4MWY1OWQ5OTM4ZjE3ZDZkMDQyY2JkYmIzNzhiYzYyOGUxYWUxNWJjMGQxNzgwODg1MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4NDdmYWMxNGU0NDMxMzA5MGJhYzBkODhjNmEwOWVlNzQ0MGY2OTFhOWIzYjQzYjY2MDU3ZDk2ZGQ0NjM5YjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_136f5b9361294ffaa0486ab01bb68585",
+      "statement": "注入点击的判据 summoned（returnFocusTo 非 0）读的是「上一次是谁把工具召唤出来的」而不是「这一次」：returnFocusTo 只在 hideNow 里被 Swap(0) 取走，0x8010 / 0x8012 的处理又只在「前台窗口非 0 且不是工具自己」时才覆盖它，所以热键从游戏里呼出工具、再按一次收起时取到的仍是那次召唤记下的游戏窗口，这一次同样算被召唤——只要 SetForegroundWindow 成功且目标仍属于游戏，那记光标隐藏点击照旧注入。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L103-L115",
+          "version": "repo-lines-v1:sha256:6d199a46b073ae432477439bb09afbb63f198aa2bd74ced154a96da49250b95d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhNmQyNGI1MTgxMTMyMzBkNDljYTUzNjUwMzUxYjc2ZmE0ZmUxZTU1ODBkYzY5YjBlNWEzZDFmYTI1ZTMyMzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJhNmJjOWNkMmY2YjgzMzFhMmJkMDc4YzRlNDc4ZDMwN2NkMDVjNzViMzUzM2U4YzJkY2VlOTYxOTViMTI1YWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjZjg2OGJlNTI4NDNjZDk1Y2RiMzM3MzViNTliZGU4YzcwNmZlZmQ3YzY2N2ZhOTBiZmY5ZDdlZjYxY2QyNmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4MTc2ZTNhNWFlMmIzMzkxOTgwOTIyMTIwYzk0ZTc4NWVmNzgxOTk3MTQxZjYwMTc4NjVmNjdkYzVkMmExZjAifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L39-L65",
+          "version": "repo-lines-v1:sha256:39037bd2b3ba8c02d0de3663c27f0590c407831f8124b718c4aef567ca5c7711:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4MTNmYTk3ODY5OGVmYTgxODdhNzBiNTM0YjUzNmQ1YmFkNTIxNThlZWM1YzU1YzczNzAyZmUwYmViMTI3N2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRlZmVhNzYwZTlkNmI0MmI5ZTlkZDM0MWIyZmU0NmI5YzdlMzlmMzk2ZGY3NDBmZGFiYjI5NDcwNjMyOWJjOGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJiOWFlYWFmMGU0NDEwOTU4ODI2YzhkNjkwYzYzOTY2MTNhNzcyZTYzYjNkOWE4ZTdkM2NhZTFhN2QyYjMyM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3NzdkZjg1MzRhOTUyYWZlMDUzYzUzNjY4YjgyNWMwM2RiNGZiYWE2YjU5MzI0OTA5MzczZWU1Y2VjNTJmMjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ef756038e5e14485873cd696ea8a87e8",
+      "statement": "工具隐藏自己还有一条不与 mod 通信的内部路径：前端 Esc 在 keyup 之后等 150 ms 调绑定的 MinimiseApp，落到 hideToTray → findToolWindow → fakeHide；WM_CLOSE（标题栏 X 按钮）的处理里调的也是同一个 fakeHide，两条路最后都收敛成向工具自己的 UI 线程 post 0x8011。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L245-L284",
+          "version": "repo-lines-v1:sha256:6773b013479dec4af21767130273524c32b509568f7fb74a5034cdd55edec151:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlNzJhNzg2ZDg1ZTU2ZWRkNTdlODM2NTFmZjQ1NmYyMWY4OTJkNDI1ZDczZWM4NDdiNjM1YTU0N2U5NTE5MzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZjQyMGJkNGZiNzM1NTk3YjBmN2UxOGRhMWIyNjY1ZTM1ODM5ZDJjZDQ2ZDMwZjAxZmVkNzQzMmFkZGVlNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIxNzJkYWIxN2I0ZjRiMjFiNWRhNGRiY2MyZDQzZjRjOGZlOGQzZjRiZDI1NGU5ZmU1NmQ5ZTlkNmUzOWZmYjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiOGJhNDI3ZjBmMWJjYjc1NTJjY2U0ZGUwYzVmODgxZDNjOTY3N2NmNTEwNjg4ZmE3NjlkMTM1YzNkZGVjYzcifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L21-L25",
+          "version": "repo-lines-v1:sha256:f6af244d4a2f909b8d117e36d9d4772e1c4fde05f07fe55ba8005ad03619026a:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjM0NDg1ZGU2NmM1ZjVlOWVmMDcyYzA1ZjZmZGJkMjM0MjFmZDQ5MmUxMmRhOGFjZTg4NWU4NWU0NmMwNWU0MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTE1MzM3ZTMyMzk4ZjkzMTBkYThjMjNlNGQ4NTI3OWMxNTNkYjYwYjI1NzQyM2M3MDI4NzU0NWJhMTEyY2UzOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmMxYTY4YTVjODkxOWUyMDA3MTdmZTVmYzAyNjg2ZWM4ZGI2NjYwZjIzOTBmNGE3YWZlYThhN2RkZWJhOWNjMSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L24-L27",
+          "version": "repo-lines-v1:sha256:2929fe833e1ea0f0e8b1cb4535ded2f4f9c36e4aedfb9268561f4597eaa26594:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDYwMTQ2MWExNTY0Y2FlNjU4Mjc0ODQzMGRjNWJjYmM2NTg4OTk3ZTQwOWY0MDhjNTQyOTZhNTczYWVjMzg3NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTdlZmM0MTUwY2NjZWU4MWE4YzkyYjNiYWEyM2UyOTZlNTFhMTI4Y2Y1OGM3ZWVkZWQxZGM5MmFlOGUyNTVkZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDY4ZWJmNmE0MjkwNGZlYTVhZDIxOTBlNDE5M2NhM2Y1N2NmMTMwNDk1ZTZlZjdiY2Y0ZGJkM2YzNzM3Y2U1OSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L80-L102",
+          "version": "repo-lines-v1:sha256:9c1085423fc99a98f52e3e14b76f7a3f717787f8db629ecf9fb8428c6827b287:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2NGQ5NTcyMTMyMmRmMzIzM2U3ZjljNGZlZTNiN2JlNWUxMDcyNDcwZjNkNzM4YTNkYjAyZTlmYTUwMWYwN2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJhNmJjOWNkMmY2YjgzMzFhMmJkMDc4YzRlNDc4ZDMwN2NkMDVjNzViMzUzM2U4YzJkY2VlOTYxOTViMTI1YWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlMzg0YjU1MzhkYjQ4OGFkYWM3N2IwNDlhNjY5NGFmMzhjMjkzNDAxMGFkYzIyYmUxYjkxOTc4NTQxMWJhZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU3OGEyZjllOWViYzcyODhkOGVkZDM5MTVjMTg5ZjNiZTE1YjhmNjkzZDQ1NTg2ZjE3MGEwYmY4YzMzYTc5MDcifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

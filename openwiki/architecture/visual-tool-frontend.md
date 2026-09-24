@@ -1,11 +1,8 @@
 ---
 type: architecture
 title: 可视工具前端（React）
-description: SigilLoadout\frontend\ 这棵 React 树：三个页签的组件分工、App.tsx 的加载时序与两道「不写盘」门、单一失败通道 Failure、语言切换与 nameCache、model.ts 与 skills.ts 的纯逻辑规则，以及 dist 与 bindings 这两份构建期产物的生成顺序。
+description: SigilLoadout\frontend\ 这棵 React 树：三个页签的分工与 keepMounted 的理由、App.tsx 的加载时序与三道「不写盘」门（loadoutRead、数据表为空、editListRead）、单一失败通道 Failure、编辑到载荷到 Go 绑定的单向流、键盘与焦点两组全局监听、语言与显示名的三层分工，以及 dist 与 bindings 的构建约束与测试边界。
 tags: [architecture, frontend, react, wails, i18n, state]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
 sources:
   - id: openwiki-source-39c3295efc089133e87a9c80
     resource: repo://CONTEXT.md
@@ -73,7 +70,10 @@ sources:
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 可视工具前端（React）
@@ -114,6 +114,7 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
 - **tooltip 归谁（`useRowTooltip`）**：行会在指针底下移动——一次勾选会把打开的内容排到最前——而 `enter`/`leave` 说不出「此刻指针下是哪一行」，所以列表这一层用 `document.elementFromPoint(...).closest("[data-row]")` 问文档，再把答案（`hoveredRow`）交给各行自己去比 `data-row`。两处配套的重放也在这里：Base UI 只在「打开它的那次事件是 mouseenter/mousemove」时才让弹层跟着光标，所以「指针进入」（`onRowPointerEnter`）与「勾选之后重新指向」（`resolveRowUnderPointer`）都要把进入过程在行上重放一遍；而一次勾选会让浏览器把仍然持有焦点的那个勾选框滚回视野，所以勾选之前 `keepScroll()` 记下 `scrollTop`，由同一个 layout effect 放回去。这份状态住在列表上，行只拿它跟自己的 id 比。
 - **方向键与 Esc 归谁**：`SkillPicker` 的触发器在捕获阶段吞掉 `ArrowUp`/`ArrowDown`（Base UI 在触发器上按方向键就会打开列表），方向键才留给字段导航与数值输入框自己的步进；`SkillRow` 的数值框则 `preventDefault` 后自己步进（否则方向键会把光标移到框末尾，在一个可滚动列表上还会顺手把列表也滚了），并把 Esc 定义成 `e.currentTarget.blur()`（外壳那条「Esc 隐藏窗口」因此要把 `.skill-rows input` 当浮层排除，见下一节）。
 - **正在输入的半成品文本暂存在组件里**：一个槽里的一次按键意味着什么、何时提交，由 `skills.ts` 的 `slotEdit` 作为数据返回（`drop` / `half` / `commit`），`SkillRow` 只负责渲染——`half` 的文本进 `halfTyped` 本地 state，`commit` 的 `values` 交上去，`commit.keeps` 让输入框在失焦前继续显示用户敲的那串文本（`0.0`、`0.00` 也是数字，用提交后的数字渲染会把后面输入的内容吃掉）。规则在 `skills.ts`，屏幕上怎么显示在 `SkillRow.tsx`，这条分工本身就是「组件没有单测也不慌」的原因（见「测试边界」一节）。
+- **父行勾选框的三种状态与半选那根横杠**：状态由 `skills.ts` 的 `parentState` 给（按这一行**显示的**等级算，不按记录条数，否则「11 个等级开了 1 个」会被读成全选，半选态永远不出现），而画法只有 DOM 知道：Base UI 的 indicator 永远画对勾，所以半选那根横杠由 `SkillRow.tsx` 自己画（14 单位盒子里的一条 y=7.5 的线，落在像素行中点上才不会发虚），`style.css` 只负责把 `[data-indeterminate]` 的盒子刷成选中态填充并藏掉 indicator 里的 svg。
 
 ## 入口纪律：一条全局监听与一个兜底
 
@@ -169,6 +170,8 @@ sequenceDiagram
 2. **`LoadExclusives` 先发出、最后才 await**：promise 在第一时间创建，`exclusives.catch(() => {})` 当场挂上（否则中间任何一次 await 抛出都会把它变成未处理拒绝），真正的解析与 `setExclusiveTable` 放在第三段。
 3. **三段各自 `try`，各自只写一条失败**：读因子表抛 → `kind: "sigil"`；`applyConfig` 抛 → `kind: "config"`（此时**仍要** `setSlots(padSlots([]))` 把槽位铺满，屏幕上 0 行看起来像什么都没发生）；读专属表抛 → `kind: "exclusive"`。任一段失败都不许挡住后面的段。
 
+加载期还有一处只为观感存在的门：通用配装页表头的「全选」勾选框在 `slots.length === 0` 时不渲染——空数组的 `every()` 是 `true`，配置读回来之前会先勾上、再被真实状态改掉，看起来像闪了一下。
+
 这条 effect 的依赖数组是空的，而且是**刻意不读文案**：失败文案在渲染时由 `failureText(failure, t)` 取，所以没有语言依赖能把「只跑一次」重新触发。
 
 另外两个小的单词 effect 与它分开：`document.documentElement.lang = lang` 跟着语言走；按 `lang` 取显示名（见「显示名」一节）。
@@ -195,7 +198,7 @@ flowchart TD
 
 失败往哪里去：外壳五类失败共用一条状态条，因子编辑页另有自己的对话框。
 
-状态条挂在**页签之外**（外壳那一层，`aria-live="polite"`），因为它是外壳级的通知：切到因子编辑页时，那两个配装页的「没保存成功」不该被静默吞掉。另一半是分工：因子编辑页的读取失败与写入失败走它自己的 `AlertDialog`（读不出编辑列表、`SaveEdits` 当场被拒，以及后端防抖之后才失败、只能以 `GBFR.SigilLoadout.SaveFailed` 事件到达的那一类）。`saveNow` 成功时会顺手清掉之前那条 `kind: "save"`（`setFailure((prev) => (prev?.kind === "save" ? null : prev))`），而读取类失败在会话里保留。注意事件的**唯一订阅者**在那个页面上，而它 `keepMounted`，所以配装那条路的防抖写入失败也复用同一个对话框——配装页自己没有监听者。事件名是**手抄的镜像常量**（`editservice.go` 的 `saveFailedEvent` 与 `SigilEditorPanel.tsx` 的 `SAVE_FAILED` 之间没有任何关联），改名必须同时改两处——Go 侧的 `sharedconstants_test.go` 有一道对拍断言专门盯着这两个字面量（每条声明必须**正好**匹配一次，其中 TS 那一侧是读 `SigilEditorPanel.tsx` 的**源码文本**），所以单边改名是测试红，而不是那个对话框永远不弹。
+状态条挂在**页签之外**（外壳那一层，`aria-live="polite"`），因为它是外壳级的通知：切到因子编辑页时，那两个配装页的「没保存成功」不该被静默吞掉。另一半是分工：因子编辑页的读取失败与写入失败走它自己的 `AlertDialog`（读不出编辑列表、`SaveEdits` 当场被拒，以及后端防抖之后才失败、只能以 `GBFR.SigilLoadout.SaveFailed` 事件到达的那一类）。`saveNow` 成功时会顺手清掉之前那条 `kind: "save"`（`setFailure((prev) => (prev?.kind === "save" ? null : prev))`），而读取类失败在会话里保留。注意事件的**唯一订阅者**在那个页面上，而它 `keepMounted`，所以配装那条路的防抖写入失败也复用同一个对话框——配装页自己没有监听者。那份订阅挂在 `[lang]` 上（`Events.On` 交回的函数就是 React 退出时运行的取消订阅），语言一变就重挂一次，免得对话框的标题停在旧语言上。事件名是**手抄的镜像常量**（`editservice.go` 的 `saveFailedEvent` 与 `SigilEditorPanel.tsx` 的 `SAVE_FAILED` 之间没有任何关联），改名必须同时改两处——Go 侧的 `sharedconstants_test.go` 有一道对拍断言专门盯着这两个字面量（每条声明必须**正好**匹配一次，其中 TS 那一侧是读 `SigilEditorPanel.tsx` 的**源码文本**），所以单边改名是测试红，而不是那个对话框永远不弹。
 
 ### 编辑 → 状态更新 → 构建载荷 → 调 Go 绑定
 
@@ -252,6 +255,8 @@ sequenceDiagram
 ```ts
 onClick={() => { edit({lang: option}) }}
 ```
+
+四个按钮包在一个 `ButtonGroup` 里（`aria-label={t.langSwitch}`、`size="icon-sm"`），选中格用 `default` 变体并补一条 `border-input`（该变体不带边框色，组的外框会断一截），再用行内 `translate: none` / `transition: none` 抵掉按下位移与选中格那 150ms 的淡出淡入——行内样式优先于 class，所以这些覆盖不必去改组件原语。
 
 串起来的后果是跨系统的，必须一次说清：
 
@@ -330,9 +335,9 @@ onClick={() => { edit({lang: option}) }}
 两条理由，两条都是「卸载会丢东西」：
 
 - **配装页**：不 `keepMounted` 的话，每次切页都要卸载/重挂整表 `SlotRow`，而每行带两个 Base UI 下拉——切页于是从「显示/隐藏」变成一次真实的重建。代价是三页在启动时都挂上（专属页每行一个 PL 码，几十行，可忽略）。
-- **因子编辑页**：这一页的编辑状态（`edits` 这个按地址索引的 `Map`）活在组件里，而后端要等 500ms 防抖才落盘。切走就卸载的话，在防抖窗口内切回来会读到**还没写下的旧文件**——屏幕上刚敲的数字消失，随后那份旧列表还会把磁盘上的新值覆盖掉。这一页同时用 `memo` 包住（`export const SigilEditorPanel = memo(SigilEditorPanelBase)`），免得 App 的每次重渲染都连带它。
+- **因子编辑页**：这一页的编辑状态（`edits` 这个按地址索引的 `Map`）活在组件里，而后端要等 500ms 防抖才落盘。切走就卸载的话，在防抖窗口内切回来会读到**还没写下的旧文件**——屏幕上刚敲的数字消失，随后那份旧列表还会把磁盘上的新值覆盖掉。这一页同时用 `memo` 包住（`export const SigilEditorPanel = memo(SigilEditorPanelBase)`），免得 App 的每次重渲染都连带它。页内还有一条同样性质的减速带：搜索框的值经 `useDebounced`（150ms）才进过滤，否则每敲一个键都要重排整张列表（两百行上下）。
 
-与这套滚动盒子配套的外壳规则写在 `style.css`：`html, body { overflow: hidden }`，外壳钉在窗口上，只有列表自己滚。否则一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大可滚动区域，窗口自己的滚动条于是从右边冒出来——它要从视口里拿走宽度，整个外壳被推得向左一跳，等它消失才弹回来。同一层还有两条小规则：`body` 收回 I 形光标、只有 `input, textarea` 显式要回（页面上的文字标签因此不必一个个加 `cursor-default`）；`.skill-rows` 里的勾选框关掉位移动画（勾一下会让那一行移位，组件自带的 transition 会在行已经跳走之后还在填充颜色）。
+与这套滚动盒子配套的外壳规则写在 `style.css`：`html, body { overflow: hidden }`，外壳钉在窗口上，只有列表自己滚。否则一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大可滚动区域，窗口自己的滚动条于是从右边冒出来——它要从视口里拿走宽度，整个外壳被推得向左一跳，等它消失才弹回来。同一层还有两条小规则：`body` 收回 I 形光标、只有 `input, textarea` 显式要回（页面上的文字标签因此不必一个个加 `cursor-default`）；`.skill-rows`（因子编辑页那个滚动盒的 class，也是这一页所有勾选框覆盖规则的作用域）里的勾选框有两条自己的覆盖：关掉位移动画（勾一下会让那一行移位，组件自带的 transition 会在行已经跳走之后还在填充颜色），并给 `:focus-visible` 补一条 `box-shadow: 0 0 0 2px var(--ring)`——焦点环是向外长的，会被容器边缘切掉，所以行在左边留了同样 2px（`ml-0.5`）。
 
 ## 键盘与焦点：两组全局监听
 
@@ -364,6 +369,23 @@ Esc 的两条路：浮层内归浮层，浮层外才把窗口假隐藏，而且�
 ### 失焦时保住聚焦指示
 
 窗口失活那一刻，`:focus` / `:focus-visible` 会被判掉（指示灭），而 DOM 焦点其实还在框里——「切到游戏改完数据再切回来接着输」靠的就是它。所以外壳在 `window` 的 `blur` 上给仍持有焦点的元素挂一个 `data-focus-hold` 属性，在 `focus` 上摘掉（卸载时也摘一次），由 `style.css` 把聚焦指示补齐：
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Win as window
+    participant App as App.tsx 的监听器
+    User->>Win: 切到游戏 窗口失活
+    Win->>App: blur
+    App->>App: 给 document.activeElement 挂 data-focus-hold
+    Note over App: style.css 那条 has 规则把聚焦指示补齐
+    User->>Win: 切回工具
+    Win->>App: focus
+    App->>App: 摘掉 data-focus-hold
+    Note over App: 卸载时也 release 一次
+```
+
+上图：失活时挂属性、激活时摘属性，聚焦指示由 CSS 按属性补齐，而不是靠 `:focus` 伪类。
 
 ```css
 [data-slot="input-group"]:has([data-focus-hold]) { @apply border-ring ring-3 ring-ring/50; }
@@ -464,6 +486,7 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 | Esc 在捕获阶段监听 | 冒泡阶段看到的是已被摘下来的 target，判成不在浮层 |
 | `useWheelStep` 的 `wheel` 监听器必须是原生的、`passive: false` | React 的 `wheel` 是 passive，`preventDefault` 无效：列表跟着滚，而数值也同时变了 |
 | 方向键在下拉触发器上由捕获阶段吞掉 | 聚焦触发器时按一下方向键就打开列表，而不是做字段导航或数值框步进 |
+| 父行的三种勾选态按这一行**显示的**等级算（`parentState`），不按记录条数 | 「11 个等级只开了 1 个」被读成全选，半选态永远不出现 |
 | 文档不滚（`html, body { overflow: hidden }`） | 一个撑大可滚动区域的 tooltip 让窗口自己的滚动条冒出来，整个外壳被推得向左一跳 |
 | 取不到显示名时回落成 hash | 用别的语言的名字冒充当前语言 |
 | `messages` 必须四语齐备（`Record<Lang, Messages>`） | 少一种语言的 `tsc` 就红，不会漏到运行期 |

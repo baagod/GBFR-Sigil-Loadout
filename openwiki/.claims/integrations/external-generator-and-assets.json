@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:df6b8cf3984eba3991065fdf7993020a09378c92332fd353d9fdcbb6844f6fcd",
+  "pageVersion": "sha256:0810313cb39c01c09d40596ea8bca706239f991f0ce98045a44a26b4fee06314",
   "claims": [
     {
       "id": "claim_8595bf5254334998acae44bef4a20b7b",
@@ -256,11 +256,15 @@
     },
     {
       "id": "claim_108793e663dd45a69e629bb678f2e7df",
-      "statement": "九份资产的读者不止可视工具：Go 测试进程由 assets_test.go 的 TestMain 调 loadAssetsFrom(\"assets\") 从源码树装一次（生产路径是 exeDir()\\assets\\，而 go test 进程的 exeDir() 是临时目录，所以 readAssetMap / loadAssetsFrom 都带目录参数当缝），loadoutservice_test.go 与前端 index.test.ts 又直接按相对路径读入库的 sigils.json / sigils.chara.json 当夹具。",
+      "statement": "九份资产的读者不止可视工具：Go 测试进程由 assets_test.go 的 TestMain 调 loadAssetsFrom(\"assets\") 从源码树装一次启动期那七份（生产路径是 exeDir()\\assets\\，而 go test 进程的 exeDir() 是临时目录，所以 readAssetMap / loadAssetsFrom 都带目录参数当缝）；此外 loadoutservice_test.go 直接按相对路径读入库的两份表 assets/sigils.json 与 assets/sigils.chara.json 当夹具，而前端只读一份：index.test.ts 读入库的 ../../assets/sigils.json，exclusive.test.ts 用的是内联夹具、不读入库文件。",
       "evidence": [
         {
           "resource": "repo://SigilLoadout/assets_test.go#L9-L28",
           "version": "repo-lines-v1:sha256:0d8422d4f65826506e35c9073b2caf5e58c2a69b76da089d611fcdb74afdb601:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4ZmU3NDI3NmI5YzkzZmJhZmI2MDFhYzM0ZWZmOTBlNTk0OWE2ZjkwOGEwOWZjMzM2YzlmMWQ3Y2U2MzcyYTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiYjA4YzVhZjUzMGE1NTZkNzdmNzZhZTY3NDI5ZDU0YjU2NWM0NzgzZmIzZWQ0YzNjNjI0OWMwZmEwNDU4Y2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMzZTljYzQ5MGMxMDE3OTYwOGZiMGI1MmViMjZkMDM2NGRiYjM3Zjg0YzMxYjQ1MDhmMzZlNjg3Zjk4YjhiZWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/exclusive.test.ts#L14-L24",
+          "version": "repo-lines-v1:sha256:bd54dc616d09baa8c7fd3efeae16374d86d69a476c6110667c21306e256e1f00:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3YTM1ZmQyZjZkYmY5NzE1NmY2NzNlM2ZmZDE2ZTk3YzZlYjhkNTkyYWVkMGQ2ZjI1MzliODg4MmQ1NDdkN2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE2ZDZiYjlkNzcyMDIxODdkYTgwY2JmN2U0ZTA4NzViYjhmYTY0NjAzNjhmZGFkODY0ZjAxYWI5ZmQ4ZDk2ZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyMmE0NWM2NTMzOWQxYjQxYmVjM2M5ZTlhZDU1MDY5Y2JkNDc5NDgxNTkxMWE4MmVjZmExMjkzNWU2ZDJhNDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQyMGRjNzQ1NjFiYWZhMzBhNDcxYjBlMmJjNGMyZTNmZDhlNDlkOGE1MjY4YWU5NmZlYjVlY2Q0NzRjNTUyMzEifQ"
         },
         {
           "resource": "repo://SigilLoadout/frontend/src/index.test.ts#L5-L24",
@@ -273,6 +277,10 @@
         {
           "resource": "repo://SigilLoadout/loadoutservice_test.go#L291-L296",
           "version": "repo-lines-v1:sha256:419fe1686db2049b1cc37bc2b45a4d2d0d99f90b42cef868fb6d1710b97d23cf:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDJkZGEzZjlkYjA0ZDRlZjViMGFlZmFjYzY4NTMxNWNmM2NjMWM0MWUxMzlmNWQzYzkyMGFlNGM5M2EwYTY5MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjZGE4MmRhNjA2MjM4ZTA1ZTYyMzk5NTY5YzVlZTAzOTkzNDE5NjQ4YWU1ZDQzYTJiZjhjZDYzNDdmODI2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDVkOWQzMGRhOWQxMzYwOTY1ZjJkNDUwYjI3NzE2ZmNlN2I5ZDc3MjM1ODFiNjYxYjE3Yjg0OTFlZGU5NWM5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNkZDFlZWUxYWE2MGE0MjA5N2RlZjYxMDk4ODljNjU3MDE0MzQxMmQ4MWQ4YWQ5ZmVjYzE1YTNkNDdmZmY4OSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice_test.go#L342-L345",
+          "version": "repo-lines-v1:sha256:8a10a628acb3d6f39ee3003e48103793ef8a0540f9f73d369f7bf783bb949619:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmVkMTJjZjEwM2VjMDBkMzNhMjc0Y2RkMTUzYzMyZmFkMWQ0NDRhZDFlZDIzMjcwNzJiOGM3Y2Q4ZTdiZjllMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjBiMWU5ZmU5NjY0MzQ0NWU3ZmM5Yzk4ZmU1Y2JiOTJjYWI1ZDY5YzNmNjQ4NDI0YTMzYzdmMDE2NWE1YzJjNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGMxOGQ0Zjc3MDlmMzIwNjViNDk3YzAxOGViZTQ4NjkxZGQ1ZmY5ZTkyN2VlYWZjZTQ5OGIxMjU2NTFmMjYxNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTM1YjJhZDI2ODUwYzcyNTFlMzA4ZjdkY2EwN2JjMTc4OWIwOGNmYzVlYjJiNGU2MWE2Mzg4Y2Y0NjU5M2U3NCJ9"
         }
       ]
     },
@@ -343,10 +351,46 @@
           "version": "repo-lines-v1:sha256:2e0b040a868a360d5ec1c0ec17a5d437476b02ba0a9e9e6c63f04b733bed4ee3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzM2ZhYmM0OGE0YmZiMzI2Yjc0NDY2YjM4OWE5ZGQwZGU0ZjhiZDcyNzQyMzkzZmY3ZTk5YzFmNzM4ZWNiYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjliM2M1MzU3YThjY2ZkOTZjOWU0NGRlYjIyZjhjZTIxMWRhZjdjNTNjM2MxYmZmYmQyNTUyOGYyMDMwOGRjMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NDIyOGJhY2Q5YTE3MDUyNTM2YThjMTE2MmZkNzIwMjYzNjE3ZGNkMGY5MDVjMjNmNzU0YjNhZTMzMmE1NGEifQ"
         }
       ]
+    },
+    {
+      "id": "claim_afcca58e8fa8458899203f00bb3f22a4",
+      "statement": "随包数据缺失时的启动失败会点名是哪一份：readAssetMap 的错误信息带上完整路径与文件名，main() 把它交给 fatalDialog，后者用 MessageBox 显示「随包数据读不到，工具无法启动」并退出（exe 是 -H windowsgui，没有控制台可看）。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L81-L94",
+          "version": "repo-lines-v1:sha256:b01e2eff61d3d26d22d84bc77e3339b6372382512eb408f3d40dc01b1fce8647:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxZWQ5NGNiN2UzYzhjOWVhZTdjZDIyNjBmNWRhMWQ3YWFjZDUzN2EzZGViYTVmMDQ3MWNhMTA2Yjk0ZjZiOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEwZGZlYmQ0NzY2YzExMWVjYjQ1MzlkYmM3ODJjYThmOWY5OTJlNjdmYzhiY2IwNWRjMWQ4Njc2NThjYTg5MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAzZDVhYTYyOTY1MjUxMTYyM2IzNDk1NjZlNDkxNGNhMDcwOWE5YTJlN2Q5N2UxNjFkZWQ4ZDI2ZmY2NjllYzgifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L44-L50",
+          "version": "repo-lines-v1:sha256:4c3116723df58f1a8a596379678799513a4f7a1788d7f721e6765b04dd601f77:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzE1ZDY0Zjk3MWIyNGY3MDFkMzRjNzdmMTI1YWQ5M2Q3MGI3YjQwYTAyYzAyMzZiMDQ1MzkzZTI0YmY2YjVmZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjZGE4MmRhNjA2MjM4ZTA1ZTYyMzk5NTY5YzVlZTAzOTkzNDE5NjQ4YWU1ZDQzYTJiZjhjZDYzNDdmODI2MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDczOTRlYTE3OTBhNWJhMDE0OTI0M2IwOWE0MDFjMjJhZTNiOGU4ODdmYjAzZDliYmI1NWI5OGI0NGIwMzE0NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWNlZDczNjRkNDI1NGY4YWUyNDY0NTYxZTkzMGQxN2I5ZWNkMTRiNzc1N2JjM2JjNmQ2ZmI3YmU1ODNiMTBiZCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/startup.go#L35-L47",
+          "version": "repo-lines-v1:sha256:457aa322d65f54f5deb487f9ce1e05afb714d1337fdb7d140cb214448ea18ac6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllZWYwY2U1OWRiZTIxNGI1YjVlODRlMWU1NTE2ODFhMTMwMTU1NTIyNzEwNTNiNWRiNWRmMmViOWQxYTUzMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c9ec0d86c4d64a94bbed4d07f1ddd0cd",
+      "statement": "原生侧这条对 gen 的依赖没有任何友好失败包装：目标失败时能看到的就是 MSBuild 对 Exec 的退出码报错与/或 go run 的原始输出，若 .inc 仍未产出则编译停在 template_loadout.cpp 的 #include \"exclusive_table.inc\"（cannot open include file），发布脚本那侧也只把整步报成 Native build failed with exit code <N>.，不补充因果解释。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/GBFR.SigilLoadout.Native.vcxproj#L121-L127",
+          "version": "repo-lines-v1:sha256:b70945ae77b20bb0e0dada6b395590754984ce67ac252dc57c8053436b23806b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJlMTk5YTRmZmNkNTFhMDBkYzFjNjY2NmIzMDQ5NGM0YmE3ODhjYzU0M2JkYTA0NTdmZDNiYzJjYzJkMTRlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkwZTJmZWJlZTAyMGVhMzk2MGJkZjBlMWVhZTdmMTNkNzg2ZTlmODY0YmRlNmI1Yzc5NTJkYzU4MjViNzJlMCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzdmMGIxOTliMzY0ZTA3OTFjOTFmZGY2MmMwOTU0YTVhZWQ5NDY1YTUxZTQyNzk0M2E0Mzg1NjBjOGUyNzQ0NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDc4ZjI1MGE1YTJhMmM5MmMyODFhOTdiNTEzMDM0NGRkOWRiOTI3NWNmMGQ0YzlmOGQxYWNiMzNiODU3NTAyMyJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L34-L36",
+          "version": "repo-lines-v1:sha256:3425ff7ed8292d8484ffa4dad4ccc91d6d37f72231e64305b7d600ea129a8d5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmEzOTRiZTRhNjRiZTM1OGU5YmNmNWUxZGU4MGE4YjVkYTFhZWVmM2JmMjY2Zjk5MDRhNTljZmUzZjJiY2UwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWYzNmJlMDM5MTc5ZWE1MzEyNDJlOThmN2Q2NjEwNjE4NzIzNjFkMzEyMjBmODZmNGE5ZmYyNmZlZWQzYmFhMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDAzZjU3MTM3MzRkYjZhNzg1NDNhZGQyNzA2YjBkZjNjY2U5MDU1NmY5OGNhZjAyNDM0Yzc1N2VjYjI4NDJkZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTIyM2NlOTU3MDk1YmMxOGMwMTllNmU3MjZmZTE4NTY1NTMzZTQ0ZTlmOTE4OWJmNDk5YjUyZGM4ODNkOWRkYSJ9"
+        },
+        {
+          "resource": "repo://tools/build-release.ps1#L104-L112",
+          "version": "repo-lines-v1:sha256:1b8f2ab1007bfea5c5f01847234027f5fdec103cdc915cd4930f6b6532f70b8d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzMzYzAwNGQzYzQ4Mzk1ZWFjZDVkM2ZjOGJlZDkyZjVjY2NkYzM4NjQwNzliYTliOTlhMDM1YTE0NGJkYjY2MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTJhZmMyYzkwZmMxMjBmY2YzNDBhODRhZmZhOGJlMTk1ZDI1M2UzOWFiMzU0MTJiODJlNTEzY2VmZGM2MTEzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTg5MDA2OGEwOGNhNWEyZDVlNTI0ZTRhNDVhMWM4NDI4M2U5NzUxOTEwYzViNmY5NzkyOTZlOTZkMzZhODY3YSJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

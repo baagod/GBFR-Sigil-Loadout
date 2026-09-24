@@ -1,7 +1,7 @@
 ---
 type: workflow
 title: 工作流：配装从界面到游戏状态
-description: 配装改动的端到端链路：前端状态与 buildLoadoutPayload → Wails SaveLoadout 校验 → 500ms 防抖原子写 loadout.json → 托管 250ms 拍的 mtime 门 → ParseAndValidate/ParseExclusiveOverrides → NativeCore.ApplyLoadout → 原生 ApplyLoadout（槽位计数发布、循环上限拓宽、模板重建）→ 发布选择并触发一次状态重建；并逐个跨界点列出失败时的可见后果（保留上一份配置 / 原生拒绝 / 超容量截断），以及"切一次界面语言"同样走这条写盘通路、被版本门认领并整份重新应用这一跨系统后果。
+description: 配装改动的端到端链路：前端 edit 与 buildLoadoutPayload → SaveLoadout 的当场校验与 500ms 防抖原子写 loadout.json → 托管 250ms 维护拍的 mtime 版本门 → ParseAndValidate/ParseExclusiveOverrides → 一次 NativeCore.ApplyLoadout → 原生把通用槽钳到 21、发布槽位计数、拓宽两条技能循环上限、重建模板表 → 发布选择并对已认出队伍尝试一次热重建；并逐个跨界点列出失败时的可见后果（拒写 / 保留上一份配置 / 超容量截断 / 跳过热重建），以及"切一次界面语言"同样走这条写盘通路这一跨系统后果。
 tags: [workflow, loadout, config-contract, mtime-gate, abi, native-core]
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
@@ -36,10 +36,14 @@ sources:
     resource: repo://SigilLoadout/editservice.go
   - id: openwiki-source-49f1f8d8049b397adb1880a2
     resource: repo://SigilLoadout/frontend/src/App.tsx
+  - id: openwiki-source-7fbcbd2efdc35c82bc96784e
+    resource: repo://SigilLoadout/frontend/src/ExclusivePanel.tsx
   - id: openwiki-source-35bfa15a0bffce3055471ebd
     resource: repo://SigilLoadout/frontend/src/index.test.ts
   - id: openwiki-source-798e7a6a1018647de37a73c1
     resource: repo://SigilLoadout/frontend/src/lang.ts
+  - id: openwiki-source-feaf623f526a117e9d09327c
+    resource: repo://SigilLoadout/frontend/src/messages.ts
   - id: openwiki-source-00406d1c826c7d1ff3bde8c3
     resource: repo://SigilLoadout/frontend/src/model.ts
   - id: openwiki-source-d14d5931f805c1b9a18ee717
@@ -56,7 +60,10 @@ sources:
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 工作流：配装从界面到游戏状态
@@ -77,6 +84,7 @@ sequenceDiagram
     participant N as 原生 ApplyLoadout
     participant Game as 游戏状态与选择表
 
+    Note over UI: 配置未读回或数据表未加载 这一下编辑不写盘
     UI->>Go: SaveLoadout 载荷字符串
     Note over UI,Go: 跨界点一 结构或取值不合法就当场返回错误 界面弹一条横幅 磁盘不动
     Go-->>UI: 返回 nil 只表示已进待写
@@ -84,8 +92,8 @@ sequenceDiagram
     Note over Go,F: 跨界点二 写盘失败则待写放回 并推 SaveFailed 事件
     Tick->>F: 每 250ms 比一次 mtime
     Note over Tick,F: 跨界点三 版本没变就不做事 读不出来就保留上一份配置 这一版不再重试
-    Tick->>F: 读文件 只做形状校验
-    Tick->>ABI: 通用槽数组与专属开关
+    Tick->>F: 读文件 只做形状校验与映射
+    Tick->>ABI: 通用槽数组与专属开关 一次调用
     Note over Tick,ABI: 跨界点四 计数越界 关机中 钩子没装好 或内部抛异常都返回 0 整份拒绝
     ABI->>N: 截断到 21 个通用槽后应用
     Note over ABI,N: 拓宽两条循环上限失败则回滚计数并整体返回 0 此时模板表一个字节都没动
@@ -98,7 +106,7 @@ sequenceDiagram
 | # | 跨界点 | 载体 | 这一层怎么"说不" | 用户/日志看见什么 |
 | --- | --- | --- | --- | --- |
 | 一 | 界面 → Go | Wails 绑定 `SaveLoadout(config string) error` | 当场返回 `error`（同步） | 外壳级横幅 `自动保存失败：…`；磁盘上不留任何痕迹 |
-| 二 | Go → 磁盘 | `debouncedWriter` + `writeFileAtomic` | 写盘错误没有调用方可返回 | 工具日志一行 + `GBFR.SigilLoadout.SaveFailed` 事件（前端唯一订阅者在因子编辑页） |
+| 二 | Go → 磁盘 | `debouncedWriter` + `writeFileAtomic` | 写盘错误没有调用方可返回 | 工具日志一行（前缀是提交时的 label `loadout`）+ `GBFR.SigilLoadout.SaveFailed` 事件（前端唯一订阅者在因子编辑页） |
 | 三 | 磁盘 → 托管 | 每 250ms 比 mtime（`FileStamp.Changed`） | 这一版被认领即"处理过了"，不再重试 | mod 日志 `Invalid loadout.json; kept previous configuration: …`，内存里上一份配置继续生效 |
 | 四 | 托管 → 原生 | `GBFR20_ApplyLoadout` 返回 `int32` | 0 = 拒绝（计数越界 / 关机中 / 钩子未就绪 / 循环上限拓宽失败 / `GuardAbi` 兜住的异常） | mod 日志 `Native rejected the custom loadout; kept previous configuration.` |
 | — | 原生 → 游戏 | 选择表 + 热重建 | 不拒绝，只有"截断"与"跳过" | `ApplyLoadout: the request asked for general slots=…` 与 `hot rebuild: skipped (…)` 等日志 |
@@ -114,17 +122,26 @@ sequenceDiagram
 const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveState; lang?: Lang}) => {
     latest.current = {...latest.current, ...patch}
     if (patch.slots) setSlots(patch.slots)
-    ...
+    if (patch.exclusiveState) setExclusiveState(patch.exclusiveState)
+    if (patch.lang) setLang(patch.lang)
     void saveNow()
 }, [saveNow])
 ```
 
-`saveNow` 刻意不带响应式依赖（否则闭包里的值会过期），状态一律从 `latest.current` 读；而 `latest.current` 由 `useLayoutEffect` 在提交后同步刷新。外壳的其余部分（Tab 的 `keepMounted` 策略、托盘与 Esc、窗口失活的焦点处理）与这条链无关，见 [可视工具前端（React 外壳）](/openwiki/architecture/visual-tool-frontend.md)。
+`saveNow` 刻意不带响应式依赖（否则闭包里的值会过期），状态一律从 `latest.current` 读；而 `latest.current` 由 `useLayoutEffect` 在提交后同步刷新。成功时它只清掉自己上一条"保存失败"（`prev?.kind === "save" ? null : prev`），不会碰别的失败横幅。
+
+界面上的每一种编辑都只是构造 `patch`：
+
+- 通用页的每行（`SlotEditor.tsx` 的 `SlotRow`）通过 `updateSlot(row, patch)` 改一行、表头全选框改所有行；
+- 专属页（`ExclusivePanel.tsx`）只报"哪个**玩家码**的哪个技能被切成什么"（`onChange(player, skillHash, value)`），落到文件里的键由 `App` 决定：一次点击要写到共享这个 PL 码的**每个**角色 hash 上（古兰/姬塔共享 PL0000），规则在 `model.ts` 的 `withExclusiveToggle` 里，那里能单独测；
+- 全部文案来自 `messages.ts` 这一张表，四种语言齐备由 `Record<Lang, Messages>` 在编译期保证。
+
+外壳的其余部分（Tab 的 `keepMounted` 策略、托盘与 Esc、窗口失活的焦点处理）与这条链无关，见 [可视工具前端（React 外壳）](/openwiki/architecture/visual-tool-frontend.md)。
 
 两条门决定"什么时候**不**写盘"：
 
-- **`loadoutRead` 之前绝不写盘。** 读配置失败时槽位被铺成 `pad12([])`，此刻交出的载荷会把磁盘上那份完整配置整体替换掉——所以 `saveNow` 的第一行就是 `if (!loadoutRead) return`。自动保存也只由编辑处理器触发，不由 `[slots, lang, exclusiveState]` 这类状态变化触发（旧版本靠一次性旗标赌"哪次状态更新先消费它"，加载期的任何额外 `setState` 都会把启动变成一次写盘）。
-- **数据表没加载好就不写。** `mainKeys` 或 `skillHashes` 为空时给的是横幅 `数据表未加载，无法保存`，而不是一份"所有槽都被跳过"的载荷。
+- **`loadoutRead` 之前绝不写盘。** 读配置失败时槽位被铺成 `padSlots([])`，此刻交出的载荷会把磁盘上那份完整配置整体替换掉——所以 `saveNow` 的第一行就是 `if (!loadoutRead) return`。自动保存也只由编辑处理器触发，不由 `[slots, lang, exclusiveState]` 这类状态变化触发（旧版本靠一次性旗标赌"哪次状态更新先消费它"，加载期的任何额外 `setState` 都会把启动变成一次写盘）。
+- **数据表没加载好就不写。** `index.mainKeys` 或 `index.skillHashes` 为空时给的是横幅 `数据表未加载，无法保存`，而不是一份"所有槽都被跳过"的载荷。这条门是必需的：`loadoutRead` 只盯配置文件本身，`LoadSigils` 读失败时它照样为真，保住这条链的只剩这道表检查。
 
 载荷由 `buildLoadoutPayload(slots, index, lang, exclusive)` 拼出，规则全在它一处：
 
@@ -132,7 +149,7 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 | --- | --- |
 | `mainHash === ""` 的行整行跳过 | 空行不写进文件（`index.test.ts` 钉住） |
 | `index.gemOf(mainHash, secHash, mainGem)` 解析不出物品 hash 时整行跳过 | 空 id 会让 mod 拒掉**整份**文件，所以在源头就丢掉这一行，而不是发出去让下游拒 |
-| `items[0]` 同时写 `gem`（物品 hash）与 `hash`（它给的主技能） | mod 不再持有因子表，主技能只能随载荷走 |
+| `items[0]` 同时写 `gem`（物品 hash）与 `hash`（它给的主技能） | mod 不持有因子表，主技能只能随载荷走；两处缺任一都会在 Go 与 C# 两侧各被拒一次 |
 | `items[1]` 只在有副技能时写，不带 `gem` | 副技能只是一个技能 hash 加等级 |
 | `exclusive` 只有非空时才带上 | 空对象与"没有这个成员"是同一件事（未提到的角色三槽全开） |
 
@@ -162,10 +179,12 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 | --- | --- |
 | 不是 `{lang, slots, exclusive}` 这种形状（例如早期版本的裸数组） | `jsonv2.Unmarshal` 报错——**不**翻译成"空配置"写下去 |
 | 缺 `slots` 成员 | `loadout.json needs a 'slots' array (an empty array means no general slots)`；放过去就是"工具说保存成功、游戏里什么都没变" |
-| 每行 `items` 长度不在 1..2 | `items must have 1 or 2 entries` |
-| `items[0].gem` 空、`items[0].hash` 空、`items[1].hash` 空 | 主技能 hash 是必需的：mod 不持有因子表 |
-| 任何一项 `level < 0` | `negative level` |
-| **启用**的行数 > `MaxSlots` | `too many enabled slots: n (max 12)` |
+| 每行 `items` 长度不在 1..2 | `slot N: items must have 1 or 2 entries` |
+| `items[0].gem` 空 | `slot N: item gem is empty` |
+| `items[0].hash`（主技能）空 | `slot N: main item hash is empty` |
+| 有第二项时 `items[1].hash` 空 | `slot N: second item hash is empty` |
+| 任何一项 `level < 0` | `slot N: negative level` |
+| **启用**的行数 > `MaxSlots`（= 16） | `too many enabled slots: n (max 16)` |
 
 `enabled` 在 Go 侧是 `*bool`：缺这个成员与 `enabled: true` 同义，与 C# 的 `!TryGetProperty("enabled", …) || …` 和 TS 的 `s.enabled !== false` 一致。这里曾经用 `bool`（零值 `false`），结果是同一份文件在 Go 数出 0 个启用、在 mod 那边数出十几个——"存盘成功、游戏里什么都没变"，`TestValidateSlotsTreatsMissingEnabledAsEnabled` 把它钉成了回归测试。
 
@@ -174,6 +193,7 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 接受之后**不做任何内容改写**：载荷原样进 `debouncedWriter`，500ms 静止后写盘：
 
 - 每次调用替换待写并重启定时器，所以一串连续编辑只换来一次落盘，而落盘的**永远是屏幕上最后的状态**（`TestSaveLoadoutWritesOnlyTheLatestSubmission`）。500ms 这个数只声明一次（`editservice.go` 的 `debounceDelay`），配装与因子编辑两个 service 共用。
+- 写下去的字节就是提交上来的那个字符串（前端给的是 2 空格缩进的 JSON），测试直接按字节比对。
 - 写盘走 `writeFileAtomic`：同目录唯一临时文件（`loadout.json.*.tmp`）+ `rename`。运行中的 mod 会反复读这份文件，直接 `O_TRUNC` 会留下"读到半截"的窗口，而那一边只能看到坏 JSON（语义是"保留上一份"）。
 - 写失败时待写被**放回**（一次瞬时 IO 失败不该变成永久丢失），同时写工具日志并推 `GBFR.SigilLoadout.SaveFailed` 事件。这个失败已经没有调用方可以返回，所以只能以事件形式到达——注意该事件的唯一订阅者在因子编辑页的 `SigilEditorPanel`（`keepMounted`），也就是说配装这条路的写盘失败会复用那个页面的写盘失败对话框，配装页自己没有监听者。
 - 退出流程由 `main.go` 的 `app.OnShutdown(loadoutService.flushNow)` 兜住：窗口可能在防抖窗口里就被关掉，而刚做的那次编辑才是用户想留下的。
@@ -228,7 +248,7 @@ flowchart TD
 
 三条都要点记住：
 
-- **"没有启用行"包括"所有行都被禁用"。** `ParseAndValidate` 只收 `enabled` 为真（或缺该成员）的行，所以一份把 12 行全部取消勾选的文件落进 `slots.Count == 0` 那一支，日志是 `loadout.json has no general slots; built-in exclusive template active.`，而与"文件不存在"那条日志不同、结果相同（通用槽全擦掉）。
+- **"没有启用行"包括"所有行都被禁用"。** `ParseAndValidate` 只收 `enabled` 为真（或缺该成员）的行，所以一份把 16 行全部取消勾选的文件落进 `slots.Count == 0` 那一支，日志是 `loadout.json has no general slots; built-in exclusive template active.`，而与"文件不存在"那条日志不同、结果相同（通用槽全擦掉）。
 - **文件里的 `exclusive` 不依赖 `slots`。** 走 `null` 那一支时开关照旧随 `overrides` 一起发出去。
 - **两半是同一次调用。** `NativeCore.ApplyLoadout` 把槽数组与开关数组合成一次 `GBFR20_ApplyLoadout`：两半在原生侧收尾于同一个"重新发布表"步骤，所以分成两次（v17 的形状）只会让同一张表被发布、被打印两遍。
 
@@ -238,7 +258,7 @@ flowchart TD
 
 - 主技能 hash 从 `items[0].hash` 读——它没有别的地方可查（"物品 → 主技能 / 上限"的语义属于唯一读过 `assets\sigils.json` 的一方，也就是前端）。
 - 等级只判**非负**；缺失回落 `DefaultLevel = 15`。上界不判（见第 7 节）。
-- 启用行超过 `MaxSlots = 12` 时抛 `more than 12 enabled slots`：**整份文件被拒**、保留上一份配置，而不是截断这 12 行。这也是"工具说保存成功、游戏里什么都没变"的经典形状之一。
+- 启用行超过 `MaxSlots = 16` 时抛 `more than 16 enabled slots`：**整份文件被拒**、保留上一份配置，而不是截断这 16 行。这也是"工具说保存成功、游戏里什么都没变"的经典形状之一。
 - `slots[].items` 的第 3 项及以后被静默忽略（只读 `items[0]` / `items[1]`；Go 在存盘时已经拒掉长度 > 2）。
 - `exclusive` 只把值为 `false` 的项变成 `disabled = 1`；外层键解析不成角色 hash（例如写成了 PL 码）会记 `exclusive: '…' is not a character hash; ignored.` 并跳过——否则"开关点了没用"在日志里没有任何线索。
 - `lang` 完全不参与：顶层只需要是"带 `slots` 数组的对象"，语言字段有没有、是什么都不影响这条路径。
@@ -252,9 +272,9 @@ flowchart TD
 进了 `template_loadout.cpp` 的 `ApplyLoadout` 之后，步骤是固定的，而且每一步的位置都有理由：
 
 1. **先把通用槽请求钳到容量。** `effective_count = min(requested, kVirtualSlotCapacity - kBuiltinExclusiveSlotCount)` = 最多 21 个；总数是 `3 + effective_count`。请求数不等于生效数时打一行日志（请求数、本构建上限、实际数都打出来）。
-2. **总数变了才动 `.text`，而且先发布计数。** `g_virtual_slot_count.store(total_slot_count)` 在 `ApplySkillLoopLimits(total_slot_count)` **之前**：detour 按这个计数给虚拟槽设闸（`TryGetRuntimeSlot` 的第一道判断就是 `virtual_slot >= g_virtual_slot_count`），所以它必须已经与游戏线程下一轮循环看到的补丁一致。收窄配置时这一步也是"残留的旧槽数据立刻不再被服务"的原因。`ApplySkillLoopLimits` 把两条技能循环的上限字节（apply 与 category）事务式地改成 `13 + N`（`kNativeInternalSlotCount + virtual_slot_count`）：第二个字节写失败就把第一个回滚到**它原来那个值**，然后返回 false。
+2. **总数变了才动 `.text`，而且先发布计数。** `g_virtual_slot_count.store(total_slot_count)` 在 `ApplySkillLoopLimits(total_slot_count)` **之前**：detour 按这个计数给虚拟槽设闸（`TryGetRuntimeSlot` 的第一道判断就是 `virtual_slot >= g_virtual_slot_count`），所以它必须已经与游戏线程下一轮循环看到的补丁一致。收窄配置时这一步也是"残留的旧槽数据立刻不再被服务"的原因。拓宽本身还有一道布局前置：只有在钩子与语义布局都就绪时才去调 `ApplySkillLoopLimits`（标志为假时它一律 no-op，半截布局算不出地址）。`ApplySkillLoopLimits` 把两条技能循环的上限字节（apply 与 category）事务式地改成 `13 + N`（`kNativeInternalSlotCount + virtual_slot_count`）：第二个字节写失败就把第一个回滚到**它原来那个值**，然后返回 false。
 3. **这是唯一的失败点。** `ApplySkillLoopLimits` 失败时 `g_virtual_slot_count` 被恢复成上一次的值，函数在**碰模板表之前**返回 false。所以"被拒"= 上一份配置仍然完整生效，托管侧那句 `Native rejected the custom loadout; kept previous configuration.` 是准确的：不存在"半份新配置"。
-4. **在 `g_template_mutex` 下重建每个角色的模板行。** 先 `ApplyExclusiveSwitchesLocked(overrides, count)`（整份替换，见下），再对每个已知角色：`ApplyExclusiveStateLocked`（清 `slots[0..2]`，按位填回 T1 / T2 / 战气 或留空槽），然后把 `slots[3..24]` 逐格写成 `config_index < effective_count ? slots[config_index] : TemplateGemSlot{}`。
+4. **在 `g_template_mutex` 下重建每个角色的模板行。** 先 `ApplyExclusiveSwitchesLocked(overrides, count)`（整份替换，见下），再对每个已知角色：`ApplyExclusiveStateLocked`（清 `slots[0..2]`，按位填回 T1 / T2 / 战气 或留空槽），然后把 `slots[3..24)` 逐格写成 `config_index < effective_count ? slots[config_index] : TemplateGemSlot{}`——注意循环覆盖整个原生容量，而托管侧最多只交 16 行，所以第 17 格之后永远是空槽。
 5. **收尾只有一个入口：`PublishTemplateSelections()`。** 它做两件事——`InstallDefaultTemplateSelections()` 与 `RebuildPartyStatusesOnce()`。以前三个调用点各拼一遍同一序列，而"钩子还没装好就不排重建"这个条件只写在其中两个里。
 
 注意第 2 步的 `if (total_slot_count != previous_count)`：槽位数量没变时既不动 `.text`，也不重新拓宽循环上限，但第 4、5 步**无条件**执行。这就是"内容相同的配置被再应用一次"（例如只改了语言、或只改了某个因子的等级）仍然是一次完整模板重建的原因。
@@ -287,20 +307,7 @@ Installed built-in template loadout selections=N. exclusive slots 1-3 (T1/T2/war
 
 `RebuildPartyStatusesOnce()` 是本项目**唯一**会去动游戏活对象的地方：对每个"已知的出战角色"各调一次游戏的状态重建函数。没有它，改动要等到下一次开战才会进战斗状态——而**战斗里游戏自己不会重建角色状态**，所以"等下一场战斗"在战斗中永远等不到。
 
-它的闸门（`TryClaimRebuildNow`）与逐角色条件：
-
-| 条件 | 行为 | 日志 |
-| --- | --- | --- |
-| 钩子或语义布局未就绪 | 直接返回（前置条件，不算闸门的一条理由） | — |
-| 上一次重建失败后 60 秒内 | 跳过 | `hot rebuild: skipped (cooling down after a failed rebuild)` |
-| 游戏 250ms 内建过状态 | 跳过 | `hot rebuild: skipped (game is building)`（源码注释仍称这一条"刻意静默"，与实现不符） |
-| 距上次热重建不到 500ms | 跳过（静默，CAS 认领窗口） | — |
-| 还没认出任何队伍成员 | 跳过 | `hot rebuild: no party known yet; skipped` |
-| 队伍刚变更过 2 秒内 | 跳过 | `hot rebuild: skipped (party changed just now)` |
-| 该角色的记录不属于当前轮队伍装配 | 逐角色跳过（对象已被游戏拆掉，重建就是戳内存垃圾） | `hot rebuild: char=0x… skipped (left the party: assembly a < b)` |
-| 重建返回 false | 该对象记一次失败，冷却 60 秒 | `hot rebuild: cooling down 60s (a rebuild failed)` |
-
-跳过**不是**失败：改动仍会在游戏下一次自然构建时落地，只是不是即时的（菜单里实测十几秒）。逐角色重建之间 `Sleep(50)`。
+它的前置条件是钩子与语义布局都就绪；在这之上，`TryClaimRebuildNow` 用一组时间戳闸门决定"这一拍动不动手"（失败后 60 秒冷却、游戏 250ms 内建过状态、距上次热重建不足 500ms 的节流、还没认出任何队伍成员、队伍刚变更 2 秒内），并且只重建**属于当前轮队伍装配**的那份 status 对象。跳过**不是**失败：改动仍会在游戏下一次自然构建时落地，只是不是即时的（菜单里实测十几秒）。这些判据的顺序、理由、以及为什么每加一条都要有实测依据，见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)；那条路径上唯一会"发声"的东西是日志（`hot rebuild: …` 那一组，见 [日志与诊断](/openwiki/operations/logging-and-diagnostics.md)），所以别在这里再抄一份闸门表。
 
 ## 6. 三个容易误解的行为
 
@@ -308,43 +315,48 @@ Installed built-in template loadout selections=N. exclusive slots 1-3 (T1/T2/war
 
 **② 未提到的角色 = 三个专属槽全开。** 文件里的 `exclusive` 只记录**被关掉**的槽：C# 只把值为 `false` 的项变成 `disabled = 1` 的 override，原生 `ApplyExclusiveSwitchesLocked` 先 `clear()` 整张 `g_exclusive_state` 再按这次的 override 重建，而 `ReadExclusiveStateLocked` 对**缺失条目**返回 `ExclusiveAll`。三条推论都很容易踩：`true` 与"没提到"完全同义（前端也因此把"打开"实现成**删掉那个键**）；开关状态不跨调用累积（同一份配置里删掉某个 `false` 条目就会把那个槽重新打开）；认不出的 `(角色, 技能)` 对被静默忽略（`character_hash == 0`、`disabled == 0`、角色不在模板索引里、技能 hash 不属于该角色的三个槽）。
 
-**③ 槽位超容量是截断并记日志，不是拒绝。** 原生通用槽上限是 `kVirtualSlotCapacity - kBuiltinExclusiveSlotCount = 21`；超过时取前 21 个，**其余槽位照常应用**，并打一行把请求数、上限、实际数都说出来的日志。拒绝会让整份配置连其余槽位一起失效，比截断更糟——但必须让它**可见**，否则症状只是"某几个槽位静默不生效"。实践上这条日志几乎只见于直接调 ABI 的调用方：托管路径根本到不了 21，因为 `MaxSlots = 12` 在 Go 与 C# 两侧都会先把更大的配置拒掉。
+**③ 槽位超容量是截断并记日志，不是拒绝。** 原生通用槽上限是 `kVirtualSlotCapacity - kBuiltinExclusiveSlotCount = 21`；超过时取前 21 个，**其余槽位照常应用**，并打一行把请求数、上限、实际数都说出来的日志。拒绝会让整份配置连其余槽位一起失效，比截断更糟——但必须让它**可见**，否则症状只是"某几个槽位静默不生效"。实践上这条日志几乎只见于直接调 ABI 的调用方：托管路径根本到不了 21，因为 `MaxSlots = 16` 在 Go 与 C# 两侧都会先把更大的配置拒掉。
 
 ## 7. 上限分三层，只有一层在本链路上判
 
 | 上限 | 值 | 声明位置 | 谁判 | 判的是什么 |
 | --- | --- | --- | --- | --- |
-| 启用槽上限 | `MaxSlots = 12` | C# `LoadoutConfig.cs`、Go `loadoutservice.go`、TS `model.ts`（`MAX_SLOTS`，同时是编辑器固定显示的行数） | Go（保存时，给用户报错）与 C#（读到手改文件时守自己） | 只数**启用**的行；超了就拒掉整份文件 |
+| 启用槽上限 | `MaxSlots = 16` | C# `LoadoutConfig.cs`、Go `loadoutservice.go`、TS `model.ts`（`MAX_SLOTS`，也是编辑器至少铺满的行数，见 `padSlots`） | Go（保存时，给用户报错）与 C#（读到手改文件时守自己） | 只数**启用**的行；超了就拒掉整份文件 |
 | 技能等级上界 | 每条技能自己的 `cap` | `assets\sigils.json`（随包数据） | **只有前端** | 输入框的 `max` 与载入时的 `clampLevel`；写进文件的等级因此已经在 cap 内 |
-| 虚拟槽数组容量 | `kVirtualSlotCapacity = 24` | `native_internal.h` | 原生 | 数组边界与截断上限；ABI 另有一道计数闸（`slot_count > 24` 或 `override_count > 32 × 3 = 96` → 整份拒绝并记 `counts out of range`） |
+| 虚拟槽数组容量 | `kVirtualSlotCapacity = 24` | `native_internal.h` | 原生 | 数组边界与截断上限；ABI 另有一道计数闸（`slot_count > 24` 或 `override_count > kRuntimeTemplateCapacity × 3 = 96` → 整份拒绝并记 `counts out of range`） |
 
-三处声明的那一项由 `sharedconstants_test.go` 的 `MaxSlots（启用槽上限）` 一组对拍（C# / TS / Go 三个正则各抓一个字面量）；`DefaultLevel = 15`（C#/TS）与 `UnwornCharacterHash = 0x887AE0B0`（C#/C++）也在同一份名单里。**等级上界不在这一层判**：Go 的 `validateSlots` 与 C# 的 `GetLevel` 都只拒负数，注释里的理由是同一规则的第三份副本会与真正的 cap 表漂移，而且判的还不是真正的不变量。所以一份手改的文件可以带着超过 cap 的等级一路走到原生，并如实生效。
+三处声明的那一项由 `sharedconstants_test.go` 的 `MaxSlots（启用槽上限）` 一组对拍（C# / TS / Go 三个正则各抓一个字面量，且每条声明必须正好匹配一次）；`DefaultLevel = 15`（C#/TS）、`UnwornCharacterHash = 0x887AE0B0`（C#/C++）与目录名、两个文件名、保存失败事件名等也在同一份名单里。**等级上界不在这一层判**：Go 的 `validateSlots` 与 C# 的 `GetLevel` 都只拒负数，注释里的理由是同一规则的第三份副本会与真正的 cap 表漂移，而且判的还不是真正的不变量。所以一份手改的文件可以带着超过 cap 的等级一路走到原生，并如实生效。
+
+`MaxSlots` 还有一条对拍管不到的上界：同一份测试里的 `TestVirtualSlotCapacityFitsPlayerSlots` 要求它不超过原生放得下的通用槽数（`kVirtualSlotCapacity − kBuiltinExclusiveSlotCount = 21`）。三处一起改大时对拍仍然全绿，只有这条会红——超了不会报错，只会让多出来的槽被原生静默截断。
 
 ## 8. 每一步失败时的可见后果
 
 | 在哪失败 | 判据 | 磁盘 / 内存里剩下什么 | 可见证据 |
 | --- | --- | --- | --- |
 | 界面 → Go | 形状、取值、启用行数不合 | 磁盘不变（连目录都不建） | 横幅 `自动保存失败：…`；`TestSaveLoadoutRejectsInvalidWithoutTouchingDisk` |
+| 界面（还没到 Go） | 配置没读回、或数据表未加载 | 一次 Wails 调用都不发出，磁盘不变 | 没有横幅（数据表那条除外：`数据表未加载，无法保存`） |
 | Go → 磁盘 | 临时文件写失败 / rename 失败 | 待写被放回，下一次防抖或退出时重试 | 工具日志一行 + `GBFR.SigilLoadout.SaveFailed` 事件（订阅者在因子编辑页） |
-| 文件 → 托管 | JSON 坏、缺 `slots`、超 1 MiB、超 12 个启用行 | 内存一个字节都不动，**这一版不再重试** | `Invalid loadout.json; kept previous configuration: …` |
+| 文件 → 托管 | JSON 坏、缺 `slots`、超 1 MiB、超 16 个启用行 | 内存一个字节都不动，**这一版不再重试** | `Invalid loadout.json; kept previous configuration: …` |
 | 托管 → ABI | 钩子未就绪 / 关机中 / 计数越界 | 同上（`ApplyLoadoutEntry` 在动任何东西之前返回） | `Native rejected the custom loadout; kept previous configuration.` |
 | 原生：循环上限 | `ApplySkillLoopLimits` 失败 | `g_virtual_slot_count` 回滚，模板表未动 | 只有托管那一句（原生这一步不记日志；`Hook rollback: …` 属于**卸载钩子**那条路，不是这里） |
 | 原生：抛异常 | `GuardAbi` 捕获（第 4 步中途也可能） | **没有回滚**：模板表与专属状态可能只写了一半 | `GBFR20_ApplyLoadout: threw; reported as a refusal.` + 托管那句 |
 | 原生：通用槽数 | 请求 > 21 | 前 21 个照常应用 | `ApplyLoadout: the request asked for general slots=…; only the first … were applied.` |
-| 原生：热重建 | 七条闸门之一命中 | 选择表已更新，角色状态等游戏下一次自然构建 | `hot rebuild: skipped (…)` / `hot rebuild: char=0x… ok=0` + 60 秒冷却 |
+| 原生：热重建 | 闸门之一命中或该对象不属于当前轮 | 选择表已更新，角色状态等游戏下一次自然构建 | `hot rebuild: skipped (…)` / `hot rebuild: char=0x… ok=0` + 60 秒冷却 |
 | 文件被删 | `mtime == NoFile` | 通用槽全擦，专属开关全开 | `loadout.json removed; restored the built-in exclusive template.` |
 
-"保留上一份配置"这句话在四个地方出现，但含金量不同：Go 拒的时候磁盘上那份根本没变；托管拒的时候内存里那份还在；原生那三条里只有**循环上限失败**是"连模板表都没被碰过"，异常那条可能留下半份。
+"保留上一份配置"这句话在四个地方出现，但含金量不同：Go 拒的时候磁盘上那份根本没变；界面那两道门拒的时候连调用都没发生；托管拒的时候内存里那份还在；原生那三条里只有**循环上限失败**是"连模板表都没被碰过"，异常那条可能留下半份。
 
 ## 9. 这条链被验证到什么程度
 
 | 覆盖 | 位置 |
 | --- | --- |
 | 防抖、只落最后一份、原子写不留临时文件、并发写不撕文件 | `loadoutservice_test.go` 的 `TestSaveLoadoutDefersTheWrite` / `TestSaveLoadoutWritesOnlyTheLatestSubmission` / `TestSaveLoadoutWritesAndLeavesNoTempFiles` / `TestConcurrentSavesNeverTearTheFile` |
-| 各种拒绝路径不碰磁盘、缺 `enabled` 算启用、`MaxSlots` 边界（12 过 / 13 拒 / 13 行里一行禁用过）、"等级超 cap 仍合法" | 同文件的 `TestSaveLoadoutRejects…` 三条与 `TestValidateSlots` / `TestValidateSlotsTreatsMissingEnabledAsEnabled` |
+| 各种拒绝路径不碰磁盘、缺 `enabled` 算启用、`MaxSlots` 边界（16 过 / 17 拒 / 17 行里一行禁用过）、"等级超 cap 仍合法" | 同文件的 `TestSaveLoadoutRejects…` 三条与 `TestValidateSlots` / `TestValidateSlotsTreatsMissingEnabledAsEnabled` |
 | 载荷规则（空行不写、解析不出的主因子整行跳过、主技能随载荷走、`exclusive` 空则不写） | `frontend/src/index.test.ts` 的"落盘载荷"一组，跑的是**入库的真实** `assets/sigils.json` |
 | 语言随载荷写出（`payload.lang` 等于传入的语言） | 同文件的"主因子写 gem、没有副技能就不写第二项"（`ja` 进、`ja` 出） |
-| 跨语言常量（`MaxSlots` / `DefaultLevel` / `UnwornCharacterHash` / 目录名与两个文件名） | `sharedconstants_test.go` |
+| 专属开关的落盘形状（打开 = 删键、空条目整个删掉、共享 PL 码联动） | `frontend/src/exclusive.test.ts` 的 `withExclusiveToggle` 一组 |
+| 跨语言常量（`MaxSlots` / `DefaultLevel` / `UnwornCharacterHash` / 目录名与文件名 / 保存失败事件名） | `sharedconstants_test.go` 的对拍 |
+| `MaxSlots` 装得进原生容量（`≤ 24 − 3`） | 同文件的 `TestVirtualSlotCapacityFitsPlayerSlots` |
 | 原生锚点解析与 fail-closed 逐字节复验 | `tests/NativeLayoutHarness`（`ResolveGameLayout` / `RevalidateGameLayout`，改坏一个字节必须复验失败） |
 
 **覆盖不到的部分要明确**：C# 的 `LoadoutConfig` 与原生 `ApplyLoadout`（含专属开关、截断、发布、热重建、`GuardAbi` 那条异常路径）没有自动化测试——托管侧只有常量的正则对拍，`NativeLayoutHarness` 只管布局锚点、不碰模板表。这一段唯一的正面证据是游戏里的日志：`Applied custom loadout, slots=…`、`Installed built-in template loadout selections=N. …`、`ctx1 build: …`、`hot rebuild: char=0x… ok=1`，以及运行期那条 `Skill contribution confirmed for 0x…: N/N virtual sigils reached the context-1 status.`。"切语言也走这条路"同样只有这些日志可以观测：`lang` 在 C# 侧没有读者、在 Go 侧没有校验，两侧都没有针对它的测试。
@@ -353,7 +365,8 @@ Installed built-in template loadout selections=N. exclusive slots 1-3 (T1/T2/war
 
 - **改"哪些行会被写进文件"** → 改 `buildLoadoutPayload` 与它的 `index.test.ts`；不要在下游补一个"猜"的分支，mod 侧没有因子表可查。
 - **改校验** → 想清楚是"拒"还是"截断"：工具侧当场拒是给用户看的，托管侧拒是给自己守内存的，原生截断是"宁可少几个槽也别让整份配置失效"。
-- **改上限** → 至少要同时看三处：`MaxSlots`（三语言、带对拍）、`kVirtualSlotCapacity`（数组与截断）、`ApplyLoadoutEntry` 的 `kMaxTemplateSlots` / `kMaxExclusiveOverrides`（ABI 拒绝闸）。
+- **改上限** → 至少要同时看四处：`MaxSlots`（三语言、带对拍，还要过 `TestVirtualSlotCapacityFitsPlayerSlots`）、`kVirtualSlotCapacity`（数组与截断）、`kRuntimeTemplateCapacity`（ABI 的 override 上界 `32 × 3`）、`ApplyLoadoutEntry` 的 `kMaxTemplateSlots` / `kMaxExclusiveOverrides`（ABI 拒绝闸）。
 - **改界面语言的存法** → 语言现在借 `loadout.json` 的一个字段活在同一条写盘通路上，于是"记住语言"和"改一次配装"在磁盘上分不开：把语言挪到别处（或干脆不再写它）会顺带取消"切语言 → mtime 前进 → 托管侧认领并整份重新应用"这个副作用；反过来，给 `lang` 加任何语义都会让这一下"纯粹重复的应用"开始有别的后果。
 - **别把 mtime 认领改成"确认生效后才推进"**（或反过来）：配装是单次应用，因子编辑那条路才需要 `Pending()` + `MarkApplied()`。两者的语义差别与理由见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
+- **碰热重建的闸门** → 只改一处、只按实测理由改，判据本身与理由在 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)；这里只依赖它的结论。
 - **想让工具显示"游戏已生效"** → 目前没有这条通道：mod 只 post 两条不带数据的窗口消息。真要做，等于新增一条跨进程回报协议，而不是在现有链路上加一行日志解析。

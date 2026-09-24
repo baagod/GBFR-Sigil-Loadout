@@ -44,10 +44,10 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 原生核心（C++ DLL）
@@ -72,11 +72,11 @@ verified:
 
 ### 编译输入与仓库外的生成器
 
-`vcxproj` 的编译输入很短：`src\` 下十个 `.cpp`（`dllmain` / `exports` / `runtime` / `runtime_state` / `layout_resolver` / `table_slot` / `skill_hooks` / `template_loadout` / `selection_store` / `safe_game_access`）加两份 vendored 源码 `third_party\safetyhook.cpp` 与 `third_party\Zydis.c`（以 `CompileAs` C 编）。没有包管理器、没有要还原的外部依赖：safetyhook 与 Zydis 都是随仓库带进来的源码，`third_party` 只是加进 `AdditionalIncludeDirectories`。两处警告抑制是给这两份第三方源码开的——`safetyhook.cpp` 关掉 4834（丢弃 `[[nodiscard]]` 返回值），`Zydis.c` 关掉 4201（无名 struct/union 的非标准扩展）。语言标准是 `stdcpplatest`，另有 `/utf-8 /Zc:threadSafeInit` 与 `MultiProcessorCompilation`。
+`vcxproj` 的 `ClCompile` 只有十二项：`src\` 下十个 `.cpp`（`dllmain` / `exports` / `runtime` / `runtime_state` / `layout_resolver` / `table_slot` / `skill_hooks` / `template_loadout` / `selection_store` / `safe_game_access`）加两份 vendored 源码 `third_party\safetyhook.cpp` 与 `third_party\Zydis.c`（以 `CompileAs` C 编）；另有四个 `ClInclude`（`native_api.h`、`native_internal.h` 与两份 vendored 头），它们不属于编译输入。没有包管理器、没有要还原的外部依赖：safetyhook 与 Zydis 都是随仓库带进来的源码，`third_party` 只是加进 `AdditionalIncludeDirectories`。两处警告抑制是给这两份第三方源码开的——`safetyhook.cpp` 关掉 4834（丢弃 `[[nodiscard]]` 返回值），`Zydis.c` 关掉 4201（无名 struct/union 的非标准扩展）。语言标准是 `stdcpplatest`，另有 `/utf-8 /Zc:threadSafeInit` 与 `MultiProcessorCompilation`。
 
 两个配置（Debug / Release）都定义 `GBFR20_NATIVE_EXPORTS`（决定 `GBFR20_API` 展开成 `dllexport` 还是 `dllimport`），也**都以 `/EHa`**（`ExceptionHandling=Async`）编译——「阶段体抛异常能被记成一条失败行」与 SEH 包裹的安全访问这两条路都以它为前提。
 
-构建期还有一处**仓库之外**的边界。vcxproj 末尾的 `GenerateExclusiveTable` target 排在 `ClCompile` 之前：
+构建期还有一处**仓库之外**的边界。vcxproj 末尾的 `GenerateExclusiveTable` target 排在 `ClCompile` 之前（工程文件里这一段还带两处解释性注释，说明 `Inputs`/`Outputs` 的意义与 `Touch` 的理由；下面只保留 target 的实质内容）：
 
 ```xml
 <Target Name="GenerateExclusiveTable" BeforeTargets="ClCompile"
@@ -106,17 +106,17 @@ target 尾部那个 `Touch` 是给这套增量判断补的一步：gen 在内容
 
 ## ABI v20 导出面
 
-导出面的全部内容就是 `native_api.h`。没有 `.def` 文件：`GBFR20_API` 在编译期展开为 `extern "C" __declspec(dllexport)`（vcxproj 两个配置都定义 `GBFR20_NATIVE_EXPORTS`），调用约定统一是 `GBFR20_CALL` = `__cdecl`。下表的签名就是那份头文件里的声明，一个不多、一个不少：
+导出面的全部内容就是 `native_api.h`。没有 `.def` 文件：`GBFR20_API` 在编译期展开为 `extern "C" __declspec(dllexport)`（vcxproj 两个配置都定义 `GBFR20_NATIVE_EXPORTS`），调用约定统一是 `GBFR20_CALL` = `__cdecl`。下表逐个导出写清参数、返回值语义与「异常跨边界时的兜底值」，签名就是那份头文件里的声明，一个不多、一个不少：
 
-| 导出 | 语义 | 返回值 / 失败表示 |
-| --- | --- | --- |
-| `GBFR20_GetAbiVersion` | 返回 `GBFR20_ABI_VERSION`（= 20） | 纯常量，无状态 |
-| `GBFR20_SetLogCallback` | 把宿主回调存进 `g_log_callback`（一次原子 store） | — |
-| `GBFR20_Initialize` | 懒初始化（幂等），返回钩子是否装好 | 返回 0 = 没装成；关机中直接 0 |
-| `GBFR20_Shutdown` | 关停：置标志、回滚字节、拆钩子（幂等） | void |
-| `GBFR20_CopyRuntimeMessage` | 回读最近一条运行消息 | 返回所需缓冲区长度（含结尾 NUL）；异常 → 0 |
-| `GBFR20_ApplyLoadout` | 一次调用套用整份玩家配置（通用槽 + 逐角色专属开关） | 1 = 应用，0 = 拒绝 |
-| `GBFR20_WriteSkillStatusTable` | 把整张编辑后的表写进游戏那份活表 | `>= 0` = 实际改写的行数；`< 0` = 拒绝码 |
+| 导出 | 参数 | 返回值语义 | 抛出时的兜底 |
+| --- | --- | --- | --- |
+| `GBFR20_GetAbiVersion` | 无 | 常量 `GBFR20_ABI_VERSION`（= 20），无状态 | 不抛，也不经 `GuardAbi` |
+| `GBFR20_SetLogCallback` | `GBFR20_LogCallback callback` | 存进 `g_log_callback`（一次原子 store）；`nullptr` 即卸载回调 | 不抛，也不经 `GuardAbi` |
+| `GBFR20_Initialize` | 无 | 1 = 钩子装好；0 = 没装成（关机中也是 0） | `GuardAbi` 拒绝值 `0` |
+| `GBFR20_Shutdown` | 无 | `void`：置标志、回滚字节、拆钩子，幂等 | 同样走 `GuardAbi`（`void` 上的拒绝值只为统一形状） |
+| `GBFR20_CopyRuntimeMessage` | `char* buffer, uint32_t buffer_size` | 返回所需长度（含结尾 NUL）；`buffer` 为 `nullptr` 或大小为 0 时只问长度 | `GuardAbi` 拒绝值 `0`（当作「没有消息」，它本身只是诊断信息） |
+| `GBFR20_ApplyLoadout` | `const GBFR20_TemplateSlot* slots, uint32_t slot_count, const GBFR20_ExclusiveOverride* overrides, uint32_t override_count` | 1 = 应用；0 = 拒绝 | `GuardAbi` 拒绝值 `0` |
+| `GBFR20_WriteSkillStatusTable` | `const uint8_t* table, uint32_t length` | `>= 0` = 实际改写的 52 字节行数（0 = 内存里已经是这些字节）；`< 0` = 拒绝码 -1..-7 | `GuardAbi` 拒绝值 `GBFR20_TABLE_WRITE_FAILED`（-7） |
 
 ABI 版本号是 20，并且是**派生出来的**：这个 mod 的原始版本里 `selector` / `inventory` / `preset` / `input` / `present` / `state` 那些 API 已全部删除，活下来的就是上表这七个。专属开关以 **skill hash** 传递而不是槽位号，所以托管侧不需要按角色维护一张 T1/T2/战气对照表——那张表（`src/exclusive_table.inc`）在原生侧编译进来。槽位模型的完整说明见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)。
 
@@ -137,10 +137,11 @@ T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
 }
 ```
 
-三个推论，改这份代码时必须记住：
+四条推论，改这份代码时必须记住：
 
 - **会抛的内部实现不能标 `noexcept`。** `template_loadout.cpp` 的 `ApplyLoadout`（以及 `SetRuntimeMessage`）会抛——`std::format` / `std::string` / 加锁都可能失败。`native_internal.h` 里对这两者刻意**不**标 `noexcept`，因为标了之后 `throw` 会在函数出口先变成 `std::terminate`，`GuardAbi` 根本来不及接。
-- **每个导出的拒绝值各自取"最保守"的那个。** `GBFR20_Initialize` 与 `GBFR20_ApplyLoadout` 用 `0`；`GBFR20_WriteSkillStatusTable` 用 `GBFR20_TABLE_WRITE_FAILED`（-7），因为它是唯一"写之后"的码（表可能只更新了一部分），把"守卫兜住了异常"报成 -7 比报成"一个字节都没动"的码安全。
+- **每个导出的拒绝值各自取"最保守"的那个。** `GBFR20_Initialize`、`GBFR20_ApplyLoadout` 与 `GBFR20_CopyRuntimeMessage` 用 `0`；`GBFR20_WriteSkillStatusTable` 用 `GBFR20_TABLE_WRITE_FAILED`（-7），因为它是唯一"写之后"的码（表可能只更新了一部分），把"守卫兜住了异常"报成 -7 比报成"一个字节都没动"的码安全。
+- **守卫不是每个导出的统一外壳。** 只有会抛的那些才进 `GuardAbi`；`GBFR20_GetAbiVersion` 返回一个常量、`GBFR20_SetLogCallback` 只做一次原子 store，两者都不可能抛，所以没有被包裹。
 - **反过来，不抛或自己兜住的路径就标 `noexcept`。** 这一侧的清单是 `Log`、`safe_game_access.cpp` 的各读取（`SafeReadUint64` / `SafeReadStatusIdentity` / `SafeCopyToOutput` / `ReadByte` / `IsGameRange` / `DecodeRipTarget` / `SafeInvokeStatusRebuild`）、`WriteSkillStatusTable`、`TryGetRuntimeSlot`、`ApplySkillLoopLimits`、`ResetGameLayout`。这条区分不是风格：它决定了"异常到不到得了 `GuardAbi`"——`ApplyLoadout` 与 `SetRuntimeMessage` 会抛，所以**必须留着不标**。
 
 守卫覆盖的不只是返回值的那些导出：`GBFR20_Shutdown` 是 `void`，它同样走 `GuardAbi`（拒绝值在 `void` 上无意义，只是为了统一形状）。
@@ -197,33 +198,55 @@ T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
 
 ## Initialize 的阶段链与失败即回滚
 
-`GBFR20_Initialize` 只回一个比特"钩子装没装成"，但它背后是一条分阶段的链，每段失败各有自己的落点：
+`GBFR20_Initialize` 只回一个比特"钩子装没装成"，但它背后是一条分阶段的链，每段失败各有自己的落点。参与方与顺序如下：
 
 ```mermaid
-flowchart TD
-    A["GBFR20_Initialize"] --> B{"g_shutting_down"}
-    B -- "是" --> Z0["返回 0，什么都不做"]
-    B -- "否" --> C["EnsureInitialized：std::call_once，一个进程只跑一次"]
-    C --> D["executable-validation：GetModuleFileNameW 且文件名必须是 granblue_fantasy_relink.exe"]
-    D -- "失败" --> F1["SetRuntimeMessage 说明原因 + 阶段行 state=failed"]
-    D --> E["semantic-layout-resolution：ResolveGameLayout"]
-    E -- "失败" --> F2["ResetGameLayout + 运行消息 Game layout resolution failed at 某阶段 + 阶段行 state=failed"]
-    E --> G["template-selection-install：InitializeRuntimeTemplates + PublishTemplateSelections"]
-    G --> H["ResolveTableSlot：不计时，失败只记日志，不中止"]
-    H --> I["native-hook-install：InstallHooks 的四个子阶段"]
-    I -- "任一子阶段失败" --> F3["DisableGameplayHooksAndRestore + SetRuntimeMessage + 阶段行 state=failed"]
-    I --> J["g_hooks_ready = true + 运行消息 Native hooks installed N virtual slots"]
-    J --> K["native-initialize state=complete，返回 1"]
-    F1 --> Z1["返回 0：不装钩子，选择表与持久化数据不变"]
-    F2 --> Z1
-    F3 --> Z2["返回 0：循环上限字节与已装钩子已回滚"]
+sequenceDiagram
+    autonumber
+    participant Managed as 托管侧
+    participant Export as exports.cpp
+    participant Init as runtime.cpp 的 Initialize
+    participant Resolver as layout_resolver.cpp
+    participant Templates as template_loadout.cpp
+    participant Slot as table_slot.cpp
+    participant Hooks as skill_hooks.cpp
+
+    Managed->>Export: GBFR20_Initialize
+    Export->>Export: g_shutting_down 为真就直接返回 0
+    Export->>Init: EnsureInitialized
+    Note over Init: call_once 包装保证它一个进程只跑一次，一次失败的初始化不会重试
+    Init->>Init: 阶段 executable-validation
+    Note over Init: 若失败，写运行消息与 state=failed 后返回 0。此时还没动过任何东西，没有可回滚的
+    Init->>Resolver: 阶段 semantic-layout-resolution，ResolveGameLayout
+    Note over Resolver: 任一环节不成立都走 FailResolution，只清 g_layout_ready，运行消息说明卡在哪一步、持久化选择未改动，然后返回 0
+    Init->>Templates: 阶段 template-selection-install
+    Note over Templates: 数据编译进 DLL，没有失败路径。钩子还没装，所以只发布选择、不排状态重建
+    Init->>Slot: ResolveTableSlot，不计时也不拿它当门
+    Note over Slot: 锚点必须用未被 safetyhook 改写过的字节匹配。失败只记日志，代价是之后热应用一律拒写 -2
+    Init->>Hooks: 阶段 native-hook-install，InstallHooks
+    Hooks->>Hooks: required-byte-rva-preflight 逐字节复验
+    Hooks->>Hooks: gem-data-getter-hook 与 skill-fetch-hook
+    Hooks->>Hooks: skill-loop-limit-patches 加宽两条循环上限字节
+    alt 任一子阶段失败
+        Hooks->>Hooks: 统一回滚 DisableGameplayHooksAndRestore，恢复仍是我们扩展值的上限字节、disable 两个钩子、清 g_layout_ready
+        Hooks->>Hooks: SetRuntimeMessage 说清为什么，阶段行 state=failed
+        Hooks-->>Init: false
+        Init-->>Export: 返回 0
+    else 四个子阶段全部通过
+        Hooks->>Hooks: g_hooks_ready 置 true，运行消息 Native hooks installed N virtual slots
+        Hooks-->>Init: true
+        Init->>Init: 阶段 native-initialize state=complete
+        Init-->>Export: 返回 1
+    end
+    Export-->>Managed: 1 或者 0
+    Note over Managed,Export: 0 只赌上钩子这一件事。游戏照常启动，配装只是不生效，选择表与持久化数据一字未改
 ```
 
-`Initialize` 的阶段链：两个前置门失败即返回 0，表槽解析与钩子安装互不相干。
+初始化时序：每一阶段的成功路径，以及失败时的回滚落点——失败只关掉钩子这一件事，游戏照常启动。
 
 各阶段的落点：
 
-- **executable-validation**：路径解析不到、或文件名不是 `granblue_fantasy_relink.exe`（`_wcsicmp`，大小写不敏感）就退出。这是唯一对外部环境做校验的阶段。
+- **executable-validation**：路径解析不到、或文件名不是 `granblue_fantasy_relink.exe`（`_wcsicmp`，大小写不敏感）就退出。这是唯一对外部环境做校验的阶段，也是唯一一个**没有任何东西需要回滚**的阶段——它排在一切副作用之前。
 - **semantic-layout-resolution**：`ResolveGameLayout()` 失败走 `FailResolution`——`ResetGameLayout()` 只清 `g_layout_ready`（不动那份已发布的结构体），写一条运行消息说明"钩子未安装、持久化的因子选择未被改动"，然后返回 0。整条链上**没有第二处**可以改游戏字节。
 - **template-selection-install**：装内置模板与默认选择，失败路径不存在（数据是编译进来的），阶段行固定为 `complete`。此处钩子还没装，所以 `PublishTemplateSelections` 只发布选择、不排状态重建。
 - **ResolveTableSlot**：刻意排在 `InstallHooks()` **之前**——safetyhook 会改写 `.text`，而槽发布锚点要用没被改写的字节匹配。它成功与否只影响热应用能否写活表（失败 = 之后只会拒写 -2），所以失败只记日志、不拿它当门。**表槽与钩子的成败因此互相独立**：钩子装好了而槽没解出来（或反过来）都是合法结局，前者只让热应用持续拿 -2。
@@ -233,23 +256,36 @@ flowchart TD
 
 `InstallHooks` 内部还有四个各自计时的子阶段：`required-byte-rva-preflight`（`RevalidateGameLayout`，逐字节复验解析结果）、`gem-data-getter-hook`、`skill-fetch-hook`、`skill-loop-limit-patches`（两条循环上限字节的加宽）。四条失败路径全部走同一个 lambda：`DisableGameplayHooksAndRestore()` + `SetRuntimeMessage(为什么)` + 返回 `false`。成功才置 `g_hooks_ready` 并写运行消息 `Native hooks installed: N virtual slots.`。
 
+`DisableGameplayHooksAndRestore()` 就是这一层唯一的回滚实现，它只回滚"已经做出去的事"：恢复仍是我们扩展值的上限字节、`disable()` 两个钩子、排空在途调用、`reset()` inline hook，最后 `ResetGameLayout()`；一个钩子都没装时它只清那两个标志，所以四条失败路径可以共用它而不必各自判断。
+
 两条上限字节的写入是**事务式**的：先记下 apply 字节原来那个值，写第二个字节失败时回滚到**它原来的值**而不是游戏出厂值——调用方在失败时会把 `g_virtual_slot_count` 恢复成上一次的计数，写回 13 会留下"计数说还有 N 个虚拟槽、apply 字节说 13、category 字节还是上一次的展开值"这种自相矛盾的状态（一条循环会越过 13 格数组）。回滚的那一侧（`DisableGameplayHooksAndRestore` 里的 `restore_limit`）**只写当前仍等于我们的扩展值的字节**：已经恢复过、或从未被我们打过补丁的字节不碰——回滚不能把别人写进去的值当成自己的。
 
 ## 关闭与拆卸顺序
 
 ```mermaid
-flowchart TD
-    S["GBFR20_Shutdown 或 DllMain 收到 DLL_PROCESS_DETACH"] --> T["g_shutting_down = true"]
-    T --> U["先恢复两条技能循环上限字节：此时两个 detour 还活着，slot 大于等于 13 的请求仍被挡住"]
-    U --> V["disable 两个钩子，safetyhook 还原目标字节"]
-    V --> W["最多等 5 秒，等 g_active_getter_calls 与 g_active_mid_calls 归零"]
-    W -- "超时" --> W1["钩子留着不释放，只记一行日志"]
-    W -- "归零" --> X["reset g_get_gem_hook，释放 inline hook 的 trampoline"]
-    X --> Y["刻意不 reset g_skill_fetch_hook：stub 在 detour 返回后还要执行收尾指令"]
-    Y --> Q["ResetGameLayout 只清 g_layout_ready"]
+sequenceDiagram
+    autonumber
+    participant Managed as 托管侧
+    participant Export as exports.cpp
+    participant Hooks as skill_hooks.cpp
+    participant Detour as 游戏线程上的 detour
+
+    Managed->>Export: GBFR20_Shutdown
+    Export->>Hooks: ShutdownHooks，只有 g_shutdown_complete 交换为 true 的那一次才进来
+    Hooks->>Hooks: g_shutting_down 置 true、g_hooks_ready 置 false
+    Hooks->>Hooks: 第 1 步 恢复两条技能循环上限字节，此时两个 detour 还活着、slot 大于等于 13 的请求仍被挡住
+    Note over Hooks: 只写当前仍等于我们扩展值的字节，已经恢复过或从未被我们打过补丁的不碰
+    Hooks->>Detour: 第 2 步 disable 两个钩子，safetyhook 还原目标字节
+    Hooks->>Detour: 第 3 步 最多等 5 秒，等 g_active_getter_calls 与 g_active_mid_calls 归零
+    Note over Hooks,Detour: 超时就把钩子留着不释放只记一行日志，绝不 VirtualFree 线程仍在执行的内存
+    Hooks->>Hooks: 第 4 步 reset g_get_gem_hook，释放 inline hook 的 trampoline
+    Note over Hooks: 刻意不 reset g_skill_fetch_hook，stub 在 detour 返回之后还要执行收尾指令
+    Hooks->>Hooks: 第 5 步 ResetGameLayout 只清 g_layout_ready，那份已发布的布局留着不动
+    Export-->>Managed: void
+    Note over Managed,Detour: DllMain 的 DLL_PROCESS_DETACH 是另一条路，只置 g_shutting_down、不自己拆钩子，此后任何入口包括仍在游戏线程上跑的 detour 立刻退化成 no-op
 ```
 
-拆卸与关停的顺序：每一步都是为了让下一步不会踩到还在执行的内存。
+拆卸与关停的顺序：每一步都是为了让下一步不会踩到还在执行的内存；`GBFR20_Shutdown` 走完整拆卸，`DllMain` 只留下"进程要没了"这个信号。
 
 顺序上的两个讲究，都是"换个顺序就会崩"的那种：
 
@@ -332,7 +368,7 @@ flowchart TD
 
 ## 改这份代码时的边界
 
-- **新增或改动导出**要成对改三处：`native_api.h`、`GBFR.SigilLoadout/NativeCore.Interop.cs` 的 `DllImport` 与结构体声明、以及 `EnsureAbiLayout` 的尺寸与逐字段偏移。别忘了 `GBFR20_ABI_VERSION`——但要知道版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"，后者正是结构体错位最可能发生的方式。
+- **新增或改动导出**要成对改三处：`native_api.h`、`GBFR.SigilLoadout/NativeCore.Interop.cs` 的 `DllImport` 与结构体声明、以及 `EnsureAbiLayout` 的尺寸与逐字段偏移。别忘了 `GBFR20_ABI_VERSION`——但要知道版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"，后者正是结构体错位最可能发生的方式。新导出若会抛，还要在 `exports.cpp` 里选一个最保守的兜底值并把 `GuardAbi` 套上。
 - **会抛的内部实现不要标 `noexcept`**（见上文），否则 `GuardAbi` 就成了摆设。
 - **布局相关的东西留在 `layout_resolver.cpp`**：预检字节表与偏移表在那里成对出现，`RevalidateGameLayout` 负责逐字节复验；锚点必须在 safetyhook 改写 `.text` 之前解析。
 - **别把"全内存扫描"加回 `table_slot.cpp`。** 那一版兜底一次都没跑过，而且它证明不了唯一重要的事——"这块缓冲区就是游戏在用的那块"静态证不出来；拒写的代价只是这一局内存不变（编辑在游戏下一次解析或重启后照样生效），而扫描是 5~6 秒的慢路径。

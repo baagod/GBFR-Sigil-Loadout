@@ -46,10 +46,10 @@ sources:
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 构建、发布与部署链
@@ -186,7 +186,7 @@ flowchart TD
 顺序是 **原生 → 托管 → 工具**，而且不是"随便排的舒服顺序"，两条硬约束都写在工程文件里：
 
 - `GBFR.SigilLoadout.csproj:41-43` 用 `PreserveNewest` 从 `..\GBFR.SigilLoadout.Native\bin\$(Configuration)\` 把原生 DLL 拷进托管输出目录（`GBFR.SigilLoadout.Native.dll`）。先建托管就会拷到**上一次**的原生 DLL——打包用的是托管输出目录，于是发出去的是旧原生核心。
-- `GBFR.SigilLoadout.Native.vcxproj:121-127` 的 `GenerateExclusiveTable` 目标 `BeforeTargets="ClCompile"`，并且带 `Inputs`/`Outputs`：五个输入（`..\..\gen\main.go` 与 `gen\game\sigils\` 下的 `exclusive.go`、`sigils.go`、`json.go`，加上 `..\SigilLoadout\assets\sigils.json`）里任一个比两个输出（`src\exclusive_table.inc`、`..\SigilLoadout\assets\sigils.chara.json`）新、或输出缺失时，MSBuild 才在 `..\..\gen` 里跑 `go run . exclusive -mod <仓库根>`；跑完用 `Touch` 把两个输出的时间戳推新——`gen` 内容没变时不写文件，不推时间戳这个目标就会一直判过期。
+- `GBFR.SigilLoadout.Native.vcxproj:117-127` 的 `GenerateExclusiveTable` 目标 `BeforeTargets="ClCompile"`，并且带 `Inputs`/`Outputs`：五个输入（`..\..\gen\main.go` 与 `gen\game\sigils\` 下的 `exclusive.go`、`sigils.go`、`json.go`，加上 `..\SigilLoadout\assets\sigils.json`）里任一个比两个输出（`src\exclusive_table.inc`、`..\SigilLoadout\assets\sigils.chara.json`）新、或输出缺失时，MSBuild 才在 `..\..\gen` 里跑 `go run . exclusive -mod <仓库根>`；跑完用 `Touch` 把两个输出的时间戳推新——`gen` 内容没变时不写文件，不推时间戳这个目标就会一直判过期。工程文件在这里的注释里补了一句约束：`Inputs` 必须**逐条列文件**（`gen` 的四个源路径没有一条是通配符），因为 MSBuild 不展开这里的通配符。所以 `gen` 里**新增**的源文件不会自动进入这套过期判断——只改那个新文件不会触发重新生成，得把它的路径手工补进 `Inputs`。
 
 也就是说 `..\gen` 是**条件性**的硬前置，两个条件彼此独立：
 

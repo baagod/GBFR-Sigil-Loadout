@@ -22,6 +22,8 @@ sources:
     resource: repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp
   - id: openwiki-source-ac7bb7c2f4a36fd9a94d83f1
     resource: repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp
+  - id: openwiki-source-5298fbc43f2a1044d5c67e9e
+    resource: repo://GBFR.SigilLoadout/LoadoutConfig.cs
   - id: openwiki-source-6d678759e60f125bb782b9a7
     resource: repo://GBFR.SigilLoadout/Mod.cs
   - id: openwiki-source-8ef2d1990c2fef1e911f1040
@@ -30,7 +32,10 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 工作流：游戏侧注入运行期（detour 与循环上限）
@@ -63,7 +68,7 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
 | --- | --- | --- |
 | 装钩子与首次加宽上限字节 | 调用 `GBFR20_Initialize` 的那条托管线程（mod 启动时一次，`EnsureInitialized` 由 `std::call_once` 门住） | 失败不会被重试，那一会话就是降级状态；见下文「装钩子是一次性动作」 |
 | 两个 detour 体 | 游戏自己跑技能循环的线程 | 一次构建在那条线程上**同步**走完 `13…13+N-1`，所以构建快照与贡献计数帧可以放 `thread_local`（不变量见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)） |
-| 后续的上限字节加宽 | 托管维护拍线程经 `GBFR20_ApplyLoadout` | 只在 `g_hooks_ready && g_layout_ready` 且计数真的变了时才写字节 |
+| 后续的上限字节加宽 | 托管维护拍线程（250 ms 一拍）经 `GBFR20_ApplyLoadout` | 只在计数真的变了时才写字节；钩子没装成时这个导出在进入 `ApplyLoadout` **之前**就拒绝了（见「装钩子是一次性动作」） |
 | 还原上限字节 + 拆钩子 | 调用 `GBFR20_Shutdown` 的托管线程（`Mod.Dispose()` 无条件调用） | `DllMain` 的 `DLL_PROCESS_DETACH` 只把 `g_shutting_down` 置真，不做拆卸 |
 | 回读运行消息 | 托管启动线程一次（且只在钩子没装成时） | 见「运行消息」一节 |
 
@@ -85,13 +90,13 @@ call.from_category_loop =
 
 ```mermaid
 flowchart TD
-    subgraph GAME["游戏自己的线程：一次构建同步跑完扩展槽 13 到 13+N-1"]
+    subgraph GAME["游戏自己的线程：一次构建同步跑完虚拟槽位 13 到 13+N-1"]
         APPLY["apply 循环：call getter<br/>锚点 +0x24，返回 +0x29"]
         FETCH["category 循环：fetch 段起点<br/>mid hook 落点 = 锚点 +0x1E"]
     end
     APPLY --> INLINE["inline detour GetGemDataByIndexDetour"]
     FETCH --> RANGE{"r13 落在 13 到 13+N-1 内"}
-    RANGE -- "否，本体槽位" --> NATIVE["不设 rip 与 rax：游戏照原路取因子"]
+    RANGE -- "否：本体槽位或超出范围" --> NATIVE["不设 rip 与 rax：游戏照原路取因子"]
     RANGE -- "是" --> MID["mid detour OnSkillFetch"]
     NATIVE -. 真正 call getter 时才回到 inline .-> INLINE
     INLINE --> CLS{"_ReturnAddress 命中哪个返回 RVA"}
@@ -206,7 +211,7 @@ if (call.identity.context_mode == 1)
 
 它跑在身份闸之后，所以身份读不到的那一格既不会注入也不会留下快照。四个 `thread_local` 字段快照的是"这一次构建用哪套槽位"，此后整个构建（`slot_index` 从 13 走到最后一格）都读这一份，所以构建进行中改配装不会让同一个角色拿到半新半旧的选择。匹配条件是 `status` **和** `character_hash` 两项：`status` 对象的地址会跨角色复用，只比地址会让某个角色用上别人那次构建的槽位。
 
-后两个调用把游戏线程的事实喂给热重建这条路径：`RememberGameBuild()` 记下"刚刚有人问过扩展槽第一格"，`context_mode == 1`（在场那份 status）时 `RememberContext1Status(...)` 记下"这个角色现在这份 status 是哪个对象、属于哪一轮队伍装配"。
+后两个调用把游戏线程的事实喂给热重建这条路径：`RememberGameBuild()` 记下"刚刚有人问过虚拟槽位第一格"，`context_mode == 1`（在场那份 status）时 `RememberContext1Status(...)` 记下"这个角色现在这份 status 是哪个对象、属于哪一轮队伍装配"。
 
 ## 自然贡献计数
 
@@ -237,7 +242,7 @@ flowchart TD
 | confirmed | `injected == expected`、`expected != 0`、重读身份一致 | `Skill contribution confirmed for 0x…: N/M virtual sigils reached the context-1 status.`——`g_live_confirmation_reported` 保证**每会话只报一次** |
 | incomplete | 上面任一不成立且 `expected != 0` | `Skill contribution incomplete for 0x…: N/M virtual sigils reached the context-1 status.`——**每次都报** |
 
-两句话都走 `SetRuntimeMessage`，所以同时进日志与 `GBFR20_CopyRuntimeMessage` 回读的运行消息。"每会话只说一次"只对成功那条成立：健康的配装每场战斗都会重复 9/9，而失败每次都要出声，因为这正是排查注入是否生效的唯一正向证据。注意这一对计数只在"走到最后一格"时结算——被提前打断的构建既不算成功也不算失败，它只是没有结论（那一帧一直留到下一次 apply 循环的第一格重新开始记账，或某一格的匹配条件不符而整帧作废）。
+两句话都走 `SetRuntimeMessage`，所以同时进日志与 `GBFR20_CopyRuntimeMessage` 回读的运行消息。"每会话只说一次"只对成功那条成立：健康的配装每场战斗都会再报一次同样的 N/N，而失败每次都要出声，因为这正是排查注入是否生效的唯一正向证据。注意这一对计数只在"走到最后一格"时结算——被提前打断的构建既不算成功也不算失败，它只是没有结论（那一帧一直留到下一次 apply 循环的第一格重新开始记账，或某一格的匹配条件不符而整帧作废）。
 
 ## 运行消息：这条链向玩家暴露的失败状态
 
@@ -287,7 +292,7 @@ bool ApplySkillLoopLimits(int32_t virtual_slot_count) noexcept {
 flowchart TD
     P["ApplyLoadout：total_slot_count 与上一次不同"] --> S["release store 新计数"]
     S --> C{"钩子与布局都就绪"}
-    C -- "否" --> N["只发布计数，字节留给 InstallHooks"]
+    C -- "否：防御分支，ABI 路径上不可达" --> N["只发布计数、返回，字节留给 InstallHooks"]
     C -- "是" --> W1["WriteByte apply 上限字节"]
     W1 -- "失败" --> R1["计数回滚为 previous_count，返回 false"]
     W1 -- "成功" --> W2["WriteByte category 上限字节"]
@@ -295,7 +300,7 @@ flowchart TD
     W2 -- "成功" --> OK["计数与两条字节描述同一个长度"]
 ```
 
-先发计数、再写字节；任一步失败都退回到这一次调用之前的状态（`g_hooks_ready` / `g_layout_ready` 不成立的路径只发布计数，字节留给装钩子那一步）。上限字节这一步排在改模板表之前，所以它失败时返回 `false`，模板表与选择表都还没有被动过——玩家看到的是"这次改动整个没落地"，而不是"部分生效"。
+先发计数、再写字节；字节这一步失败就退回这一次调用之前的状态（计数回滚，模板表与选择表都还没被碰过）。那条 `g_hooks_ready && g_layout_ready` 不成立的支路是防御性的：ABI 入口 `GBFR20_ApplyLoadout` 在 `!g_hooks_ready` 时已经返回 0，根本走不到 `ApplyLoadout`（见下一节）。上限字节这一步排在改模板表之前，所以它失败时返回 `false`，模板表与选择表都还没有被动过——玩家看到的是"这次改动整个没落地"，而不是"部分生效"。
 
 顺序的理由写在这段代码的注释里：**detour 是按这个计数给虚拟槽设闸的**，所以计数必须已经与游戏线程下一轮循环将会看到的补丁一致。把顺序摆正之后，两个方向都是安全的：
 
@@ -354,18 +359,18 @@ flowchart TD
 
 ### 装钩子是一次性动作，失败后本会话不重试
 
-`Initialize` 由 `std::call_once` 门住，所以装钩子只发生在第一次 `GBFR20_Initialize` 里；失败之后没有第二次尝试。失败留下的状态还要更严格：`DisableGameplayHooksAndRestore()` 收尾时把 `g_layout_ready` 清成假，于是
+`Initialize` 由 `std::call_once` 门住，所以装钩子只发生在第一次 `GBFR20_Initialize` 里；失败之后没有第二次尝试。失败留下的状态还要更严格：`DisableGameplayHooksAndRestore()` 第一行就把 `g_hooks_ready` 置假，收尾时又把 `g_layout_ready` 清成假，于是
 
-- 之后 `GBFR20_ApplyLoadout` 里"钩子与布局都就绪"这两条都不成立，配装改了计数也**只发布计数、不写那两条字节**（游戏循环仍停在 13 格，虚拟槽位拿不到因子）；
+- ABI 入口 `GBFR20_ApplyLoadout` 的第一道闸（`g_hooks_ready`）就拒绝并返回 0：`ApplyLoadout` 根本不会被调用——新计数**不会发布**、两条上限字节不会被尝试、运行期模板表也不会被换；托管侧把它记成一行 `Native rejected the custom loadout; kept previous configuration.`，这一会话里起作用的只有 `Initialize` 在装钩子之前就装进去的那份内置专属模板选择；
 - `RebuildPartyStatusesOnce` 的第一道前置条件同样不成立，热重建直接静默返回。
 
-也就是说"钩子没装成"是整场有效的降级：配装改动照常落地（模板表与选择表都会换），但游戏那两条循环仍只走 13 格，虚拟槽位一次都不会被请求——要等重启重装钩子才有机会。这一点决定了排查方向——先看 `Startup phase=native-core`，再看那几句运行消息。
+也就是说"钩子没装成"是整场有效的降级：游戏那两条循环仍只走 13 格，虚拟槽位一次都不会被请求，玩家改的配装每次都只换来一句"被拒绝"——要等重启重装钩子才有机会落地。这一点决定了排查方向——先看 `Startup phase=native-core`，再看那几句运行消息。
 
 ## 本页喂给热重建的两条事实
 
 `ObserveBuildStart` 是这条链给热重建的全部输入，判据本身（250ms 静默窗口、500ms 节流、2 秒换队禁重建、`pass_id` 轮次、60 秒冷却）在 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)：
 
-- `RememberGameBuild()` 是那个 250ms 静默窗口的**唯一**来源，它不区分"谁触发的构建"：`g_tls_hot_rebuild_build` 只影响 `RememberContext1Status` 里的轮次切分，不影响时间戳刷新。由于重建函数会反过来进 detour，我们自己那一次重建只要让 apply 循环再走到扩展槽第一格，它同样会刷新这个窗口（下一次热重建至少还要再等 250ms）。
+- `RememberGameBuild()` 是那个 250ms 静默窗口的**唯一**来源，它不区分"谁触发的构建"：`g_tls_hot_rebuild_build` 只影响 `RememberContext1Status` 里的轮次切分，不影响时间戳刷新。由于重建函数会反过来进 detour，我们自己那一次重建只要让 apply 循环再走到虚拟槽位第一格，它同样会刷新这个窗口（下一次热重建至少还要再等 250ms）。
 - `context_mode == 1` 时 `RememberContext1Status(...)` 记下这个角色现在这份 status 对象与它属于哪一轮队伍装配（`pass_id` 只在游戏自己的构建之间推进，我们自己的重建调用经 `g_tls_hot_rebuild_build` 标出、不切轮）。这张表同时就是"见过哪些出战角色"的名单。
 
 所以从运行期看，本页的这两个 detour 是"游戏什么时候建过状态、建的是哪个角色"这两条事实的采集点。

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:93c9ef48b5979b7f0668e2801dbc634b1d3376824efe1b34d21d866529999b5d",
+  "pageVersion": "sha256:b7ddc936dc780ea5f90fd48cbe773506a89cf05e0e421fffb836d9bad43905c5",
   "claims": [
     {
       "id": "claim_0f5ad3c0c60e4ba089414e2d524ba945",
@@ -374,8 +374,16 @@
     },
     {
       "id": "claim_12a723c53e994814bf830aa561a4e192",
-      "statement": "装钩子是一次性动作：Initialize 由 std::call_once 门住，失败后本会话不再尝试；而失败回滚的 DisableGameplayHooksAndRestore 在正常路径上以 ResetGameLayout() 收尾、把 g_layout_ready 清成假，于是之后 GBFR20_ApplyLoadout 里「钩子与布局都就绪」两条都不成立，计数变了也只发布计数、不写那两条上限字节（两条循环仍只走 13 格，虚拟槽位一次都不会被请求），RebuildPartyStatusesOnce 的第一道前置条件同样不成立而直接返回。",
+      "statement": "装钩子是一次性动作：Initialize 由 std::call_once 门住，失败后本会话不再尝试；失败回滚走的 DisableGameplayHooksAndRestore 第一行就置假 g_hooks_ready、收尾 ResetGameLayout 又把 g_layout_ready 清成假，于是 ABI 入口 GBFR20_ApplyLoadout 在 g_hooks_ready 这道闸就返回 0——内部的 ApplyLoadout 根本不会执行：新计数不发布、两条上限字节不被尝试、运行期模板表也不被换（托管侧把它记成一行「Native rejected the custom loadout; kept previous configuration.」，这一会话里起作用的只剩 Initialize 在装钩子之前就装进去的内置专属模板选择），同时 RebuildPartyStatusesOnce 的第一道前置条件也不成立而直接静默返回。",
       "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L80-L92",
+          "version": "repo-lines-v1:sha256:cafe424d1f11d02c34b5800367687358aee7403c04e7599e5b714e248bd225c0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzZDM0NDFjYzQyYzY5ZDNkMGZkZjcxMTExNDUzNzAyMDI2NTJkMGRkZDkzNzE2YjJhMDIwYzNjNWVjZGEwY2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJiOWIwNzA3NmEyZWUyOGVlYWQxOWViZDZlZDQyYTU3YWE1YTRkYjQ1NTcyYWQyNGZiM2Y0ZTVmZWI2ZDI5ZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmZDc3Y2MxNzliZmE4MGVhNmEzNDIzYWYyODk4YWJlMzFlMTQxZjA3Yjk3YzMyODQxMjg0ZWMyY2VkODVmN2EifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L42-L47",
+          "version": "repo-lines-v1:sha256:8b282049d8118731b3015280e01f6515a82625dcfa1ca909dafaaa208c1b776c:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZlNzU2MDY1YWQ1YzQxZmRjMjgzOWIyMDg5ZWJjODZkNzM4ZmQ4OWFkY2Q2M2MyOWRmMmE2YWM2MmE5MzU1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTE4MzU2ZjFkODJkZGFhZGRlNGRmZThkMDY5MGQ4NGRiZmY0YTdkYmZlYjdiYmQ1OWFlOGUzNTdjZWRiOWFhYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTQ3MzVmMWY2NGVjMTllYzMzZmYyNWVlM2JkMjc0YjEzMzQyNzQxNjE1YmM4NTNiY2IyZjhlNTkyZDhjYTA5YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTQ4YTE2N2YyMGRjZTFmYWYwZWZlZjRlODFjYWQ1MGQ2NmRlZjA1YTIwMzYzYTczYTNlZDk2NzllZTRmOTQ5YSJ9"
+        },
         {
           "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L53-L61",
           "version": "repo-lines-v1:sha256:8d6448c7bd8564a3bc903ed95720ff758871bf0ec087382484ae61f2e9ebef7c:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2U2YzgyODQwNTA3YmFmMjYzMjZlMzI2ZDY1NWE4ZWQ1MjhhZmNlNWQyNzhkMzhiYTUzZDBiYWM1MjQzNTcwYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDhlZWFmMzAyNzY0MDBkOTkxOTFhNTQyNTc1ZGFmMDhkZGE5Njg1MGFiZDc4ODUwNzBlM2JiNjc1MjhhNDgxMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
@@ -385,12 +393,12 @@
           "version": "repo-lines-v1:sha256:d0ed0bec825c3b0d4d0c653d46a57433e591f4b3d57bcd0451428e564455f3a1:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzIwYWMzZmI4NzY3MjEwM2YzYjc1Njc3OTZjMmY3NDQwOWYxYjEwM2E1N2EwNjdkMWEyNGI2MmQyZjBmNWZmNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiNDA1YmExYTRkZDIyY2JkNzc5MGMwNzM3MmU0MjdhOGEzOTQ5MmJmZTc0MjIwZDgxYWJhMjE5ZDcxNmY0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFiZDA4MDQ0OGUzNTg0YTk4MzY5ZDZjMTkzYmViNTEzZWQ1OGQxYzgxNmRiYTg5Y2RmZWIyZDk2YWNiZGZjNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2FlODQ4NGNjYjUxMTNhMjlmYTg0ODViOTYxYjUzZWRkNWNjNjBkYWMxN2FmZjE3NjFkNjJjZTkwMDNkMjg3OSJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L330-L378",
-          "version": "repo-lines-v1:sha256:ee149ab966b889fdc1ece348108cf072e9bfe0acee590282cd8a7dd75bfdb6ae:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEzZDBhMTU1YWVmOWYzMDhhNWFkZGNmZjlhYTM2ZTIwY2I0OThiNzgzYWVkOGY0Y2RkYTE2NDU3MDNjZWYzMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwNTFlODFjYzBjZGY1Njg1ZmIyN2U4YmE4MTdkZTYxOWRlZDlhNzM0YzRhYTk0ZWU4MmNkNzBlYTgyNDQ0ZWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlhYjk4NzBhZjYyZDI5OTljYzU1NmM4YTI0ZDk2NjYzMTM4YTRjMTJjMThiN2FlYjU3NjFhNjgzODczYjZiZjAifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L330-L338",
+          "version": "repo-lines-v1:sha256:0501b09954c9dae057da0e793ac3c2b6eb3b7c0226ca17024348a86180fa79d3:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTNkMGExNTVhZWY5ZjMwOGE1YWRkY2ZmOWFhMzZlMjBjYjQ5OGI3ODNhZWQ4ZjRjZGRhMTY0NTcwM2NlZjMyMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGRlZDgyMjQwZWQ3NzBiMjhkMzM2NmI1YWZmOGNjMTg1YjMwNWJjMGNmZjFiMmMyYjMzYjcwZjA0YjlmMjcwZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjA1MWU4MWNjMGNkZjU2ODVmYjI3ZThiYTgxN2RlNjE5ZGVkOWE3MzRjNGFhOTRlZTgyY2Q3MGVhODI0NDRlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmI3NTQ1OWY2NWI4YjRjMGViMTNkNTNkNTk2ZGJlZjUwNDg4Y2IxYmE1MWJlY2FlZGZkMzBiOTEwNGEwMWNhYyJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L272-L285",
-          "version": "repo-lines-v1:sha256:1cb5b32afa2e956795518369c42f2d7d519c81f78095fa4c81c5ba15de27a916:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjZDdkOTNhZWZmNzUyZmRkNzZlZDhkZDY2N2IwZmZkZDQ5ZGNhMmExMWE0ZDgzZjI2NjdlYzk5YTYwNTU2Y2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgxOGUxMmE1MjIxMDUyMDRkOWRkMmUwZDgyMWU2NGQ2NjcwMmQ1YmVkY2YyMjVjNGYwYWUyYmMxMmM1ZDRlMjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkMjBhMmM1ZjBjOWU3Nzc1M2ZkMTViODQwNzVlMjc0MmFjNTU4ZDEzYjk5OTQ5NmY3NmRiMTNjMWViOTk3ODcifQ"
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L66-L79",
+          "version": "repo-lines-v1:sha256:ddbdb4b7709c7b8777e894a5cd1e44fa83ccf99bfed1703d376651ffb857c073:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhlOTFmMmJmMjE4NTU5NTllZmY2YzRlZTBmMWY2MzVkZGM2YTY2MDVkZjBmZWIyZWM5MDI1OTc4NWQxNmMyMWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExM2RkZWRiYTczYTI0OGY5YjEzMGU1ZWYzNjEzYWZmZTkwNTkyNGZlZWExM2ZhNWNmMTU1MzFiODliYzE5YzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhOTVhMDc0ZjVhMzlhOTk4NTU5NWNlOGI2ODU2OThiNTY2YmRkNmE1ZWRkOThmOGI2MzZmOGIzOWYwOTViNDQifQ"
         }
       ]
     },
@@ -429,10 +437,40 @@
           "version": "repo-lines-v1:sha256:6425ffb9d7d1c18f036403bef3ffdd8f36dbb0fb5e52e8115c1eb6c636e4436c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTk1YzUzMTg0MGYzYjE3NTNiMDI4ZDU0NDMzMjRlYTEyN2UzZmNjMTUyYjY2MzQ2MmYxYzhjYTk0MTBiYmZhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTdjNTVmNDA3ZDc1ZWI5YzI2MTU0NTYxNTEyMGQ2ZWYyMzdhZTk4N2E2MTI3ZTA3YWJiYmRhNTVlNDQ3MmU5NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjYyYThmNmZmZGVhNTMxNGQ5YTU1MWNmMzM3NWE3MTg1ZGI5YjJkMjIwMTE2MzAwOGFiM2QwOGExNjMwNDYxNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTg5Nzc1NzdlY2Y3NTE0MzA0ZjMzNTQ5YmE1NjAwNDA0NjZjNWQ5ODdmMWMzY2EyNDgyNjkxMWZkMjQzMGY1MyJ9"
         }
       ]
+    },
+    {
+      "id": "claim_b7b1a6f954154c71bc6729c2d107a7f6",
+      "statement": "钩子就绪蕴含布局就绪，所以 ApplyLoadout 内部那条 `g_hooks_ready && g_layout_ready` 判断在 ABI 路径上不会走「否」的一支（只发布计数、字节留给 InstallHooks）——那一支只是防御性的：GBFR20_ApplyLoadout 入口在 !g_hooks_ready 时已经返回 0，而 InstallHooks 的 required-byte-rva-preflight 子阶段用的 RevalidateGameLayout() 在 !g_layout_ready 时直接返回 false，所以能被置真的 g_hooks_ready 路径上 g_layout_ready 必为真。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/exports.cpp#L80-L92",
+          "version": "repo-lines-v1:sha256:cafe424d1f11d02c34b5800367687358aee7403c04e7599e5b714e248bd225c0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzZDM0NDFjYzQyYzY5ZDNkMGZkZjcxMTExNDUzNzAyMDI2NTJkMGRkZDkzNzE2YjJhMDIwYzNjNWVjZGEwY2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJiOWIwNzA3NmEyZWUyOGVlYWQxOWViZDZlZDQyYTU3YWE1YTRkYjQ1NTcyYWQyNGZiM2Y0ZTVmZWI2ZDI5ZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmZDc3Y2MxNzliZmE4MGVhNmEzNDIzYWYyODk4YWJlMzFlMTQxZjA3Yjk3YzMyODQxMjg0ZWMyY2VkODVmN2EifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L578-L579",
+          "version": "repo-lines-v1:sha256:cb1eb8019ac0bdc7d126d6ec01ff47fe338b59df8ecef31578f7a24aeaf74d94:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTMyZTFkYTY0NzcxNGQxM2ViNzk4YWY0NDY2NzhhYTIxNDJlYmZmZTUxNzRkNDkxYzIwYTA2MmM4MDA4YWNiNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZiOGU2Y2NiYzI4ODlkNDdiODc0ZDQzZmQzNDk5OGFkYTI0NGM1MmZkMDQ4NDE5NWU1NzU1NzY0YjAyNDNkNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzkyNTUxYmI4Yzk3ODFmYzE5N2JjNDU2OGZiNTU4MzMyMGEwMTJmNGJkNWUyYzhlMjE1ZTUzNTNmMjhjNWQ3MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTY1M2UyYzhjMDEyMzU0MzJmNDRhOTUyNzkwOWNlN2ZjNTZjY2NlNTAxZGZhYTY1NTU1MDQzY2RkMmE0NmViOCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L592-L597",
+          "version": "repo-lines-v1:sha256:03652899e77e38da700cb1bd44e2ced59ffaf813455344182b69e4a590cec804:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQxODM0MzkwOTFkYmFiYmVjNWFhZDQxZGU4NWUyYTVlM2FiNTBlNWVmODY5MWFjNWJhMWY1YzFjZjIwNGMxYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Q4YzhhYmVkNjZhYzVkNGE3MDRjNTA1NWIwNjYyODBmNDM0MDJkZmMxOTY0MTg2ZTM5YjlhNjZmYzRiMWM2ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFiZDA4MDQ0OGUzNTg0YTk4MzY5ZDZjMTkzYmViNTEzZWQ1OGQxYzgxNmRiYTg5Y2RmZWIyZDk2YWNiZGZjNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjg1NTc3NTY4YWMzNWQ2MDgzMGNmOTI1YmViMjJiYWJmZmZkZjgwYzM1YmZkNDVhMTJlODhmZGJhMzA1Njk0ZCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L420-L427",
+          "version": "repo-lines-v1:sha256:d6bf1298f02db6c9e300784c94f30e13af2583e0357a4e575cf43215a349b7f7:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjljYTg5MWJmZjdhYzFmN2NlYWFlNDBlZjA1MTA2NmJlOWVmZTQ3YjRlNDI4MWU4NmMzMTliZTJjNTVlYmNlNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzE2MTViNzM0Y2ZmZjFlZDgyYjNkYjQwYjM3YmJlZWUxYzQ0NWVmYTdjMTMxODY0ZDY3ODE3NTAwM2Y2ZWEzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2MxMjc4ODJiYmExNTJkNDM0MmY0NWJlNjk3NzBkZmM2OTFhOTU0MmY0ZjlkMzI0MDUxNmI5YTMyMjNiZjUwMiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L460-L460",
+          "version": "repo-lines-v1:sha256:3a0cc543a4d48eb0e2bebce43e6503b57a360341db7acdb60d50b39baa4c71ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2EwY2M1NDNhNGQ0OGViMGUyYmViY2U0M2U2NTAzYjU3YTM2MDM0MWRiN2FjZGI2MGQ1MGIzOWJhYTRjNzFhZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2EwY2M1NDNhNGQ0OGViMGUyYmViY2U0M2U2NTAzYjU3YTM2MDM0MWRiN2FjZGI2MGQ1MGIzOWJhYTRjNzFhZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjkzODc4NTFlYjRiZDZhZTczNThmNzA5ZDcyMWI1NTkzMzg5YjQxMTdlODQ0MWVjNDAxNDc4ZTIzNjQwYWQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2NlMzA0ZjEwNzk0Njk1NDk2ODY0NzA5ODkxZWQyMmViNDZhNzllOWE4NWIxMjE2ZjY3NzllNzg2MWU4OTg3NyJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp#L273-L285",
+          "version": "repo-lines-v1:sha256:1c57ffc07e96340a45840a4cbe0b56b00f82a283de2fa3ce42b30a98eef59ce9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgwODk1MjY2ODdhNjQ5YTM0NmUzZjBiMmY0OGFhZTJmYTNkZDg1Yjg1MmZmZjFmY2JmMzBiNTVjOWQ2NzM0MzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM3ZTQxY2RlYWVkOTg0MDdjMjAyM2NjODUyYmM1MGRhZGFkN2U3NzM3NGFmN2I3YTQ3NzIzOWRlZjk0Yjg3YzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkMjBhMmM1ZjBjOWU3Nzc1M2ZkMTViODQwNzVlMjc0MmFjNTU4ZDEzYjk5OTQ5NmY3NmRiMTNjMWViOTk3ODcifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-23T20:50:35.513Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

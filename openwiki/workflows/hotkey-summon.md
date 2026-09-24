@@ -12,6 +12,10 @@ sources:
     resource: repo://GBFR.SigilLoadout/HotkeyConfig.cs
   - id: openwiki-source-6d678759e60f125bb782b9a7
     resource: repo://GBFR.SigilLoadout/Mod.cs
+  - id: openwiki-source-49f1f8d8049b397adb1880a2
+    resource: repo://SigilLoadout/frontend/src/App.tsx
+  - id: openwiki-source-47cff6e6e142f07c1c683a7b
+    resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-0bf2c9729fd22b4c04cbe5ba
@@ -22,7 +26,10 @@ sources:
     resource: repo://SigilLoadout/win32.go
   - id: openwiki-source-46f7ef112800a873cada707b
     resource: repo://SigilLoadout/windowstate.go
-generated: { by: "openwiki/0.6.0", at: "2026-09-23T20:50:35.513Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 工作流：热键呼出/收起可视工具
@@ -36,18 +43,21 @@ sequenceDiagram
     participant HK as Hotkey 线程
     participant Tool as SigilLoadout 工具进程
 
-    Note over HK: RegisterHotKey 已成功 WM_HOTKEY 落在 message-only 窗口
+    Note over HK: RegisterHotKey 已成功，WM_HOTKEY 落在 message-only 窗口
     HK->>HK: IsGameOrToolForeground 通过
     HK->>HK: WaitForKeyRelease 最多 400 ms
-    HK->>HK: FindWindow 按标题找已有窗口 含最多 3 s 重试
-    HK->>Tool: 有窗口则 PostMessage 0x8012 开关命令
-    HK->>Tool: 没有窗口则 Process.Start 拉起 exe 不发消息
-    Tool->>Tool: 读 toolHidden 决定 revealTool 或 fakeHide
-    HK->>Tool: 80 ms 后 SetForegroundWindow 抢前台
+    HK->>HK: FindWindow 按标题找窗口，进程已在时最多重试 3 s
+    alt 找到窗口
+        HK->>Tool: PostMessage 0x8012 开关命令
+        Tool->>Tool: 读 toolHidden 决定 revealTool 或 fakeHide
+        HK->>Tool: 80 ms 后 SetForegroundWindow 抢前台
+    else 没找到且 mod 目录里有 exe
+        HK->>Tool: Process.Start 拉起 exe 不发消息不抢前台
+    end
     Note over Tool: 假隐藏时把焦点还给游戏窗口
 ```
 
-热键链路时序：mod 的消息窗口接住按键，按标题找到（或拉起）工具，发一条命令，然后由 mod 自己抢前台；收起那一半的焦点归还在工具侧完成。
+热键链路时序：mod 的消息窗口接住按键，按标题找到（或拉起）工具，发一条命令，然后由 mod 自己抢前台；收起那一半的焦点归还在工具侧完成。两条分支的差别是有意的——找到已有窗口才发消息、抢前台，冷启动那条什么都不发（新进程自己就会显示）。
 
 ## mod 侧：注册一次，消息驱动
 
@@ -87,7 +97,7 @@ sequenceDiagram
 
 **前台门 `IsGameOrToolForeground`**：取 `GetForegroundWindow`，`GetWindowThreadProcessId` 拿 pid，再比进程名——只认 `granblue_fantasy_relink` 与 `SigilLoadout`。两个名字缺一不可：F2 这类无修饰键在别的程序里太常见，不该被全局抢走；而工具被呼出后自己就是前台（这正是 mod 那记 `SetForegroundWindow` 的作用），此时同一个按键必须还能把它收起来。取进程名可能抛（进程在比较之前退出），异常一律当"不是"。
 
-**等按键抬起 `WaitForKeyRelease`**：最多 40 × 10 ms = 400 ms 轮询到键不再按下，然后才去拉工具。理由是同一颗键的 key-up 不能落到刚起来的启动器窗口上——那会被工具当成一次隐藏操作，于是"呼出"刚发生就自己收回去。这段等待只在消息路径上；轮询回退路径不等待（那一拍本来就是采样）。
+**等按键抬起 `WaitForKeyRelease`**：最多 40 × 10 ms = 400 ms 轮询到键不再按下，然后才去拉工具。源码注释给的理由是同一颗键的 key-up 不能落到刚起来的启动器窗口上——按注释的说法，那会被工具当成一次隐藏操作，于是"呼出"刚发生就自己收回去。这段等待只在消息路径上；轮询回退路径不等待（那一拍本来就是采样）。
 
 整个处理被 `try/catch` 包住，异常绝不带走消息循环；`_threadExit` 会在处理前再查一次，把关停途中的在途热键丢掉。
 
@@ -122,7 +132,7 @@ SetForegroundWindow(hWnd);
 
 注意区分：托盘左键（`tray.go`）与第二个实例（`startup.go`）那两条路上，`SetForegroundWindow` 是**工具进程自己**调的；只有热键这条路必须由 mod 代劳——激活权跟着 `RegisterHotKey` 那次按键走，而那次按键记在"注册热键的进程"名下，也就是游戏进程里的 mod，不是后台常驻的工具。
 
-## 工具侧：三态、三条入口与焦点归还
+## 工具侧：三态、入口与焦点归还
 
 ```mermaid
 stateDiagram-v2
@@ -134,15 +144,16 @@ stateDiagram-v2
     Shown --> Fake : 热键 0x8012 且当前可见
     Fake --> Shown : 热键 0x8012 且当前假隐藏
     Fake --> Shown : 托盘左键或第二实例 0x8010
-    Shown --> Shown : 托盘左键 0x8010 重复激活
+    Shown --> Shown : 托盘左键再次抢前台
     Shown --> Fake : X 按钮 WM_CLOSE
     Fake --> Fake : X 按钮 WM_CLOSE
-    Shown --> Gone : 托盘菜单 Exit 且 quitting=true
-    Fake --> Gone : 托盘菜单 Exit 且 quitting=true
+    Shown --> Fake : Esc 前端隐藏到托盘
+    Shown --> Gone : 托盘 Exit 的 WM_CLOSE 且 quitting=true
+    Fake --> Gone : 托盘 Exit 的 WM_CLOSE 且 quitting=true
     Gone --> [*]
 ```
 
-窗口三态与能进到窗口的四条路：只有热键带开关语义，X 按钮只会收，托盘与第二实例只会显；唯一能把窗口真正销毁的是置了 `quitting` 的 `WM_CLOSE`。
+窗口三态与能改变它的命令：只有热键带开关语义；X 按钮与工具自己的 Esc 只会收；托盘与第二实例只会显；唯一能把窗口真正销毁的是置了 `quitting` 的 `WM_CLOSE`（只有托盘 Exit → `app.Quit()` 那条路走到它）。
 
 四条路的后果**各不相同**，不能互相替换：
 
@@ -153,7 +164,7 @@ stateDiagram-v2
 | 托盘左键 | `0x8010` | 永远"显出来"，不可能是收起。托盘只在"窗口不是前台"或"正假隐藏"时才 post，否则每个左键点击都会重放一次激活；随后由工具进程自己调 `SetForegroundWindow` |
 | 第二个实例 | `0x8010` | 命名互斥体命中后按标题找到已有窗口，`ShowWindow(SW_SHOW)` + post + `SetForegroundWindow`，然后 `os.Exit(0)`——第二个进程不留下来，它只做一次激活 |
 
-（工具自己还有第四条**内部**路径 `0x8011`：前端 Esc（150 ms 去抖）→ `MinimiseApp` → `hideToTray`。它不与 mod 通信，所以不在本页的消息表里。）
+（还有一条**内**路，不属于这张表：前端 Esc 在 keyup 之后等 150 ms 调绑定的 `MinimiseApp`，落到 `hideToTray` → `findToolWindow` → `fakeHide`；X 按钮的 `WM_CLOSE` 处理里调的也是同一个 `fakeHide`，所以两条隐藏路最后都收敛成"向自己的 UI 线程 post `0x8011`"。它不与 mod 通信，`0x8011` 也没有第二个声明方。）
 
 **焦点归还为什么是不变量。** `0x8010`/`0x8012` 的处理只在"当时的前台窗口不是 0、也不是工具自己"时才覆盖 `returnFocusTo`，否则保留上一个目标——这条正是"工具可见时按热键收起"能回到游戏的原因（那一刻前台就是工具自己）。`hideNow` 里三步的顺序不可交换：
 
@@ -164,6 +175,8 @@ stateDiagram-v2
 把焦点还给游戏是硬要求，因为 `IsGameOrToolForeground` 只认游戏与工具两个进程：如果不还，禁用后的窗口不再提供一个属于这两个进程的前台目标，**下一次按热键会被直接丢掉**，表现成"按了没反应"。
 
 `SetForegroundWindow` 成功之后还有一处补丁：只有**这次是被游戏召唤的**（`returnFocusTo` 真的有过值）**且目标窗口确实属于游戏**时才注入一记点击。游戏把光标停在原处、只在下一记鼠标按下时才隐藏，所以焦点变化后的第一下点击会被吞掉（游戏内实测）；重放就是补上这一下（`LEFTDOWN` → 20 ms → `LEFTUP`，轮询会漏掉零长度的点击，1 ms 又太短），跑在单独的 goroutine 里。`isGameWindow` 用 `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` + `QueryFullProcessImageNameW` 拿进程映像名，只认 `granblue_fantasy_relink.exe`——直接打开的工具从不注入，因为向任意前台程序注入无条件点击是明确的危险动作。
+
+`summoned` 的判据就是"`returnFocusTo` 非 0"，而这个值**只在 `hideNow` 里被 `Swap(0)` 取走**、显出工具时并不清空。所以它读的是"上一次是谁把工具召唤出来的"：热键从游戏里呼出、再按一次收起时，`hideNow` 取到的仍是那次召唤记下的游戏窗口，这一步同样算被召唤——目标还是游戏，那记点击照旧注入。
 
 ## 为什么启动时不能预热工具进程
 
@@ -178,7 +191,20 @@ stateDiagram-v2
 - message-only 窗口建不出来（`CreateWindowEx` 返回 0）；
 - `RegisterHotKey` 失败，通常是**这颗键已经被别的程序占了**。
 
-两种情况各记一行日志（`Hotkey message window creation failed; fallback polling active.` / `RegisterHotKey unavailable (key may be taken); fallback polling active.`），然后由维护拍用 `GetAsyncKeyState` 的 `0x8000` 位做**边沿检测**（`_wasDown`）采样，同样要过前台门，命中则走同一个 `TryLaunchTool`。轮询是"零丢失"的退步：采样间隔内按下并抬起的按键会漏，而 `RegisterHotKey` 不会。
+两种情况各记一行日志（`Hotkey message window creation failed; fallback polling active.` / `RegisterHotKey unavailable (key may be taken); fallback polling active.`），然后由维护拍用 `GetAsyncKeyState` 的 `0x8000` 位做**边沿检测**（`_wasDown`）采样，同样要过前台门，命中则走同一个 `TryLaunchTool`。
+
+**两条路径对同一颗键的语义差别。** 检出之后的行为完全一样（`TryLaunchTool` 共用，所以还是同一个 `0x8012` 开关、同样 80 ms 后抢前台），差别全在"这颗键有没有交给系统注册、由谁来发现它"：
+
+| | 注册成功（消息路径） | 注册失败（250 ms 轮询） |
+| --- | --- | --- |
+| 谁发现按键 | 系统把 `WM_HOTKEY` 投进消息窗口，`GetMessage` 循环接收 | 维护拍采样 `GetAsyncKeyState` 的 `0x8000` 位 |
+| 这颗键是否被系统拿走 | 是：key-down 被当成热键消费，前台窗口收不到它 | 否：按键照常送到前台窗口，游戏也会看到同一颗键 |
+| 按住不放 | `MOD_NOREPEAT` 保证只触发一次 | 边沿检测（`down && !_wasDown`）同样只触发一次 |
+| 快按 | 一次不漏（消息在队列里排着） | 相邻两拍之间按下又抬起的按键会被整段漏掉，且不留任何日志 |
+| 采样时机 | 按键落下立即处理，跑在独立的 `GBFR-Hotkey` 线程上 | 跟着维护拍走，排在同拍里配装 tick 与因子编辑之后，会被更慢的阶段拖后 |
+| 按键抬起 | `WaitForKeyRelease` 最多等 400 ms，先等 key-up 再拉工具 | 不等：检出边沿就去拉工具，key-up 可能落到刚聚焦的工具窗口上 |
+
+所以回退不是等价替代：它照样能呼出/收起，但会在低概率下**静默丢掉一整个按键**，而且这颗键不再被系统从游戏那里拿走——游戏会照样收到它。
 
 ## 跨语言常量对拍
 

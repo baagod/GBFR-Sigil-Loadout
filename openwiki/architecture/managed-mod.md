@@ -1,7 +1,7 @@
 ---
 type: architecture
 title: 托管 mod（C# Reloaded 外壳）
-description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序（含失败回滚）、250ms 维护拍的单飞串行化与整拍失败隔离、日志双汇与单代轮转、热键配置装配与 F1 回退、NativeCore 门面的 DLL 解析与 ABI 版本＋结构尺寸/偏移双检（含 NativeCore.Interop.cs 的 P/Invoke 面）、LoadoutConfig 与 SigilEditorFeature 共用 FileStamp 的两种版本门语义，以及跨语言常量（MaxSlots = 16）各自落在哪一侧、被哪道门对拍。
+description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序（含失败回滚）、250ms 维护拍的三阶段单飞、Dispose 拆除次序、日志双汇与单代轮转、NativeCore 门面（DLL 路径绑定、ABI 尺寸+偏移双检、日志回调与运行时消息）、LoadoutConfig 与 SigilEditorFeature 的职责划分（前者只做载荷映射、不读数据文件、不持有表，等级只判非负、上界不在此判定，专属开关只转发 false）、热键配置装配与 F1 回退、两个 FileStamp 版本门语义，以及跨语言常量（MaxSlots = 16）各自落在哪一侧、被哪道门对拍。
 tags: [managed-mod, reloaded-ii, lifecycle, maintenance-tick, fail-closed, interop]
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
@@ -40,15 +40,15 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 托管 mod（C# Reloaded 外壳）
 
-`GBFR.SigilLoadout.dll` 是三个交付物里唯一不直接改游戏内存的一个：它没有 overlay UI、没有输入捕获、没有预设存储，也没有 Overlay Broker——原生核心自己经 SafetyHook 装钩子，并自动套用内置模板配装。这层外壳只做四件事：**承载宿主生命周期**、**驱动一拍 250ms 的维护循环**、**转发日志**，以及**读两个由可视工具写下的 JSON**（见 [系统总览](/openwiki/architecture/overview.md) 与 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)）。
+`GBFR.SigilLoadout.dll` 自己既不扫描也不改写游戏内存——所有写入都经 ABI 交给原生核心，地址由原生从语义锚点解析并持有（细节见 [原生核心（C++ DLL）](/openwiki/architecture/native-core.md)）；它没有 overlay UI、没有输入捕获、没有预设存储，也没有 Overlay Broker，因为原生核心自己经 SafetyHook 装钩子，并自动套用内置模板配装。这层外壳只做四件事：**承载宿主生命周期**、**驱动一拍 250ms 的维护循环**、**转发日志**，以及**读两个由可视工具写下的 JSON**（见 [系统总览](/openwiki/architecture/overview.md) 与 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)）。
 
 两条不变量是"这一层为什么能这么薄"的全部理由，改动前先确认没有破坏它们：
 
@@ -341,10 +341,17 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 | 输入 | `%LOCALAPPDATA%\GBFRSigilLoadout\loadout.json` | `%LOCALAPPDATA%\GBFRSigilLoadout\sigiledits.json` |
 | 形态 | `static` 类，无实例状态 | 实例，持有 `IModLoader` / `IDataManager` 与当前表 |
 | 唯一职责 | 载荷 → ABI 结构映射，再调 `NativeCore.ApplyLoadout` | 编辑列表 → 表字节 → 注册给数据管理器 + 原生就地写入活表 |
-| 校验责任 | 只做形状校验（JSON 坏、缺技能 hash、负等级、启用槽超过 `MaxSlots`）；不判"选得对不对/有没有超上限" | 只挑 `(Key, Level)` 匹配的行；不改 Key、不猜等级语义 |
+| 校验责任 | 只做形状校验（JSON 坏、缺 `slots` 数组、缺技能 hash、等级为负、启用槽超过 `MaxSlots`）；不判"选得对不对"，等级也只判非负——上界不在这里 | 只挑 `(Key, Level)` 匹配的行；不改 Key、不猜等级语义 |
 | 版本门 | `FileStamp.Changed()`：**认领后处理**，成败都算处理过 | `FileStamp.Now()` + `Pending()` + `MarkApplied()`：**确认生效后才推进** |
 | 失败之后 | 保留上一份有效配置，等下一次保存改 mtime | 那一版还欠着，下一拍再来（同版本按 5s 节流、只报一次） |
 | 启动那次 | `Initialize` 里过一遍同一道门 | `Bootstrap` 造表后走 `TryApply`，与热应用同一条 `Publish` 路径 |
+
+`LoadoutConfig` 那一侧的边界单列一遍，是因为最常见的误改就是"在这一层顺手多判一点"：
+
+- **只做载荷映射。** 主技能 hash 随载荷的 `items[0].hash` 走，而那是可视工具（`assets\sigils.json` 的唯一读者）写进来的；"这个因子选得对不对"在这一层既无从判、也不判。
+- **不读数据文件、不持有表。** 本类是 `static`，没有实例状态，唯一持久的东西是 `FileStamp` 记住的那一版 mtime；模板表与专属表都在原生侧，托管侧唯一的"表"是因子编辑那条路从归档读出、就地打补丁的 `skill_status` 字节。
+- **等级只判非负，上界不在这里判。** 上界是**每条技能自己的 cap**，而持有那张表的只有可视工具（它写盘之前已经把等级夹在 cap 内）；在这一层再判一次上界就成了同一规则的第三份副本，判的还不是真正的不变量。这一层能给的只有"负数不行"（`GetLevel` 的注释写的就是这个理由）。
+- **`exclusive` 只转发 `false`。** 只有值恰好为 `false` 的项才变成一条 `(CharacterHash, SkillHash, Disabled = 1)`；`true` 与"没提到"在这里是同一件事，都不生成条目（原生对没被提到的角色一律三槽全开）。两侧的键也都必须是 hash：外层解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` 并整条跳过，内层解析不成 skill hash 的记一行 `… has a non-hash skill key …; ignored.` 并跳过该键。hex 合法但不在原生专属表里的技能 hash 由原生忽略——托管侧不持有那张表，所以它能做的只有转发，`PL` 码只是可视工具显示用的标签。
 
 为什么两种门都要存在，是这一页最该记住的一条：
 
@@ -358,7 +365,7 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - **`MaxSlots` 还有第二道约束，且它不在 C# 里。** `TestVirtualSlotCapacityFitsPlayerSlots` 要求它不超过原生放得下的通用槽数：`kVirtualSlotCapacity − kBuiltinExclusiveSlotCount`（现在是 24 − 3 = 21）。超了不会报错，只会让多出来的槽被原生静默截断——游戏里少几个因子，只有日志会说。所以"把上限调大"这件事的边界由原生容量决定，不是由这个数字本身决定。
 - **这两个文件有意不实现任何 Reloaded 配置接口**：那会让启动器多出一个渲染不了列表的 "Mod configuration" 窗口。所以 `Config` 是纯数据（数据形状与成员名见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)），而热键那份配置走另一套（第 8 节）。
 
-`LoadoutConfig` 的映射本身只认一种形状：`slots[].items[0]` 是因子（`gem` → `GemId`、`hash` → `Skill1`、`level` → 同时写 `Skill1Level` 与 `SigilLevel`），`items[1]` 可选（`hash` → `Skill2`、`level` → `Skill2Level`）；没有副技能时 `Skill2` 填上面那个哨兵、等级 0。`exclusive` 只把值为 `false` 的项变成 override（"没说"就是"开着"），外层键解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` 并忽略——PL 码是可视工具显示用的标签，不是这里的身份。
+`LoadoutConfig` 的映射本身只认一种形状：`slots[].items[0]` 是因子（`gem` → `GemId`、`hash` → `Skill1`、`level` → 同时写 `Skill1Level` 与 `SigilLevel`），`items[1]` 可选（`hash` → `Skill2`、`level` → `Skill2Level`）；没有副技能时 `Skill2` 填上面那个哨兵、等级 0。`slots` 缺失或不是数组、`items` 缺失或为空、`gem` / 主技能 hash / 副技能 hash 解析不出来、等级为负、启用槽超过 `MaxSlots`——这些都会让**整份**配置被判为坏（一行 `Invalid loadout.json; kept previous configuration: …`），而不是跳过出问题的那一行；`enabled` 缺失按"启用"算（与 Go / TS 两侧一致），被禁用的行不计数、也不参与校验。这也是为什么前台载荷把解析不出物品 hash 的整行先丢掉：发出去只会让 mod 拒掉整份文件。
 
 `SigilEditorFeature` 的生命周期完全寄生在宿主上：它没有自己的日志、配置目录、文件监听或调度器，状态推进由 `Mod` 的维护拍驱动——未接上 `IDataManager` 时每拍重试 `Bootstrap`（只在第一次没拿到时说一句），并且**构造与启动不受 `hooksReady` 影响**。它自己的 `Dispose` 只置 `_stopped`，因为宿主的定时器回调不保证已经跑完；`Apply` 每次开头读这个标志，已卸载就不再动游戏内存。这条"卸载之后还可能有一拍"的风险由共享的并发约定兜住，见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
 
@@ -419,4 +426,5 @@ public int VirtualKey =>
 - **动 ABI**：见第 9 节末尾那一串同时要改的地方；`EnsureAbiLayout` 的期望值就是 `native_api.h` 的 `static_assert`。
 - **新增一个配置文件**：路径必须经 `UserConfig.FilePath` 推导、版本门必须用 `FileStamp`，并把常量加进 `SigilLoadout/sharedconstants_test.go` 的对拍清单——两侧算同一个字符串而没有任何协商点是这条协议最贵的性质。
 - **改 `MaxSlots`**：C# / TS / Go 三处都要改（对拍只保证它们相等，不保证这个值合理），并用 `TestVirtualSlotCapacityFitsPlayerSlots` 确认它不超过原生通用槽容量——超了不会报错，只会静默截断多出来的槽。
+- **往 `LoadoutConfig` 加判断**：先问"这张表在哪"。它的边界是只做载荷映射——不读数据文件、不持有表，等级只判非负、上界不在这里判，专属开关只转发 `false`。缺的那几张表（`assets\sigils.json`、原生专属表）都在别处，本地补一份副本就是同一规则的第三份，而且判的往往不是真正的不变量。
 - **写日志**：一律经 `Mod.Log`（它同时写文件与启动器、两个汇都 fail-soft）；不要在持有 `_logLock` 的路径上重入 `Log`。

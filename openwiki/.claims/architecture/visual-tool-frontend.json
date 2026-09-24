@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:1a396613dec901a85ea6d7db54223d6278d816849cfaa215037be8a1f8d23477",
+  "pageVersion": "sha256:4f00a583d82afcb319ab485258c1a4885b5b32032d992585e3e627cea9ae7fe3",
   "claims": [
     {
       "id": "claim_5926bc5648464eb4845b0dc070643e37",
@@ -803,10 +803,94 @@
           "version": "repo-lines-v1:sha256:d9fe0cd441cd43c48f6bb21e27bc4df675b53268f526ffa9c18f3eaa629283c2:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTdmYTZjYWUwZDU4YTA0ZTJlZWZkNDNjNzhiZjZkMTBiYmVhYWZmM2ViN2MwYzhjNGU3ZTMzMTMxODgzNGE2MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDVlNTdjODM5MzVlYTg5MGJjZTYwY2FjYmE3NWE0M2I0NjNiNzVmZjBhNjk0YWM1ZWI3MGQ0NzZlOTZkOThiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzJjYWQ2ODM3N2EyODc2MmQxNTRkODJkMTA0ZDk3N2U5YjcyZmMzODFlMDlkODQyYTkyYjY1MGVjZjUyZTI3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmE5YjQ3ZTI2YzQ1YmM5MzM0YTVkMzhjZmI3YjhkMTFhNzM1Yzk5NjZjMDdhOTMxYzkxYmZjM2Y4YTgyNzUzMiJ9"
         }
       ]
+    },
+    {
+      "id": "claim_2690c89e6d254a2f9272f7a33de5b158",
+      "statement": "通用配装页表头的「全选」勾选框在 `slots.length === 0` 时不渲染：空数组的 `every()` 为 true，配置读回来之前它会先显示为已勾上、再被真实状态改掉，看起来像闪了一下。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L231-L235",
+          "version": "repo-lines-v1:sha256:bd3ca6d8acf20c6633dd66cd2a137f7596ff41afbf367fec64c71f6c821ca9ca:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGVjMGM4ZDFlNDVmMjMyNjQwNTY2N2Q3Y2Q4MWZhNTE4ZmNjYzk3ODg5Y2Y1ODFmZWI0OTRkYjZmYTQxNzA3NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFlYzBiMTYzZDVkZGI1MDNmZTk5ZDIyOTNhNDg0YzcxM2U2ZGY0NWNjMjFjYjRiNzFhMTUzYzBmMmI3N2Y1OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTUxMWRmZDY3NGRmMDJiNmJkMWJkNmQ4OWMyZDcyMzI0ZmM4MGQwMTRlNGFmZDI1MzY3MjM0OWRjMzczZmY1NSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L364-L376",
+          "version": "repo-lines-v1:sha256:ef4d8d54a2418727474d94c92ee1d8c153c11765e8345808167c9c7680a79971:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5NjRjMzAxYTJlMTg3MGZhMGUxMzEyMGE3YzM1NWFjMzFmMzY1NjAxOTc2NWU3ZDdkMGVlNjJjMTFlNDVhOTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBlM2UxNzQwMDAzNTc2Zjg1ZThmOTI2MjY0ZWRlZjllNjU2ZWI5ZmZiYjBhYTUzNDBkNDk2NTA5NTMwYTMxOTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI0OGNjM2UxYTViNzAyZjY0ODYwNjMxODlkMGQ3NWNlNDhhOWM5MWJlOWNkMDIwYWFhZmUxMjQ0MTFiN2JjZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmMzg1MjE1YjE1N2NlNDI5YjkwMzc3YmM3MzE2NjcyOWE2ZDY4YjdjZmI1ODY1OWQxZTU0NDI2MGZhNTE4YjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c327e31176864b26826c5366170bcf05",
+      "statement": "语言切换的四个按钮包在一个 ButtonGroup 里（`aria-label={t.langSwitch}`、`size=\"icon-sm\"`），选中格用 `default` 变体并补一条 `border-input`（该变体不带边框色，组的外框会断一截），再用行内 `translate: none` / `transition: none` 抵掉按下位移与选中格 150ms 的淡出淡入，不必去改组件原语。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L321-L345",
+          "version": "repo-lines-v1:sha256:111dca7baa9e117be9a2c019981bbc0900a1072546b96c46fd453e4874f906ac:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0MjE5YzYxNDZiNGYxODY1NWFhOGJmYWFkNzMyNmU4MjRiMTkxNzQ3MjBjOTE1N2M0NjJmMDM5MzcwNTczOWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyZDdjOGM4Mzk1MGViODFkYmFjYmE0ZTE0ZWQwNDgxOGE0ZDkwMzRhYmY5ZjBhMjYwNDU1YTJjZWVlMmY3ZjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIwMDA2MTBjOTU5YjkwNGMyYjFkYjA2MjA4MGJiZWNmYWFkZjY4ZjEzZjhhYmJmNDA4MWZjMDc0NTU3YzQyNmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc0NDIyMDgzYmJlOGM4NmI1YWIxNjZjNmUwMmY1ZTQ3NDFmNzc3OTQ4ZDM3NDhiNjk0ODQ2Y2FiZTg2NWRkZTIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a00308b3e06b4a9b8fd78fc534c53204",
+      "statement": "父行勾选框的三种状态由 `skills.ts` 的 `parentState` 按这一行显示的等级给出（不是按记录条数，否则 11 个等级只开 1 个会被读成全选、半选态永不出现）；因为 Base UI 的 indicator 永远画对勾，半选那根横杠由 `SkillRow.tsx` 自己画（14 单位盒子里一条 y=7.5 的线），`style.css` 只负责把 `[data-indeterminate]` 的盒子刷成选中态填充并藏掉 indicator 里的 svg。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SkillRow.tsx#L328-L392",
+          "version": "repo-lines-v1:sha256:0e22e3e1161073d79e0be515e0fad7b426a504fa80f1d5f8fda8103a9d72cae1:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmODU2NDkwN2M0OWM4ZGFiZGUzZTI0Y2FkMjdiMjE4OTJlN2M5NGE3ZmYxZmU2NzBjMDlhMWVmNzllNmNjZjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhYmE4YTBmNTIxOGJlZmZlYTZmZDMwODJhMWEyMjRhZTc0YWE0NmNmZTcyN2YyMTQyZTFmMjA4Y2RjMWY1MGIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyZDgyOGEwMzdhYzFjODE1MzViMWQ1NTAwODMyMzIzYmZiYjg2NmEzYTNmODdlN2E2OGMxM2EyYmFlNTZmZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVmNjgyY2U3NTc0ZmVlY2M0MWE3NzFhNTZlMzc5YjM3NThjYTRiZTI2NDFkNGI0ODk1ZThkMDlkY2Q1MzE4ZDIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/skills.ts#L209-L225",
+          "version": "repo-lines-v1:sha256:9b338f02c2fcd6c1db481aaff07fdacb7961c86a7eac194271f44dc4956500c5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmZjVmZTAxOTYzZGI4OTQ0YmQ2ZTg4OWQ0NTljMjNmMGI2YWJhYmQ1YzY4ZDg2OTNkMmQ4NGU0ZmNkNWZhOTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyMmZhYTUzNWJkMmVhM2Q1MmU3NDFlZDQ1NDQzNWI3ZmU0OWU4MzU4NmU5NDNkOThkODJiYmZiMjRkMWY1YzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjNWI4YzMxNzZjYzUzZWFjNTZiZGQ5NzcxYzRhYWQ5Mzk0NDc0MzQ5YTQ4ZTU0ODliMDgxZWMwNmE0ZTE2NTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkYWU4NDMxZDhlMDA1NjU4ZTg3YmUyMDIxYjRjMzEyNzRkYzU2YTBiOTY3MDA1Y2IwNGRiM2YxOTBjYjk5OWMifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/style.css#L130-L140",
+          "version": "repo-lines-v1:sha256:97c77818888aa8bfaedee098a4a489a59ba724eda5efef43dbc53d0af407a8ea:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmZDI1MzU4YTM4MTVjOWFkOWQzMDNhNjU4YjVlY2M4NzQzZDE5MDA5OTZkZjBjMWUwODM3OTBiZWQ2NDdlYmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyZDk0YjZlMmY4MjQyNDkwNTU5MmVmZmUzMzE0ZDNkNjE2ZjU5NmE1N2E3ZmMxZjE4MWY5ZjUzYzdkMGVhYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIxZjFiNzUyYjQ0ZDYwYzlhZDNjYTE1OTNjZWFmZGMxM2I4Yzg2ZmFmY2Y2YTViM2EzODAxYjk4ZjVjYTgzOWIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_43ce79b35f174d029a84c0a98529e5f9",
+      "statement": "因子编辑页的勾选框在 `.skill-rows` 这个 class 作用域下有两条覆盖：关掉位移动画（勾选会让那一行重排，组件自带的 transition 会在行已经跳走之后还在填充颜色），以及给 `:focus-visible` 补一条 `box-shadow: 0 0 0 2px var(--ring)`——焦点环向外生长会被容器边缘切掉，所以行在左边留了同样 2px（`ml-0.5`）。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SkillRow.tsx#L262-L268",
+          "version": "repo-lines-v1:sha256:34a62660484cf2d4347272cd1160467891f925a02c1410d3c49638bd48caa59b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjQ1OTQxMDEzZWQwZGZhZjBjZjNjN2Y0YjkwYTcxODk4YTBiNTBmMWRhNTZlNzcxMjdlMmM4NWQxZmQ0YmM2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzFhNmE4ZmMzZjU5MjE5ZGViZDUwZDU4NWIyY2RlNjMwODIwYjJlMmQ4ODk4ZWVlZGY2ZmY0YWE5ZjZjMzBmMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzM1ZjA5NDNlYThlZDBhYWM4NzMyM2E1OGNjZmVjNjZhYzFmYjM4Y2ZjZDE4M2ZiNjYyZWUxNWMxODZlNjg5MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODA1M2EyMTIzNmY3MTAzNzU0ODVmZTQxZWE5ZWEyZWRmNjE3NDMxMTUyNTA4ZjlmNzlmMzI2NWMyMmJjZmU1OCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/style.css#L109-L129",
+          "version": "repo-lines-v1:sha256:921a68b2a2fa1a7f9e0635013019d59a2023557041184694f1c7706b26502318:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRmODcyNDA2ZTY1ZTY1ZDdkMDcxZWVkMzRlMjhkZjU1YjlmZmRlZWNlZDNmNjhkYmFkMzZjYTkxYTFiYjdkYjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE3Mzc0OWNjNTUyNWE3NzA1MGI3YTM5YWM5ZmNkOGMyNjliMmRlYTUxNGVkZTM1MzE4ODk0ZjMzNWNmYzkwZTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_46ec08a9052749e8bc7e7ef7b61fdbfd",
+      "statement": "`GBFR.SigilLoadout.SaveFailed` 的订阅挂在 `[lang]` 上：语言一变就重挂一次（`Events.On` 交回的函数就是 React 退出时运行的取消订阅），免得失败对话框的标题停在旧语言上。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L167-L178",
+          "version": "repo-lines-v1:sha256:c68851415a032b24a7ee293c7ad3e85ec24760c4966836b53da43f2b71941f5a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmODU2NDkwN2M0OWM4ZGFiZGUzZTI0Y2FkMjdiMjE4OTJlN2M5NGE3ZmYxZmU2NzBjMDlhMWVmNzllNmNjZjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0ZTQyMDhjZDZmZmI4YzRhMzU0N2IyZjU0YWRhMTk5NzhjM2YzNjVlNzhmOTUwMmVmNTE0NWNkZDJhYTg1NDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFjMTIwOWRiZjRlOTIzYzIwNGExZjY4MDM4YjUwZjc3ZWVkZTRlMGI4ZGJiNzc1MGE5ZWI5YjVlMWJiYzFmZjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzY2Y4MzlkZWE0NTE5NzA2YmE3ODlmMmUwYWJlMGQ1ZmJmMzdmNzIzZDJkYmM0NjcwM2U5NDNjZTJmYzI3OTQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9e1785f645884bc4ba652477cffea04f",
+      "statement": "因子编辑页搜索框的值经 `useDebounced`（150ms）之后才进过滤，否则每敲一个键都要重排整张列表。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L184-L229",
+          "version": "repo-lines-v1:sha256:aa31c03d4221ec0557107dd48215daf3519cb52696153b2d4fd663e0428c09fa:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhMDZkNTk2MTRhMmE4ZWE1Y2VmMzEyMTk3ZTA4MjNmNzIzNTg2NjdkNGIwNjYyZTJkMjcxOTViNmMxZDc0ODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1ZDhjZDdmZDBjYWI5NjAwZjhlYjg3YTMxM2VhMzc1Mzk1ZDA3YzEzYjU4MzhjYTQyYmM4MTlkODkwYzkxY2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5Yzk2OThkMWYwMzU3Y2U3ODQ4YjE4NmM3N2UyY2I5MWQ4YWY2NTc5NTVjZjhkMGU3OGRkMzUzNzM1MjU0MTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjZjJlZTA4ZTFlMjcyNzIzODQ0MzM0OGYxMGJjZWRjYzMzZmU0OWQ0Mzk3ZDVlMjJjNGFmNjZkYjg4ZjU4YjIifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L46-L54",
+          "version": "repo-lines-v1:sha256:a85aa1bab861e5d4bee9a7f9a971251933814cfd6deacd2226fdf2042da818d4:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzhiNmRhMjA2MDYwZGViNjY5NDY2YjMzY2RjN2IzNWM5ZDk4ZWI4NDQ1YmMwZjkyZGJhMTBlYzM2N2U4YzgzMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWJiZmM0OTY5NTQ0MzVlNmNkMGI1NjczN2RlMGY0YjllMDc2ZmIzOTYwMzYzNTA0NDUzZDkyOTY5OWRjYTdiMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGI5NWE2M2Q4NTEyNjE5ZThmNGVjYTRhZTljMzRhNWRlNDU0N2IzNDIzZTI1Y2JhNjcxNjM0YmU1NDBiZWFkNSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L84-L86",
+          "version": "repo-lines-v1:sha256:e17c8a5ae8e00d0bd8766dd935e16a52ddc3ca635cb077a8bfec31b21f858c76:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDRmMTRkMzBmZGE2NDRhYjc2NzY1ZjQ0YmI5YjUzZjRkMDc2YjQyY2QwZmQ2NTUxZWMwYzdkYTU2NDQ5ODUwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2Q0YjdhM2ZjYTVlNzJjYjdjN2UwMDJiNDQxMzkwN2NlMmFkOThhMjNlOTgxNmUxZWQxMTRkMjdkYjBhMDQyYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTZjM2E1OTA1ZTcyODIyYWM0NWYyNjE5OWJjYWE1MDQzNDhjMTc2MGJhYjAxZDdmYTE1NGMzZmZlZWViNDg0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDFmYjkwZjUzNWIwZGI1OTI2Y2Q3NDM4MDk2M2Q0ZTU5NzBkZjAzNDA4N2NjN2JiN2Q3Y2I3NDIyOTBmNmJlMSJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:f2a27658fd6881d86ca8310c3f687501042927f3a580bfbbc238f16d0cdf9a50",
+  "pageVersion": "sha256:16dd2ed571e712c7eab86fefbf093cc69d57498de21381bc1560208656ea2600",
   "claims": [
     {
       "id": "claim_41f5f5788f694041b58e190df51cab4d",
@@ -493,10 +493,90 @@
           "version": "repo-lines-v1:sha256:8909b387f5244900502df32435570dfe07e9acbbc726881477e936d83a137a3d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3NzY0MjIyYTkxMzEzNmExMGZjNTJiMDQzMWZhZGI3YWM1NGFiNGE2YTA1MmZmYmJmZDllZTE2M2MyOTYwNTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         }
       ]
+    },
+    {
+      "id": "claim_04b1aac008dc4d3aa0846b1ae3d125cd",
+      "statement": "等级上界的唯一实现是可视工具前端，C# 与 Go 都刻意不判：面板的 LevelInput 用 max = capOfMain / capOfSkill（表里查不到该技能时 max 回落 DEFAULT_LEVEL = 15）在输入与滚轮步进上夹住，model.ts 把存档读成编辑器状态时用 clampLevel 按 cap 夹（cap 未知的 gem 保留文件里的原值，该行在下次保存时被丢弃）；C# 的 GetLevel 与 Go 的 validateSlots 都只拒负数（与 cap 无关，任何情况下都无意义）。因此一份手改的 loadout.json 写入超过 cap 的等级会原样通过两侧检查直达原生，而再在任一侧加一份固定上界只会成为同一规则的第三份副本。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L192-L201",
+          "version": "repo-lines-v1:sha256:56946e53a34c4ce6dd4d248afcb32215f3b30f8b551e9a349bb9c0dd72a707e6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5YTcwZWQxNjIxMjM2OTc3NWMzMWZhODY3Nzk3NDA3ZjNmY2FjMDJkMDNlZDIzYzE0ZDczZjg4NzU2OGE3OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ0YWU0ZDVkYzQ0ZTU4MGI4OTc3OWM1NDdhYzRkYzJiZjI2YWEzMzE1MTNkMzg1MDQ4ZjQzNTBiNGMxMzMyMTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExMWNhYzYwMzQ3YWFjNDYzOGFmNWVkZWM5YjhkMjljYmY4ZjhmMGU3N2EyY2ZlYWU4NGI0OWEzMTg5ZmRjMWEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SlotEditor.tsx#L119-L126",
+          "version": "repo-lines-v1:sha256:1e9b8c75e309c05d70d5e87e865666e4ca703de70e9291c6a83d9cc71dd6f42b:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmJmNTA3YjU5N2I1ODJjNDUwZWMwNDJkZTc0NjBmMWI4NWEwMDg3OTU3MGMwNThjNjRkODRmYmViYzg2NGU3MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTBhMTJiNDBkZDk4YThmMmEwMDBlNzcwYjVhZDU3YjVjZTJlYjQ5M2E1NmI0MjQzMTE1NGJhMzU4YjA5ODQ4MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWQ2MTc4NmJlNzk4ZGVhZDQ1NjljNTRjZWMyN2UxNDUzN2U2MzRiM2FkMWVkNjY4OGRhMDljMjQzZjU3MjAxYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGJiZDJmMTQ1OTc0OTY5ZGRkYzBiMjE0NWEwZWE0YjU4MTdhZmI2YmFkZTgyODUzMzE3ODdhMDg0YmRjYTYyMCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/SlotEditor.tsx#L39-L62",
+          "version": "repo-lines-v1:sha256:ea54f030d58a71f769d673559045229d93d64d3afff99e213f70d3e0c968109d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZhZDQyZTVmOGJkMmJkM2RhY2FmZDExMTNmOTQxMGI2YWJmY2NlMjlkZWEwY2VhNGZmZjZlMGNkZDU3NDhiODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyNGEyOWY2ZWNkMzhiNjgyMTQ3NzJhY2YzZmEwZjA5N2UxMTIzMjc2ZDNhYjk3ZGNiMjAzMTI3N2YyOWY1NWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxYmNlNmIzMjBjOTdjZjVlNzcwY2YyYTUxNjZhNWE3YWUxZDY5MzBiYWFjZWVlNjcyNjNhYThkOTM3MDczMDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU0ZTI2MDQyYmI3ZjA5NjQ2MjU2Mjc2NTcyMjQ1MzRhOGU5ZGFhMjU1MmQ3NGRlODgwODRlMmE1MDU2ZTAxMDkifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/model.ts#L179-L180",
+          "version": "repo-lines-v1:sha256:cb5ea295bc5323134acc2cf90f4dbc79a251fb4afbcff02d5e5ca7ccbffeb27e:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2UzYTExODNiMWZlZTAzOTQ0ZTQ1ZjlkYmU3YmUwMTBlZjA1NWJhNDM4MTVkODQxYTlkNDdiMTBjZTAyY2FlYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjU5MGZmZmU5YTNhY2EzZDBiYTJjMTVmMGI5ZGI1NWEwYTQ4MDc3OTg0NTdhNTVkZGQ3MzY5OGUzNzM0NTY1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2JhZDUyMDFmYWI5NTliNTliYmM5N2E5ZDIxYzJkODBmMGZjNjk0MGUyNTQyYzg4NDExMWQ3MTU1NWVhYmYzOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTgxNjcxMzNlZThkZDhmZmNlNTRiODRmNTI2YTVkMDkwYjM2OGI3OTUxY2UwNmE2Y2FlODFmOWFiOTQyMzJlMiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/model.ts#L300-L306",
+          "version": "repo-lines-v1:sha256:a6955cc25e85a46c3e72ff8a9b0fe3e1fa2e3577f174cbdeb6bf958c77b47fec:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTNlMTUzODZiMmViNDdkNDc2ZWZjNjhmNWMzMzM4MzRhZGRkMGU5OTE5MTY0YmEzNjc4MDIzYTMwMTE2M2RmZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODY1YjEzNDgyYjQwNDg0Yjg2OWE2YTkyMmU5NDA1Zjg3NzM4ZGMzNjJkY2FhZGY0ZWI2MTUyZmYwMzdhZGZlZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzhlNzQ2YjdhODE3OTljMmFiOWQzMWYyMjM2YzRkZjczZWQ2Y2E0ZWVmNzVmODRhZTk0ZGY4NGI0NDczNTJmYiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/model.ts#L380-L390",
+          "version": "repo-lines-v1:sha256:bffd61f79f81db3cbfe57b8fee8322ddc7288f0cd12ad6f77cb83ceaf3ecea42:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1ZjE5YzY2MTA2MjYxMTI3OTc0YTM2NmFkZjJhOTdhNWI4YjM3OWQzM2Q1ODNjNTZlZGRiNGUwODU2ZjFiNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyODZmNWNkOWNkNzUzNzA3ZGExOTViMmE3NDkwNjkxY2QxMmYzODA2NWRlYjJmY2Y2ZTQ2MDJjNDQ4MmI0YTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3MDgwMDRmMzIyNDg5NWIwZmNkMDAzNWZmOGE4YTEyNGRkZDAwODE4MmY4YmNjMTNkYzJlZmM5YmYxODFjZDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMGY4MmUzZjI2M2U1M2NkMDExNTNjZjkyMjNkMGRhYmQxZjM2MTY5MDBiOWE0YWYxZDE5NTczODlhZmM1NWEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L160-L197",
+          "version": "repo-lines-v1:sha256:bca52cd90ae5141b80028662ab5c6699e01873704062bedf67601aa9f8c5088c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRjYjQwMjQ0YTcyZWEyMTVlM2MyYTNhYmIzMDQ5YjIyNjM0MmZlOGI4MTFmNmZlODQwOTQwNGRmZjI1MmQ2MWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJiNDQ2NWM0NzVhODM5YTI2Mjc5ZTI1MjRkNDNmODI5MmJlMTA0MzkzMzUwYjg0MzYzY2ZmZmFiMWVjN2Y3NTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxYjVmY2RjZmQzZjQ3NjYyMGY2ZGY2MzkwYWNkY2I2NDNiNWJkYTdlMTNkMTc2Zjg3MjNlZmUxOTRkODRmOGYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1d2be5b8c3c04a878cefe47d34345d54",
+      "statement": "托管侧与工具侧对 loadout.json 一行的遍历顺序不同：C# 先判 enabled（false 就 continue，连这一行的 items 都不看），再判启用槽数上限，最后才判 items 的形状；Go 的 validateSlots 则对每一行都要求 items 结构合法（含被禁用的行），只有「数进去几个」这件事排除禁用行。于是「禁用的行 + 坏 items」这种手改文件在 mod 侧被静默跳过，而同一形状的载荷从工具那边保存时会被 Go 拒掉。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L142-L155",
+          "version": "repo-lines-v1:sha256:9476d325699b74faafe8b2a99c7f6210534e354c02758f7e016d348936cf0b52:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUyNWU0ODFmNTc2MTNhZWM4ZTE1NmU2NzBhMWY3Zjg4ODY0MWVlMWI2YmJmNDEzMDI2ODdkMGZhNGNlNDcwMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmMDdjY2Q4YTkyMGNiOGM5MmRhMTNlN2ZmNDM5MDBkNzk1NDEzMDI3MmEwZmQ2YTU0ZTlkNGVjZDYwNjFmZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5MzM4YTNkYWUwMGFmYzJlMTI3NjMwMDNiNGFkOGViMGFlYWMxMmY2MGI2NDJmYTFiOTc0ZGUwMjA3YTg5NDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIyZjkyMjVhYzA0N2JmNTZjZDUwNDY4MjhmZmZlYzcxZDQ3MDU5YzU1ZjZiMzJhNGJiNmU3ZGJmNTRjM2U3NmMifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L166-L197",
+          "version": "repo-lines-v1:sha256:d0b32ca5584211cfee4ea920ef95d8cc95abd2b83dddece47e35a20bc966aa33:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMxNmRlNWU1N2Y2NDU4MjNmMDg5ZmZkNGJjNjQxOTcxYTQ5Mjg0ZTM1MTlmYzBhM2ExZGQxZjI5YWQ2YjcwZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI1MTAwODI1MmM3ZjVjNDExMGZlZmY1Yjk1MzIzMzViMmE2YjM4ZjVlMzBiNmI2YTdmOGUzMWFiYWEyYWZkOTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxYjVmY2RjZmQzZjQ3NjYyMGY2ZGY2MzkwYWNkY2I2NDNiNWJkYTdlMTNkMTc2Zjg3MjNlZmUxOTRkODRmOGYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d38b58fdd480420794dcbf433900bd46",
+      "statement": "loadout.json 的 slots[].enabled 只接受 JSON 布尔值：缺成员等于启用（`!TryGetProperty(\"enabled\", …) || GetBoolean()`），而成员存在却不是布尔值时 GetBoolean() 抛异常，落进 TryApply 的外层 catch 后整份文件被拒并保留上一份配置（日志 Invalid loadout.json; kept previous configuration: …）。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L144-L147",
+          "version": "repo-lines-v1:sha256:7a66902050914be77dfe85e36d943989f86bb275c618c038537640884c70b561:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2UzMDA0NTIzNzk3NDFhMTJlYTE2N2Y1ZDZiYjAzYzBlOWZkNDQyZWRmZTg1YzhhYWRjMzE3YWJjMDM0MjVhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzQyNWVhYzVjOTUyOWRjYWRhYjA2ZTQ4NTAwNjY1YzJhMGY3MDUyNDA4YTJlZjg0YmNhNDk2Nzc1MjNkNjA1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjFiYzM4ZDJlYjcyYjFlNDUzNmMzYzk0NzYyNmJjNzRmNmM1ODc0N2U3ZjQ5MjQ0MjRiODkxMzJjZDM4MzExNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjM1OTdmZjIzMzg0ZDFiM2Y5MDE2M2I5NDFmYjU5Y2IwYmIxYjQ3NzU0OWI1OTk4M2NhYThiY2JmYzgxMzI4YiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L80-L84",
+          "version": "repo-lines-v1:sha256:7c96bbb7293fe1ccc229bcd1c4f80b4722d4b9ab88f6f835fc6947f736818169:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2JlYWY5Y2Q4NjY3ZDQ5OWQ0YmM0M2Q2ZTFiZjZiOTQ2NDg4ZTA5YzRhODM1YmFiMmNkZDBmZjYxN2Y1YTFmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWQyMmE4MDgxZDA5ZDZkYWRlNWE2YTAwZWE2MjljYTE2N2EyNTk0NDY2NDQ3ODdjY2M1NDhjYTdiNjczYWY2YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmRmYmM4NDkzNGVlNGZkNGZkMDZlNmEyYjNmM2Q0ZDNhMzk4NmU3ZTQ4ODkxZDc0ZDIyNzhlODFhZWM2NTAwOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f3599ab66dd0435da22981ed350e1e1e",
+      "statement": "loadout.json 的 slots 成员在两侧是「缺成员即拒、空数组合法」：C# 抛 missing 'slots' array（根不是对象时是 expected an object with a 'slots' array），Go 的 SaveLoadout 反序列化后检查 c.Slots == nil 并当场报错、磁盘上不留痕迹（旧的裸数组形状 [ { items, enabled } ] 同样被拒，TestSaveLoadoutRejectsAnObjectWithoutSlots 与 TestSaveLoadoutRejectsTheOldBareArrayShape 各钉一条）；而 \"slots\": [] 在两侧都合法，含义是「没有通用槽」。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L133-L141",
+          "version": "repo-lines-v1:sha256:9410acd9d2201a30cfe7fbcf760f0ea6ccdfaf5f83566d6dfb66e80b6ceb301a:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM1NTMwOWM0NWVjZjYxNTY2ZTE5ZjViYzBlMjVlMzFmNWRkODlhNGMwMmIwZTc4OGRhMmJhZWI3NjJmZjAwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTY2YzRiZjg1Zjk5OTYxMDgyZGMwMjU3MGIxZmY2NDkzMGYyNjkxMjliMzg2YTQ3ZmM5ODhkZmZiZWVjMzY3YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOGZmZTg4NTFiM2I1MjI1NjkzNWVhMmVjNzlhMjcwOTA1Nzc1NzNkYzY0ODExNDk0ZTIxODc5MzQ0NWZmYTE2ZSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L199-L222",
+          "version": "repo-lines-v1:sha256:017b4881e4d0e6a87d14365bf06b5e6454b02e5755e434094c34ea80b5aedc2b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjYTEzNWY5NjNkMGY3ZWM5MTY0YzRmODU3MTkzOTU0M2YzNTkyZjUyM2Q3ZjI3Y2FkNzQyZTBiNGM2NTg5MWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE2MzFiNmUyY2EwN2Q4YmFmMGViNDRlNzQ5ZGJmNDkwYjM5MmUzYTUzNGVmNjEwMjI3NzExNDZjZGY5YWYxYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiN2QyZmY4NjBmNzIzOWE4MWMxNTAyYTgzZjNiNTE0OGU3YjJjMjQ2MGIxOGY2NGI2YmUyYTg5YzQyYjlhN2YifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice_test.go#L248-L284",
+          "version": "repo-lines-v1:sha256:2471e50cca3ee9053f7e5bdb9a4114fbd4cf65e542909c15801512eff6696d08:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMjU5NDJkMDVhMTE5OGQ0ZDk0MjYzMjQxZmEzNTNhZmQ3ODUyZTBjMTJkZTc5NzQwYTJhZmEyMDcwYzdlNmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkNmUxYmE4NDFhZDU0MWQ3YTQ1ODY1MzU4MGM1OWY2NTcxOGFjNTZkZTdiOTNhZjg4MTFmMDZjMDE2ZTQ3YjUifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

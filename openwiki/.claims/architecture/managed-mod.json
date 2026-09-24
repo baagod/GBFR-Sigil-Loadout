@@ -1,14 +1,18 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:25683a48c14d95bf31342a2a5f4245e18b7501bc598e544a5405c8c19330984f",
+  "pageVersion": "sha256:fcf9523c85917c408622be3ed0d8233b516a351e5672e2bab33342bb23245e86",
   "claims": [
     {
       "id": "claim_2b2224e918be4901a0ac96a52af537ea",
-      "statement": "GBFR.SigilLoadout.dll 是薄外壳：没有 overlay UI、输入捕获、预设存储或 Overlay Broker，原生核心自己经 SafetyHook 装钩子并自动套用内置模板配装；托管侧只承载宿主生命周期、250ms 维护拍、日志转发与读两个由可视工具写下的 JSON，并且不持有任何游戏侧事实（不缓存地址、不扫内存、不维护按角色槽表）。",
+      "statement": "GBFR.SigilLoadout.dll 是薄外壳：它自己既不扫描也不改写游戏内存（所有写入都经 ABI 交给原生核心，活表地址由原生从语义锚点解析并持有），没有 overlay UI、输入捕获、预设存储或 Overlay Broker，也不维护按角色槽表（模板表与专属表都在原生侧，托管侧唯一的“表”是因子编辑那条路从游戏归档读出、就地打补丁的 skill_status 字节）；托管侧只承载宿主生命周期、250ms 维护拍、日志转发与读两个由可视工具写下的 JSON。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout/Mod.cs#L8-L14",
           "version": "repo-lines-v1:sha256:3fa510c5b613d9b2e30fa726fbad3f0d92d54535fd99cf5f05cb5b34f2a62357:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWMxOTdiMTkwNDgzZjFiNzBkNDE0MTA2YWU2MTJjOTk4N2UyNzMyNjcwMTUwYmNhMGMyYzk3NGY3OTNjMGEwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDVkYTQwNWQ0ZmE0M2FiZWExZjhiNGJkNmQ0MzhhNTdmYmY2OTMxODI0MzJlODZmNWQ5OTE3NzRmNzNmYzAxMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjZjNDEzNjYwNzU2OTNlZWY2OGVjNzhkODc3NmRjYzFjNjIzOGJmZjNhZmIwMzNiMmI2OTE0OTBkOTFmNjBiYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmE5YTRkMjVkNTQzMWEwODc5NDkyNDAzMzhmODc1ZDY3NjRjYTE4NjQ0OTVmZmJiZmFjMTAxZWVjOWU3NTFiYSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/NativeCore.Interop.cs#L53-L59",
+          "version": "repo-lines-v1:sha256:652ad412e02ab62386bf06d1839d95a606c7024965b1aac3740a848e22a67f8e:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzJiNmRjOTBiMmY3OTI5NjNkY2RhZGZlZmI0MDg0ODU0OTNjMDNjM2UxYTgwZjE0OWJjNjM4MDNjZGQwNDY4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmNkZWI0ODBlMWYxOThjNDgxZTk2ZmRkYjU3Nzc4NzdhNTQzOGU0NDlhOWU0MzQ0Y2JhZTBjNTc0YWRlNTc5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzYyYzE2YjQ3NDFkMDE0MDkzNTdhMDNmYTQ4OTVlOWM3YWJhMmQ4NGU1ODhiNWY2ZTM4ZDNhZmU5ODliMzEyYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjY0NTljNzg0ZmRhZTk3NzA5OGQ3NTkwMTRmZjJhMTYxZmYzZTAyYzBjZDc1ZDk1MzAwZjAzNjA5MGIxZDAyZSJ9"
         }
       ]
     },
@@ -320,11 +324,11 @@
     },
     {
       "id": "claim_772b47236f51416c903db6f3667852b7",
-      "statement": "LoadoutConfig 是 static 类，唯一职责是把可视工具写下的 loadout.json 载荷映射成 ABI 结构并推进原生模板表：不读任何数据文件、不持有任何表，也不判“因子选得对不对/有没有超上限”，只做形状校验（JSON 坏、缺技能 hash、等级为负、启用槽超过 MaxSlots）。",
+      "statement": "LoadoutConfig 是 static 类，只把可视工具写下的载荷映射成 ABI 结构并推进原生模板表：不读任何数据文件（assets\\sigils.json 的唯一读者是可视工具，主技能 hash 随载荷的 items[0].hash 走）、不持有任何表（模板表与专属表都在原生侧），也不判“因子选得对不对”；等级只要求非负——每条技能自己的上界（cap）只有可视工具持有，且它在写盘前已把等级夹在 cap 内，在这一层再判一次上界就是同一规则的第三份副本，判的还不是真正的不变量。",
       "evidence": [
         {
-          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L133-L190",
-          "version": "repo-lines-v1:sha256:aaed94742b7e1deea4e5a36b2bb8668f0e37357526e64baf5a4c0c02a6ca4af7:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzNTUzMDljNDVlY2Y2MTU2NmUxOWY1YmMwZTI1ZTMxZjVkZDg5YTRjMDJiMGU3ODhkYTJiYWViNzYyZmYwMDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk2NmM0YmY4NWY5OTk2MTA4MmRjMDI1NzBiMWZmNjQ5MzBmMjY5MTI5YjM4NmE0N2ZjOTg4ZGZmYmVlYzM2N2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhYjhiOTQ2Mzk4OWZhOTc4NjRkZWM3M2MxMzExZmE2YWM3OThjY2ZhMWJhMWQ5NjUyOTg1MDc2YWFmNzM5OWUifQ"
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L190-L201",
+          "version": "repo-lines-v1:sha256:ceb25e4dba249552d552725d0cf47e12d8d6c83a2f9f90e8a5c934dca206051c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmYjAyYzNmMTIwYWM4YzA0ZGVjNThiOGM4YzQ3YTRiMDA3YzcyNWIyMzMwM2Q2NzI4OTQ5ZmU4OWUyNGI3OTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExMWNhYzYwMzQ3YWFjNDYzOGFmNWVkZWM5YjhkMjljYmY4ZjhmMGU3N2EyY2ZlYWU4NGI0OWEzMTg5ZmRjMWEifQ"
         },
         {
           "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L6-L31",
@@ -520,7 +524,7 @@
     },
     {
       "id": "claim_1264832001924d868928a3d5c5754aa0",
-      "statement": "exclusive 只把值为 false 的项变成 ExclusiveOverrideNative（“没说”与“说开着”是同一件事：原生对没被提到的角色一律三槽全开）；外层键解析不成角色 hash 就记一行 “exclusive: '…' is not a character hash; ignored.” 并忽略（PL 码是可视工具显示用的标签，不是这里的身份），一条 override 都没有时返回 null。",
+      "statement": "exclusive 只把值恰好为 false 的项变成 ExclusiveOverrideNative{Disabled=1}（“没说”与“说开着”是同一件事：原生对没被提到的角色一律三槽全开）：外层键解析不成角色 hash 就记一行 “exclusive: '…' is not a character hash; ignored.” 并整条跳过（PL 码是可视工具显示用的标签，不是这里的身份），内层键解析不成 skill hash 的记一行非 hash 键并跳过该键，hex 合法但不在原生专属表里的技能 hash 由原生忽略——托管侧不持有那张表，只做转发；一条 override 都没有时返回 null。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L87-L131",
@@ -583,10 +587,24 @@
           "version": "repo-lines-v1:sha256:c5449753999b48fdc7462c829a3ea710a55322b666a074b1a6aa2f97e77ec49d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3NzY0MjIyYTkxMzEzNmExMGZjNTJiMDQzMWZhZGI3YWM1NGFiNGE2YTA1MmZmYmJmZDllZTE2M2MyOTYwNTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
         }
       ]
+    },
+    {
+      "id": "claim_3eb7f1922f3f43499a1b1df998dd694b",
+      "statement": "LoadoutConfig 的校验是整份的：slots 缺失或不是数组、items 缺失或为空、gem/主技能 hash/副技能 hash 解析不出来、等级为负、启用槽超过 MaxSlots 任一条命中，TryApply 就记一行 “Invalid loadout.json; kept previous configuration: …” 并保留上一份有效配置，而不是跳过出问题的那一行；enabled 缺失按“启用”算（与 Go/TS 两侧一致），被禁用的行既不计数也不参与校验。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L133-L190",
+          "version": "repo-lines-v1:sha256:aaed94742b7e1deea4e5a36b2bb8668f0e37357526e64baf5a4c0c02a6ca4af7:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzNTUzMDljNDVlY2Y2MTU2NmUxOWY1YmMwZTI1ZTMxZjVkZDg5YTRjMDJiMGU3ODhkYTJiYWViNzYyZmYwMDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk2NmM0YmY4NWY5OTk2MTA4MmRjMDI1NzBiMWZmNjQ5MzBmMjY5MTI5YjM4NmE0N2ZjOTg4ZGZmYmVlYzM2N2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhYjhiOTQ2Mzk4OWZhOTc4NjRkZWM3M2MxMzExZmE2YWM3OThjY2ZhMWJhMWQ5NjUyOTg1MDc2YWFmNzM5OWUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L57-L85",
+          "version": "repo-lines-v1:sha256:8b24ada36aedf790b71b23952c5e5a1146428baca5cf69e121ab7da0d6d1c49a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4NzhhMDdmNWU3MGFhMjU1NTZlYTAwYWVkZmVhNGRmOWVmOTllZTg2ZDI3NDI3NWUwM2I3ZTk3YjRmY2FkNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzMzhmZDI4MWYxMDY0NzIxODQzZDM0ZjA3OGNjYzJjNGNjNjk4M2U1YzgyYmQ4MmJlZjk5MjYxZWQwNmNmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwMjU0MGE1MWJhZmM2Zjg5ZDIxYTkyMzE0Y2I5YWQwMzVkMTg5NzJiNWE5MWI4NzNhM2Y5MDBjZTMyNmFiZDEifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

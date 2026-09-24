@@ -1,7 +1,7 @@
 ---
 type: concept
 title: 两个配置文件与跨语言常量契约
-description: 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、形状校验责任的划分、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 对拍的范围与它证明不了的东西。
+description: 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、校验责任划分（Go 当场拒 / C# 只做形状校验 / 等级上界只由可视工具按 cap 夹）、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 对拍的范围与它证明不了的东西。
 tags: [configuration, file-format, cross-language, contract, mtime, validation]
 sources:
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
@@ -34,16 +34,18 @@ sources:
     resource: repo://SigilLoadout/frontend/src/index.test.ts
   - id: openwiki-source-00406d1c826c7d1ff3bde8c3
     resource: repo://SigilLoadout/frontend/src/model.ts
+  - id: openwiki-source-57a5fafa103ff743fd902b0d
+    resource: repo://SigilLoadout/frontend/src/SlotEditor.tsx
   - id: openwiki-source-a877d6a19260cf861fd5bddf
     resource: repo://SigilLoadout/loadoutservice_test.go
   - id: openwiki-source-47cff6e6e142f07c1c683a7b
     resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 两个配置文件与跨语言常量契约
@@ -68,6 +70,33 @@ verified:
 ```text
 %LOCALAPPDATA%\GBFRSigilLoadout\{loadout.json, sigiledits.json}
 ```
+
+```mermaid
+flowchart LR
+    subgraph Tool["SigilLoadout.exe —— 唯一写者"]
+        LS["LoadoutService<br/>validateSlots 当场拒<br/>500ms 防抖"]
+        ES["EditService<br/>padValues<br/>500ms 防抖"]
+        AW["writeFileAtomic<br/>MkdirAll 目录 + 唯一临时文件 + rename"]
+    end
+    subgraph Dir["LOCALAPPDATA 下的 GBFRSigilLoadout 目录"]
+        LO["loadout.json"]
+        SE["sigiledits.json"]
+    end
+    subgraph Mod["GBFR.SigilLoadout.dll —— 只读者，从不写也从不修"]
+        LC["LoadoutConfig<br/>FileStamp.Changed：认领后处理"]
+        SF["SigilEditorFeature<br/>Pending + MarkApplied：确认生效才推进"]
+    end
+    LS --> AW
+    ES --> AW
+    AW -->|"整份文件一次落盘"| LO
+    AW -->|"整份文件一次落盘"| SE
+    LO -->|"mtime 变了才读，失败保留上一份"| LC
+    SE -->|"mtime 变了才读，失败下一拍重试"| SF
+    LO -.->|"本进程内读回：LoadConfig"| LS
+    SE -.->|"本进程内读回：LoadEdits"| ES
+```
+
+唯一写者、只读者与两道 mtime 门的关系：两个文件各有一个写者和一个托管侧读者，中间没有第三个参与者。虚线是工具自己把文件读回编辑器状态（同一进程内，不属于跨进程契约）。
 
 | 侧 | 推导位置 | 目录名从哪来 | 文件名从哪来 |
 | --- | --- | --- | --- |
@@ -109,7 +138,7 @@ verified:
 
 - **可视工具侧（Go）是唯一能对用户说话的一方**：`SaveLoadout` 实时校验，不合法当场返回错误，前端靠它弹框（`TestSaveLoadoutRejectsInvalidWithoutTouchingDisk` 断言被拒的保存在任何目录/文件建出来之前就中止，磁盘上不留痕迹）。但它**不修内容**：能接受的载荷经 500ms 防抖后**原样**写盘（`writeLoadoutFile` 写的就是 `[]byte(config)`，`TestSaveLoadoutWritesAndLeavesNoTempFiles` 断言读回来逐字节相同）。
 - **托管侧（C#）只做形状校验**。它的不变量是「读不出来就保留上一份有效配置，绝不用半份配置去覆盖内存」；它不判断「这个因子选得对不对」「等级有没有超上限」——那张表（`assets\sigils.json`）的唯一读者是可视工具，所以上限判定属于前端，末端的死值判定在原生侧。
-- **因此有一条规则是「一处拥有」而不是「各写一份」**：等级**上界**在 Go 与 C# 都**不**判。`validateSlots` 在等级上只拒负数（与 cap 无关，任何情况下都无意义）；`LoadoutConfig.GetLevel` 同样只拒负数。同一规则的第三份副本会与真正的 cap 表漂移，而且判的还不是真正的不变量。
+- **因此有一条规则是「一处拥有」而不是「各写一份」**：等级**上界**只由可视工具那一侧实现，C# 与 Go 都**不**判。夹的动作有两处、都在可视工具内：面板的 `LevelInput` 用 `max={capOfMain / capOfSkill}`（表里查不到那个技能时 max 回落 `DEFAULT_LEVEL`）在输入与滚轮步进上夹住，`model.ts` 把存档读成编辑器状态时用 `clampLevel` 按 cap 夹（cap 未知的 gem 原样保留原值，那一行在下次保存时被丢弃）。C# 的 `GetLevel` 只拒负数；Go 的 `validateSlots` 在等级上也只拒负数（与 cap 无关，任何情况下都无意义）。这条分工有两面后果：一份手改的 `loadout.json` 写了超过 cap 的等级会**原样通过两侧检查直达原生**，没有任何一层把它夹回去（这不是漏洞，而是「cap 表只有一处」的必然结论）；同时，同一规则的第三份副本会与真正的 cap 表漂移，而且判的还不是真正的不变量。
 - 唯一的例外是**启用槽数上限**：它必须在两侧都判（Go 要先给用户报错，C# 要在读到一份手改文件时守住自己），所以它就是上表里被对拍钉住的那一条。
 
 ### loadout.json 的成员
@@ -121,21 +150,23 @@ verified:
   exclusive: { 角色hash: { 技能hash: bool } } }
 ```
 
-`items[0]` 是**因子**（`gem` = 物品 hash、`hash` = 它提供的主技能）；`items[1]` 是可选的副技能（只带 `hash`/`level`，没有 `gem`）。
+`items[0]` 是**因子**（`gem` = 物品 hash、`hash` = 它提供的主技能）；`items[1]` 是可选的副技能（只带 `hash`/`level`，没有 `gem`）。跨进程的读者只有 C# 一处（`LoadoutConfig`）；工具自己也会在启动时把它读回面板（`LoadoutService.LoadConfig`，文件不在就给 `{"lang":"","slots":[]}`），但这是同一进程内的事。
 
-| 成员 | 谁写 | C# 怎么读 | 漂了 / 缺失的表现 |
-| --- | --- | --- | --- |
-| `lang` | 前端写，Go 原样存 | **完全不读**（注释：`lang` 只有可视工具在意） | 只影响工具界面的语言选择。文件不存在时 Go 返回 `{"lang":"","slots":[]}`：空串不在语言表里，正是为了让前端保留「按系统语言猜」而不被写死成 `zh` |
-| `slots` | 前端 | 必需且必须是数组，否则抛 `missing 'slots' array` | 缺成员 = 整份文件被拒、保留上一份。`"slots": []` 是**合法**值，含义是「没有通用槽」（见第 3 节） |
-| `slots[].items` | 前端 | 必需、数组、长度 ≥ 1；只读 `items[0]` 与 `items[1]` | Go 在存盘时拒掉长度 > 2（`items must have 1 or 2 entries`）；手改的文件绕过 Go 之后，第 3 项及以后被 C# **静默忽略** |
-| `items[0].gem` | 前端（`buildLoadoutPayload` 解析出的物品 hash） | `GetProperty("gem")`，非十六进制或为 0 → `slot N: bad sigil hash` | 成员缺失会让 `GetProperty` 直接抛 `KeyNotFoundException`，落进外层 catch 变成通用的 `Invalid loadout.json; kept previous configuration: …` |
-| `items[0].hash` | 前端（主技能 hash） | 必需（`TryGetProperty`），缺失 → `slot N: main item carries no skill hash` | 拼错成别的名字 = 同一句话。**这是 mod 不再持有因子表的直接后果**：主技能只能随载荷走 |
-| `items[1].hash` | 前端（有副技能才写） | 只有**整个 `items[1]` 不存在**才等于「没有副技能」；这一项存在就必须带 `hash`（`GetProperty` 缺成员直接抛 `KeyNotFoundException` → 整份文件被拒），非十六进制 → `bad secondary skill hash` | 手改出的 `{"level":15}` 第二项会被判成坏文件（不是「没有副技能」）；Go 侧同样在存盘前拒掉 `items[1].hash` 为空的载荷（`second item hash is empty`） |
-| `items[*].level` | 前端（已夹在自己的 cap 内） | 缺失 → `DefaultLevel`（15）；负数 → `must not be negative`；上界不判 | 漏写 `level` 时工具与游戏必须落回同一个数，这正是 `DefaultLevel` 被对拍的原因 |
-| `slots[].enabled` | 前端（永远显式写） | `!TryGetProperty("enabled", …) \|\| GetBoolean()` —— **缺成员算启用** | 见下面那条真实回归 |
-| `exclusive` | 前端（只写**关掉**的槽） | 只把值为 `false` 的项变成 override；外层键解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` | 成员名拼错 = C# 当它不存在 = 所有专属开关静默失效（三槽全开）。PL 码不是这里的身份，所以按 PL 码写的键会被忽略并记日志 |
+| 成员 | 类型 | 谁写 | C# 怎么读（跨进程的唯一读者） | 漂了 / 缺失的表现 |
+| --- | --- | --- | --- | --- |
+| `lang` | 字符串 | 前端写，Go 原样存 | **完全不读**（注释：`lang` 只有可视工具在意） | 只影响工具界面的语言选择。文件不存在时 Go 返回 `{"lang":"","slots":[]}`：空串不在语言表里，正是为了让前端保留「按系统语言猜」而不被写死成 `zh` |
+| `slots` | 数组 | 前端（`buildLoadoutPayload` 每次都写） | 必需且必须是数组：根不是对象抛 `expected an object with a 'slots' array`，缺成员或不是数组抛 `missing 'slots' array` | 缺成员 = 整份文件被拒、保留上一份。Go 侧 `SaveLoadout` 同样当场拒它（`loadout.json needs a 'slots' array`），并连旧的裸数组形状（`[ { items, enabled } ]`）一起拒——放过去就是「工具说保存成功、游戏里什么都没变」。`"slots": []` 在两侧都是**合法**值，含义是「没有通用槽」（见第 3 节） |
+| `slots[].items` | 数组，长度 1–2 | 前端 | 必需、数组、长度 ≥ 1；只读 `items[0]` 与 `items[1]` | Go 在存盘时拒掉长度 > 2（`items must have 1 or 2 entries`）；手改的文件绕过 Go 之后，第 3 项及以后被 C# **静默忽略** |
+| `items[0].gem` | 字符串（8 位十六进制物品 hash） | 前端（`buildLoadoutPayload` 解析出的物品 hash） | `GetProperty("gem")`，非十六进制或为 0 → `slot N: bad sigil hash` | 成员缺失会让 `GetProperty` 直接抛 `KeyNotFoundException`，落进外层 catch 变成通用的 `Invalid loadout.json; kept previous configuration: …` |
+| `items[0].hash` | 字符串（8 位十六进制技能 hash） | 前端（主技能 hash） | 必需（`TryGetProperty`），缺失 → `slot N: main item carries no skill hash`；解析不出十六进制 → `bad main skill hash` | 拼错成别的名字 = 同一句话。**这是 mod 不再持有因子表的直接后果**：主技能只能随载荷走，所以两侧都拒空——Go 的 `validateSlots` 也拒掉 `main item hash is empty` 的载荷（前端两个都写，它拒的是手改坏的文件） |
+| `items[1].hash` | 字符串（8 位十六进制技能 hash） | 前端（有副技能才写） | 只有**整个 `items[1]` 不存在**才等于「没有副技能」；这一项存在就必须带 `hash`（`GetProperty` 缺成员直接抛 `KeyNotFoundException` → 整份文件被拒），非十六进制 → `bad secondary skill hash` | 手改出的 `{"level":15}` 第二项会被判成坏文件（不是「没有副技能」）；Go 侧同样在存盘前拒掉 `items[1].hash` 为空的载荷（`second item hash is empty`） |
+| `items[*].level` | 整数 | 前端（已夹在自己的 cap 内） | 缺失 → `DefaultLevel`（15）；负数 → `must not be negative`；上界不判 | 漏写 `level` 时工具与游戏必须落回同一个数，这正是 `DefaultLevel` 被对拍的原因 |
+| `slots[].enabled` | 布尔 | 前端（永远显式写） | `!TryGetProperty("enabled", …) \|\| GetBoolean()` —— **缺成员算启用**；成员存在但不是一个布尔值时 `GetBoolean()` 抛错，落进外层 catch → 整份文件被拒 | 见下面那条真实回归 |
+| `exclusive` | 对象：角色 hash → { 技能 hash: 布尔 } | 前端（只写**关掉**的槽） | 只把值为 `false` 的项变成 override；外层键解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` | 成员名拼错、或这个成员存在但不是对象，C# 都当它不存在 = 所有专属开关静默失效（三槽全开）。PL 码不是这里的身份，所以按 PL 码写的键会被忽略并记日志 |
 
 **「缺 `enabled` = 启用」是三个实现的一致约定**，也是曾经的 bug 现场：Go 侧用 `bool` 时，一份没写 `enabled` 的文件在 Go 数出 0 个启用、在 mod 那边数出十几个 → 存盘成功、游戏里什么都没变。现在 Go 用 `*bool`、C# 用 `TryGetProperty` 的短路、前端用 `s.enabled !== false`，`TestValidateSlotsTreatsMissingEnabledAsEnabled` 把这条钉成回归测试。
+
+两侧的遍历顺序不同，这决定了一行「坏在哪」是否会被发现：C# 先判 `enabled`（`false` 就 `continue`，连这一行的 `items` 都不看），再判启用槽数上限，最后才判 `items` 的形状；Go 的 `validateSlots` 则对**每一行**都要求 `items` 结构合法（含被禁用的行），只有「数进去几个」这件事排除禁用行。所以「禁用的行 + 坏 `items`」这种手改文件在 mod 侧被静默跳过（那一行的内容本来也不参与任何事），而同一形状的载荷若从工具那边保存，会被 Go 拒掉。
 
 ### sigiledits.json 的成员
 
@@ -145,14 +176,16 @@ verified:
 { edits: [ { enabled, key, level, values: [ 10 × (数字 | null) ] } ] }
 ```
 
-| 成员 | 谁写 | 两侧怎么读 | 漂了 / 缺失的表现 |
-| --- | --- | --- | --- |
-| `edits` | Go（`writeEdits`，缩进 2） | C#：必需、必须是数组，否则抛三种各有措辞的错误（不是对象 / 没有该成员 / 不是数组）；Go：`LoadEdits` 把缺失或 `null` 归一成空列表 | 手改的 `{"edits":null}` 或 `{}`：工具读成空列表，mod 把它当坏形状**拒绝**并保留现状——两侧对同一份手改文件反应不同，这是有意的（空列表是真实状态，坏文件不是） |
-| `enabled` | 前端 | C# 默认 `true`（`= true` 初始化式）；Go 零值 `false` | 手改的记录漏写这个成员时，mod 按启用生效、编辑器显示成未勾选——两边不一致 |
-| `key` | 前端（8 位十六进制 hash） | C# 解析不出就逐条 `skip (key is not an 8-digit hex hash yet)` | 拼错一边就整列读成空串，**每条编辑都被跳过**，而编译与测试都绿 |
-| `level` | 前端 | C# 缺省 15；`< 1` 在强制转换**之前**判（否则负数会变成几十亿，症状会伪装成「行没找到」） | 等级落到游戏没读的那一行时，编辑写下去也不会有可见效果 |
-| `values` | 前端（`padValues` 补齐/截到正好 10） | C#：读的时候把显式 `"values": null` 规整成 10 长数组；非有限数（例如手写的 `1e39`，`System.Text.Json` 给的是 ±Infinity）→ 那个槽位跳过并记 `slot N is not a finite number` | `null` = 「那个槽位保持游戏原样」。写全值就是用旧副本盖掉没编辑过的槽位，所以只写用户设过的数字 |
-| 未知成员 | — | 两侧都忽略。**旧拼写**（`Edits`/`Enabled`/`Key`/`Level`/`Values`）读成空列表 | 「从头来过」是既定形状：不读取、不改写，下一次保存写出当前格式（`TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling` 把它钉成决定而不是意外） |
+这个文件的读者有两处：托管侧的 `Config.Load`，以及工具自己的 `LoadEdits`（面板启动时把磁盘上的列表读回编辑器状态）。
+
+| 成员 | 类型 | 谁写 | 两侧怎么读 | 漂了 / 缺失的表现 |
+| --- | --- | --- | --- | --- |
+| `edits` | 数组 | Go（`writeEdits`，缩进 2） | C#：必需、必须是数组，否则抛三种各有措辞的错误（不是对象 / 没有该成员 / 不是数组）；Go：`LoadEdits` 把缺失或 `null` 归一成空列表 | 手改的 `{"edits":null}` 或 `{}`：工具读成空列表，mod 把它当坏形状**拒绝**并保留现状——两侧对同一份手改文件反应不同，这是有意的（空列表是真实状态，坏文件不是） |
+| `enabled` | 布尔 | 前端 | C# 默认 `true`（`= true` 初始化式）；Go 零值 `false` | 手改的记录漏写这个成员时，mod 按启用生效、编辑器显示成未勾选——两边不一致 |
+| `key` | 字符串（8 位十六进制 hash） | 前端 | C# 解析不出就逐条 `skip (key is not an 8-digit hex hash yet)` | 拼错一边就整列读成空串，**每条编辑都被跳过**，而编译与测试都绿 |
+| `level` | 整数 | 前端 | C# 缺省 15；`< 1` 在强制转换**之前**判（否则负数会变成几十亿，症状会伪装成「行没找到」） | 等级落到游戏没读的那一行时，编辑写下去也不会有可见效果 |
+| `values` | 数组：10 × （数字 或 `null`） | 前端（`padValues` 补齐/截到正好 10） | C#：读的时候把显式 `"values": null` 规整成 10 长数组；非有限数（例如手写的 `1e39`，`System.Text.Json` 给的是 ±Infinity）→ 那个槽位跳过并记 `slot N is not a finite number` | `null` = 「那个槽位保持游戏原样」。写全值就是用旧副本盖掉没编辑过的槽位，所以只写用户设过的数字 |
+| 未知成员 | — | — | 两侧都忽略。**旧拼写**（`Edits`/`Enabled`/`Key`/`Level`/`Values`）读成空列表 | 「从头来过」是既定形状：不读取、不改写，下一次保存写出当前格式（`TestLoadEditsDoesNotReadAFileFromTheOldKeySpelling` 把它钉成决定而不是意外） |
 
 托管读侧还有一条与「成员」无关的整体规则：**只有外层形状算错误**。`Config.Options` 是有意留空的（不开大小写折叠、不猜名字）；认不出的记录内成员读成默认值，随后由 `PatchRows` 逐条报 `skip`，而不是把整份文件判成读不出来。
 
@@ -246,11 +279,11 @@ flowchart TD
 
 | 缺口 | 具体后果 |
 | --- | --- |
-| **`loadout.json` 的成员名完全不在对拍范围里** | `slots`/`items`/`gem`/`hash`/`level`/`enabled`/`exclusive`/`lang` 是**两处**独立的字面量：C# 侧是 `TryGetProperty("…")`，Go 侧是 struct tag。改一边能编译、全部测试绿。因为 C# 缺 `slots`/错形状会抛错，多数拼错会降级成「保留上一份」（可见）；但 `exclusive` 拼错是**静默**的（专属开关全部失效），`enabled` 拼错则会让“缺成员算启用”这条约定失效 |
+| **`loadout.json` 的成员名完全不在对拍范围里** | `slots`/`items`/`gem`/`hash`/`level`/`enabled`/`exclusive`/`lang` 是**两处**独立的字面量：C# 侧是 `TryGetProperty("…")`，Go 侧是 struct tag。改一边能编译、全部测试绿。C# 缺 `slots`/错形状会抛错（降级成可见的「保留上一份」），Go 的 `json:"slots"` 漂了也会被 `SaveLoadout` 那条「缺成员即拒」当场拦下（工具里报错，而不是静默写出一份游戏读不懂的文件）；但 `exclusive` 拼错是**静默**的（专属开关全部失效），`enabled` 拼错则会让“缺成员算启用”这条约定失效 |
 | **只有大小写不同的一种漂移能通过** | `edits` vs `Edits`、`key` vs `Key` 会被 `EqualFold` 判成一致，而两个 JSON 格式都是**大小写敏感**的（C# 有意关掉折叠，Go 侧也精确匹配）。旧拼写文件读成空列表这件事，恰恰是靠 Go 的行为测试而不是靠这道对拍来钉住的 |
 | **只比常量、不比推导** | 目录名比的是字面量「`GBFRSigilLoadout`」，没比基准目录：C# 用 `SpecialFolder.LocalApplicationData`，Go 用环境变量 `LOCALAPPDATA` 且带一个 `exeDir()` 回落。基准漂了（例如有人把 Go 改成 `os.UserConfigDir`），这道门仍然是绿的 |
 | **同侧重复或搬移不一定红** | 名字精确到文件的组（如 `loadoutservice.go` 里的 `MaxSlots`）只在**那一个文件**里找：在别的文件里再加一份副本不会被发现，而这一份正好会与另一份漂移 |
 | **对拍不证明「这个数值是可行的」** | 它只保证三处字面量当前相等。把 `MaxSlots` 三处一起改成 25，对拍仍然全绿，而原生只放得下 21 个通用槽。这条边界由同一文件里的 `TestVirtualSlotCapacityFitsPlayerSlots` 单独守（见第 7 节），不在对拍的结论里 |
 | **比的是字面量，不是行为** | 「空数组 ≠ 缺成员」「缺 `enabled` = 启用」「坏文件保留上一份」「1 MiB 上限」「两种 mtime 门」全都不在它的结论里 |
 
-行为那一半由别的东西守住：Go 侧有 `TestValidateSlots*`、`TestSaveLoadout*`（含被拒的保存不碰磁盘、并发保存不撕裂文件、防抖只落最后一份）、`TestLoadEdits*`（空列表 vs 解析不了、旧拼写、`[]` 而不是 `null`）、`TestPadValuesAlwaysGivesTenSlots`、`TestUserCfgDirMatchesModPath`、容量预算那条 `TestVirtualSlotCapacityFitsPlayerSlots` 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 里列出的其余套件；前端有 `frontend/src/index.test.ts` 的「落盘载荷」一组，钉住 `buildLoadoutPayload` 写出的形状（空槽不写进文件、没有副技能就不写第二项、副技能带自己的等级、`enabled` 原样保留、`exclusive` 全空时不写这个成员）与 cap 缺失时回落到 `DEFAULT_LEVEL`。**托管侧没有测试工程**（解决方案里只有原生工程与托管工程），所以 `LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察——这也是「文档表」和这道对拍必须同时维护、谁都不能替代谁的原因。
+行为那一半由别的东西守住：Go 侧有 `TestValidateSlots*`（含「缺 `enabled` 算启用」与「等级超 cap 仍合法」）、`TestSaveLoadout*`（含被拒的保存不碰磁盘、缺 `slots` 成员与旧的裸数组形状各有一条、并发保存不撕裂文件、防抖只落最后一份）、`TestLoadEdits*`（空列表 vs 解析不了、旧拼写、`[]` 而不是 `null`）、`TestPadValuesAlwaysGivesTenSlots`、`TestUserCfgDirMatchesModPath`、容量预算那条 `TestVirtualSlotCapacityFitsPlayerSlots` 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) 里列出的其余套件；前端有 `frontend/src/index.test.ts` 的「落盘载荷」一组，钉住 `buildLoadoutPayload` 写出的形状（空槽不写进文件、解析不出的主因子整行跳过、没有副技能就不写第二项、副技能带自己的等级、`enabled` 原样保留、`exclusive` 全空时不写这个成员）与 cap 缺失时回落到 `DEFAULT_LEVEL`。**托管侧没有测试工程**（解决方案里只有原生工程与托管工程），所以 `LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察——这也是「文档表」和这道对拍必须同时维护、谁都不能替代谁的原因。

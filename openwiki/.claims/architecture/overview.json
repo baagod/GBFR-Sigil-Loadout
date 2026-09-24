@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:2e227f02ca624d97dbb0ec0ef5e03c5a5d01d838185cff34aba6e3d4bbe5dd24",
+  "pageVersion": "sha256:1c4c01000b84bc1bf2941b2cdff19c02e7129a21d5e79f2033e0b8b3fe0c0acb",
   "claims": [
     {
       "id": "claim_621f0ce931e2451684b00f549ffe1b94",
@@ -252,7 +252,7 @@
     },
     {
       "id": "claim_342123838d4a4b1c8a994112d21a2059",
-      "statement": "仓库外的生成器 gen（..\\gen）是 assets\\sigils.json、assets\\sigils.chara.json 与编译进原生 DLL 的 src\\exclusive_table.inc（不入库）的来源，且它不在本仓库：原生工程每次编译前由 GenerateExclusiveTable 目标（BeforeTargets=ClCompile，工作目录 ..\\..\\gen）跑 go run . exclusive，发布构建的随包数据段则对九份资产逐份按「在场即跳过 → 取 ..\\gen\\output 同名预制品 → 才 go run . export」处理，gen\\main.go 不在时直接抛出；所以本仓库无法单独完成一次发布构建，也无法单独编译原生 DLL。",
+      "statement": "仓库外的生成器 gen（..\\gen）是 assets\\sigils.json、assets\\sigils.chara.json 与编译进原生 DLL 的 src\\exclusive_table.inc（不入库）的来源，且它不在本仓库。两处可观察调用点：原生工程在 ClCompile 之前跑 GenerateExclusiveTable 目标（BeforeTargets=ClCompile、WorkingDirectory ..\\..\\gen、go run . exclusive -mod $(MSBuildProjectDirectory)\\..），它用 Inputs（gen\\main.go、gen\\game\\sigils\\ 的 exclusive.go/sigils.go/json.go 与 assets\\sigils.json——逐条列出是因为 MSBuild 不展开这里的通配符）与 Outputs（src\\exclusive_table.inc 与 assets\\sigils.chara.json）让 MSBuild 只在源较新时才跑，并在末尾 Touch 这两份产物，以抵消“gen 内容未变时不写文件”造成的永久过期；发布构建（tools\\build-release.ps1）的随包数据段对九份资产逐份按「在场即跳过 → 取 ..\\gen\\output 同名预制品 → 才 go run . export」处理，gen\\main.go 不在时直接抛出。所以本仓库无法单独完成一次发布构建，也无法单独编译原生 DLL。",
       "evidence": [
         {
           "resource": "repo://.gitignore#L15-L16",
@@ -437,10 +437,32 @@
           "version": "repo-lines-v1:sha256:40a3d8622873cb3a4416a6cdc36a0c18180920d367dcef6746b579ef6ed697e8:eyJzZWxlY3RlZExpbmVDb3VudCI6ODIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMxODM0YmVkMTA3MDQzNWEzZjUyZmY3OWY1YTI4ODQzNjQ2OGE4MjdhODcxNjBhODdjZmEzMzk2NzA5NjhjZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcwNTA4ODY0ZDdhNjY5MWI4Y2YxZjliZjI5YjQ3MjU3ZDM4MDdlZmFlNTZhOWQ0ZTlmNDRiNTAyYmFjZTRjY2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI3ZmVlMzNiZmJmYjlmZjc3MWU3ZWRiY2E2NzllMWM3ZTBjODM0M2Q4ZmJjZmVjM2MzZDA3OGE0NjRiOWI3ZmIifQ"
         }
       ]
+    },
+    {
+      "id": "claim_ec2ef2db580c4eb0a3ccf8331b5337b9",
+      "statement": "两个配置文件的版本门语义相反，差别正是同一次失败下的收场方式：loadout.json 用 FileStamp.Changed（mtime 变了就读并当场认领），所以应用失败时保留上一份有效配置、不重试同一版，要等下一次保存改 mtime；sigiledits.json 用 Pending 加 MarkApplied（只有原生确实把行写进游戏内存之后才推进），所以读不出来或被拒写时这一版不认领，下一拍会按新版本重试（同版本重试有 5 秒节流），游戏内存一个字节不动。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/LoadoutConfig.cs#L34-L44",
+          "version": "repo-lines-v1:sha256:0d8707e2a0cc4783c4604154af18a3ef90a2a3852a6d29854a5875345793ffe3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmZjY5OWNlOGVlODBjMDYxNWU3ZTc3OTEwYmE0NjkwYTE2YjI5NTk5ZWQ4MzUxY2RjOGJmNjZjZjU5ZTg0MzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNDZmOTkxM2ViZjdmYzJlZjdkNGZkZTBhNjkzY2IwYzg3NzViNjY0YzQxY2Q0ODk2OTMzNzM5NjVjMzdiZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1YzZiNzBmNDAwYWJkYTdiOWFkNTBlMWQxODVlNWI5MTkyNmY2ODYxMDQxMzE5YjgyMjE4Nzg2MmY2ZDZhNzIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L146-L160",
+          "version": "repo-lines-v1:sha256:619696cae3b1e688e708a27b369ece549a7388839437f723847369a5f870564c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5MThjZmM5N2VmNWVjZTlkNWY5MTM1OTg4NzBjOTNmM2M3Zjc3MmE4MDdiMTYxM2Q5OWQzNGNhMTgwYzBhZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ4MGUyYzVkNjZhYjdlZmY2Y2VjZDMzNmE1ZGE1NjA4OTA2YjBmM2RlMTA3MjUwMzk2NzhiZDNlNWI5MzAwYTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzMzhmZDI4MWYxMDY0NzIxODQzZDM0ZjA3OGNjYzJjNGNjNjk4M2U1YzgyYmQ4MmJlZjk5MjYxZWQwNmNmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJjMWY3N2UzOWQ5N2ZkNjNhYjk0YzcyMDE3NjczMmNkODMyY2E5ODUyNmY2NDNiZDU1MzhjMGEwMzRlNWE5OTkifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L239-L257",
+          "version": "repo-lines-v1:sha256:aea9bcf2de149f56fc7d64a8f8e670e82a2000878672976b318b050bd0bf9ff8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0ZTVkNGM5NTNjOTU5MWFlZWU0ZmZkMWYwOTA0ODFjODI0MjQ0MGUyMzhhMzcwNmExMmNmYThkOWJiMTNhMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVhYmI1ZjY1MzgwYTdhNGUzOTkwNjJjN2YyMTdiMmIyZTIyMjg1YTllNzc3YWY0NzY3NWUxYjFiNmQzYmVkZGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4MGVhYTY2ZTVlMzFjNjE1ODAyN2Q3NjQwYzdkYTRhMjNjNDhiNDM1NGQ1MWM1ZDk1YzExMDdkNDBhYTU2Y2YifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/UserConfig.cs#L28-L63",
+          "version": "repo-lines-v1:sha256:8d0284902c5c21d8365e84725c6707e7ef3b1292a101800f0a2ba8ed75f662a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMTk3YjE5MDQ4M2YxYjcwZDQxNDEwNmFlNjEyYzk5ODdlMjczMjY3MDE1MGJjYTBjMmM5NzRmNzkzYzBhMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlNTQ3OTFmMDZiODQwZTUyOTA0YjE3ODJkY2E5NWVkMzAzYzUyOGM0N2Q4ZmNjZDE5YTI3MzM3ODEzZmY1ODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5OThhYzg5YjA1MjYzZTA5NzYxY2IxODRlNmMxMTBjMzg5ZDVjMGI5YmRiNjAwNzY5ODIxOTQ2ZjNhYzg2M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-24T01:16:26.192Z"
   }
 }

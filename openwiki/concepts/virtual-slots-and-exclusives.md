@@ -3,9 +3,6 @@ type: concept
 title: 虚拟槽位、模板因子与专属开关
 description: 槽位模型与合成因子的数据来源：本体 13 个内部槽之后接 3 个内置角色专属槽（T1/T2/战气）再加玩家通用槽，模板 slot-id 取 0xFE000000 高位区间而不与库存 id 冲突的原因、专属表如何由仓库外的 gen 编译进 DLL、专属开关以 skill hash 传递与「未提到 = 三槽全开」两条语义、古兰/姬塔的角色兼容规则、kUnwornCharacterHash 哨兵、容量 24 的两道边界与超容量截断语义。
 tags: [virtual-slots, sigil-loadout, exclusive-table, slot-mapping, abi, native-core]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -21,6 +18,8 @@ sources:
     resource: repo://GBFR.SigilLoadout.Native/src/runtime_state.cpp
   - id: openwiki-source-c0bed4f5631a52dfcfe51dd3
     resource: repo://GBFR.SigilLoadout.Native/src/runtime.cpp
+  - id: openwiki-source-bdc2bbaf5b3f226aa7c5cc8f
+    resource: repo://GBFR.SigilLoadout.Native/src/selection_store.cpp
   - id: openwiki-source-828c909a79d5981b9251889c
     resource: repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp
   - id: openwiki-source-ac7bb7c2f4a36fd9a94d83f1
@@ -43,7 +42,10 @@ sources:
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 虚拟槽位、模板因子与专属开关
@@ -144,6 +146,16 @@ sequenceDiagram
 
 一次请求要么合成一份 `GemData`，要么返回「这一格没有」。
 
+**每层是谁的表、谁改、谁读、在哪把锁下**——三层里只有前两层驻留，第三层根本不存在「表」：
+
+| 层 | 数据 | 写者 | 读者 | 锁 |
+| --- | --- | --- | --- | --- |
+| 模板表 | `g_runtime_templates`，外加角色 → 行下标的 `g_character_template_index` 与开关表 `g_exclusive_state`（三张同在这把锁下，它们必须一起变） | `InitializeRuntimeTemplates`（启动一次）、`ApplyLoadout`（`unique_lock`） | detour 的 `TryGetRuntimeSlot`（`shared_lock`，**拷值**后返回） | `g_template_mutex` |
+| 选择表 | `g_character_selections` | `InstallDefaultTemplateSelections`（`unique_lock`） | `GetSelection`（`shared_lock`，返回数组**副本**） | `g_selection_mutex` |
+| 合成 `GemData` | 不驻留：没有表，也没有第三个读者 | detour 在一次调用里合成到调用方的 output | —— | 无 |
+
+锁序固定是 `g_template_mutex → g_selection_mutex`，唯一同时持两把锁的地点是 `InstallDefaultTemplateSelections`；两条读路径都只把值拷出来，不把锁带过任何游戏调用。锁序的理由、违规后的死锁/数据竞争症状，以及「锁内不回到游戏代码」这条不变量的完整清单见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
+
 读侧还有三件事值得记住（细节在 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）：
 
 - `slot_index < 13` 直接转发原始 getter；`slot_index >= GetExpandedInternalSlotCount()` 返回 0 而**不**转发——原始 getter 只有 13 格，转过去就是读它自己数组的边界之外。
@@ -174,10 +186,10 @@ inline constexpr uint32_t kTemplateSlotIdBase = 0xFE000000u;
 // 所以运行期没有数据文件要读，启动时也没有可 fail closed 的东西。
 ```
 
-- **谁生成**：仓库**外面**那个共享生成器 `gen`（`..\..\gen`）的 `exclusive` 子命令，数据源是 `gen` 的 `game\sigils\exclusive.go`。vcxproj 的 `GenerateExclusiveTable` 目标排在 `ClCompile` 之前，每次编译跑 `go run . exclusive -mod "$(MSBuildProjectDirectory)\.."`；`Inputs` 逐条列出 gen 的 `main.go`、`game\sigils\exclusive.go`、`sigils.go`、`json.go` 与 `assets\sigils.json`，`Outputs` 是两份产物（`.inc` 与 `sigils.chara.json`），末尾再 `Touch` 一次把产物的时间戳推到源之后（gen 内容没变时不写文件，否则 MSBuild 会一直判过期）。
-- **不入库**：`.gitignore` 明确忽略 `GBFR.SigilLoadout.Native/src/exclusive_table.inc`。它是构建中间产物，所以「生成物是否过期、要不要提交」这个问题对它**不存在**：每次编译前都重生成，没有 `.inc` 时连编译都过不去（`template_loadout.cpp` 直接 `#include` 它）。
-- **因此**：改专属数据**要去改 gen**；手改 `.inc` 会在下一次编译被冲掉，而「在本仓库里加一个生成脚本」也不是这里的做法（`exclusive_table.inc` 表头自己也写着「勿手改」）。
-- **另一个产物待遇不同**：`SigilLoadout/assets/sigils.chara.json` 由同一条命令产出、**入库**且随包发布，于是它会被同一次生成重写。它只有可视工具读（`LoadoutService.LoadExclusives` 每次都现读磁盘），mod 侧与原生侧都不读——这正是不需要托管侧维护一张 T1/T2/战气对照表的前提。
+- **谁生成**：仓库**外面**那个共享生成器 `gen`（`..\..\gen`）的 `exclusive` 子命令，数据源是 `gen` 的 `game\sigils\exclusive.go`。vcxproj 的 `GenerateExclusiveTable` 目标定为 `BeforeTargets="ClCompile"`：`Inputs` 逐条列出 gen 的 `main.go`、`game\sigils\exclusive.go`、`sigils.go`、`json.go` 与 `..\SigilLoadout\assets\sigils.json`（**只能逐条列**——MSBuild 不展开这里的通配符），`Outputs` 是两份产物 `src\exclusive_table.inc` 与 `..\SigilLoadout\assets\sigils.chara.json`；于是**任一个输入比产物新、或产物缺失**时（新克隆少了 `.inc` 就是这一种），MSBuild 才在 `..\..\gen` 里跑 `go run . exclusive -mod "$(MSBuildProjectDirectory)\.."`。跑完再 `Touch` 一次两个产物：gen 内容没变时不写文件，不推时间戳的话产物 mtime 会永远落后于源、MSBuild 每次都判过期。
+- **不入库**：`.gitignore` 明确忽略 `GBFR.SigilLoadout.Native/src/exclusive_table.inc`。它是构建中间产物，所以「生成物是否过期、要不要提交」这个问题对它**不存在**：过期与否由上面那组 `Inputs`/`Outputs` 判定并当场重生成，不需要人记得跑；而没有 `.inc` 时连编译都过不去（`template_loadout.cpp` 直接 `#include` 它）。产物的第一行自己也写着「由 gen 的 sigils（exclusiveSources）生成；勿手改」——vcxproj 调的子命令名是 `exclusive`，生成源却是 gen 的 sigils 那一套，两者指的是同一个生成器、同一批数据。
+- **因此**：改专属数据**要去改 gen**；手改 `.inc` 会在下一次生成被冲掉，而「在本仓库里加一个生成脚本」也不是这里的做法。
+- **另一个产物待遇不同**：`SigilLoadout/assets/sigils.chara.json` 由同一条命令产出、**入库**且随包发布，于是它会被同一次生成重写（改了 gen 就得把重写后的这份一起提交）；发布构建对它只做「在场」检查（13 项必需文件清单里有它），没有任何自动化门禁替你发现「改了 gen 但没提交资产」。它只有可视工具读（`LoadoutService.LoadExclusives` 每次都现读磁盘），mod 侧与原生侧都不读——这正是不需要托管侧维护一张 T1/T2/战气对照表的前提。
 
 表里每个角色一行、每行三个 `(gem, skill)` 对，行数由第 1 节那条 `static_assert` 卡在 `kRuntimeTemplateCapacity = 32` 以内。古兰（`0x2A26B1B2`）与姬塔（`0xA4ACBA76`）共用**同一组** gem 与技能（所以两行内容相同），这正是 `IsCharacterCompatible` 认这一对、以及前端把共享 PL 码的角色合并成一行开关的前提。生成时已核对它与 `sigils.json` 的 `character` 列一致——这条核对只发生在 gen 里，本仓库无从复核。
 
@@ -223,12 +235,12 @@ inline constexpr uint32_t kDjeetaCharacterHash = 0xA4ACBA76;
 
 ## 8. 容量与两道边界：拒绝 vs 截断
 
-`kVirtualSlotCapacity = 24` 是**数组的**上限（3 + 21）。围绕它有两道语义完全不同的边界：
+`kVirtualSlotCapacity = 24` 是**数组的**上限（3 + 21）。围绕它有两道语义完全不同的边界，触发点与**可见性**都不一样：
 
-| 边界 | 位置 | 触发条件 | 行为 |
-| --- | --- | --- | --- |
-| ABI 闸 | `ApplyLoadoutEntry`（`exports.cpp`） | `slot_count > 24`，或 `override_count > 32 × 3 = 96`（`kRuntimeTemplateCapacity * 3`） | **整份拒绝**：记一行 `counts out of range` 并返回 0，什么都不动 |
-| 通用槽截断 | `ApplyLoadout`（`template_loadout.cpp`） | 请求的通用槽 > 21 | 取前 21 个、**照常应用其余槽位**，同时记一行日志（请求数、上限、实际数都打出来） |
+| 边界 | 位置 | 触发条件 | 行为 | 可见性 |
+| --- | --- | --- | --- | --- |
+| ABI 闸（**拒绝**） | `ApplyLoadoutEntry`（`exports.cpp`） | `slot_count > 24`，或 `override_count > 32 × 3 = 96`（`kRuntimeTemplateCapacity * 3`） | **整份拒绝**：记一行并返回 0，什么都不动（这一步排在 `EnsureInitialized` 之前） | 原生 `ApplyLoadout: counts out of range (slots … > 24, overrides … > 96); rejected.` + 托管侧 `Native rejected the custom loadout; kept previous configuration.` |
+| 通用槽截断（**截断**） | `ApplyLoadout`（`template_loadout.cpp`） | 请求的通用槽 > 21 | 取前 21 个、**照常应用其余槽位**；多出来的位置写成空槽 `TemplateGemSlot{}` | 原生 `ApplyLoadout: the request asked for general slots=…, which exceeds the 21 this build supports; only the first … were applied.`（请求数、上限、实际数都在里面）；界面上没有任何提示 |
 
 为什么 ABI 闸要拒绝而不是截断：它下面按调用方的计数逐个读那两块内存，而专属开关那块没有自己的容器大小可依——一个凭空来的计数会一路读到调用方数组之外，所以这里是「形状不对就不碰」，且这一步排在 `EnsureInitialized` 之前。
 
@@ -247,12 +259,24 @@ inline constexpr uint32_t kDjeetaCharacterHash = 0xA4ACBA76;
 
 `GBFR20_ApplyLoadout(slots, slot_count, overrides, override_count)` 一次带两张表，任一半是 `nullptr` / 0 都表示「这一半没有」：
 
-| 入参 | 含义 | 结果 |
-| --- | --- | --- |
-| `slots == nullptr`（或 `slot_count == 0`） | 没有通用槽 | 所有角色的 `slots[3..]` 被擦成空槽：只剩内置专属模板（每个角色三个专属槽） |
-| `overrides == nullptr`（或 `override_count == 0`） | 没有开关 | 专属三槽全开（缺失条目 = `ExclusiveAll`） |
+| 入参 | 含义 | 结果 | 代码位置 |
+| --- | --- | --- | --- |
+| `slots == nullptr`（或 `slot_count == 0`） | 没有通用槽 | 所有角色的 `slots[3..]` 被擦成空槽：只剩内置专属模板（每个角色三个专属槽） | `template_loadout.cpp` 的 `ApplyLoadout`：`requested = slots == nullptr ? 0 : max(slot_count, 0)` |
+| `overrides == nullptr`（或 `override_count == 0`） | 没有开关 | 专属三槽全开（缺失条目 = `ExclusiveAll`） | `ApplyExclusiveSwitchesLocked` 先 `clear()` 后直接返回；`ReadExclusiveStateLocked` 对缺失条目返回 `ExclusiveAll` |
 
 擦除与填充是同一个循环：`ApplyLoadout` 对每个角色、每个 `slot_index` 取 `config_index < effective_count ? slots[config_index] : TemplateGemSlot{}`。托管侧对应两条不同的日志：`loadout.json` 被删是 `loadout.json removed; restored the built-in exclusive template.`，文件存在但 `slots` 为空是 `loadout.json has no general slots; built-in exclusive template active.`。
+
+另外几条「空/缺」的语义分散在三个语言里，逐条列在这里（每条都是「缺」被赋成哪个确定值，而不是「缺 = 假」）：
+
+| 缺什么 | 语义 | 代码位置 |
+| --- | --- | --- |
+| 通用行缺 `enabled` 成员 | 视为**启用**（与 `enabled: true` 同义），这一行照常计入并生效 | C#：`GBFR.SigilLoadout/LoadoutConfig.cs` 的 `ParseAndValidate`（`!slot.TryGetProperty("enabled", …)` 或 `enabledElement.GetBoolean()`）；Go：`SigilLoadout/loadoutservice.go` 的 `validateSlots` 用 `*bool`，`nil` 计为启用；TS：`SigilLoadout/frontend/src/model.ts` 的 `slotsFromConfig`（`enabled: s.enabled !== false`） |
+| 通用行缺 `level` 成员 | 回落 `DefaultLevel = 15` | `GBFR.SigilLoadout/LoadoutConfig.cs` 的 `GetLevel` |
+| 通用行没有副技能 | `skill2 = kUnwornCharacterHash`（**未选中哨兵**，不是 `0`，也不是「字段缺席」） | `GBFR.SigilLoadout/LoadoutConfig.cs` 的 `ParseAndValidate`：`uint skill2Hash = UnwornCharacterHash;` |
+| 某个角色没有 `exclusive` 条目 / 整个 `exclusive` 成员缺席 | 三个专属槽**全开**（不是「全关」） | `GBFR.SigilLoadout.Native/src/template_loadout.cpp` 的 `ReadExclusiveStateLocked` 返回 `ExclusiveAll`；`GBFR.SigilLoadout/LoadoutConfig.cs` 的 `ParseExclusiveOverrides` 在成员缺席或形状不对时返回 `null` |
+| override 条目 `disabled == 0` | 跳过（防御路径，不是常规路径） | `GBFR.SigilLoadout.Native/src/template_loadout.cpp` 的 `ApplyExclusiveSwitchesLocked` 里 `override.disabled == 0` 那个分支 |
+
+三条语言声明里「缺」必须是同一个意思，这正是 Go 侧用 `*bool` 而不是 `bool` 的理由：`bool` 的零值会把「缺成员」读成 `false`，于是同一份文件在可视工具数出 0 个启用行、在 mod 侧数出十几个，症状是「存盘成功、游戏里什么都没变」——这条有 `TestValidateSlotsTreatsMissingEnabledAsEnabled` 钉着。
 
 **为什么两半挤进一个导出**：它们收尾于同一个「重新发布」步骤（`PublishTemplateSelections` = 发布选择 + 排一次状态重建）。分成两个导出，代价是每份配置把同一张表发布并打印两遍。
 
@@ -293,11 +317,12 @@ Installed built-in template loadout selections=N. exclusive slots 1-3 (T1/T2/war
 - **跨语言常量**：`sharedconstants_test.go` 钉住 `MaxSlots = 16`（C# / TS / Go 三处）与 `UnwornCharacterHash = 0x887AE0B0`（C# / C++ 两处）；同一个文件里的 `TestVirtualSlotCapacityFitsPlayerSlots` 另把「原生放得下 `MaxSlots` 个通用槽」钉在 `kVirtualSlotCapacity - kBuiltinExclusiveSlotCount` 上。前两组证明的是「多处声明同一个字面量」，**不**证明原生真的按哨兵语义在用那个值。
 - **专属页数据**：`frontend/src/exclusive.test.ts` 钉住「标签取物品 hash 的名字、状态键取技能 hash」、只写 `false`、打开即删键、槽全开后该角色不再出现在状态里、共享 PL 码联动成两个角色，以及 `parseExclusiveTable` 的信任边界（形状不完整整条丢，非数组抛给界面）。
 - **随包数据**：`loadoutservice_test.go` 的 `TestCharaNamesCoverTheExclusiveTableInEveryUILanguage` 要求 `sigils.chara.json` 每行都是三槽记录且 PL 码在 `chara.lang.json` 的 zh/en/ja/ko 四种语言里都有名字——这条守的是专属页的行标签（缺的只是让整行退回 PL 码）。发布构建另有一样「在场」检查：打包清单里必须有 `assets\sigils.chara.json`。
-- **覆盖不到的部分**：`exclusive_table.inc` 本身没有任何自动化测试（它每次编译重生成，「过期」不是问题），生成时与 `sigils.json` 的一致性核对只发生在 gen 里；模板槽 → `GemData` 的合成路径、`slot_id` 会不会被游戏侧别处解释、以及「关掉一个专属槽」在界面上的实际表现，都只能在真机游戏里验证。运行期唯一的正面证据是那条 `Skill contribution confirmed for 0x…: N/N virtual sigils reached the context-1 status.`（每会话一行）。
+- **覆盖不到的部分**：`exclusive_table.inc` 本身没有任何自动化测试（它由 MSBuild 按 `Inputs`/`Outputs` 判定过期后重生成，「过期」不是问题），生成时与 `sigils.json` 的一致性核对只发生在 gen 里；模板槽 → `GemData` 的合成路径、`slot_id` 会不会被游戏侧别处解释、以及「关掉一个专属槽」在界面上的实际表现，都只能在真机游戏里验证。运行期唯一的正面证据是那条 `Skill contribution confirmed for 0x…: N/N virtual sigils reached the context-1 status.`（每会话一行）。
 
 ## 改这份代码/这份数据的边界
 
-- **改专属数据** → 去 gen 的 `game\sigils\exclusive.go`，不要手改 `src/exclusive_table.inc`（下一次编译就没了），也不要指望「生成物是否过期」的门禁帮你发现漂移；改完注意 `sigils.chara.json` 也会被同一条命令重写（入库的那份需要一起提交）。
+- **改专属数据** → 去 gen 的 `game\sigils\exclusive.go`，不要手改 `src/exclusive_table.inc`（下一次生成就没了），也不要指望「生成物是否过期」的门禁帮你发现漂移；改完注意 `SigilLoadout\assets\sigils.chara.json` 也会被同一条命令重写（入库的那份需要一起提交）。
 - **改容量或边界** → 至少同时看四处：`kVirtualSlotCapacity`（原生数组与截断上限）、`MaxSlots`（三语言、带对拍，还有 `TestVirtualSlotCapacityFitsPlayerSlots`）、`kRuntimeTemplateCapacity`（模板行数与 ABI 的 override 上界 `32 × 3`）、`ApplyLoadoutEntry` 的 `kMaxTemplateSlots` / `kMaxExclusiveOverrides`（ABI 拒绝闸）。
+- **给三层表加新状态** → 先问它归哪把锁：模板表那三张（模板、角色下标、专属开关）必须一起在 `g_template_mutex` 下变，选择表在 `g_selection_mutex` 下；新增的取锁点不许把 `template → selection` 的次序颠倒（见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)）。
 - **加一类虚拟槽** → 要动的是：专属行结构、`ExclusiveState` 位、`ExclusiveBitForSkill`，以及所有 `0/1/2` 的硬编码约定（前端面板就是按 `gems` 的下标顺序渲染的，`exclusiveSlots` 是唯一读法）。
 - **不要给 `GemData` 加导出收发**：它不跨 ABI 是原生核心结构的前提，模板 slot 才是边界上的形状（`GBFR20_TemplateSlot`，六个字段、`static_assert` 对齐）。

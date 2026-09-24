@@ -5,7 +5,7 @@ description: 三个交付产物（GBFR.SigilLoadout.dll、GBFR.SigilLoadout.Nati
 tags: [architecture, overview, boundaries, interop, configuration]
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
+    at: 2026-09-24T01:16:26.192Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -59,7 +59,7 @@ sources:
     resource: repo://SigilLoadout/windowstate.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
 ---
 
 # 系统总览：三个单元与它们的边界
@@ -190,10 +190,23 @@ flowchart TB
 
 - **Reloaded-II**：托管 mod 的宿主与生命周期来源（`IModLoader`/`IMod`）。`ModConfig.json` 是这条宿主契约的唯一声明处，字段按当前字面值读出来就是这些后果：`ModId` 是 `GBFR.SigilLoadout`（`Mod.cs` 里同名常量用它向启动器问 mod 目录与 mod 配置目录），`ModName` 是 `GBFR Sigil Loadout (2.0.5)`，`ModVersion` 是 `0.6.0`（显示名里的数字与它不是同一个值；发布版本号以 `ModVersion` 为准），`ModDll` 是 `GBFR.SigilLoadout.dll`，`ModNativeDll32`/`ModNativeDll64` 都是空串，`ModDependencies` 为空而 `OptionalDependencies` 只列 `gbfrelink.utility.manager`，`SupportedAppId` 只列 `granblue_fantasy_relink.exe`，`CanUnload` 为 `false`（与 `Mod.CanUnload()`/`CanSuspend()` 的 `false` 一致：原生钩子没法安全卸下或挂起）。
 - **gbfrelink.utility.manager（数据管理器）**：读取游戏归档的**唯一**入口（`IDataManager.GetArchiveFile` / `AddOrUpdateExternalFile` / `UpdateIndex`）。它是**可选**依赖：缺它时因子编辑功能等它加载并重试，其余初始化与配装功能照常，日志会明说。托管 mod 自己同样不读任何游戏数据文件。
-- **仓库外的生成器 gen**：`assets\sigils.json`、`assets\sigils.chara.json` 与编译进原生 DLL 的 `src\exclusive_table.inc`（刻意不入库）都由它产出。仓库里能观察到的调用点两处：原生工程每次编译前由 `GenerateExclusiveTable` 目标（`BeforeTargets="ClCompile"`，工作目录 `..\..\gen`）跑 `go run . exclusive -mod <仓库根>`，同时刷新 `assets\sigils.chara.json`；发布构建的随包数据段对九份资产逐份「在场就跳过」，缺席时**先**取 `..\gen\output` 里的同名预制品（有就直接拷进 `assets\`），**再**才跑 `go run . export -mod <仓库根>`，连 `gen\main.go` 都不在就抛出并明说 gen 不在本仓库。所以本仓库既无法单独完成一次发布构建，也无法单独编译原生 DLL。见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
+- **仓库外的生成器 gen**：`assets\sigils.json`、`assets\sigils.chara.json` 与编译进原生 DLL 的 `src\exclusive_table.inc`（刻意不入库）都由它产出。仓库里能观察到的调用点两处：原生工程在 `ClCompile` 之前有一个 `GenerateExclusiveTable` 目标（`BeforeTargets="ClCompile"`，`WorkingDirectory` 为 `..\..\gen`）跑 `go run . exclusive -mod <仓库根>`（`$(MSBuildProjectDirectory)\..`），一次同时产出 `src\exclusive_table.inc` 与 `assets\sigils.chara.json`；该目标声明了 `Inputs`（gen 的 `main.go`、`game\sigils\` 下的 `exclusive.go`/`sigils.go`/`json.go`，再加 `assets\sigils.json`——MSBuild 不在这里展开通配符）与 `Outputs`（就是上面那两份产物），源不比产物新时它根本不跑，而 gen 内容没变时它不写文件、产物 mtime 便永远落后于源，所以目标末尾用一次 `Touch` 只推这两份产物的时间戳、不动内容。发布构建的随包数据段对九份资产逐份「在场就跳过」，缺席时**先**取 `..\gen\output` 里的同名预制品（有就直接拷进 `assets\`），**再**才跑 `go run . export -mod <仓库根>`，连 `gen\main.go` 都不在就抛出并明说 gen 不在本仓库。所以本仓库既无法单独完成一次发布构建，也无法单独编译原生 DLL。见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
 
 ## 边界上的失败语义
 
-边界上的失败大多是「降级、可诊断、不带走游戏进程」：原生 DLL 装上了但钩子没成（`GBFR20_Initialize` 返回 0）→ 记一行 `Native core loaded without hooks:` 加运行消息，配装、热键、因子编辑照常；数据管理器缺席 → 编辑等待重试；配置文件坏掉 → 保留上一份有效配置或整份不写；工具不在 mod 目录 → 热键记一行「找不到 exe」；`assets\` 里启动时装载的那七份缺一份 → 可视工具弹框说清缺什么然后退出（`-H windowsgui` 没有控制台），而按需读的 `sigils.json`/`sigils.chara.json` 缺了只在那次调用里报错。真正的例外是**装错了**，而且两处都不带走游戏进程：原生 DLL 缺失或 ABI/布局不符时，托管侧把它当致命——`NativeCore.Initialize` 抛异常、`Mod.QueueStart` 记一行 `Initialization failed:` 后转 `Dispose()`；由于配装读取、热键与因子编辑都排在这一步之后，它们根本不会启动（这次运行的文件日志也随 `Dispose()` 收掉），只有游戏进程照常。各单元的责任划分、宿主契约的逐字段后果、以及出问题时该读的日志行分别在 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)、[宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md) 与 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
+边界上的失败大多是「降级、可诊断、不带走游戏进程」——出问题的那一方按下面这一份契约收场，另一方照常跑：
+
+| 边界 | 触发 | 谁在读 | 读不到 / 被拒时怎么办 |
+| --- | --- | --- | --- |
+| 原生核心的钩子 | `GBFR20_Initialize` 返回 0（布局锚点或钩子没成） | 托管侧 | 记一行 `Native core loaded without hooks:` 加原生那条运行消息；配装、热键、因子编辑照常启动。 |
+| 数据管理器（可选依赖） | `IDataManager` 缺席或比 mod 晚加载 | 托管侧因子编辑 | 每拍重试挂载，只在第一次记一行「等它加载」；因子编辑之外的初始化与配装照常。 |
+| `loadout.json` | 读不出来、超过 1 MB、形状不符 | 托管侧 `LoadoutConfig` | 保留上一份有效配置（原生那份模板表不动），这一版照样算处理过，等下一次保存改 mtime 再来。 |
+| `sigiledits.json` | 读不出来，或按它造不出表 | 托管侧 `SigilEditorFeature` | 这一版**不认领**，下一拍按新版本重试（同版本重试 5 秒节流）；游戏内存一个字节不动。 |
+| 活表写入 | `GBFR20_WriteSkillStatusTable` 返回 `-1..-7` | 托管侧 | 编辑不丢：列表已存盘并重新注册，游戏下一次解析或重启就会拿到；候选表留着按 5 秒节流重试。 |
+| 可视工具 exe | mod 目录里没有 `SigilLoadout.exe` | 托管侧热键 | 记一行「找不到 exe」后什么都不做；游戏照常。 |
+| `assets\` 启动期那七份 | 缺一份，或不是合法 JSON | 可视工具 | 弹框说清缺什么然后退出（`-H windowsgui` 没有控制台）。 |
+| `assets\sigils.json` / `sigils.chara.json` | 缺失或坏掉 | 可视工具 | 只在那一次调用里报错；工具本身继续跑，玩家本来就可以替换这两份。 |
+
+真正的例外是**装错了**，而且两处都不带走游戏进程：原生 DLL 缺失或 ABI/布局不符时，托管侧把它当致命——`NativeCore.Initialize` 抛异常、`Mod.QueueStart` 记一行 `Initialization failed:` 后转 `Dispose()`；由于配装读取、热键与因子编辑都排在这一步之后，它们根本不会启动（这次运行的文件日志也随 `Dispose()` 收掉），只有游戏进程照常。各单元的责任划分、宿主契约的逐字段后果、以及出问题时该读的日志行分别在 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)、[宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md) 与 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
 
 术语以 `CONTEXT.md` 的术语表为准：本页只用「虚拟槽位」「活表」「可视工具」「数据管理器」这几个词，不另造同义词。
