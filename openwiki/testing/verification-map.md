@@ -3,12 +3,7 @@ type: testing
 title: 验证地图：测试与门禁各护什么
 description: 按改动面回答"该跑什么、它保证什么、保证不了什么"：SigilLoadout 包四个 Go 测试文件（TestMain 沙箱与资产装载、跨语言常量对拍与原生容量、配装校验与防抖原子写、编辑列表往返与资产不变量）、frontend/src 下四个 vitest 纯逻辑测试各自的用例分组、需 MSVC 才能编起来且缺游戏 exe 时打印 SKIP 的离线 NativeLayoutHarness，以及 tools\build-release.ps1 里那几道没有独立本地入口的门禁。
 tags: [testing, verification, gates, go-test, vitest, native-harness]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
 sources:
-  - id: openwiki-source-6d4b4e707b8d60b6ccfa3425
-    resource: repo://.github/workflows/openwiki-update.yml
   - id: openwiki-source-8037e2358a2c4f9b2c722a11
     resource: repo://AGENTS.md
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
@@ -55,12 +50,17 @@ sources:
     resource: repo://tests/NativeLayoutHarness/run.ps1
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+  - id: openwiki-source-10778beddac6e1744ce68515
+    resource: repo://tools/deploy.ps1
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:46:48.632Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T01:46:48.632Z
 ---
 
 # 验证地图：测试与门禁各护什么
 
-这套仓库**没有任何 CI 跑测试**：`.github\workflows\` 下只有 OpenWiki 的每日更新任务。所以"跑测试"这件事被强制的地方只有一处——`tools\build-release.ps1` 的工具链阶段。其余时候，跑什么由改动落在哪里决定。
+这套仓库**没有任何 CI 跑测试**：当前检出里没有 `.github\` 目录，`AGENTS.md` 的 OpenWiki 段只提到有一个定时的 OpenWiki GitHub Actions 工作流负责刷新仓库 wiki——它既不构建也不跑测试。所以"跑测试"这件事被强制的地方只有一处——`tools\build-release.ps1` 的工具链阶段。其余时候，跑什么由改动落在哪里决定。
 
 本文回答三个问题：**改完该跑什么、它到底保证什么、它保证不了什么。**
 

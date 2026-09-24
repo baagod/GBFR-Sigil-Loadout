@@ -4,10 +4,10 @@ title: 构建、发布与部署链
 description: 从源码到 Reloaded-II 包的两段式操作链——tools\build-release.ps1 的版本对账（ModConfig.json 的 ModVersion 是唯一权威源）、九份随包数据的「在场或补齐」、原生到托管的编译顺序与 vcxproj 里判过期的 gen 生成步骤、工具链门禁、13 项打包清单与 dist\.build-complete 完成标记，以及 tools\deploy.ps1 的完成标记、源码时间戳与游戏未运行检查；逐道门禁给出判据行、它保证什么、原样失败信息与跳过条件，并说明仓库根 README.md 已不再承载构建命令。
 tags: [build, release, deployment, packaging, gates, operations]
 sources:
-  - id: openwiki-source-6d4b4e707b8d60b6ccfa3425
-    resource: repo://.github/workflows/openwiki-update.yml
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
+  - id: openwiki-source-8037e2358a2c4f9b2c722a11
+    resource: repo://AGENTS.md
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
     resource: repo://GBFR-Sigil-Loadout.sln
   - id: openwiki-source-1c2664f2b94475ebd431b66e
@@ -46,15 +46,15 @@ sources:
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:46:48.632Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+    at: 2026-09-24T01:46:48.632Z
 ---
 
 # 构建、发布与部署链
 
-这套 mod 的发布是**两个 PowerShell 脚本**，没有别的入口：`tools\build-release.ps1` 把源码编译成 `dist\GBFR.SigilLoadout\` 目录与配套的 `dist\GBFR-Sigil-Loadout-<版本>.zip`，`tools\deploy.ps1` 把那个目录**整份替换**进 Reloaded-II 的 Mods 目录。仓库里**没有 CI 构建或发布工作流**（`.github\workflows\` 下只有 OpenWiki 的每日更新任务），所以整条链都是本机 Windows 操作，并且假定一整条工具链已经装好。
+这套 mod 的发布是**两个 PowerShell 脚本**，没有别的入口：`tools\build-release.ps1` 把源码编译成 `dist\GBFR.SigilLoadout\` 目录与配套的 `dist\GBFR-Sigil-Loadout-<版本>.zip`，`tools\deploy.ps1` 把那个目录**整份替换**进 Reloaded-II 的 Mods 目录。仓库里**没有 CI 构建或发布工作流**——当前检出里连 `.github\` 目录都没有，`AGENTS.md` 的 OpenWiki 段记着的唯一自动化是一个定时刷新仓库 wiki 的 GitHub Actions 工作流，它不承担构建、测试或发布——所以整条链都是本机 Windows 操作，并且假定一整条工具链已经装好。
 
 两个脚本共用同一套约定：`$ErrorActionPreference = 'Stop'`，每一步外部命令都查 `$LASTEXITCODE` 并 `throw`，**任一步失败即中止**。仅有的两处"允许跳过"全在构建侧、而且都会**明说自己跳过了**（找不到 `gcc` 时的竞态检测、没有 `GBFR_EXE` 时的布局回归）；部署侧没有任何跳过条件。
 
@@ -318,7 +318,7 @@ flowchart TD
 - **不为图标留生成器**：`icon.png`（主图）与 `icon.ico`（exe 资源 + 托盘，内含多档尺寸）都是入库的静态资产，只在改图标时手工重出一次；`.syso` 由 `wails3 generate syso` 从 `.ico` 现生成。托盘 `go:embed` 的也是同一份 `.ico`。
 - **不给托管工程加 `<Version>`**：那会再造一处需要与 `ModConfig.json` 同步的版本号；托管程序集自身的版本与发布版本无关。
 - **不清理"同名 go build 残留"**：`go.mod` 的模块名是 `sigilloadout`，而产物叫 `SigilLoadout.exe`——两者只差大小写，Windows 不区分大小写，所以那一步清理删掉的就是产品本身。要做纯编译检查就加 `-o <临时路径>`，别在构建脚本里写清理。
-- **没有 CI**：发布是本地操作，前置条件见本页开头那张表（带 C++ 工作负载的 VS 2022 Build Tools、仓库旁的 `gen\`、Go、Node 与已装好的 `frontend\node_modules`、`wails3`、.NET 8 SDK）。
+- **没有 CI**：当前检出里没有 `.github\` 目录，因此也没有任何跑构建或测试的工作流配置；`AGENTS.md` 里记着的唯一自动化是那个定时刷新仓库 wiki 的 GitHub Actions 工作流，它不是构建、测试或发布入口。发布是本地操作，前置条件见本页开头那张表（带 C++ 工作负载的 VS 2022 Build Tools、仓库旁的 `gen\`、Go、Node 与已装好的 `frontend\node_modules`、`wails3`、.NET 8 SDK）。
 - **不替你装依赖**：不跑 `npm install`，也不在线取 NuGet 包（离线也要能绿）。
 
 ## 相关页面

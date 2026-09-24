@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:0a095d6c7db38fd916523f0b8da31113ee360b8759a11ffc9474ba0396bace00",
+  "pageVersion": "sha256:7af5c62ac33f83a48b75120c457b915d4664b1e41ab765e78cef2ec53144ef15",
   "claims": [
     {
       "id": "claim_37bb5a91ba774d799214ba50662a57b2",
@@ -26,15 +26,15 @@
     },
     {
       "id": "claim_33e81e9b0d924e5ab6dd09373e509b22",
-      "statement": "仓库没有任何 CI 跑这些测试（.github/workflows 下只有 OpenWiki 更新任务），唯一强制跑测试的地方只有 tools/build-release.ps1 的工具链阶段（typecheck → vitest → vgo vet → go test → go build）。",
+      "statement": "仓库里没有任何 CI 跑这些测试：AGENTS.md 的 OpenWiki 段只说明有一个定时的 OpenWiki GitHub Actions 工作流负责刷新仓库 wiki（当前检出里也没有 .github/ 目录），唯一强制跑测试的地方只有 tools/build-release.ps1 的工具链阶段（npm run typecheck → npm test → go vet ./... → go test（找到 gcc 时带 -race）→ go build）。",
       "evidence": [
         {
-          "resource": "repo://.github/workflows/openwiki-update.yml#L1-L13",
-          "version": "repo-lines-v1:sha256:23aa475c0d088cbc73cf937cc19925a3a275af150f372d5e03fe009cd8bbe2ed:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MDI3ODdhZjZkY2MwODM0ZGUxMjFjYmIxY2I5NWY5NDU5YjcyMWVhYjAzNDlmMTA1MDFiOTk2YzFjNzdmZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5Y2VhZjlkNWFmMDA3MDUwOTYyN2MwZDlhMWY2NzRiYzQwMGYxN2ZiZmNkMDIyNTk4MzIyYTI4YWFiODZkNzkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI2NDA0YjA4ZmU2MzJkNjIxYmI4OWFmNTIxZDJhNDBlOTA1N2M0ZmVlMWJiNzA5MjIyNjM4YzQzOGM3ODNlZDAifQ"
+          "resource": "repo://AGENTS.md#L92-L92",
+          "version": "repo-lines-v1:sha256:ab53953bfb72c1262bbae2eaca72cabf1af49927a0bba1157b2d5bdb285c4bd2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWI1Mzk1M2JmYjcyYzEyNjJiYmFlMmVhY2E3MmNhYmYxYWY0OTkyN2EwYmJhMTE1N2IyZDViZGIyODVjNGJkMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWI1Mzk1M2JmYjcyYzEyNjJiYmFlMmVhY2E3MmNhYmYxYWY0OTkyN2EwYmJhMTE1N2IyZDViZGIyODVjNGJkMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjZjYjMwYThmOTQ4MTMxNDkwODJmM2RjYjkxOWRiMTJmMjIwYjMxYTI5NWZiZWU5NTM1MWNmOGYxNGJhZGEyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzA4OWRmOTNmOGJhNTdhNGRkYmZkOGYwMTM5NjJjMzk3OGNlNGRiNjgxOTljNGRhNjY2NjQ5YjA5OTZjZWRhOSJ9"
         },
         {
-          "resource": "repo://tools/build-release.ps1#L150-L162",
-          "version": "repo-lines-v1:sha256:a11655014aaed0e681fd20fe7a216a8329c8b4c27dd194b6521edcbebd5a4c37:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MjY2ZmQ4YTcwM2I2YWEzMzRkYzU2MDUyYzgwZDJhYjdmNTE5Y2M2NWIzMTRhNjE1ZmM4ZWNjNGNjNzljNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5YzhlMjI2YTg4NTlkYTIzZDg4ZjM1MTE3OTM3NTA2N2IzNGM2M2U4ZGMyNjNiNDlkMDYyNTk4ZjQ1MDc3Y2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc0NGRhN2Q5ZTZlYjE5NDFhM2FiYzU4MDU3NWFmYjkyMWZlYWIyZWFiYTU5MGU4MWYxNmRkMjUwOWQ4Y2Q3MjkifQ"
+          "resource": "repo://tools/build-release.ps1#L142-L209",
+          "version": "repo-lines-v1:sha256:3db56d4ec108338cbece799825c622df0a6993e7d652a28cc2b75774eb185d13:eyJzZWxlY3RlZExpbmVDb3VudCI6NjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5ZTI4YjE1MjU0ODdiMmVlZTM2NDI0ZmJlNWViY2FkYWQ4MWRhOGVlZGI4NGIzYjZhM2M4NDBkZGFhYTE2ZjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNmNmY0ODA0M2VkYjJjMjlhMWUyZjdkODNkOGNmNTAxMmEzNTZkNjU1YmRhNDA2YjI4OTFhMDQ1NWU5NTJlMTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY2N2U2OTlhYTU4NmQ2NzMyMTJjMDQ2MmFiMTE0ZjgyNjE5YzEyODBhMjVlZjA4ZDVkZGJlYjNjOTIxZjVhMjMifQ"
         }
       ]
     },
@@ -587,10 +587,32 @@
           "version": "repo-lines-v1:sha256:c5449753999b48fdc7462c829a3ea710a55322b666a074b1a6aa2f97e77ec49d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3NzY0MjIyYTkxMzEzNmExMGZjNTJiMDQzMWZhZGI3YWM1NGFiNGE2YTA1MmZmYmJmZDllZTE2M2MyOTYwNTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Y2RhODJkYTYwNjIzOGUwNWU2MjM5OTU2OWM1ZWUwMzk5MzQxOTY0OGFlNWQ0M2EyYmY4Y2Q2MzQ3ZjgyNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyOTY0MDc5YzNjNWM4MTUyMGVmMzNhMmI5ZDJlMTVhMWI4NGQ3MjgwZGI4NTkwZGNkNjU3NDdlM2UwMTJhNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
         }
       ]
+    },
+    {
+      "id": "claim_f95fc82983f742f092362ecd211bb56b",
+      "statement": "dist/.build-complete 是发布完成标记：tools/build-release.ps1 在打包开始时就删掉它、只有在打包与所有门禁通过之后才把版本号写进去；tools/deploy.ps1 靠它判断 dist 是不是一次跑完了的构建——标记缺失即拒绝部署，标记里的版本必须与 GBFR.SigilLoadout\\ModConfig.json 声明的 ModVersion 相等，并且再比参与构建的三个单元源码的 mtime（比标记新就拒绝）。理由是构建失败会把上一次的产物原封不动留在 dist 里，只比 mtime 挡不住那种包被装上去。",
+      "evidence": [
+        {
+          "resource": "repo://tools/build-release.ps1#L263-L272",
+          "version": "repo-lines-v1:sha256:cb32aa24da46cfa616f1fde4e8bd4be3e2c1eba6402882396e1981436f23e5f7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMxODM0YmVkMTA3MDQzNWEzZjUyZmY3OWY1YTI4ODQzNjQ2OGE4MjdhODcxNjBhODdjZmEzMzk2NzA5NjhjZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMjU3MWNlODk0ODNlNzE2OGRjNzliMWJkODZhYWQ5YzhmNGYxZDU3YmI4OTllMDFhNjcxNTlhYWY4MTliNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcwNTA4ODY0ZDdhNjY5MWI4Y2YxZjliZjI5YjQ3MjU3ZDM4MDdlZmFlNTZhOWQ0ZTlmNDRiNTAyYmFjZTRjY2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE5YzNiNDQyZGE0YjM0MmU4ZDhhZDliOTMxNTc5ZTg4YTA0NWJjNzVjMzg2ZTg3YjBmNDA1NGE4YTZmZGI1OWEifQ"
+        },
+        {
+          "resource": "repo://tools/build-release.ps1#L346-L348",
+          "version": "repo-lines-v1:sha256:03a3c727b3e540d835683a44c3a14321f0b526cafb7a678722861c8306d42ef7:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWVjNDNjOGM4MTNjYjU0Njc3OWI3MDVkYzQyMWIzMDVjOGNiZmZiZWRhYjk0ZmUyMzBiYjczYzI0MGJlM2FmMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjg0M2ZhNDE0MjU2MGUwZGEyYWE1MDkxMDM2ZDFjZjg0Nzk2MGY5MmFhODJiYzJjODdiOGQ0YjI2ZjQxODQxZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjRmZDY3OWZlOWNiOTIwZDI1MWU4MmE5NzNmZWJiZjc5MzJlZmYyZDQ5OTg0YzRjYmQzY2RmNzU5YzkwMjAyZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM0YTk2ZWFkNjFiMzNmZjIxZjExYWYzNWZkYmEwMDNlN2ZkNGM3NjBiNWY5ZDM5MTU4OTgwNDk1ZDgyMDQ3OSJ9"
+        },
+        {
+          "resource": "repo://tools/build-release.ps1#L47-L49",
+          "version": "repo-lines-v1:sha256:69af34858c4aa9e82ad682e819f3d3acfa5e4213936d64ee93b3a810f8226959:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjI5MjdmMThjMTUzNzMzMTJmZWEzYWI1YzU4NWIyOGQ3YTE3YjBhYWZjNGE1MDc2YmRjYmJjZTUzZjAyNGM4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDYwMWViMGFkYTAzNmNkOWU5ZWYzNDNmOGM1Y2VlNmI4NTI3NTlkZmFhOTYyNzUwZmU0NTllZWZlMDZlYzA4OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjhlMzRhNDk4ODAxM2FjNzAxODVjNzJkYTk4M2U2MmRkN2I2ODM5ZjQ2NGI1ZDJjMDE5Y2EzZjkzMDJiN2E1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjQ3OTM2ZTViYzE0OTRlMzM3OWNjYTBlNmI3YjRmMGZhMmQwOGI1ZDM1NjFmMzAyOTViYWY3NThhMWY3ZWYyZiJ9"
+        },
+        {
+          "resource": "repo://tools/deploy.ps1#L28-L59",
+          "version": "repo-lines-v1:sha256:06bbd877d97eea0a90f9b3f004105cf8d8da7b84d8ec903f9bc1d2a307f7f8c0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkYWI2YzJiNzllYzRhNDlmNzQyZjIzYTY3NzJiMDE0MGZiZjNhYzQ3OTkwNTRhZGExNGY5ZmQ0MjJkNGQ4YTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5ZTc2MzU1Y2YxMTk5NDgwYzNmOTk4MzZiMTQ4NmM4NDFkODkxZmFhZDkwNGM2MDhlMDkzMDIyZDM3NTdhZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0M2JjNjZjNTllMDhlMzI1NGQ5ZjQxZTYzMTljYWZlOTY3ZjM3YTRhMjc2OTcwZTExNGVkNGJjYjMxMDI3OWQifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T01:16:26.192Z"
+    "at": "2026-09-24T01:46:48.632Z"
   }
 }

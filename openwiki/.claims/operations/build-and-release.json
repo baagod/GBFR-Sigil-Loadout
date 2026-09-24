@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:46d668a5552504f16592b2d204cb1484c3802d5616187b8723eadb8199f74e2d",
+  "pageVersion": "sha256:821a5596794f7fb893bbeaab96e57046936d5bd6b74d08783551cb60dbd0264e",
   "claims": [
     {
       "id": "claim_58a86f97c7cd40a1bc3616f1104514ac",
@@ -294,19 +294,19 @@
     },
     {
       "id": "claim_99e2fe2688e941a2b2067151ee7f2861",
-      "statement": "仓库没有 CI 构建或发布工作流（.github 下只有 OpenWiki 更新任务），发布是本地 Windows 操作：前置条件包括带 C++ 工作负载的 VS 2022 Build Tools、仓库旁的 gen\\、已装好的 SigilLoadout\\frontend\\node_modules 以及 PATH 上的 go/dotnet/npm/wails3；脚本不跑 npm install，并用 --ignore-failed-sources 与 NuGetAudit=false 让离线构建保持绿色。",
+      "statement": "仓库里没有 CI 构建或发布工作流：当前检出连 .github\\ 目录都没有，AGENTS.md 的 OpenWiki 段记着的唯一自动化是一个定时刷新仓库 wiki 的 GitHub Actions 工作流，它不承担构建、测试或发布职责；因此发布只能是本地 Windows 操作，前置条件包括带 C++ 工作负载的 VS 2022 Build Tools、仓库旁的 gen\\、已装好的 SigilLoadout\\frontend\\node_modules 以及 PATH 上的 go/dotnet/npm/wails3，脚本不跑 npm install，并用 --ignore-failed-sources 与 NuGetAudit=false 让离线构建保持绿色。",
       "evidence": [
         {
-          "resource": "repo://.github/workflows/openwiki-update.yml#L1-L16",
-          "version": "repo-lines-v1:sha256:392f6f8d761f9a649e3b8121a7ecf49166a58316919136f1f9599555fe02feb7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MDI3ODdhZjZkY2MwODM0ZGUxMjFjYmIxY2I5NWY5NDU5YjcyMWVhYjAzNDlmMTA1MDFiOTk2YzFjNzdmZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1ZDZjZjdkNDI4Y2E4MTE1ZmM0YmFiYjY4MDczOTAyMzMyN2E3YTlkOTE2M2Y3MDZhMjc2ODdkZDUxNmYzOTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjViOWQ5OWUyMTE0MzRhZThjM2RkZWE4YTcwOGRiNzYwY2NjMzQxMTQxNzQ1ZDI0NjkwN2U5MTJhZGE1NDE5NDcifQ"
+          "resource": "repo://AGENTS.md#L92-L92",
+          "version": "repo-lines-v1:sha256:ab53953bfb72c1262bbae2eaca72cabf1af49927a0bba1157b2d5bdb285c4bd2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWI1Mzk1M2JmYjcyYzEyNjJiYmFlMmVhY2E3MmNhYmYxYWY0OTkyN2EwYmJhMTE1N2IyZDViZGIyODVjNGJkMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWI1Mzk1M2JmYjcyYzEyNjJiYmFlMmVhY2E3MmNhYmYxYWY0OTkyN2EwYmJhMTE1N2IyZDViZGIyODVjNGJkMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjZjYjMwYThmOTQ4MTMxNDkwODJmM2RjYjkxOWRiMTJmMjIwYjMxYTI5NWZiZWU5NTM1MWNmOGYxNGJhZGEyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzA4OWRmOTNmOGJhNTdhNGRkYmZkOGYwMTM5NjJjMzk3OGNlNGRiNjgxOTljNGRhNjY2NjQ5YjA5OTZjZWRhOSJ9"
         },
         {
           "resource": "repo://tools/build-release.ps1#L116-L121",
-          "version": "repo-lines-v1:sha256:bbe1f0b1769654a5a0aba18adc873d7221ebebbf05f52018d7d3f5115f3ca16f:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjU2NGUyMDYxZWQ0OGE1ZWIyNDdiNzc4OWQzNjA0YzA4MjliZGIxYWE3ZjBmNWNjMzc0M2MxMGY2NWYwNTBjNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDA4MzliM2RhNDRkNjUwNGQxNGM4MzM2MTJmYmY4ZjA1NjdiZDc3YTA4NzBiNWFjNzZjMTQ1NWFjM2FiNzJjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzNkODlmY2IwN2I4ZWExOGNlMDc2NDQ0Y2Q3NTZlYTllYjhlNmEyZTMxNmE3ZGY4MWM4ZmVkZWVjMTM5ODRhOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWM0NTFhNTdjZGVkYjdhOTNmZmQxODI0NTAzNjY1NjRmZTdhOTI1NWMwYTBiZWU3ZDFkNzNkOGRjYzdhZDk1OCJ9"
+          "version": "repo-lines-v1:sha256:8093570a334a7542577d9183083e1e24f9c61a6e3da5afeee7886a35d6fd3158:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGM1YTkwMGJmYzgxYjgxMzk3MDg2NjgzYWNhMGI1OWE3NDYwNWUxMjRkMjc1OGM0OGJjMjRjZjNkM2E3YmZmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTVkMDUyN2QyZjk0NTc1YTFlYWIxMjE1ZmExMTcyN2E1MjkwYzljNTEyYmQ2YTkwZGM5N2I0NjEyZjIwZGQzMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTg5MDA2OGEwOGNhNWEyZDVlNTI0ZTRhNDVhMWM4NDI4M2U5NzUxOTEwYzViNmY5NzkyOTZlOTZkMzZhODY3YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzliMDJlZGJkZWVkYzYwODVkZmExNzRlZjhjOTc2YzkyYTEwYWRhMjRmMTg2MmU5Y2NkZmRlY2UxNzhhYzA3NSJ9"
         },
         {
           "resource": "repo://tools/build-release.ps1#L136-L166",
-          "version": "repo-lines-v1:sha256:10585c3d65daa56b8857becf7afdf13b6d5d6d784617b488ce31820e16ec5603:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRkMjJjZTg4MDYyYTk3NWZjYjIxNGI0YTZmZDc4NTdiYTkwYjc0MTJhYjkyYmMwZmNiMDllYzc1ZGQxOTU0ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlNTdiNmI3ZjUzNGY0YmEzM2Y0N2M4MmRiZDMxZWQzNDgwM2UyYWI3YjFhYzZhOWIzNTRkYTk0NTE4ZjE0NWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJjZjAwNzVjNDAyYzJkNzQ1NDMwOWRkMTU4ZDViZDRlMzM1NzA1NjMwZjhlZmI0N2I4MjdjMjAxZGY4MjM0ZGQifQ"
+          "version": "repo-lines-v1:sha256:f386c30e6d7eec13b8dd7ac74b5e0bfb16502075f2b55ca8e528c97ed04a1a33:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhNTNiYTM1MDk2Njc2YzUyNDBjYzA4NDQ4M2ZlMDM1NjE3Zjk0ZjA5MGMyYTA5YTI4NjdjMDQwYWEzNjE5ZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMyOTUyZWZhY2Y3OWM5MmNmMmVkZDQ0MDFlNjE1N2VmZTM3NGNlOTVjZWFjZWIzNmUxOWM0NjgwNTZlZWYzZjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBmODQxZTVkYTZlYmNmOTM4NjI1Zjc0Y2JmMGU3MzkyNWJhMjk1YmIyNGRjNGFlMzg3OTA5ZWVhMWNiNzY4MTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0YTgyOGUzMGE4MjA0ZmFlNjU0ZTU0MzYzNmViZDdlODBjNmE5Y2E3MGQyNjMxNTA5NDUyNDAyNTFmYTI1NzUifQ"
         }
       ]
     },
@@ -553,6 +553,6 @@
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T01:16:26.192Z"
+    "at": "2026-09-24T01:46:48.632Z"
   }
 }
