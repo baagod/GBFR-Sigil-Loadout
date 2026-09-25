@@ -1,4 +1,5 @@
-﻿<#
+#Requires -Version 7.0
+<#
   离线布局解析回归：断言清单见 program.cpp 头部。
 
   用法: pwsh -File tests\NativeLayoutHarness\run.ps1 -Exe <游戏 exe>；省略时读 $env:GBFR_EXE，

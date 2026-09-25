@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
@@ -44,9 +45,8 @@ $managedOutput = Join-Path $root "GBFR.SigilLoadout\bin\$Configuration"
 $distRoot = Join-Path $root 'dist'
 $packageDir = Join-Path $distRoot 'GBFR.SigilLoadout'
 $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
-# 构建完成标记：打包一开始就删掉、**所有闸门通过之后**才写。deploy.ps1 靠它判断 dist 是不是一次
-# 跑完了的构建——只比 mtime 的话，"失败构建留下的上一次产物"拦不住（那就会被装上去）。
-$completionMarker = Join-Path $distRoot '.build-complete'
+# zip 先写 .tmp、成功才改名落位，于是正式名只可能来自一次跑完的构建。
+$zipTemp = "$zipPath.tmp"
 
 # --- 随包数据（assets\）-------------------------------------------------------
 # 九份资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
@@ -264,10 +264,7 @@ New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
 if (Test-Path -LiteralPath $packageDir) {
     Remove-Item -LiteralPath $packageDir -Recurse -Force
 }
-if (Test-Path -LiteralPath $zipPath) {
-    Remove-Item -LiteralPath $zipPath -Force
-}
-Remove-Item -LiteralPath $completionMarker -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $zipPath, $zipTemp -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $packageDir | Out-Null
 Copy-Item -Path (Join-Path $managedOutput '*') -Destination $packageDir -Recurse -Force
 
@@ -343,12 +340,12 @@ if ($packagedConfig) {
     throw "Mutable config state must be runtime-created and was packaged unexpectedly: $($packagedConfig.FullName)"
 }
 
-Compress-Archive -LiteralPath $packageDir -DestinationPath $zipPath -CompressionLevel Optimal
+# 先写 .tmp、成功才改名落位（同目录改名是原子的）：正式名只可能来自一次跑完的构建。
+Compress-Archive -LiteralPath $packageDir -DestinationPath $zipTemp -CompressionLevel Optimal
+Move-Item -LiteralPath $zipTemp -Destination $zipPath -Force
+Remove-Item -LiteralPath $packageDir -Recurse -Force
 
-Set-Content -LiteralPath $completionMarker -Value $Version -NoNewline
-
-Write-Output "Reloaded-II package: $packageDir"
 Write-Output "ZIP: $zipPath"
 
 # 开发便利：打开编辑工具以便立刻查看。已经有实例在跑时，改为激活它自己的窗口（单实例 mutex）。
-Start-Process -FilePath (Join-Path $packageDir 'SigilLoadout.exe')
+Start-Process -FilePath $toolExe

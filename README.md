@@ -38,7 +38,7 @@
 - Go 1.27+
 - Wails v3 CLI ( `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` )
 - Node.js 20.19+ ( Vite 8 要求 )
-- pwsh 7 (5.1 无法产出一致包)
+- pwsh 7 ( 5.1 无法产出一致包 )
 
 从仓库根目录运行 ( 产出 `dist/GBFR-Sigil-Loadout-<版本>.zip` )：
 
@@ -52,4 +52,4 @@ pwsh -ExecutionPolicy Bypass -File .\tools\build-release.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 [-Target <path>]
 ```
 
-将自动把 `dist/GBFR-SigilLoadout-<版本>.zip` 解压到 `C:\Users\<username>\Desktop\Reloaded-II\Mods\` ( 可用 `-Target` 改 )。
+将解压 `dist/GBFR-Sigil-Loadout-<版本>.zip` 到 `C:\Users\<username>\Desktop\Reloaded-II\Mods\` ( `-Target` 可改 )。
