@@ -37,8 +37,8 @@
 - .NET 8 SDK
 - Go 1.27+
 - Wails v3 CLI ( `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` )
-- Node.js 20.19+ ( Vite 8 要求 )
-- pwsh 7 ( 5.1 无法产出一致包 )
+- Node.js 20.19+
+- pwsh 7
 
 从仓库根目录运行 ( 产出 `dist/GBFR-Sigil-Loadout-<版本>.zip` )：
 

@@ -45,7 +45,6 @@ $managedOutput = Join-Path $root "GBFR.SigilLoadout\bin\$Configuration"
 $distRoot = Join-Path $root 'dist'
 $packageDir = Join-Path $distRoot 'GBFR.SigilLoadout'
 $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
-# zip 先写 .tmp、成功才改名落位，于是正式名只可能来自一次跑完的构建。
 $zipTemp = "$zipPath.tmp"
 
 # --- 随包数据（assets\）-------------------------------------------------------
@@ -261,10 +260,7 @@ if ($loadoutProcesses) {
 }
 
 New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
-if (Test-Path -LiteralPath $packageDir) {
-    Remove-Item -LiteralPath $packageDir -Recurse -Force
-}
-Remove-Item -LiteralPath $zipPath, $zipTemp -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $packageDir, $zipPath, $zipTemp -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $packageDir | Out-Null
 Copy-Item -Path (Join-Path $managedOutput '*') -Destination $packageDir -Recurse -Force
 
