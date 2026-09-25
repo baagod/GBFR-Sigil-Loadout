@@ -24,7 +24,7 @@
 - **必须读** `skill:i-have-adhd`，并始终以此方式对话。
 - 当用户一次提出多个问题时，必须逐条回答，若问题之间有关联，先说明关系。
 - 每次 **精确修改 ( 字符串替换 )** 文件，禁止 **覆盖重建**。
-- **改完部署**，执行 `pwsh -File tools\build-and-deploy.ps1`。
+- **改完即部署**：`pwsh -File tools\build-release.ps1` → `pwsh -File tools\deploy.ps1`。
 
 ## 编码原则
 

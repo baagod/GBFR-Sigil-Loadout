@@ -56,7 +56,7 @@ export const messages: Record<Lang, Messages> = {
     en: {
         tabGeneral: "General Loadout",
         tabExclusive: "Exclusive Sigils",
-        tabSigilEditor: "Sigil Editor",
+        tabSigilEditor: "Sigil Edit",
         langSwitch: "Switch Language",
         crashed: "The interface crashed and has to reload.",
         reload: "Reload",

@@ -25,21 +25,12 @@ if (Get-Process -Name 'granblue_fantasy_relink' -ErrorAction SilentlyContinue) {
 # 3. 停掉正在跑的工具，免得部署的文件被锁住，并等到它真的没了：
 #    工具持有单实例 mutex，与关闭赛跑的启动只会激活那个正在死掉的窗口。
 function Stop-SigilLoadout {
-    Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue |
-        Stop-Process -Force -ErrorAction SilentlyContinue
-    $deadline = (Get-Date).AddSeconds(15)
-    while ((Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) {
-        Start-Sleep -Milliseconds 200
-    }
+    Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Wait-Process -Name 'SigilLoadout' -Timeout 15 -ErrorAction SilentlyContinue
 }
 
 function Start-SigilLoadout {
-    # 不过 shell（未签名 exe 走 ShellExecute 会弹「无法验证发布者」），并重定向掉 stdout/stderr——
-    # 否则工具继承调用者的管道，调用者退出后那根管道还开着，外面看到的就是"任务永不结束"。
-    $p = [System.Diagnostics.Process]::Start([System.Diagnostics.ProcessStartInfo]@{
-            FileName = (Join-Path $modDir 'SigilLoadout.exe'); UseShellExecute = $false
-            RedirectStandardOutput = $true; RedirectStandardError = $true })
-    $p.StandardOutput.Close(); $p.StandardError.Close()
+    explorer.exe (Join-Path $modDir 'SigilLoadout.exe')
     Start-Sleep -Seconds 3
     return [bool](Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue)
 }
