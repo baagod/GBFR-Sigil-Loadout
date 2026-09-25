@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:4f00a583d82afcb319ab485258c1a4885b5b32032d992585e3e627cea9ae7fe3",
+  "pageVersion": "sha256:98b788796a4ab36fa65bfda4fee5030ca781c01ccc1baf0f784172018f59db1f",
   "claims": [
     {
       "id": "claim_5926bc5648464eb4845b0dc070643e37",
@@ -392,15 +392,15 @@
     },
     {
       "id": "claim_f20acd434c2f40fdb28d3f813ffec7f2",
-      "statement": "frontend/bindings/ 是 wails3 generate bindings 的构建期产物且被 .gitignore 忽略，而 App.tsx 直接 import 它，所以生成必须排在 tsc 与 vite build 之前（vite 只抹类型、不做检查）：tsconfig.json 因此保持 noImplicitAny: false（生成的 *.js 没有 .d.ts，打开只会在那一句 import 上报 TS7016）并把 bindings 列进 include，vite.config.ts 的 wails(\"./bindings\") 插件带同一个路径。",
+      "statement": "frontend/bindings/ 是 wails3 generate bindings 的构建期产物且被 .gitignore 忽略，而 App.tsx 直接 import 它——而且是两个生成模块（loadoutservice 与 shellservice），所以生成必须排在 tsc 与 vite build 之前（vite 只抹类型、不做检查）：tsconfig.json 因此保持 noImplicitAny: false（生成的 *.js 没有 .d.ts，打开只会在那两句 import 上报 TS7016）并把 bindings 列进 include，vite.config.ts 的 wails(\"./bindings\") 插件带同一个路径。",
       "evidence": [
         {
           "resource": "repo://SigilLoadout/.gitignore#L9-L12",
           "version": "repo-lines-v1:sha256:2d4a389261468afbe88c570880ac639998ee1a32a27594d0d5a606e4a0376342:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmRlYzEzNmRiYWEyZTU4YzNlZWRhMTZmNDhjM2I2ODc5YjI3ZDMwZjVjYjEwYTNmMDI1MTM2ZWI0MjA0ZmZiMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTdjYWZjZWNmMTNmMzQ1MTc5NWE1Yjg5ZWZiZWZkNjFiNDIzOTVjZjliOWFmOTAyNWQ3NjQ5MDU5NWI5ZTIwYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTczYjllYTJlMzRhMTVkN2VmNWM4YTA3N2ZmNjY4ZjQzMTQxMGVlYjk1ODA1YjIxMWY5NDA0MDM3MmViMDA5NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGFmOGUzZTkyMGQwY2UxNDAwMmQ0ODBiYjVhYjc0Y2JiNTE2ZjU3NjY0YTc5YTM0MWU1ZTc3ZmI2ZWFmYjA2YSJ9"
         },
         {
-          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L6-L6",
-          "version": "repo-lines-v1:sha256:6f4b99c12392f0c20ecfe735cc4d056a17b52a7f40f4d2d839bb1bf3e42b0e7a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmY0Yjk5YzEyMzkyZjBjMjBlY2ZlNzM1Y2M0ZDA1NmExN2I1MmE3ZjQwZjRkMmQ4MzliYjFiZjNlNDJiMGU3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmY0Yjk5YzEyMzkyZjBjMjBlY2ZlNzM1Y2M0ZDA1NmExN2I1MmE3ZjQwZjRkMmQ4MzliYjFiZjNlNDJiMGU3YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZiYzQ2NzE1ZDU2NDI2N2VhM2E5OGI1Mjc2Yzk1OTc5NWI0ZTQ1YzJhMTNiOGMzNGZhMjE3MjM0MTQyZjNkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQ1MTA5MTZhZDAzY2YxNWMwMmI4MmUxNTQzODM1NTk2YjQ2ODc3MjkzNWIwYzJmMTJmZWJlMmMzM2QyMGYxZCJ9"
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L6-L7",
+          "version": "repo-lines-v1:sha256:b3038e03555e6d34947ac29ee31499be3b02d6cedf63401ddf838a37161838b3:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDgyMjRmNzI3ZDEzNmNiMWM3NzA5YmE5M2E0M2JmNTljM2NlYTdlZWI5YmUwODIyNDUwYjcyNDRmZjMzMWU0NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjE0ZTE5Y2EyY2ZjZDQ3OWMxODE4YThiMzMzMGRmZjg1ZWFlN2QzOTA0Y2FhYTJjNmJiY2YwNTNjYTgzNWUwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZiYzQ2NzE1ZDU2NDI2N2VhM2E5OGI1Mjc2Yzk1OTc5NWI0ZTQ1YzJhMTNiOGMzNGZhMjE3MjM0MTQyZjNkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQ1MTA5MTZhZDAzY2YxNWMwMmI4MmUxNTQzODM1NTk2YjQ2ODc3MjkzNWIwYzJmMTJmZWJlMmMzM2QyMGYxZCJ9"
         },
         {
           "resource": "repo://SigilLoadout/frontend/tsconfig.json#L7-L24",
@@ -412,21 +412,25 @@
         },
         {
           "resource": "repo://tools/build-release.ps1#L136-L157",
-          "version": "repo-lines-v1:sha256:012d305ce2d741e8df53aa3767fbb0ea02af6a90a63daa241c1ec95a1d5d2927:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRkMjJjZTg4MDYyYTk3NWZjYjIxNGI0YTZmZDc4NTdiYTkwYjc0MTJhYjkyYmMwZmNiMDllYzc1ZGQxOTU0ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlNTdiNmI3ZjUzNGY0YmEzM2Y0N2M4MmRiZDMxZWQzNDgwM2UyYWI3YjFhYzZhOWIzNTRkYTk0NTE4ZjE0NWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRiZDg3YzU5ODg1MjQzYjM2NmVmZWYzOGRlMWZkNmMzNWMwNmJkZDZmMGEwMzI2OWZjNzM5YTYxNzRmOGZmNzYifQ"
+          "version": "repo-lines-v1:sha256:239292a4b57bd964ab533c2c8d2ba215d3e638e554b1f6cd35903aa6d4c8b949:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhNTNiYTM1MDk2Njc2YzUyNDBjYzA4NDQ4M2ZlMDM1NjE3Zjk0ZjA5MGMyYTA5YTI4NjdjMDQwYWEzNjE5ZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ3ZDJmYmE0YjRiYzJlMmMwNGZjODY3OTQyN2IzNmEwYmNkMmQ2MDQzYzBlZWQwODg2NGM2MDZmN2VlNzcwNDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBmODQxZTVkYTZlYmNmOTM4NjI1Zjc0Y2JmMGU3MzkyNWJhMjk1YmIyNGRjNGFlMzg3OTA5ZWVhMWNiNzY4MTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc2MTMzY2E0ODZlOTU2ODQ2YjY4YTE5NjliZDQzZjg2MjAxZWI3ZmFlMDUyNzc0Yzg2ZmYzMzk4NjQ1ZWE5ZTAifQ"
         }
       ]
     },
     {
       "id": "claim_db5afb46cc724b37bd6a5fc738e1e9f3",
-      "statement": "前端并存两种绑定调用风格：App.tsx 用生成的 loadoutservice 模块（生成代码内部走 Call.ByID(<数字 id>)），SigilEditorPanel.tsx 用 Call.ByName(\"main.EditService.<方法>\") 字符串派发；后者的代价是服务名与方法名成为手写字符串，Go 侧改名不会有任何编译期报错，只会在运行时失败。",
+      "statement": "前端并存两种绑定调用风格：App.tsx 用生成的模块（数据读写 loadoutservice、窗口动作 shellservice，生成代码内部走 Call.ByID(<数字 id>)），SigilEditorPanel.tsx 用 Call.ByName(\"main.EditService.<方法>\") 字符串派发；后者的代价是服务名与方法名成为手写字符串，Go 侧改名不会有任何编译期报错，只会在运行时失败。而生成模块这一侧也只在「模块存不存在」这一层受 tsc 保护：生成的 *.js 没有 .d.ts、整个模块落成 any，所以成员名写错、方法搬了 service 或改了 Go 签名却没重新生成，都不会在 tsc 里红，只有 bindings/ 整个不在时模块解析失败才会红。",
       "evidence": [
         {
           "resource": "repo://SigilLoadout/frontend/bindings/sigilloadout/editservice.js#L31-L52",
-          "version": "repo-lines-v1:sha256:abd4f37eb0580b3080cee41593f6167ed8b2e7a6aa2af5e247fdb40b95831576:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjYmExMGJlMGRhZjA5YTIwMjU2NjZjZWYyNjIyMzVlZDk2ZWZkYmJjZjIyZjk5M2M4YTkzNDExMDM0ZWJjMTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkNTRjZDYwMDM4OTQ2ZDFjNzdkMmYxZjBkODU1ZmZiNDBlNmQyNmNhYjlhOGIzNjVkNTg3MDI4Y2NmYTFlZjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlZWIzMWJhYzVhYWMxZWJiODliNmYwMzNmYjZiMmUwNTUzYjNlZTUxMWYyYmEwYzEwODJhYzMxOWFmM2QyNjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM3OTI5ZTkxZTBmOTljM2U4MjVkZTY5YjQzNWZiNjQ4NGQxYjBhMWRmMmY0NjU2MWFiZjFhMjlmMDQxODhiODgifQ"
+          "version": "repo-lines-v1:sha256:2a74536748dad31539d64787f44519c715458d22849cf35a9811130545f0a538:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxMTE2Yzg3MzY4NDdiM2ZiNGE0YmQwZjY5ZDg3YTFhNTQzMmM3N2IyNmY3ZWVjM2ZlNGMzODY2NmVhZWJlZWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlZDcwMzYzODJmM2JhNDYzNmYwMTYyOTQxMzZiZmE3MTJlYWJjYWU2NmE2MTEwODlmZDI2ZjAzMzY5OGY1ZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiMjg1NTM5NjcyYWNiMGFhOGJmNjllNzg3NGY1ODQyNzM0ZjY1OTE1NDM4YThmOTAyYjRjNWU3MDhjN2VkMjcifQ"
         },
         {
-          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L6-L6",
-          "version": "repo-lines-v1:sha256:6f4b99c12392f0c20ecfe735cc4d056a17b52a7f40f4d2d839bb1bf3e42b0e7a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmY0Yjk5YzEyMzkyZjBjMjBlY2ZlNzM1Y2M0ZDA1NmExN2I1MmE3ZjQwZjRkMmQ4MzliYjFiZjNlNDJiMGU3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmY0Yjk5YzEyMzkyZjBjMjBlY2ZlNzM1Y2M0ZDA1NmExN2I1MmE3ZjQwZjRkMmQ4MzliYjFiZjNlNDJiMGU3YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZiYzQ2NzE1ZDU2NDI2N2VhM2E5OGI1Mjc2Yzk1OTc5NWI0ZTQ1YzJhMTNiOGMzNGZhMjE3MjM0MTQyZjNkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQ1MTA5MTZhZDAzY2YxNWMwMmI4MmUxNTQzODM1NTk2YjQ2ODc3MjkzNWIwYzJmMTJmZWJlMmMzM2QyMGYxZCJ9"
+          "resource": "repo://SigilLoadout/frontend/bindings/sigilloadout/shellservice.js#L20-L40",
+          "version": "repo-lines-v1:sha256:965c997d9ff8769acf85a1e5409c321a8b273490de4385b1936fbded30a59813:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZGYyM2EzOGFiYmI4N2RjZjM5ZmY0YmQ5YWY2MTc1OWE5YjM2ZTc4NTdhY2U2MmNjM2MxZTdlMmVlNDBkMTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYxNDQ0ZmViOGI1NWQ4ZWY1NWQ1M2ZkMjE2ZmU4MjQ4NmVlMzk0Y2MxNGE0YzFiNDY5YjhmZDFhMmJlMTA4YTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L6-L7",
+          "version": "repo-lines-v1:sha256:b3038e03555e6d34947ac29ee31499be3b02d6cedf63401ddf838a37161838b3:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDgyMjRmNzI3ZDEzNmNiMWM3NzA5YmE5M2E0M2JmNTljM2NlYTdlZWI5YmUwODIyNDUwYjcyNDRmZjMzMWU0NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjE0ZTE5Y2EyY2ZjZDQ3OWMxODE4YThiMzMzMGRmZjg1ZWFlN2QzOTA0Y2FhYTJjNmJiY2YwNTNjYTgzNWUwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZiYzQ2NzE1ZDU2NDI2N2VhM2E5OGI1Mjc2Yzk1OTc5NWI0ZTQ1YzJhMTNiOGMzNGZhMjE3MjM0MTQyZjNkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQ1MTA5MTZhZDAzY2YxNWMwMmI4MmUxNTQzODM1NTk2YjQ2ODc3MjkzNWIwYzJmMTJmZWJlMmMzM2QyMGYxZCJ9"
         },
         {
           "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L108-L128",
@@ -439,6 +443,10 @@
         {
           "resource": "repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx#L39-L44",
           "version": "repo-lines-v1:sha256:9d0fd06a76cfe903f83e723e73f3bd864d48d1b5bceec5e865573e8d63d73f66:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWE3N2E2Y2Q0ZGI0Yzg5Zjk2MjQwY2ViZWFhZmRkNThiN2QwYzM0MmYwYzVkZWYxNWExN2ZmM2U3YmJiMmZhYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTUxOWRjZjAxNDI3YWJlZjQ0MWViMjE0M2UzMzljYzQ2YjZiOWNkNGUyNTEzMDgwOWZlZTc3NTc4OTZhODUwZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTk2MzZkNmQxNWU2Mzc4ZWVlZjBkZmY3ZTgzNzYyMTgzYTQ3ZWRmYjEwNDUxYjRlOGMwYzI1NWZiY2U2YmZjNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjgyNzY5NDJiNzVlMDA4YTgyN2U2MzQ3NWY0OTUwMGQ3Y2EyNDIxNDMxOGUxMmMxNzkzNDhkZWQwMmNjYWIwMSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/tsconfig.json#L9-L11",
+          "version": "repo-lines-v1:sha256:b2d36ced98dd9f8655a9aa9615266916a132ffe4340d0a090dc6100aa2e80135:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTVjOGNmZmY5YmM3YTg4NmNiNTNjYmQ5YWRhNTU1YzAyYTMxZjNjN2FjMTczM2E0OTIzN2IxNGM3ZGVmYWI2MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGVhNTQ4NjdkZDIxYjg3MmFjMDBhNjBhMzExZjM0MWY1Nzc1NDJlOTQyMTQ4YjQ3M2MwOWM1ZjQ1NTU5NDc3YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTJiZjFhMjM5ZDY4MGE1YzZlNzVlZTUyMjExZTY0OThjZGFkMTUyZjEzM2ZlMzFhZWM2ZDU1ZWEzNjA3MDQxZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWE1MGNlNWZjMTM3NzhiM2E0ZTBhOTliZTIwOWVjOTQxODA1NjRhMTYyYWY4MWI1MWRjZTFmZWZmYTYyMDhlMCJ9"
         }
       ]
     },
@@ -887,10 +895,84 @@
           "version": "repo-lines-v1:sha256:e17c8a5ae8e00d0bd8766dd935e16a52ddc3ca635cb077a8bfec31b21f858c76:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDRmMTRkMzBmZGE2NDRhYjc2NzY1ZjQ0YmI5YjUzZjRkMDc2YjQyY2QwZmQ2NTUxZWMwYzdkYTU2NDQ5ODUwNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2Q0YjdhM2ZjYTVlNzJjYjdjN2UwMDJiNDQxMzkwN2NlMmFkOThhMjNlOTgxNmUxZWQxMTRkMjdkYjBhMDQyYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTZjM2E1OTA1ZTcyODIyYWM0NWYyNjE5OWJjYWE1MDQzNDhjMTc2MGJhYjAxZDdmYTE1NGMzZmZlZWViNDg0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDFmYjkwZjUzNWIwZGI1OTI2Y2Q3NDM4MDk2M2Q0ZTU5NzBkZjAzNDA4N2NjN2JiN2Q3Y2I3NDIyOTBmNmJlMSJ9"
         }
       ]
+    },
+    {
+      "id": "claim_38e006924ed94a11bd1f1cbeb9386d78",
+      "statement": "App.tsx 从两个生成模块取绑定，粒度就是 Go 侧 service 的粒度：数据读写 import ../bindings/sigilloadout/loadoutservice（LoadSigils / LoadConfig / SaveLoadout / LoadExclusives / GemNames / CharaNames 六条，对应只做读数据与写配置的 LoadoutService），窗口显隐与托盘 import ../bindings/sigilloadout/shellservice（MinimiseApp / SetTrayExitLabel 两条，对应 ShellService——窗口显隐与托盘跟载荷数据无关，所以自成一体、不从 LoadoutService 走）；因此 Esc 那条隐藏路径调的是 shellservice 的 MinimiseApp()，而不是 LoadoutService 上的方法。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/bindings/sigilloadout/shellservice.js#L20-L40",
+          "version": "repo-lines-v1:sha256:965c997d9ff8769acf85a1e5409c321a8b273490de4385b1936fbded30a59813:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzZGYyM2EzOGFiYmI4N2RjZjM5ZmY0YmQ5YWY2MTc1OWE5YjM2ZTc4NTdhY2U2MmNjM2MxZTdlMmVlNDBkMTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYxNDQ0ZmViOGI1NWQ4ZWY1NWQ1M2ZkMjE2ZmU4MjQ4NmVlMzk0Y2MxNGE0YzFiNDY5YjhmZDFhMmJlMTA4YTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L6-L7",
+          "version": "repo-lines-v1:sha256:b3038e03555e6d34947ac29ee31499be3b02d6cedf63401ddf838a37161838b3:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDgyMjRmNzI3ZDEzNmNiMWM3NzA5YmE5M2E0M2JmNTljM2NlYTdlZWI5YmUwODIyNDUwYjcyNDRmZjMzMWU0NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjE0ZTE5Y2EyY2ZjZDQ3OWMxODE4YThiMzMzMGRmZjg1ZWFlN2QzOTA0Y2FhYTJjNmJiY2YwNTNjYTgzNWUwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZiYzQ2NzE1ZDU2NDI2N2VhM2E5OGI1Mjc2Yzk1OTc5NWI0ZTQ1YzJhMTNiOGMzNGZhMjE3MjM0MTQyZjNkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODQ1MTA5MTZhZDAzY2YxNWMwMmI4MmUxNTQzODM1NTk2YjQ2ODc3MjkzNWIwYzJmMTJmZWJlMmMzM2QyMGYxZCJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L118-L136",
+          "version": "repo-lines-v1:sha256:8d62f7e64112ba2a3732936ceccb60fbd29bccecece934d31377962949938ed6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyODU0MjM5ZWNkZWQ3ZDAxNzE2Yjg1YmZmZThmNWZlZWNmOTJmODdhNDAzYmM2YjI2OGFjYzMwYjA3ZjI0MmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkNWQ1N2ZkNjQwMmYxZGUwNWQ1Mjk5YTMyNDc3OWU4ZTQzNDk3MTBkNDM0MzhkMDQxOGYzYTYwYjY3YzYwODAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFjYTU4ZDQ4ODA4YTEzMWQ1NWQ4MzFjMTgwZjcwYmI1Y2FjZTg1NTk0NzA0MDFkMzllNzkzMDZkODhlOWFmMmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJkOTYyZjVjM2Q5ZWQ0NTI1MTViMWVjZmIxNGVjMmQyNWZiMjQ0MTA2OTc5NzU2YmExZTJlZTgwMjQ0NzlhMzQifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/loadoutservice.go#L14-L19",
+          "version": "repo-lines-v1:sha256:297b722ca0b9a28ae5c3d2048911b27090666c2ebfca2c2b75aa5eb190f6e754:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzM1ODBmNGM4ZGVkNjk0ZmE4YWI5MzM3MmU3OTRlOTkzOGE1NDM4NzY4NmQwMjYwZjljZTk2N2YyNmI4MGY3YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmQzZDJiNGRiOGY3MTc1MjM3OTU5NWZiOTJhNzA5MzlkZjZhZDVkOWIwYTc3NDJkYmY3YzkxNjA2MjhjZmVjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmMxYTY4YTVjODkxOWUyMDA3MTdmZTVmYzAyNjg2ZWM4ZGI2NjYwZjIzOTBmNGE3YWZlYThhN2RkZWJhOWNjMSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/shellservice.go#L5-L13",
+          "version": "repo-lines-v1:sha256:49b378c6ed300328ba725a39ed5ebbf23c86ad294d883859bfbaa2fc428a3c9b:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2MxMmZiYmFmZDVlY2QzZWU5YWVjNzM4NTM4YTEyOGNhOWQ3NGY2MWUxN2VkZDZiNzU3NWE3NDg1NzUxNjNmYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzNjODQxNmE1MTU4NTIxYzJlYzgwMmE0NzMyMDVlYTIyZWI4ZjM3ZDZmOWQ1MjM4NDFhOWNiNmI0ODJkMGQzMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDdmNDg3NzEwNTIxZjAzMzI4ZmFlNDc5Y2U0MDlhYTdiMjgzNTZlNjFjYzc5NjljMzlhMzMwOTRjNzViMGYwNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWNmMWRhODQ0YjVhNjQ3NDA3ODA0OTZmZmExMGY3ODI2NGZiNzU0NzVhNTUzOGFhMzNkNmExZThiZmM4NDliOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_26781fbfebb84e71b8688019b1698c5a",
+      "statement": "托盘右键菜单那一条文案由前端推给 Go：main.go 先把菜单项写成英文 Exit 撑到 WebView 起来，之后 App.tsx 在一个挂在 [lang] 上的 effect 里调 ShellService.SetTrayExitLabel(messages[lang].trayExit)——文案只有前端 messages.ts 一份（Go 侧再抄一张翻译表就是同一件事的第三处、只会在托盘这一条上漂移），Go 侧用 application.InvokeSync 改那一项，因为菜单属于主线程建的托盘窗口而服务方法跑在别的 goroutine 上；又因为 lang 的初值是 initialLang() 的猜测，启动时可能推两次：第一次是猜测，LoadConfig 成功、applyConfig 里 setLang 之后再推 loadout.json 里存的那种语言。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L182-L187",
+          "version": "repo-lines-v1:sha256:5f3ad9eb8f2d45a5baf3e6fe5b2bea51a5f0d9362e933c44365f08e55f2627c9:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWNjMTE5MmZiNmNkOThjY2ZlNmE3ZmQxYWQyNTdkYzdkODFlMmJlNjVmMTc5MTdhOTNjYWQ4NTBhNWVlMWEyOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM5ZjZiMWNhYjQ1MTlkNWM0NzFjNDE0MGQ5NzI0Y2I2YmE3NjAyMGUxNmQ5MGJlN2ZiYzZhOTVjZGZlNjJiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZmZTA4N2UxZGFlYmRkYjkzYjRmOWNhZWI4YmJiMGVlNWEzYjJkOTgzNDNlZjUwMTI4M2E2NTgzYWRmODM1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTBlMjdkYmNhMDRkZmIyMTcyYWMwNmQ0Nzk1NjQ4ZDJjNjdlMmY2OGZhZTc0ZDhlYTk2NGQ4YWQ2NzY5YmEzOSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L226-L235",
+          "version": "repo-lines-v1:sha256:c5dc0ed120e96828ab2ffdd5fbf3a55b2873d47992748d916cd9f0836ecf02ca:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyYzg3NmQ3NDJhNDFmZTZiOGY3Njc5MTBlNDNmNDBkYjhmYzc3OGEzMzFjMTA3ZjBlZjEyNTc3NzljMDhkOGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczYWJjZTUxNzljYjczYzExNzlhMjMxM2UwNjc0ZmVjZjlmOWNkODI5ZGY4MjliOTFjY2YyMTQwM2I5NWU1MTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhMTg0M2I0NTVhMjM2OWQ2ZjFiZDE0Nzk5ZWM5OTgzYTc0MDA2ZGRlMzU3MjkzZTI4MTM1YjEyYTlkNzE0ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExZWMwYjE2M2Q1ZGRiNTAzZmU5OWQyMjkzYTQ4NGM3MTNlNmRmNDVjYzIxY2I0YjcxYTE1M2MwZjJiNzdmNTgifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L83-L83",
+          "version": "repo-lines-v1:sha256:65241c52f63340b1e44413c4c0d11176d882117eb9943dfd57f515a2db598053:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjUyNDFjNTJmNjMzNDBiMWU0NDQxM2M0YzBkMTExNzZkODgyMTE3ZWI5OTQzZGZkNTdmNTE1YTJkYjU5ODA1MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjUyNDFjNTJmNjMzNDBiMWU0NDQxM2M0YzBkMTExNzZkODgyMTE3ZWI5OTQzZGZkNTdmNTE1YTJkYjU5ODA1MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjI5MzdiYTExOWVjYWEzYWYxZWY0YjliYzNjZDdjMTgwZWI5ZTg3ODcwNmM2YTk4NTQwNzhiNDBmMmQwYzJhMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjYzOTA5Nzc0NTM0ZjgyOTlmNTAyNTI3MDIzY2E3NjkzZmEzMTIyMDFkNGM1N2QyNDQwZDdkZGY4Y2RkZjFkZSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/messages.ts#L22-L23",
+          "version": "repo-lines-v1:sha256:0e547e832e11e49ad433607b283508cb33338cc587ce47cf691ce1b17076a17c:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDEyYTY2MTRiMzVhYmUyMTAyMTc3ZjE2ZWVlMWUzMjA2Mjk4ZmEwMzhkZjQ1NzJjOWUxOWVkZjU2YzlhNTc3MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWM3NmIwZmRkMDIwYjRlNTQxODI2MGE5NTU2Zjk4ZmJkODM1YmFiN2EwYTY2MzZmYWQ5YTdhZDBmMTg3ODNlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzE2Y2ExNjI2NTNmNDAwY2I1YTA4ZWRiNmUyNzVhMzIxOGQyMDU5OGE3MzU0M2M5MmY5NzFjYjY4NjczYjE0OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTc1NzIyZWJlNzRmNWYwYmQ4M2Y5NDc5ZDQ5OTE2N2EzNWQ0ZDNlYjZmYTY4NjhjNTAyOTUyMjdmNDJjNDRiNSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/main.go#L55-L60",
+          "version": "repo-lines-v1:sha256:1da6046d8e64e6d88c8f7c2c1067cd9d6777d571408abba0dcb8f810dfcca4e7:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWQ1OTI0OWJiMDE5MzU1NDFkZDlhODg0YTI4NWEwNzA3M2UzY2Y2NGI0NmVlMmYwNjNlYjBmMTQ2MjQ0ODdmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFhZTVjZTA5OWYyZjI4MWU2MDFjZjFkOTA1YTgzMWNjNzQ5Y2U3OWZhMjc3Y2JhYmVkNzZmNGViMGNkZmY0NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmVhZWY5MjBmNGI2Yjk3MDRmNGQ4YTc4NTQxZTFlZmZkZTU4OTcxNWI4OGE1NmMxMDhjYTViODAyNmFkNDA3MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDQxYjI4OTU3MjA2OTJkYzU4NWQ1NWUxODQwYzAwZGI2NWY2ZmJkZGJkYmFlMWNjMDk5ZTMwNjRmZDhhYzQ0YiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/shellservice.go#L15-L30",
+          "version": "repo-lines-v1:sha256:cdf287400818f120d7e3c728d0dcc16275ba243fba1dc88a3f5bab851b856898:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2Zjg3N2JiMDYzMGRlMDQ2NjljNTUwOTRlOWU2MGFlZWNiYTFmNjc3YzI4ZWM4NzIzNTRmZTEwNzAzMzdmZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhYTI1NWU0YTg5MzcxMDU0ODY1M2E5N2Q0ZDcwNDFjZjVjMGZjMTBkNDNiM2JhZTk2ZjU2MWVhM2U3NDAyYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bbdc16e90eaa48e19ef0a3b17d455d73",
+      "statement": "托盘文案推送的失败被就地吞掉（SetTrayExitLabel(...).catch(() => {})），不进外壳那条单一失败通道——屏幕上看不到托盘，为它显示一条提示没有意义，代价只是那一条暂时不换语言；Go 侧 SetTrayExitLabel 在 label 为空时不换（保留上一条），因为 Record<Lang, Messages> 只强制键存在、不强制非空，写成 trayExit: \"\" 会让菜单出现一条空项、从托盘再也退不掉。",
+      "evidence": [
+        {
+          "resource": "repo://SigilLoadout/frontend/src/App.tsx#L182-L187",
+          "version": "repo-lines-v1:sha256:5f3ad9eb8f2d45a5baf3e6fe5b2bea51a5f0d9362e933c44365f08e55f2627c9:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWNjMTE5MmZiNmNkOThjY2ZlNmE3ZmQxYWQyNTdkYzdkODFlMmJlNjVmMTc5MTdhOTNjYWQ4NTBhNWVlMWEyOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWM5ZjZiMWNhYjQ1MTlkNWM0NzFjNDE0MGQ5NzI0Y2I2YmE3NjAyMGUxNmQ5MGJlN2ZiYzZhOTVjZGZlNjJiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmZmZTA4N2UxZGFlYmRkYjkzYjRmOWNhZWI4YmJiMGVlNWEzYjJkOTgzNDNlZjUwMTI4M2E2NTgzYWRmODM1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTBlMjdkYmNhMDRkZmIyMTcyYWMwNmQ0Nzk1NjQ4ZDJjNjdlMmY2OGZhZTc0ZDhlYTk2NGQ4YWQ2NzY5YmEzOSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/frontend/src/messages.ts#L50-L53",
+          "version": "repo-lines-v1:sha256:5f1234676afaa4660e61d6189e22ed9302fe51f41734fa02383863c474d13ced:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWVjZWE0NTdhZGFhYmE3OWQ2MjViMjBmMTFiN2RhYTk5MWJhM2M4MDg3ZTgxNzU3MjQ1Y2Q0ZDNmZGU5MWQ5NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWI2MmE3NzhlZjBlNjgwY2Q3MzMyMWVmNzc3MjM1NWQ0YjQ4NDI2YjIyMzcyMzE0ZjliOGM5YzdlNTI1MmRhYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWZkZTFhNTYzODQyYjhjMTY5YWM0NWY2ZGExMzU2ZWJjZTg0Zjg3NzJhZDAxZTE4ZTI0MTU1Y2U1YWY0Y2Y4MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzBjNzVhYzhmZjY5NjEwMjI3ZWI3ZGY2MmQ1ZmEwMWNjZTZkZTBkYTY1ZDg2ZjFlYjIxNTg2MDMwZWI4ZThhYiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/shellservice.go#L21-L29",
+          "version": "repo-lines-v1:sha256:98d675ca9e38f076249289896e9cf299b47608d2002c4ec2a336920914256ac4:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDI1Yzg1MTJkMjM3MGQ3MThiZDM3NjhlOGRjZGU1OTQyZmE3NTI2NmI4OGEzNjA3MDY5OGUzZjFiODc1M2QxYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjFkOWQ3NTgwODlmNWM0YmEzZTEyODIxMjg5ODgxM2VlMGEzMTJmODlmMWJiODhiNmYzZWMwNTBiNGQ4YzY4NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDEzNDBmYzI2NDQ4ZjgwNDlkNmE3ZjQ2N2FiNDFmNmY5OGVmZTkyMTRiZWVlYjkwZjRmY2FkNjBiODc2MTI0ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T01:16:26.192Z"
+    "at": "2026-09-24T18:48:22.808Z"
   }
 }

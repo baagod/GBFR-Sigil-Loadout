@@ -1,6 +1,6 @@
 # 文件
 
-- [两个配置文件与跨语言常量契约](config-file-contracts.md) - 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、校验责任划分（Go 当场拒 / C# 只做形状校验 / 等级上界只由可视工具按 cap 夹）、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 对拍的范围与它证明不了的东西。
+- [两个配置文件与跨语言常量契约](config-file-contracts.md) - 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、校验责任划分（Go 当场拒 / C# 只做形状校验 / 等级上界只由可视工具按 cap 夹）、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 逐组对拍的范围（18 组：窗口消息只剩 0x8012 两侧都有，0x8010 已退化成 Go 的单处声明）与它证明不了的东西。
 - [语义锚点与布局解析（fail-closed 的核心）](game-layout-anchors.md) - 原生核心如何用四条 pattern（apply 循环、category 循环、status notifier、getter 体内的 SystemData）从游戏 PE 映像里推出 ResolvedGameLayout 的十个 RVA、两个身份字段偏移与两个原始循环上限字节，用九条预检字节与 RevalidateGameLayout 逐字节复验，并在任何一步不成立时一个钩子、一个字节补丁都不装。
 - [skill_status 表与活表写入闸门](skill-status-table.md) - 唯一被真正改写的游戏数据表：8 字节行数头 + 52 字节行的行布局与两侧常量的对拍关系、托管侧按 (Key, Level) 打行、原生侧从两步语义锚点解出游戏发布该表的固定槽、写前五道 fail-closed 闸门与 -1..-7 拒绝码，以及为什么删掉的全内存扫描兜底不得再加回来。
 - [并发、锁序与生命周期守卫](threading-and-locks.md) - 这套 mod 不让游戏崩掉的不变量集合：template→selection 的锁序与共享锁读者、thread_local 构建快照为何取代「以 status 地址为键的授权表」、ActiveCallGuard 与拆卸时排空在途 detour、「先置 g_shutting_down 再拆除」的关停顺序、热重建的时间戳闸门与 60 秒冷却、托管侧 250ms 单飞维护拍与两种 mtime 版本门、Go 侧防抖写加原子替换与退出 flush，以及 ABI 边界上的异常与输入守卫。

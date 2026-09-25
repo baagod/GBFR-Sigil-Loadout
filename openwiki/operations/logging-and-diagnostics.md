@@ -1,7 +1,7 @@
 ---
 type: operations
 title: 日志与故障定位
-description: 这套 mod 的三类日志落点（mod 目录下 GBFR.SigilLoadout.log 的追加写与 4 MiB 单代轮转、Reloaded-II 的 ILogger、原生侧只写 OutputDebugStringA 与宿主回调，没有独立原生日志文件）、阶段行/运行消息/去重规则三个契约，以及五类典型症状（游戏里没生效、钩子未装、活表拒写、工具起不来、配置坏文件）各自的「先看哪一行、再看哪一行、决定性判据」，另含工具侧 tool-debug.on 标记开关默认静默的开启方式、外壳那条唯一失败通道（failureText 的五个 kind）与必须成对改的两个 SaveFailed 字面量，以及钉住这些契约的测试。
+description: 这套 mod 的三类日志落点（mod 目录下 GBFR.SigilLoadout.log 的追加写与 4 MiB 单代轮转、Reloaded-II 的 ILogger、原生侧只写 OutputDebugStringA 与宿主回调，没有独立原生日志文件）、阶段行/运行消息/去重规则三个契约（含热键「注册 / 释放」那对只在期望态翻转时各留一行的日志），以及五类典型症状（游戏里没生效、钩子未装、活表拒写、工具起不来 / 按热键没反应、配置坏文件）各自的「先看哪一行、再看哪一行、决定性判据」，另含工具侧 tool-debug.on 标记开关默认静默的开启方式、外壳那条唯一失败通道（failureText 的五个 kind）与必须成对改的两个 SaveFailed 字面量，以及钉住这些契约的测试。
 tags: [logging, diagnostics, troubleshooting, log-rotation, failure-localization, operations]
 sources:
   - id: openwiki-source-0b100d4f3734fcb50250a654
@@ -60,17 +60,17 @@ sources:
     resource: repo://tests/NativeLayoutHarness/run.ps1
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 日志与故障定位
 
 这套 mod 的失败几乎都是 **fail-soft**：钩子装不上不会拦住游戏，原生拒写不抛异常，配置读坏不弹窗（见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)）。于是"为什么没生效"的答案基本只存在于一行日志里。
 
-本页按**症状**组织，不按文件组织：每一类症状给一条「**先看哪一行 → 再看哪一行 → 决定性判据**」的定位顺序，再附该症状可能出现的全部行与它们的含义。行里的关键字（`Startup phase=`、`refused`、`hot apply:`、`ctx1 build`、`party+`、`hot rebuild: skipped`）在实现里就是字面量，可以原样粘进搜索框。
+本页按**症状**组织，不按文件组织：每一类症状给一条「**先看哪一行 → 再看哪一行 → 决定性判据**」的定位顺序，再附该症状可能出现的全部行与它们的含义。行里的关键字（`Startup phase=`、`refused`、`hot apply:`、`ctx1 build`、`party+`、`hot rebuild: skipped`、`Hotkey registered` / `Hotkey released`）在实现里就是字面量，可以原样粘进搜索框。
 
 ## 1. 三类日志落点：先确认在看哪一份
 
@@ -183,6 +183,7 @@ sequenceDiagram
 | 进程内只报一次 | `sigil edit: IDataManager is not available yet; …` | 第一次没拿到数据管理器时 |
 | 每会话只报一次 | `Skill contribution confirmed for 0x…: <n>/<m> virtual sigils reached the context-1 status.` | 第一次实战确认；`incomplete` 那一条**每次都报** |
 | 节流窗口刻意静默 | `hot rebuild` 那一组 | 节流 CAS 命中时不打印（每个 tick 都可能命中）；其他跳过原因各有自己一行 |
+| 注册状态翻转才动手 | `Hotkey registered: …` / `RegisterHotKey unavailable (key may be taken); fallback polling active.` / `Hotkey released: another program is in the foreground.` | 前台在「游戏或工具」与「别的程序」之间翻转的那一刻各写一行；因为只在**期望态变化**时动手，注册失败不会每拍重试、也不会每拍刷一行，而关停（消息循环退出）时只清标志、**不打** `released` |
 
 推论：**"还在拒写"这件事在日志里看不出来**。想确认现在还拒不拒，在工具里再存一次并看是否出现 `hot apply: SUCCESS`。
 
@@ -283,17 +284,45 @@ sequenceDiagram
 
 **症状**：双击 `SigilLoadout.exe` 什么都不发生，或弹一个红叉对话框；也可能是"热键呼不出来"。
 
+"按了热键没反应"这一类只从**注册状态**这一侧分流（判据的机制与两侧分工见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md) §8.2–8.4）：
+
+```mermaid
+flowchart TD
+    A["游戏里按热键没反应"] --> B["先搜 Hotkey registered 与 Hotkey released"]
+    B --> C{"最后见到的是哪一种"}
+    C -->|"Hotkey registered"| D{"按下那一刻留下哪一行"}
+    C -->|"Hotkey released"| E["前台已经切走：把游戏切回前台再看"]
+    C -->|"RegisterHotKey unavailable"| F["这颗键被别人占着：已退回 250 ms 轮询"]
+    C -->|"一行都没有"| G["前台从来不是游戏或工具，或消息窗口没建出来"]
+    D -->|"Launched 或 toggled"| H["这条链通了：问题在工具那一侧"]
+    D -->|"SigilLoadout.exe not found"| I["装包不全：mod 目录里没有那个 exe"]
+    D -->|"Hotkey ignored"| J["被前台门丢掉：注册状态比前台慢了一拍"]
+    D -->|"连 ignored 都没有"| K["这一记按键没被看到：轮询路径会整段漏掉快按"]
+    F --> K
+```
+
+热键没反应的定位顺序：先确定这颗键**此刻归谁**，再看按键那一刻有没有留下放行行。
+
 **先看哪一行 → 再看哪一行 → 判据**
 
 1. **先**看屏幕上有没有对话框。**判据**：有对话框就说明是**随包数据**（启动期读的那七份）缺了或不是合法 JSON，工具随即 `exit 1`——`-H windowsgui` 没有控制台，写 stderr 没人看得见，所以这是它唯一的出口。对话框正文：`随包数据读不到，工具无法启动：` + 具体错误 + `它应当与 SigilLoadout.exe 一起放在 assets\ 下。`
-2. **如果窗口能开、只是呼不出来**，看 mod 侧日志里的热键几行（它们进的是 `GBFR.SigilLoadout.log`，不是工具日志）。**判据**：`Hotkey registered: … via RegisterHotKey.` 说明注册成功；`RegisterHotKey unavailable (key may be taken); fallback polling active.` 说明该键被别的程序占用、退回 250 ms 轮询，这段期间仍可用；`Hotkey message window creation failed; fallback polling active.` 则连兜底轮询都没有。
-3. **再看**按热键那一刻的两行：`Launched loadout editor tool.`（真的起了进程）或 `SigilLoadout.exe not found in the mod directory.`（装包不全，mod 目录里没有它）或 `Loadout tool is already running; toggled.`（已经开着，这次只是把窗口收/放，见 [工作流：热键呼出/收起可视工具（F1 到窗口显隐的完整链路）](/openwiki/workflows/hotkey-summon.md)）。
+2. **如果窗口能开、只是呼不出来**，看 mod 侧日志里的热键几行（它们进的是 `GBFR.SigilLoadout.log`，不是工具日志）。**先**搜 `Hotkey registered` 与 `Hotkey released`：这对行是**状态翻转**才写的，所以要看**最后留下的是哪一个**（为什么键要在运行期交还，见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md) §8.2）。
+   - 最后一次是 `Hotkey registered: <键名> (0x<码>) via RegisterHotKey.` → 这颗裸键此刻归本进程独占，按键由消息路径接住。**同一会话里它反复出现是正常的**：每切回一次前台就重新注册、重写一行。
+   - 最后一次是 `Hotkey released: another program is in the foreground.` → 前台已经切走、键已还回去，这时按下去不会有反应，直到游戏或工具重新成为前台。**这一行不代表刚才注册成功过**：期望态一翻到"不是我们"就无条件打它，它上面那一条同类行也可能是 `RegisterHotKey unavailable …`。关停（消息循环退出）时只清两个标志、不打这一行，所以日志末尾缺 `released` 是正常的。
+   - **一次都没有** → 这次运行里前台从来不是游戏或工具（mod 装好时游戏在后台、之后一直在别的窗口里操作，或启动器窗口一直握着焦点）：不是故障，切到游戏就会有第一行。若日志里同时有 `Hotkey message window creation failed; …`，那是另一个原因：窗口没建出来时根本不进这条同步逻辑，永远不会写这两行。
+   - `RegisterHotKey unavailable (key may be taken); fallback polling active.` → 这颗键被别的程序占着，回退到 250 ms 轮询（这段期间仍可用）；它同样跟着期望态走，所以**每切回一次前台会再报一次**，而不是每拍刷一行。
+   - `Hotkey message window creation failed; fallback polling active.` → 连消息窗口都建不出来，只剩轮询回退。
+   - `Hotkey ignored: neither the game nor the tool was in the foreground.` → 这一记按键**被看到了**、但被前台门丢掉。它出现就说明前台已经不是游戏或工具，而**注册状态最多滞后一拍**（键还注册着的时候，这一记按键本该被系统吃掉、前台程序根本收不到它）；由轮询那半边负责响应时，在别的程序里按键也走这一行。
+3. **再看**按热键那一刻的放行结果：`Launched loadout editor tool.`（真的起了进程，mod 目录里有 exe）或 `Loadout tool is already running; toggled.`（窗口已存在，这一记只是开关，见 [工作流：热键呼出/收起可视工具（F1 到窗口显隐的完整链路）](/openwiki/workflows/hotkey-summon.md)）或 `SigilLoadout.exe not found in the mod directory.`（装包不全，mod 目录里没有它）。这四行（连同 `Hotkey ignored: …`）在**注册路径与轮询路径上共用同一个实现**，所以选中的动作与措辞一致，缺行只说明这一记按键根本没被看到。
 4. **判据（第二次启动）**：再点一次 exe 不会弹错、也不会留下任何日志——第二个实例检测到 `Local\GBFRSigilLoadout` 已存在，就把已有窗口 `ShowWindow(SW_SHOW)` + post `0x8010` + `SetForegroundWindow`，然后 `os.Exit(0)`。可观察的结果只有"已经开着的那个窗口被拉到前台"。
 
 | 该搜的日志行 / 现象 | 含义 | 下一步 |
 | --- | --- | --- |
 | 对话框正文 `随包数据读不到，工具无法启动：` + `它应当与 SigilLoadout.exe 一起放在 assets\ 下。` | 启动期要读的七份之一读不到或不是合法 JSON；工具随即 `exit 1` | 错误文本里带着出错路径（`读随包数据 <路径>: …`）或 `随包数据 <名字> 不是合法 JSON: …` |
 | 工具窗口里的失败提示（**无日志行、无对话框**） | `sigils.json` / `sigils.chara.json` 是**按需读**的，失败不弹对话框、也不进任何日志 | 在这两个文件上找原因：它们在 `assets\` 下 |
+| `Hotkey registered: <键名> (0x<码>) via RegisterHotKey.` | 从这一刻起这颗裸键**全局独占**地归本进程（别的程序收不到它） | 反复出现是正常的：每次切回前台重新注册一行 |
+| `Hotkey released: another program is in the foreground.` | 已 `UnregisterHotKey`、键还给别的程序；**无条件打出**，不代表刚才注册成功过 | 按下去没反应就是预期行为，切回前台再试；关停时不打这一行 |
+| `Hotkey ignored: neither the game nor the tool was in the foreground.` | 这一记按键被看到、但被前台门丢掉：前台已经不是游戏或工具（注册状态最多滞后一拍），或此刻正由轮询那半边响应 | 一般无需处理，切回游戏再按；连续出现说明前台一直不是你 |
 | `Hotkey configuration unavailable: <消息>; falling back to the default F1 hotkey.` | 热键配置读不出来 | 不影响其它功能，F1 仍可用 |
 | `SigilLoadout.exe not found in the mod directory.` | 热键想拉起工具，但 mod 目录里没有它 | 装包不全 |
 | `Native core not found: <路径>`（出现在 `Initialization failed: …` 里） | 原生 DLL 缺失或路径不对 | 装包不全 |
@@ -326,7 +355,7 @@ sequenceDiagram
 | `sigil edit: no edit reached a row (<n> enabled); not writing the table back` | 列表读到了，但一条都没落到行上 | 往上找逐条的跳过原因 |
 | `sigil edit:   skip (disabled): <哈希>` / `skip (key is not an 8-digit hex hash yet): <键>` / `skip (level <n> is below the first level): <键>` / `<KEY> L<LEVEL>: row not found` / `<KEY> L<LEVEL>: slot <n> is not a finite number (<值>); left as the game has it` | 逐条被跳过的原因 | 按行修 `sigiledits.json` |
 | `sigil edit: the edit list changed while the table was being built; it will be applied on the next tick` | 建表期间文件又变了，这一版作废（不推进版本） | 无需处理：下一拍按新版本重来 |
-| `Hotkey configuration unavailable: <消息>; falling back to the default F1 hotkey.` / `RegisterHotKey unavailable (key may be taken); fallback polling active.` | 热键配置读不出来，或该键被占用 | 换一个键；不影响其它功能 |
+| `Hotkey configuration unavailable: <消息>; falling back to the default F1 hotkey.` / `RegisterHotKey unavailable (key may be taken); fallback polling active.` | 热键配置读不出来，或该键被别的程序占着（后者跟着注册状态翻转走，每切回一次前台再报一次） | 换一个键；不影响其它功能，判据链见 §7 |
 
 ## 9. 附：配装热重建那一组行
 
@@ -354,7 +383,8 @@ sequenceDiagram
 - `debugf` 每次调用先看 `exeDir()\tool-debug.on` 是否存在；不存在立即返回——**什么文件都不产生**。存在才向同目录 `tool-debug.log` 追加一行 `HH:MM:SS.mmm <消息>`。
 - **为什么默认静默**：正式安装从不创建那个标记，所以玩家永远不会在 mod 目录里多出诊断文件（mod 目录每次更新会被整份替换，也不适合放可变状态）。
 - **怎么打开**：在 `SigilLoadout.exe` 旁边（也就是 mod 目录）建一个**空文件** `tool-debug.on`。内容不参与判断（只看存不存在），也**不需要重启**——每次调用都重新判定；删掉即恢复静默，`tool-debug.log` 是追加写的，自己删即可。
-- **打开后能读到什么**：假隐藏 / 显出这条链上的每一步，例如 `fakeHide post hwnd=… target=…`、`hideNow hwnd=… fg=… target=…`、`pre-setfg fg=… target=…`、`SetForegroundWindow(<hwnd>) ret=… err=… fgNow=…`、`replay cursor-hiding click (hold)`、`EnableWindow ret=…`、`revealTool hwnd=…`、`WM_CLOSE hwnd=…`、`0x8010 prev=… hidden=…`。
+- **打开后能读到什么**：假隐藏 / 显出这条链上的每一步，例如 `fakeHide post hwnd=… target=…`、`hideNow hwnd=… fg=… target=…`、`pre-setfg fg=… target=…`、`SetForegroundWindow(<hwnd>) ret=… err=… fgNow=…`、`replay cursor-hiding click (hold)`、`EnableWindow ret=…`、`revealTool hwnd=…`、`hideToTray (frontend Esc/X)`、`WM_CLOSE hwnd=…`、`WM_SYSCOMMAND SC_MINIMIZE hwnd=…`、`wmToggle hwnd=… fg=… hidden=… rf=… game=… -> <动作>`（这一记开关被判成收起 / 显出 / 丢掉哪一个）、`0x8010 prev=… hidden=…`（没覆盖焦点目标时写作 `0x8010 prev=… (kept …) hidden=…`）。
+- **两处"缺行"是设计**：真正退出时那记 `WM_CLOSE`（`quitting` 已置）直接交回默认处理，**不打** `WM_CLOSE hwnd=…`；标题栏最小化走 `WM_SYSCOMMAND` 而不是 `WM_CLOSE`，所以那条路上只会有 `WM_SYSCOMMAND SC_MINIMIZE hwnd=…`。
 - **它不含单实例与托盘那几行**：那几处走标准库 `log`，而 exe 以 `-H windowsgui` 编译、全代码里没有任何 `log.SetOutput`，所以正式构建里那几行无处可见。
 - 写不进日志文件时静默返回；实现是每次调用 OpenFile + Close，适合窗口事件这种低频量，别往里塞高频采样。
 
@@ -389,6 +419,6 @@ sequenceDiagram
 
 ## 11. 这些契约由谁钉住
 
-- `SigilLoadout/sharedconstants_test.go` 对拍跨语言声明的字面量（C# / Go / TS / C++ 各写一份，写错**不会编译失败**）：窗口标题（mod 靠它找窗口）、两条窗口消息（`0x8010` 激活 / `0x8012` 开关）、用户配置目录与两个文件名、`sigiledits.json` 的成员名，以及 `GBFR.SigilLoadout.SaveFailed` 事件名——它有两份字面量（Go 的 `saveFailedEvent`、前端 `SigilEditorPanel.tsx` 的 `SAVE_FAILED`），Go 发、前端收，只改一边不会编译失败，只会让那张失败对话框永远不弹。
+- `SigilLoadout/sharedconstants_test.go` 的 `TestSharedConstantsAgreeAcrossLanguages` 逐组对拍跨语言声明的字面量（C# / Go / TS / C++ 各写一份，写错**不会编译失败**，只会在游戏里表现成错值；每条声明必须**正好匹配一次**，正则写松了就会对着碰巧像它的东西比出假绿）：窗口标题（mod 靠它 `FindWindow` 找窗口）、热键开关消息（C# `Hotkey.WmToggle` 与 Go `wmToggle`，值 `0x8012`）、用户配置目录与两个文件名、`sigiledits.json` 的 `edits` / `enabled` / `key` / `level` / `values` 成员名、`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash` 哨兵、参槽数 `LevelValueCount` 与 `skill_status` 的表头 / 行 / `Key` 偏移，以及 `GBFR.SigilLoadout.SaveFailed` 事件名——它有两份字面量（Go 的 `saveFailedEvent`、前端 `SigilEditorPanel.tsx` 的 `SAVE_FAILED`），Go 发、前端收，只改一边不会编译失败，只会让那张失败对话框永远不弹。注意 `0x8010` **已经不在**名单里：mod 侧不再声明它（这条激活命令只由工具自己 post），没有第二方要跟它对齐，也就没有可漂移的对。同一文件里的 `TestVirtualSlotCapacityFitsPlayerSlots` 另外断言 `MaxSlots` 放得进原生容量（`kVirtualSlotCapacity` 减掉内置专属槽数），超了会被静默截断、**只有日志会说**。
 - `SigilLoadout/editservice_test.go` 的写失败用例：写入做不成时那行必须落进日志（测试直接抓 `log` 输出），并且待写必须放回——没有后续编辑而直接退出时，`flushNow` 是它唯一的机会。
 - `tests/NativeLayoutHarness` 用真实游戏 exe 验布局解析与 fail-closed（改坏一个 hook 字节必须让复验失败，成功时打印 `NATIVE_LAYOUT=PASS` 与 `NATIVE_LAYOUT_FAIL_CLOSED=PASS`）；不给 `GBFR_EXE` 时 `run.ps1` 打印 `NATIVE_LAYOUT=SKIP (未给 -Exe / $env:GBFR_EXE)` 并以 0 退出，所以它是一条可跳过的门禁，见 [构建、发布与部署链](/openwiki/operations/build-and-release.md) 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。

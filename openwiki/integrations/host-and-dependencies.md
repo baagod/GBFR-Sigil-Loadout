@@ -57,9 +57,6 @@ sources:
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
 generated: { by: "openwiki/0.6.0", at: "2026-09-24T00:51:14.273Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T00:51:14.273Z
 ---
 
 # 宿主与依赖边界（Reloaded-II / 数据管理器）

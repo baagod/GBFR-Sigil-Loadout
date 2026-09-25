@@ -1,11 +1,11 @@
 ---
 type: architecture
-title: 系统总览：三个单元与它们的边界
-description: 三个交付产物（GBFR.SigilLoadout.dll、GBFR.SigilLoadout.Native.dll、SigilLoadout.exe）各自的运行时域与加载方式、它们之间的三条通道（进程内 ABI v20、用户配置目录下两个 JSON、Win32 窗口消息）、状态归属，以及 Reloaded-II 宿主契约、数据管理器、仓库外 gen 这些外部边界。
+title: 系统总览：三个交付单元、三条通道与状态归属
+description: 三个交付产物（GBFR.SigilLoadout.dll、GBFR.SigilLoadout.Native.dll、SigilLoadout.exe）各自的运行时域与加载方式、它们之间的三条通道（进程内 ABI v20、用户配置目录下两个 JSON、Win32 窗口消息 0x8012/0x8010）、热键按前台状态动态注册与释放、逐项状态归属，以及 Reloaded-II 宿主清单（ModVersion 0.6.2）、数据管理器与仓库外 gen 这些外部边界。
 tags: [architecture, overview, boundaries, interop, configuration]
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+    at: 2026-09-24T18:48:22.808Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -55,14 +55,16 @@ sources:
     resource: repo://SigilLoadout/tray.go
   - id: openwiki-source-3e6af52b742314f1b631b09d
     resource: repo://SigilLoadout/win32.go
+  - id: openwiki-source-971b5ce7ce337d3ba8d34aa0
+    resource: repo://SigilLoadout/windowstate_test.go
   - id: openwiki-source-46f7ef112800a873cada707b
     resource: repo://SigilLoadout/windowstate.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 ---
 
-# 系统总览：三个单元与它们的边界
+# 系统总览：三个交付单元、三条通道与状态归属
 
 本 mod 的全部交付物是三个二进制加一份随包数据。它们分居两个进程，中间只有三条通道——一条进程内的 ABI、一条跨进程的磁盘契约、一条 Win32 消息。把这三条通道和「谁拥有哪份状态」认清，改动就不会跨错层；本页只讲边界与归属，各单元内部的结构与运行时序在各自的系统页与工作流页。
 
@@ -110,7 +112,7 @@ flowchart TB
     Native -->|"detour 注入虚拟槽位"| GameState
     Managed -->|"GetArchiveFile skill_status.tbl"| DataManager
     Managed -->|"热键启动进程"| ToolUI
-    Managed -->|"通道三 PostMessage 0x8012 开关"| ToolUI
+    Managed -->|"通道三 借出激活权后 PostMessage 0x8012 开关"| ToolUI
     ToolUI -->|"托盘与第二个实例 post 0x8010"| ToolUI
     ToolServices -->|"读资产"| AssetData
     ToolServices -->|"通道二 防抖原子写两个 JSON"| UserConfig
@@ -125,7 +127,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | 进程内 ABI v20 | 托管 mod ↔ 原生核心（同一进程） | 版本号、日志、整份玩家配置、编辑后的表、一条运行消息 | `GBFR.SigilLoadout.Native/native_api.h` ↔ `NativeCore.Interop.cs` |
 | 磁盘 JSON 契约 | 可视工具（唯一写者）→ 托管 mod（只读） | `loadout.json` 配装、`sigiledits.json` 编辑列表 | C# 的 `UserConfig.FilePath` ↔ Go 的 `userCfgDirName`/`loadoutFileName`/`editListName`，由 `sharedconstants_test.go` 对拍 |
-| Win32 窗口消息 | 托管 mod → 可视工具（`0x8012`）；工具 → 自己（`0x8010`） | 只有命令，**没有任何载荷** | `Hotkey.cs` 的两个常量 ↔ Go 的 `wmToggle`/`wmActivate`，同样由对拍测试钉住 |
+| Win32 窗口消息 | 托管 mod → 可视工具（`0x8012` 开关）；工具 → 自己（`0x8010` 显示、`0x8011` 假隐藏） | 只有命令，**没有任何载荷** | 对拍只钉 `ToolWindowTitle` 与 `0x8012`；`0x8010`/`0x8011` 只在工具那侧声明，没有第二方要跟它对齐 |
 
 ## 边界一：ABI v20（进程内）
 
@@ -153,21 +155,24 @@ flowchart TB
 1. **单向写者**。两个文件各有唯一写者（可视工具，落盘走防抖 + 原子替换），托管 mod 只读；反过来 mod 从不写它们。于是工具与游戏可以任意先后启动、任意重启，中间不需要协商。
 2. **变更靠 mtime 发现**，没有通知机制：托管侧的维护拍每 250ms 比一次文件修改时间（`FileStamp` / `UserConfig.Stamp` 的唯一实现），文件被删掉也是一版真实的变更。写入侧的防抖与原子替换、读取侧的门与重试语义见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
 
-目录名与两个文件名是**协议的一部分**，两侧各只有一处声明（C# 的 `UserConfig.FilePath`、Go 的 `userCfgDirName`/`loadoutFileName`/`editListName`），由 `SigilLoadout/sharedconstants_test.go` 对拍；同一道门也钉住了窗口标题与两条窗口消息、`MaxSlots`、参槽数 `LevelValueCount`、`kUnwornCharacterHash` 哨兵以及 skill_status 的行布局常量。它是对拍（漂了立刻红），不是「边界已证明」。
+目录名与两个文件名是**协议的一部分**，两侧各只有一处声明（C# 的 `UserConfig.FilePath`、Go 的 `userCfgDirName`/`loadoutFileName`/`editListName`），由 `SigilLoadout/sharedconstants_test.go` 对拍；同一道门也钉住了窗口标题与热键那条 `0x8012`、`MaxSlots`、参槽数 `LevelValueCount`、`kUnwornCharacterHash` 哨兵以及 skill_status 的行布局常量。它只钉「两侧各有一处声明」的常量，所以 `0x8010`/`0x8011` 这类单侧声明的值不在名单里；而且它是对拍（漂了立刻红），不是「边界已证明」。
 
 ## 边界三：Win32 窗口消息（跨进程，非数据通道）
 
 热键与窗口显隐这条链上，托管侧与可视工具进程之间走的是窗口消息，**不传任何数据**：
 
-- 托管侧按固定窗口标题（`Hotkey.ToolWindowTitle` 与 Go 的 `toolWindowTitle` 是同一个字符串）用 `FindWindow` 找工具窗口；工具进程在跑但窗口还没建好时会在 3 秒内轮询等它，仍然找不到就 `Process.Start` 拉起 mod 目录下的 `SigilLoadout.exe`。
-- 找到就 `PostMessage 0x8012`（开关：工具可见就收、不可见就呼出，当前是哪一态由工具自己持有）。`0x8010` 是另一条命令——「显示/激活」，由**工具自己那侧** post（托盘点击，以及第二个实例的去激活路径），托管侧那条热键路径不发它（两侧仍各声明一份同一个值，由对拍测试钉住）。
+- 托管侧按固定窗口标题（`Hotkey.ToolWindowTitle` 与 Go 的 `toolWindowTitle` 是同一个字符串）用 `FindWindow` 找工具窗口；工具进程在跑但窗口还没建好时会在 3 秒内轮询等它，仍然找不到才走启动路径——而这条路径还要过前台门：只有游戏（本进程）或工具自己是前台时才 `Process.Start` 拉起 mod 目录下的 `SigilLoadout.exe`，否则只记一行「既不是游戏也不是工具在前台」就把这次热键丢掉（少了这一步，在任何程序里按 F1 都会把工具弹出来）。
+- 找到窗口就走一条三步动作：先把激活权**借给**工具进程（`AllowSetForegroundWindow(工具体进程 id)`），再 `PostMessage 0x8012`，然后由工具自己决定显还是收。借权不是可选项：热键那一次按下算在 `RegisterHotKey` 的持有者（本进程）头上，工具自己调 `SetForegroundWindow` 会被拒。`0x8012` 是开关——工具可见就收、不可见就呼出，当前是哪一态只由工具持有，mod 无从得知。
+- `0x8010`（显示/激活）与 `0x8011`（假隐藏）是另一对命令，**只在工具那侧声明与发送**：`0x8010` 由工具自己的托盘点击与第二个实例的去激活路径 post，`0x8011` 由工具 post 给自己的 UI 线程（X 按钮、前端 Esc），托管侧那条热键路径两个都不发，托管侧代码里也已经不再有它们的声明。
+- **热键不是「启动时注册一次」**。`RegisterHotKey` 注册的裸键是**全局独占**的（只要注册着，别的程序就再也收不到这颗键），所以 mod 只在「游戏或工具正是前台」时才注册，一切走就立刻注销、把键还给别的程序。判据由维护拍驱动：每 250ms 托管侧向自己的热键线程 post 一条私有消息（`0x8014`）请它重新核对，线程只在**期望态变化**时动手（否则键被别的程序占着时会变成每拍重试 + 每拍刷一行日志）。注册成功时采样那半边闭嘴，避免一次按键被处理两遍；只有消息窗口建不出来或 `RegisterHotKey` 失败（键被占着）才回落到 250ms 的 `GetAsyncKeyState` 采样。
+- 这条前台判据在工具侧有一个**必须保留的副本**：工具按「自己是前台还是游戏是前台」决定一记开关该收、该显还是干脆不动，条件与 mod 侧「这颗键该不该被我独占」是同一个，只是工具晚 ≤250ms 看到它——那一段滞后正是这个副本挡住的。
 - 工具把自己假隐藏成托盘态（整窗 alpha 0、禁用输入、不进任务栏），所以重复按热键不会重复起进程；第二次启动工具实例由命名互斥体 `Local\GBFRSigilLoadout` 拦下并去激活已有窗口。
 
 这条链的完整时序与状态机见 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)。
 
 ## 状态归属
 
-「谁拥有哪份状态」是本仓库最容易改错的一处：托管侧不持有任何**游戏侧**状态——既不持有游戏内存地址，也不维护按角色的槽表，所以也没有「缓存失效」这个概念。它持有的只有自己的簿记（表里最后两行），那两项不冒充游戏那一份。
+「谁拥有哪份状态」是本仓库最容易改错的一处：托管侧不持有任何**游戏侧**状态——既不持有游戏内存地址，也不维护按角色的槽表，所以也没有「缓存失效」这个概念。它持有的只有自己的簿记与热键注册状态，那几项都不冒充游戏那一份。
 
 | 状态 | 所有者 | 谁写 | 谁读 |
 | --- | --- | --- | --- |
@@ -180,6 +185,8 @@ flowchart TB
 | 编辑列表的**已应用版本**（`FileStamp` 记的 mtime） | 托管侧 | 托管侧，原生确实把行写进游戏内存**之后**才推进 | 托管侧（维护拍据此判断还欠不欠这一版） |
 | 上一份建好的 skill_status 表（托管侧那份副本） | 托管侧 | 托管侧按编辑列表造出来 | 托管侧（变更基线、被拒写后的重试载荷） |
 | 热键键位（mod 配置目录下的 `HotkeyConfig.json`） | Reloaded-II | 玩家在启动器的配置页改 | 托管侧启动时读一次（运行期不再改键） |
+| 这颗热键此刻是否被 mod 从系统独占（注册状态） | 托管侧热键线程 | 托管侧按「游戏或工具是不是前台」注册/释放，只在期望态变化时动手 | 托管侧热键线程与维护拍；工具侧另用同一条判据决定按下去做什么 |
+| 可视工具的显隐态（窗口整场 shown，靠整窗 alpha、禁用输入与任务栏标志实现假隐藏） | 可视工具 | 可视工具自己（热键的 `0x8012`、托盘与第二实例的 `0x8010`、X 按钮与前端 Esc） | 可视工具（`0x8012` 的开关语义靠它；mod 无从得知它当前是哪一态） |
 | 随包数据 `assets\`（九份） | 仓库（生成物） | 仓库外的 gen | 可视工具 |
 
 配装那半的版本门是「读到就认领」（应用失败就保留上一份、等下一次保存改 mtime），编辑列表那半是「生效之后才认领」，两处差别见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。模板表、选择表与虚拟槽位的容量与配对规则见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)；这张表是按「谁拥有」而不是按文件组织的。
@@ -188,7 +195,7 @@ flowchart TB
 
 三个单元之外还有三处仓库管不着的边界：
 
-- **Reloaded-II**：托管 mod 的宿主与生命周期来源（`IModLoader`/`IMod`）。`ModConfig.json` 是这条宿主契约的唯一声明处，字段按当前字面值读出来就是这些后果：`ModId` 是 `GBFR.SigilLoadout`（`Mod.cs` 里同名常量用它向启动器问 mod 目录与 mod 配置目录），`ModName` 是 `GBFR Sigil Loadout (2.0.5)`，`ModVersion` 是 `0.6.0`（显示名里的数字与它不是同一个值；发布版本号以 `ModVersion` 为准），`ModDll` 是 `GBFR.SigilLoadout.dll`，`ModNativeDll32`/`ModNativeDll64` 都是空串，`ModDependencies` 为空而 `OptionalDependencies` 只列 `gbfrelink.utility.manager`，`SupportedAppId` 只列 `granblue_fantasy_relink.exe`，`CanUnload` 为 `false`（与 `Mod.CanUnload()`/`CanSuspend()` 的 `false` 一致：原生钩子没法安全卸下或挂起）。
+- **Reloaded-II**：托管 mod 的宿主与生命周期来源（`IModLoader`/`IMod`）。`ModConfig.json` 是这条宿主契约的唯一声明处，字段按当前字面值读出来就是这些后果：`ModId` 是 `GBFR.SigilLoadout`（`Mod.cs` 里同名常量用它向启动器问 mod 目录与 mod 配置目录），`ModName` 是 `GBFR Sigil Loadout (2.0.5)`，`ModVersion` 是 `0.6.2`（显示名里的数字与它不是同一个值；发布版本号以 `ModVersion` 为准，前端 `package.json`/`package-lock.json` 当前也是 `0.6.2`），`ModDll` 是 `GBFR.SigilLoadout.dll`，`ModNativeDll32`/`ModNativeDll64` 都是空串，`ModDependencies` 为空而 `OptionalDependencies` 只列 `gbfrelink.utility.manager`，`SupportedAppId` 只列 `granblue_fantasy_relink.exe`，`CanUnload` 为 `false`（与 `Mod.CanUnload()`/`CanSuspend()` 的 `false` 一致：原生钩子没法安全卸下或挂起）。
 - **gbfrelink.utility.manager（数据管理器）**：读取游戏归档的**唯一**入口（`IDataManager.GetArchiveFile` / `AddOrUpdateExternalFile` / `UpdateIndex`）。它是**可选**依赖：缺它时因子编辑功能等它加载并重试，其余初始化与配装功能照常，日志会明说。托管 mod 自己同样不读任何游戏数据文件。
 - **仓库外的生成器 gen**：`assets\sigils.json`、`assets\sigils.chara.json` 与编译进原生 DLL 的 `src\exclusive_table.inc`（刻意不入库）都由它产出。仓库里能观察到的调用点两处：原生工程在 `ClCompile` 之前有一个 `GenerateExclusiveTable` 目标（`BeforeTargets="ClCompile"`，`WorkingDirectory` 为 `..\..\gen`）跑 `go run . exclusive -mod <仓库根>`（`$(MSBuildProjectDirectory)\..`），一次同时产出 `src\exclusive_table.inc` 与 `assets\sigils.chara.json`；该目标声明了 `Inputs`（gen 的 `main.go`、`game\sigils\` 下的 `exclusive.go`/`sigils.go`/`json.go`，再加 `assets\sigils.json`——MSBuild 不在这里展开通配符）与 `Outputs`（就是上面那两份产物），源不比产物新时它根本不跑，而 gen 内容没变时它不写文件、产物 mtime 便永远落后于源，所以目标末尾用一次 `Touch` 只推这两份产物的时间戳、不动内容。发布构建的随包数据段对九份资产逐份「在场就跳过」，缺席时**先**取 `..\gen\output` 里的同名预制品（有就直接拷进 `assets\`），**再**才跑 `go run . export -mod <仓库根>`，连 `gen\main.go` 都不在就抛出并明说 gen 不在本仓库。所以本仓库既无法单独完成一次发布构建，也无法单独编译原生 DLL。见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
 
@@ -200,6 +207,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | 原生核心的钩子 | `GBFR20_Initialize` 返回 0（布局锚点或钩子没成） | 托管侧 | 记一行 `Native core loaded without hooks:` 加原生那条运行消息；配装、热键、因子编辑照常启动。 |
 | 数据管理器（可选依赖） | `IDataManager` 缺席或比 mod 晚加载 | 托管侧因子编辑 | 每拍重试挂载，只在第一次记一行「等它加载」；因子编辑之外的初始化与配装照常。 |
+| 热键注册 | `RegisterHotKey` 失败（这颗键被别的程序占着）或 message-only 窗口建不出来 | 托管侧 | 记一行回退日志，改由维护拍采样同一个键：不再独占它，且相邻两拍之间按下又抬起的快按会被整段漏掉、不留日志。 |
 | `loadout.json` | 读不出来、超过 1 MB、形状不符 | 托管侧 `LoadoutConfig` | 保留上一份有效配置（原生那份模板表不动），这一版照样算处理过，等下一次保存改 mtime 再来。 |
 | `sigiledits.json` | 读不出来，或按它造不出表 | 托管侧 `SigilEditorFeature` | 这一版**不认领**，下一拍按新版本重试（同版本重试 5 秒节流）；游戏内存一个字节不动。 |
 | 活表写入 | `GBFR20_WriteSkillStatusTable` 返回 `-1..-7` | 托管侧 | 编辑不丢：列表已存盘并重新注册，游戏下一次解析或重启就会拿到；候选表留着按 5 秒节流重试。 |

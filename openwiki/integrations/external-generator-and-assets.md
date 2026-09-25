@@ -3,9 +3,6 @@ type: integration
 title: 外部生成器 gen 与随包数据资产
 description: 仓库外的共享生成器 gen 与 SigilLoadout\assets\ 九份随包 JSON 的关系：谁产出哪一份、谁在哪个调用点读它、哪些入库哪些是构建中间产物，vcxproj 的 GenerateExclusiveTable 目标与 build-release.ps1 的资产补齐与必需文件清单门禁及其原样报错文本，以及「本仓库无法单独完成一次发布构建、也没有任何机械证据证明资产与 gen 一致」这两条硬前提。
 tags: [code-generation, data-assets, build-gates, packaging, gen, sigil-loadout]
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -27,12 +24,16 @@ sources:
     resource: repo://SigilLoadout/editservice_test.go
   - id: openwiki-source-9e45365fcf44633af4489b2c
     resource: repo://SigilLoadout/editservice.go
+  - id: openwiki-source-49f1f8d8049b397adb1880a2
+    resource: repo://SigilLoadout/frontend/src/App.tsx
   - id: openwiki-source-c47140156ddd80fe7b801b56
     resource: repo://SigilLoadout/frontend/src/exclusive.test.ts
   - id: openwiki-source-7fbcbd2efdc35c82bc96784e
     resource: repo://SigilLoadout/frontend/src/ExclusivePanel.tsx
   - id: openwiki-source-35bfa15a0bffce3055471ebd
     resource: repo://SigilLoadout/frontend/src/index.test.ts
+  - id: openwiki-source-798e7a6a1018647de37a73c1
+    resource: repo://SigilLoadout/frontend/src/lang.ts
   - id: openwiki-source-00406d1c826c7d1ff3bde8c3
     resource: repo://SigilLoadout/frontend/src/model.ts
   - id: openwiki-source-a877d6a19260cf861fd5bddf
@@ -45,7 +46,10 @@ sources:
     resource: repo://SigilLoadout/startup.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 外部生成器 gen 与随包数据资产
@@ -159,16 +163,16 @@ flowchart TD
 
 ## 九份随包资产
 
-目录只有一处：源码树里的 `SigilLoadout\assets\`，也就是打包后的 `<mod>\assets\`（见下节）。带语言维度的六份（`sigils.lang.json`、`chara.lang.json`、四份 `skill.<lang>.json`）的语言集合都是 `zh`、`en`、`ja`、`ko`，不认得的语言在 Go 侧一律回落 `zh`（`pick()`）。
+目录只有一处：源码树里的 `SigilLoadout\assets\`，也就是打包后的 `<mod>\assets\`（见下节）。带语言维度的六份资产都覆盖 `zh`、`en`、`ja`、`ko`，但形状分两类：两份名字表（`sigils.lang.json`、`chara.lang.json`）是**一份文件里按语言分桶**（顶层键 = 语言），四份 `skill.<lang>.json` 是**一份文件一种语言**，由 `loadAssetsFrom` 按 `zh`/`en`/`ja`/`ko` 逐个无条件读入。三个查表入口——`LoadoutService.GemNames`、`LoadoutService.CharaNames`、`EditService.SkillMap`——只共用 `pick()` 这一处回落：不认得的语言拿到的是 `zh` 的那一份，而不是空表；单个条目缺失时由调用方回落成裸 hash／PL 码（面板就是这样显示缺名字的条目的）。
 
 「产出者」一列要这么读：所有九份都源自 `gen`，但只有 `sigils.chara.json` 的产出命令是仓库里看得见的；其余八份本仓库只知道"缺席时脚本会用 `gen\output\` 的预制品或 `go run . export` 补"，具体由 gen 哪一步写出、数据源是什么，看不到。
 
 | 文件 | 产出者 | 消费者（调用点） | 是否入库 | 缺失或漂移时的表现 |
 | --- | --- | --- | --- | --- |
 | `sigils.json` | `gen`（命令不可见；缺席时脚本用 `gen\output\` 预制品或 `export` 补） | 只有可视工具：`LoadoutService.LoadSigils()` 每次调用重读 `assets\sigils.json` 并原样返回字符串 → 前端 `parseSigilRows` 分出物品行与技能行 → `skillTableOf` / `itemRowsOf`（Go 测试与前端测试也把这一份当夹具读） | 入库、随包 | 缺：因子页整页报错（`App.tsx` 的 failure kind `sigil`），可选项、名字、等级上限、合法副技能全都推不出来。内容漂移：无人察觉。行里**不带名字**（名字在 `sigils.lang.json`，测试会拒绝行内出现 `name`/`zh`） |
-| `sigils.chara.json` | `go run . exclusive -mod <仓库根>`——它同时也是原生工程那个 Target 的 Output，会随构建被重写 | 只有可视工具：`LoadoutService.LoadExclusives()` 每次调用重读 → 前端 `parseExclusiveTable` → `ExclusivePanel` 用 `exclusiveSlots` 渲染。名字表以 `gems[0]`（因子物品 hash）为键，写给游戏的开关状态键是 `gems[1]`（技能 hash）；**原生 DLL 不读这个文件**（限制表编译在 `exclusive_table.inc` 里），C# 侧只转发技能 hash | 入库、随包，但可能被构建改写且**无人对账** | 缺：专属因子页报错，mod 本体照常工作。形状不完整的行被前端整条丢掉（不是数组才抛错）；行数与"三对 gems"以外的一切无人检查 |
-| `sigils.lang.json` | `gen`（命令不可见，同 `sigils.json`） | 工具启动期 `loadAssets()` → `readAssetMap[map[string]string]` → 一次装进内存，按语言由 `LoadoutService.GemNames(lang)` 取用（`App.tsx` 在语言变化时拉一次） | 入库、随包 | 缺：`main()` 里当场 `fatalDialog`，工具根本起不来（弹窗里带出错的文件路径）。少条目：名字回落成裸 hash；行数不等或日文等于英文：Go 测试失败 |
-| `chara.lang.json` | `gen`（命令不可见） | 工具启动期 `loadAssets()` → `CharaNames(lang)`（键就是 `sigils.chara.json` 的 `player`，文件里还带着 `NP*` 那样的非角色码） | 入库、随包 | 缺：启动 fatal。少条目：专属页整行标签退化成 PL 码 |
+| `sigils.chara.json` | `go run . exclusive -mod <仓库根>`——它同时也是原生工程那个 Target 的 Output，会随构建被重写 | 只有可视工具：`LoadoutService.LoadExclusives()` 每次调用重读 → 前端 `parseExclusiveTable` → `ExclusivePanel` 用 `exclusiveSlots` 渲染（两个函数都在 `model.ts`：`parseExclusiveTable` 是唯一的形状闸门，`exclusiveSlots` 是唯一解构 `gems` 下标的地方）。名字表以 `gems[0]`（因子物品 hash）为键，写给游戏的开关状态键是 `gems[1]`（技能 hash）；**原生 DLL 不读这个文件**（限制表编译在 `exclusive_table.inc` 里），C# 侧只转发技能 hash | 入库、随包，但可能被构建改写且**无人对账** | 缺：专属因子页报错，mod 本体照常工作。形状不完整的行被前端整条丢掉（不是数组才抛错）；行数与"三对 gems"以外的一切无人检查 |
+| `sigils.lang.json` | `gen`（命令不可见，同 `sigils.json`） | 工具启动期 `loadAssets()` → `readAssetMap[map[string]string]` → 一次装进内存，按语言由 `LoadoutService.GemNames(lang)` 取用（`App.tsx` 在语言变化时拉一次 `GemNames`/`CharaNames` 并按语言缓存） | 入库、随包 | 缺：`main()` 里当场 `fatalDialog`，工具根本起不来（弹窗里带出错的文件路径）。少条目：名字回落成裸 hash；行数不等或日文等于英文：Go 测试失败 |
+| `chara.lang.json` | `gen`（命令不可见） | 工具启动期 `loadAssets()` → `CharaNames(lang)`，与 `GemNames` 同一次前端调用、共用 `pick()` 的语言回落（键就是 `sigils.chara.json` 的 `player`，文件里还带着 `NP*` 那样的非角色码） | 入库、随包 | 缺：启动 fatal。少条目：专属页整行标签退化成 PL 码 |
 | `skill_status.json` | `gen`（命令不可见） | 工具启动期 `loadAssets()` → `readAssetMap[SkillInfo]` → `EditService.SkillTable()`，喂因子编辑页显示的起始数值与参槽含义 | 入库、随包 | 缺：启动 fatal。漂移：编辑页显示的起始数字与游戏原表对不上（真正被改写的是 C# 从归档读的原表） |
 | `skill.zh.json`<br>`skill.en.json`<br>`skill.ja.json`<br>`skill.ko.json` | `gen`（命令不可见；四份是一批） | 工具启动期 `loadAssets()` **四份无条件全部读进来**（循环 `zh/en/ja/ko`）→ `EditService.SkillMap(lang)` | 入库、随包 | 缺**任何一份**（哪怕只用中文）：启动 fatal。漂移（少一个 key）：该语言的 tooltip 变空；Go 测试会拒 |
 
@@ -203,6 +207,7 @@ flowchart TD
 - **改了 `gen` 的专属数据源**：下一次编译原生（目标判过期那次）会重写入库的 `assets\sigils.chara.json`。**没有任何门禁会提醒你把它提交**——发布前自己 `git status` 看一眼；随包发出去的就是工作区里那份。
 - **只改了原生代码**：`exclusive_table.inc` 可能被重生成，但它是 `.gitignore` 里的中间产物，提交与否都不影响任何门禁。
 - **改了那七份「只消费」的资产**：没有任何门禁会告诉你它们与 `gen` 里的数据源对不上；能挡住的只有包内在场清单与测试的交叉一致性。
+- **加一种语言**：得同时动三处——两份名字文件里的那一个语言桶、该语言的 `skill.<lang>.json`、以及 `loadAssetsFrom` 里 `[]string{LangZH, "en", "ja", "ko"}` 那个循环（前端另要动 `lang.ts` 的 `LANGS` 与 `messages.ts`）。少任何一处都不会报错：Go 侧在 `pick()` 处静默回落 `zh`，只有"整份文件不在场"才是启动 fatal，而交叉一致性测试只覆盖已列出的四种语言。
 - **判"内容是不是最新"只能靠人**：构建唯一的回答是"九份在场"，`git status` 能告诉你 `sigils.chara.json` 被构建改过，但没有任何一步能把入库的那份与 `gen` 的上游对起来。
 - **没有 `gen`**：全新克隆编不出原生 DLL（`.inc` 不是仓库内容，而它是编译输入，失败会以 MSBuild / `go run` 的原始报错出现），发布构建也会在缺资产时停下并说明 gen 不在仓库旁。反过来，`gen` 跑过一次之后，`.inc` 与九份都在场，MSBuild 会跳过那次 `Exec`——`Inputs`/`Outputs` 只是省掉一次不必要的重跑，**不是**把这个依赖变成可选。
 

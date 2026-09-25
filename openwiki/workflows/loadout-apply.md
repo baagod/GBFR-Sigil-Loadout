@@ -1,8 +1,11 @@
 ---
 type: workflow
 title: 工作流：配装从界面到游戏状态
-description: 配装改动的端到端链路：前端 edit 与 buildLoadoutPayload → SaveLoadout 的当场校验与 500ms 防抖原子写 loadout.json → 托管 250ms 维护拍的 mtime 版本门 → ParseAndValidate/ParseExclusiveOverrides → 一次 NativeCore.ApplyLoadout → 原生把通用槽钳到 21、发布槽位计数、拓宽两条技能循环上限、重建模板表 → 发布选择并对已认出队伍尝试一次热重建；并逐个跨界点列出失败时的可见后果（拒写 / 保留上一份配置 / 超容量截断 / 跳过热重建），以及"切一次界面语言"同样走这条写盘通路这一跨系统后果。
+description: 配装改动的端到端链路：前端 edit 与 buildLoadoutPayload → SaveLoadout 的当场校验与 500ms 防抖原子写 loadout.json → 托管 250ms 维护拍的 mtime 版本门 → ParseAndValidate/ParseExclusiveOverrides → 一次 NativeCore.ApplyLoadout → 原生把通用槽钳到 21、发布槽位计数、拓宽两条技能循环上限、重建模板表 → 发布选择并对已认出队伍尝试一次热重建；并逐个跨界点列出失败时的可见后果（拒写 / 保留上一份配置 / 超容量截断 / 跳过热重建），以及"切一次界面语言"同样走这条写盘通路而显示名另走一条只读通路这一跨系统后果。
 tags: [workflow, loadout, config-contract, mtime-gate, abi, native-core]
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-24T18:48:22.808Z
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
     resource: repo://GBFR.SigilLoadout.Native/native_api.h
@@ -58,12 +61,11 @@ sources:
     resource: repo://SigilLoadout/main.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
+  - id: openwiki-source-3e6af52b742314f1b631b09d
+    resource: repo://SigilLoadout/win32.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 ---
 
 # 工作流：配装从界面到游戏状态
@@ -111,7 +113,7 @@ sequenceDiagram
 | 四 | 托管 → 原生 | `GBFR20_ApplyLoadout` 返回 `int32` | 0 = 拒绝（计数越界 / 关机中 / 钩子未就绪 / 循环上限拓宽失败 / `GuardAbi` 兜住的异常） | mod 日志 `Native rejected the custom loadout; kept previous configuration.` |
 | — | 原生 → 游戏 | 选择表 + 热重建 | 不拒绝，只有"截断"与"跳过" | `ApplyLoadout: the request asked for general slots=…` 与 `hot rebuild: skipped (…)` 等日志 |
 
-这条链是**单向**的：托管 mod 从不改写 `loadout.json`、也从不回报"我接受了"。mod 到工具的通道只有两条不带数据的窗口消息（`0x8010` / `0x8012`，`wParam`、`lParam` 都是 0），所以工具界面上"保存成功"的含义永远只是"已经交给后端"，而不是"游戏已经生效"。
+这条链是**单向**的：托管 mod 从不改写 `loadout.json`（`TryApply` 只读文件、只调原生），也从不回报"我接受了"。mod 发给工具窗口的只有**一条**不带数据的窗口消息：`WmToggle = 0x8012`（`wParam`、`lParam` 都是 0），而它只是"切换窗口显隐"这条命令，不带任何关于配装是否生效的信息（工具侧自用的 `wmActivate 0x8010` / `wmFakeHide 0x8011` 由工具自己 post，与 mod 无关）。所以工具界面上"保存成功"的含义永远只是"已经交给后端"，而不是"游戏已经生效"。
 
 ## 2. 界面侧：一次编辑产生什么载荷
 
@@ -133,8 +135,12 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 界面上的每一种编辑都只是构造 `patch`：
 
 - 通用页的每行（`SlotEditor.tsx` 的 `SlotRow`）通过 `updateSlot(row, patch)` 改一行、表头全选框改所有行；
-- 专属页（`ExclusivePanel.tsx`）只报"哪个**玩家码**的哪个技能被切成什么"（`onChange(player, skillHash, value)`），落到文件里的键由 `App` 决定：一次点击要写到共享这个 PL 码的**每个**角色 hash 上（古兰/姬塔共享 PL0000），规则在 `model.ts` 的 `withExclusiveToggle` 里，那里能单独测；
+- 专属页（`ExclusivePanel.tsx`）只报"哪个**玩家码**的哪个技能被切成什么"（`onChange(player, skillHash, value)`），面板本身按 `player` 去重（一行 = 一个 PL 码），落到文件里的键由 `App` 的 `updateExclusive` 决定：一次点击要写到共享这个 PL 码的**每个**角色 hash 上（古兰/姬塔共享 PL0000），规则在 `model.ts` 的 `withExclusiveToggle` 里，那里能单独测；
 - 全部文案来自 `messages.ts` 这一张表，四种语言齐备由 `Record<Lang, Messages>` 在编译期保证。
+
+### 专属页那一行的文字是从哪来的（只读，不在这条链上）
+
+标签走的是**另一个方向**，而且只读：`ExclusivePanel` 不自己查名字，只收 `App` 传下来的两个按当前语言取回的映射——`names`（因子/技能 hash → 名字，来自 `sigils.lang.json`）与 `charaNames`（PL 码 → 角色名，来自 `chara.lang.json`）。行标签是 `charaNames[player]`，三个槽的标签与状态键由 `model.ts` 的 `exclusiveSlots(row, names)` 解出，两者**不能对调**：状态键取自技能 hash（`gems[i][1]`），标签取自因子物品 hash（`gems[i][0]`），取错下标整页标签就退化成裸 hash（`charaNames` 缺条目时同理退化成 PL 码）。这条路径不碰 `loadout.json`，写进文件的永远是 hash——名字只是标签，**身份是 hash**。
 
 外壳的其余部分（Tab 的 `keepMounted` 策略、托盘与 Esc、窗口失活的焦点处理）与这条链无关，见 [可视工具前端（React 外壳）](/openwiki/architecture/visual-tool-frontend.md)。
 
@@ -159,6 +165,13 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 
 界面语言不存在别处，就在同一份 `loadout.json` 的 `lang` 字段里，所以语言按钮按下去走的是**同一个** `edit({lang: option})`（源码注释就写着"语言也存在 loadout.json 里，所以这也是一次编辑"）：`latest.current.lang` 换成新值、`setLang`、`void saveNow()`，`buildLoadoutPayload` 把新语言原样写进载荷的 `lang`，`SaveLoadout` 只校验形状（Go 侧声明了 `Lang` 字段但从不校验、从不读，只把它当字符串原样落盘）然后交进防抖写盘。
 
+一次语言切换有**两条**通路，只有一条写盘：
+
+- **读（不写任何文件）**：`lang` 一变，`App` 就调 `GemNames(lang)` 与 `CharaNames(lang)` 取回这一种语言的显示名——Go 侧只是从启动时 `loadAssets` 装进内存的 `sigils.lang.json` / `chara.lang.json` 里切一份，磁盘上别的东西一概不读；前端按语言缓存住结果，好让标签与外层文字同一帧换掉。同一次切换还会把托盘那条"退出"文案推给 Go（`SetTrayExitLabel`）、并改 `document.documentElement.lang`，两者都不碰磁盘。
+- **写**：就是上面那句 `edit({lang: option})` → `SaveLoadout` → 防抖落盘 `loadout.json`。
+
+显示名**不参与载荷**：`buildSigilIndex` 只把名字填进 `labels`，而 `buildLoadoutPayload` 从不读 `labels`，所以这一次切换改不掉被重新应用的槽位内容。
+
 于是**点一下语言按钮就是一次真实的 `loadout.json` 写入**，链上后面全部照常发生：
 
 1. 防抖 500ms 后原子替换整份文件：新的 `lang`，同一份 `slots` 与 `exclusive` 被重写一遍，mtime 前进。
@@ -167,7 +180,7 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 
 三个要点，避免把它读成"改语言会影响游戏数据"：
 
-- **值上什么都没变。** 重新应用的是同一份 `slots` 与 `exclusive`，游戏里的配装不会因此不同——变的只有磁盘上那个 mod 根本不读的 `lang` 字段、mtime，以及日志里多出的那一行。这条副作用是"多跑一次同样的应用"，不是"改了应用的内容"。
+- **值上什么都没变。** 重新应用的是同一份 `slots` 与 `exclusive`，游戏里的配装不会因此不同——变的只有磁盘上那个 mod 根本不读的 `lang` 字段、mtime，以及日志里多出的那一行；屏幕上换掉的只是那些按语言取的标签，而它们从来不在文件里。这条副作用是"多跑一次同样的应用"，不是"改了应用的内容"。
 - **它首先是一次整份覆盖写。** 交出去的载荷由编辑器状态拼出，所以点语言也会把 `loadout.json` 里的任何手改（或上一次被托管侧拒掉的那一版）整份替换成屏幕上的状态。"记住语言"与"重写配装"是同一次动作，分不开。
 - **它同样受上面那两条门约束。** `setLang` 在 `edit` 里先执行，所以界面文案会立刻换；但 `loadoutRead` 之前、或数据表没加载好时 `saveNow` 直接返回，磁盘一个字节都不动，这条重新应用也就不会发生。启动期同理：`LoadConfig` 在文件不存在时返回的 `{"lang":"","slots":[]}` 里空串不在 `LANGS` 中，前端会保留 `initialLang()` 的系统猜测，**打开工具不会写盘**——只有用户真的按了语言按钮才有这一次写入。
 
@@ -201,6 +214,8 @@ const edit = useCallback((patch: {slots?: Slot[]; exclusiveState?: ExclusiveStat
 ## 4. 托管侧：250ms 拍与 mtime 版本门
 
 托管侧的维护拍每 250ms 依次跑三件事，顺序固定为 `LoadoutConfig.Tick(Log)` → `_sigilEditor?.Tick()` → `Hotkey.Tick(Log)`，整段被 `_ticking` 的 `Interlocked.Exchange` 串行化（定时器回调不串行），并且三个阶段之外套着一个空 `catch`——维护拍绝不能把进程带走。启动路径上 `LoadoutConfig.Initialize(Log)` 在原生核心初始化之后**读一次**，之后只有拍会碰它。
+
+第三个阶段属于**热键那条路**，与配装只共用这个 250ms 拍：`Hotkey.Tick` 每拍给热键自己的 message-only 窗口 post 一条自用消息（`WmSyncRegistration`），请热键线程重算一次"现在该不该独占这个键"；注册不上时才回退到本拍轮询按键。这条路的产物是发给工具窗口的那条 `WmToggle`（也就是上面"单向"那句里唯一的通道），完整时序在 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)；本页只用到"它和配装共用同一个拍、因此最多滞后一拍"这一点。
 
 版本门是 `FileStamp.Changed()`，它的语义是**认领后处理**：
 
@@ -355,6 +370,7 @@ Installed built-in template loadout selections=N. exclusive slots 1-3 (T1/T2/war
 | 载荷规则（空行不写、解析不出的主因子整行跳过、主技能随载荷走、`exclusive` 空则不写） | `frontend/src/index.test.ts` 的"落盘载荷"一组，跑的是**入库的真实** `assets/sigils.json` |
 | 语言随载荷写出（`payload.lang` 等于传入的语言） | 同文件的"主因子写 gem、没有副技能就不写第二项"（`ja` 进、`ja` 出） |
 | 专属开关的落盘形状（打开 = 删键、空条目整个删掉、共享 PL 码联动） | `frontend/src/exclusive.test.ts` 的 `withExclusiveToggle` 一组 |
+| 专属页标签用的两份名字表（四种界面语言各自覆盖 `sigils.json` 的每个 hash 与 `sigils.chara.json` 的每个 PL 码；日文至少一条与英文不同，防止"把英文抄了一遍"） | `loadoutservice_test.go` 的 `TestGemNamesCoverTheTableInEveryUILanguage` / `TestCharaNamesCoverTheExclusiveTableInEveryUILanguage` |
 | 跨语言常量（`MaxSlots` / `DefaultLevel` / `UnwornCharacterHash` / 目录名与文件名 / 保存失败事件名） | `sharedconstants_test.go` 的对拍 |
 | `MaxSlots` 装得进原生容量（`≤ 24 − 3`） | 同文件的 `TestVirtualSlotCapacityFitsPlayerSlots` |
 | 原生锚点解析与 fail-closed 逐字节复验 | `tests/NativeLayoutHarness`（`ResolveGameLayout` / `RevalidateGameLayout`，改坏一个字节必须复验失败） |
@@ -366,7 +382,7 @@ Installed built-in template loadout selections=N. exclusive slots 1-3 (T1/T2/war
 - **改"哪些行会被写进文件"** → 改 `buildLoadoutPayload` 与它的 `index.test.ts`；不要在下游补一个"猜"的分支，mod 侧没有因子表可查。
 - **改校验** → 想清楚是"拒"还是"截断"：工具侧当场拒是给用户看的，托管侧拒是给自己守内存的，原生截断是"宁可少几个槽也别让整份配置失效"。
 - **改上限** → 至少要同时看四处：`MaxSlots`（三语言、带对拍，还要过 `TestVirtualSlotCapacityFitsPlayerSlots`）、`kVirtualSlotCapacity`（数组与截断）、`kRuntimeTemplateCapacity`（ABI 的 override 上界 `32 × 3`）、`ApplyLoadoutEntry` 的 `kMaxTemplateSlots` / `kMaxExclusiveOverrides`（ABI 拒绝闸）。
-- **改界面语言的存法** → 语言现在借 `loadout.json` 的一个字段活在同一条写盘通路上，于是"记住语言"和"改一次配装"在磁盘上分不开：把语言挪到别处（或干脆不再写它）会顺带取消"切语言 → mtime 前进 → 托管侧认领并整份重新应用"这个副作用；反过来，给 `lang` 加任何语义都会让这一下"纯粹重复的应用"开始有别的后果。
+- **改界面语言的存法** → 语言现在借 `loadout.json` 的一个字段活在同一条写盘通路上，于是"记住语言"和"改一次配装"在磁盘上分不开：把语言挪到别处（或干脆不再写它）会顺带取消"切语言 → mtime 前进 → 托管侧认领并整份重新应用"这个副作用；反过来，给 `lang` 加任何语义都会让这一下"纯粹重复的应用"开始有别的后果。注意另一条通路（`GemNames` / `CharaNames` 取的显示名、以及推给托盘的文案）本来就不写盘，所以它不随这个改动移位。
 - **别把 mtime 认领改成"确认生效后才推进"**（或反过来）：配装是单次应用，因子编辑那条路才需要 `Pending()` + `MarkApplied()`。两者的语义差别与理由见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
 - **碰热重建的闸门** → 只改一处、只按实测理由改，判据本身与理由在 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)；这里只依赖它的结论。
-- **想让工具显示"游戏已生效"** → 目前没有这条通道：mod 只 post 两条不带数据的窗口消息。真要做，等于新增一条跨进程回报协议，而不是在现有链路上加一行日志解析。
+- **想让工具显示"游戏已生效"** → 目前没有这条通道：mod 发给工具窗口的只有一条不带数据的窗口消息（`WmToggle = 0x8012`，`wParam` 与 `lParam` 都是 0，且它的语义只是"切换窗口显隐"，见 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)）。真要做，等于新增一条跨进程回报协议，而不是在现有链路上加一行日志解析。

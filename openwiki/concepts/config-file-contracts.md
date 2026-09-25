@@ -1,7 +1,7 @@
 ---
 type: concept
 title: 两个配置文件与跨语言常量契约
-description: 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、校验责任划分（Go 当场拒 / C# 只做形状校验 / 等级上界只由可视工具按 cap 夹）、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 对拍的范围与它证明不了的东西。
+description: 可视工具与 mod 之间唯一的磁盘契约：%LOCALAPPDATA%\GBFRSigilLoadout 下 loadout.json 与 sigiledits.json 的路径/文件名/成员名「各只有一处声明」规则、校验责任划分（Go 当场拒 / C# 只做形状校验 / 等级上界只由可视工具按 cap 夹）、空数组/缺成员/坏文件三种缺失语义的区别、两种 mtime 版本门（认领 vs 确认生效）、1 MiB 上限，以及 sharedconstants_test.go 逐组对拍的范围（18 组：窗口消息只剩 0x8012 两侧都有，0x8010 已退化成 Go 的单处声明）与它证明不了的东西。
 tags: [configuration, file-format, cross-language, contract, mtime, validation]
 sources:
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
@@ -14,6 +14,8 @@ sources:
     resource: repo://GBFR.SigilLoadout/Config.cs
   - id: openwiki-source-d9cc925612842aacff93a408
     resource: repo://GBFR.SigilLoadout/Configuration/Configurator.cs
+  - id: openwiki-source-1687ac29fa6d25687a06387d
+    resource: repo://GBFR.SigilLoadout/Hotkey.cs
   - id: openwiki-source-5298fbc43f2a1044d5c67e9e
     resource: repo://GBFR.SigilLoadout/LoadoutConfig.cs
   - id: openwiki-source-6d678759e60f125bb782b9a7
@@ -42,10 +44,12 @@ sources:
     resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+  - id: openwiki-source-3e6af52b742314f1b631b09d
+    resource: repo://SigilLoadout/win32.go
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 两个配置文件与跨语言常量契约
@@ -59,7 +63,7 @@ verified:
 
 1. **单向写者、无协商**。两个文件各有唯一写者（可视工具），托管 mod 只读、从不改写也从不修复。两侧因此可以任意先后启动、任意重启，中间不需要握手。
 2. **变更靠 mtime 发现**。没有通知、没有握手文件、没有锁，托管侧的 250ms 维护拍比一次文件修改时间就决定了要不要处理这一版（`FileStamp`）。
-3. **常量是协议的字面部分**，而它们分居 C# / Go / TS / C++ 四种语言里。这类值写错**不会编译失败**，只会表现成游戏里的错值——所以「各只有一处声明 + 一道对拍」是这里唯一的防线，而那道防线本身有明确的边界（见下文第 7、8 节）。
+3. **常量是协议的字面部分**，而它们分居 C# / Go / TS / C++ 四种语言里。这类值写错**不会编译失败**，只会表现成游戏里的错值——所以「各只有一处声明 + 一道对拍」是这里唯一的防线，而那道防线只覆盖**两侧都至少有一处声明**的值，本身也有明确的边界（见下文第 7、8 节）。
 
 各单元内部的结构与时序不在本页：托管外壳见 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)，两条端到端流程见 [工作流：配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md) 与 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)，测试与门禁的全貌见 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。
 
@@ -112,23 +116,33 @@ flowchart LR
 
 ### 每个常量的声明位置与漂了的表现
 
-下表包含 `sharedconstants_test.go` 里**全部**对拍项；与本页主题无关的几组（窗口标题与两条窗口消息、`skill_status` 行布局）在这里只列坐标与症状，展开在它们各自的页里。
+下表就是 `SigilLoadout/sharedconstants_test.go` 里 `groups` 的**逐条**重列（当前 18 组）：每一行是一位组，列出的声明位置就是这一组要比对的全部 decls——两侧（或三侧）都在这张表里，没有第二处声明的值不会出现。与本页主题无关的几组（窗口标题、热键开关消息、`skill_status` 行布局）在这里只列坐标与症状，展开在它们各自的页里。
 
-| 常量（值） | 声明位置（全部） | 对拍 | 漂了会表现成什么症状 |
-| --- | --- | --- | --- |
-| 用户配置目录名 `GBFRSigilLoadout` | C# `UserConfig.cs`；Go `loadoutservice.go`（`userCfgDirName`） | ✓ | 两侧各写进一个自己的目录：工具「保存成功」，游戏里什么都没变；编辑列表永远读不到。无任何报错 |
-| 配装文件名 `loadout.json` | C# `LoadoutConfig.cs`（`UserConfig.FilePath("loadout.json")`）；Go `loadoutservice.go`（`loadoutFileName`） | ✓ | 同上；而托管侧只有在读不到 `loadout.json`（含从来没写过）时才回到内置专属模板，日志 `loadout.json removed; restored the built-in exclusive template.` |
-| 编辑列表文件名 `sigiledits.json` | C# `SigilEditorFeature.cs`（`ConfigFileName`）；Go `editservice.go`（`editListName`） | ✓ | 同上；日志里会出现 `sigil edit: no edit list yet at …(the tool writes it there)`，而工具那边一切正常 |
-| 启用槽上限 `MaxSlots = 16`（只数启用的行） | C# `LoadoutConfig.cs`（`MaxSlots`，注释里写明与 Go 那处同步）；Go `loadoutservice.go`；TS `frontend/src/model.ts`（`MAX_SLOTS`，同一常数也是编辑器至少显示的行数，见 `padSlots`） | ✓ | 三处不等价就会「存盘成功、游戏里什么都没变」：Go/前端允许的那一行被 C# 判成 `more than 16 enabled slots` 而**拒掉整份文件**，旧配置继续生效 |
-| 缺失 cap 时的回落等级 `DefaultLevel = 15` | C# `LoadoutConfig.cs`；TS `model.ts`（`DEFAULT_LEVEL`） | ✓ | 手改文件漏写 `level` 时，工具与游戏落在不同等级上；前端的 cap 基准也跟着错（`capOfSkill`/`capOfMain`） |
-| 未选副技能的哨兵 `UnwornCharacterHash = 0x887AE0B0` | C# `LoadoutConfig.cs`；C++ `native_internal.h`（`kUnwornCharacterHash`） | ✓ | 槽位错位：某个真实角色 hash 被当成「未选择」，或「未选择」被当成一个真实技能去查表 |
-| 参槽数 `LevelValueCount = 10` | C# `Config.cs`；Go `editservice.go`；TS `frontend/src/skills.ts`（`SLOTS`） | ✓ | 写多一个：托管侧循环的上界是两者的较小值，多出来的数字被**静默忽略**；写少一个：那个槽位永远保持游戏原值，编辑看起来「没生效」 |
-| `sigiledits.json` 的成员名 `edits` / `enabled` / `key` / `level` / `values` | C# `Config.cs` 的五个 `[JsonPropertyName]`；Go `editservice.go` 的五个 struct tag | ✓ | 只改一边仍能编译、别的测试也全绿；游戏里表现成「每条编辑都被跳过」（`key` 读成空串 → `skip (key is not an 8-digit hex hash yet)`）或整份文件读不出来 |
-| 工具窗口标题 `GBFR Sigil Loadout` | C# `Hotkey.cs`（`ToolWindowTitle`）；Go `main.go`（`toolWindowTitle`） | ✓ | 找窗口失败 → 每次热键都试图新起一个实例（第二实例由命名互斥体拦下并去激活）。见 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md) |
-| 显示/开关消息 `0x8010` / `0x8012` | C# `Hotkey.cs`（`WmActivate`/`WmToggle`）；Go `*.go`（`wmActivate`/`wmToggle`） | ✓ | 热键按下去工具没反应：窗口不显示、或（开关语义反了）第二次按不再收起 |
-| `skill_status` 表头 8 / 行 52 / 行内 Key 偏移 40 | C# `SigilEditorFeature.cs`；C++ `src/table_slot.cpp` | ✓ | 行错位：把数值写进别的行或行外。见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) |
-| 写盘失败事件名 `GBFR.SigilLoadout.SaveFailed` | Go `editservice.go`（`saveFailedEvent`）；TS `SigilEditorPanel.tsx` | ✓ | 防抖写盘失败不再弹对话框，只在工具日志里留一行 |
-| 单文件上限 `Config.MaxBytes = 1 MiB` | 只有 C# `Config.cs` 一处，两个文件共用 | —（没有第二处可漂） | 改它会同时改两个文件的上限；`LoadoutConfig` 那条异常消息里把数字又写成了字符串 `"loadout.json exceeds 1 MB"`，只是文案，不影响行为 |
+| 常量（值） | 声明位置（= 该组的全部 decls） | 漂了会表现成什么症状 |
+| --- | --- | --- |
+| 用户配置目录名 `GBFRSigilLoadout` | C# `UserConfig.cs`；Go `loadoutservice.go`（`userCfgDirName`） | 两侧各写进一个自己的目录：工具「保存成功」，游戏里什么都没变；编辑列表永远读不到。无任何报错 |
+| 配装文件名 `loadout.json` | C# `LoadoutConfig.cs`（`UserConfig.FilePath("loadout.json")`）；Go `loadoutservice.go`（`loadoutFileName`） | 同上；而托管侧只有在读不到 `loadout.json`（含从来没写过）时才回到内置专属模板，日志 `loadout.json removed; restored the built-in exclusive template.` |
+| 编辑列表文件名 `sigiledits.json` | C# `SigilEditorFeature.cs`（`ConfigFileName`）；Go `editservice.go`（`editListName`） | 同上；日志里会出现 `sigil edit: no edit list yet at …(the tool writes it there)`，而工具那边一切正常 |
+| 启用槽上限 `MaxSlots = 16`（只数启用的行） | C# `LoadoutConfig.cs`；TS `frontend/src/model.ts`（`MAX_SLOTS`，同一常数也是编辑器至少显示的行数，见 `padSlots`）；Go `loadoutservice.go` | 三处不等价就会「存盘成功、游戏里什么都没变」：Go/前端允许的那一行被 C# 判成 `more than 16 enabled slots` 而**拒掉整份文件**，旧配置继续生效 |
+| 缺失 cap 时的回落等级 `DefaultLevel = 15` | C# `LoadoutConfig.cs`；TS `model.ts`（`DEFAULT_LEVEL`）——只有这两处：Go 既不声明它也不判等级上界 | 手改文件漏写 `level` 时，工具与游戏落在不同等级上；前端的 cap 基准也跟着错（`capOfSkill`/`capOfMain`） |
+| 未选副技能的哨兵 `UnwornCharacterHash = 0x887AE0B0` | C# `LoadoutConfig.cs`；C++ `native_internal.h`（`kUnwornCharacterHash`） | 槽位错位：某个真实角色 hash 被当成「未选择」，或「未选择」被当成一个真实技能去查表 |
+| 参槽数 `LevelValueCount = 10` | C# `Config.cs`；Go `editservice.go`；TS `frontend/src/skills.ts`（`SLOTS`） | 写多一个：托管侧循环的上界是两者的较小值，多出来的数字被**静默忽略**；写少一个：那个槽位永远保持游戏原值，编辑看起来「没生效」 |
+| `sigiledits.json` 的成员名 `edits` / `enabled` / `key` / `level` / `values`（对拍里是**五个**独立的组） | C# `Config.cs` 的五个 `[JsonPropertyName]`；Go `editservice.go` 的五个 struct tag | 只改一边仍能编译、别的测试也全绿；游戏里表现成「每条编辑都被跳过」（`key` 读成空串 → `skip (key is not an 8-digit hex hash yet)`）或整份文件读不出来 |
+| 工具窗口标题 `GBFR Sigil Loadout` | C# `Hotkey.cs`（`ToolWindowTitle`）；Go `main.go`（`toolWindowTitle`；组里按 `*.go` 整包找） | 找窗口失败 → 每次热键都试图新起一个实例（第二实例由命名互斥体拦下并去激活）。见 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md) |
+| 游戏内热键的开关消息 `0x8012` | C# `Hotkey.cs`（`WmToggle`）；Go `win32.go`（`wmToggle`） | 热键按下去工具没反应：窗口不显示、或（开关语义反了）第二次按不再收起 |
+| `skill_status` 表头 `8` | C# `SigilEditorFeature.cs`（`FileHeaderSize`）；C++ `src/table_slot.cpp`（`kTableHeaderBytes`） | 行错位：把数值写进别的行或行外。见 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) |
+| `skill_status` 行 `52` | C# `SigilEditorFeature.cs`（`RowSize`）；C++ `src/table_slot.cpp`（`kTableRowBytes`） | 同上 |
+| `skill_status` 行内 Key 偏移 `40` | C# `SigilEditorFeature.cs`（`KeyOffset`）；C++ `src/table_slot.cpp`（`kRowKeyOffset`） | 同上 |
+| 写盘失败事件名 `GBFR.SigilLoadout.SaveFailed` | Go `editservice.go`（`saveFailedEvent`）；TS `SigilEditorPanel.tsx`（`SAVE_FAILED`） | 防抖写盘失败不再弹对话框，只在工具日志里留一行 |
+
+**已退化成单处声明的值不是对拍项**，所以它们不在上表里：没有第二处可漂，机械防线就无从下手，只能靠注释与同一侧的使用点维持。
+
+| 值 | 现在只在哪一处声明 | 为什么现在没有对拍 |
+| --- | --- | --- |
+| `0x8010`（`wmActivate`） | Go `win32.go` | 托盘左键与「第二个实例」这两条激活路径 post 的就是它，**只有工具自己发**；托管侧已经不再声明它——热键那条路只发开关 `0x8012`，于是这一对消息里只剩开关是两侧常量 |
+| `0x8011`（`wmFakeHide`） | Go `win32.go` | 工具 post 给自己的 UI 线程（X 按钮、前端 Esc 的假隐藏），从来没有第二方要跟它对齐 |
+| `LevelOffset = 48` | C# `SigilEditorFeature.cs` | 行内偏移是**相对行首**的，只有托管侧用它去找 `Level` 列，原生侧没有第二份声明 |
+| `Config.MaxBytes = 1 MiB` | C# `Config.cs` | 两个文件共用同一个数，见第 5 节 |
 
 `MaxSlots` 另有一条**只在原生侧才有**的上界，它不属于跨语言对拍：一张角色模板表只有 `kVirtualSlotCapacity = 24` 个槽，前 `kBuiltinExclusiveSlotCount = 3` 个留给内置专属槽（T1/T2/战气），所以通用槽余量是 21。原生 `ApplyLoadout` 用 `std::min(请求数, 余量)` 处理超出，**截断而不是拒写**——拒写会让整份配置连其余槽位一起失效，比截断更糟；但截断会打一行 `the request asked for general slots=…, which exceeds the … this build supports; only the first … were applied.`，因为「某几个槽位静默不生效」是最难查的症状。`sharedconstants_test.go` 的 `TestVirtualSlotCapacityFitsPlayerSlots` 单独断言 `MaxSlots ≤ 余量`：把三处 `MaxSlots` 一起改大而不动原生容量，对拍全绿，只有这条会红。
 
@@ -264,21 +278,22 @@ flowchart TD
 
 `SigilLoadout/sharedconstants_test.go` 是跨语言常量的唯一机械防线。它的机制有四个值得知道的细节：
 
-1. **每条声明必须正好匹配一次**（`len(matches) != 1` 就报错）。正则写松了就会对着文件里第一个碰巧像它的东西比，比出来还是绿的——假绿比红更贵。这也是为什么 Go 侧那几个成员名的正则锚在 `type SigilSkill struct {` 上：`json:"key"` 在本包里合法地出现两次（`SigilSkill` 与 `SkillInfo`，两个不同的文件格式）。
+1. **每条声明必须正好匹配一次**（`len(matches) != 1` 就报错）。正则写松了就会对着文件里第一个碰巧像它的东西比，比出来还是绿的——假绿比红更贵。这也是为什么 Go 侧那四个记录内成员名（`enabled`/`key`/`level`/`values`）的正则锚在 `type SigilSkill struct {` 上：`json:"key"` 在本包里合法地出现两次（`SigilSkill` 与 `SkillInfo`，两个不同的文件格式），只有锚到结构体上才是前者。
 2. **Go 的声明属于包、不属于文件**，所以 `"*.go"` 表示把本包所有非测试源文件拼起来找。一次纯粹的文件搬移不该让断言变红——它盯的是「值漂没漂」。
 3. **比较是大小写不敏感的**（`strings.EqualFold`），这对 `0x887AE0B0` 这类十六进制值正合适。但它同时是成员名字段的盲区（见下）。
 4. **文件被改名或搬走时是硬失败**（`t.Fatalf("reading %s: %v")`），不是静默跳过——这一点是对的。
 
-覆盖范围就是第 1 节那张表的全部行：`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash`、`LevelValueCount`、目录名、两个文件名、五个 `sigiledits.json` 成员名、窗口标题、两条窗口消息、`skill_status` 的三个布局常量、保存失败事件名。
+覆盖范围就是第 1 节那张表——当前 **18 组**，逐条是：`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash`、`LevelValueCount`、用户配置目录名、`loadout.json` 与 `sigiledits.json` 两个文件名、`sigiledits.json` 的五个成员名（各成一组）、窗口标题、游戏内热键的**开关**消息 `0x8012`、`skill_status` 的表头 8 / 行 52 / 行内 Key 偏移 40（各成一组）、保存失败事件名 `GBFR.SigilLoadout.SaveFailed`。**只有一条窗口消息在名单里**：`0x8012` 由 C# 与 Go 两侧各声明一处；`0x8010` 与 `0x8011` 只有 Go 一处声明，没有第二方要跟它对齐，因此不在名单里（见第 1 节末那张表）。
 
 同一文件里还有第二个测试，它做的**不是**对拍而是容量断言：`TestVirtualSlotCapacityFitsPlayerSlots` 读 `native_internal.h` 的 `kVirtualSlotCapacity` 与 `kBuiltinExclusiveSlotCount`，用它们的差去比 Go 侧的 `MaxSlots`。「三处 `MaxSlots` 是否一样」仍归上面那次对拍，所以两个测试各管一半：一个管「三处相等」，一个管「这个数原生装得下」。
 
 ## 8. 这道门证明不了什么
 
-**绿不等于契约已证明。**`sharedconstants_test.go` 只证明「这些字面量当前两两相等」，下面这些它一个字都没说：
+**绿不等于契约已证明。**`sharedconstants_test.go` 只证明「这两三处字面量当前相等」，下面这些它一个字都没说：
 
 | 缺口 | 具体后果 |
 | --- | --- |
+| **只在单侧声明的常量根本不在名单里** | 收录门槛是「至少两侧各有一处声明」，所以单处声明的值没有任何机械防线。`0x8010` 就是活例子：它曾由 `Hotkey.cs` 与 `win32.go` 两侧声明，托管侧撤掉那条声明之后就退化成 Go 的单处声明，于是「这个值漂了立刻红」这句话对它不再成立；`0x8011`、`Config.MaxBytes`、C# 的 `LevelOffset` 同理。这类值只能靠注释（`win32.go` 那几行就写着「只有工具自己发它」）与同一侧的使用点维持 |
 | **`loadout.json` 的成员名完全不在对拍范围里** | `slots`/`items`/`gem`/`hash`/`level`/`enabled`/`exclusive`/`lang` 是**两处**独立的字面量：C# 侧是 `TryGetProperty("…")`，Go 侧是 struct tag。改一边能编译、全部测试绿。C# 缺 `slots`/错形状会抛错（降级成可见的「保留上一份」），Go 的 `json:"slots"` 漂了也会被 `SaveLoadout` 那条「缺成员即拒」当场拦下（工具里报错，而不是静默写出一份游戏读不懂的文件）；但 `exclusive` 拼错是**静默**的（专属开关全部失效），`enabled` 拼错则会让“缺成员算启用”这条约定失效 |
 | **只有大小写不同的一种漂移能通过** | `edits` vs `Edits`、`key` vs `Key` 会被 `EqualFold` 判成一致，而两个 JSON 格式都是**大小写敏感**的（C# 有意关掉折叠，Go 侧也精确匹配）。旧拼写文件读成空列表这件事，恰恰是靠 Go 的行为测试而不是靠这道对拍来钉住的 |
 | **只比常量、不比推导** | 目录名比的是字面量「`GBFRSigilLoadout`」，没比基准目录：C# 用 `SpecialFolder.LocalApplicationData`，Go 用环境变量 `LOCALAPPDATA` 且带一个 `exeDir()` 回落。基准漂了（例如有人把 Go 改成 `os.UserConfigDir`），这道门仍然是绿的 |

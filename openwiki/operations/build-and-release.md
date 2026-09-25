@@ -1,13 +1,15 @@
 ---
 type: operations
 title: 构建、发布与部署链
-description: 从源码到 Reloaded-II 包的两段式操作链——tools\build-release.ps1 的版本对账（ModConfig.json 的 ModVersion 是唯一权威源）、九份随包数据的「在场或补齐」、原生到托管的编译顺序与 vcxproj 里判过期的 gen 生成步骤、工具链门禁、13 项打包清单与 dist\.build-complete 完成标记，以及 tools\deploy.ps1 的完成标记、源码时间戳与游戏未运行检查；逐道门禁给出判据行、它保证什么、原样失败信息与跳过条件，并说明仓库根 README.md 已不再承载构建命令。
+description: 从源码到 Reloaded-II 包的两段式操作链——tools\build-release.ps1 的版本对账（ModConfig.json 的 ModVersion 是唯一权威源，三处现均为 0.6.2）、九份随包数据的「在场或补齐」、原生到托管的编译顺序与 vcxproj 里判过期的 gen 生成步骤、工具链门禁、13 项打包清单与 dist\.build-complete 完成标记，以及 tools\deploy.ps1 的完成标记、源码时间戳与游戏未运行检查；逐道门禁给出判据行、它保证什么、原样失败信息与跳过条件，给出「本仓库无法单独完成一次发布构建」的两条判据行，并说明仓库根 README.md 已不再承载构建命令。
 tags: [build, release, deployment, packaging, gates, operations]
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
   - id: openwiki-source-8037e2358a2c4f9b2c722a11
     resource: repo://AGENTS.md
+  - id: openwiki-source-191cced2a023705ae2bdfb7d
+    resource: repo://dist/.build-complete
   - id: openwiki-source-c9de7a0fdc1e3b43c6d1079f
     resource: repo://GBFR-Sigil-Loadout.sln
   - id: openwiki-source-1c2664f2b94475ebd431b66e
@@ -26,6 +28,8 @@ sources:
     resource: repo://README.md
   - id: openwiki-source-77d89298944beb882bffc37e
     resource: repo://SigilLoadout/.gitignore
+  - id: openwiki-source-0625efd74564071b0a31eee5
+    resource: repo://SigilLoadout/frontend/package-lock.json
   - id: openwiki-source-df2192c06b0ec71699fdac08
     resource: repo://SigilLoadout/frontend/package.json
   - id: openwiki-source-49f1f8d8049b397adb1880a2
@@ -46,10 +50,10 @@ sources:
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:46:48.632Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:46:48.632Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 构建、发布与部署链
@@ -84,7 +88,7 @@ pwsh -File tools\deploy.ps1 -Target "<Reloaded-II>\Mods\GBFR.SigilLoadout"
 
 仓库根 `README.md` 现在只讲玩家要用的东西——安装、使用（`F1` 呼出配装工具）、下载链接与致谢——**没有任何构建或部署命令**。构建与发布的可执行入口只有 `tools\build-release.ps1` 与 `tools\deploy.ps1` 两个脚本，文字入口是本页与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)（后者逐个说明构建里跑的那些测试各护什么、能证明什么）。
 
-两处指向旧章节的说法因此已经指空，知道一下可以少白找一轮：随包进 mod 目录的 `GBFR.SigilLoadout\README.md` 第 42 行仍写着"构建命令与验证清单在仓库根的 `README.md`"，而 `build-release.ps1:236-238` 那句"（README「构建与部署」里写了）"所指的是一个已不存在的章节。
+两处指向旧章节的说法因此已经指空，知道一下可以少白找一轮：随包进 mod 目录的 `GBFR.SigilLoadout\README.md` 的 `## Building` 段仍写着"构建命令与验证清单在仓库根的 `README.md`"，而 `tools\build-release.ps1` 末尾那段"不能清理同名 go build 残留"的注释里，括号那句"（README「构建与部署」里写了）"所指的也是一个已不存在的章节。
 
 ## 两段式与各自的职责边界
 
@@ -155,7 +159,9 @@ flowchart TD
 
 ## 版本号的唯一权威源
 
-`GBFR.SigilLoadout\ModConfig.json` 的 `ModVersion`（当前值 `0.6.0`）是发布版本号的唯一权威源：脚本读它作为默认版本，`-Version` 只是"发布时可选覆盖手段"，且必须与它**逐字相等**，否则直接抛 `Version mismatch: …`。`-Version` 只接受 `^[0-9A-Za-z][0-9A-Za-z._-]*$`。
+`GBFR.SigilLoadout\ModConfig.json` 的 `ModVersion` 是发布版本号的唯一权威源：脚本读它作为默认版本，`-Version` 只是"发布时可选覆盖手段"，且必须与它**逐字相等**，否则直接抛 `Version mismatch: …`。`-Version` 只接受 `^[0-9A-Za-z][0-9A-Za-z._-]*$`。
+
+三处当前的值都是 `0.6.2`：`ModConfig.json` 的 `ModVersion`、`SigilLoadout\frontend\package.json` 的 `version`，以及 `package-lock.json` 里该版本号出现的那两次（根的 `version` 与 `packages` 映射里空键条目的 `version`）。发版时要同时改这三处，改漏任何一处都会被下面这两道对账当场拦住。
 
 随后是两处对账，因为**可视工具自己也是一份带版本号的 npm 包**，而这两处以前根本没人管——工具界面与包名可以一直停在旧值上：
 
@@ -166,7 +172,7 @@ flowchart TD
 
 版本号只影响 zip 文件名与完成标记的内容，因此两处一致性检查不需要碰程序集版本：`GBFR.SigilLoadout.csproj` **刻意不写 `<Version>`**——那会再造一处需要与 `ModConfig.json` 同步的版本号。同一段里还关掉了 `EnableSourceLink` 与 `IncludeSourceRevisionInInformationalVersion`（默认两者都是 `true`，会把源链接写进 PDB、把 commit sha 追加到 informational version 上），与 Go 那边加 `-buildvcs=false` 是同一个动机：**同一份源码编出同一份元数据**。
 
-一个**没有门禁**的字段：`ModConfig.json` 的 `ModName`（当前值 `"GBFR Sigil Loadout (2.0.5)"`）是启动器列表里显示的名字，由宿主读取——**本仓库没有任何脚本读它**，`build-release.ps1` 从同一个文件里只取 `ModVersion`。所以括号里的 `2.0.5` 与 mod 的发布版本（`0.6.0`）不是同一个量，把它和 `ModVersion`"顺手对齐"是错的；反过来，改显示名时也没有任何构建期检查会拦你。
+一个**没有门禁**的字段：`ModConfig.json` 的 `ModName`（当前值 `"GBFR Sigil Loadout (2.0.5)"`）是启动器列表里显示的名字，由宿主读取——**本仓库没有任何脚本读它**，`build-release.ps1` 从同一个文件里只取 `ModVersion`。所以括号里的 `2.0.5` 与 mod 的发布版本（当前 `0.6.2`）不是同一个量，把它和 `ModVersion`"顺手对齐"是错的；反过来，改显示名时也没有任何构建期检查会拦你。
 
 ## 构建前的随包数据：只补缺，不对拍
 
@@ -196,6 +202,15 @@ flowchart TD
 反过来，如果九份资产齐全、`src\exclusive_table.inc` 与 `assets\sigils.chara.json` 又都比 `gen` 那几个源新，MSBuild 会直接跳过这个目标、那次构建也就不碰 `gen`——这条路既没有闸门也没有提示，判断它会不会被走到只能看那几个输入与输出的时间戳关系。
 
 原生用 `/t:Rebuild`（强制全量），托管走 `restore --ignore-failed-sources -p:NuGetAudit=false` → `clean` → `build --no-incremental --no-restore`。两处都指向同一件事：**不要拿增量结果当发布产物**。`NuGetAudit=false` 与 `--ignore-failed-sources` 是为了让离线构建保持绿色；漏洞检查是另一条命令（`dotnet list package --vulnerable`），不在发布链里。
+
+### 「本仓库无法单独完成一次发布构建」的判据行
+
+这个结论不靠推理，有两处可以直接拿到的判据：
+
+- **脚本自己承认的那一句 throw**：`tools\build-release.ps1` 的资产补齐段在 `..\gen\main.go` 不在、而某份资产又缺席时抛出 `随包数据缺 <name>，而生成器不在 <gen 绝对路径>（它不在本仓库里）：补进 SigilLoadout\assets\，或把 gen\ 放回仓库旁。`——判据就是 `..\gen\main.go` 的存在性（`$genDir` 由仓库根的上层目录拼出）。
+- **`.gitignore` 与一个声明输出**：根 `.gitignore` 列着 `GBFR.SigilLoadout.Native/src/exclusive_table.inc`，而它正是 `GenerateExclusiveTable` 声明的两个输出之一。**任何克隆都不带这个文件**，于是输出缺失、目标必跑，而目标的 `Exec` 工作目录是仓库旁的 `..\..\gen`（还需要机器上有 Go）。这一段没有任何友好包装：能看到的只有 `go run` / MSBuild 对 `Exec` 的原始报错，或者编译器停在 `template_loadout.cpp` 的 `#include "exclusive_table.inc"` 上；脚本那侧只把它归并成 `Native build failed with exit code N.`。
+
+结论：只有本仓库时，读代码、改代码、跑测试都行，**跑一次发布构建不行**——随包数据缺的那几份补不出来，原生那一步也会因为 `.inc` 只能由 `gen` 生成而停下。
 
 ## 工具链：为什么是这个顺序
 
@@ -258,6 +273,8 @@ stateDiagram-v2
 ```
 
 `dist\.build-complete` 的状态迁移：标记只在链路跑到最后时才出现，任何中途失败都会留下"有目录、没标记"的状态。
+
+顺带一个容易被忽略的事实：**整个 `dist` 都是本机状态**——根 `.gitignore` 分别忽略 `dist/` 与 `*.zip`，所以包目录、给玩家的 zip 与完成标记都不入库。当前这份 `dist\.build-complete` 的内容是 `0.6.2`，与三处版本字面量一致，也就是"这份 dist 是一次跑完了的 0.6.2 构建的产物"。换一台机器（或手工删掉 `dist`）就必须从零重跑一遍构建——部署侧那些检查里连"包目录存在"都是硬条件。
 
 为什么不能只比时间：构建失败时 `dist` 会原封不动留着上一次的产物，脚本照样装上去并报"成功"（踩过一次）。两个脚本的检查是**互补**的：
 

@@ -1,7 +1,7 @@
 ---
 type: testing
 title: 验证地图：测试与门禁各护什么
-description: 按改动面回答"该跑什么、它保证什么、保证不了什么"：SigilLoadout 包四个 Go 测试文件（TestMain 沙箱与资产装载、跨语言常量对拍与原生容量、配装校验与防抖原子写、编辑列表往返与资产不变量）、frontend/src 下四个 vitest 纯逻辑测试各自的用例分组、需 MSVC 才能编起来且缺游戏 exe 时打印 SKIP 的离线 NativeLayoutHarness，以及 tools\build-release.ps1 里那几道没有独立本地入口的门禁。
+description: 按改动面回答"该跑什么、它保证什么、保证不了什么"：SigilLoadout 包五个 Go 测试文件（TestMain 沙箱与资产装载、跨语言常量对拍与原生容量、配装校验与防抖原子写、编辑列表往返与资产不变量、windowstate_test.go 的 F1 三态显隐判据）、frontend/src 下四个 vitest 纯逻辑测试各自的用例分组、需 MSVC 才能编起来且缺游戏 exe 时打印 SKIP 的离线 NativeLayoutHarness，以及 tools\build-release.ps1 里那几道没有独立本地入口的门禁（版本对账当前三处同为 0.6.2）。
 tags: [testing, verification, gates, go-test, vitest, native-harness]
 sources:
   - id: openwiki-source-8037e2358a2c4f9b2c722a11
@@ -10,6 +10,10 @@ sources:
     resource: repo://GBFR-Sigil-Loadout.sln
   - id: openwiki-source-12f2ddddaa65ce032d15e738
     resource: repo://GBFR.SigilLoadout.Native/native_internal.h
+  - id: openwiki-source-1687ac29fa6d25687a06387d
+    resource: repo://GBFR.SigilLoadout/Hotkey.cs
+  - id: openwiki-source-bdd0795df8ba4586dd351eff
+    resource: repo://GBFR.SigilLoadout/ModConfig.json
   - id: openwiki-source-7cf4dbc095c47542aea2f4b9
     resource: repo://SigilLoadout/assets_test.go
   - id: openwiki-source-88642e4d88b55d7e1f093294
@@ -20,6 +24,8 @@ sources:
     resource: repo://SigilLoadout/editservice_test.go
   - id: openwiki-source-9e45365fcf44633af4489b2c
     resource: repo://SigilLoadout/editservice.go
+  - id: openwiki-source-0625efd74564071b0a31eee5
+    resource: repo://SigilLoadout/frontend/package-lock.json
   - id: openwiki-source-df2192c06b0ec71699fdac08
     resource: repo://SigilLoadout/frontend/package.json
   - id: openwiki-source-c47140156ddd80fe7b801b56
@@ -44,6 +50,12 @@ sources:
     resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
+  - id: openwiki-source-3e6af52b742314f1b631b09d
+    resource: repo://SigilLoadout/win32.go
+  - id: openwiki-source-971b5ce7ce337d3ba8d34aa0
+    resource: repo://SigilLoadout/windowstate_test.go
+  - id: openwiki-source-46f7ef112800a873cada707b
+    resource: repo://SigilLoadout/windowstate.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
@@ -52,10 +64,10 @@ sources:
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:46:48.632Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:46:48.632Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 验证地图：测试与门禁各护什么
@@ -68,7 +80,7 @@ verified:
 
 | 套件 | 代码位置 | 怎么跑 | 依赖 |
 | --- | --- | --- | --- |
-| Go 包测试（4 个文件，包 `main`） | `SigilLoadout\*_test.go` | 在 `SigilLoadout\` 里 `go test ./...` | 源码树里的 `SigilLoadout\assets\`（九份）在场；不需要游戏 exe；`-race` 另需 gcc |
+| Go 包测试（5 个文件，包 `main`） | `SigilLoadout\*_test.go` | 在 `SigilLoadout\` 里 `go test ./...` | 源码树里的 `SigilLoadout\assets\`（九份）在场；不需要游戏 exe；`-race` 另需 gcc |
 | 前端纯逻辑测试（4 个文件） | `SigilLoadout\frontend\src\*.test.ts` | `npm --prefix SigilLoadout\frontend test`（= `vitest run`） | 已装好的 `frontend\node_modules`；`index.test.ts` 直接读入库的 `assets\sigils.json` |
 | 离线布局回归 | `tests\NativeLayoutHarness\`（`program.cpp` + `run.ps1`） | `pwsh -File tests\NativeLayoutHarness\run.ps1 -Exe "<游戏 exe>"` | MSVC：脚本自己用 `vswhere` 找 VS、从 `vcvars64.bat` 导环境、调 `cl.exe`，**这一步排在 SKIP 判断之前**，所以缺 MSVC 时它是在编译处抛错，而不是打印 SKIP；游戏 exe 路径由 `-Exe` 或 `$env:GBFR_EXE` 给 |
 | **托管 C#（`GBFR.SigilLoadout.dll`）** | — | — | **没有测试工程**：解决方案里只有原生工程与托管工程两个项目 |
@@ -83,6 +95,7 @@ Go 测试的工作目录是**包目录**（`SigilLoadout\`），文件路径都�
 | 配装写盘 · 校验 · 防抖（`loadoutservice.go`、`debouncedwrite.go`、`atomicwrite.go`） | 同上；并发路径再加 `go test -race ./...`（需 gcc） | 校验边界与被拒保存**磁盘不留痕**、防抖只落最后一次、并发保存不撕文件、缺 `enabled` 视为启用 | 托管侧 `LoadoutConfig` 怎么读这份文件；游戏何时读它；写失败时前端是否真的弹出对话框 |
 | 编辑列表服务（`editservice.go`） | 同上 | 落点与 mod 一致、防抖尾沿只落最后状态、写失败被放回并记日志、`LoadEdits` 的缺失/损坏/旧拼写语义、参槽总是补齐十个 | mod（`SigilEditorFeature`）是否照这些语义应用；界面提示；真机生效 |
 | 前端规则（`skills.ts`、`model.ts`） | `npm --prefix SigilLoadout\frontend run typecheck`，然后 `npm --prefix SigilLoadout\frontend test` | 输入框按键状态机、每个地址最多一条编辑、什么算编辑、派生索引与落盘载荷、变体往返、专属页的唯一规则 | 组件渲染与事件、真实浏览器里的按键/滚轮行为、Go 与 C# 两侧对同一份文件的读取 |
+| 窗口显隐 / F1 开关的判据（`windowstate.go` 的 `toggleActionFor`） | 在 `SigilLoadout\` 里 `go test ./...` | "给定三态组合该做什么"的整张判据表（呼出 / 收起 / 不动），含"工具自己有焦点→收起"与"别的程序在前台→不动" | 三个输入从哪来（`toolHidden` 镜像、`GetForegroundWindow`、认 exe 名的 `isGameWindow`）；`hideNow` / `revealTool` 的 Win32 效果、焦点归还与那记重放点击；`WM_CLOSE` / `WM_SYSCOMMAND` / `0x8010` / `0x8011` 分支；真机上的显隐结果 |
 | `layout_resolver.cpp` / `safe_game_access.cpp` | `pwsh -File tests\NativeLayoutHarness\run.ps1 -Exe "<游戏 exe>"`（需 MSVC；没给 exe 时 SKIP） | 生产解析器认得这份 exe 的锚点、解析结果过逐字节复验、改坏一个字节后复验必定失败 | 钩子落点对不对、真机效果、`table_slot.cpp` 那一侧的任何闸门、别的游戏版本 |
 | 托管 C#（`LoadoutConfig`、`Config.Load`、`SigilEditorFeature`、`Hotkey`） | 无（只有 `build-release.ps1` 的 `dotnet build` 编译它） | 只有"能编译" | 一切运行时行为，只能在游戏日志里观察 |
 | 打包与发布产物 | `pwsh -File tools\build-release.ps1` | 版本号三处一致、必需文件 13 项在场、legacy 与可变配置 fail-closed、工具链顺序 | 包在真机上能否跑起来、装进游戏后是否生效 |
@@ -92,18 +105,20 @@ flowchart TD
     Q{"这次改动落在哪"} --> A["跨语言常量 / 协议字面量 / 资产表"]
     Q --> B["写盘 · 校验 · 防抖 · 编辑列表"]
     Q --> C["前端规则 skills.ts / model.ts"]
+    Q --> F["窗口显隐 / F1 开关判据 windowstate.go"]
     Q --> D["layout_resolver.cpp"]
     Q --> E["托管 C# 与游戏内行为"]
     A --> G1["go test ./..."]
     B --> G1
     C --> G2["vitest run"]
+    F --> G1
     D --> G3["NativeLayoutHarness 需 MSVC 与 GBFR_EXE"]
     E --> G4["没有自动化证据 只能看日志与真机"]
 ```
 
-每档改动对应的套件；最后一档是任何套件都不覆盖的部分。
+每档改动对应的套件；窗口显隐那一档只有那条纯判据进 Go 测试，最后一档是任何套件都不覆盖的部分。
 
-## Go 包测试：一个包、四个文件
+## Go 包测试：一个包、五个文件
 
 ### 所有 Go 测试共享的沙箱（`assets_test.go`）
 
@@ -116,7 +131,7 @@ flowchart TD
 
 ### `sharedconstants_test.go`：跨语言常量对拍与原生容量
 
-这些值分别在 C# / Go / TS / C++ 里声明，写错**不会编译失败**，只在游戏里表现成错值——这类错误最难查，所以值得钉住。覆盖的组：`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash`、`LevelValueCount`、用户配置目录名、两个配置文件名、两条窗口消息、工具窗口标题、`skill_status` 的表头/行/行内 Key 偏移、`sigiledits.json` 的五个成员名、保存失败事件名。
+这些值分别在 C# / Go / TS / C++ 里声明，写错**不会编译失败**，只在游戏里表现成错值——这类错误最难查，所以值得钉住。当前名单是 18 组：`MaxSlots`、`DefaultLevel`、`UnwornCharacterHash`、`LevelValueCount`、用户配置目录名、两个配置文件名、窗口标题、**游戏内热键的开关消息（`0x8012`，窗口消息只剩这一条）**、`skill_status` 的表头/行/行内 Key 偏移、`sigiledits.json` 的五个成员名、保存失败事件名。窗口消息退到只剩一条是因为入选门槛是"至少两侧各有一处声明"：`0x8010`（激活）现在只由工具那侧声明与发送，没有第二方要跟它对齐，于是它不再是"漂了立刻红"的可对拍值（详见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md) 里那张单侧声明表）。
 
 机制上有四个细节，读它时值得知道：
 
@@ -156,6 +171,22 @@ flowchart TD
 - **无事可做的 flush**：`TestFlushWithNothingPendingDoesNothing` 把文件删掉后再 flush，它不该回来。
 
 `testing/synctest` 是较新的标准库，`go.mod` 声明的是 `go 1.27.0`——工具链太旧的机器连编译都过不去，这比测试失败更早暴露。
+
+### `windowstate_test.go`：F1 三态判据的那张表
+
+整层 Win32 窗口行为里只有一条纯判据被拉进自动化：`TestToggleActionFollowsTheUsersRule` 直接调 `toggleActionFor(hidden, selfForeground, gameForeground)`，把用户口述的规则写成五条表格用例——不建窗口、不碰线程、不读环境，所以它在任何机器上都能跑（仍然沿用 `TestMain` 那个沙箱，只是这里一个环境变量都用不上）。
+
+| 用例 | `hidden` / `selfForeground` / `gameForeground` | 期望 |
+| --- | --- | --- |
+| 游戏在前台，工具在托盘 → 呼出 | true / false / true | `actionReveal` |
+| 游戏在前台，工具可见但在后面 → 呼出 | false / false / true | `actionReveal` |
+| 工具自己有焦点 → 隐藏 | false / true / false | `actionHide` |
+| 托盘里 + 别的程序在前台 → 不动 | true / false / false | `actionIgnore` |
+| 可见但在后面 + 别的程序在前台 → 不动 | false / false / false | `actionIgnore` |
+
+这张表值得钉住，是因为 F1 是**裸键**：放行只有两种情形（工具自己被激活、或游戏在前台），其余一律不动，否则在任何程序里按一下都会把工具弹出来。而放行条件与托管侧 `Hotkey.cs` 的 `SyncRegistration` 是同一个条件——那边管"这键归谁"（`RegisterHotKey` 的裸键是全局独占的，所以只在游戏或工具自己在前台时才注册），这边管"按下去做什么"；两侧都不能省，区别只是工具晚 ≤250ms 才看到前台变化，这一段滞后正是这条判据挡的东西。表格用例还隐含钉住了优先级：工具自己在前台时先判"收起"，而不是落到"呼出"。
+
+**它的保证边界就是这张表。** 它不告诉你那三个输入是怎么算出来的（`toolHidden` 是假隐藏状态的镜像、`foregroundWindow()` 走 `GetForegroundWindow`、`isGameWindow()` 用 `OpenProcess` + `QueryFullProcessImageNameW` 只认 `granblue_fantasy_relink.exe`）；不覆盖判成 `actionReveal` / `actionHide` 之后那串 Win32 动作实际做成了什么（ex-style 上 `WS_EX_APPWINDOW` / `TOOLWINDOW` / `TRANSPARENT` 三个标志的加减、整窗 alpha、**先还焦点再 `EnableWindow(FALSE)`** 这个顺序、以及那记重放的光标隐藏点击）；也不覆盖 `returnFocusTo` 的存储条件，以及不经过这条判据的几个入口（`WM_CLOSE`、`WM_SYSCOMMAND SC_MINIMIZE`、`0x8010`、`0x8011`）。所以"F1 真的把窗口收/放对了、焦点真的回到游戏"仍然只能靠 `tool-debug.log` 里那行 `wmToggle hwnd=… -> <动作>` 与游戏内实测。
 
 ## 前端 vitest：只有纯逻辑，且刻意薄
 
@@ -221,7 +252,7 @@ flowchart TD
 
 | 门禁 | 为什么它在发布链里 |
 | --- | --- |
-| 版本对账 | `GBFR.SigilLoadout\ModConfig.json` 的 `ModVersion` 是版本号的唯一权威源；`-Version` 给了就必须与它相等；`SigilLoadout\frontend\package.json` 的 `version` 必须相等；`package-lock.json` 里版本号必须出现至少两次（根条目与根包条目）。只改一处不会让任何测试变红，只会发一个自称是别的版本的包 |
+| 版本对账 | `GBFR.SigilLoadout\ModConfig.json` 的 `ModVersion` 是版本号的唯一权威源；`-Version` 给了就必须与它相等；`SigilLoadout\frontend\package.json` 的 `version` 必须相等；`package-lock.json` 里版本号必须出现至少两次（根条目与根包条目）。当前这三处读出来都是 `0.6.2`。只改一处不会让任何测试变红，只会发一个自称是别的版本的包 |
 | `wails3 generate bindings` → `npm run typecheck` → `npm test` → `npm run build` | 顺序不可换：`bindings` 是 gitignore 的生成物而 `App.tsx` 直接 import 它；**vite 只抹掉类型、不做检查**，后面的步骤都不会发现类型错误；带着红的测试集发出去的就是没检查过的版本 |
 | 图标在场检查 → `wails3 generate syso` | Windows 只认链接期资源（`.syso`），而 `.syso` 要 `.ico` |
 | `go vet ./...` → `go test`（可选 `-race`）→ `go build` | — |
@@ -233,7 +264,7 @@ flowchart TD
 
 门禁之外还有两道纯防御性的边界检查（拒绝清理仓库外或 `dist` 外的路径），它们保护的不是行为正确性，而是"这次构建不会误删别人的目录"。
 
-当前检出里存在 `dist\.build-complete`（内容为版本号 `0.6.0`），说明这条链在本机至少跑完过一次，那些门禁都通过过。但它不告诉你 `-race` 是否真的开了——gcc 缺失时脚本只打印一行跳过。
+当前检出里存在 `dist\.build-complete`（内容为版本号 `0.6.2`，与同目录的 `GBFR-Sigil-Loadout-0.6.2.zip` 一致），说明这条链在本机至少跑完过一次，那些门禁都通过过。但它不告诉你 `-race` 是否真的开了——gcc 缺失时脚本只打印一行跳过。
 
 ## 这套验证的工作方式：先写复现它的测试
 
@@ -247,7 +278,7 @@ flowchart TD
 
 1. **真机游戏内效果**。改完因子数值后是"游戏内描述同步更新、实际效果下一次战斗生效"这类行为，任何套件都不碰游戏进程：harness 只把 exe 静态映射进内存，Go 与前端测试只碰文件与内存里的值。
 2. **钩子的实际落点**。`skill_fetch_path_rva` 这类 RVA 只在真机里才有意义；harness 证明的是"这些锚点在这个 exe 里还认得出来、且字节复验能拒绝被改坏的映像"，**不是**"钩子挂对了位置"。结论：**锚点与布局在真机上的正确性只能靠离线 harness（对这份 exe 的字节）+ 游戏内实测**，两者都过才算数，harness 绿不能替代实测。
-3. **性能与崩溃**。帧率影响、原生崩溃、Wails 窗口行为、托盘与热键，全部只在游戏/工具实际运行时暴露。
+3. **性能与崩溃**。帧率影响、原生崩溃、Wails 窗口行为、托盘与热键，全部只在游戏/工具实际运行时暴露。窗口显隐那一档也一样：`windowstate_test.go` 只钉住"该做什么"的判据，假隐藏与还原那串 Win32 调用的真实效果（连同重放点击与焦点归还）只在运行时可观察。
 4. **托管侧与若干原生路径没有离线证据**。托管 C# 没有测试工程，`LoadoutConfig` / `Config.Load` 的读取行为只能在游戏日志里观察；harness 只编译 `layout_resolver.cpp` 与 `safe_game_access.cpp`，**不含 `table_slot.cpp`**——所以锚点命中数、可写段判定、以及写活表的每一道闸（各拒绝码）都只能靠真机日志。Go 的 `-race` 也只覆盖 Go 侧并发（例如并发保存），不覆盖托管侧与原生侧的竞态。
 
 ## 相关页面
@@ -257,4 +288,5 @@ flowchart TD
 - harness 保护的那段解析：[语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md)
 - 防抖与锁的完整语义：[线程模型与锁](/openwiki/concepts/threading-and-locks.md)
 - 门禁在流水线里的顺序与理由：[构建、发布与部署链](/openwiki/operations/build-and-release.md)
+- 那条三态判据在链路里的位置：[工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)
 - 最短上手路径与命令入口：[最短上手路径](/openwiki/quickstart.md)

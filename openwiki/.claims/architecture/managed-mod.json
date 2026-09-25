@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:fcf9523c85917c408622be3ed0d8233b516a351e5672e2bab33342bb23245e86",
+  "pageVersion": "sha256:2f2efadb2cf08cc4aecd9040ff4553f62eb70a73ed9806d023648f681c0d8070",
   "claims": [
     {
       "id": "claim_2b2224e918be4901a0ac96a52af537ea",
@@ -186,15 +186,19 @@
     },
     {
       "id": "claim_7baf9895b6044a85b42fbe032dc3252c",
-      "statement": "热键只读一次、运行期不再改键：Hotkey.Configure 起一条后台线程建 message-only 窗口并 RegisterHotKey，由 Mod.Dispose 拆掉，所以有意不留重入路径；本 mod 自己的 Configuration/Configurable.cs 把 ConfigurationUpdated 实现成永不触发的空操作（官方运行期热重载已删），因此配置页里“修改实时生效”的描述与源码不一致。",
+      "statement": "热键配置只读一次、运行期不再改键：Hotkey.Configure 每个 mod 生命周期只调一次（QueueStart 幂等），只存下 mod 目录、虚拟键与日志汇、重置 _wasDown 并起一条后台线程 GBFR-Hotkey（虚拟键从此定死），线程由 Mod.Dispose 的 Hotkey.Shutdown 拆掉，所以它有意不留重入路径。本 mod 自己的 Configuration/Configurable.cs 把 ConfigurationUpdated 实现成永不触发的空操作（官方模板那套运行期热重载已删），因此配置页里“修改实时生效”的描述与源码不一致、改热键要重启游戏；这与“键的归属每拍都在变”是两件事。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout/Configuration/Configurable.cs#L16-L22",
           "version": "repo-lines-v1:sha256:8bef5903ecd67dc61ac2149f53a5ebfcc2da880581e28b716781ea7cdcf6f30b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjkzMTI2YjRiNThjMzM5YTNlOGIwNzI5OWNjNGM0ZjAzOGYzZGEyMjM4ZjNjYmI0N2M0ZWUyYTU5ODhhMGRkNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTM2NGI3MDdmYzcyMTU5MDdlYzUyMWVmNzYyODEzMzJjNGQ5MzU3YjMzZjQ3MmY5YWU0NGQ3MTA4NzBlZGJhYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2FkMmIxMDZkMjJkNTgwNDk3MTZlYTBiYzA0N2E4NDJiNjRhZjA0OTVmYjUxOTEzMGYwMDlkNTRlMThlY2U1MiJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L93-L111",
-          "version": "repo-lines-v1:sha256:6187ba5d8b4849c985c8bbec2725728fde8a93eb18fd9d22bc12d0d3cece8769:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ4YTAzMGQzMGZiMGQ5YTgxNjllODA2ZmJmYTBhYWM3OWE2MDUwMWMyYzcyNWY3ZThlMzJkOTFmMDg5YzhlMTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVjZDQ4NTYzMzU0M2MwNTRjM2M5N2I0Yzk0YzZjNWM5MDRhNTRiZDU3ODBhMWNiMjA3YTc1ZTRiYWFmMmIxNzcifQ"
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L98-L116",
+          "version": "repo-lines-v1:sha256:6187ba5d8b4849c985c8bbec2725728fde8a93eb18fd9d22bc12d0d3cece8769:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ4YTAzMGQzMGZiMGQ5YTgxNjllODA2ZmJmYTBhYWM3OWE2MDUwMWMyYzcyNWY3ZThlMzJkOTFmMDg5YzhlMTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmNzczZTYzYTc2OWU0MmMwNGQxNmNlY2RmZDFhYjI1NjBmYWNkYjQ3ZDkyNGI3MjRmZWM5NDMwYmNiMTkzYWQifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L131-L141",
+          "version": "repo-lines-v1:sha256:92f6afb08578d159b927a99f7425eccf1e437a29f99cd5a4f9b85b3927a28efc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE0MDcyZjk0ZjI0ZTA0OGYyNTFmMzJmZTM3M2ZiM2EzNzg4MmZkYmIyNDU5MjkyMDg1YTZhMjdlOTQxN2YyZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlMjVjNzZmMjU4YzBhNjQ2MTk0MDhmYWY1YmY0YjMzNDY4NjYxNjcxNDE4ZmQyZDBkYjNmZGJiMWM1NDBjMjAifQ"
         }
       ]
     },
@@ -450,7 +454,7 @@
         },
         {
           "resource": "repo://GBFR.SigilLoadout/ModConfig.json#L5-L5",
-          "version": "repo-lines-v1:sha256:cae3a0ffb57a8add77956046ebb332cece129b8da391ae2551f355dd522910cd:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2FlM2EwZmZiNTdhOGFkZDc3OTU2MDQ2ZWJiMzMyY2VjZTEyOWI4ZGEzOTFhZTI1NTFmMzU1ZGQ1MjI5MTBjZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2FlM2EwZmZiNTdhOGFkZDc3OTU2MDQ2ZWJiMzMyY2VjZTEyOWI4ZGEzOTFhZTI1NTFmMzU1ZGQ1MjI5MTBjZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjE5MWU4ODZhMTJhMDY4ODVkOGNkYTZiN2Q3MmJlYmVmYmUzYmNiNzgzZmRlYTJlMjJkMmE0NmFjZTJmMTVjZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODVhMWQ3M2JlZDA5N2FhNzUxOGM3NWQ5MDQyNTgyZjhmYTZjNDI5MzIzYTZlZDIyYzFhNzU1MGI5YzhkNWMwZCJ9"
+          "version": "repo-lines-v1:sha256:9481b0739dca29f98d716de01c97d58eec1cc2aa137c3d926cc3f3b2689c1d98:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTQ4MWIwNzM5ZGNhMjlmOThkNzE2ZGUwMWM5N2Q1OGVlYzFjYzJhYTEzN2MzZDkyNmNjM2YzYjI2ODljMWQ5OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTQ4MWIwNzM5ZGNhMjlmOThkNzE2ZGUwMWM5N2Q1OGVlYzFjYzJhYTEzN2MzZDkyNmNjM2YzYjI2ODljMWQ5OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjE5MWU4ODZhMTJhMDY4ODVkOGNkYTZiN2Q3MmJlYmVmYmUzYmNiNzgzZmRlYTJlMjJkMmE0NmFjZTJmMTVjZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODVhMWQ3M2JlZDA5N2FhNzUxOGM3NWQ5MDQyNTgyZjhmYTZjNDI5MzIzYTZlZDIyYzFhNzU1MGI5YzhkNWMwZCJ9"
         },
         {
           "resource": "repo://tools/build-release.ps1#L15-L39",
@@ -601,10 +605,94 @@
           "version": "repo-lines-v1:sha256:8b24ada36aedf790b71b23952c5e5a1146428baca5cf69e121ab7da0d6d1c49a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4NzhhMDdmNWU3MGFhMjU1NTZlYTAwYWVkZmVhNGRmOWVmOTllZTg2ZDI3NDI3NWUwM2I3ZTk3YjRmY2FkNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzMzhmZDI4MWYxMDY0NzIxODQzZDM0ZjA3OGNjYzJjNGNjNjk4M2U1YzgyYmQ4MmJlZjk5MjYxZWQwNmNmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwMjU0MGE1MWJhZmM2Zjg5ZDIxYTkyMzE0Y2I5YWQwMzVkMTg5NzJiNWE5MWI4NzNhM2Y5MDBjZTMyNmFiZDEifQ"
         }
       ]
+    },
+    {
+      "id": "claim_1725ae3fe27e4dcf992151e9fea71e04",
+      "statement": "RegisterHotKey 注册的是无修饰键（fsModifiers 只有 MOD_NOREPEAT = 0x4000），而裸键注册是全局独占的，所以托管侧只在“游戏（本进程）或工具自己是前台”时持有它、前台一被切走就立刻释放：SyncRegistration 用 GameOrToolIsForeground() 算期望态，并且只在期望态真的变化时动手（want == _wantRegistered 直接返回），否则注册失败（键被别的程序占着）会变成每个维护拍重试一次、每个维护拍刷一条日志；放开时记 “Hotkey released: another program is in the foreground.”，注册成功记 “Hotkey registered: <键名> (0x..) via RegisterHotKey.”、失败记 “RegisterHotKey unavailable (key may be taken); fallback polling active.”。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L228-L260",
+          "version": "repo-lines-v1:sha256:fd646163997361782597d3e5e50d25aeae84002aa532d3e877032a6f5ba1e8c3:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjZWJmMDc3ZWVmYTJkZmVkYzg3YzBiNzRkMDc3N2I5ZWNkZjQwZTBjNWZkZmYwMDcxNjJlN2FmZDM1NWE3MzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkxYzFmNDg0ODRjZDM3NDZhNzFkNGJkYjhiNzFlNjlmOWFhZWE5OWQ5MWUxM2MzZGFhZjE3MzE4NzFiNjE4NzIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L88-L96",
+          "version": "repo-lines-v1:sha256:300183dbe29755df82a091fbddd87eb7676891f6682f30e9a0b8e9dbce9541f5:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmY0NmNjM2MxMjQzOTJjMzk4OTllMDcxMDQ1MGQ0MDliMTk4NTM5ODQzOGU4ZDk5ZTI2ZGEzOGJkMDhiOWM2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGIwMzg5ZmU2ODEwMWRjZTE2MjEyOTAxODBmMGY3ZjhmZGZlZGU0ZjQ5ZjBjM2IyMTllZTdkMTUwYjk4NWRmMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGQ4MDlhZmJjODc1ZDIyMzBhOTFmZmJlNWMzNGU4MzY2ZGFhNTk1ZDYxMjEyMTAxOGY5MjQzNzczMTU5YTY5ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGU3YmM2ZTU4YjQyMGZjNTZiMjliYTNjNGU2ODZmZTZjNjI4M2YxMmEzYTE3MWRmMmFmYzFkYzQ1ZmU0MTg4ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e6b801685b714f47a9b495837bca5235",
+      "statement": "GameOrToolIsForeground 只放行两种前台：前台窗口按标题等于工具窗口（FindWindow(null, ToolWindowTitle)），或前台窗口的进程 id 等于 Environment.ProcessId——mod 活在游戏进程里，所以“游戏在前台”不必按进程名查。并发约定上，_wantRegistered 只在热键线程上读写（因此不必 volatile），而 _messageWindow、_hotKeyRegistered、_virtualKey、_threadExit 都带 volatile，因为它们被维护拍那一侧读。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L262-L274",
+          "version": "repo-lines-v1:sha256:c3daff42721ecc09409ebc972b91f01d65e100e2742f7a0b68d8dfd2aeadaaad:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM1NmZmMzM4MDRlMDZjNDE1YWJjZDU3YjJhNzg3M2U5ODU4MDRlMjNlYzRmNzExYjRkM2RjZTJmMDczZTg5NTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwNDU5YmM4NjM4M2QwNzE1N2YxYTkzMDMyNzBiNmIzMDNjYWMyYTk5MmIzMjljNDM1OTI4NDg1OTgxZmUxZDYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L86-L96",
+          "version": "repo-lines-v1:sha256:3c6064dc75c8d3f7013cd7bd60308de89162e2d20e0fbff75d98bf503b43e9df:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4YmM4NDUzMjg4MTI0YjJjMjkwNWY1OTMyMTIxNzU1MDIzYmIxNmY0YmQ1NWI4ZWVlNjkyOTdlYjllYjZhN2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiMDM4OWZlNjgxMDFkY2UxNjIxMjkwMTgwZjBmN2Y4ZmRmZWRlNGY0OWYwYzNiMjE5ZWU3ZDE1MGI5ODVkZjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzNmQzZjBiNWQxZDFjMWI4NDU0MTY2ZjBlZGVlNTYyOTc2MzIxN2U4OTUzMWNmNzQ5N2JiM2Q3YjI2NTQzYzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRlN2JjNmU1OGI0MjBmYzU2YjI5YmEzYzRlNjg2ZmU2YzYyODNmMTJhM2ExNzFkZjJhZmMxZGM0NWZlNDE4OGYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6e00f5a4911845c2b4afd593b2b51ef9",
+      "statement": "Hotkey.Tick 每 250ms 做两件事且次序不可交换：先（消息窗口存在时）向它 post WmSyncRegistration 请热键线程复核“键该不该归我们”——这一条排在提前返回之前，否则注册成功后再也不会有人放开这颗键；然后已注册就立即返回，只有未注册（窗口建不出来或 RegisterHotKey 当时失败）才用 GetAsyncKeyState 的 0x8000 位做边沿检测（_wasDown）采样并走同一个 TryLaunchTool，注册着时轮询这半边必须闭嘴，否则一次按键会被处理两遍。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L174-L192",
+          "version": "repo-lines-v1:sha256:30711eb648b38feef59504864a177abe037d7879f1b2eb4c2fbf68d1aee680a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkNWViYTFjZjkwODBhNWQ3MzUzNTZjMjQ5ZjI4ZGY0NDY5MWFkMTdhZDVhNmU0ODIzZDRhY2I0NDZkZWI1ZjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzYTJkZDBmYWRhOGZlMmQ0M2ExMWQzMjRlYTdmZDQyY2IwNzdjYjAzNzQwODNmOTg0NGYzZTg4MGEzZTZhZWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY2ODhiZGFiMmNjYWNhMzVmODM3MmEyM2JmYTdiYWVmYTE0ZThjMWQwMmUzMTkzN2NiMDVhOTkyMmE1NWJmN2EifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9754788f13fd4ad8b9bdbfec37fe03c6",
+      "statement": "热键线程自己拥有 message-only 窗口的整个生命周期：窗口句柄在注册决定之前就发布（_messageWindow 先写进静态字段，随后才由 SyncRegistration 决定是否注册），注销与 DestroyWindow 都只在循环退出时由循环线程自己做（跨线程 DestroyWindow 不安全），Shutdown 只置 _threadExit、窗口非零时 post WM_QUIT 并 Join(1000)，join 超时不影响正确性，因为关停路径从不跨线程碰这扇窗口；关停途中的在途 WM_HOTKEY 会被 _threadExit 丢掉，消息处理整段 try/catch 保证消息循环不会因回调异常而死。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L118-L172",
+          "version": "repo-lines-v1:sha256:6d0d65f8b9af37a95f1022f86d4f870ee75810387a9fc0bbcfed57dd83aa826b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM0OGI5NzhlYTcxYTk5MTE4MGVlMDAzODA1YjViZWE2ZGJhYjQ2ZWM0NzkwYjQxN2ZjYjA1NzY1ZDBlM2JlNjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1ODUxNTIyNTliNjUzYWQ5MTBkYjY4MGFiZjY1NmI3NzI0NjAwZjFiMTJmMzJjZDc1YTUzODllNzg3YmIwMmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMyYTQxOGVjZDYzMTU0MmEyMTE1N2U0OWE3NzRhZGZiMTc2OTRhYjhiMzgwZTE0MTRlMzM0NjIwYmM5MzM4MzcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7d898173e8e646328550d4c24d80c90b",
+      "statement": "message-only 窗口用父窗口 HWND_MESSAGE = -3、类名 STATIC、窗口名 GBFRHotkey——刻意与工具的标题 GBFR Sigil Loadout（ToolWindowTitle，被 SigilLoadout/sharedconstants_test.go 对拍）不同，所以按标题 FindWindow 找工具时不会命中自己；窗口建不出来时记 “Hotkey message window creation failed; fallback polling active.” 并结束线程，只剩轮询回退。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L11-L21",
+          "version": "repo-lines-v1:sha256:6d1fa8dcb68386d9a5afae385f4eb789334e42b33c36e3f2d9c696825492bc4c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwNDZiZWJmOTY3ODRhNWYyYzBlYzA3ZGQxMTY2NzZkNjFhMGY4NWMzYmJjMGM2NDFhZjZhZGJmYmZhYmU5ZjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxMWIzYjczYjY4OTZiNmM2MGQzYTdjZjAwMzQxMDU3Njk3YWY4N2MyY2E0YTZiMTdlZTQ2YmIyMTBkYjNkMDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYjg4ODE2NjFlMTkxYWMzOTI2NDI2ODZhMWE3NjM5ODg3MDQ1M2IyNjYzYWI3N2IyNzE1NjUxNzVkNjgwMzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQwYmY2NjAzN2JlZjE5ZWMxYjhmOTdjNTVmOWNhMTBlNGEyMWM2OTE3ZDg3ODNlZjE2NTQ1OGY2NDJhMWU0ZWUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L131-L139",
+          "version": "repo-lines-v1:sha256:70daf67961ff1c07f0b403d358bb6a52348e6cb90adf230d88604993b14d8e11:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM0YWQzZmMyMzMxNzE3NjJiYmNjMDkxMjkwYjAxMTdjN2IwNTFjODY5OGI1YzRjMTliZDlkMjUwNzNjNWNjNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDYwMmZmYjZhNjlkNDQyZmVkZmJiM2RhMTYzNGY1YjE3MGRlZWM4OGZiMmYyN2NlOTBlNDAyNTE4NTRjYzA3YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjM1OTMyMTkwM2YwMzcyZjI4NWI5NzhkODQ0YjFmOGViNTUxYjk1YzE2OGI0MWYzYzFmYWYyOTRiNTY2NTBiNiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L110-L116",
+          "version": "repo-lines-v1:sha256:ac56da4a94d122aa419959904b3c591460569b97a4088692c7ccaf315bd0dad1:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDliYmEwNWY4NDFlOTk0MmUwNWU5ZmE2NDU3N2E1ZWRmYjIwNmY1MWQ3MGQ0ZmVkYTA2ZTE1YzRkZjE4MmJiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzRmZDI4Y2QyY2M5MTI0OGEyNzM3Y2JiM2VjZjJiZjY3M2NhYWUyMGM4Mjg4ODM3MzUyYTBjMjU4ZDRiMDlkMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a66ef65722d948a8b162fcc4435846dc",
+      "statement": "热键的前台判据在两侧各判一次、不能只留一侧：托管侧 SyncRegistration 管“键归谁”（全局独占的裸键何时被本进程持有），工具侧 windowstate.go 的 toggleActionFor 管“按下去做什么”（隐藏、呼出还是忽略），用的是同一个条件但工具侧晚 ≤250ms 看到（注册状态最多滞后一拍，这中间用户可能已经切走）。另外 ActivateWindow 不抢前台：它只把激活权借给工具进程（AllowSetForegroundWindow）再 post WmToggle(0x8012)，因为热键那一次按下算在注册热键的本进程头上，工具自己调 SetForegroundWindow 会被拒。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L228-L240",
+          "version": "repo-lines-v1:sha256:c6b7ea8ba2eac20c1ed046be14a67eddf054e4091e43867e91ba485923311769:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjZGViNDgwZTFmMTk4YzQ4MWU5NmZkZGI1Nzc3ODc3YTU0MzhlNDQ5YTllNDM0NGNiYWUwYzU3NGFkZTU3OTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjZWJmMDc3ZWVmYTJkZmVkYzg3YzBiNzRkMDc3N2I5ZWNkZjQwZTBjNWZkZmYwMDcxNjJlN2FmZDM1NWE3MzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2OTU3MjdlODJhNjcyNGNiYjdhM2VmMDRlMDI5MWU3NzhhMzc3YWJiZjc0MDgzNGVlYjg1NjJlZTI2ZmMxMDkifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L299-L311",
+          "version": "repo-lines-v1:sha256:f93af159d8e12d5c10bfe8d25174f332114e271b93cf4575c9416a06206a7a4a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/windowstate.go#L97-L112",
+          "version": "repo-lines-v1:sha256:693472e320f80b9d5dfd4e33796261f520c83b4d1f0398f4d9aa8e6273051bc0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyZWRjNWQzNjQxNmIwYjQ4ZjdmNTY0Zjk3OGI0MmVkM2Y3MjllNWFiNmMwYjcxNDU3ZWY5Y2I1NDA1YjU5NzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU0Y2Q3ZjE4MzAzMzMzNTFiOTk4ZDExNWQ5NTVmZDE0NjE5YjIwZjcyZWU5YTUzNGJkZThhM2EwM2M5ZmNlYjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFmYjMyOTJhYzYwY2Q4NWNmMGUwYjA2OGQzNTM3YmI0YzY4ZWRiZDVmZWYyZDUxZThjMWU5ZDYxYjVhODg5NWEifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T01:16:26.192Z"
+    "at": "2026-09-24T18:48:22.808Z"
   }
 }

@@ -1,6 +1,6 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
-    [string]$Target = 'C:\Users\baago\Desktop\Reloaded-II\Mods\GBFR.SigilLoadout'
+    [string]$Target = "$env:USERPROFILE\Desktop\Reloaded-II\Mods\GBFR.SigilLoadout"
 )
 
 $ErrorActionPreference = 'Stop'

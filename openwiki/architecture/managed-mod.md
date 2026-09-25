@@ -1,7 +1,7 @@
 ---
 type: architecture
 title: 托管 mod（C# Reloaded 外壳）
-description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序（含失败回滚）、250ms 维护拍的三阶段单飞、Dispose 拆除次序、日志双汇与单代轮转、NativeCore 门面（DLL 路径绑定、ABI 尺寸+偏移双检、日志回调与运行时消息）、LoadoutConfig 与 SigilEditorFeature 的职责划分（前者只做载荷映射、不读数据文件、不持有表，等级只判非负、上界不在此判定，专属开关只转发 false）、热键配置装配与 F1 回退、两个 FileStamp 版本门语义，以及跨语言常量（MaxSlots = 16）各自落在哪一侧、被哪道门对拍。
+description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序（含失败回滚）、250ms 维护拍的三阶段单飞、Dispose 拆除次序、日志双汇与单代轮转、NativeCore 门面（DLL 路径绑定、ABI 尺寸+偏移双检、日志回调与运行时消息）、LoadoutConfig 与 SigilEditorFeature 的职责划分（前者只做载荷映射、不读数据文件、不持有表，等级只判非负、上界不在此判定，专属开关只转发 false）、热键那一半的所有权（配置装配与 F1 回退、后台线程与 message-only 窗口、按前台态动态注册/释放、维护拍每拍请热键线程复核"键归谁"、与工具侧显隐判据的分工）、两个 FileStamp 版本门语义，以及跨语言常量（MaxSlots = 16）各自落在哪一侧、被哪道门对拍。
 tags: [managed-mod, reloaded-ii, lifecycle, maintenance-tick, fail-closed, interop]
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
@@ -36,14 +36,16 @@ sources:
     resource: repo://GBFR.SigilLoadout/UserConfig.cs
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
+  - id: openwiki-source-46f7ef112800a873cada707b
+    resource: repo://SigilLoadout/windowstate.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 托管 mod（C# Reloaded 外壳）
@@ -66,7 +68,7 @@ verified:
 | `SigilEditorFeature` | 把 `sigiledits.json` 变成整张 `skill_status` 表，注册给数据管理器并让原生就地写入活表 |
 | `UserConfig` / `FileStamp` | 用户配置目录与两个文件名的唯一推导处；两个特性共用的 mtime 版本门 |
 | `Configurator` / `Configurable<T>` / `HotkeyConfig` | `IConfiguratorV3` 配置页连接器与热键那一份配置（本 mod 自己裁过的 `Configurable` 基类） |
-| `Hotkey` | `RegisterHotKey` 消息线程，以及注册失败时的 250ms 轮询回退；生命周期由 `Mod` 掌握 |
+| `Hotkey` | message-only 窗口与 `RegisterHotKey` 消息线程；按前台态动态注册/释放这颗全局独占的裸键，注册不上或窗口建不出来时退回 250ms 轮询；生命周期由 `Mod` 掌握 |
 
 ABI 导出面的语义（每个导出做什么、拒绝码含义、原生侧生命周期）不在本页：[原生核心（C++ DLL）](/openwiki/architecture/native-core.md) 与 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) 是它们的权威；本页只讲托管侧**怎么用它**。
 
@@ -163,7 +165,7 @@ Startup phase=<name> state=complete|failed elapsed_ms=<n>.
 | --- | --- | --- |
 | 1 | `LoadoutConfig.Tick(Log)` | 版本门 `Changed()` 直接认领，没变就返回，不改任何状态 |
 | 2 | `_sigilEditor?.Tick()` | 未接上数据管理器就只重试 `Bootstrap`；`Pending` 不通过就返回 |
-| 3 | `Hotkey.Tick(Log)` | `RegisterHotKey` 已成功时第一行就返回；否则只是采样 `GetAsyncKeyState` |
+| 3 | `Hotkey.Tick(Log)` | 先 post 一次 `WM_SYNC_REGISTRATION` 请热键线程复核"键归谁"（这一条在提前返回之前）；已注册时到此为止，否则只是采样 `GetAsyncKeyState` |
 
 ```mermaid
 sequenceDiagram
@@ -375,7 +377,7 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - **逐字节相同的捷径**：新表与已发布的那份相同时什么都不做，但会 `MarkApplied`——内存里已经是这一版的字节，这一版确实处理完了；不标记的话 `Pending` 永远为真，而这条捷径又让 Tick 的"同版本"节流条件失效；
 - **版本号必须先取**：`Bootstrap` 在读取列表与建表**之前**取 mtime，建完表再复查一次；反过来就会拿 T4 的版本号去标记 T1 的内容（内存里是旧内容而编辑静默丢失），中途变了就什么都不写、也不推进版本，交给下一拍。
 
-## 8. 热键配置装配与回退
+## 8. 热键：配置装配、注册归属与轮询回退
 
 热键那一份配置是托管侧唯一走 Reloaded 配置页的东西：
 
@@ -396,10 +398,67 @@ public int VirtualKey =>
 
 它是派生值，同时挡在 JSON 和启动器表格之外（`[JsonIgnore]` / `[Browsable(false)]`）；取值范围在这里判，是因为 `Configurable.SerializerOptions` 带 `JsonStringEnumConverter`，手改文件里写任意整数都会被收下。取值不在 `OverlayHotkey` 里就回落 F1。
 
-两条运行期约定：
+### 8.1 热键线程与 message-only 窗口
 
-1. **热键只读一次，运行期不再改键。** `Hotkey.Configure` 起一条后台线程建 message-only 窗口并 `RegisterHotKey`，由 `Mod.Dispose` 拆掉，所以它有意不留重入路径。`Configuration/Configurable.cs` 是本 mod 自己裁过的基类：`ConfigurationUpdated` 被实现成永不触发的空操作（官方模板那套运行期热重载已删），因此配置页里"修改实时生效"的描述与源码不一致、改热键要重启游戏——这一条在 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md) 有完整对照表。
-2. **250ms 轮询只是回退。** `RegisterHotKey` 成功时 `Hotkey.Tick` 第一行就返回；只有注册失败（键被占用、消息窗口建不出来）才由维护拍采样 `GetAsyncKeyState`。按键到工具窗口的完整时序见 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)。
+`Hotkey` 是 static 类，线程只有一条，它的全部状态都在这里：
+
+- `Hotkey.Configure(modDirectory, virtualKey, log)` 每个 mod 生命周期只调一次（`QueueStart` 幂等，它有意不留重入路径）：存下 mod 目录、虚拟键与日志汇，重置 `_wasDown`，起一条后台线程（`IsBackground = true`，名字 `GBFR-Hotkey`）。
+- 线程上第一件事是 `CreateWindowEx` 建 **message-only 窗口**（父窗口 `HWND_MESSAGE = -3`，类名 `STATIC`，窗口名 `GBFRHotkey`——刻意不是工具的标题 `GBFR Sigil Loadout`，所以按标题 `FindWindow` 找工具时不会撞上自己这扇隐形窗口）。建不出来就记一行 `Hotkey message window creation failed; fallback polling active.`，线程随即结束，只剩轮询回退。
+- **句柄先发布，注册与否不在建窗时定。** `_messageWindow` 一拿到就写进静态字段，随后才由 `SyncRegistration` 决定要不要注册；维护拍每拍往这个句柄 post 一次同步请求（见 8.3）。
+- 消息循环只认三件事：`WM_SYNC_REGISTRATION (0x8014)` → 重新对一次"键该不该归我们"；`WM_HOTKEY (0x0312)` → `_threadExit` 已置就丢掉这一记在途按键，否则先 `WaitForKeyRelease`（最多 40 × 10 ms）再 `TryLaunchTool`，整段包在 try/catch 里——**消息循环绝不能因回调异常而死**；其余消息照常 `TranslateMessage` / `DispatchMessage`。真正把工具带出来的是 `TryLaunchTool`（按标题找窗口，找不到且游戏或工具在前台时才从 mod 目录 `Process.Start` 那个 exe），消息路径与轮询路径共用它，所以两条路的行为一致。
+- **注销与销毁窗口都归循环线程自己做**：循环退出时 `UnregisterHotKey` + `DestroyWindow`。`Shutdown()`（由 `Mod.Dispose` 调）只置 `_threadExit`；消息窗口非零时再 post `WM_QUIT (0x0012)` 并 `Join(1000)`，最后清掉 `_messageWindow` / `_hotkeyThread`。join 超时没关系——关停路径从不跨线程碰这扇窗口，而跨线程 `DestroyWindow` 是不安全的。
+
+### 8.2 注册/释放的判据：键为什么要在运行期交还
+
+注册的是一颗**无修饰键**（`fsModifiers` 里只有 `MOD_NOREPEAT = 0x4000`，没有 Alt/Ctrl/Shift/Win），而裸键的 `RegisterHotKey` 是**全局独占**的：只要注册着，别的程序就再也收不到这颗键。所以只在"游戏（本进程）或工具自己是前台"时才持有它——那段时间别的程序本来也没有焦点——一旦切走立刻放开，把键还给它们。
+
+判据 `GameOrToolIsForeground()` 只有两种放行：前台窗口按标题等于工具窗口（`FindWindow(null, ToolWindowTitle)`），或者前台窗口的进程 id 等于 `Environment.ProcessId`——mod 活在游戏进程里，所以"游戏在前台"不必去查进程名。
+
+`SyncRegistration()` 只在**期望态变化**时动手，这正是它存在的理由：
+
+| 期望态 | 动作 | 日志 |
+| --- | --- | --- |
+| 从"前台不是我们"变为是 | `RegisterHotKey(hwnd, 0x47B1, MOD_NOREPEAT, vk)` | 成功 `Hotkey registered: <名字> (0x<两位十六进制>) via RegisterHotKey.`；失败 `RegisterHotKey unavailable (key may be taken); fallback polling active.` |
+| 从是变为不是 | `UnregisterHotKey`，并把 `_hotKeyRegistered` 置假 | `Hotkey released: another program is in the foreground.` |
+
+`want == _wantRegistered` 就直接返回：少了这道"只在变化时动手"的判断，注册失败（键被别的程序占着）会变成每个维护拍重试一次、每个维护拍刷一条日志。`_wantRegistered` 只在热键线程上读写（所以不必 `volatile`），而 `_messageWindow`、`_hotKeyRegistered`、`_virtualKey`、`_threadExit` 都带 `volatile`，因为它们被维护拍那一侧读。
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    state "无消息窗口，只剩轮询" as NoWindow
+    state "未注册，键归别的程序" as Released
+    state "已注册，本进程独占这颗裸键" as Held
+    [*] --> NoWindow : CreateWindowEx 失败
+    [*] --> Released : 窗口建好，SyncRegistration 判定前台不是我们
+    Released --> Held : 前台是游戏或工具且 RegisterHotKey 成功
+    Released --> Released : RegisterHotKey 失败，期望态不变就不再重试
+    Held --> Released : 前台切走，UnregisterHotKey
+    Held --> Held : 每拍 WmSyncRegistration 复核，期望态没变则不动
+    NoWindow --> NoWindow : Tick 采样 GetAsyncKeyState
+    Released --> [*] : Shutdown 或消息循环退出
+    Held --> [*] : Shutdown 或消息循环退出
+```
+
+热键注册状态只有两态、外加一个降级态：窗口建不出来就永远只剩轮询；窗口在时，注册与否跟着"前台是不是游戏或工具"走，每拍复核只在期望态真的变了时才动作。
+
+### 8.3 `Tick` 的两个职责与次序
+
+维护拍里的 `Hotkey.Tick(Log)` 每 250ms 做两件事，次序不可交换：
+
+1. **消息窗口存在就 post 一次 `WM_SYNC_REGISTRATION`**，请热键线程重新对一次"键该不该归我们"。这一条**排在提前返回之前**——否则一旦注册成功，切到别的程序之后就再也不会有人放开这颗键。
+2. **已注册时立即返回**；只有没注册（窗口建不出来，或 `RegisterHotKey` 当时失败）才用 `GetAsyncKeyState` 的 `0x8000` 位做边沿检测（`_wasDown`）采样，命中则走同一个 `TryLaunchTool`。注册着的时候响应的责任在消息那一半，**轮询这半边必须闭嘴**，否则一次按键会被处理两遍。
+
+函数开头的守卫是"配置齐了吗"（`_virtualKey < 0` 或 `_modDirectory` 为空就返回）。这里要分清两件事：**虚拟键只读一次、运行期不再改键**（配置页那份 `Configurable` 把 `ConfigurationUpdated` 实现成永不触发的空操作，所以改热键要重启游戏，理由与完整对照表见 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)）；而**"键的归属"每拍都在变**。
+
+### 8.4 与工具侧的分工：键归谁 vs 按下去做什么
+
+两侧的判据是**同一个条件**，但负责的事不同，两侧都不能省：
+
+- **托管侧（`SyncRegistration`）管"键归谁"**：注册/释放那颗全局独占的裸键，代价是生效最多滞后一拍。
+- **工具侧（`windowstate.go` 的 `toggleActionFor`）管"按下去做什么"**：收起、呼出，还是丢掉。它比托管侧晚 ≤250ms 看到同一个条件（这中间用户可能已经切走），所以它挡的是那一段滞后。
+
+工具窗口被呼出之后，谁该在前台由工具自己决定：`ActivateWindow` 只做两件事——**把激活权借给工具进程**（`AllowSetForegroundWindow`，因为热键那一次按下算在 `RegisterHotKey` 的持有者也就是本进程头上，工具自己调 `SetForegroundWindow` 会被拒），然后 post `WmToggle (0x8012)`；发完就不再判断、不再抢、也不再等。按下去到窗口显隐的完整时序、消息路径与轮询路径的差别，以及工具侧的三态与焦点归还，都在 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)。
 
 ## 9. 工程与依赖边界
 

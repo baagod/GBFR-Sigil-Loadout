@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:16dd2ed571e712c7eab86fefbf093cc69d57498de21381bc1560208656ea2600",
+  "pageVersion": "sha256:1284388edc5cff4de85bb8d1c44130825666cc300ffbd3c2837fde060dcddfe1",
   "claims": [
     {
       "id": "claim_41f5f5788f694041b58e190df51cab4d",
@@ -348,11 +348,11 @@
     },
     {
       "id": "claim_0be9bbb690d64677a2bbc4fc941f4705",
-      "statement": "对拍覆盖的完整清单是：MaxSlots、DefaultLevel、UnwornCharacterHash、LevelValueCount、用户配置目录名、loadout.json 与 sigiledits.json 两个文件名、sigiledits.json 中的 edits/enabled/key/level/values 五个成员名、工具窗口标题、两条窗口消息（0x8010/0x8012）、skill_status 的表头 8 与行 52 与行内 Key 偏移 40、以及保存失败事件名 GBFR.SigilLoadout.SaveFailed。",
+      "statement": "对拍（sharedconstants_test.go 的 groups）当前是 18 组：MaxSlots、DefaultLevel、UnwornCharacterHash、LevelValueCount、用户配置目录名、loadout.json 与 sigiledits.json 两个文件名、sigiledits.json 中的 edits/enabled/key/level/values 五个成员名（各成一组）、工具窗口标题、游戏内热键的开关消息 0x8012、skill_status 的表头 8 与行 52 与行内 Key 偏移 40（各成一组）、以及保存失败事件名 GBFR.SigilLoadout.SaveFailed；托管侧另外那个行内 Level 偏移没有第二处声明，所以不收。",
       "evidence": [
         {
           "resource": "repo://SigilLoadout/sharedconstants_test.go#L56-L201",
-          "version": "repo-lines-v1:sha256:70c456dba211e38a1b1a2a2194ca979cbec7b4926442890fc066a62a03bb2182:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQ2LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI4OWJjNzUxMWIyMmI1MzhkZjE0MjgzMzc1MWQ0YTAzNzQxYmIyODM5M2I0M2YxOWY4ZDY2ZDQ5MWRhZjUyZDllIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI1YmFkN2NjMmRmYWZjMjE3NWZhMmQ5NzA0ZTAyMDJmOTQwODNhOWRhNjlhNTg1YjBiMThjNDhiZWEyMzYyNzVlIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI2ZmE2MzJlMjNkOThkZDg4ZjVjOWJkNDE0NDJjZGU5Mzc5MGQ2ODZlYzUzMjIyMzY1Nzg0MGJmZDEwNGE0YjBlIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI3ZTNhZjhiN2YyNmRiZWU1NDc4YmQ2OTExYTc5MTUxZmUzZjZhNTQ3ZjhlNTQ3MzMwODhmZDE4YmQ3YTZlMDc2In0"
+          "version": "repo-lines-v1:sha256:f3ad42435827bbe59814aa8b09c79f2e351acfe138a2a8b7b13cad4f1802b1f6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTM5LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI4OWJjNzUxMWIyMmI1MzhkZjE0MjgzMzc1MWQ0YTAzNzQxYmIyODM5M2I0M2YxOWY4ZDY2ZDQ5MWRhZjUyZDllIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI1YmFkN2NjMmRmYWZjMjE3NWZhMmQ5NzA0ZTAyMDJmOTQwODNhOWRhNjlhNTg1YjBiMThjNDhiZWEyMzYyNzVlIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI2ZmE2MzJlMjNkOThkZDg4ZjVjOWJkNDE0NDJjZGU5Mzc5MGQ2ODZlYzUzMjIyMzY1Nzg0MGJmZDEwNGE0YjBlIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI3ZTNhZjhiN2YyNmRiZWU1NDc4YmQ2OTExYTc5MTUxZmUzZjZhNTQ3ZjhlNTQ3MzMwODhmZDE4YmQ3YTZlMDc2In0"
         }
       ]
     },
@@ -573,10 +573,58 @@
           "version": "repo-lines-v1:sha256:2471e50cca3ee9053f7e5bdb9a4114fbd4cf65e542909c15801512eff6696d08:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMjU5NDJkMDVhMTE5OGQ0ZDk0MjYzMjQxZmEzNTNhZmQ3ODUyZTBjMTJkZTc5NzQwYTJhZmEyMDcwYzdlNmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkNmUxYmE4NDFhZDU0MWQ3YTQ1ODY1MzU4MGM1OWY2NTcxOGFjNTZkZTdiOTNhZjg4MTFmMDZjMDE2ZTQ3YjUifQ"
         }
       ]
+    },
+    {
+      "id": "claim_a620e2bedeee4374b165fdcee2c2f72a",
+      "statement": "窗口消息这一对里现在只剩开关 0x8012 是两侧常量：C# Hotkey.cs 的 WmToggle 与 Go win32.go 的 wmToggle 仍被对拍钉住，而显示/激活命令 0x8010（Go 的 wmActivate，由工具自己的托盘点击与第二个实例 post）与假隐藏命令 0x8011（Go 的 wmFakeHide，post 给工具自己的 UI 线程）都只在工具那侧声明——托管侧已无 WmActivate，热键那条路径只 post 0x8012。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L11-L21",
+          "version": "repo-lines-v1:sha256:6d1fa8dcb68386d9a5afae385f4eb789334e42b33c36e3f2d9c696825492bc4c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwNDZiZWJmOTY3ODRhNWYyYzBlYzA3ZGQxMTY2NzZkNjFhMGY4NWMzYmJjMGM2NDFhZjZhZGJmYmZhYmU5ZjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxMWIzYjczYjY4OTZiNmM2MGQzYTdjZjAwMzQxMDU3Njk3YWY4N2MyY2E0YTZiMTdlZTQ2YmIyMTBkYjNkMDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzYjg4ODE2NjFlMTkxYWMzOTI2NDI2ODZhMWE3NjM5ODg3MDQ1M2IyNjYzYWI3N2IyNzE1NjUxNzVkNjgwMzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQwYmY2NjAzN2JlZjE5ZWMxYjhmOTdjNTVmOWNhMTBlNGEyMWM2OTE3ZDg3ODNlZjE2NTQ1OGY2NDJhMWU0ZWUifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L299-L311",
+          "version": "repo-lines-v1:sha256:f93af159d8e12d5c10bfe8d25174f332114e271b93cf4575c9416a06206a7a4a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyYjZkYzkwYjJmNzkyOTYzZGNkYWRmZWZiNDA4NDg1NDkzYzAzYzNlMWE4MGYxNDliYzYzODAzY2RkMDQ2ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5OWJkZWZlZWFjYTYzNDBlMDI5MGRjODZlODg5Yzg5ZDVlMTg5YWE1YmE0NGI1ODViM2I3MDczNGY0YTYyZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L117-L123",
+          "version": "repo-lines-v1:sha256:ac93c5ddb994fd8963ee1cbeee62fa4e5a0819217a583d84283eab8e0550316b:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODliYzc1MTFiMjJiNTM4ZGYxNDI4MzM3NTFkNGEwMzc0MWJiMjgzOTNiNDNmMTlmOGQ2NmQ0OTFkYWY1MmQ5ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJhZDdjYzJkZmFmYzIxNzVmYTJkOTcwNGUwMjAyZjk0MDgzYTlkYTY5YTU4NWIwYjE4YzQ4YmVhMjM2Mjc1ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDRhNWM0ZGNlN2IyNmI3OGI5MGU4MzA4ZmM0M2NhMDUzZTQxNDM4NGJhMDkyMWUyOThlY2IwODk2NjZiZjhlYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTNiOThmOWM3NjRmNjBmMWI5M2I2OTdjNTVmOGViYTBmOTU5MGM2OWIyZTQ0MDY5YjA0YjdhNDJmZGJhZmVlMiJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/win32.go#L17-L24",
+          "version": "repo-lines-v1:sha256:452c717de60378a1d27cc22481f27b59b497ffdc06077db2cd6cec87e7b9b168:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjFhODBmZmYyMDM1M2U4OTZjYmZhMDNkOWY4NDUxZTE4YjIxMDk0OWQyYWUzZDQ0MGUyZmVmMWM4OWMwZjU3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjA0MWE1NDI3ZDJkOGI3ZTMxMTAyZWQxMmRhNTIxZjRiYmYxNjJiMjI3Y2RiMDBmNzE3NTQ1Y2E3ZGFjNDk1MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjc5M2RkM2IyMmJmNDJmNWFhM2M0YWQ5ZmFmNWRiNWZhMzE5ZWJhYzhkODgxOTg4ZWQ1M2VhZDM0YTE3M2MyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYyMTQ1NDljNDc4ZTM5MjRiM2ZkMDg0NzZlNDRiZDE5NWE0ZDgzNDIzNmFjOGMxYTkyODNmNGIwOTY1NjVkMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2192e46e888843e891d9b9ce60e221ed",
+      "statement": "对拍的收录门槛是「至少两侧各有一处声明」，因此单处声明的值根本不在名单里、漂了不会有任何测试变红，只能靠注释与同一侧的使用点维持：0x8010 就是活例子（曾由 Hotkey.cs 与 win32.go 两侧声明，托管侧撤掉那条声明后退化成 Go 的单处声明），0x8011（wmFakeHide）、C# 的 SigilEditorFeature.LevelOffset = 48（行内偏移只有托管侧用）、以及 Config.MaxBytes = 1 MiB（两个文件共用的唯一数值声明）同理。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout/Config.cs#L84-L84",
+          "version": "repo-lines-v1:sha256:51cab783d0012c4c9a0dd7f7c2cf505621943e29d84b4d4fbb709ee19e20dc55:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTFjYWI3ODNkMDAxMmM0YzlhMGRkN2Y3YzJjZjUwNTYyMTk0M2UyOWQ4NGI0ZDRmYmI3MDllZTE5ZTIwZGM1NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTFjYWI3ODNkMDAxMmM0YzlhMGRkN2Y3YzJjZjUwNTYyMTk0M2UyOWQ4NGI0ZDRmYmI3MDllZTE5ZTIwZGM1NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2M3YTkyNWY1MzkzYmUzZDZhZTFiMjBiZWJiN2M1YjJkYzRkN2Q4NzQxMmJhNzdlYTAyNTc5MjZlNjc0MmM0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Hotkey.cs#L11-L19",
+          "version": "repo-lines-v1:sha256:f76dd3f6ddf69f5904feb021af7c912b29aacaacb68d4de89187651abd8cbdac:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzA0NmJlYmY5Njc4NGE1ZjJjMGVjMDdkZDExNjY3NmQ2MWEwZjg1YzNiYmMwYzY0MWFmNmFkYmZiZmFiZTlmNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzk5M2JjOGY3ZjY5OTRlOTBjZjFmYjY2MTEwYWRhNjU4MWM3MTNmNzE1M2Q0MTlhZGY2MzcwOGQ0OTE0ZDNlOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjNiODg4MTY2MWUxOTFhYzM5MjY0MjY4NmExYTc2Mzk4ODcwNDUzYjI2NjNhYjc3YjI3MTU2NTE3NWQ2ODAzNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDVjMGQ5YzRlYThjMDBlYTRmNDc3YmIwZWQxZWJmMDVhYjFjMmJiNWMxOTVlMDEzNDkzYWNmOWI2OGQyNzY2NCJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/SigilEditorFeature.cs#L23-L29",
+          "version": "repo-lines-v1:sha256:ccc841140a9e75d88fd285954264e0cb17437d89d1659968a145daa9da168ee7:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjQyYmFhMDM3YzZmNzczZTZmYTk5MjlhNzVmMjA2MjM5ZGJkYTYxMTRkMTBjYzNhMjUwMmViMTJlMjUyMWFkOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2Y3MmU2ODRjMjdlNGYxZmFiNGI3YjE5ZTJjNWE0ZWQyZThjOTBkNzBiZGE5MjVjNmQ5YjI2M2MzOThjYmY3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOThjOTBmODMyMDgwZjA4ZmQyYmUyMGNiMzZjYWYxOWIxMWMyM2FjMWEzMTM0NjhkNmI5ZmU3MGMyNDBmNTliZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzViY2E5M2I0Y2FmOGIxNTU2OTJmMGQ0OTIwYjU3M2NjYmI3NjZlMzc2N2JmM2FhMzMyNDA2ZGM5OWExYWM0OSJ9"
+        },
+        {
+          "resource": "repo://SigilLoadout/sharedconstants_test.go#L117-L126",
+          "version": "repo-lines-v1:sha256:47dc6f2f577336e6d523408cd1db8d566a474a636a0e87be68679733983de8b6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5YmM3NTExYjIyYjUzOGRmMTQyODMzNzUxZDRhMDM3NDFiYjI4MzkzYjQzZjE5ZjhkNjZkNDkxZGFmNTJkOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ0YTVjNGRjZTdiMjZiNzhiOTBlODMwOGZjNDNjYTA1M2U0MTQzODRiYTA5MjFlMjk4ZWNiMDg5NjY2YmY4ZWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlMTNmMmZlZjFjMmE4ZGM5MTA1MmVjZDc5OTU3ZTdkODg4ZjRhYWNkN2Y5MmY2NzU0ODBlYTg3YzI2NDFjMTcifQ"
+        },
+        {
+          "resource": "repo://SigilLoadout/win32.go#L17-L24",
+          "version": "repo-lines-v1:sha256:452c717de60378a1d27cc22481f27b59b497ffdc06077db2cd6cec87e7b9b168:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjFhODBmZmYyMDM1M2U4OTZjYmZhMDNkOWY4NDUxZTE4YjIxMDk0OWQyYWUzZDQ0MGUyZmVmMWM4OWMwZjU3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjA0MWE1NDI3ZDJkOGI3ZTMxMTAyZWQxMmRhNTIxZjRiYmYxNjJiMjI3Y2RiMDBmNzE3NTQ1Y2E3ZGFjNDk1MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjc5M2RkM2IyMmJmNDJmNWFhM2M0YWQ5ZmFmNWRiNWZhMzE5ZWJhYzhkODgxOTg4ZWQ1M2VhZDM0YTE3M2MyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDYyMTQ1NDljNDc4ZTM5MjRiM2ZkMDg0NzZlNDRiZDE5NWE0ZDgzNDIzNmFjOGMxYTkyODNmNGIwOTY1NjVkMyJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T01:16:26.192Z"
+    "at": "2026-09-24T18:48:22.808Z"
   }
 }

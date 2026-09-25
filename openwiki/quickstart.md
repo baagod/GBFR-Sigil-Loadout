@@ -1,7 +1,7 @@
 ---
 type: quickstart
 title: Quickstart：任务路由与阅读顺序
-description: 仓库入口页：三个交付二进制（C# 托管 mod、C++ 原生核心、Go + Wails 可视工具）与嵌进可视工具 exe 的 React 前端、仓库外生成器 gen 产出的九份随包数据之间的关系，"只有本仓库为什么做不出一次发布"的实际根因，最短上手路径（跑测试 / 离线布局回归 / 看界面 / 发布），以及按任务路由到六个目录下各系统页与工作流页的对照表。
+description: 仓库入口页：三个交付单元（C# 托管 mod、C++ 原生核心、Go + Wails 可视工具）与嵌进可视工具 exe 的 React 前端、仓库外生成器 gen 产出的九份随包数据之间的关系，热键这条链上"键归谁 / 按下做什么"两份判据的分工，"只有本仓库为什么做不出一次发布"的实际根因，最短上手路径（跑测试 / 离线布局回归 / 看界面 / 发布），以及按任务路由到六个目录下各系统页与工作流页的对照表。
 tags: [quickstart, onboarding, navigation, routing, boundaries, frontend]
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
@@ -48,6 +48,8 @@ sources:
     resource: repo://SigilLoadout/frontend/src/lang.ts
   - id: openwiki-source-feaf623f526a117e9d09327c
     resource: repo://SigilLoadout/frontend/src/messages.ts
+  - id: openwiki-source-d14d5931f805c1b9a18ee717
+    resource: repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx
   - id: openwiki-source-db183fc9438957e49306adb6
     resource: repo://SigilLoadout/frontend/tsconfig.json
   - id: openwiki-source-aa73d08d0f491bdb952bdffc
@@ -58,20 +60,28 @@ sources:
     resource: repo://SigilLoadout/main.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
+  - id: openwiki-source-732af211fb1778c973e768f0
+    resource: repo://SigilLoadout/shellservice.go
   - id: openwiki-source-0bf2c9729fd22b4c04cbe5ba
     resource: repo://SigilLoadout/startup.go
+  - id: openwiki-source-7a8e67c026443c2bc4979af5
+    resource: repo://SigilLoadout/tray.go
   - id: openwiki-source-3e6af52b742314f1b631b09d
     resource: repo://SigilLoadout/win32.go
+  - id: openwiki-source-971b5ce7ce337d3ba8d34aa0
+    resource: repo://SigilLoadout/windowstate_test.go
+  - id: openwiki-source-46f7ef112800a873cada707b
+    resource: repo://SigilLoadout/windowstate.go
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:46:48.632Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:46:48.632Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # Quickstart：任务路由与阅读顺序
@@ -88,7 +98,7 @@ verified:
 2. **再认仓库约束**。`AGENTS.md` 有两条硬要求：**未经用户明确要求严禁执行 `git add` / `git commit`**；每次**精确修改（字符串替换）**改文件，**禁止覆盖重建**。同一文件还要求始终中文回复、动手前暴露假设而不是猜。
 3. **认清三个交付单元与它们的边界**：[系统总览：三个单元与它们的边界](/openwiki/architecture/overview.md)。先读这一页——它讲清"谁在哪个进程里、哪份状态归谁、两侧靠什么通信"；嵌在工具里的那棵 React 树不是第四个二进制，但它有自己的系统页（[可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md)）。
 4. **按任务路由**：见下面的路由表，以及 [六个目录分别有什么](#六个目录分别有什么)。
-5. **改完先验证**：[验证地图](/openwiki/testing/verification-map.md) 回答"这次改动该跑什么、它保证什么、保证不了什么"。
+5. **改完先验证**：[验证地图](/openwiki/testing/verification-map.md) 回答"这次改动该跑什么、它保证什么、保证不了什么"。改的是热键或窗口显隐那条链时，最窄的机械验证就是 `windowstate_test.go` 里那张三态判据表（在 `SigilLoadout\` 里 `go test ./...`）——托管侧那一半没有测试工程，只能在游戏日志里看。
 6. **要发布**：[构建、发布与部署链](/openwiki/operations/build-and-release.md)——但先读下面那条「本仓库无法单独完成一次发布构建」。
 
 ## 三个交付单元与 gen
@@ -100,7 +110,9 @@ verified:
 | Go + Wails 可视工具（外壳） | `SigilLoadout\`（Go 模块 `sigilloadout`） | `SigilLoadout.exe` | 独立进程，读随包数据、写两个配置文件 | [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) |
 | React 前端（源码，不是独立产物） | `SigilLoadout\frontend\` | vite 产出 `frontend\dist`，被 `go:embed all:frontend/dist` 编进 `SigilLoadout.exe`；`frontend\dist`、`frontend\bindings` 与 `SigilLoadout.exe` 本身都不入库 | 与 Go 外壳同一个进程（WebView 里那棵 React 树） | [可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md) |
 
-三个交付单元之间的关系不是"调用链"，而是三条通道：托管侧与原生核心之间是一条进程内的 C ABI（导出面在 `GBFR.SigilLoadout.Native/native_api.h`，`GBFR20_ABI_VERSION = 20`）；可视工具与 mod 之间**只有磁盘契约**（`%LOCALAPPDATA%\GBFRSigilLoadout\` 下的 `loadout.json` 与 `sigiledits.json`，可视工具是唯一写者，托管侧只读，靠 mtime 门发现新版本）；游戏内热键那条链只传 Win32 窗口消息、不传数据。三条通道的契约与状态归属全部在 [系统总览](/openwiki/architecture/overview.md)，两个 JSON 的成员名与 mtime 门在 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
+三个交付单元之间的关系不是"调用链"，而是三条通道：托管侧与原生核心之间是一条进程内的 C ABI（导出面在 `GBFR.SigilLoadout.Native/native_api.h`，`GBFR20_ABI_VERSION = 20`）；可视工具与 mod 之间**只有磁盘契约**（`%LOCALAPPDATA%\GBFRSigilLoadout\` 下的 `loadout.json` 与 `sigiledits.json`，可视工具是唯一写者，托管侧只读，靠 mtime 门发现新版本）；游戏内热键那条链只传 Win32 窗口消息、不传数据——托管侧只发其中一条命令（`0x8012` 开关），另两条 `0x8010`（显示/激活）与 `0x8011`（假隐藏）只在工具进程内部发。三条通道的契约与状态归属全部在 [系统总览](/openwiki/architecture/overview.md)，两个 JSON 的成员名与 mtime 门在 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
+
+热键这条链上，两侧各有一份**字面相同、读法不同**的判据，谁也替不了谁：托管侧 `Hotkey.SyncRegistration` 管"这个裸键**归谁**"——只有游戏（本进程）或工具自己是前台时才 `RegisterHotKey` 持有它，一旦切走立刻 `UnregisterHotKey` 交还；工具侧 `windowstate.go` 的 `toggleActionFor` 管"按下去**做什么**"——收起 / 呼出 / 不动三态。托管侧命中热键后不再自己抢前台：它先把激活权借给工具进程（`AllowSetForegroundWindow`），再 post `0x8012`，之后显隐完全由工具决定。
 
 第四样东西是**仓库外的生成器 `gen`**（`..\gen`，一个 Go 工程）。它的产物按待遇分两类：**入库且随包**的 `SigilLoadout\assets\` 九份 JSON，以及**不入库**、只作编译输入的 `GBFR.SigilLoadout.Native\src\exclusive_table.inc`；谁产出谁消费、九份随包资产各被谁读，见 [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)。
 
@@ -133,7 +145,7 @@ flowchart TD
 
 | 你想确认的事 | 权威来源 | 它的边界 |
 | --- | --- | --- |
-| 跨语言协议字面量有没有漂（文件名、成员名、窗口消息、槽位数、`skill_status` 行布局…） | `SigilLoadout\sharedconstants_test.go` 的**对拍** | 它是"漂了立刻红"，**不是"边界已证明"**：它只证明这些字面量当前两两相等，不管推导过程，`loadout.json` 的成员名等不在范围内，大小写差异会被放过 |
+| 跨语言协议字面量有没有漂（目录名与两个文件名、窗口标题与开关消息 `0x8012`、槽位数与参槽数、`skill_status` 行布局、`sigiledits.json` 成员名、保存失败事件名…） | `SigilLoadout\sharedconstants_test.go` 的**对拍** | 它是"漂了立刻红"，**不是"边界已证明"**：它只证明这些字面量当前两两相等，不管两侧各自的推导过程，`loadout.json` 的成员名不在范围内，只在单侧声明的窗口消息（`0x8010` / `0x8011`）也不在名单里，大小写差异会被放过 |
 | 这份源码能不能打包、这个 dist 能不能装 | `tools\build-release.ps1` 与 `tools\deploy.ps1` 的**门禁** | 当前检出里连 `.github\` 目录都没有，所以仓库**没有** CI 构建或发布工作流：`AGENTS.md:79-94` 的 OpenWiki 段记着的唯一自动化是一个定时刷新仓库 wiki 的 GitHub Actions 工作流（那个工作流文件本身不在检出中，也不构建、不测试、不发布），整条链只有本机入口；每个门禁的跳过条件它都会**明说自己跳过了** |
 
 构建侧的门禁（版本对账、九份随包资产的在场或补齐、工具链顺序、包内必需文件清单 13 项）逐条理由与判据行在 [构建、发布与部署链](/openwiki/operations/build-and-release.md)，各测试"护住什么、护不住什么"在 [验证地图](/openwiki/testing/verification-map.md)。随包数据这一段只补缺：**在场的文件一个字节都不比对**，所以"构建会校验随包数据"是错的理解——它拦住"少一份"，拦不住"内容陈旧或漂移"。
@@ -146,18 +158,18 @@ flowchart TD
 | **改因子数值编辑**（编辑器里的等级数值、`sigiledits.json`） | [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) → [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md) → 文件形状与成员名见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md) | `SigilLoadout/editservice.go`、`GBFR.SigilLoadout/SigilEditorFeature.cs`、`GBFR.SigilLoadout/Config.cs`（载荷形状）、`GBFR.SigilLoadout.Native/src/table_slot.cpp` |
 | **改钩子与语义锚点**（布局解析、两个 detour、循环上限） | [语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md) → [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md) → [原生核心（C++ DLL）](/openwiki/architecture/native-core.md) → 改前必读 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md) | `GBFR.SigilLoadout.Native/src/layout_resolver.cpp`、`skill_hooks.cpp`、`safe_game_access.cpp`、`exports.cpp`；离线验证用 `tests\NativeLayoutHarness\run.ps1` |
 | **改托管侧**（生命周期、维护拍、日志、热键配置、NativeCore 门面） | [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md) → [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)（`ModConfig.json` 逐字段后果、三个目录的分工） | `GBFR.SigilLoadout/Mod.cs`、`NativeCore.cs`、`NativeCore.Interop.cs`、`Hotkey.cs`、`HotkeyConfig.cs`、`LoadoutConfig.cs`、`UserConfig.cs` |
-| **改热键**（换一个开关键、解释注册失败） | [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md) → [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md) | Reloaded 的 mod 配置目录下的 `HotkeyConfig.json`（托管侧自己写，见 `HotkeyConfig.cs`）、`Hotkey.cs`；注册失败会回落到 F1 |
-| **改可视工具外壳（Go 侧）**（启动顺序、单实例、窗口显隐、托盘与窗口消息、资产加载） | [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) → 热键呼出链路 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md) | `SigilLoadout/main.go`、`startup.go`、`windowstate.go`、`win32.go`、`tray.go`、`loadoutservice.go` |
-| **改界面外壳（React 侧）**（页签、语言切换、焦点与 Esc、i18n 文案、落盘顺序与失败提示） | [可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md) → [工作流：配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md)（编辑通路与载荷规则；注意「切换语言」也走同一条写盘通路） → [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md)（前端那些调用落到的 Go 侧） | `SigilLoadout/frontend/src/App.tsx`（跨页状态 `:67-84`，落盘链 `saveNow` / `edit` 在 `:104-136`），以及同级的 `lang.ts`（`:8-9` 语言身份）、`messages.ts`（四语文案表）；入口与兜底在 `main.tsx`、`ErrorBoundary.tsx`，纯逻辑规则在 `model.ts`、`skills.ts`，面板在 `ExclusivePanel.tsx`、`SigilEditorPanel.tsx`、`SkillPicker.tsx` |
+| **改热键**（换一个开关键、解释"释放/重新注册"那两行日志） | [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md) → [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)（`Hotkey` 那一节） | mod 侧：`GBFR.SigilLoadout/Hotkey.cs`（`SyncRegistration` 管键的归属、`Tick` 每个 250 ms 维护拍 post `0x8014` 同步请求、`TryLaunchTool`）、`HotkeyConfig.cs`（`OverlayHotkey` 枚举与派生值 `VirtualKey`，默认 F1、越界值回落 F1）；工具侧那一半在 `SigilLoadout/windowstate.go` 的 `toggleActionFor`。键被别的程序占着或消息窗口建不出来时，回落到 250 ms 轮询采样，**不是**"回落到 F1" |
+| **改可视工具外壳（Go 侧）**（启动顺序、单实例、窗口显隐、托盘与窗口消息、资产加载） | [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) → 热键呼出链路 [工作流：热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md) | `SigilLoadout/main.go`（单实例、`application.New` 里注册**三个** service、托盘与窗口选项）、`startup.go`、`windowstate.go`（显隐三态判据与 `wmToggle` / `wmActivate` 分支）、`win32.go`（只放 Win32 依赖）、`tray.go`；后端面按职责分三份：`loadoutservice.go`（读表 + 写 `loadout.json`）、`editservice.go`（写 `sigiledits.json`）、`shellservice.go`（`MinimiseApp` 与托盘文案——窗口与托盘那两条已从 `LoadoutService` 拆到这里） |
+| **改界面外壳（React 侧）**（页签、语言切换、焦点与 Esc、i18n 文案、托盘文案、落盘顺序与失败提示） | [可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md) → [工作流：配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md)（编辑通路与载荷规则；注意「切换语言」也走同一条写盘通路） → [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md)（前端那些调用落到的 Go 侧） | `SigilLoadout/frontend/src/App.tsx`（跨页状态、加载时序与"没读回来就不写盘"、`saveNow` / `edit` 落盘链、Esc 隐藏到托盘、`SetTrayExitLabel` 推送），以及同级的 `lang.ts`（`:8-9` 语言身份）、`messages.ts`（四语文案表）；入口与兜底在 `main.tsx`、`ErrorBoundary.tsx`，纯逻辑规则在 `model.ts`、`skills.ts`，面板在 `ExclusivePanel.tsx`、`SigilEditorPanel.tsx`、`SkillPicker.tsx`。绑定只有两处 import（`../bindings/sigilloadout/loadoutservice` 与 `.../shellservice`）；编辑页不走 bindings——它用 `@wailsio/runtime` 的 `Call` / `Events` 直接调 `main.EditService`。托盘那条"退出"是 Windows 原生菜单项、不在 React 树里，它的文案也不归 Go 持有：由前端按当前语言经 `SetTrayExitLabel` 推过去（见 `shellservice.go`） |
 | **改数据资产与语言表**（`assets\` 下九份） | [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md) → [验证地图](/openwiki/testing/verification-map.md)（资产不变量由 Go 与前端测试守） | `SigilLoadout\assets\`；构建侧只做两件事：缺哪份补哪份（`tools\build-release.ps1:51-79`，不比对内容）与包内必需文件清单（`:286-308`） |
 | **构建、发布、部署** | [构建、发布与部署链](/openwiki/operations/build-and-release.md) → [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)（随包数据「只补缺、不对账」的实际语义） → [验证地图](/openwiki/testing/verification-map.md)（哪些门禁只在发布脚本里跑） | `tools\build-release.ps1`、`tools\deploy.ps1` |
 | **排查故障**（游戏里没生效、钩子未装、活表拒写、工具起不来、配置坏文件） | [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)——五类典型故障各自的"决定性日志行" | mod 目录下的 `GBFR.SigilLoadout.log`（追加写、超 4 MB 轮转为 `.1`、每次运行有 `Session Start` 分隔行）；工具侧诊断默认静默，放一个 `tool-debug.on` 才开始往 exe 旁的 `tool-debug.log` 写 |
-| **改完想证明它没坏** | [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) | `SigilLoadout\` 里的 `go test ./...`；`npm --prefix SigilLoadout\frontend test`；`tests\NativeLayoutHarness\run.ps1` |
+| **改完想证明它没坏** | [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) | `SigilLoadout\` 里的 `go test ./...`（并发路径再加 `-race`，需 gcc）；`npm --prefix SigilLoadout\frontend run typecheck` 与 `npm --prefix SigilLoadout\frontend test`；`tests\NativeLayoutHarness\run.ps1` |
 
 ### 六个目录分别有什么
 
 - `architecture/`——三个单元的系统页与总览：[系统总览](/openwiki/architecture/overview.md)、[托管 mod](/openwiki/architecture/managed-mod.md)、[原生核心](/openwiki/architecture/native-core.md)、[可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md)、[可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md)。
-- `concepts/`——四套必须理解的不变量：[虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)、[skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)、[语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md)、[并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)、[两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
+- `concepts/`——五套必须理解的不变量：[虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)、[skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)、[语义锚点与布局解析（fail-closed 的核心）](/openwiki/concepts/game-layout-anchors.md)、[并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)、[两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
 - `workflows/`——四条端到端链路：[配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md)、[因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)、[游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)、[热键呼出/收起可视工具](/openwiki/workflows/hotkey-summon.md)。
 - `integrations/`——仓库外侧的边界：[外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md)、[宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)。
 - `operations/`——动手时要走的链：[构建、发布与部署链](/openwiki/operations/build-and-release.md)、[日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
@@ -182,13 +194,13 @@ flowchart TD
    go test ./...
    ```
 
-   Go 测试的工作目录是包目录 `SigilLoadout\`，文件路径都相对它；需要的 Go 版本由 `SigilLoadout\go.mod` 声明。前端纯逻辑测试同样不需要游戏：
+   Go 测试的工作目录是包目录 `SigilLoadout\`，文件路径都相对它；需要的 Go 版本由 `SigilLoadout\go.mod` 声明。包目录里现在是五个 `_test.go`，其中 `windowstate_test.go` 就是"按 F1 该收起、呼出还是不动"那张判据表。前端纯逻辑测试同样不需要游戏：
 
    ```
    npm --prefix SigilLoadout\frontend test
    ```
 
-   它需要已装好的 `SigilLoadout\frontend\node_modules`。
+   它需要已装好的 `SigilLoadout\frontend\node_modules`；`npm --prefix SigilLoadout\frontend run typecheck` 与 `run build` 还额外要求 `frontend\bindings\` 在场（见下面第 3 条）。
 2. **改了布局解析（`layout_resolver.cpp` 或游戏更新）**——唯一能在本地给出答案的东西，需要一个真实游戏 exe：
 
    ```
@@ -196,7 +208,7 @@ flowchart TD
    ```
 
    不给 `-Exe`（或 `$env:GBFR_EXE`）时它会打印 `NATIVE_LAYOUT=SKIP` 并以 0 退出——那等于没验。
-3. **想看工具界面**：跑 `dist\GBFR.SigilLoadout\SigilLoadout.exe` 或部署后的 `Mods\GBFR.SigilLoadout\SigilLoadout.exe`，两者都把 `assets\` 放在 exe 旁边。**不要在 `SigilLoadout\` 里用 `go run .`**：随包数据按 `exeDir()\assets\` 读，而 `go run` 的 `exeDir()` 是临时目录，工具会直接弹"坏安装"对话框退出。要在源码树里跑就先 `go build -o SigilLoadout.exe .`（产物落在 `SigilLoadout\`，与 `assets\` 同级）再运行。改了 `SigilLoadout\frontend\src\` 之后要先重建前端才看得见：exe 里那份界面是构建期嵌进去的 `frontend\dist`——先 `wails3 generate bindings`（`frontend\bindings\` 是不入库的生成物，`App.tsx` 从它 import）再 `npm --prefix SigilLoadout\frontend run build`，最后重新 `go build`（或直接走 `tools\build-release.ps1`），否则看到的还是上一次的界面。
+3. **想看工具界面**：跑 `dist\GBFR.SigilLoadout\SigilLoadout.exe` 或部署后的 `Mods\GBFR.SigilLoadout\SigilLoadout.exe`，两者都把 `assets\` 放在 exe 旁边。**不要在 `SigilLoadout\` 里用 `go run .`**：随包数据按 `exeDir()\assets\` 读，而 `go run` 的 `exeDir()` 是临时目录，工具会直接弹"坏安装"对话框退出。要在源码树里跑就先 `go build -o SigilLoadout.exe .`（产物落在 `SigilLoadout\`，与 `assets\` 同级）再运行。改了 `SigilLoadout\frontend\src\` 之后要先重建前端才看得见：exe 里那份界面是构建期嵌进去的 `frontend\dist`——先 `wails3 generate bindings`（`frontend\bindings\` 是不入库的生成物，`App.tsx` 从 `bindings\sigilloadout\loadoutservice` 与 `bindings\sigilloadout\shellservice` 两处 import）再 `npm --prefix SigilLoadout\frontend run build`，最后重新 `go build`（或直接走 `tools\build-release.ps1`），否则看到的还是上一次的界面。
 4. **要发布**：
 
    ```

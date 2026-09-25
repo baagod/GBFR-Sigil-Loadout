@@ -1,7 +1,7 @@
 ---
 type: architecture
 title: 可视工具前端（React）
-description: SigilLoadout\frontend\ 这棵 React 树：三个页签的分工与 keepMounted 的理由、App.tsx 的加载时序与三道「不写盘」门（loadoutRead、数据表为空、editListRead）、单一失败通道 Failure、编辑到载荷到 Go 绑定的单向流、键盘与焦点两组全局监听、语言与显示名的三层分工，以及 dist 与 bindings 的构建约束与测试边界。
+description: SigilLoadout\frontend\ 这棵 React 树：三个页签的分工与 keepMounted 的理由、App.tsx 的加载时序与三道「不写盘」门（loadoutRead、数据表为空、editListRead）、单一失败通道 Failure、编辑到载荷到 Go 绑定的单向流、键盘与焦点两组全局监听、语言与显示名及托盘文案的三层分工、两个生成绑定模块（loadoutservice 与 shellservice）的分用，以及 dist 与 bindings 的构建约束与测试边界。
 tags: [architecture, frontend, react, wails, i18n, state]
 sources:
   - id: openwiki-source-39c3295efc089133e87a9c80
@@ -18,6 +18,8 @@ sources:
     resource: repo://SigilLoadout/editservice.go
   - id: openwiki-source-dd775deef689d74bf9308776
     resource: repo://SigilLoadout/frontend/bindings/sigilloadout/editservice.js
+  - id: openwiki-source-a85a1f0fb38686e45b8a923a
+    resource: repo://SigilLoadout/frontend/bindings/sigilloadout/shellservice.js
   - id: openwiki-source-fd6c5970b28f6e4327a545e3
     resource: repo://SigilLoadout/frontend/index.html
   - id: openwiki-source-df2192c06b0ec71699fdac08
@@ -68,19 +70,21 @@ sources:
     resource: repo://SigilLoadout/main.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
+  - id: openwiki-source-732af211fb1778c973e768f0
+    resource: repo://SigilLoadout/shellservice.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 可视工具前端（React）
 
 可视工具（`SigilLoadout.exe`）的界面是 `SigilLoadout\frontend\` 下的一棵 React 19 单页前端，构建产物是 `frontend/dist/`，由 Go 侧 `//go:embed all:frontend/dist`（`SigilLoadout/main.go`）在**编译期**嵌进 exe，再作为 `application.AssetFileServerFS(assets)` 的资源处理器交给 Wails。所以它**不是第四个交付单元、也没有独立的发布物**：改了 `src/` 之后不重建前端、不重新 `go build`，运行的还是上一次嵌进去的那份界面（顺序见「构建约束」一节）。
 
-本页只讲前端这一个运行时域：模块划分（哪一半能脱离 React 与 DOM 测、哪一半只能留在组件里）、外壳级不变量（加载顺序、写盘顺序、页签与失败通道、键盘与焦点）、`model.ts` 里的载入→保存规则、语言的三层分工，以及入口与构建约束。
+本页只讲前端这一个运行时域：模块划分（哪一半能脱离 React 与 DOM 测、哪一半只能留在组件里）、外壳级不变量（加载顺序、写盘顺序、页签与失败通道、键盘与焦点）、`model.ts` 里的载入→保存规则、语言的三层分工（含托盘那一条文案怎么推到 Go 侧），以及两个生成绑定模块、入口与构建约束。
 
 以下内容**不在**本页，请点过去看：载荷字段规则、Go 侧校验与两道 mtime 门、托管侧的三段式应用在 [工作流：配装落盘与应用](/openwiki/workflows/loadout-apply.md)；`sigiledits.json` 的编辑记录规则与热应用在 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)；两个文件的形状、常量对拍范围与「各只有一处声明」的纪律在 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)；专属表的语义在 [虚拟槽位、专属因子与它们的开关语义](/openwiki/concepts/virtual-slots-and-exclusives.md)；Go 外壳、窗口三态与「前端 Esc 调到哪个 Win32 消息」在 [可视工具（Go + Wails）：装配、单实例与窗口状态机](/openwiki/architecture/visual-tool.md)。
 
@@ -92,14 +96,14 @@ verified:
 | --- | --- |
 | `main.tsx` | 入口：右键菜单策略（全局唯一一条）、`createRoot(#app)`、把 `App` 挂进 `ErrorBoundary` |
 | `ErrorBoundary.tsx` | 渲染期异常的兜底：一句话 + 重新载入 |
-| `App.tsx` | 唯一的外壳：全部跨页状态、加载时序、`edit` / `saveNow` 落盘链、三个页签、失败状态条、Esc 与焦点这两组全局监听 |
+| `App.tsx` | 唯一的外壳：全部跨页状态、加载时序、`edit` / `saveNow` 落盘链、三个页签、失败状态条、Esc 与焦点这两组全局监听、托盘文案推送 |
 | `SlotEditor.tsx`（`SlotRow`、`HEADER_ROW`）、`SkillPicker.tsx`、`ExclusivePanel.tsx` | 「通用配装」与「专属因子」两页的行与控件 |
 | `SigilEditorPanel.tsx`、`SkillRow.tsx`、`useRowTooltip.ts`、`useWheelStep.ts` | 「因子编辑」页：列表、行、tooltip 归属、滚轮步进 |
 | `model.ts` | 因子表的**全部**派生关系（`buildSigilIndex`）、载入与落盘载荷、专属状态、变体解析 |
 | `skills.ts` | 一条编辑记录的规则：什么算编辑、地址去重、输入框按键状态机、等级与说明文本 |
 | `lang.ts` / `messages.ts` | 语言身份（有哪些语言、按什么猜）/ 四语文案表 |
 | `style.css` + `components/ui/*` | Tailwind v4 + shadcn（Base UI 版）原语，加上外壳与列表自己的几条覆盖规则 |
-| `bindings/` | **构建期生成物**，不入库（见「构建约束」） |
+| `bindings/` | **构建期生成物**，不入库；按 Go service 分文件（`loadoutservice.js` / `shellservice.js` / `editservice.js`…），而前端只 import 前两个（见「构建约束」） |
 
 两条纪律写在这套划分里：
 
@@ -174,7 +178,7 @@ sequenceDiagram
 
 这条 effect 的依赖数组是空的，而且是**刻意不读文案**：失败文案在渲染时由 `failureText(failure, t)` 取，所以没有语言依赖能把「只跑一次」重新触发。
 
-另外两个小的单词 effect 与它分开：`document.documentElement.lang = lang` 跟着语言走；按 `lang` 取显示名（见「显示名」一节）。
+另外三个小的单词 effect 与它分开，各自挂在 `[lang]` 上：`document.documentElement.lang = lang`；把语言变化推给托盘那一条菜单（见「语言」一节末尾）；按 `lang` 取显示名（见「显示名」一节）。
 
 ### 单条失败通道
 
@@ -361,7 +365,7 @@ Esc 的两条路：浮层内归浮层，浮层外才把窗口假隐藏，而且�
 
 - **捕获阶段**是必需的：Base UI 会在 React 处理 `keydown` 时卸载弹层，冒泡阶段的监听器会看到一个已经摘下来的 target，从而错判成「不在浮层」而把窗口藏掉。
 - **同时听 `keydown` 与 `keyup`**，且浮层判断只在 `keydown` 做（`isInOverlay`），结果留给 `keyup` 用。两条路都会赋值，丢一次 `keyup` 不会把下一次 Esc 也吞掉。
-- **推迟到 `keyup` 才隐藏**（再等 150ms）：`keydown` 就藏掉的话，这一记 `keyup` 会落到已经拿到焦点的游戏窗口上。真正的隐藏动作是绑定 `MinimiseApp()`，之后走的是 [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) 里那条 `hideToTray` 状态机。
+- **推迟到 `keyup` 才隐藏**（再等 150ms）：`keydown` 就藏掉的话，这一记 `keyup` 会落到已经拿到焦点的游戏窗口上。真正的隐藏动作是绑定 `MinimiseApp()`——注意它来自**另一个**生成模块 `../bindings/sigilloadout/shellservice`（Go 侧 `ShellService`：窗口显隐与托盘自成一体，不挂在读写载荷数据的 `LoadoutService` 上）；之后走的是 [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) 里那条 `hideToTray` 状态机。
 - **哪些东西算浮层**由选择器给出：`[data-slot="combobox-content"]`、`[role="dialog"]`、`[role="alertdialog"]`，以及 `.skill-rows input`——最后这一项是因子编辑页的十个参槽：那一页把 Esc 定义成「放开这个框」（`e.currentTarget.blur()`），不该同时把整个窗口藏到托盘去。
 - **菜单热键不在这里处理**：它是 mod 的全局注册，按一下就是开关这个窗口。
 - **另一半键盘判断不在外壳里**：下拉触发器吞方向键、数值框自己步进与 blur，那些是组件层的规则（见「组件层剩下什么」）；外壳只管「不在浮层里就把窗口藏起来」这一层。
@@ -412,6 +416,32 @@ sequenceDiagram
 - **`LANGS` 在 Go 侧有一份手抄的副本**：`loadAssetsFrom` 里硬编码着 `[]string{LangZH, "en", "ja", "ko"}` 去读四份 `skill.<lang>.json`。加第五种语言要同时动 `lang.ts` 与那一行；只动前端的话，界面文字是新语言而因子名会经 `pick` 回落到中文。
 - **界面文案与术语表是两回事**：`CONTEXT.md` 约束代码与文档的用词，但玩家看到的界面按游戏自己的说法——「主因子 / 副因子 / 专属因子 / 因子编辑」。`messages.ts` 的文件头把这条写明了，而且「因子」那三种语言用的是游戏自己的译名（英文 sigil、日文 ジーン、韩文 진），不是音译。
 
+### 托盘那一条：唯一由前端推给 Go 的文案
+
+语言还有一个不在 React 树里的落点：托盘右键菜单（Windows 原生画的那一条）。它的文案仍然只有前端一份——Go 侧再抄一张翻译表就是同一件事的第三处，只会在托盘这一条上漂移——所以 Go 侧只留一个入口 `ShellService.SetTrayExitLabel(label)`，`main.go` 先把那条写成英文 `Exit` 撑到 WebView 起来，之后由 `App.tsx` 推：
+
+```mermaid
+sequenceDiagram
+    participant App as App.tsx
+    participant Shell as Go 侧 ShellService
+    participant Tray as 托盘菜单项
+    Note over Tray: main.go 先写死英文 Exit 撑到 WebView 起来
+    App->>Shell: 挂载后用 initialLang 猜出的那种语言推一次
+    Shell->>Tray: 菜单属于主线程那个窗口 所以用 InvokeSync 改那一条
+    App->>App: LoadConfig 回来 存的是另一种语言就 setLang
+    App->>Shell: 再推 loadout.json 里那种语言
+    Shell->>Tray: 再改一次
+    Note over App: 推失败就地 catch 掉 不打断界面
+```
+
+上图：托盘文案由前端在每次语言变化时推给 Go，启动时可能推两次，Go 侧只负责把 label 写到菜单项上。
+
+三条细节：
+
+- 这个 effect 挂在 `[lang]` 上，所以启动时**可能推两次**：挂载后第一次推的是 `initialLang()` 的猜测，第二次才是 `loadout.json` 里存的那种语言（`applyConfig` 成功时 `setLang`）。第一次不是多余的：配置读回来之前托盘不该一直停在英文。
+- 失败就地 `.catch(() => {})` 吃掉：这条推送不进外壳那条失败通道（屏幕上看不到托盘，为它弹一条「保存失败」式的提示没有意义），代价只是托盘那一条暂时不换语言。
+- Go 侧的 `SetTrayExitLabel` 在 `label` 为空时**不换**：`Record<Lang, Messages>` 只强制键存在、不强制非空，手滑写成 `trayExit: ""` 的话菜单会出现一条空项（从托盘再也退不掉），保留上一条比换成空条好。
+
 ### 显示名：启动期读一次，按语言缓存一次
 
 界面文案是打包在 `dist` 里的常量，**显示名不是**：它们来自游戏文本表，由 Go 侧在启动时无条件读进内存——`sigils.lang.json`、`chara.lang.json`、`skill_status.json`，以及四份 `skill.<lang>.json` 全部无条件读进来，缺一份就是坏安装（`main()` 里 `fatalDialog`）。之后前端按语言取一次并缓存：
@@ -423,11 +453,14 @@ sequenceDiagram
 
 ## 构建约束：`dist` 是嵌进 exe 的资产，`bindings/` 是生成物
 
-界面不是第四个交付单元：源码在 `SigilLoadout\frontend\`，产物 `frontend\dist\` 由 `go:embed all:frontend/dist` 在编译期打进 `SigilLoadout.exe`。这带来两条同时成立的边界：**`frontend\dist\` 与 `frontend\bindings\` 都不入库**（`SigilLoadout/.gitignore`），而 `App.tsx` **直接 import 生成物**：
+界面不是第四个交付单元：源码在 `SigilLoadout\frontend\`，产物 `frontend\dist\` 由 `go:embed all:frontend/dist` 在编译期打进 `SigilLoadout.exe`。这带来两条同时成立的边界：**`frontend\dist\` 与 `frontend\bindings\` 都不入库**（`SigilLoadout/.gitignore`），而 `App.tsx` **直接 import 生成物**——而且是**两个**生成模块，一个 service 一个文件：
 
 ```ts
-import {LoadSigils, LoadConfig, SaveLoadout, MinimiseApp, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
+import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
+import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/shellservice"
 ```
+
+数据读写走 `loadoutservice`（对应 Go 的 `LoadoutService`，六条），窗口显隐与托盘文案走 `shellservice`（对应 Go 的 `ShellService`，两条：`MinimiseApp` 与 `SetTrayExitLabel`）。生成物的分文件粒度就是 **service 的粒度**，所以 Go 侧把一个方法从一个 service 搬到另一个，前端这一句 import 也得跟着搬。
 
 所以在源码树里改前端之后，要走的顺序是：
 
@@ -440,7 +473,7 @@ npm --prefix frontend run build                   # -> frontend/dist
 go build -o SigilLoadout.exe .                    # 或直接走 tools\build-release.ps1
 ```
 
-每一步都不是多余的：没有 `bindings/` 时 `npm run typecheck` 与 `vite build` 都会红；`tsconfig.json` 因此保持 `noImplicitAny: false`（生成的 `*.js` 没有 `.d.ts`，打开这一项只会在那一句 import 上报 `TS7016`），并把 `bindings` 列进 `include`；`vite` 只抹掉类型、不做检查，所以编译器必须排在打包之前；没有 `frontend\dist\` 时 `go:embed` 匹配不到文件、`go build` 直接失败（好在是失败，不是静默降级）。发布链在这个顺序之后还有 `wails3 generate syso` → `go vet` → `go test` → `go build`，完整清单与各步失败出口见 [构建、发布与部署链](/openwiki/operations/build-and-release.md)。
+每一步都不是多余的：没有 `bindings/` 时 `npm run typecheck` 与 `vite build` 都会红；`tsconfig.json` 因此保持 `noImplicitAny: false`（生成的 `*.js` 没有 `.d.ts`，打开这一项只会在那两句 import 上报 `TS7016`），并把 `bindings` 列进 `include`；`vite` 只抹掉类型、不做检查，所以编译器必须排在打包之前；没有 `frontend\dist\` 时 `go:embed` 匹配不到文件、`go build` 直接失败（好在是失败，不是静默降级）。发布链在这个顺序之后还有 `wails3 generate syso` → `go vet` → `go test` → `go build`，完整清单与各步失败出口见 [构建、发布与部署链](/openwiki/operations/build-and-release.md)。
 
 `vite.config.ts` 里有三件与源码布局有关的事：`wails("./bindings")` 插件带着同一个路径（开发态与构建态用的是同一份生成物）、`@` 别名指向 `src`、dev server 钉在 `127.0.0.1` 的 `WAILS_VITE_PORT`（默认 9245）并 `strictPort: true`。`package.json` 的脚本就是上面那四条（`dev` / `build` / `test` / `typecheck`）。
 
@@ -448,10 +481,12 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 
 | | 谁在用 | 形式 |
 | --- | --- | --- |
-| 生成的模块 | `App.tsx`（用到的七个 `LoadoutService` 方法） | import `../bindings/sigilloadout/loadoutservice`，生成代码内部走 `Call.ByID(<数字 id>)` |
+| 生成的模块 | `App.tsx`：数据读写用 `loadoutservice`（`LoadSigils` / `LoadConfig` / `SaveLoadout` / `LoadExclusives` / `GemNames` / `CharaNames`），窗口动作用 `shellservice`（`MinimiseApp` / `SetTrayExitLabel`） | import `../bindings/sigilloadout/<service>`，生成代码内部走 `Call.ByID(<数字 id>)` |
 | 字符串派发 | `SigilEditorPanel.tsx`（`EditService` 的 `LoadEdits` / `SkillTable` / `SkillMap` / `SaveEdits`） | `Call.ByName("main.EditService.<方法>")`，`SERVICE` 常量在文件头 |
 
-加一个 `EditService` 方法时，第二种风格不需要碰生成物，但代价是**服务名与方法名成为手写字符串**：Go 侧改名不会有任何编译期报错，只会在运行时失败。相应地，防抖失败事件的字符串同样是手抄的（见「单条失败通道」）。
+加一个 `EditService` 方法时，第二种风格不需要碰生成物（也不需要在 `App.tsx` 里多一句 import），但代价是**服务名与方法名成为手写字符串**：Go 侧改名不会有任何编译期报错，只会在运行时失败。相应地，防抖失败事件的字符串同样是手抄的（见「单条失败通道」）。
+
+反过来看第一种风格也别高估它：生成的 `*.js` 没有 `.d.ts`（`tsconfig.json` 的 `noImplicitAny: false` 正是为它留的），整个模块是 `any`，所以 `tsc` 认下的其实只是**这个模块存不存在**——成员名写错、方法搬了 service、或改了 Go 侧签名却忘了重新生成，都不会在 `tsc` 里红，只会在运行时说话。会红的只有「`bindings/` 整个不在」这一种（模块解析不了）。
 
 ## 测试边界
 
@@ -464,7 +499,7 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 | `exclusive.test.ts` | `model.ts` | `exclusiveSlots`（标签与状态键各取哪个 hash）、`withExclusiveToggle`（删键而不是写 `true`、写到共享 PL 码的每个角色、空了整条删）、`parseExclusiveTable` 的形状过滤 |
 | `skills.test.ts` | `skills.ts` | 输入框按键状态机（`slotEdit` / `HALF_TYPED` / `NUMBER`）、`stepValue` 的上界、`dedupe`、`isEdit` / `trimGameValues` / `asEdits`、`levelsOf`、`parentState`、`matches`、`explainAt`、`slotLabel` |
 
-由此得到两条必须诚实写下的空洞：**本页讲的外壳行为（加载顺序、两道门、Esc、焦点保持、三个 `keepMounted` 页签、`nameCache`）没有任何自动化验证**；`sanitizeExclusiveState` 与 `padSlots` 也只有调用点、没有直接单测。唯一伸进这份前端代码的自动化是 Go 侧的对拍断言——`sharedconstants_test.go` 读 `SigilEditorPanel.tsx` 的**源码文本**去比那个事件名——它比的是字符串，不是行为。各测试分别护住什么、这套验证证明不了什么，见 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。
+由此得到两条必须诚实写下的空洞：**本页讲的外壳行为（加载顺序、三道门、Esc、焦点保持、三个 `keepMounted` 页签、`nameCache`、托盘文案推送）没有任何自动化验证**；`sanitizeExclusiveState` 与 `padSlots` 也只有调用点、没有直接单测。唯一伸进这份前端代码的自动化是 Go 侧的对拍断言——`sharedconstants_test.go` 读 `SigilEditorPanel.tsx` 的**源码文本**去比那个事件名——它比的是字符串，不是行为。各测试分别护住什么、这套验证证明不了什么，见 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。
 
 ## 不变量与失败语义
 
@@ -492,6 +527,8 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 | `messages` 必须四语齐备（`Record<Lang, Messages>`） | 少一种语言的 `tsc` 就红，不会漏到运行期 |
 | 加语言要同时动 `lang.ts` 与 Go 的 `loadAssets` 四语言列表 | 界面文字换了语言，因子名回落成中文 |
 | `bindings/` 必须在 typecheck 与 `vite build` 之前生成 | 缺生成物时 typecheck 与打包直接失败 |
+| 窗口动作走 `shellservice`、数据读写走 `loadoutservice`（一个 service 一个生成模块） | import 到不存在的模块时 `tsc` 与 `vite build` 都红；而把名字挂在已经搬走的 service 上，模块照样解析，于是没有任何编译期反应——Esc 或托盘那一条要等运行时才坏 |
+| 托盘那条文案由前端推、Go 侧只留英文占位 | 托盘停在英文 `Exit`（或 Go 侧再抄一张翻译表，只在这一条上漂移）；`label` 为空时不换正是防它变成一条空项 |
 | `frontend/dist/` 必须在 `go build` 之前重建 | 嵌进 exe 的还是上一次的界面 |
 
 ## 相关页面
