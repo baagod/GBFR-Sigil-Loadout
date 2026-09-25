@@ -187,9 +187,9 @@ func (s *EditService) LoadEdits() ([]SigilSkill, error) {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
 
-	// 这里不做任何过滤：哪些记录算编辑由前端决定（见 skills.ts 的 asEdits），Go 只负责补齐。
-	// nil 归一成空切片：没有 edits 成员（或它是 null）读出来是 nil，而 nil 在线格式上写作 null
-	// 而不是 []，同一个“空列表”就会有两种拼写。
+	// 这里不做任何过滤：哪些记录算编辑由前端决定（见 skills.ts 的 isEdit），Go 只负责补齐。
+	// nil 归一成空切片：没有 edits 成员（或它是 null）读出来是 nil，
+	// 而 nil 在线格式上写作 null 而不是 []，同一个 “空列表” 就会有两种拼写。
 	edits := cfg.Edits
 	if edits == nil {
 		edits = []SigilSkill{}

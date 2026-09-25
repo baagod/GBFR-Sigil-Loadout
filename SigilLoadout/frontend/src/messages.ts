@@ -51,23 +51,25 @@ export type Messages = typeof zh;
 
 export const messages: Record<Lang, Messages> = {
     zh,
+    // en 的大小写：标签类（页签、按钮、占位符、aria、空态）Title Case；整句（失败消息、崩溃提示）
+    // 句首大写。句子里有 to/of 这类词，Title Case 会读成坏英文。
     en: {
-        tabGeneral: "General",
-        tabExclusive: "Exclusives",
-        tabSigilEditor: "Sigil edit",
-        langSwitch: "Switch language",
+        tabGeneral: "General Loadout",
+        tabExclusive: "Exclusive Sigils",
+        tabSigilEditor: "Sigil Editor",
+        langSwitch: "Switch Language",
         crashed: "The interface crashed and has to reload.",
         reload: "Reload",
         trayExit: "Exit",
-        searchSigil: "Search sigil | Hex",
-        noMatch: "No matching sigils",
+        searchSigil: "Search Sigil | Hex",
+        noMatch: "No Matching Sigils",
 
         headerPrimary: "Primary Sigil",
         headerSecondary: "Secondary Sigil",
-        selectAll: "Select all / none",
-        pickSkill: "Select sigil",
+        selectAll: "Select All / None",
+        pickSkill: "Select Sigil",
         none: "None",
-        rowEnable: "Enable slot",
+        rowEnable: "Enable Slot",
         sigilFail: (e: unknown) => `Failed to load sigil table: ${e}`,
         configFail: (e: unknown) => `Failed to load loadout: ${e}`,
         exclFail: (e: unknown) => `Failed to load exclusive factors: ${e}`,
@@ -82,7 +84,7 @@ export const messages: Record<Lang, Messages> = {
         writeFailed: "Could not write",
     },
     ja: {
-        tabGeneral: "汎用ジーン",
+        tabGeneral: "汎用装備構成",
         tabExclusive: "専用ジーン",
         tabSigilEditor: "ジーン編集",
         langSwitch: "言語を切り替え",
@@ -112,7 +114,7 @@ export const messages: Record<Lang, Messages> = {
         writeFailed: "書き込みに失敗しました",
     },
     ko: {
-        tabGeneral: "일반 진",
+        tabGeneral: "일반 장비 구성",
         tabExclusive: "전용 진",
         tabSigilEditor: "진 편집",
         langSwitch: "언어 전환",

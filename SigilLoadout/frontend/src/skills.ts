@@ -13,7 +13,7 @@ export type SigilSkill = {
     /*
         十个 LevelValue 槽，按位置对应。一个槽是数字，或 null = "游戏自己的值，没被动过"：
         mod 只写数字，行的其余部分保持原样，所以没人设过的槽不会被游戏表里的陈旧副本覆盖。
-        什么算"没被动过"由 trimGameValues 决定。
+        谁碰过它只看它是不是 null——数字哪怕等于该等级游戏自己的值，也是用户的输入。
     */
     values: (number | null)[];
 };
@@ -42,33 +42,11 @@ export const SLOTS = 10;
 export const addressOf = (key: string, level: number) => `${key}#${level}`;
 
 /**
- * 一条记录算不算编辑——决定它会不会被保存。被勾选或带着数字就够；两者都没有，就是用户勾了又
- * 取消的那一行，sigiledits.json 里不会有这样的行。
+ * 一条记录算不算编辑——列表显示什么、sigiledits.json 里留什么，都由它一处说了算。
+ * 被勾选或带着数字就够；两者都没有，就是用户勾了又取消的那一行，文件里不会有这样的行。
  */
 export const isEdit = (record: SigilSkill) =>
     record.enabled || record.values.some((value) => value !== null);
-
-/**
- * 把该等级自己的数值从槽里摘出去：槽里放着游戏的值就不算输入，于是置为 null——该数字只作为占位符
- * 显示。有的文件会把游戏那一行整行照抄进槽里（为了让行能写回去），这一步让它们仍然读对。
- * 表里没有的等级（手工添加的记录）保留数值：没有东西可比对，而那些数字很可能正是游戏需要写入的。
- */
-export const trimGameValues = (
-    values: (number | null)[],
-    vanilla: number[] | undefined,
-) => values.map((value, i) => (value === vanilla?.[i] ? null : value));
-
-/**
- * 把记录变成编辑：只放着游戏数值的槽清空，之后完全不算编辑的记录丢掉。进出这个列表的
- * 每条路径都经过这里，列表、sigiledits.json 和游戏对"什么算编辑"的看法才一致。
- */
-export const asEdits = (records: SigilSkill[], info: Record<string, SkillInfo>) =>
-    records
-        .map((record) => ({
-            ...record,
-            values: trimGameValues(record.values, valuesAt(info[record.key], record.level)),
-        }))
-        .filter(isEdit);
 
 export const pad = (values: (number | null)[]) =>
     Array.from({ length: SLOTS }, (_, i) => values[i] ?? null);

@@ -105,6 +105,7 @@ if (-not $msbuild) {
     /p:Configuration=$Configuration `
     /p:Platform=$Platform `
     /m `
+    /nodeReuse:false `
     /v:minimal
 if ($LASTEXITCODE -ne 0) {
     throw "Native build failed with exit code $LASTEXITCODE."
@@ -125,7 +126,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Managed clean failed with exit code $LASTEXITCODE."
 }
 
-& dotnet build $managedProject -c $Configuration --nologo --no-incremental --no-restore
+# /nodeReuse:false 与 -p:UseSharedCompilation=false：MSBuild 节点与 Roslyn 编译器服务器是**常驻**进程，
+# 它们继承调用者的 stdout/stderr 并活过构建，调用者那根管道就永不关闭——CI/agent 里表现为"任务永不结束"。
+& dotnet build $managedProject -c $Configuration --nologo --no-incremental --no-restore -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) {
     throw "Managed build failed with exit code $LASTEXITCODE."
 }
@@ -342,6 +345,3 @@ Move-Item -LiteralPath $zipTemp -Destination $zipPath -Force
 Remove-Item -LiteralPath $packageDir -Recurse -Force
 
 Write-Output "ZIP: $zipPath"
-
-# 开发便利：打开编辑工具以便立刻查看。已经有实例在跑时，改为激活它自己的窗口（单实例 mutex）。
-Start-Process -FilePath $toolExe

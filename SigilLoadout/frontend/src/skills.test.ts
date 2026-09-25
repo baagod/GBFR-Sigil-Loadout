@@ -5,7 +5,6 @@
 import { describe, expect, it } from "vitest";
 import {
     addressOf,
-    asEdits,
     dedupe,
     explainAt,
     HALF_TYPED,
@@ -19,7 +18,6 @@ import {
     slotEdit,
     slotLabel,
     stepValue,
-    trimGameValues,
     type ExplainBand,
     type SigilSkill,
     type SkillInfo,
@@ -219,46 +217,6 @@ describe("what counts as an edit", () => {
     it("drops a record that is neither switched on nor carrying a number", () => {
         // 勾了又取消的等级，或者数值又被清空的等级：没有东西可写，sigiledits.json 不留行。
         expect(isEdit(record("A1", 15, false))).toBe(false);
-    });
-
-    /*
-        上面三条说的是规则，下面两条说的是"清空输入框"这件事**只能**按那条规则走。
-
-        asEdits 是唯一的闸口（见 skills.ts）：面板若自己按"还有没有数字"判断，清空输入框就会顺手
-        把用户勾上的那一下也撤销掉——勾选同时也是置顶排序的键，那一行还会当场掉下去。
-    */
-    it("清空最后一个数值不会撤销用户勾上的那一下", () => {
-        // 勾选是"把它送进游戏"的那个动作；清空输入框只是把数值还给游戏自己的值。所以这条记录仍然是
-        // 编辑：它留在列表里、勾选框仍然勾着、也仍然在置顶区。
-        const tickedThenCleared = { ...record("A1", 15, true), values: pad([]) };
-        expect(asEdits([tickedThenCleared], {})).toEqual([tickedThenCleared]);
-    });
-
-    it("只输入过、又清空了的记录会被丢掉", () => {
-        // 没有勾选也没有数字：什么都没留下，所以它（连同那个输入框）回到游戏自己的数值。
-        const typedThenCleared = { ...record("A1", 15, false), values: pad([]) };
-        expect(asEdits([typedThenCleared], {})).toEqual([]);
-    });
-});
-
-describe("the game's own numbers are not inputs", () => {
-    const vanilla = [10, 3, 20, 0, 0, 0, 0, 0, 0, 0];
-
-    it("takes the level's own number back out of a slot", () => {
-        // 有的文件每个槽都填着游戏的那一行（为了让行能写回去）。这些副本不算编辑——
-        // 把它们当数值显示会读起来像十个槽都被输入过。
-        expect(trimGameValues(pad([10, 3, 20]), vanilla)).toEqual(pad([]));
-    });
-
-    it("keeps a number that differs, including a zero where the game has one", () => {
-        // 这里 0 和别的数字一样：把游戏填 200 的槽设成 0 就是一次编辑，而且一直是。
-        expect(trimGameValues(pad([30, 3, 0]), vanilla)).toEqual(pad([30, null, 0]));
-    });
-
-    it("leaves a level the tables do not know alone", () => {
-        // 手工添加的记录可能指向表里根本没有的因子或等级；没有东西可以比对，而它的数字可能正是
-        // 游戏需要写入的。
-        expect(trimGameValues(pad([30, 3]), undefined)).toEqual(pad([30, 3]));
     });
 });
 

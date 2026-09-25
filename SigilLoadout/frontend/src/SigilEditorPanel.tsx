@@ -24,9 +24,9 @@ import { SkillRow, type RowContext } from "./SkillRow";
 import { useRowTooltip } from "./useRowTooltip";
 import {
     addressOf,
-    asEdits,
     dedupe,
     explainAt,
+    isEdit,
     levelsOf,
     matches,
     pad,
@@ -151,11 +151,14 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                 ),
             }));
 
-        // 一个地址一条编辑，且只留编辑（见 asEdits）。**只读，不写回**：归一化只是为了在屏幕上
+        // 一个地址一条编辑，且只留编辑（见 isEdit）。**只读，不写回**：归一化只是为了在屏幕上
         // 理顺这份列表，用户文件在下一次真正的编辑之前不该被动过——在读取时发现差异就回写等于
         // "打开一次就等于改过一次"，与 App.tsx 那条"启动不写盘"是同一条规则。
-        const loaded = dedupe(asEdits(raw, skillTable ?? {}));
-        setEdits(new Map(loaded.map((record) => [addressOf(record.key, record.level), record])));
+        setEdits(
+            new Map(dedupe(raw.filter(isEdit)).map(
+                (record) => [addressOf(record.key, record.level), record]
+            ))
+        );
         setSkills(skillTable ?? {});
         setEditListRead(true);
     }
@@ -296,12 +299,12 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
             return;
         }
         /*
-            只打补丁，绝不在这里碰 enabled——它是用户勾选出来的。
+            只打补丁，绝不在这里碰 enabled —— 它是用户勾选出来的。
 
-            清空最后一个数值之后这条记录还算不算编辑，由 skills.ts 的 isEdit（"勾选了，或者带着
-            数字"）说了算，而 commit 的每条路径都经过 asEdits。在这里再写一遍那条规则就等于只按
-            后半句判断：勾选着的记录会因为输入框被清空而丢掉勾选，于是也掉出置顶区——用户明确按下
-            的那一下被一次输入框操作撤销了。
+            清空最后一个数值之后这条记录还算不算编辑，由 skills.ts 的 isEdit
+            （"勾选了，或者带着数字"）说了算，而 commit 的每条路径都经过 isEdit。
+            在这里再写一遍那条规则就等于只按后半句判断：勾选着的记录会因为输入框被清空而丢掉勾选，
+            于是也掉出置顶区——用户明确按下的那一下被一次输入框操作撤销了。
         */
         commit(new Map(edits).set(address, { ...existing, ...patch }));
     }
@@ -329,7 +332,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
 
     /*
         每一次编辑都经过这里：屏幕上的列表就是全部状态，也是运行中的游戏最终拿到的东西。不是
-        编辑的在途中就被丢掉（asEdits）——勾选一个等级再取消不会留下任何东西，而清空一条编辑的
+        编辑的在途中就被丢掉（isEdit）——勾选一个等级再取消不会留下任何东西，而清空一条编辑的
         所有框会把整条编辑带走。
 
         前端对"何时写入"刻意保持无知：每次变化把整份列表交出去，不等答复；后端的尾随防抖把一串
@@ -339,9 +342,9 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     function commit(next: Map<string, SigilSkill>) {
         // 列表还没读回来就不写；不写盘的理由见 editListRead 的声明。
         if (!editListRead) return;
-        // 状态本身就是按地址去重的容器，不必再跑一遍 dedupe。归一化仍走 asEdits，好让"同一条
-        // 记录连着两次提交"得到逐字节相同的结果。
-        const kept = asEdits([...next.values()], skills);
+        // 状态本身就是按地址去重的容器，不必再跑一遍 dedupe。
+        // 只留编辑仍走 isEdit，好让 "同一条记录连着两次提交" 得到逐字节相同的结果。
+        const kept = [...next.values()].filter(isEdit);
         setEdits(new Map(kept.map((record) => [addressOf(record.key, record.level), record])));
         Call.ByName(`${SERVICE}.SaveEdits`, kept).catch((err) =>
             showError({ title: messages[lang].writeFailed, detail: String(err) }),

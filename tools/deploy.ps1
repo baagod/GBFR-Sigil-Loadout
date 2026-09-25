@@ -34,7 +34,12 @@ function Stop-SigilLoadout {
 }
 
 function Start-SigilLoadout {
-    Start-Process -FilePath (Join-Path $modDir 'SigilLoadout.exe')
+    # 不过 shell（未签名 exe 走 ShellExecute 会弹「无法验证发布者」），并重定向掉 stdout/stderr——
+    # 否则工具继承调用者的管道，调用者退出后那根管道还开着，外面看到的就是"任务永不结束"。
+    $p = [System.Diagnostics.Process]::Start([System.Diagnostics.ProcessStartInfo]@{
+            FileName = (Join-Path $modDir 'SigilLoadout.exe'); UseShellExecute = $false
+            RedirectStandardOutput = $true; RedirectStandardError = $true })
+    $p.StandardOutput.Close(); $p.StandardError.Close()
     Start-Sleep -Seconds 3
     return [bool](Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue)
 }
