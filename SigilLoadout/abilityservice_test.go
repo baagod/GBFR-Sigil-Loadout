@@ -20,7 +20,7 @@ func TestSaveAbilityEditsWritesTheAgreedShape(t *testing.T) {
 	hermeticHome(t)
 
 	service := &AbilityService{}
-	edits := []AbilityEdit{{Enabled: true, Key: "0D0BCF24", Levels: 3, Value: 321}}
+	edits := []AbilityEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{500, 600, 321}}}
 	if err := service.SaveAbilityEdits(edits); err != nil {
 		t.Fatalf("SaveAbilityEdits: %v", err)
 	}
@@ -36,8 +36,11 @@ func TestSaveAbilityEditsWritesTheAgreedShape(t *testing.T) {
     {
       "enabled": true,
       "key": "0D0BCF24",
-      "levels": 3,
-      "value": 321
+      "values": [
+        500,
+        600,
+        321
+      ]
     }
   ]
 }`
@@ -57,7 +60,7 @@ func TestSaveAbilityEditsWaitsForTheEditingToStop(t *testing.T) {
 		service := &AbilityService{}
 		cfgPath := localConfig(t, abilityEditListName)
 
-		if err := service.SaveAbilityEdits([]AbilityEdit{{Enabled: true, Key: "0D0BCF24", Levels: 3, Value: 5}}); err != nil {
+		if err := service.SaveAbilityEdits([]AbilityEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{5, 6, 7}}}); err != nil {
 			t.Fatalf("SaveAbilityEdits: %v", err)
 		}
 		time.Sleep(debounceDelay / 4)
@@ -65,7 +68,7 @@ func TestSaveAbilityEditsWaitsForTheEditingToStop(t *testing.T) {
 			t.Fatal("abilityedits.json was written while the debounce window was still open")
 		}
 
-		if err := service.SaveAbilityEdits([]AbilityEdit{{Enabled: true, Key: "0D0BCF24", Levels: 3, Value: 321}}); err != nil {
+		if err := service.SaveAbilityEdits([]AbilityEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{500, 600, 321}}}); err != nil {
 			t.Fatalf("SaveAbilityEdits: %v", err)
 		}
 		time.Sleep(debounceDelay / 4)
@@ -84,7 +87,7 @@ func TestSaveAbilityEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
 			t.Fatalf("abilityedits.json is not valid JSON: %v", err)
 		}
-		if len(cfg.Edits) != 1 || cfg.Edits[0].Value != 321 {
+		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 || cfg.Edits[0].Values[2] != 321 {
 			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
 		}
 	})
@@ -95,13 +98,13 @@ func TestLoadAbilityEditsReadsTheUserConfig(t *testing.T) {
 	hermeticHome(t)
 
 	writeFile(t, localConfig(t, abilityEditListName),
-		`{"edits":[{"enabled":true,"key":"0D0BCF24","levels":3,"value":321}]}`)
+		`{"edits":[{"enabled":true,"key":"0D0BCF24","values":[500,600,321]}]}`)
 
 	loaded, err := (&AbilityService{}).LoadAbilityEdits()
 	if err != nil {
 		t.Fatalf("LoadAbilityEdits: %v", err)
 	}
-	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || loaded[0].Levels != 3 || loaded[0].Value != 321 || !loaded[0].Enabled {
+	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || len(loaded[0].Values) != 3 || loaded[0].Values[2] != 321 || !loaded[0].Enabled {
 		t.Fatalf("abilityedits.json was not read back: %+v", loaded)
 	}
 }
@@ -113,7 +116,7 @@ func TestLoadAbilityEditsReadsTheUserConfig(t *testing.T) {
 func TestLoadAbilityEditsTreatsAMissingEnabledAsOn(t *testing.T) {
 	hermeticHome(t)
 
-	writeFile(t, localConfig(t, abilityEditListName), `{"edits":[{"key":"0D0BCF24","levels":3,"value":321}]}`)
+	writeFile(t, localConfig(t, abilityEditListName), `{"edits":[{"key":"0D0BCF24","values":[321]}]}`)
 
 	loaded, err := (&AbilityService{}).LoadAbilityEdits()
 	if err != nil {
@@ -125,7 +128,7 @@ func TestLoadAbilityEditsTreatsAMissingEnabledAsOn(t *testing.T) {
 
 	// 明写成关着的那一条照旧关着——上面那条默认值不能把这一栏吃掉。
 	writeFile(t, localConfig(t, abilityEditListName),
-		`{"edits":[{"enabled":false,"key":"0D0BCF24","levels":3,"value":321}]}`)
+		`{"edits":[{"enabled":false,"key":"0D0BCF24","values":[321]}]}`)
 	loaded, err = (&AbilityService{}).LoadAbilityEdits()
 	if err != nil {
 		t.Fatalf("LoadAbilityEdits: %v", err)
@@ -170,15 +173,15 @@ func TestLoadAbilityEditsRejectsAFileItCannotParse(t *testing.T) {
 }
 
 /*
-成员类型不对的文件整份读不出来，而不是把坏值读成零值再写回去：Go 侧解的成员是 int / float，而 mod
-那边（C# 的 int / float）同样拒它——两边都不接受手写成字符串的数字。这一条也是前端不必再对数值做形状
-检查的原因（见 ability.ts 的 asEdit）。
+成员类型不对的文件整份读不出来，而不是把坏值读成零值再写回去：Go 侧解的成员是 float 的数组，而 mod
+那边（C# 的 float[]）同样拒它——两边都不接受手写成字符串或标量的数字。这一条也是前端不必再对数值做
+形状检查的原因（见 ability.ts 的 asEdit）。
 */
 func TestLoadAbilityEditsRejectsAFileWithTheWrongMemberTypes(t *testing.T) {
 	hermeticHome(t)
 
 	writeFile(t, localConfig(t, abilityEditListName),
-		`{"edits":[{"key":"0D0BCF24","levels":"3","value":321}]}`)
+		`{"edits":[{"key":"0D0BCF24","values":300}]}`)
 
 	loaded, err := (&AbilityService{}).LoadAbilityEdits()
 	if err == nil {
@@ -209,9 +212,9 @@ func TestLoadAbilityEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 }
 
 /*
-资产是一起生成的，前端拿它填表格、决定每栏写几个档位、以及把 Key 原样交给 mod。这里钉的是**跨层
-假设**，不是数据本身：Key 必须是 mod 认的 8 位十六进制，每栏的档位数与游戏默认值必须对得上，效果
-文案里除了 {0} 不能有别的东西（前端只换 {0}，其余的会原样显示在屏幕上）。
+资产是一起生成的，前端拿它铺表格、决定每个参数行写几个档位、以及把 Key 原样交给 mod。这里钉的是
+**跨层假设**，不是数据本身：Key 必须是 mod 认的 8 位十六进制，参数行的档位数与游戏默认值必须对得上，
+效果文案里除了 {0} 不能有别的东西（前端只换 {0}，其余的会原样显示到屏幕上）。
 */
 func TestAbilityTableIsUsable(t *testing.T) {
 	if abilityTable == nil {
@@ -233,33 +236,41 @@ func TestAbilityTableIsUsable(t *testing.T) {
 		seen := map[string]bool{}
 		for _, ability := range character.Abilities {
 			abilities++
-			if !isAbilityKey(ability.Key) {
-				t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
-					character.Name, ability.Name, ability.Key)
-			}
-			// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同名记录只会互相覆盖。
-			if seen[ability.Key] {
-				t.Fatalf("%s names %s twice", character.Name, ability.Key)
-			}
-			seen[ability.Key] = true
-
 			if ability.AbilityID == "" || ability.Name == "" || ability.Node == "" || ability.Category == "" {
 				t.Fatalf("%s/%s is missing a display field: %+v", character.Name, ability.Name, ability)
 			}
-			if ability.Levels < 1 || ability.Levels > 10 {
-				t.Fatalf("%s/%s writes %d levels, which the mod skips", character.Name, ability.Name, ability.Levels)
+			if len(ability.Params) == 0 {
+				t.Fatalf("%s/%s offers no param row to write", character.Name, ability.Name)
 			}
-			if len(ability.Defaults) != ability.Levels {
-				t.Fatalf("%s/%s has %d defaults for %d levels", character.Name, ability.Name, len(ability.Defaults), ability.Levels)
-			}
-			if ability.Effect != "" && !strings.Contains(ability.Effect, "{0}") {
-				t.Fatalf("%s/%s: effect %q has no {0} to fill in", character.Name, ability.Name, ability.Effect)
-			}
-			// 面板只换 {0}（这一版一栏一个数值），别的占位符会被原样显示到屏幕上。
-			for _, slot := range "123456789" {
-				if strings.Contains(ability.Effect, "{"+string(slot)) {
-					t.Fatalf("%s/%s: effect %q has a placeholder the panel cannot fill in",
-						character.Name, ability.Name, ability.Effect)
+
+			for _, param := range ability.Params {
+				if !isAbilityKey(param.Key) {
+					t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
+						character.Name, ability.Name, param.Key)
+				}
+				// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同 Key 的记录只会互相覆盖。
+				if seen[param.Key] {
+					t.Fatalf("%s names %s twice", character.Name, param.Key)
+				}
+				seen[param.Key] = true
+
+				// 档位数就是界面要铺的框数：0 档没有意义，超过 10 档 mod 整条跳过。
+				if len(param.Defaults) < 1 || len(param.Defaults) > 10 {
+					t.Fatalf("%s/%s writes %d levels on %s, which the mod skips",
+						character.Name, ability.Name, len(param.Defaults), param.Key)
+				}
+				if param.Effect == "" {
+					continue
+				}
+				if !strings.Contains(param.Effect, "{0}") {
+					t.Fatalf("%s/%s: effect %q has no {0} to fill in", character.Name, ability.Name, param.Effect)
+				}
+				// 面板只换 {0}，别的占位符会被原样显示到屏幕上。
+				for _, slot := range "123456789" {
+					if strings.Contains(param.Effect, "{"+string(slot)) {
+						t.Fatalf("%s/%s: effect %q has a placeholder the panel cannot fill in",
+							character.Name, ability.Name, param.Effect)
+					}
 				}
 			}
 		}

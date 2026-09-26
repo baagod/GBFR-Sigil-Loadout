@@ -10,13 +10,16 @@
           "name": "无尽连斩",
           "category": "攻击类能力",
           "node": "强化无尽连斩",
-          "effect": "造成的伤害+{0}%",
-          "key": "48D59E25",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "48D59E25",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -24,13 +27,16 @@
           "name": "护甲破坏",
           "category": "攻击类能力",
           "node": "强化护甲破坏",
-          "effect": "效果持续时间+{0}%",
-          "key": "A0F792FD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A0F792FD",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -38,13 +44,16 @@
           "name": "密集方阵",
           "category": "强化类能力",
           "node": "强化密集方阵",
-          "effect": "效果持续时间+{0}%",
-          "key": "6AED3312",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "6AED3312",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -52,13 +61,16 @@
           "name": "全体治疗",
           "category": "回复类能力",
           "node": "强化全体治疗",
-          "effect": "冷却时间-{0}%",
-          "key": "FF5E12A7",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FF5E12A7",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -66,13 +78,16 @@
           "name": "箭雨",
           "category": "攻击类能力",
           "node": "强化箭雨",
-          "effect": "效果持续时间+{0}%",
-          "key": "0CB04E11",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0CB04E11",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -80,13 +95,16 @@
           "name": "惨雾",
           "category": "弱化类能力",
           "node": "强化惨雾",
-          "effect": "效果持续时间+{0}%",
-          "key": "D8B8C3BD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D8B8C3BD",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -94,13 +112,16 @@
           "name": "暴怒",
           "category": "强化类能力",
           "node": "强化暴怒",
-          "effect": "效果持续时间+{0}%",
-          "key": "A7E419C5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A7E419C5",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -108,13 +129,16 @@
           "name": "过载爆发",
           "category": "攻击类能力",
           "node": "强化过载爆发",
-          "effect": "昏厥值+{0}%",
-          "key": "01790F2F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "01790F2F",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -122,13 +146,16 @@
           "name": "全体净化",
           "category": "回复类能力",
           "node": "强化全体净化",
-          "effect": "冷却时间-{0}%",
-          "key": "F3F7A52E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F3F7A52E",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -136,13 +163,16 @@
           "name": "圣迹",
           "category": "攻击类能力",
           "node": "强化圣迹",
-          "effect": "造成的伤害+{0}%",
-          "key": "38F46AD1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "38F46AD1",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -150,13 +180,16 @@
           "name": "缓沼",
           "category": "弱化类能力",
           "node": "强化缓沼",
-          "effect": "效果持续时间+{0}%",
-          "key": "AA10C797",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "AA10C797",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -164,13 +197,16 @@
           "name": "复苏",
           "category": "回复类能力",
           "node": "强化复苏",
-          "effect": "冷却时间-{0}%",
-          "key": "2B58A259",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2B58A259",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -178,13 +214,16 @@
           "name": "圣纱",
           "category": "强化类能力",
           "node": "强化圣纱",
-          "effect": "冷却时间-{0}%",
-          "key": "B83C2B6A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B83C2B6A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -192,13 +231,16 @@
           "name": "驱散",
           "category": "弱化类能力",
           "node": "强化驱散",
-          "effect": "冷却时间-{0}%",
-          "key": "07D5FF58",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "07D5FF58",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -206,13 +248,16 @@
           "name": "渡能",
           "category": "强化类能力",
           "node": "强化渡能",
-          "effect": "冷却时间-{0}%",
-          "key": "D233E54B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D233E54B",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -220,13 +265,16 @@
           "name": "挺身而出",
           "category": "强化类能力",
           "node": "强化挺身而出",
-          "effect": "冷却时间-{0}%",
-          "key": "A1088E9A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A1088E9A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -240,13 +288,16 @@
           "name": "无尽连斩",
           "category": "攻击类能力",
           "node": "强化无尽连斩",
-          "effect": "造成的伤害+{0}%",
-          "key": "48D59E25",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "48D59E25",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -254,13 +305,16 @@
           "name": "护甲破坏",
           "category": "攻击类能力",
           "node": "强化护甲破坏",
-          "effect": "效果持续时间+{0}%",
-          "key": "A0F792FD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A0F792FD",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -268,13 +322,16 @@
           "name": "密集方阵",
           "category": "强化类能力",
           "node": "强化密集方阵",
-          "effect": "效果持续时间+{0}%",
-          "key": "6AED3312",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "6AED3312",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -282,13 +339,16 @@
           "name": "全体治疗",
           "category": "回复类能力",
           "node": "强化全体治疗",
-          "effect": "冷却时间-{0}%",
-          "key": "FF5E12A7",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FF5E12A7",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -296,13 +356,16 @@
           "name": "箭雨",
           "category": "攻击类能力",
           "node": "强化箭雨",
-          "effect": "效果持续时间+{0}%",
-          "key": "0CB04E11",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0CB04E11",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -310,13 +373,16 @@
           "name": "惨雾",
           "category": "弱化类能力",
           "node": "强化惨雾",
-          "effect": "效果持续时间+{0}%",
-          "key": "D8B8C3BD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D8B8C3BD",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -324,13 +390,16 @@
           "name": "暴怒",
           "category": "强化类能力",
           "node": "强化暴怒",
-          "effect": "效果持续时间+{0}%",
-          "key": "A7E419C5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A7E419C5",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -338,13 +407,16 @@
           "name": "过载爆发",
           "category": "攻击类能力",
           "node": "强化过载爆发",
-          "effect": "昏厥值+{0}%",
-          "key": "01790F2F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "01790F2F",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -352,13 +424,16 @@
           "name": "全体净化",
           "category": "回复类能力",
           "node": "强化全体净化",
-          "effect": "冷却时间-{0}%",
-          "key": "F3F7A52E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F3F7A52E",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -366,13 +441,16 @@
           "name": "圣迹",
           "category": "攻击类能力",
           "node": "强化圣迹",
-          "effect": "造成的伤害+{0}%",
-          "key": "38F46AD1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "38F46AD1",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -380,13 +458,16 @@
           "name": "缓沼",
           "category": "弱化类能力",
           "node": "强化缓沼",
-          "effect": "效果持续时间+{0}%",
-          "key": "AA10C797",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "AA10C797",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -394,13 +475,16 @@
           "name": "复苏",
           "category": "回复类能力",
           "node": "强化复苏",
-          "effect": "冷却时间-{0}%",
-          "key": "2B58A259",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2B58A259",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -408,13 +492,16 @@
           "name": "圣纱",
           "category": "强化类能力",
           "node": "强化圣纱",
-          "effect": "冷却时间-{0}%",
-          "key": "B83C2B6A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B83C2B6A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -422,13 +509,16 @@
           "name": "驱散",
           "category": "弱化类能力",
           "node": "强化驱散",
-          "effect": "冷却时间-{0}%",
-          "key": "07D5FF58",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "07D5FF58",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -436,13 +526,16 @@
           "name": "渡能",
           "category": "强化类能力",
           "node": "强化渡能",
-          "effect": "冷却时间-{0}%",
-          "key": "D233E54B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D233E54B",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -450,13 +543,16 @@
           "name": "挺身而出",
           "category": "强化类能力",
           "node": "强化挺身而出",
-          "effect": "冷却时间-{0}%",
-          "key": "A1088E9A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A1088E9A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -470,13 +566,16 @@
           "name": "附魔剑击",
           "category": "攻击类能力",
           "node": "强化附魔剑击",
-          "effect": "造成的伤害+{0}%",
-          "key": "D808FB7E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D808FB7E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -484,13 +583,16 @@
           "name": "寒冬冰雨",
           "category": "攻击类能力",
           "node": "强化寒冬冰雨",
-          "effect": "昏厥值+{0}%",
-          "key": "F5D81BD9",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F5D81BD9",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -498,13 +600,16 @@
           "name": "治疗",
           "category": "回复类能力",
           "node": "强化治疗",
-          "effect": "冷却时间-{0}%",
-          "key": "2A65BECE",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2A65BECE",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -512,13 +617,16 @@
           "name": "神圣凛风",
           "category": "弱化类能力",
           "node": "强化神圣凛风",
-          "effect": "冷却时间-{0}%",
-          "key": "4DEBD3C3",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "4DEBD3C3",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -526,13 +634,16 @@
           "name": "苍天之剑",
           "category": "强化类能力",
           "node": "强化苍天之剑",
-          "effect": "冷却时间-{0}%",
-          "key": "3C5701AD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "3C5701AD",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -540,13 +651,16 @@
           "name": "光墙屏障",
           "category": "强化类能力",
           "node": "强化光墙屏障",
-          "effect": "冷却时间-{0}%",
-          "key": "0B553796",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0B553796",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -554,13 +668,16 @@
           "name": "非凡旅程",
           "category": "攻击类能力",
           "node": "强化非凡旅程",
-          "effect": "造成的伤害+{0}%",
-          "key": "92FBD076",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "92FBD076",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -568,13 +685,16 @@
           "name": "翡翠之盾",
           "category": "强化类能力",
           "node": "强化翡翠之盾",
-          "effect": "冷却时间-{0}%",
-          "key": "F8BEABDF",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F8BEABDF",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -588,13 +708,16 @@
           "name": "烈火射击",
           "category": "攻击类能力",
           "node": "强化烈火射击",
-          "effect": "造成的伤害+{0}%",
-          "key": "393BE587",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "393BE587",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -602,13 +725,16 @@
           "name": "枪林弹雨",
           "category": "攻击类能力",
           "node": "强化枪林弹雨",
-          "effect": "冷却时间-{0}%",
-          "key": "04513C69",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "04513C69",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -616,13 +742,16 @@
           "name": "双发子弹",
           "category": "强化类能力",
           "node": "强化双发子弹",
-          "effect": "冷却时间-{0}%",
-          "key": "7D86FACC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7D86FACC",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -630,13 +759,16 @@
           "name": "以逸待劳",
           "category": "强化类能力",
           "node": "强化以逸待劳",
-          "effect": "冷却时间-{0}%",
-          "key": "340F36E9",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "340F36E9",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -644,13 +776,16 @@
           "name": "送葬火舌",
           "category": "攻击类能力",
           "node": "强化送葬火舌",
-          "effect": "造成的伤害+{0}%",
-          "key": "7922655E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7922655E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -658,13 +793,16 @@
           "name": "荒野硝烟",
           "category": "强化类能力",
           "node": "强化荒野硝烟",
-          "effect": "冷却时间-{0}%",
-          "key": "0879726E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0879726E",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -672,13 +810,16 @@
           "name": "霰弹扫射",
           "category": "攻击类能力",
           "node": "强化霰弹扫射",
-          "effect": "造成的伤害+{0}%",
-          "key": "F10A05EA",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F10A05EA",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -686,13 +827,16 @@
           "name": "战地余波",
           "category": "攻击类能力",
           "node": "强化战地余波",
-          "effect": "造成的伤害+{0}%",
-          "key": "D3D750D0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D3D750D0",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -706,13 +850,16 @@
           "name": "治愈之风",
           "category": "回复类能力",
           "node": "强化治愈之风",
-          "effect": "冷却时间-{0}%",
-          "key": "5BDBD96D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "5BDBD96D",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -720,13 +867,16 @@
           "name": "寒冰",
           "category": "攻击类能力",
           "node": "强化寒冰",
-          "effect": "造成的伤害+{0}%",
-          "key": "B2B6C452",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B2B6C452",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -734,13 +884,16 @@
           "name": "雷霆",
           "category": "弱化类能力",
           "node": "强化雷霆",
-          "effect": "效果持续时间+{0}%",
-          "key": "653D9B49",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "653D9B49",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -748,13 +901,16 @@
           "name": "魔洞",
           "category": "攻击类能力",
           "node": "强化魔洞",
-          "effect": "造成的伤害+{0}%",
-          "key": "D854D143",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D854D143",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -762,13 +918,16 @@
           "name": "火焰",
           "category": "攻击类能力",
           "node": "强化火焰",
-          "effect": "造成的伤害+{0}%",
-          "key": "846748A0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "846748A0",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -776,13 +935,16 @@
           "name": "专注",
           "category": "强化类能力",
           "node": "强化专注",
-          "effect": "效果持续时间+{0}%",
-          "key": "AE7C2D50",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "AE7C2D50",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -790,13 +952,16 @@
           "name": "花耀七闪",
           "category": "攻击类能力",
           "node": "强化花耀七闪",
-          "effect": "造成的伤害+{0}%",
-          "key": "F3B9FCF7",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F3B9FCF7",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -804,13 +969,16 @@
           "name": "魔力漩涡",
           "category": "强化类能力",
           "node": "强化魔力漩涡",
-          "effect": "冷却时间-{0}%",
-          "key": "795FD4A6",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "795FD4A6",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -824,13 +992,16 @@
           "name": "暮光",
           "category": "攻击类能力",
           "node": "强化暮光",
-          "effect": "造成的伤害+{0}%",
-          "key": "4D40C1F0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "4D40C1F0",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -838,13 +1009,16 @@
           "name": "爆裂射击",
           "category": "攻击类能力",
           "node": "强化爆裂射击",
-          "effect": "造成的伤害+{0}%",
-          "key": "D77D90F5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D77D90F5",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -852,13 +1026,16 @@
           "name": "战术拦截",
           "category": "攻击类能力",
           "node": "强化战术拦截",
-          "effect": "造成的伤害+{0}%",
-          "key": "CDD7B3A2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "CDD7B3A2",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -866,13 +1043,16 @@
           "name": "穿甲弹",
           "category": "攻击类能力",
           "node": "强化穿甲弹",
-          "effect": "造成的伤害+{0}%",
-          "key": "FB1DEF63",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FB1DEF63",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -880,13 +1060,16 @@
           "name": "剧毒榴弹",
           "category": "弱化类能力",
           "node": "强化剧毒榴弹",
-          "effect": "效果持续时间+{0}%",
-          "key": "FD085A26",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FD085A26",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -894,13 +1077,16 @@
           "name": "麻痹弹",
           "category": "弱化类能力",
           "node": "强化麻痹弹",
-          "effect": "效果持续时间+{0}%",
-          "key": "38D11B0B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "38D11B0B",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -908,13 +1094,16 @@
           "name": "治疗弹",
           "category": "回复类能力",
           "node": "强化治疗弹",
-          "effect": "冷却时间-{0}%",
-          "key": "B11D3621",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B11D3621",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -922,13 +1111,16 @@
           "name": "驱散射击",
           "category": "弱化类能力",
           "node": "强化驱散射击",
-          "effect": "冷却时间-{0}%",
-          "key": "CEEC4A0E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "CEEC4A0E",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -942,13 +1134,16 @@
           "name": "馥郁幻迹",
           "category": "强化类能力",
           "node": "强化馥郁幻迹",
-          "effect": "冷却时间-{0}%",
-          "key": "64D6C4F3",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "64D6C4F3",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -956,13 +1151,16 @@
           "name": "群花之主",
           "category": "强化类能力",
           "node": "强化群花之主",
-          "effect": "冷却时间-{0}%",
-          "key": "214CCFBB",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "214CCFBB",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -970,13 +1168,16 @@
           "name": "魅惑芳丛",
           "category": "弱化类能力",
           "node": "强化魅惑芳丛",
-          "effect": "冷却时间-{0}%",
-          "key": "8E32AADF",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "8E32AADF",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -984,13 +1185,16 @@
           "name": "螺旋玫瑰",
           "category": "攻击类能力",
           "node": "强化螺旋玫瑰",
-          "effect": "冷却时间-{0}%",
-          "key": "CC97C87E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "CC97C87E",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -998,13 +1202,16 @@
           "name": "铁娘子",
           "category": "强化类能力",
           "node": "强化铁娘子",
-          "effect": "冷却时间-{0}%",
-          "key": "FE6FF98F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FE6FF98F",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1012,13 +1219,16 @@
           "name": "落花无情",
           "category": "攻击类能力",
           "node": "强化落花无情",
-          "effect": "造成的伤害+{0}%",
-          "key": "F30CC861",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F30CC861",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1026,13 +1236,16 @@
           "name": "玫瑰结界",
           "category": "强化类能力",
           "node": "强化玫瑰结界",
-          "effect": "持续时间+{0}%",
-          "key": "D4DC7311",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D4DC7311",
+              "effect": "持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1040,13 +1253,16 @@
           "name": "繁花似锦",
           "category": "强化类能力",
           "node": "强化繁花似锦",
-          "effect": "冷却时间-{0}%",
-          "key": "5161E637",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "5161E637",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1060,13 +1276,16 @@
           "name": "王之盾",
           "category": "强化类能力",
           "node": "强化王之盾",
-          "effect": "效果持续时间+{0}%",
-          "key": "A92687AF",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A92687AF",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1074,13 +1293,16 @@
           "name": "耀眼猛攻",
           "category": "攻击类能力",
           "node": "强化耀眼猛攻",
-          "effect": "效果持续时间+{0}%",
-          "key": "C709F71D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C709F71D",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1088,13 +1310,16 @@
           "name": "跳跃反击",
           "category": "攻击类能力",
           "node": "强化跳跃反击",
-          "effect": "冷却时间-{0}%",
-          "key": "BD2D783A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BD2D783A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1102,13 +1327,16 @@
           "name": "英勇战姿",
           "category": "强化类能力",
           "node": "强化英勇战姿",
-          "effect": "冷却时间-{0}%",
-          "key": "BA007D38",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BA007D38",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1116,13 +1344,16 @@
           "name": "神圣灌注",
           "category": "强化类能力",
           "node": "强化神圣灌注",
-          "effect": "冷却时间-{0}%",
-          "key": "9550511A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9550511A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1130,13 +1361,16 @@
           "name": "所向披靡",
           "category": "强化类能力",
           "node": "强化所向披靡",
-          "effect": "效果持续时间+{0}%",
-          "key": "CFB53920",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "CFB53920",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1144,13 +1378,16 @@
           "name": "卢米埃之剑",
           "category": "攻击类能力",
           "node": "强化卢米埃之剑",
-          "effect": "造成的伤害+{0}%",
-          "key": "AE5F7548",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "AE5F7548",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1158,13 +1395,16 @@
           "name": "神圣阶梯",
           "category": "攻击类能力",
           "node": "强化神圣阶梯",
-          "effect": "造成的伤害+{0}%",
-          "key": "1D91C22D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1D91C22D",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1178,13 +1418,16 @@
           "name": "罗汉天降击",
           "category": "攻击类能力",
           "node": "强化罗汉天降击",
-          "effect": "冷却时间-{0}%",
-          "key": "307E5CFA",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "307E5CFA",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1192,13 +1435,16 @@
           "name": "印可掌",
           "category": "攻击类能力",
           "node": "强化印可掌",
-          "effect": "冷却时间-{0}%",
-          "key": "FC475964",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FC475964",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1206,13 +1452,16 @@
           "name": "激震铁山靠",
           "category": "攻击类能力",
           "node": "强化激震铁山靠",
-          "effect": "造成的伤害+{0}%",
-          "key": "845F0BAF",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "845F0BAF",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1220,13 +1469,16 @@
           "name": "无明白天",
           "category": "强化类能力",
           "node": "强化无明白天",
-          "effect": "效果持续时间+{0}%",
-          "key": "B5CCBC36",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B5CCBC36",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1234,13 +1486,16 @@
           "name": "威武雄姿",
           "category": "强化类能力",
           "node": "强化威武雄姿",
-          "effect": "效果持续时间+{0}%",
-          "key": "B37DF106",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B37DF106",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1248,13 +1503,16 @@
           "name": "力足舞",
           "category": "弱化类能力",
           "node": "强化力足舞",
-          "effect": "效果持续时间+{0}%",
-          "key": "9AE0F3DC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9AE0F3DC",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1262,13 +1520,16 @@
           "name": "古今无双",
           "category": "强化类能力",
           "node": "强化古今无双",
-          "effect": "冷却时间-{0}%",
-          "key": "BE2F2514",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BE2F2514",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1276,13 +1537,16 @@
           "name": "禅定",
           "category": "回复类能力",
           "node": "强化禅定",
-          "effect": "冷却时间-{0}%",
-          "key": "17C4A6AC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "17C4A6AC",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1296,13 +1560,16 @@
           "name": "幻灵之鞭",
           "category": "攻击类能力",
           "node": "强化幻灵之鞭",
-          "effect": "昏厥值+{0}%",
-          "key": "5A7097CD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "5A7097CD",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1310,13 +1577,16 @@
           "name": "蓝灵束缚",
           "category": "攻击类能力",
           "node": "强化蓝灵束缚",
-          "effect": "效果持续时间+{0}%",
-          "key": "7946B9DC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7946B9DC",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1324,13 +1594,16 @@
           "name": "吉吉，拖住对手！",
           "category": "弱化类能力",
           "node": "强化吉吉，拖住对手！",
-          "effect": "效果持续时间+{0}%",
-          "key": "91FB5C41",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "91FB5C41",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1338,13 +1611,16 @@
           "name": "幻灵祝福",
           "category": "回复类能力",
           "node": "强化幻灵祝福",
-          "effect": "冷却时间-{0}%",
-          "key": "7B9A67F9",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7B9A67F9",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1352,13 +1628,16 @@
           "name": "幽影幻步",
           "category": "攻击类能力",
           "node": "强化幽影幻步",
-          "effect": "造成的伤害+{0}%",
-          "key": "9E219423",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9E219423",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1366,13 +1645,16 @@
           "name": "幻灵惩戒",
           "category": "攻击类能力",
           "node": "强化幻灵惩戒",
-          "effect": "造成的伤害+{0}%",
-          "key": "E2176D84",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "E2176D84",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1380,13 +1662,16 @@
           "name": "强化之光",
           "category": "强化类能力",
           "node": "强化强化之光",
-          "effect": "效果持续时间+{0}%",
-          "key": "24F69549",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "24F69549",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1394,13 +1679,16 @@
           "name": "幻灵守护",
           "category": "攻击类能力",
           "node": "强化幻灵守护",
-          "effect": "造成的伤害+{0}%",
-          "key": "B08FEF10",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B08FEF10",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1414,13 +1702,16 @@
           "name": "镜花水月",
           "category": "攻击类能力",
           "node": "强化镜花水月",
-          "effect": "造成的伤害+{0}%",
-          "key": "D428A3A2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D428A3A2",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1428,13 +1719,16 @@
           "name": "刹那",
           "category": "攻击类能力",
           "node": "强化刹那",
-          "effect": "冷却时间-{0}%",
-          "key": "C49CB8A2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C49CB8A2",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1442,13 +1736,16 @@
           "name": "至人无己",
           "category": "攻击类能力",
           "node": "强化至人无己",
-          "effect": "效果持续时间+{0}%",
-          "key": "150269FA",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "150269FA",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1456,13 +1753,16 @@
           "name": "纤月",
           "category": "攻击类能力",
           "node": "强化纤月",
-          "effect": "冷却时间-{0}%",
-          "key": "743216D0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "743216D0",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1470,13 +1770,16 @@
           "name": "泡沫梦幻",
           "category": "攻击类能力",
           "node": "强化泡沫梦幻",
-          "effect": "造成的伤害+{0}%",
-          "key": "F056B9FE",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F056B9FE",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1484,13 +1787,16 @@
           "name": "花风·薄红舞",
           "category": "强化类能力",
           "node": "强化花风·薄红舞",
-          "effect": "效果持续时间+{0}%",
-          "key": "0D0BCF24",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0D0BCF24",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1498,13 +1804,16 @@
           "name": "花风·水缥舞",
           "category": "强化类能力",
           "node": "强化花风·水缥舞",
-          "effect": "效果持续时间+{0}%",
-          "key": "B827EA3B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B827EA3B",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1512,13 +1821,16 @@
           "name": "无二无三",
           "category": "强化类能力",
           "node": "强化无二无三",
-          "effect": "效果持续时间+{0}%",
-          "key": "01344577",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "01344577",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1532,13 +1844,16 @@
           "name": "剑刃冲击",
           "category": "攻击类能力",
           "node": "强化剑刃冲击",
-          "effect": "造成的伤害+{0}%",
-          "key": "8357837A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "8357837A",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1546,13 +1861,16 @@
           "name": "寒冰魔爪",
           "category": "弱化类能力",
           "node": "强化寒冰魔爪",
-          "effect": "效果持续时间+{0}秒",
-          "key": "C75F5A81",
-          "levels": 3,
-          "defaults": [
-            1,
-            1,
-            1
+          "params": [
+            {
+              "key": "C75F5A81",
+              "effect": "效果持续时间+{0}秒",
+              "defaults": [
+                1,
+                1,
+                1
+              ]
+            }
           ]
         },
         {
@@ -1560,13 +1878,16 @@
           "name": "冰雪飞刃",
           "category": "攻击类能力",
           "node": "强化冰雪飞刃",
-          "effect": "造成的伤害+{0}%",
-          "key": "C7C54DF8",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C7C54DF8",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1574,13 +1895,16 @@
           "name": "苍蓝双剑",
           "category": "强化类能力",
           "node": "强化苍蓝双剑",
-          "effect": "效果持续时间+{0}%",
-          "key": "F7889337",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F7889337",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1588,13 +1912,16 @@
           "name": "乱气流",
           "category": "攻击类能力",
           "node": "强化乱气流",
-          "effect": "冷却时间-{0}%",
-          "key": "F9E1FC67",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F9E1FC67",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1602,13 +1929,16 @@
           "name": "南十字星",
           "category": "攻击类能力",
           "node": "强化南十字星",
-          "effect": "造成的伤害+{0}%",
-          "key": "2EADCC8D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2EADCC8D",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1616,13 +1946,16 @@
           "name": "剑魂",
           "category": "强化类能力",
           "node": "强化剑魂",
-          "effect": "冷却时间-{0}%",
-          "key": "3E8642AD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "3E8642AD",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1630,13 +1963,16 @@
           "name": "蜃景",
           "category": "强化类能力",
           "node": "强化蜃景",
-          "effect": "效果持续时间+{0}%",
-          "key": "C9F21337",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C9F21337",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1650,13 +1986,16 @@
           "name": "铜墙铁壁",
           "category": "强化类能力",
           "node": "强化铜墙铁壁",
-          "effect": "效果持续时间+{0}%",
-          "key": "4A189DCD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "4A189DCD",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1664,13 +2003,16 @@
           "name": "裂空连斩",
           "category": "攻击类能力",
           "node": "强化裂空连斩",
-          "effect": "造成的伤害+{0}%",
-          "key": "EB779566",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "EB779566",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1678,13 +2020,16 @@
           "name": "破军之力",
           "category": "强化类能力",
           "node": "强化破军之力",
-          "effect": "效果持续时间+{0}%",
-          "key": "7944BCE0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7944BCE0",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1692,13 +2037,16 @@
           "name": "巨力重击",
           "category": "攻击类能力",
           "node": "强化巨力重击",
-          "effect": "昏厥值+{0}%",
-          "key": "B4793FEC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B4793FEC",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1706,13 +2054,16 @@
           "name": "英勇打击",
           "category": "攻击类能力",
           "node": "强化英勇打击",
-          "effect": "造成的伤害+{0}%",
-          "key": "D503D58C",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D503D58C",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1720,13 +2071,16 @@
           "name": "战魂觉醒",
           "category": "回复类能力",
           "node": "强化战魂觉醒",
-          "effect": "效果持续时间+{0}%",
-          "key": "0E835A0A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0E835A0A",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1734,13 +2088,16 @@
           "name": "活力灭击",
           "category": "攻击类能力",
           "node": "强化活力灭击",
-          "effect": "造成的伤害+{0}%",
-          "key": "6C2C7F8F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "6C2C7F8F",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1748,13 +2105,16 @@
           "name": "龙之荣耀",
           "category": "强化类能力",
           "node": "强化龙之荣耀",
-          "effect": "效果持续时间+{0}%",
-          "key": "B83C78B7",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B83C78B7",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1768,13 +2128,16 @@
           "name": "烈火突袭",
           "category": "攻击类能力",
           "node": "强化烈火突袭",
-          "effect": "造成的伤害+{0}%",
-          "key": "C13D7AFE",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C13D7AFE",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1782,13 +2145,16 @@
           "name": "烈焰脚步",
           "category": "强化类能力",
           "node": "强化烈焰脚步",
-          "effect": "效果持续时间+{0}%",
-          "key": "368E4189",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "368E4189",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1796,13 +2162,16 @@
           "name": "未知之魂",
           "category": "弱化类能力",
           "node": "强化未知之魂",
-          "effect": "效果持续时间+{0}%",
-          "key": "ADAD356E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "ADAD356E",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1810,13 +2179,16 @@
           "name": "撕裂",
           "category": "攻击类能力",
           "node": "强化撕裂",
-          "effect": "效果持续时间+{0}%",
-          "key": "478AF26D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "478AF26D",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1824,13 +2196,16 @@
           "name": "梦幻曲",
           "category": "强化类能力",
           "node": "强化梦幻曲",
-          "effect": "效果持续时间+{0}%",
-          "key": "24762848",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "24762848",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1838,13 +2213,16 @@
           "name": "力量",
           "category": "攻击类能力",
           "node": "强化力量",
-          "effect": "昏厥值+{0}%",
-          "key": "88495A4E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "88495A4E",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1852,13 +2230,16 @@
           "name": "王之威势",
           "category": "攻击类能力",
           "node": "强化王之威势",
-          "effect": "造成的伤害+{0}%",
-          "key": "1F6ED4A1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1F6ED4A1",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1866,13 +2247,16 @@
           "name": "赤焰旋涡",
           "category": "攻击类能力",
           "node": "强化赤焰旋涡",
-          "effect": "造成的伤害+{0}%",
-          "key": "67E08981",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "67E08981",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -1886,13 +2270,16 @@
           "name": "无畏之刃",
           "category": "攻击类能力",
           "node": "强化无畏之刃",
-          "effect": "造成的伤害+{0}%",
-          "key": "0071F5DB",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0071F5DB",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1900,13 +2287,16 @@
           "name": "昨日之影",
           "category": "攻击类能力",
           "node": "强化昨日之影",
-          "effect": "冷却时间-{0}%",
-          "key": "084E7316",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "084E7316",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1914,13 +2304,16 @@
           "name": "计谋",
           "category": "强化类能力",
           "node": "强化计谋",
-          "effect": "效果持续时间+{0}%",
-          "key": "D58625D1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D58625D1",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1928,13 +2321,16 @@
           "name": "蹑龙挪步",
           "category": "攻击类能力",
           "node": "强化蹑龙挪步",
-          "effect": "昏厥值+{0}%",
-          "key": "C8958F76",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C8958F76",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1942,13 +2338,16 @@
           "name": "救世之力",
           "category": "强化类能力",
           "node": "强化救世之力",
-          "effect": "冷却时间-{0}%",
-          "key": "C77B9640",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C77B9640",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1956,13 +2355,16 @@
           "name": "幻甲",
           "category": "强化类能力",
           "node": "强化幻甲",
-          "effect": "效果持续时间+{0}%",
-          "key": "6C91157B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "6C91157B",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1970,13 +2372,16 @@
           "name": "湮灭斩",
           "category": "攻击类能力",
           "node": "强化湮灭斩",
-          "effect": "效果持续时间+{0}%",
-          "key": "BD51F38C",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BD51F38C",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -1984,13 +2389,16 @@
           "name": "龙气外释",
           "category": "强化类能力",
           "node": "强化龙气外释",
-          "effect": "冷却时间-{0}%",
-          "key": "3A473EC2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "3A473EC2",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2004,13 +2412,16 @@
           "name": "拟态人偶",
           "category": "攻击类能力",
           "node": "强化拟态人偶",
-          "effect": "冷却时间-{0}%",
-          "key": "B0D4071F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B0D4071F",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2018,13 +2429,16 @@
           "name": "盘蛇之阵",
           "category": "攻击类能力",
           "node": "强化盘蛇之阵",
-          "effect": "造成的伤害+{0}%",
-          "key": "F9F6F61D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F9F6F61D",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2032,13 +2446,16 @@
           "name": "幻术光影",
           "category": "强化类能力",
           "node": "强化幻术光影",
-          "effect": "效果持续时间+{0}%",
-          "key": "4D3386E5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "4D3386E5",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2046,13 +2463,16 @@
           "name": "固魂",
           "category": "回复类能力",
           "node": "强化固魂",
-          "effect": "冷却时间-{0}%",
-          "key": "390CE9D0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "390CE9D0",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2060,13 +2480,16 @@
           "name": "毁散",
           "category": "弱化类能力",
           "node": "强化毁散",
-          "effect": "造成的伤害+{0}%",
-          "key": "76037FA7",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "76037FA7",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2074,13 +2497,16 @@
           "name": "根源之术",
           "category": "回复类能力",
           "node": "强化根源之术",
-          "effect": "冷却时间-{0}%",
-          "key": "36510BF3",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "36510BF3",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2088,13 +2514,16 @@
           "name": "起源之城",
           "category": "攻击类能力",
           "node": "强化起源之城",
-          "effect": "造成的伤害+{0}%",
-          "key": "BFEA2037",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BFEA2037",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2102,13 +2531,16 @@
           "name": "蛇行列车",
           "category": "攻击类能力",
           "node": "强化蛇行列车",
-          "effect": "造成的伤害+{0}%",
-          "key": "0A268710",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0A268710",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2122,13 +2554,16 @@
           "name": "十起",
           "category": "攻击类能力",
           "node": "强化十起",
-          "effect": "造成的伤害+{0}%",
-          "key": "95152CE1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "95152CE1",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2136,13 +2571,16 @@
           "name": "空空漠漠",
           "category": "攻击类能力",
           "node": "强化空空漠漠",
-          "effect": "造成的伤害+{0}%",
-          "key": "ECDBEFDB",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "ECDBEFDB",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2150,13 +2588,16 @@
           "name": "刀逡巡",
           "category": "强化类能力",
           "node": "强化刀逡巡",
-          "effect": "冷却时间-{0}%",
-          "key": "859A683C",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "859A683C",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2164,13 +2605,16 @@
           "name": "千转",
           "category": "强化类能力",
           "node": "强化千转",
-          "effect": "冷却时间-{0}%",
-          "key": "FD0D00CF",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FD0D00CF",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2178,13 +2622,16 @@
           "name": "以牙还牙",
           "category": "攻击类能力",
           "node": "强化以牙还牙",
-          "effect": "冷却时间-{0}%",
-          "key": "49E09682",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "49E09682",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2192,13 +2639,16 @@
           "name": "百承",
           "category": "强化类能力",
           "node": "强化百承",
-          "effect": "效果持续时间+{0}%",
-          "key": "DF469A99",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "DF469A99",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2206,13 +2656,16 @@
           "name": "闪空",
           "category": "攻击类能力",
           "node": "强化闪空",
-          "effect": "造成的伤害+{0}%",
-          "key": "0646D93E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0646D93E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2220,13 +2673,16 @@
           "name": "惊天动地",
           "category": "攻击类能力",
           "node": "强化惊天动地",
-          "effect": "昏厥值+{0}%",
-          "key": "37437D79",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "37437D79",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2240,13 +2696,16 @@
           "name": "无尽奇观",
           "category": "攻击类能力",
           "node": "强化无尽奇观",
-          "effect": "效果持续时间+{0}%",
-          "key": "48DFA926",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "48DFA926",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2254,13 +2713,16 @@
           "name": "愤怒之雨",
           "category": "攻击类能力",
           "node": "强化愤怒之雨",
-          "effect": "效果持续时间+{0}%",
-          "key": "EB1D36FC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "EB1D36FC",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2268,13 +2730,16 @@
           "name": "阿尔贝斯之枪",
           "category": "攻击类能力",
           "node": "强化阿尔贝斯之枪",
-          "effect": "造成的伤害+{0}%",
-          "key": "7B7F668E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7B7F668E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2282,13 +2747,16 @@
           "name": "符文狂潮",
           "category": "强化类能力",
           "node": "强化符文狂潮",
-          "effect": "效果持续时间+{0}%",
-          "key": "F20A5206",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F20A5206",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2296,13 +2764,16 @@
           "name": "长枪回旋",
           "category": "攻击类能力",
           "node": "强化长枪回旋",
-          "effect": "效果持续时间+{0}%",
-          "key": "652514CA",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "652514CA",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2310,13 +2781,16 @@
           "name": "复仇之火",
           "category": "强化类能力",
           "node": "强化复仇之火",
-          "effect": "效果持续时间+{0}%",
-          "key": "3763BBF8",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "3763BBF8",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2324,13 +2798,16 @@
           "name": "千炎",
           "category": "攻击类能力",
           "node": "强化千炎",
-          "effect": "效果持续时间+{0}%",
-          "key": "2B43CEE3",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2B43CEE3",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2338,13 +2815,16 @@
           "name": "威光领域",
           "category": "攻击类能力",
           "node": "强化威光领域",
-          "effect": "冷却时间-{0}%",
-          "key": "606683D5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "606683D5",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2358,13 +2838,16 @@
           "name": "恐怖军势",
           "category": "攻击类能力",
           "node": "强化恐怖军势",
-          "effect": "造成的伤害+{0}%",
-          "key": "6F1762E8",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "6F1762E8",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2372,13 +2855,16 @@
           "name": "暴虐暗影",
           "category": "攻击类能力",
           "node": "强化暴虐暗影",
-          "effect": "造成的伤害+{0}%",
-          "key": "8107A6DC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "8107A6DC",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2386,13 +2872,16 @@
           "name": "巨镰古洛诺斯",
           "category": "攻击类能力",
           "node": "强化巨镰古洛诺斯",
-          "effect": "昏厥值+{0}%",
-          "key": "1E86BE21",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1E86BE21",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2400,13 +2889,16 @@
           "name": "无畏巨躯",
           "category": "强化类能力",
           "node": "强化无畏巨躯",
-          "effect": "效果持续时间+{0}%",
-          "key": "B3EF7C31",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B3EF7C31",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2414,13 +2906,16 @@
           "name": "遗忘传说",
           "category": "强化类能力",
           "node": "强化遗忘传说",
-          "effect": "冷却时间-{0}%",
-          "key": "0C81FF69",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0C81FF69",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2428,13 +2923,16 @@
           "name": "灭顶一击",
           "category": "攻击类能力",
           "node": "强化灭顶一击",
-          "effect": "效果持续时间+{0}%",
-          "key": "D06BA547",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D06BA547",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2442,13 +2940,16 @@
           "name": "暗蚀",
           "category": "弱化类能力",
           "node": "强化暗蚀",
-          "effect": "效果持续时间+{0}%",
-          "key": "7379C670",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7379C670",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2456,13 +2957,16 @@
           "name": "地狱之怒",
           "category": "攻击类能力",
           "node": "强化地狱之怒",
-          "effect": "冷却时间-{0}%",
-          "key": "91DC3F95",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "91DC3F95",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2476,13 +2980,16 @@
           "name": "游影自如",
           "category": "攻击类能力",
           "node": "强化游影自如",
-          "effect": "造成的伤害+{0}%",
-          "key": "5A242B75",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "5A242B75",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2490,13 +2997,16 @@
           "name": "逐星",
           "category": "攻击类能力",
           "node": "强化逐星",
-          "effect": "造成的伤害+{0}%",
-          "key": "3E42189D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "3E42189D",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2504,13 +3014,16 @@
           "name": "恩布拉斯克之剑",
           "category": "攻击类能力",
           "node": "强化恩布拉斯克之剑",
-          "effect": "造成的伤害+{0}%",
-          "key": "046305C5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "046305C5",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2518,13 +3031,16 @@
           "name": "永恒征程",
           "category": "弱化类能力",
           "node": "强化永恒征程",
-          "effect": "效果持续时间+{0}%",
-          "key": "A2346E69",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A2346E69",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2532,13 +3048,16 @@
           "name": "烈焰之心",
           "category": "攻击类能力",
           "node": "强化烈焰之心",
-          "effect": "造成的伤害+{0}%",
-          "key": "71E5158A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "71E5158A",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2546,13 +3065,16 @@
           "name": "雷鸟",
           "category": "攻击类能力",
           "node": "强化雷鸟",
-          "effect": "造成的伤害+{0}%",
-          "key": "F7D4CF6E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F7D4CF6E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2560,13 +3082,16 @@
           "name": "破缚残影",
           "category": "强化类能力",
           "node": "强化破缚残影",
-          "effect": "冷却时间-{0}%",
-          "key": "F5E75919",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F5E75919",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2574,13 +3099,16 @@
           "name": "新星跃升",
           "category": "强化类能力",
           "node": "强化新星跃升",
-          "effect": "冷却时间-{0}%",
-          "key": "37AC42C1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "37AC42C1",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2594,13 +3122,16 @@
           "name": "缓刑",
           "category": "弱化类能力",
           "node": "强化缓刑",
-          "effect": "效果持续时间+{0}%",
-          "key": "875F0A2B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "875F0A2B",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2608,13 +3139,16 @@
           "name": "不朽之誓",
           "category": "攻击类能力",
           "node": "强化不朽之誓",
-          "effect": "造成的伤害+{0}%",
-          "key": "D3CA3C59",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D3CA3C59",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2622,13 +3156,16 @@
           "name": "戏火",
           "category": "强化类能力",
           "node": "强化戏火",
-          "effect": "冷却时间-{0}%",
-          "key": "294E43E8",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "294E43E8",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2636,13 +3173,16 @@
           "name": "怒号连击",
           "category": "攻击类能力",
           "node": "强化怒号连击",
-          "effect": "冷却时间-{0}%",
-          "key": "B4A67F8D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B4A67F8D",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2650,13 +3190,16 @@
           "name": "雷光迅步",
           "category": "强化类能力",
           "node": "强化雷光迅步",
-          "effect": "冷却时间-{0}%",
-          "key": "A1E02085",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A1E02085",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2664,13 +3207,16 @@
           "name": "不屈之志",
           "category": "强化类能力",
           "node": "强化不屈之志",
-          "effect": "",
-          "key": "C2EDB910",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C2EDB910",
+              "effect": "",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2678,13 +3224,16 @@
           "name": "弗拉梅克之雷",
           "category": "攻击类能力",
           "node": "强化弗拉梅克之雷",
-          "effect": "造成的伤害+{0}%",
-          "key": "673C502F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "673C502F",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2692,13 +3241,16 @@
           "name": "撼地天雷",
           "category": "攻击类能力",
           "node": "强化撼地天雷",
-          "effect": "造成的伤害+{0}%",
-          "key": "DF1DBAC4",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "DF1DBAC4",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2712,13 +3264,16 @@
           "name": "横扫剑弧",
           "category": "攻击类能力",
           "node": "强化横扫剑弧",
-          "effect": "造成的伤害+{0}%",
-          "key": "E5368706",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "E5368706",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2726,13 +3281,16 @@
           "name": "无尽剑阵",
           "category": "攻击类能力",
           "node": "强化无尽剑阵",
-          "effect": "造成的伤害+{0}%",
-          "key": "B3B7F48E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B3B7F48E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2740,13 +3298,16 @@
           "name": "破灭剑陨",
           "category": "攻击类能力",
           "node": "强化破灭剑陨",
-          "effect": "造成的伤害+{0}%",
-          "key": "A7BBC6E4",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A7BBC6E4",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2754,13 +3315,16 @@
           "name": "聚灵剑气",
           "category": "强化类能力",
           "node": "强化聚灵剑气",
-          "effect": "效果持续时间+{0}%",
-          "key": "E8AC93E1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "E8AC93E1",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2768,13 +3332,16 @@
           "name": "缚魂剑罡",
           "category": "攻击类能力",
           "node": "强化缚魂剑罡",
-          "effect": "效果持续时间+{0}%",
-          "key": "E0C167C5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "E0C167C5",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2782,13 +3349,16 @@
           "name": "碎星剑斩",
           "category": "攻击类能力",
           "node": "强化碎星剑斩",
-          "effect": "造成的伤害+{0}%",
-          "key": "46AA5F9E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "46AA5F9E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2796,13 +3366,16 @@
           "name": "狂风剑气",
           "category": "强化类能力",
           "node": "强化狂风剑气",
-          "effect": "效果持续时间+{0}%",
-          "key": "F712D95D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F712D95D",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2810,13 +3383,16 @@
           "name": "七星剑闪",
           "category": "强化类能力",
           "node": "强化七星剑闪",
-          "effect": "等待时间-{0}%",
-          "key": "9A13EA07",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9A13EA07",
+              "effect": "等待时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2830,13 +3406,16 @@
           "name": "信使神光",
           "category": "强化类能力",
           "node": "强化信使神光",
-          "effect": "效果持续时间+{0}%",
-          "key": "FE8D8B61",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "FE8D8B61",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2844,13 +3423,16 @@
           "name": "堕落箭雨",
           "category": "攻击类能力",
           "node": "强化堕落箭雨",
-          "effect": "造成的伤害+{0}%",
-          "key": "24AD07C0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "24AD07C0",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2858,13 +3440,16 @@
           "name": "致命一击",
           "category": "攻击类能力",
           "node": "强化致命一击",
-          "effect": "造成的伤害+{0}%",
-          "key": "0C326331",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0C326331",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2872,13 +3457,16 @@
           "name": "散矢疾影",
           "category": "攻击类能力",
           "node": "强化散矢疾影",
-          "effect": "造成的伤害+{0}%",
-          "key": "EBCD47C0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "EBCD47C0",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2886,13 +3474,16 @@
           "name": "圆弧散射",
           "category": "攻击类能力",
           "node": "强化圆弧散射",
-          "effect": "造成的伤害+{0}%",
-          "key": "A4AC0AE2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A4AC0AE2",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2900,13 +3491,16 @@
           "name": "致命箭雨",
           "category": "攻击类能力",
           "node": "强化致命箭雨",
-          "effect": "造成的伤害+{0}%",
-          "key": "4FACDEDA",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "4FACDEDA",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2914,13 +3508,16 @@
           "name": "弓魄无双",
           "category": "强化类能力",
           "node": "强化弓魄无双",
-          "effect": "效果持续时间+{0}%",
-          "key": "523567B2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "523567B2",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2928,13 +3525,16 @@
           "name": "二王之诤",
           "category": "攻击类能力",
           "node": "强化二王之诤",
-          "effect": "等待时间-{0}%",
-          "key": "1F99A227",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1F99A227",
+              "effect": "等待时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -2948,13 +3548,16 @@
           "name": "天司之息",
           "category": "回复类能力",
           "node": "强化天司之息",
-          "effect": "冷却时间-{0}%",
-          "key": "04B51F4D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "04B51F4D",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2962,13 +3565,16 @@
           "name": "无路可逃",
           "category": "攻击类能力",
           "node": "强化无路可逃",
-          "effect": "造成的伤害+{0}%",
-          "key": "060F007D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "060F007D",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2976,13 +3582,16 @@
           "name": "天光轨迹",
           "category": "攻击类能力",
           "node": "强化天光轨迹",
-          "effect": "造成的伤害+{0}%",
-          "key": "664122D7",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "664122D7",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -2990,13 +3599,16 @@
           "name": "一人之力",
           "category": "强化类能力",
           "node": "强化一人之力",
-          "effect": "效果持续时间+{0}%",
-          "key": "BFE03CEF",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BFE03CEF",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3004,13 +3616,16 @@
           "name": "极火虹光",
           "category": "攻击类能力",
           "node": "强化极火虹光",
-          "effect": "造成的伤害+{0}%",
-          "key": "0A3D95DE",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0A3D95DE",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3018,13 +3633,16 @@
           "name": "独守天穹",
           "category": "攻击类能力",
           "node": "强化独守天穹",
-          "effect": "效果持续时间+{0}%",
-          "key": "1E174AE1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1E174AE1",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3032,13 +3650,16 @@
           "name": "凛冬暗夜",
           "category": "攻击类能力",
           "node": "强化凛冬暗夜",
-          "effect": "造成的伤害+{0}%",
-          "key": "66712D58",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "66712D58",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3046,13 +3667,16 @@
           "name": "定法囚牢",
           "category": "弱化类能力",
           "node": "强化定法囚牢",
-          "effect": "造成的伤害+{0}%",
-          "key": "EE0FC138",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "EE0FC138",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -3066,13 +3690,16 @@
           "name": "降咒",
           "category": "攻击类能力",
           "node": "强化降咒",
-          "effect": "效果持续时间+{0}%",
-          "key": "9F2D7464",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9F2D7464",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3080,13 +3707,16 @@
           "name": "猩红梦魇",
           "category": "攻击类能力",
           "node": "强化猩红梦魇",
-          "effect": "效果持续时间+{0}%",
-          "key": "6C09E125",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "6C09E125",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3094,13 +3724,16 @@
           "name": "暴虐之拳",
           "category": "攻击类能力",
           "node": "强化暴虐之拳",
-          "effect": "造成的伤害+{0}%",
-          "key": "55138869",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "55138869",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3108,13 +3741,16 @@
           "name": "转瞬之机",
           "category": "攻击类能力",
           "node": "强化转瞬之机",
-          "effect": "造成的伤害+{0}%",
-          "key": "7E0BC84B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7E0BC84B",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3122,13 +3758,16 @@
           "name": "夺命领域",
           "category": "攻击类能力",
           "node": "强化夺命领域",
-          "effect": "造成的伤害+{0}%",
-          "key": "D4798E75",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D4798E75",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3136,13 +3775,16 @@
           "name": "破面踢",
           "category": "攻击类能力",
           "node": "强化破面踢",
-          "effect": "冷却时间-{0}%",
-          "key": "46116BD6",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "46116BD6",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3150,13 +3792,16 @@
           "name": "夺目光辉",
           "category": "攻击类能力",
           "node": "强化夺目光辉",
-          "effect": "冷却时间-{0}%",
-          "key": "19F65A11",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "19F65A11",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3164,13 +3809,16 @@
           "name": "力量源泉",
           "category": "攻击类能力",
           "node": "强化力量源泉",
-          "effect": "造成的伤害+{0}%",
-          "key": "A22A3613",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "A22A3613",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -3184,13 +3832,16 @@
           "name": "碎魂",
           "category": "攻击类能力",
           "node": "强化碎魂",
-          "effect": "冷却时间-{0}%",
-          "key": "316AFC8B",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "316AFC8B",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3198,13 +3849,16 @@
           "name": "逆爪",
           "category": "攻击类能力",
           "node": "强化逆爪",
-          "effect": "冷却时间-{0}%",
-          "key": "2CB830BD",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2CB830BD",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3212,13 +3866,16 @@
           "name": "灾兆",
           "category": "强化类能力",
           "node": "强化灾兆",
-          "effect": "冷却时间-{0}%",
-          "key": "DC1E1B4D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "DC1E1B4D",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3226,13 +3883,16 @@
           "name": "黑之祝福",
           "category": "强化类能力",
           "node": "强化黑之祝福",
-          "effect": "效果持续时间+{0}%",
-          "key": "F7D5A004",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "F7D5A004",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3240,13 +3900,16 @@
           "name": "本源恐惧",
           "category": "弱化类能力",
           "node": "强化本源恐惧",
-          "effect": "效果持续时间+{0}%",
-          "key": "91728863",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "91728863",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3254,13 +3917,16 @@
           "name": "咒葬",
           "category": "强化类能力",
           "node": "强化咒葬",
-          "effect": "效果持续时间+{0}%",
-          "key": "23326B77",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "23326B77",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3268,13 +3934,16 @@
           "name": "瘴域",
           "category": "攻击类能力",
           "node": "强化瘴域",
-          "effect": "造成的伤害+{0}%",
-          "key": "1CB2F2F6",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1CB2F2F6",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3282,13 +3951,16 @@
           "name": "逆核",
           "category": "攻击类能力",
           "node": "强化逆核",
-          "effect": "造成的伤害+{0}%",
-          "key": "06719F5D",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "06719F5D",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -3302,13 +3974,16 @@
           "name": "圣迹再临",
           "category": "攻击类能力",
           "node": "强化圣迹再临",
-          "effect": "造成的伤害+{0}%",
-          "key": "3755AAEE",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "3755AAEE",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3316,13 +3991,16 @@
           "name": "无缚之斩",
           "category": "攻击类能力",
           "node": "强化无缚之斩",
-          "effect": "昏厥值+{0}%",
-          "key": "0755E545",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0755E545",
+              "effect": "昏厥值+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3330,13 +4008,16 @@
           "name": "赎罪",
           "category": "攻击类能力",
           "node": "强化赎罪",
-          "effect": "造成的伤害+{0}%",
-          "key": "0E146781",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "0E146781",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3344,13 +4025,16 @@
           "name": "末日形态",
           "category": "强化类能力",
           "node": "强化末日形态",
-          "effect": "冷却时间-{0}%",
-          "key": "D521C6E3",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D521C6E3",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3358,13 +4042,16 @@
           "name": "天谴",
           "category": "攻击类能力",
           "node": "强化天谴",
-          "effect": "造成的伤害+{0}%",
-          "key": "D3788A5E",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "D3788A5E",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3372,13 +4059,16 @@
           "name": "神愿之力",
           "category": "攻击类能力",
           "node": "强化神愿之力",
-          "effect": "伤害减免+{0}%",
-          "key": "EE0C1CBC",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "EE0C1CBC",
+              "effect": "伤害减免+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3386,13 +4076,16 @@
           "name": "永无止境",
           "category": "攻击类能力",
           "node": "强化永无止境",
-          "effect": "造成的伤害+{0}%",
-          "key": "5C492FDB",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "5C492FDB",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3400,13 +4093,16 @@
           "name": "乐园之噬",
           "category": "弱化类能力",
           "node": "强化乐园之噬",
-          "effect": "效果持续时间+{0}%",
-          "key": "B1218F6F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B1218F6F",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -3420,13 +4116,16 @@
           "name": "横枪立马",
           "category": "强化类能力",
           "node": "强化横枪立马",
-          "effect": "效果持续时间+{0}%",
-          "key": "E0DAE4A5",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "E0DAE4A5",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3434,13 +4133,16 @@
           "name": "华枪天降",
           "category": "攻击类能力",
           "node": "强化华枪天降",
-          "effect": "造成的伤害+{0}%",
-          "key": "88E58FD2",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "88E58FD2",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3448,13 +4150,16 @@
           "name": "穿山一刺",
           "category": "攻击类能力",
           "node": "强化穿山一刺",
-          "effect": "造成的伤害+{0}%",
-          "key": "C50CD206",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "C50CD206",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3462,13 +4167,16 @@
           "name": "武刹枪",
           "category": "攻击类能力",
           "node": "强化武刹枪",
-          "effect": "造成的伤害+{0}%",
-          "key": "1A73F917",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "1A73F917",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3476,13 +4184,16 @@
           "name": "风卷残云",
           "category": "攻击类能力",
           "node": "强化风卷残云",
-          "effect": "冷却时间-{0}%",
-          "key": "45551DEA",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "45551DEA",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3490,13 +4201,16 @@
           "name": "锋芒一线",
           "category": "攻击类能力",
           "node": "强化锋芒一线",
-          "effect": "造成的伤害+{0}%",
-          "key": "AF60AF33",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "AF60AF33",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3504,13 +4218,16 @@
           "name": "摧山坼地",
           "category": "攻击类能力",
           "node": "强化摧山坼地",
-          "effect": "造成的伤害+{0}%",
-          "key": "BC368D04",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "BC368D04",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3518,13 +4235,16 @@
           "name": "铁衣玉碎",
           "category": "强化类能力",
           "node": "强化铁衣玉碎",
-          "effect": "冷却时间-{0}%",
-          "key": "9A849FD0",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9A849FD0",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]
@@ -3538,13 +4258,16 @@
           "name": "迅雷之锤",
           "category": "攻击类能力",
           "node": "强化迅雷之锤",
-          "effect": "造成的伤害+{0}%",
-          "key": "4DC1089A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "4DC1089A",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3552,13 +4275,16 @@
           "name": "必杀魔铳",
           "category": "攻击类能力",
           "node": "强化必杀魔铳",
-          "effect": "造成的伤害+{0}%",
-          "key": "2A649D4A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "2A649D4A",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3566,13 +4292,16 @@
           "name": "奇迹权杖",
           "category": "回复类能力",
           "node": "强化奇迹权杖",
-          "effect": "冷却时间-{0}%",
-          "key": "21EE055A",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "21EE055A",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3580,13 +4309,16 @@
           "name": "神威宝枪",
           "category": "攻击类能力",
           "node": "强化神威宝枪",
-          "effect": "造成的伤害+{0}%",
-          "key": "B9C54D8C",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "B9C54D8C",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3594,13 +4326,16 @@
           "name": "坚毅戎歌",
           "category": "强化类能力",
           "node": "强化坚毅戎歌",
-          "effect": "冷却时间-{0}%",
-          "key": "7F911E9F",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7F911E9F",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3608,13 +4343,16 @@
           "name": "暗夜离曲",
           "category": "攻击类能力",
           "node": "强化暗夜离曲",
-          "effect": "造成的伤害+{0}%",
-          "key": "7D4B457C",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "7D4B457C",
+              "effect": "造成的伤害+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3622,13 +4360,16 @@
           "name": "曲音萦绕",
           "category": "强化类能力",
           "node": "强化曲音萦绕",
-          "effect": "冷却时间-{0}%",
-          "key": "18C94BE6",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "18C94BE6",
+              "effect": "冷却时间-{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         },
         {
@@ -3636,13 +4377,16 @@
           "name": "英勇颂歌",
           "category": "强化类能力",
           "node": "强化英勇颂歌",
-          "effect": "效果持续时间+{0}%",
-          "key": "9AE30EF1",
-          "levels": 3,
-          "defaults": [
-            2,
-            3,
-            5
+          "params": [
+            {
+              "key": "9AE30EF1",
+              "effect": "效果持续时间+{0}%",
+              "defaults": [
+                2,
+                3,
+                5
+              ]
+            }
           ]
         }
       ]

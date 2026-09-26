@@ -101,17 +101,17 @@ internal sealed class AbilityEditorFeature {
         foreach (AbilityEdit edit in config.Edits) {
             if (!edit.Enabled)
                 continue;
-            if (!TryParseKey(edit.Key, out uint keyHash) || edit.Levels < 1 || edit.Levels > MaxLevels) {
+            if (!TryParseKey(edit.Key, out uint keyHash)
+                || edit.Values is null
+                || edit.Values.Length < 1
+                || edit.Values.Length > MaxLevels) {
                 skipped++;
                 continue;
             }
 
-            // 同一档位写同一个值：这一版一栏一个数值，分档设值不在这一版里。
-            var levels = new float[edit.Levels];
-            for (int index = 0; index < levels.Length; ++index)
-                levels[index] = edit.Value;
-
-            int result = NativeCore.SetLimitBonusLevels(keyHash, levels);
+            // 逐档写：values[i] 进 Lv(i+1)。没提到的槽一个字节都不碰——原生的 level_count 就是数组
+            // 长度，所以"写几档"完全由这一条记录说了算。
+            int result = NativeCore.SetLimitBonusLevels(keyHash, edit.Values);
             if (result >= 0)
                 landed++;
             else

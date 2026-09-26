@@ -326,8 +326,8 @@ export default function App() {
                             <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
                             <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
                             <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
-                            {/* 能力编辑页刻意只做中文：它读的资产也只有中文，所以这一个标签不走 messages.ts。 */}
-                            <TabsTrigger value="abilityEditor">能力编辑</TabsTrigger>
+                            {/* 角色强化页刻意只做中文：它读的资产也只有中文，所以这一个标签不走 messages.ts。 */}
+                            <TabsTrigger value="abilityEditor">角色强化</TabsTrigger>
                         </TabsList>
                         {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的

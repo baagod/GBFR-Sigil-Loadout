@@ -1,15 +1,21 @@
 /*
-    能力强化编辑页：一个能力一栏、一个数值。
+    能力编辑页：一条能力一栏，**一行就是第一档**——这一页只改第一档，游戏里 Lv2/Lv3 保持原值
+    （见 ability.ts 的 withFirstValue）。
 
     这一页刻意只做中文——它读的资产（assets/abilities.json）只有中文，所以文案直接写在组件里，
     不走 messages.ts 的多语言（那一份是给四个页签共用的外壳与因子页准备的）。
 
-    编辑列表与因子编辑页是同一套规矩：按 Key 索引（mod 也按 Key 找 limit_bonus_param 的行）、每次
-    改动把整份列表交给后端防抖落盘（见 abilityservice.go）、读取不写回。
+    编辑列表与因子编辑页是同一套规矩：按 Key 索引（一个参数行一个 Key，mod 也按 Key 找
+    limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 abilityservice.go）、读取不写回。
+
+    屏幕上的那一行是**第一档**：左边一格里是各参数行的效果模板（{0} 写成框号 {1}/{2}/{3}），右边并排
+    着它们各自的数值框——描述里的第 n 个号就是从左数第 n 个框。一条能力挂几个参数行，一行里就有几个
+    框（1..3）：属性类强化有三个参数行（伤害上限 = 普攻/能力/奥义），因此读成一行，而不是叠三行描述
+    与三个框。
 */
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useRef, useState } from "react";
 import { Call, Events } from "@wailsio/runtime";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import {
     AlertDialog,
@@ -21,27 +27,19 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-    Combobox,
-    ComboboxContent,
-    ComboboxEmpty,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-    ComboboxTrigger,
-    ComboboxValue,
-} from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
     asEdit,
     dedupeCharacters,
     dedupeEdits,
-    defaultOf,
-    effectText,
+    levelLabel,
+    slotsAt,
+    valueAt,
+    withFirstValue,
     type Ability,
     type AbilityCharacter,
     type AbilityEdit,
+    type AbilityParam,
     type AbilityTable,
 } from "./ability";
 import { slotEdit, stepValue } from "./skills";
@@ -55,28 +53,39 @@ const SERVICE = "main.AbilityService";
 const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
 
 /*
-    表头与每一行共用这张列宽表，列才对得上：宽度只在这一处声明。效果那一列吃掉剩下的宽度——它最长，
-    而其余几列的内容都是定长的。
+    表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，
+    而其余两列的内容都是定长的（名字、三个数值槽）。
+
+    勾选框那一列随"有值即启用"一起删掉了（见 ability.ts 的 withFirstValue）：留着空列只会把能力名推右。
+    一条能力就是一行，三列各填一格：能力名、描述、那三个槽。
+
+    数值那一列按**固定的三个槽**留宽（3 × 56px 的框 + 3 × 6px 的 `|` 分隔 = 186px）：一个槽对应一个
+    参数行，一条强化最多三个。
 */
-const COLUMNS =
-    "grid grid-cols-[170px_88px_170px_minmax(160px,1fr)_84px_44px] items-center gap-2";
+const COLUMNS = "grid grid-cols-[130px_minmax(160px,1fr)_200px] items-center gap-2";
 
 /**
- * 一栏。数值框的半成品文本、提交规则与步进与因子编辑页的十个槽逐字相同（见 skills.ts 的 slotEdit
- * 与 stepValue），只是这里一栏只有一个框。
+ * 一个数值框：描述里的 {n} 指的就是它。
+ *
+ * 半成品文本、提交规则与步进与因子编辑页的十个槽逐字相同（见 skills.ts 的 slotEdit 与 stepValue）
+ * ——这里只是借它们解析一个框。
  */
-function AbilityRow({
-    ability,
+function SlotBox({
+    name,
+    slot,
+    param,
     record,
     onValue,
-    onToggle,
 }: {
-    ability: Ability;
-    /** 这一栏的编辑；没编辑过就是 undefined。 */
+    /** 能力名：只在读屏里指认这个框用，屏幕上它就在这一行的左端。 */
+    name: string;
+    /** 第几个框，从 1 起：描述里的 {n} 是同一个号。 */
+    slot: number;
+    param: AbilityParam;
+    /** 这个参数行的记录；没编辑过就是 undefined。 */
     record: AbilityEdit | undefined;
-    /** 一个数值算完了，null = 清空（这一栏回到没编辑过）。 */
+    /** 这一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
     onValue: (value: number | null) => void;
-    onToggle: () => void;
 }) {
     /*
         编辑中的框正在显示的文本，前提是它与已提交数字渲染出来的样子不同："-" 与 "0." 是通往一个数字
@@ -85,19 +94,20 @@ function AbilityRow({
     */
     const [typed, setTyped] = useState<string | null>(null);
 
-    const committed = record?.value;
-    // 没人输入过时框是空的、占位符是游戏自己的数值：空 = 没碰过，与因子编辑页的十个槽同一条规矩。
-    // 而效果那一行总要有个数可填，所以它拿游戏自己的数值当起点。
-    const shown = committed ?? defaultOf(ability);
+    // 这一格有没有用户填过的数：手写过的记录缺第一格（values 是空的）与"没编辑过"一样，显示占位符。
+    // 读的永远是记录的第一格——这一页只写、只显示第一档（见 ability.ts 的 valueAt）。
+    const committed = record?.values[0];
+    // 框里的占位符读的是 Lv1 的数（见 ability.ts 的 valueAt）。
+    const shown = valueAt(param, record);
 
     function step(delta: 1 | -1) {
         setTyped(null);
-        onValue(stepValue(committed ?? defaultOf(ability), delta));
+        onValue(stepValue(shown, delta));
     }
 
     /*
         滚轮让聚焦的框步进，而列表不能跟着滚——监听器为什么必须是原生的、passive: false 的，见
-        useWheelStep。这一页一行只有一个框，所以不必像因子行那样按位置认是哪一个。
+        useWheelStep。一格只有一个框，所以不必像因子行那样按位置认是哪一个。
     */
     const host = useRef<HTMLDivElement>(null);
     useWheelStep(
@@ -107,34 +117,26 @@ function AbilityRow({
     );
 
     return (
-        <div ref={host} className={`${COLUMNS} h-11 border-b text-sm last:border-b-0`}>
-            <span className="truncate">{ability.name}</span>
-            <span className="truncate text-muted-foreground">{ability.category}</span>
-            <span className="truncate text-muted-foreground">{ability.node}</span>
-            {/* 节点描述下面那一行。它跟着数值框走——就是游戏里填了这个数会长成什么样子；这一栏是否
-                正在游戏里生效由右边那个开关说。少数节点游戏自己没有这行文案。 */}
-            <span className="truncate">
-                {ability.effect === "" ? (
-                    <span className="text-muted-foreground">—</span>
-                ) : (
-                    effectText(ability, shown)
-                )}
-            </span>
+        <div ref={host} className="min-w-0 flex-1">
             <Input
                 type="text"
                 inputMode="decimal"
-                aria-label={`${ability.name} 数值`}
-                placeholder={String(defaultOf(ability))}
+                aria-label={`${name} Lv1 数值 ${slot}`}
+                placeholder={String(shown)}
                 value={typed ?? (committed === undefined ? "" : String(committed))}
                 onChange={(e) => {
-                    const edit = slotEdit(e.target.value, 0, [committed ?? null]);
+                    /*
+                        只借 slotEdit 的解析规则（"-" 与 "0." 这类半成品文本、前导零、清空成 null）：起点
+                        给 [null] 是因为结果只取 [0]，而"只写第一档"那条规矩在 withFirstValue 里（见
+                        ability.ts），不该在这里再写一遍。
+                    */
+                    const edit = slotEdit(e.target.value, 0, [null]);
                     if (edit.kind === "drop") return;
                     if (edit.kind === "half") {
                         setTyped(edit.text);
                         return;
                     }
-                    // 数字已提交，但框会保留用户敲的那串文本直到离开它（见 typed 的声明）；
-                    // 清空得到的是 null，也就是"这一栏回到没编辑过"。
+                    // 数字已提交，但框保留用户敲的那串文本直到离开它（见 typed 的声明）；清空得到 null。
                     setTyped(edit.keeps ?? null);
                     onValue(edit.values[0]);
                 }}
@@ -149,15 +151,137 @@ function AbilityRow({
                     e.preventDefault();
                     step(e.key === "ArrowUp" ? 1 : -1);
                 }}
-                className="h-8 text-center tabular-nums"
+                /*
+                    无边框：框就是行高，读的是数字本身；"这一格能改"由 hover 与 focus 的淡底色回答——
+                    指针或焦点落在框上时它才现出来，所以框在静止时像裸文本，却又不是。
+
+                    那两条 dark: 不是重复：框自己的深色底色被 dark:bg-transparent 顶掉之后，深色下
+                    focus:bg-muted/50 与它同特异性、又按编译顺序排在后面（见 style.css 里因子页那条同样
+                    的取舍），带 dark: 前缀重写一遍才真的盖得住。
+                */
+                className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus:bg-muted/50 focus-visible:ring-0 dark:bg-transparent"
             />
-            <Checkbox
-                checked={record?.enabled ?? false}
-                // 没有编辑的栏里没有可启用的东西：开关不给按，数值框才是入口（见 toggle 的注释）。
-                disabled={!record}
-                aria-label={`启用 ${ability.name}`}
-                onCheckedChange={onToggle}
-            />
+        </div>
+    );
+}
+
+/**
+ * 一条能力：**就是一行**——能力名、描述、那三个数值槽（合并前是能力行下面再挂一行 Lv1 行）。
+ *
+ * 这一页只改第一档（见 ability.ts 的 withFirstValue）：Lv2/Lv3 不写也不显示，游戏里保持原值，所以
+ * 屏幕上不再有 Lv 字样，能力行自己就是那一档。
+ *
+ * 描述是各参数行的效果模板连成的一格（见 ability.ts 的 levelLabel），{n} 指着右边第 n 个槽。槽数固定
+ * 三（参数的个数上界），缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样
+ * 在每一条上都该是同一件事（与因子编辑页十个槽并排同理）。
+ */
+function AbilityRow({
+    ability,
+    edits,
+    onValue,
+}: {
+    ability: Ability;
+    /** 按参数行 Key 索引的全部编辑：这一行自己去取它那几个参数行的。 */
+    edits: Map<string, AbilityEdit>;
+    /** 某一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
+    onValue: (param: AbilityParam, value: number | null) => void;
+}) {
+    // 这一行的三个槽，按资产里的顺序：从左到右就是描述里的 {1}、{2}、{3}。
+    const slots = slotsAt(ability);
+    const label = levelLabel(slots);
+
+    return (
+        <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
+            {/* 能力名用默认前景色：层级交给字号（14 vs 角色名的 16）与 32px 缩进，不靠颜色。 */}
+            <span className="truncate text-sm">{ability.name}</span>
+            {/*
+                描述显示的是模板本身，不是把数值填进去：数字已经在右边的槽里了，说不清的正是哪个槽对
+                应效果的哪一部分。颜色比能力名淡（#a0a0a0），一行就是一行高。少数参数行游戏自己没有
+                这行文案，那时画一个占位符。
+            */}
+            <span className="min-w-0 truncate text-sm text-[#a0a0a0]">
+                {label === "" ? "—" : label}
+            </span>
+            <div className="flex items-center">
+                {slots.map(({ param, slot }) => (
+                    <Fragment key={slot}>
+                        {/*
+                            每个槽前面一个 |，第一个也不例外：它把数值与描述隔开，方式与数值彼此之间
+                            一样（与因子编辑页的 ValueSlots 逐字相同）。
+                        */}
+                        <span className="shrink-0 text-muted-foreground/40" aria-hidden>
+                            |
+                        </span>
+                        {param === null ? (
+                            // 空槽：这条能力没有这个参数行（limit_bonus 的 ParamId2/3 为空），没有可写
+                            // 的行，所以显示游戏那边的 0 且不可编辑。
+                            <span className="min-w-0 flex-1 text-center text-xs text-[#a0a0a0] tabular-nums select-none">
+                                0
+                            </span>
+                        ) : (
+                            <SlotBox
+                                name={ability.name}
+                                slot={slot}
+                                param={param}
+                                record={edits.get(param.key)}
+                                onValue={(value) => onValue(param, value)}
+                            />
+                        )}
+                    </Fragment>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * 一个角色：一行名字，展开后是它的能力，**默认收起**。
+ *
+ * 29 个角色全摊开没法看，而这一页的第一件事是挑角色、不是挑能力；展开态由它自己拿着——列表不按
+ * 展开态过滤或排序，行卸载时自然回到收起。
+ */
+function CharacterGroup({
+    character,
+    edits,
+    onValue,
+}: {
+    character: AbilityCharacter;
+    /** 按参数行 Key 索引的全部编辑：一路传给它的能力行。 */
+    edits: Map<string, AbilityEdit>;
+    onValue: (param: AbilityParam, value: number | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        /*
+            组回到**有下边框的默认样式**（border-b，最后一行不画）：分组靠这条线，不靠底色。
+            悬停那一层色（#262626）仍给出"这一行能点"。展开的能力住在这个容器里。
+        */
+        <div className="border-b last:border-b-0">
+            <div className="flex h-11 items-center gap-2 pr-4" onClick={() => setOpen((prev) => !prev)}>
+                {/* 角色名用默认前景色 */}
+                <span className="truncate text-sm font-[550]">{character.name}</span>
+                <span className="flex-1" />
+                {/*
+                    展开箭头在行末，与能力行、因子编辑页一致：一个普通图标、自己没有点击，展开是整行的
+                    活——会响应点击的图标会成为同一件事的第二个、更安静的控制。
+                */}
+                <span
+                    aria-hidden
+                    className="grid size-7 shrink-0 place-content-center text-muted-foreground"
+                >
+                    {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                </span>
+            </div>
+            {open &&
+                character.abilities.map((ability) => (
+                    <AbilityRow
+                        key={ability.abilityId}
+                        ability={ability}
+                        edits={edits}
+                        onValue={onValue}
+                    />
+                ))}
         </div>
     );
 }
@@ -168,7 +292,6 @@ function AbilityEditorPanelBase() {
     // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的这份空列表会被后端整体替换
     // 掉（同 SigilEditorPanel 的那条规则），用户其余的编辑就没了。
     const [editListRead, setEditListRead] = useState(false);
-    const [selected, setSelected] = useState("");
     const [error, setError] = useState<{ title: string; detail: string } | null>(null);
     const [errorOpen, setErrorOpen] = useState(false);
 
@@ -184,9 +307,8 @@ function AbilityEditorPanelBase() {
                 Call.ByName(`${SERVICE}.LoadAbilities`) as Promise<AbilityTable | null>,
                 Call.ByName(`${SERVICE}.LoadAbilityEdits`) as Promise<AbilityEdit[]>,
             ]);
-            const characters = dedupeCharacters(table?.characters ?? []);
-            setCharacters(characters);
-            setSelected(characters[0]?.id ?? "");
+            const all = dedupeCharacters(table?.characters ?? []);
+            setCharacters(all);
             // 只读、不写回：归一化只是为了在屏幕上理顺这份列表，用户文件在下一次真正的编辑之前不该被动过
             // ——"打开一次就等于改过一次"与 App.tsx 那条"启动不写盘"是同一件事。
             setEdits(
@@ -215,16 +337,6 @@ function AbilityEditorPanelBase() {
         [],
     );
 
-    const items = useMemo(
-        () => characters.map((character) => ({ value: character.id, label: character.name })),
-        [characters],
-    );
-    const current = items.find((item) => item.value === selected) ?? items[0];
-    const rows = useMemo(
-        () => characters.find((character) => character.id === current?.value)?.abilities ?? [],
-        [characters, current?.value],
-    );
-
     /*
         每一次改动都经过这里：屏幕上的列表就是全部状态，也是运行中的游戏最终拿到的东西。前端对"何时
         写入"刻意保持无知——每次变化把整份列表交出去，不等答复；后端的尾随防抖把一串敲键变成一次
@@ -240,116 +352,44 @@ function AbilityEditorPanelBase() {
     }
 
     /*
-        一个数值框。往还没有编辑的栏里输入会开始一条编辑，而且**是启用的**：这一版一栏一个数值，填
-        数值就是要它生效，开关只是事后把它关掉的手段。已经有记录时只改数值、绝不在这里碰 enabled
-        ——那是用户按下的开关（同 SkillRow 的"只打补丁"）。
+        一个数值框。往还没有编辑的参数行里输入会开始一条记录，**有值就是启用**——这一页没有启用开关，
+        所以这里也从不写 enabled: false（见 ability.ts 的 withFirstValue）。
 
-        清空则把整条编辑删掉：契约里一条记录必须带数值，没有数值的记录在这里无处可存；这一栏于是回到
-        没编辑过，屏幕上显示游戏自己的数值。
+        "只写第一档"在 withFirstValue 里，这里只管两件事：有值时把那一格放回列表；**清空时把整条记录
+        删掉**——删掉之后这一行回到完全没编辑过的样子，游戏那边一个字节都没被碰过（不是"还原成默认
+        值"：那会留下一条记录）。没有记录时清空是空操作，连一次落盘都不必发生。
     */
-    function setValue(ability: Ability, value: number | null) {
-        const existing = edits.get(ability.key);
+    function setValue(param: AbilityParam, value: number | null) {
+        const patched = withFirstValue(param, value);
+        // 清空一个没编辑过的参数行：Map 里本来就没有它，没有东西可删。
+        if (patched === null && !edits.has(param.key)) return;
+
         const next = new Map(edits);
-        if (value === null) {
-            next.delete(ability.key);
-        } else {
-            next.set(ability.key, {
-                enabled: existing?.enabled ?? true,
-                key: ability.key,
-                levels: existing?.levels ?? ability.levels,
-                value: value,
-            });
-        }
+        if (patched === null) next.delete(param.key);
+        else next.set(param.key, patched);
         commit(next);
     }
 
-    /*
-        启用开关：只是事后把一条编辑关掉/再打开的手段。关掉时保留数值、只是不生效（mod 跳过未启用的
-        条目），所以关着的那一栏仍显示用户填过的那个数。
-
-        **开关不自己造数值**：没有数值的栏里它是不给按的（见渲染处的 disabled）。这一版一栏一个数值，
-        打开一个空栏就等于替用户填一个数，而"填哪个数"只有用户知道。要让它生效就在数值框里输入，
-        要撤销整栏就把数值框清空。
-    */
-    function toggle(ability: Ability) {
-        const existing = edits.get(ability.key);
-        if (!existing) return;
-        const next = new Map(edits);
-        next.set(ability.key, { ...existing, enabled: !existing.enabled });
-        commit(next);
-    }
-
-    // min-w-[888px] 是本页排出来的宽度：外面那一层面板负责横向滚动，所以窗口更窄时列是被滚动条推到
-    // 视野外，而不是被裁掉（同因子编辑页）。
+    // min-w-[640px] 是本页排出来的宽度（列宽表的下限加上页面内边距与滚动条沟槽）：外面那一层面板负责
+    // 横向滚动，所以窗口更窄时列是被滚动条推到视野外，而不是被裁掉（同因子编辑页）。
     return (
-        <div className="flex h-full min-h-0 min-w-[888px] flex-col page-padding">
-            <div className="flex shrink-0 items-center gap-2 border-b pb-4">
-                <Combobox
-                    items={items}
-                    value={current}
-                    autoHighlight
-                    onValueChange={(item) => {
-                        if (item) setSelected(item.value);
-                    }}
-                >
-                    <ComboboxTrigger
-                        render={
-                            <Button
-                                variant="outline"
-                                className="h-8 w-[220px] justify-between font-normal"
-                            >
-                                <ComboboxValue />
-                                <ChevronDown className="size-4 text-muted-foreground" />
-                            </Button>
-                        }
-                    />
-                    <ComboboxContent>
-                        <ComboboxInput showTrigger={false} placeholder="搜索角色" />
-                        <ComboboxEmpty>无匹配角色</ComboboxEmpty>
-                        <ComboboxList className="max-h-[264px]">
-                            {(item) => (
-                                <ComboboxItem key={item.value} value={item}>
-                                    {item.label}
-                                </ComboboxItem>
-                            )}
-                        </ComboboxList>
-                    </ComboboxContent>
-                </Combobox>
-            </div>
-
-            {/*
-                表头待在滚动盒**外面**，否则下滚时它跟着走。它自己也是一个滚动容器（overflow-y-hidden），
-                右边那条滚动条沟槽才与下面的列表留出同一个宽度——否则表头每列都比它下面那一行窄 16px。
-            */}
-            <div className="mt-6 shrink-0 overflow-y-hidden pr-4 [scrollbar-gutter:stable]">
-                <div className={`${COLUMNS} pb-1 text-xs text-muted-foreground`}>
-                    <span>能力</span>
-                    <span>类别</span>
-                    <span>节点</span>
-                    <span>效果</span>
-                    <span className="text-center">数值</span>
-                    <span>启用</span>
-                </div>
-            </div>
-
+        <div className="flex h-full min-h-0 min-w-[640px] flex-col page-padding">
             {/*
                 ability-rows 是给外壳那记 Esc 用的（见 App.tsx）：焦点在数值框里时，Esc 是"放开这个框"
-                （见 AbilityRow），不该同时把整个窗口藏到托盘去——与因子编辑页的 .skill-rows 同一条规矩。
+                （见 SlotBox），不该同时把整个窗口藏到托盘去——与因子编辑页的 .skill-rows 同一条规矩。
                 这一页没有用得上它的样式，所以它在这里只是个钩子。
             */}
             <div className="ability-rows min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]">
-                {rows.map((ability) => (
-                    <AbilityRow
-                        // 表格的顺序就是资产的顺序：开关与输入都不会让行跳位置，指针下那一栏永远不动。
-                        key={ability.key}
-                        ability={ability}
-                        record={edits.get(ability.key)}
-                        onValue={(value) => setValue(ability, value)}
-                        onToggle={() => toggle(ability)}
+                {characters.map((character) => (
+                    <CharacterGroup
+                        key={character.id}
+                        character={character}
+                        edits={edits}
+                        onValue={setValue}
                     />
                 ))}
-                {rows.length === 0 && (
-                    <p className="py-6 text-center text-sm text-muted-foreground">没有可编辑的能力</p>
+                {characters.length === 0 && (
+                    <p className="py-6 text-center text-sm text-muted-foreground">没有可强化的条目</p>
                 )}
             </div>
 

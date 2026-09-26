@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 )
 
-// AbilityEdit 对应 mod 的 AbilityEditConfig.cs 里的 AbilityEdit：对 limit_bonus_param 一行的覆写。
-// Value 写满 Levels 个 Lv 槽——这一版一栏一个数值，分档设值不在这一版里。
+// AbilityEdit 对应 mod 的 AbilityEditConfig.cs 里的 AbilityEdit：对一个参数行（limit_bonus_param
+// 的一行）的覆写。Values 按档位排、写成 Lv1..LvN —— 写几个槽完全由这个数组的长度决定，没提到的槽
+// 一个字节都不碰（形状与 sigiledits.json 的 values 有意一致）。
 type AbilityEdit struct {
-	Enabled bool    `json:"enabled"`
-	Key     string  `json:"key"`
-	Levels  int     `json:"levels"`
-	Value   float64 `json:"value"`
+	Enabled bool      `json:"enabled"`
+	Key     string    `json:"key"`
+	Values  []float64 `json:"values"`
 }
 
 /*
@@ -50,22 +50,27 @@ type AbilityService struct {
 	writer debouncedWriter[[]AbilityEdit]
 }
 
-// Ability 是 assets/abilities.json 里的一条能力强化节点（gen 的 abilities 子命令产物）。
+// Ability 是 assets/abilities.json 里的一条能力强化条目。
 type Ability struct {
 	AbilityID string `json:"abilityId"`
 	Name      string `json:"name"`
 	Category  string `json:"category"`
 	// Node 是游戏在天赋树上给这个节点起的名字（"强化花风·薄红舞"）。
 	Node string `json:"node"`
-	// Effect 是节点描述**下面那一行**（"效果持续时间+{0}%"），{0} 就是这一栏的数值。个别节点没有
-	// 这行文案，那时它是空串。
-	Effect string `json:"effect"`
+	// Params 是这条强化挂的参数行，最多 3 个（能力强化只有一个参数行）。每个参数行有自己的效果
+	// 模板与自己的一组档位数值——界面按参数铺描述与数值框，所以这里必须是列表。
+	Params []AbilityParam `json:"params"`
+}
+
+// AbilityParam 是一条强化的一个参数行。
+type AbilityParam struct {
 	// Key 是 limit_bonus_param 那一行的身份：正好 8 位十六进制（mod 的 TryParseKey 会拒掉别的长度）。
 	Key string `json:"key"`
-	// Levels 是这条强化有几档：mod 只写 Lv1..LvLevels，其余档位一个字节都不碰。
-	Levels int `json:"levels"`
+	// Effect 是这一行的效果模板（"效果持续时间+{0}%"），{0} 就是该档的数值。个别参数行没有文案，
+	// 那时它是空串。
+	Effect string `json:"effect"`
 	// Defaults 是游戏自己在各档上的数值，按档位排列（[2,3,5] = Lv1/2/3）。
-	Defaults []int `json:"defaults"`
+	Defaults []float64 `json:"defaults"`
 }
 
 // AbilityCharacter 是一个 PL 码名下的全部能力强化节点。古兰与姬塔是两个 PL 码、同一个能力树，

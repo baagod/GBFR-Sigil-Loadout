@@ -4,12 +4,13 @@ using System.Text.Json.Serialization;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// 一条能力强化覆盖：改 limit_bonus_param 的哪一行，写前几个 Lv 槽、写多少。
+/// 一条能力强化覆盖：改 limit_bonus_param 的哪一行，把哪些数值写进它的 Lv 槽。
 ///
-/// 一个能力强化有几档由**游戏自己的表**决定（那条 bonus 在本角色的树上有几个节点就等于几档，
-/// 娜露梅是 3 档），所以 <see cref="Levels"/> 由工具按资产填、这里只按它截取：写 Lv1..LvN，
-/// 没被用到的槽（Lv(N+1)..Lv10）一个字节都不碰。<see cref="Value"/> 是同一个值写满这些档位——
-/// 这一版一栏一个数值，分档设值不在这一版里。
+/// 一条记录对应**一个参数行**（一条强化最多 3 个参数行：ParamId1/2/3），<see cref="Values"/> 按档位
+/// 排列、写成 Lv1..LvN：只写这几个槽，没被用到的槽（Lv(N+1)..Lv10）一个字节都不碰。能力强化只有
+/// 一个参数行，所以一条强化就是一条记录；将来扩到"一条强化多个参数"时也只是多条记录。
+///
+/// 形状与 sigiledits.json 的 Values 有意一致：都是"按槽位写、没提到的槽不动"。
 /// </summary>
 public class AbilityEdit {
     [JsonPropertyName("enabled")]
@@ -19,12 +20,9 @@ public class AbilityEdit {
     [JsonPropertyName("key")]
     public string Key { get; set; } = "";
 
-    /// <summary>要写的档位数：写 Lv1..LvN，N ∈ [1,10]。越界的条目整条跳过并记一行日志。</summary>
-    [JsonPropertyName("levels")]
-    public int Levels { get; set; } = 1;
-
-    [JsonPropertyName("value")]
-    public float Value { get; set; }
+    /// <summary>按档位排的数值，写 Lv1..LvN，N ∈ [1,10]。越界的条目整条跳过并记一行日志。</summary>
+    [JsonPropertyName("values")]
+    public float[] Values { get; set; } = [];
 }
 
 /// <summary>
