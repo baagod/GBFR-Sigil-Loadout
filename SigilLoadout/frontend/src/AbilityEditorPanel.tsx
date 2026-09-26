@@ -8,10 +8,9 @@
     编辑列表与因子编辑页是同一套规矩：按 Key 索引（一个参数行一个 Key，mod 也按 Key 找
     limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 abilityservice.go）、读取不写回。
 
-    屏幕上的那一行是**第一档**：左边一格里是各参数行的效果模板（{0} 写成框号 {1}/{2}/{3}），右边并排
-    着它们各自的数值框——描述里的第 n 个号就是从左数第 n 个框。一条能力挂几个参数行，一行里就有几个
-    框（1..3）：属性类强化有三个参数行（伤害上限 = 普攻/能力/奥义），因此读成一行，而不是叠三行描述
-    与三个框。
+    屏幕上的那一行是**第一档**：左边一格里是那个参数行的效果模板（{0} 写成框号 {1}），右边并排着三
+    个数值框——只有第一个框对应真的参数行（见 ability.ts 的 slotsAt），描述里的 {1} 就是从左数第一个
+    框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
 import { Fragment, memo, useEffect, useRef, useState } from "react";
 import { Call, Events } from "@wailsio/runtime";
@@ -42,6 +41,7 @@ import {
     type AbilityParam,
     type AbilityTable,
 } from "./ability";
+import { elementColor } from "./element";
 import { slotEdit, stepValue } from "./skills";
 import { useWheelStep } from "./useWheelStep";
 
@@ -59,8 +59,8 @@ const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
     勾选框那一列随"有值即启用"一起删掉了（见 ability.ts 的 withFirstValue）：留着空列只会把能力名推右。
     一条能力就是一行，三列各填一格：能力名、描述、那三个槽。
 
-    数值那一列按**固定的三个槽**留宽（3 × 56px 的框 + 3 × 6px 的 `|` 分隔 = 186px）：一个槽对应一个
-    参数行，一条强化最多三个。
+    数值那一列按**固定的三个槽**留宽（3 × 56px 的框 + 3 × 6px 的 `|` 分隔 = 186px）：槽数不随能力变
+    （见 ability.ts 的 SLOT_COUNT），能力强化只填第一个，另两个是空槽。
 */
 const COLUMNS = "grid grid-cols-[130px_minmax(160px,1fr)_200px] items-center gap-2";
 
@@ -171,8 +171,8 @@ function SlotBox({
  * 这一页只改第一档（见 ability.ts 的 withFirstValue）：Lv2/Lv3 不写也不显示，游戏里保持原值，所以
  * 屏幕上不再有 Lv 字样，能力行自己就是那一档。
  *
- * 描述是各参数行的效果模板连成的一格（见 ability.ts 的 levelLabel），{n} 指着右边第 n 个槽。槽数固定
- * 三（参数的个数上界），缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样
+ * 描述是参数行的效果模板（见 ability.ts 的 levelLabel），{n} 指着右边第 n 个槽。槽数固定三（`limit_bonus`
+ * 能挂的参数行上界），缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样
  * 在每一条上都该是同一件事（与因子编辑页十个槽并排同理）。
  */
 function AbilityRow({
@@ -181,12 +181,12 @@ function AbilityRow({
     onValue,
 }: {
     ability: Ability;
-    /** 按参数行 Key 索引的全部编辑：这一行自己去取它那几个参数行的。 */
+    /** 按参数行 Key 索引的全部编辑：这一行自己去取它那个参数行的。 */
     edits: Map<string, AbilityEdit>;
     /** 某一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
     onValue: (param: AbilityParam, value: number | null) => void;
 }) {
-    // 这一行的三个槽，按资产里的顺序：从左到右就是描述里的 {1}、{2}、{3}。
+    // 这一行的三个槽，按资产里的顺序：从左到右就是描述里的 {1}、{2}、{3}（只有第一个是真的）。
     const slots = slotsAt(ability);
     const label = levelLabel(slots);
 
@@ -234,6 +234,13 @@ function AbilityRow({
     );
 }
 
+/*
+    资产里的角色条目还带一项 element（游戏六属性），而 ability.ts 的 AbilityCharacter 只管能力清单，
+    所以这里把要读的那一项补在它上面——Go 服务转发过来的 JSON 里就有它（见 abilityservice.go）。
+    认不出来的值由 elementColor 兜成中性灰（见 element.ts），所以这一项缺失时也不会出岔子。
+*/
+type CharacterRow = AbilityCharacter & { element?: string }
+
 /**
  * 一个角色：一行名字，展开后是它的能力，**默认收起**。
  *
@@ -245,7 +252,7 @@ function CharacterGroup({
     edits,
     onValue,
 }: {
-    character: AbilityCharacter;
+    character: CharacterRow;
     /** 按参数行 Key 索引的全部编辑：一路传给它的能力行。 */
     edits: Map<string, AbilityEdit>;
     onValue: (param: AbilityParam, value: number | null) => void;
@@ -259,8 +266,16 @@ function CharacterGroup({
         */
         <div className="border-b last:border-b-0">
             <div className="flex h-11 items-center gap-2 pr-4" onClick={() => setOpen((prev) => !prev)}>
-                {/* 角色名用默认前景色 */}
-                <span className="truncate text-sm font-[550]">{character.name}</span>
+                {/*
+                    属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定
+                    （见 element.ts），认不出来的值兜成中性灰，所以 element 缺失时也只是灰名字。
+                */}
+                <span
+                    className="truncate text-sm font-[550]"
+                    style={{ color: elementColor(character.element) }}
+                >
+                    {character.name}
+                </span>
                 <span className="flex-1" />
                 {/*
                     展开箭头在行末，与能力行、因子编辑页一致：一个普通图标、自己没有点击，展开是整行的
@@ -276,7 +291,7 @@ function CharacterGroup({
             {open &&
                 character.abilities.map((ability) => (
                     <AbilityRow
-                        key={ability.abilityId}
+                        key={ability.key}
                         ability={ability}
                         edits={edits}
                         onValue={onValue}
@@ -287,7 +302,7 @@ function CharacterGroup({
 }
 
 function AbilityEditorPanelBase() {
-    const [characters, setCharacters] = useState<AbilityCharacter[]>([]);
+    const [characters, setCharacters] = useState<CharacterRow[]>([]);
     const [edits, setEdits] = useState<Map<string, AbilityEdit>>(new Map());
     // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的这份空列表会被后端整体替换
     // 掉（同 SigilEditorPanel 的那条规则），用户其余的编辑就没了。

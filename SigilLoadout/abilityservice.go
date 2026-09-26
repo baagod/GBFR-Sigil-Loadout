@@ -21,7 +21,7 @@ type AbilityEdit struct {
 
 /*
 缺 enabled 的条目在 mod 那边是**开着**的：C# 的 AbilityEdit.Enabled 初值就是 true，而 Go 的零值是
-false。手写进 abilityedits.json 的条目省掉这一栏是常事，两边读法不同会让屏幕上显示的和游戏里正在
+false。手写进 limit_bonus.json 的条目省掉这一栏是常事，两边读法不同会让屏幕上显示的和游戏里正在
 生效的正好相反——所以这里照契约的初值来。
 
 shape 是去掉了方法的本类型：不做这一步，下面那次 Unmarshal 会递回它自己。
@@ -36,52 +36,56 @@ func (e *AbilityEdit) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// abilityEditList 是 abilityedits.json 的外层形状，与 C# 的 AbilityEditConfig 对应。
+// abilityEditList 是 limit_bonus.json 的外层形状，与 C# 的 AbilityEditConfig 对应。
 type abilityEditList struct {
 	Edits []AbilityEdit `json:"edits"`
 }
 
 // abilityEditListName 住在 mod 的用户目录里（loadoutservice.go 的 userCfgDir），和 loadout.json /
 // sigiledits.json 挨着；只有这一个位置，mod 轮询的正是它。
-const abilityEditListName = "abilityedits.json"
+const abilityEditListName = "limit_bonus.json"
 
 // 落盘是防抖的：SaveAbilityEdits 把列表交给 debouncedWriter，编辑停下来之后才写出（见 debounceDelay）。
 type AbilityService struct {
 	writer debouncedWriter[[]AbilityEdit]
 }
 
-// Ability 是 assets/abilities.json 里的一条能力强化条目。
+// Ability 是 assets/limit_bonus.json 里的一条能力强化条目。
 type Ability struct {
-	AbilityID string `json:"abilityId"`
-	Name      string `json:"name"`
-	Category  string `json:"category"`
-	// Node 是游戏在天赋树上给这个节点起的名字（"强化花风·薄红舞"）。
-	Node string `json:"node"`
-	// Params 是这条强化挂的参数行，最多 3 个（能力强化只有一个参数行）。每个参数行有自己的效果
-	// 模板与自己的一组档位数值——界面按参数铺描述与数值框，所以这里必须是列表。
-	Params []AbilityParam `json:"params"`
+	// Key 是这条能力在 ability 表里的短名（AB_PL0700_01）。界面拿它认这一行。
+	Key string `json:"key"`
+	// Hash 是这条能力的 32 位哈希（8 位大写十六进制）。写内存指的行是 Param.Key，不是它。
+	Hash string `json:"hash"`
+	Name string `json:"name"`
+	// Param 是这条强化挂的那个参数行：这一版只出能力强化（limit_bonus 的 BonusType=2），而它们
+	// 只有一个参数行（ParamId1），所以是一个对象。界面按它铺描述与数值框。
+	Param AbilityParam `json:"param"`
 }
 
-// AbilityParam 是一条强化的一个参数行。
+// AbilityParam 是一条强化的参数行。
 type AbilityParam struct {
 	// Key 是 limit_bonus_param 那一行的身份：正好 8 位十六进制（mod 的 TryParseKey 会拒掉别的长度）。
 	Key string `json:"key"`
 	// Effect 是这一行的效果模板（"效果持续时间+{0}%"），{0} 就是该档的数值。个别参数行没有文案，
 	// 那时它是空串。
 	Effect string `json:"effect"`
-	// Defaults 是游戏自己在各档上的数值，按档位排列（[2,3,5] = Lv1/2/3）。
-	Defaults []float64 `json:"defaults"`
+	// Default 是这一行 Lv1 的游戏默认值（界面空框里的那个数）。只留第一档：这一版只写 Lv1，
+	// Lv2 以后的档位不显示也不写。
+	Default float64 `json:"default"`
 }
 
 // AbilityCharacter 是一个 PL 码名下的全部能力强化节点。古兰与姬塔是两个 PL 码、同一个能力树，
 // 所以两条目的 Key 集合逐字相同（前端按 Key 集合去重）。
 type AbilityCharacter struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Element 是游戏自己的六属性（fire/water/wind/earth/light/dark），只给界面配色用：色条按它上色。
+	// 资产的来源是 chara.Element 那个整数，映射在生成器里做。
+	Element   string    `json:"element"`
 	Abilities []Ability `json:"abilities"`
 }
 
-// AbilityTable 就是整份 assets/abilities.json。这一版的能力编辑页刻意只做中文，资产也就只有一份
+// AbilityTable 就是整份 assets/limit_bonus.json。这一版的能力编辑页刻意只做中文，资产也就只有一份
 // （language == "zh"）——不像 skill.<lang>.json 那样一张语言一份表。
 type AbilityTable struct {
 	Language   string             `json:"language"`
@@ -93,7 +97,7 @@ var abilityTable *AbilityTable
 
 // loadAbilityTable 由 loadAssetsFrom 在启动时调用一次，读法与那几张表完全相同（readAsset）。
 func loadAbilityTable(dir string) error {
-	table, err := readAsset[AbilityTable](dir, "abilities.json")
+	table, err := readAsset[AbilityTable](dir, "limit_bonus.json")
 	if err != nil {
 		return err
 	}
@@ -113,7 +117,7 @@ func abilityConfigPath() string {
 	return filepath.Join(userCfgDir(), abilityEditListName)
 }
 
-// LoadAbilityEdits 从 abilityedits.json 读取当前的编辑列表。
+// LoadAbilityEdits 从 limit_bonus.json 读取当前的编辑列表。
 //
 // 文件不存在就是空列表：没有内置的起始编辑（同 LoadEdits，面板启动时就挂载，一份起始编辑会让
 // "打开可视工具"本身就是一次对游戏的改动）。

@@ -11,24 +11,25 @@
     （见 valueAt 与 withFirstValue）。
 */
 
-/** assets/abilities.json 里的一个参数行：一条能力挂 1..3 个（能力强化只有一个）。 */
+/** assets/abilities.json 里的一个参数行：一条能力挂一个。 */
 export type AbilityParam = {
     /** limit_bonus_param 那一行的 Key：正好 8 位十六进制，mod 靠它找行。 */
     key: string
     /** 这一行的效果模板（"冷却时间-{0}%"），{0} 就是这个参数行自己的数值（见 levelLabel）。个别参数行没有文案，那时是空串。 */
     effect: string
-    /** 游戏自己在各档上的数值，按档位排列（[2,3,5] = Lv1/2/3）；这一页只读第一格当空框的占位符。 */
-    defaults: number[]
+    /** 这一行 Lv1 的游戏默认值：空框的占位符读它（见 valueAt）。只留第一档——这一页只写第一档。 */
+    default: number
 }
 
 /** assets/abilities.json 里的一条能力强化条目。 */
 export type Ability = {
-    abilityId: string
+    /** 这条能力在 ability 表里的短名（AB_PL0700_01）：界面拿它认这一行。 */
+    key: string
+    /** 这条能力的 32 位哈希，8 位大写十六进制。写内存指的行是 param.key，不是它。 */
+    hash: string
     name: string
-    category: string
-    /** 游戏在天赋树上给这个节点起的名字（"强化刹那"）。资产里保留，界面上不显示。 */
-    node: string
-    params: AbilityParam[]
+    /** 这条能力挂的那个参数行：能力强化只挂一个（`limit_bonus` 的 ParamId1）。 */
+    param: AbilityParam
 }
 
 export type AbilityCharacter = { id: string; name: string; abilities: Ability[] }
@@ -53,7 +54,7 @@ export type AbilityEdit = {
  * levelLabel。）
  */
 export const valueAt = (param: AbilityParam, record: AbilityEdit | undefined) =>
-    record?.values[0] ?? param.defaults[0] ?? 0
+    record?.values[0] ?? param.default ?? 0
 
 /** 那一行里一个参数槽占的位置：描述里的 {n} 与从左数第 n 个框都是它。 */
 export type LevelSlot = {
@@ -72,13 +73,13 @@ export const SLOT_COUNT = 3
 /**
  * 这一行的三个参数槽，按资产里的顺序——也正是数值框从左到右的顺序。
  *
- * 槽数固定（见 SLOT_COUNT），所以"这一行有几个框"与"这条能力有几个参数行"是两件事：属性类强化
- * （伤害上限 = 普攻/能力/奥义）三个槽都是真的，能力强化只有第一个，另两个是空的。
+ * 槽数固定（见 SLOT_COUNT），而资产里的一条能力只挂一个参数行：槽 1 是它，槽 2/3 是空的。三个框
+ * 都画出来是因为"一行长什么样"不随能力变（与因子编辑页十个槽并排同理）。
  */
 export const slotsAt = (ability: Ability): LevelSlot[] =>
     Array.from({ length: SLOT_COUNT }, (_, index) => ({
         slot: index + 1,
-        param: ability.params[index] ?? null,
+        param: index === 0 ? ability.param : null,
     }))
 
 /**
@@ -88,8 +89,9 @@ export const slotsAt = (ability: Ability): LevelSlot[] =>
  * 把数值替进去——数字已经在右边的框里了，说不清的正是哪个框对应效果的哪一部分。所以描述与"填了多少"
  * 无关：同一条参数行各档上是同一句话，而这一页只显示第一档那一句。
  *
- * 一行可能有好几个参数行（属性类强化：伤害上限 = 普攻/能力/奥义），它们在同一格里用「；」连成一整
- * 句；空槽不占字。游戏自己就没有文案的参数行不占字，全都没有时得到空串，由组件画一个占位符。
+ * 各槽的效果模板在同一格里用「；」连成一整句，空槽不占字——每条能力只有一个参数行，所以这一句实际
+ * 只有一段，连着拼是为了"一行怎么拼"不随能力变。游戏自己就没有文案的参数行不占字，全都没有时得到
+ * 空串，由组件画一个占位符。
  */
 export const levelLabel = (slots: LevelSlot[]): string =>
     slots
@@ -110,7 +112,7 @@ export function dedupeCharacters(characters: AbilityCharacter[]): AbilityCharact
     const seen = new Set<string>()
     return characters.filter((character) => {
         const sameContent = character.abilities
-            .flatMap((ability) => ability.params.map((param) => param.key))
+            .map((ability) => ability.param.key)
             .sort()
             .join(",")
         if (seen.has(sameContent)) return false
@@ -166,7 +168,7 @@ export function dedupeEdits(records: AbilityEdit[]): AbilityEdit[] {
  * 改过第一档（Lv1）之后的那条记录；null = 清空，也就是这一行要回到没编辑过的状态。
  *
  * 记录里只有第一档这一个数：契约是 `values[i]` 写进 `Lv(i+1)`，长度 1 就是**只写 Lv1**，Lv2/Lv3 在
- * 游戏里保持原值——这正是这一页要的。**绝不按 defaults 把后面几档补齐**：那等于把用户从没填过的数
+ * 游戏里保持原值——这正是这一页要的。**绝不按 default 把缺的档位补齐**：那等于把用户从没填过的数
  * 写进游戏，多改了 2 个档位。
  *
  * 清空（value === null）**不产生记录**，由调用方把这一条从列表里删掉（见 AbilityEditorPanel 的

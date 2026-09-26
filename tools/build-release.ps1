@@ -54,7 +54,7 @@ $assetsDir = Join-Path $root 'SigilLoadout\assets'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.json',
     'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json',
-    'abilities.json')
+    'limit_bonus.json')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }
@@ -297,7 +297,7 @@ foreach ($requiredFile in @(
     'assets\skill.en.json',
     'assets\skill.ja.json',
     'assets\skill.ko.json',
-    'assets\abilities.json'
+    'assets\limit_bonus.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {

@@ -12,7 +12,7 @@ import (
 )
 
 /*
-abilityedits.json 的线格式是一份手写契约：mod 那半（AbilityEditConfig.cs）逐字成员名匹配，不折叠
+limit_bonus.json 的线格式是一份手写契约：mod 那半（AbilityEditConfig.cs）逐字成员名匹配，不折叠
 大小写，而可视工具是唯一的写入方。所以这里按字节把它钉住——加一个成员、改一个拼法、把浮点数写成
 字符串，都必须先在测试里看见，而不是等 game 里什么都没变。
 */
@@ -29,7 +29,7 @@ func TestSaveAbilityEditsWritesTheAgreedShape(t *testing.T) {
 	path := localConfig(t, abilityEditListName)
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("abilityedits.json is not where the mod looks for it: %v", err)
+		t.Fatalf("limit_bonus.json is not where the mod looks for it: %v", err)
 	}
 	const want = `{
   "edits": [
@@ -45,7 +45,7 @@ func TestSaveAbilityEditsWritesTheAgreedShape(t *testing.T) {
   ]
 }`
 	if string(raw) != want {
-		t.Fatalf("abilityedits.json 的线格式变了:\n got %s\nwant %s", raw, want)
+		t.Fatalf("limit_bonus.json 的线格式变了:\n got %s\nwant %s", raw, want)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestSaveAbilityEditsWaitsForTheEditingToStop(t *testing.T) {
 		}
 		time.Sleep(debounceDelay / 4)
 		if _, err := os.Stat(cfgPath); err == nil {
-			t.Fatal("abilityedits.json was written while the debounce window was still open")
+			t.Fatal("limit_bonus.json was written while the debounce window was still open")
 		}
 
 		if err := service.SaveAbilityEdits([]AbilityEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{500, 600, 321}}}); err != nil {
@@ -81,11 +81,11 @@ func TestSaveAbilityEditsWaitsForTheEditingToStop(t *testing.T) {
 
 		raw, err := os.ReadFile(cfgPath)
 		if err != nil {
-			t.Fatalf("the debounce never wrote abilityedits.json: %v", err)
+			t.Fatalf("the debounce never wrote limit_bonus.json: %v", err)
 		}
 		var cfg abilityEditList
 		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-			t.Fatalf("abilityedits.json is not valid JSON: %v", err)
+			t.Fatalf("limit_bonus.json is not valid JSON: %v", err)
 		}
 		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 || cfg.Edits[0].Values[2] != 321 {
 			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
@@ -105,7 +105,7 @@ func TestLoadAbilityEditsReadsTheUserConfig(t *testing.T) {
 		t.Fatalf("LoadAbilityEdits: %v", err)
 	}
 	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || len(loaded[0].Values) != 3 || loaded[0].Values[2] != 321 || !loaded[0].Enabled {
-		t.Fatalf("abilityedits.json was not read back: %+v", loaded)
+		t.Fatalf("limit_bonus.json was not read back: %+v", loaded)
 	}
 }
 
@@ -150,7 +150,7 @@ func TestLoadAbilityEditsStartsWithNothing(t *testing.T) {
 		t.Fatalf("a first run produced edits nobody made: %+v", loaded)
 	}
 	if _, err := os.Stat(localConfig(t, abilityEditListName)); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatal("reading the list created abilityedits.json")
+		t.Fatal("reading the list created limit_bonus.json")
 	}
 }
 
@@ -212,16 +212,16 @@ func TestLoadAbilityEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 }
 
 /*
-资产是一起生成的，前端拿它铺表格、决定每个参数行写几个档位、以及把 Key 原样交给 mod。这里钉的是
-**跨层假设**，不是数据本身：Key 必须是 mod 认的 8 位十六进制，参数行的档位数与游戏默认值必须对得上，
-效果文案里除了 {0} 不能有别的东西（前端只换 {0}，其余的会原样显示到屏幕上）。
+资产是一起生成的，前端拿它铺表格、并把 Key 原样交给 mod。这里钉的是**跨层假设**，不是数据本身：
+Key 与能力的哈希必须是 8 位十六进制（mod 只认这个写法），Lv1 的默认值必须拿得到（它是界面空框里的
+占位符），效果文案里除了 {0} 不能有别的东西（前端只换 {0}，其余的会原样显示到屏幕上）。
 */
 func TestAbilityTableIsUsable(t *testing.T) {
 	if abilityTable == nil {
-		t.Fatal("abilities.json did not load")
+		t.Fatal("limit_bonus.json did not load")
 	}
 	if len(abilityTable.Characters) == 0 {
-		t.Fatal("abilities.json names no character")
+		t.Fatal("limit_bonus.json names no character")
 	}
 
 	abilities := 0
@@ -236,52 +236,51 @@ func TestAbilityTableIsUsable(t *testing.T) {
 		seen := map[string]bool{}
 		for _, ability := range character.Abilities {
 			abilities++
-			if ability.AbilityID == "" || ability.Name == "" || ability.Node == "" || ability.Category == "" {
+			if ability.Key == "" || ability.Name == "" || ability.Hash == "" {
 				t.Fatalf("%s/%s is missing a display field: %+v", character.Name, ability.Name, ability)
 			}
-			if len(ability.Params) == 0 {
-				t.Fatalf("%s/%s offers no param row to write", character.Name, ability.Name)
+			if !isHexKey(ability.Hash) {
+				t.Fatalf("%s/%s: hash %q is not 8 hex digits", character.Name, ability.Name, ability.Hash)
 			}
 
-			for _, param := range ability.Params {
-				if !isAbilityKey(param.Key) {
-					t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
-						character.Name, ability.Name, param.Key)
-				}
-				// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同 Key 的记录只会互相覆盖。
-				if seen[param.Key] {
-					t.Fatalf("%s names %s twice", character.Name, param.Key)
-				}
-				seen[param.Key] = true
+			param := ability.Param
+			if !isHexKey(param.Key) {
+				t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
+					character.Name, ability.Name, param.Key)
+			}
+			// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同 Key 的记录只会互相覆盖。
+			if seen[param.Key] {
+				t.Fatalf("%s names %s twice", character.Name, param.Key)
+			}
+			seen[param.Key] = true
 
-				// 档位数就是界面要铺的框数：0 档没有意义，超过 10 档 mod 整条跳过。
-				if len(param.Defaults) < 1 || len(param.Defaults) > 10 {
-					t.Fatalf("%s/%s writes %d levels on %s, which the mod skips",
-						character.Name, ability.Name, len(param.Defaults), param.Key)
-				}
-				if param.Effect == "" {
-					continue
-				}
-				if !strings.Contains(param.Effect, "{0}") {
-					t.Fatalf("%s/%s: effect %q has no {0} to fill in", character.Name, ability.Name, param.Effect)
-				}
-				// 面板只换 {0}，别的占位符会被原样显示到屏幕上。
-				for _, slot := range "123456789" {
-					if strings.Contains(param.Effect, "{"+string(slot)) {
-						t.Fatalf("%s/%s: effect %q has a placeholder the panel cannot fill in",
-							character.Name, ability.Name, param.Effect)
-					}
+			// 这个数是界面空框里的占位符，也是"这条参数行有档位可写"的证据：生成器不发 Lv1 为 0
+			// 的行（那种行没有档位可写），所以它到这一层不该是 0。
+			if param.Default == 0 {
+				t.Fatalf("%s/%s: %s has no Lv1 default", character.Name, ability.Name, param.Key)
+			}
+			if param.Effect == "" {
+				continue
+			}
+			if !strings.Contains(param.Effect, "{0}") {
+				t.Fatalf("%s/%s: effect %q has no {0} to fill in", character.Name, ability.Name, param.Effect)
+			}
+			// 面板只换 {0}，别的占位符会被原样显示到屏幕上。
+			for _, slot := range "123456789" {
+				if strings.Contains(param.Effect, "{"+string(slot)) {
+					t.Fatalf("%s/%s: effect %q has a placeholder the panel cannot fill in",
+						character.Name, ability.Name, param.Effect)
 				}
 			}
 		}
 	}
 	if abilities == 0 {
-		t.Fatal("abilities.json offers no ability")
+		t.Fatal("limit_bonus.json offers no ability")
 	}
 }
 
 // 与 AbilityEditorFeature.cs 的 TryParseKey 同一条规矩：正好 8 位十六进制。
-func isAbilityKey(text string) bool {
+func isHexKey(text string) bool {
 	if len(text) != 8 {
 		return false
 	}

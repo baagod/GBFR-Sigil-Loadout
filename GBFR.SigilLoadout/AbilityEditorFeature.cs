@@ -3,7 +3,7 @@ using System.Globalization;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// 按用户编辑的 abilityedits.json 改写 limit_bonus_param 活表里那些行的 Lv 槽——能力强化的数值
+/// 按用户编辑的 limit_bonus.json 改写 limit_bonus_param 活表里那些行的 Lv 槽——能力强化的数值
 /// （造成的伤害 / 冷却时间 / 效果持续时间）。
 ///
 /// 与因子编辑器（<see cref="SigilEditorFeature"/>）的两处不同，都是有意的：
@@ -16,7 +16,7 @@ namespace GBFR.SigilLoadout;
 /// 节点描述是实时读表的，所以改完立刻看得见。
 /// </summary>
 internal sealed class AbilityEditorFeature {
-    private const string ConfigFileName = "abilityedits.json";
+    private const string ConfigFileName = "limit_bonus.json";
 
     // 编辑列表住在用户配置目录里（见 UserConfig），与 sigiledits.json / loadout.json 挨着：
     // 可视工具写、这里读。

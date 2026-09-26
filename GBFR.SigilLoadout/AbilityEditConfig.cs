@@ -26,7 +26,7 @@ public class AbilityEdit {
 }
 
 /// <summary>
-/// 本 mod 的 abilityedits.json。由可视工具（SigilLoadout.exe）写，这里在启动时读。
+/// 本 mod 的 limit_bonus.json。由可视工具（SigilLoadout.exe）写，这里在启动时读。
 ///
 /// 形状与 sigiledits.json 同一套规矩：名字就是契约（每个成员都写明 JSON 名，不折叠大小写），
 /// 只有**外层**形状算错误（没有 edits 成员 / 不是数组 / 不是对象），认不出的成员读成默认值、
@@ -51,18 +51,18 @@ public class AbilityEditConfig {
         // 而不是一次几个 GB 的读取。
         var info = new FileInfo(path);
         if (info.Length > MaxBytes)
-            throw new InvalidDataException($"abilityedits.json exceeds {MaxBytes} bytes");
+            throw new InvalidDataException($"limit_bonus.json exceeds {MaxBytes} bytes");
 
         using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
         if (doc.RootElement.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException(
-                $"abilityedits.json must be a JSON object, got {doc.RootElement.ValueKind}");
+                $"limit_bonus.json must be a JSON object, got {doc.RootElement.ValueKind}");
         if (!doc.RootElement.TryGetProperty("edits", out JsonElement editsElement))
             throw new InvalidDataException(
-                "abilityedits.json has no 'edits' member; an empty array is how the list is emptied");
+                "limit_bonus.json has no 'edits' member; an empty array is how the list is emptied");
         if (editsElement.ValueKind != JsonValueKind.Array)
             throw new InvalidDataException(
-                $"abilityedits.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'nothing to write')");
+                $"limit_bonus.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'nothing to write')");
 
         return doc.RootElement.Deserialize<AbilityEditConfig>(Options)!;
     }

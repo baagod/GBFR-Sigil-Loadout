@@ -3,7 +3,7 @@
     记录。这些规则决定了屏幕上显示什么、以及下一次落盘的 abilityedits.json 里有什么，所以在这里直接
     钉住——**这一页只写第一档**（values 长度恒为 1），Lv2/Lv3 留给游戏原值。
 
-    用**手搓夹具**而不是入库的资产：这里钉的是规则本身，资产的不变量（Key 长度、档位数与默认值）
+    用**手搓夹具**而不是入库的资产：这里钉的是规则本身，资产的不变量（Key 与哈希的写法、Lv1 的默认值）
     由 Go 侧的 abilityservice_test.go 对着真实文件断言，两边不必是同一份事实的第三次手抄。
 */
 import { describe, expect, it } from "vitest"
@@ -21,20 +21,19 @@ import {
     type AbilityParam,
 } from "./ability"
 
-// 一条能力一个参数行是常态（能力强化），夹具就取这个形状：刹那，Lv1/2/3 = 2/3/5。
+// 一条能力一个参数行（能力强化就是这个形状），夹具也取这个形状：刹那，Lv1 的游戏默认值是 2。
 const param = (patch: Partial<AbilityParam> = {}): AbilityParam => ({
     key: "0D0BCF24",
     effect: "冷却时间-{0}%",
-    defaults: [2, 3, 5],
+    default: 2,
     ...patch,
 })
 
 const ability = (patch: Partial<Ability> = {}): Ability => ({
-    abilityId: "AB_PL1400_06",
+    key: "AB_PL1400_06",
+    hash: "41E3C434",
     name: "刹那",
-    category: "强化类能力",
-    node: "强化刹那",
-    params: [param()],
+    param: param(),
     ...patch,
 })
 
@@ -67,36 +66,12 @@ describe("这一行显示什么", () => {
         // 一行一个框：模板里的 {0} 写成 {1}，与那个框对上。
         expect(lineAt(ability())).toBe("冷却时间-{1}%")
         // 游戏自己就没有这行文案的参数行：空串一路走到屏幕上就是空白，由组件画一个占位符。
-        expect(lineAt(ability({ params: [param({ effect: "" })] }))).toBe("")
+        expect(lineAt(ability({ param: param({ effect: "" }) }))).toBe("")
     })
 })
 
-describe("三个参数行的能力（伤害上限提升）", () => {
-    // 属性类强化：一条能力挂三个参数行，每个都有自己的效果模板与自己的一组档位数值。
-    const upperLimit = ability({
-        abilityId: "AB_PL1400_07",
-        name: "伤害上限提升",
-        params: [
-            param({ key: "AAAAAAAA", effect: "普攻上限+{0}%", defaults: [10, 11, 12] }),
-            param({ key: "BBBBBBBB", effect: "能力上限+{0}%", defaults: [10, 11, 12] }),
-            param({ key: "CCCCCCCC", effect: "奥义上限+{0}%", defaults: [10, 11, 12] }),
-        ],
-    })
-
-    it("一行的多个参数行连成一格，各带各的框号", () => {
-        // 三个参数行合起来只有一行描述：{0} 依次写成 {1}/{2}/{3}，分别对上右边那三个框。
-        expect(lineAt(upperLimit)).toBe("普攻上限+{1}%；能力上限+{2}%；奥义上限+{3}%")
-    })
-
-    it("框号按参数行在能力里的顺序数，数值框从左到右也是这个顺序", () => {
-        expect(slotsAt(upperLimit).map(({ slot, param }) => [slot, param?.key])).toEqual([
-            [1, "AAAAAAAA"],
-            [2, "BBBBBBBB"],
-            [3, "CCCCCCCC"],
-        ])
-    })
-
-    it("槽数固定三个：能力没有的那个参数行是空槽，不是少一个框", () => {
+describe("三个数值槽", () => {
+    it("只有第一个槽挂参数行，另两个是空槽，不是少一个框", () => {
         // 能力强化只挂一个参数行（这里的刹那）：槽 2/3 没有可写的行，显示 0 且不可编辑——槽有几个是
         // 这一行形状的一部分，不随能力变。
         expect(slotsAt(ability()).map(({ slot, param }) => [slot, param?.key ?? null])).toEqual([
@@ -108,17 +83,17 @@ describe("三个参数行的能力（伤害上限提升）", () => {
         expect(lineAt(ability())).toBe("冷却时间-{1}%")
     })
 
-    it("改一个参数行的 Lv1，只动那一个框", () => {
-        // 能力上限（第二个参数行）的 Lv1 改成 99：它两边的框原样。
-        const record = withFirstValue(upperLimit.params[1], 99)
+    it("改那一档的 Lv1，只有第一个框有数", () => {
+        // 唯一的参数行的 Lv1 改成 99：另两个槽本来就没有行，读数时是空。
+        const record = withFirstValue(ability().param, 99)
         // 一个用户填过的数一定会建成一条记录（这里的 ! 只是把这件事写出来）。
         expect(record).not.toBeNull()
         const records = new Map([[record!.key, record!]])
-        // 一行里的几个框各读各的参数行。
-        const boxes = slotsAt(upperLimit).map(({ param }) =>
+        // 一行的框各读各的参数行，没有参数行的槽没有数可读。
+        const boxes = slotsAt(ability()).map(({ param }) =>
             param === null ? null : valueAt(param, records.get(param.key)),
         )
-        expect(boxes).toEqual([10, 99, 10])
+        expect(boxes).toEqual([99, null, null])
     })
 })
 
@@ -170,7 +145,7 @@ describe("一个 Key 最多一条编辑", () => {
         expect(kept).toEqual([edit({ key: "AAAAAAAA", enabled: false, values: [2] })])
     })
 
-    it("三个参数行是三个 Key，各自一条记录", () => {
+    it("三个 Key 各自一条记录", () => {
         const kept = dedupeEdits([
             edit({ key: "AAAAAAAA", values: [1, 2, 3] }),
             edit({ key: "BBBBBBBB", values: [4, 5, 6] }),
@@ -182,19 +157,19 @@ describe("一个 Key 最多一条编辑", () => {
 
 describe("角色去重", () => {
     it("参数行 Key 集合相同的条目只留一份（古兰与姬塔是同一个能力树的两个人）", () => {
-        const shared = [ability({ params: [param({ key: "AAAAAAAA" })] }), ability({ params: [param({ key: "BBBBBBBB" })] })]
+        const shared = [ability({ param: param({ key: "AAAAAAAA" }) }), ability({ param: param({ key: "BBBBBBBB" }) })]
         const kept = dedupeCharacters([
             character("PL0000", shared),
             character("PL0100", [...shared].reverse()),
-            character("PL1400", [ability({ params: [param({ key: "CCCCCCCC" })] })]),
+            character("PL1400", [ability({ param: param({ key: "CCCCCCCC" }) })]),
         ])
         expect(kept.map((c) => c.id)).toEqual(["PL0000", "PL1400"])
     })
 
     it("名字不同但内容相同的条目同样只留一份：判据是内容，不是名字", () => {
         const kept = dedupeCharacters([
-            character("PL0000", [ability({ params: [param({ key: "AAAAAAAA" })] })]),
-            character("PL0100", [ability({ params: [param({ key: "AAAAAAAA" })] })]),
+            character("PL0000", [ability({ param: param({ key: "AAAAAAAA" }) })]),
+            character("PL0100", [ability({ param: param({ key: "AAAAAAAA" }) })]),
         ])
         expect(kept).toHaveLength(1)
     })
@@ -206,7 +181,7 @@ describe("改第一档落成什么记录", () => {
             // 填数值就是要它生效（开关只是事后关掉它的手段）。
             enabled: true,
             key: "0D0BCF24",
-            // 契约是 values[i] 写进 Lv(i+1)：长度 1 = 只写 Lv1。按 defaults 把后面两档也写上，
+            // 契约是 values[i] 写进 Lv(i+1)：长度 1 = 只写 Lv1。按 default 把后面两档也写上，
             // 等于替用户改了 Lv2/Lv3。
             values: [99],
         })
@@ -232,7 +207,7 @@ describe("改第一档落成什么记录", () => {
 
     it("清空 = 删掉整条记录：不产生记录，也不替用户写一个默认值", () => {
         // 返回 null 就是"这一条不要了"，由面板把它从列表里删掉——点一下清空之后游戏那边一个字节都
-        // 没被碰过。写成 defaults 的拷贝是另一回事：那会留下一条记录，等于用户填过。
+        // 没被碰过。写成 default 的拷贝是另一回事：那会留下一条记录，等于用户填过。
         expect(withFirstValue(param(), null)).toBeNull()
     })
 })
