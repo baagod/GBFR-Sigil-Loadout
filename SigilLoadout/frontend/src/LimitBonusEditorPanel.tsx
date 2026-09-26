@@ -1,15 +1,20 @@
 /*
-    能力编辑页：一条能力一栏，**一行就是第一档**——这一页只改第一档，游戏里 Lv2/Lv3 保持原值
-    （见 ability.ts 的 withFirstValue）。
+    能力强化页：一条能力一栏，**一行就是第一档**——这一页只改第一档，游戏里 Lv2/Lv3 保持原值
+    （见 limitbonus.ts 的 withFirstValue）。
 
-    这一页刻意只做中文——它读的资产（assets/abilities.json）只有中文，所以文案直接写在组件里，
-    不走 messages.ts 的多语言（那一份是给四个页签共用的外壳与因子页准备的）。
+    资产是三份：语言无关的骨架（有哪个角色、哪些能力、默认值多少）、每语言一份按 id 索引的文案、以及
+    角色属性（哪一行是哪个属性、属性各自的颜色）。骨架与属性各取一次，**文案跟着界面语言重取**（与因子
+    编辑页的 SkillMap 同一条路）。角色名不在这三份里：它由 App 按当前语言取好（charaNames，见
+    chara.lang.json 与 loadoutservice.go 的 CharaNames）传下来，专属因子页用的也是它。
+
+    页面自有文案（页签名、空态、两个错误对话框的标题）走 messages.ts；能力名与效果模板来自资产，缺哪条
+    就显示哪个 id——不拿中文兜底。
 
     编辑列表与因子编辑页是同一套规矩：按 Key 索引（一个参数行一个 Key，mod 也按 Key 找
-    limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 abilityservice.go）、读取不写回。
+    limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 limitbonusservice.go）、读取不写回。
 
-    屏幕上的那一行是**第一档**：左边一格里是那个参数行的效果模板（{0} 写成框号 {1}），右边并排着三
-    个数值框——只有第一个框对应真的参数行（见 ability.ts 的 slotsAt），描述里的 {1} 就是从左数第一个
+    屏幕上的那一行是**第一档**：左边一格里是当前语言的效果模板（{0} 写成框号 {1}），右边并排着三
+    个数值框——只有第一个框对应真的参数行（见 limitbonus.ts 的 slotsAt），描述里的 {1} 就是从左数第一个
     框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
 import { Fragment, memo, useEffect, useRef, useState } from "react";
@@ -29,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
     asEdit,
+    characterRowOf,
     dedupeCharacters,
     dedupeEdits,
     levelLabel,
@@ -36,16 +42,20 @@ import {
     valueAt,
     withFirstValue,
     type Ability,
-    type AbilityCharacter,
-    type AbilityEdit,
-    type AbilityParam,
-    type AbilityTable,
-} from "./ability";
+    type LimitBonusCharacter,
+    type LimitBonusEdit,
+    type LimitBonusParam,
+    type LimitBonusTable,
+    type LimitBonusText,
+    type CharaTable,
+} from "./limitbonus";
 import { elementColor } from "./element";
+import type { Lang } from "./lang";
+import { messages } from "./messages";
 import { slotEdit, stepValue } from "./skills";
 import { useWheelStep } from "./useWheelStep";
 
-const SERVICE = "main.AbilityService";
+const SERVICE = "main.LimitBonusService";
 /*
     与 editservice.go 的 saveFailedEvent 是同一个事件（两个服务共用一个写入失败通道）：防抖写入
     发生在请求它的那次调用返回之后，那里的失败没有可返回的答复，只能以这个事件的形式到达。
@@ -56,11 +66,11 @@ const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
     表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，
     而其余两列的内容都是定长的（名字、三个数值槽）。
 
-    勾选框那一列随"有值即启用"一起删掉了（见 ability.ts 的 withFirstValue）：留着空列只会把能力名推右。
+    勾选框那一列随"有值即启用"一起删掉了（见 limitbonus.ts 的 withFirstValue）：留着空列只会把能力名推右。
     一条能力就是一行，三列各填一格：能力名、描述、那三个槽。
 
     数值那一列按**固定的三个槽**留宽（3 × 56px 的框 + 3 × 6px 的 `|` 分隔 = 186px）：槽数不随能力变
-    （见 ability.ts 的 SLOT_COUNT），能力强化只填第一个，另两个是空槽。
+    （见 limitbonus.ts 的 SLOT_COUNT），能力强化只填第一个，另两个是空槽。
 */
 const COLUMNS = "grid grid-cols-[130px_minmax(160px,1fr)_200px] items-center gap-2";
 
@@ -81,9 +91,9 @@ function SlotBox({
     name: string;
     /** 第几个框，从 1 起：描述里的 {n} 是同一个号。 */
     slot: number;
-    param: AbilityParam;
+    param: LimitBonusParam;
     /** 这个参数行的记录；没编辑过就是 undefined。 */
-    record: AbilityEdit | undefined;
+    record: LimitBonusEdit | undefined;
     /** 这一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
     onValue: (value: number | null) => void;
 }) {
@@ -95,9 +105,9 @@ function SlotBox({
     const [typed, setTyped] = useState<string | null>(null);
 
     // 这一格有没有用户填过的数：手写过的记录缺第一格（values 是空的）与"没编辑过"一样，显示占位符。
-    // 读的永远是记录的第一格——这一页只写、只显示第一档（见 ability.ts 的 valueAt）。
+    // 读的永远是记录的第一格——这一页只写、只显示第一档（见 limitbonus.ts 的 valueAt）。
     const committed = record?.values[0];
-    // 框里的占位符读的是 Lv1 的数（见 ability.ts 的 valueAt）。
+    // 框里的占位符读的是 Lv1 的数（见 limitbonus.ts 的 valueAt）。
     const shown = valueAt(param, record);
 
     function step(delta: 1 | -1) {
@@ -128,7 +138,7 @@ function SlotBox({
                     /*
                         只借 slotEdit 的解析规则（"-" 与 "0." 这类半成品文本、前导零、清空成 null）：起点
                         给 [null] 是因为结果只取 [0]，而"只写第一档"那条规矩在 withFirstValue 里（见
-                        ability.ts），不该在这里再写一遍。
+                        limitbonus.ts），不该在这里再写一遍。
                     */
                     const edit = slotEdit(e.target.value, 0, [null]);
                     if (edit.kind === "drop") return;
@@ -168,32 +178,38 @@ function SlotBox({
 /**
  * 一条能力：**就是一行**——能力名、描述、那三个数值槽（合并前是能力行下面再挂一行 Lv1 行）。
  *
- * 这一页只改第一档（见 ability.ts 的 withFirstValue）：Lv2/Lv3 不写也不显示，游戏里保持原值，所以
+ * 这一页只改第一档（见 limitbonus.ts 的 withFirstValue）：Lv2/Lv3 不写也不显示，游戏里保持原值，所以
  * 屏幕上不再有 Lv 字样，能力行自己就是那一档。
  *
- * 描述是参数行的效果模板（见 ability.ts 的 levelLabel），{n} 指着右边第 n 个槽。槽数固定三（`limit_bonus`
- * 能挂的参数行上界），缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样
- * 在每一条上都该是同一件事（与因子编辑页十个槽并排同理）。
+ * 描述是当前语言里这个参数行的效果模板（见 limitbonus.ts 的 levelLabel 与 LimitBonusText.effects），{n}
+ * 指着右边第 n 个槽。槽数固定三（`limit_bonus` 能挂的参数行上界），缺的那些是空槽——画一个不会有反应
+ * 的 0，而不是把它们藏起来：一条能力长什么样在每一条上都该是同一件事（与因子编辑页十个槽并排同理）。
  */
 function AbilityRow({
     ability,
+    name,
+    effects,
     edits,
     onValue,
 }: {
     ability: Ability;
+    /** 这条能力在当前语言里的名字；表里没有就显示它的 Key（AB_PL1400_06）——不拿别的语言兜底。 */
+    name: string;
+    /** 当前语言的效果模板：按参数行的 Key 查（见 LimitBonusText.effects）。 */
+    effects: Record<string, string>;
     /** 按参数行 Key 索引的全部编辑：这一行自己去取它那个参数行的。 */
-    edits: Map<string, AbilityEdit>;
+    edits: Map<string, LimitBonusEdit>;
     /** 某一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
-    onValue: (param: AbilityParam, value: number | null) => void;
+    onValue: (param: LimitBonusParam, value: number | null) => void;
 }) {
     // 这一行的三个槽，按资产里的顺序：从左到右就是描述里的 {1}、{2}、{3}（只有第一个是真的）。
     const slots = slotsAt(ability);
-    const label = levelLabel(slots);
+    const label = levelLabel(slots, effects);
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
             {/* 能力名用默认前景色：层级交给字号（14 vs 角色名的 16）与 32px 缩进，不靠颜色。 */}
-            <span className="truncate text-sm">{ability.name}</span>
+            <span className="truncate text-sm">{name}</span>
             {/*
                 描述显示的是模板本身，不是把数值填进去：数字已经在右边的槽里了，说不清的正是哪个槽对
                 应效果的哪一部分。颜色比能力名淡（#a0a0a0），一行就是一行高。少数参数行游戏自己没有
@@ -220,7 +236,7 @@ function AbilityRow({
                             </span>
                         ) : (
                             <SlotBox
-                                name={ability.name}
+                                name={name}
                                 slot={slot}
                                 param={param}
                                 record={edits.get(param.key)}
@@ -235,11 +251,11 @@ function AbilityRow({
 }
 
 /*
-    资产里的角色条目还带一项 element（游戏六属性），而 ability.ts 的 AbilityCharacter 只管能力清单，
-    所以这里把要读的那一项补在它上面——Go 服务转发过来的 JSON 里就有它（见 abilityservice.go）。
-    认不出来的值由 elementColor 兜成中性灰（见 element.ts），所以这一项缺失时也不会出岔子。
+    骨架里角色条目只有 id，颜色在 chara.json 里（形状见 limitbonus.ts 的 characterRowOf）——这里把它补在
+    上面：界面拿 id 去角色表**一次**取值就拿到颜色（没有第二步查找）。认不出来时 elementColor 兜成
+    中性灰，所以缺这一条时也不会出岔子。
 */
-type CharacterRow = AbilityCharacter & { element?: string }
+type CharacterRow = ReturnType<typeof characterRowOf>
 
 /**
  * 一个角色：一行名字，展开后是它的能力，**默认收起**。
@@ -249,13 +265,22 @@ type CharacterRow = AbilityCharacter & { element?: string }
  */
 function CharacterGroup({
     character,
+    name,
+    effects,
+    abilityNames,
     edits,
     onValue,
 }: {
     character: CharacterRow;
+    /** 这个角色在当前语言里的名字；表里没有就显示 PL 码——不拿别的语言兜底。 */
+    name: string;
+    /** 当前语言的效果模板：一路传给它的能力行。 */
+    effects: Record<string, string>;
+    /** 当前语言的能力名。 */
+    abilityNames: Record<string, string>;
     /** 按参数行 Key 索引的全部编辑：一路传给它的能力行。 */
-    edits: Map<string, AbilityEdit>;
-    onValue: (param: AbilityParam, value: number | null) => void;
+    edits: Map<string, LimitBonusEdit>;
+    onValue: (param: LimitBonusParam, value: number | null) => void;
 }) {
     const [open, setOpen] = useState(false);
 
@@ -267,14 +292,15 @@ function CharacterGroup({
         <div className="border-b last:border-b-0">
             <div className="flex h-11 items-center gap-2 pr-4" onClick={() => setOpen((prev) => !prev)}>
                 {/*
-                    属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定
-                    （见 element.ts），认不出来的值兜成中性灰，所以 element 缺失时也只是灰名字。
+                    属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定，而它已经
+                    按角色算好写在 chara.json 里（见 element.ts），取一个 PL 码就拿到了，认不出来的值
+                    兜成中性灰，所以缺颜色时也只是灰名字。
                 */}
                 <span
                     className="truncate text-sm font-[550]"
-                    style={{ color: elementColor(character.element) }}
+                    style={{ color: elementColor(character.color) }}
                 >
-                    {character.name}
+                    {name}
                 </span>
                 <span className="flex-1" />
                 {/*
@@ -289,10 +315,12 @@ function CharacterGroup({
                 </span>
             </div>
             {open &&
-                character.abilities.map((ability) => (
+                character.bonuses.map((ability) => (
                     <AbilityRow
                         key={ability.key}
                         ability={ability}
+                        name={abilityNames[ability.key] ?? ability.key}
+                        effects={effects}
                         edits={edits}
                         onValue={onValue}
                     />
@@ -301,14 +329,40 @@ function CharacterGroup({
     );
 }
 
-function AbilityEditorPanelBase() {
-    const [characters, setCharacters] = useState<CharacterRow[]>([]);
-    const [edits, setEdits] = useState<Map<string, AbilityEdit>>(new Map());
+// 每语言的文案表在 Go 侧只读一次，缓存住：命中就同步落地，换语言不再等一次 IPC（同 SigilEditorPanel 的
+// textCache）。
+const textCache = new Map<Lang, LimitBonusText>();
+
+/*
+    文案还没到手（第一帧、或者这一门语言的资产读不出来）时用的空表：两张表都空，于是能力名显示
+    AB_PL1400_06、描述画一个占位符——"缺 key 就是缺"照实显示，而不是拿另一种语言垫上。角色名读的是
+    App 传下来的 charaNames，与这份表无关。
+*/
+const EMPTY_TEXT: LimitBonusText = {
+    bonuses: {},
+    effects: {},
+};
+
+function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
+    /** 当前界面语言：资产文案按它取，页面自有文案也按它取（见 messages.ts）。 */
+    lang: Lang;
+    /** PL 码 → 角色属性（chara.json 的整张表）：由 App 在挂载时取一次，语言无关；取色就从这里一步到位。 */
+    charaTable: CharaTable;
+    /** PL 码 → 角色名（chara.lang.json）：由 App 按当前语言取好传下来，角色名的唯一来源。 */
+    charaNames: Record<string, string>;
+}) {
+    // 骨架里的角色（语言无关）：挂载时取一次，之后不再变。
+    const [characters, setCharacters] = useState<LimitBonusCharacter[]>([]);
+    // 当前语言的文案。语言一变就重取：能力名与效果模板都在它里面。
+    const [text, setText] = useState<LimitBonusText | null>(null);
+    const [edits, setEdits] = useState<Map<string, LimitBonusEdit>>(new Map());
     // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的这份空列表会被后端整体替换
     // 掉（同 SigilEditorPanel 的那条规则），用户其余的编辑就没了。
     const [editListRead, setEditListRead] = useState(false);
     const [error, setError] = useState<{ title: string; detail: string } | null>(null);
     const [errorOpen, setErrorOpen] = useState(false);
+
+    const t = messages[lang];
 
     // 显示一次失败既记下它，也打开对话框。关闭只是关闭：消息留在 state 里好让退场动画仍有东西可画。
     function showError(next: { title: string; detail: string }) {
@@ -316,14 +370,17 @@ function AbilityEditorPanelBase() {
         setErrorOpen(true);
     }
 
+    /*
+        骨架与编辑列表只读一次：它们都是语言无关的，换语言不该把屏幕上还没写下去的编辑重读一遍（同
+        SigilEditorPanel 里"编辑列表与语言无关，这里刻意不动它"）。
+    */
     useEffect(() => {
         void (async () => {
             const [table, list] = await Promise.all([
-                Call.ByName(`${SERVICE}.LoadAbilities`) as Promise<AbilityTable | null>,
-                Call.ByName(`${SERVICE}.LoadAbilityEdits`) as Promise<AbilityEdit[]>,
+                Call.ByName(`${SERVICE}.LoadLimitBonusCharacters`) as Promise<LimitBonusTable | null>,
+                Call.ByName(`${SERVICE}.LoadLimitBonusEdits`) as Promise<LimitBonusEdit[]>,
             ]);
-            const all = dedupeCharacters(table?.characters ?? []);
-            setCharacters(all);
+            setCharacters(dedupeCharacters(table?.characters ?? []));
             // 只读、不写回：归一化只是为了在屏幕上理顺这份列表，用户文件在下一次真正的编辑之前不该被动过
             // ——"打开一次就等于改过一次"与 App.tsx 那条"启动不写盘"是同一件事。
             setEdits(
@@ -331,50 +388,79 @@ function AbilityEditorPanelBase() {
                     dedupeEdits(
                         (list ?? [])
                             .map(asEdit)
-                            .filter((edit): edit is AbilityEdit => edit !== null),
+                            .filter((edit): edit is LimitBonusEdit => edit !== null),
                     ).map((edit) => [edit.key, edit]),
                 ),
             );
             setEditListRead(true);
-        })().catch((err) => showError({ title: "读取失败", detail: String(err) }));
-        // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态。这一页只有中文，没有语言依赖会把这一跑重新触发。
+        })().catch((err) => showError({ title: t.readFailed, detail: String(err) }));
+        // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态。这里刻意不读 t——文案在渲染时取，所以没有
+        // 语言依赖会把这一跑重新触发。
     }, []);
 
     /*
+        当前语言的文案：能力名与效果模板都在这一份里（角色名走 App 的 charaNames，不在这里取）。换语言
+        就重取（与因子编辑页的 SkillMap 同一条路），缓存住的话命中就同步落地，标签与外层文字同一帧换掉。
+    */
+    useEffect(() => {
+        const hit = textCache.get(lang);
+        if (hit) {
+            setText(hit);
+            return;
+        }
+        let cancelled = false;
+        Call.ByName(`${SERVICE}.LoadLimitBonus`, lang)
+            .then((table) => {
+                if (cancelled) return;
+                const entry = (table ?? EMPTY_TEXT) as LimitBonusText;
+                textCache.set(lang, entry);
+                setText(entry);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                showError({ title: t.readFailed, detail: String(err) });
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [lang]);
+
+    /*
         防抖之后才失败的写入由后端推送过来（见 SAVE_FAILED）。它和立即失败共用同一个对话框，因为在
-        用户看来它们是同一件事：编辑没有落到磁盘上。On 交回的函数就是 React 在退出时运行的取消订阅。
+        用户看来它们是同一件事：编辑没有落到磁盘上。语言变化时重新订阅好让标题跟着切换（同
+        SigilEditorPanel）；On 交回的函数就是 React 在退出时运行的取消订阅。
     */
     useEffect(
         () =>
             Events.On(SAVE_FAILED, (event) => {
-                showError({ title: "写入失败", detail: String(event.data) });
+                showError({ title: t.writeFailed, detail: String(event.data) });
             }),
-        [],
+        [lang],
     );
 
     /*
         每一次改动都经过这里：屏幕上的列表就是全部状态，也是运行中的游戏最终拿到的东西。前端对"何时
         写入"刻意保持无知——每次变化把整份列表交出去，不等答复；后端的尾随防抖把一串敲键变成一次
-        abilityedits.json 写入与一次游戏内的应用。
+        limit_bonus.json 写入与一次游戏内的应用。
     */
-    function commit(next: Map<string, AbilityEdit>) {
+    function commit(next: Map<string, LimitBonusEdit>) {
         // 列表还没读回来就不写；不写盘的理由见 editListRead 的声明。
         if (!editListRead) return;
         setEdits(next);
-        Call.ByName(`${SERVICE}.SaveAbilityEdits`, [...next.values()]).catch((err) =>
-            showError({ title: "写入失败", detail: String(err) }),
+        Call.ByName(`${SERVICE}.SaveLimitBonusEdits`, [...next.values()]).catch((err) =>
+            showError({ title: t.writeFailed, detail: String(err) }),
         );
     }
 
     /*
         一个数值框。往还没有编辑的参数行里输入会开始一条记录，**有值就是启用**——这一页没有启用开关，
-        所以这里也从不写 enabled: false（见 ability.ts 的 withFirstValue）。
+        所以这里也从不写 enabled: false（见 limitbonus.ts 的 withFirstValue）。
 
         "只写第一档"在 withFirstValue 里，这里只管两件事：有值时把那一格放回列表；**清空时把整条记录
         删掉**——删掉之后这一行回到完全没编辑过的样子，游戏那边一个字节都没被碰过（不是"还原成默认
         值"：那会留下一条记录）。没有记录时清空是空操作，连一次落盘都不必发生。
     */
-    function setValue(param: AbilityParam, value: number | null) {
+    function setValue(param: LimitBonusParam, value: number | null) {
         const patched = withFirstValue(param, value);
         // 清空一个没编辑过的参数行：Map 里本来就没有它，没有东西可删。
         if (patched === null && !edits.has(param.key)) return;
@@ -398,18 +484,21 @@ function AbilityEditorPanelBase() {
                 {characters.map((character) => (
                     <CharacterGroup
                         key={character.id}
-                        character={character}
+                        character={characterRowOf(character, charaTable)}
+                        name={charaNames[character.id] ?? character.id}
+                        effects={text?.effects ?? EMPTY_TEXT.effects}
+                        abilityNames={text?.bonuses ?? EMPTY_TEXT.bonuses}
                         edits={edits}
                         onValue={setValue}
                     />
                 ))}
                 {characters.length === 0 && (
-                    <p className="py-6 text-center text-sm text-muted-foreground">没有可强化的条目</p>
+                    <p className="py-6 text-center text-sm text-muted-foreground">{t.noBonuses}</p>
                 )}
             </div>
 
             {/*写入失败值得打断用户——编辑没有落到磁盘上，而原因通常要用户自己处理
-               (abilityedits.json 被别的程序锁住、文件夹不可写)。
+               (limit_bonus.json 被别的程序锁住、文件夹不可写)。
                两种失败都落到这里：立即失败，以及后端推送的防抖失败。*/}
             <AlertDialog open={errorOpen} onOpenChange={setErrorOpen}>
                 {/* 不用 size="sm"：那会把页脚切成两列网格，而这个对话框只有一个按钮，应该居中。 */}
@@ -421,7 +510,7 @@ function AbilityEditorPanelBase() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogAction onClick={() => setErrorOpen(false)}>确定</AlertDialogAction>
+                        <AlertDialogAction onClick={() => setErrorOpen(false)}>{t.ok}</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -430,4 +519,4 @@ function AbilityEditorPanelBase() {
 }
 
 /* keepMounted 的一页：memo 住才不会被 App 的重渲染连带（切 Tab 也算）。 */
-export const AbilityEditorPanel = memo(AbilityEditorPanelBase);
+export const LimitBonusEditorPanel = memo(LimitBonusEditorPanelBase);

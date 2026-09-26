@@ -15,7 +15,7 @@ namespace GBFR.SigilLoadout;
 /// 值什么时候到游戏里：天赋/能力数值在**读档**（回标题 → 继续）或该页「全部习得」时才被重算；
 /// 节点描述是实时读表的，所以改完立刻看得见。
 /// </summary>
-internal sealed class AbilityEditorFeature {
+internal sealed class LimitBonusFeature {
     private const string ConfigFileName = "limit_bonus.json";
 
     // 编辑列表住在用户配置目录里（见 UserConfig），与 sigiledits.json / loadout.json 挨着：
@@ -41,7 +41,7 @@ internal sealed class AbilityEditorFeature {
     private bool _hasLandedOnce;
     private int _stopped;
 
-    internal AbilityEditorFeature(Action<string> log) => _log = log;
+    internal LimitBonusFeature(Action<string> log) => _log = log;
 
     /// <summary>失败会重试，而"表还没进内存""原生拒写"在屏幕上是同一件事，所以同一版只报一次。</summary>
     internal void Tick() {
@@ -66,7 +66,7 @@ internal sealed class AbilityEditorFeature {
                 _stamp.MarkApplied(current);
         }
         catch (Exception ex) {
-            _log("ability edit EXCEPTION: " + ex);
+            _log("limit bonus edit EXCEPTION: " + ex);
         }
     }
 
@@ -79,26 +79,26 @@ internal sealed class AbilityEditorFeature {
     /// <returns>这一版全都落地了（"内存里已经是一样的值"也算落地）。false = 有拒写或读不出来，
     /// 还欠着，下一拍按重试间隔再来。</returns>
     private bool Apply(bool quiet) {
-        AbilityEditConfig config;
+        LimitBonusConfig config;
         try {
-            config = AbilityEditConfig.Load(ConfigFile);
+            config = LimitBonusConfig.Load(ConfigFile);
         }
         catch (FileNotFoundException) {
             // 没有文件 = 没有编辑，不是错误（与 loadout.json 同一种反应：空列表）。
-            config = new AbilityEditConfig();
+            config = new LimitBonusConfig();
         }
         catch (DirectoryNotFoundException) {
-            config = new AbilityEditConfig();
+            config = new LimitBonusConfig();
         }
         catch (Exception ex) {
             if (!quiet)
-                _log("ability edit: the edit list could not be read (" + ex.Message
+                _log("limit bonus edit: the edit list could not be read (" + ex.Message
                     + "); nothing was written and this version stays pending");
             return false;
         }
 
         int landed = 0, skipped = 0, refused = 0;
-        foreach (AbilityEdit edit in config.Edits) {
+        foreach (LimitBonusEdit edit in config.Edits) {
             if (!edit.Enabled)
                 continue;
             if (!TryParseKey(edit.Key, out uint keyHash)
@@ -121,7 +121,7 @@ internal sealed class AbilityEditorFeature {
         if (refused == 0)
             _hasLandedOnce = true;
         if (!quiet || skipped > 0 || refused > 0)
-            _log($"ability edit: {landed} applied, {skipped} skipped, {refused} refused"
+            _log($"limit bonus edit: {landed} applied, {skipped} skipped, {refused} refused"
                 + $" (of {config.Edits.Count} entries in the list)");
         return refused == 0;
     }

@@ -1,10 +1,11 @@
 /*
-    能力编辑页的纯逻辑：Lv1 取哪个数、这一行有哪些框、描述格里写什么，以及一次改动落成什么样的一条
-    记录。这些规则决定了屏幕上显示什么、以及下一次落盘的 abilityedits.json 里有什么，所以在这里直接
+    能力强化页的纯逻辑：Lv1 取哪个数、这一行有哪些框、描述格里写什么，以及一次改动落成什么样的一条
+    记录。这些规则决定了屏幕上显示什么、以及下一次落盘的 limit_bonus.json 里有什么，所以在这里直接
     钉住——**这一页只写第一档**（values 长度恒为 1），Lv2/Lv3 留给游戏原值。
 
-    用**手搓夹具**而不是入库的资产：这里钉的是规则本身，资产的不变量（Key 与哈希的写法、Lv1 的默认值）
-    由 Go 侧的 abilityservice_test.go 对着真实文件断言，两边不必是同一份事实的第三次手抄。
+    用**手搓夹具**而不是入库的资产：这里钉的是规则本身，资产的不变量（Key 与哈希的写法、Lv1 的默认值、
+    每条 id 都有文案）由 Go 侧的 limitbonusservice_test.go 对着真实文件断言，两边不必是同一份事实的第三次
+    手抄。
 */
 import { describe, expect, it } from "vitest"
 import {
@@ -16,15 +17,15 @@ import {
     valueAt,
     withFirstValue,
     type Ability,
-    type AbilityCharacter,
-    type AbilityEdit,
-    type AbilityParam,
-} from "./ability"
+    type LimitBonusCharacter,
+    type LimitBonusEdit,
+    type LimitBonusParam,
+} from "./limitbonus"
 
-// 一条能力一个参数行（能力强化就是这个形状），夹具也取这个形状：刹那，Lv1 的游戏默认值是 2。
-const param = (patch: Partial<AbilityParam> = {}): AbilityParam => ({
+// 一条能力一个参数行（能力强化就是这个形状），夹具也取这个形状：刹那，Lv1 的游戏默认值是 2。骨架里
+// **没有文案**，所以这里也不带——名字与效果都在当前语言的文案表里。
+const param = (patch: Partial<LimitBonusParam> = {}): LimitBonusParam => ({
     key: "0D0BCF24",
-    effect: "冷却时间-{0}%",
     default: 2,
     ...patch,
 })
@@ -32,18 +33,20 @@ const param = (patch: Partial<AbilityParam> = {}): AbilityParam => ({
 const ability = (patch: Partial<Ability> = {}): Ability => ({
     key: "AB_PL1400_06",
     hash: "41E3C434",
-    name: "刹那",
     param: param(),
     ...patch,
 })
 
-const character = (id: string, abilities: Ability[]): AbilityCharacter => ({
+const character = (id: string, bonuses: Ability[]): LimitBonusCharacter => ({
     id: id,
-    name: id,
-    abilities: abilities,
+    bonuses: bonuses,
 })
 
-const edit = (patch: Partial<AbilityEdit> = {}): AbilityEdit => ({
+// 当前语言的文案表（assets/limit_bonus.<lang>.json 的那两张）：效果模板按参数行的 Key 查。角色名不在
+// 这份表里（它只有 chara.lang.json 一个来源），所以这里也没有。
+const effects = { "0D0BCF24": "冷却时间-{0}%" }
+
+const edit = (patch: Partial<LimitBonusEdit> = {}): LimitBonusEdit => ({
     enabled: true,
     key: "0D0BCF24",
     values: [500, 600, 321],
@@ -51,7 +54,8 @@ const edit = (patch: Partial<AbilityEdit> = {}): AbilityEdit => ({
 })
 
 /** 组件铺出来的那一行描述，逐字是它的拼法：模板本身，{0} 换成框号。 */
-const lineAt = (target: Ability) => levelLabel(slotsAt(target))
+const lineAt = (target: Ability, table: Record<string, string> = effects) =>
+    levelLabel(slotsAt(target), table)
 
 describe("这一行显示什么", () => {
     it("没编辑过的参数行读游戏自己的 Lv1，有记录时读记录的第一格", () => {
@@ -65,8 +69,9 @@ describe("这一行显示什么", () => {
     it("描述显示模板本身，{0} 换成它右边那个框的号", () => {
         // 一行一个框：模板里的 {0} 写成 {1}，与那个框对上。
         expect(lineAt(ability())).toBe("冷却时间-{1}%")
-        // 游戏自己就没有这行文案的参数行：空串一路走到屏幕上就是空白，由组件画一个占位符。
-        expect(lineAt(ability({ param: param({ effect: "" }) }))).toBe("")
+        // 这个参数行在当前语言的文案表里没有键（游戏自己就没有这行文案、或者这门语言的表缺这一条）：
+        // 得到空串，由组件画一个占位符。**不回退**到别的语言。
+        expect(lineAt(ability(), {})).toBe("")
     })
 })
 
@@ -121,7 +126,7 @@ describe("读回来的记录", () => {
     })
 
     // 值列表里的成员类型不对的文件根本到不了这里（Go 侧解 float，字符串会让整份文件读不出来，见
-    // abilityservice_test.go）：面板看到的是错误，不是一条被读成零值的记录。
+    // limitbonusservice_test.go）：面板看到的是错误，不是一条被读成零值的记录。
 })
 
 describe("一个 Key 最多一条编辑", () => {

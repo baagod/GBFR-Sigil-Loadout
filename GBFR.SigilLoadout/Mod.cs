@@ -12,7 +12,7 @@ namespace GBFR.SigilLoadout;
 /// 它还承载两个编辑器，都由下面 250ms 的维护拍驱动：
 ///   * 因子编辑器：按用户的编辑列表改写 skill_status 行——启动时经 IDataManager 写一次，游戏跑
 ///     起来之后再来一次，那时由维护拍发现文件变了并重新应用；
-///   * 能力编辑器：按用户的编辑列表改写 limit_bonus_param 活表里那几行（能力强化数值）。它不经过
+///   * 能力强化编辑器：按用户的编辑列表改写 limit_bonus_param 活表里那几行（能力强化数值）。它不经过
 ///     IDataManager——这张表不重新解析——所以整件事就是维护拍里的那一次原生写入。
 /// </summary>
 public sealed class Mod : IMod {
@@ -25,7 +25,7 @@ public sealed class Mod : IMod {
     private StreamWriter? _fileLog;
     private System.Threading.Timer? _tickTimer;
     private SigilEditorFeature? _sigilEditor;
-    private AbilityEditorFeature? _abilityEditor;
+    private LimitBonusFeature? _limitBonusEditor;
     private bool _disposed;
     private int _startRequested;
     private int _ticking;
@@ -102,10 +102,10 @@ public sealed class Mod : IMod {
             _sigilEditor.Start(loader);
             CompleteStartupPhase("sigil-editor", sigilEditorStarted);
 
-            // 能力编辑器与原生钩子无关，也没有启动时那一次同步写：它按编辑列表写
+            // 能力强化编辑器与原生钩子无关，也没有启动时那一次同步写：它按编辑列表写
             // limit_bonus_param 活表里那几行，由维护拍驱动。游戏可能还没把那张表读进内存，那时原生
             // 以拒写回话，拍子按 5s 重试——所以这里没有需要单独计时的启动步骤。
-            _abilityEditor = new AbilityEditorFeature(Log);
+            _limitBonusEditor = new LimitBonusFeature(Log);
 
             _tickTimer = new System.Threading.Timer(
                 _ => {
@@ -116,7 +116,7 @@ public sealed class Mod : IMod {
                     try {
                         LoadoutConfig.Tick(Log);
                         _sigilEditor?.Tick();
-                        _abilityEditor?.Tick();
+                        _limitBonusEditor?.Tick();
                         Hotkey.Tick(Log);
                     }
                     catch {
@@ -183,8 +183,8 @@ public sealed class Mod : IMod {
         _tickTimer = null;
         _sigilEditor?.Dispose();
         _sigilEditor = null;
-        _abilityEditor?.Dispose();
-        _abilityEditor = null;
+        _limitBonusEditor?.Dispose();
+        _limitBonusEditor = null;
         Hotkey.Shutdown();
         // 无条件关停。Initialize 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，
         // 之后的每一步都可能抛异常把控制权交到这里，所以不能拿"是否走到最后一步"门着它。

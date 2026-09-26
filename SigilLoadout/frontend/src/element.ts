@@ -1,37 +1,21 @@
 /*
-    角色属性（游戏自己的六属性）→ 色条颜色。**整份映射只有这一处**：以后调色改这里就够了。
+    角色那一行的颜色。**颜色不在这个文件里**：它只有一处，就是生成器出的 assets/chara.json
+    （见 gen/game/limitbonus/limitbonus.go 的 elementColors），那里按 element 把颜色算好、记在每个角色
+    上，界面拿 PL 码取到角色再一路传到渲染。所以这一份只留下"拿到的东西不像颜色时怎么办"。
 
-    属性本身来自游戏数据（chara.Element，生成器把它翻成名字写进 assets/abilities.json，见
-    gen/game/abilities/abilities.go 的 elementNames）。颜色不写进资产：一份资产不该同时带着"是什么"
-    与"画成什么色"两件事。
-
-    键用语义名，因为资产里写的就是名字；整数写法也认（老资产、或有人把生成器改回去写原始整数时，
-    0..5 同样落到这张表上，下标就是游戏枚举：0 火 1 水 2 土 3 风 4 光 5 暗）。
+    没有"属性名 → 颜色"的查找了：那只六色调色表已经删掉，取色不再需要第二步（见 chara.json 的形状）。
 */
 
-/** 六属性各自的颜色：取自游戏自己的属性色相，压暗到这一页的灰阶基调里。 */
-const ELEMENT_COLORS: Record<string, string> = {
-    fire: "#e05c4a", // 火
-    water: "#4a8fd4", // 水
-    wind: "#4fae6b", // 风
-    earth: "#c89a52", // 土
-    light: "#e6c66a", // 光
-    dark: "#9a72c9", // 暗
-}
-
-/** 整数写法用的名字表：下标即游戏枚举的值。 */
-const ELEMENT_NAMES = ["fire", "water", "earth", "wind", "light", "dark"]
-
-/** 属性缺失或认不出来时的中性灰。 */
+/** 颜色缺失、或者拿到的东西不是一个颜色值时的中性灰。 */
 const NEUTRAL = "#6b6b6b"
 
 /**
  * 一条角色色条的颜色。
  *
- * 认不出来（空串、越界的数、资产里根本没有 element 这一项）给中性灰而不是空值：色条是"这一行是哪个
- * 角色"的补充信息，缺了它也不该让那一行长歪或者报错——六个属性认得出时才是有意义的那一条。
+ * 传进来的就是资产里这个角色那一栏 color（Go 侧已经按 element 算好，属性认不出来时它自己就是中性灰）。
+ * 这里只兜一种情形：资产没到手、或者那一栏不是个正经的 hex——色条是"这一行是哪个角色"的补充信息，
+ * 缺了它也不该让那一行长歪或者报错。
  */
-export function elementColor(element: string | number | null | undefined): string {
-    const name = typeof element === "number" ? ELEMENT_NAMES[element] : element
-    return (name ? ELEMENT_COLORS[name] : undefined) || NEUTRAL
+export function elementColor(color: string | null | undefined): string {
+    return typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color) ? color : NEUTRAL
 }

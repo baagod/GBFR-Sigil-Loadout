@@ -16,6 +16,7 @@ const zh = {
     tabGeneral: "通用配装",
     tabExclusive: "专属因子",
     tabSigilEditor: "因子编辑",
+    tabLimitBonus: "角色强化",
     langSwitch: "切换语言",
     crashed: "界面出错了，需要重新载入。",
     reload: "重新载入",
@@ -45,6 +46,10 @@ const zh = {
     valueLabel: "数值",
     readFailed: "读取失败",
     writeFailed: "写入失败",
+
+    // 角色强化页
+    /** 一份能力都没有时的空态。 */
+    noBonuses: "没有可强化的条目",
 };
 
 export type Messages = typeof zh;
@@ -57,6 +62,7 @@ export const messages: Record<Lang, Messages> = {
         tabGeneral: "General Loadout",
         tabExclusive: "Exclusive Sigils",
         tabSigilEditor: "Sigil Edit",
+        tabLimitBonus: "Character Boost",
         langSwitch: "Switch Language",
         crashed: "The interface crashed and has to reload.",
         reload: "Reload",
@@ -82,11 +88,14 @@ export const messages: Record<Lang, Messages> = {
         valueLabel: "value",
         readFailed: "Could not read",
         writeFailed: "Could not write",
+
+        noBonuses: "No boostable entries",
     },
     ja: {
         tabGeneral: "汎用装備構成",
         tabExclusive: "専用ジーン",
         tabSigilEditor: "ジーン編集",
+        tabLimitBonus: "キャラ強化",
         langSwitch: "言語を切り替え",
         crashed: "画面がエラーで停止しました。再読み込みが必要です。",
         reload: "再読み込み",
@@ -112,11 +121,14 @@ export const messages: Record<Lang, Messages> = {
         valueLabel: "数値",
         readFailed: "読み込みに失敗しました",
         writeFailed: "書き込みに失敗しました",
+
+        noBonuses: "強化できる項目がありません",
     },
     ko: {
         tabGeneral: "일반 장비 구성",
         tabExclusive: "전용 진",
         tabSigilEditor: "진 편집",
+        tabLimitBonus: "캐릭터 강화",
         langSwitch: "언어 전환",
         crashed: "화면이 오류로 멈췄습니다. 다시 불러와야 합니다.",
         reload: "다시 불러오기",
@@ -142,5 +154,7 @@ export const messages: Record<Lang, Messages> = {
         valueLabel: "값",
         readFailed: "읽기에 실패했습니다",
         writeFailed: "쓰기에 실패했습니다",
+
+        noBonuses: "강화할 항목이 없습니다",
     },
 };

@@ -12,7 +12,7 @@ namespace GBFR.SigilLoadout;
 ///
 /// 形状与 sigiledits.json 的 Values 有意一致：都是"按槽位写、没提到的槽不动"。
 /// </summary>
-public class AbilityEdit {
+public class LimitBonusEdit {
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; } = true;
 
@@ -36,9 +36,9 @@ public class AbilityEdit {
 /// 只写内存、不经过数据管理器，写进去就没有第二份原始值可以拿回来。要还原默认值得由工具把
 /// 默认值当一次编辑写下来（资产里有默认档值）。
 /// </summary>
-public class AbilityEditConfig {
+public class LimitBonusConfig {
     [JsonPropertyName("edits")]
-    public List<AbilityEdit> Edits { get; set; } = [];
+    public List<LimitBonusEdit> Edits { get; set; } = [];
 
     private static readonly JsonSerializerOptions Options = new();
 
@@ -46,7 +46,7 @@ public class AbilityEditConfig {
     /// <paramref name="path"/> 里的编辑列表。空的 <c>edits</c> 数组是真实答案，返回空列表；
     /// 其余坏形状都抛异常，由调用方记下原因后什么都不写。
     /// </summary>
-    public static AbilityEditConfig Load(string path) {
+    public static LimitBonusConfig Load(string path) {
         // 大小上限与另两份配置同一道：文件可以手改，失控的那份该是一条记进日志的错误，
         // 而不是一次几个 GB 的读取。
         var info = new FileInfo(path);
@@ -64,7 +64,7 @@ public class AbilityEditConfig {
             throw new InvalidDataException(
                 $"limit_bonus.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'nothing to write')");
 
-        return doc.RootElement.Deserialize<AbilityEditConfig>(Options)!;
+        return doc.RootElement.Deserialize<LimitBonusConfig>(Options)!;
     }
 
     internal const long MaxBytes = 1 * 1024 * 1024;

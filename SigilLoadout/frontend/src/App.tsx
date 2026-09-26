@@ -5,6 +5,7 @@ import {Checkbox} from "@/components/ui/checkbox"
 import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
 import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/shellservice"
+import {Call} from "@wailsio/runtime"
 import {messages, type Messages} from "./messages"
 import {LANGS, LANG_LABEL, initialLang, type Lang} from "./lang"
 import {
@@ -27,9 +28,10 @@ import {
 import {SlotRow, HEADER_ROW} from "./SlotEditor"
 import {ExclusivePanel} from "./ExclusivePanel"
 import {SigilEditorPanel} from "./SigilEditorPanel"
-import {AbilityEditorPanel} from "./AbilityEditorPanel"
+import {LimitBonusEditorPanel} from "./LimitBonusEditorPanel"
+import type {CharaTable} from "./limitbonus"
 
-type TabKey = "general" | "exclusive" | "sigilEditor" | "abilityEditor"
+type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus"
 
 /** 外壳唯一的一条失败通道：谁失败都只是把它写进这里，屏幕上只可能显示一条。 */
 type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }
@@ -79,8 +81,11 @@ export default function App() {
     const [exclusiveState, setExclusiveState] = useState<ExclusiveState | undefined>(undefined)
     // 当前语言的显示名（sigils.lang.json：{hash: 名字}）。名字按语言变，只是标签，身份是 hash。
     const [names, setNames] = useState<Record<string, string>>({})
-    // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页的行标签。
+    // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页与能力强化页的行标签。
     const [charaNames, setCharaNames] = useState<Record<string, string>>({})
+    // 角色表（chara.json）：PL 码 → {hash, element, color}。颜色已经按属性算好记在角色上，所以取色是
+    // 一步。语言无关，只在挂载时取一次，切语言不重取。
+    const [charaTable, setCharaTable] = useState<CharaTable>({})
     const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
     const t = messages[lang]
 
@@ -169,6 +174,17 @@ export default function App() {
                 setExclusiveTable(parseExclusiveTable(JSON.parse(await exclusives)))
             } catch (e) {
                 setFailure({kind: "exclusive", error: e})
+            }
+
+            /*
+                角色表（chara.json）：PL 码 → 颜色（按属性在生成期算好）。与语言无关，所以整场只取一次。
+                取不到就留空表——角色名于是画成中性灰（见 element.ts），而不是让整页读不出来。
+            */
+            try {
+                const chara = (await Call.ByName("main.LimitBonusService.Characters")) as CharaTable | null
+                setCharaTable(chara ?? {})
+            } catch {
+                setCharaTable({})
             }
         })()
         // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态。这里也刻意不读 t——文案在渲染时由
@@ -261,7 +277,7 @@ export default function App() {
         const isInOverlay = (e: KeyboardEvent) =>
             !!(e.target as HTMLElement | null)?.closest?.(
                 // Esc 归谁：打开的浮层，以及两个编辑页里的数值框——那两页把 Esc 定义成"放开这个框"
-                // （见 SkillRow 与 AbilityEditorPanel），不该同时把整个窗口藏到托盘去。
+                // （见 SkillRow 与 LimitBonusEditorPanel），不该同时把整个窗口藏到托盘去。
                 '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .skill-rows input, .ability-rows input'
             )
         const onKeyDown = (e: KeyboardEvent) => {
@@ -326,8 +342,7 @@ export default function App() {
                             <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
                             <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
                             <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
-                            {/* 角色强化页刻意只做中文：它读的资产也只有中文，所以这一个标签不走 messages.ts。 */}
-                            <TabsTrigger value="abilityEditor">角色强化</TabsTrigger>
+                            <TabsTrigger value="limitBonus">{t.tabLimitBonus}</TabsTrigger>
                         </TabsList>
                         {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的
@@ -413,8 +428,8 @@ export default function App() {
                     <SigilEditorPanel lang={lang} />
                 </TabsPanel>
                 {/* keepMounted：理由与因子编辑页相同——这一页的编辑状态活在组件里，而后端落盘要等防抖。 */}
-                <TabsPanel value="abilityEditor" keepMounted className="min-h-0 flex-1 overflow-auto">
-                    <AbilityEditorPanel />
+                <TabsPanel value="limitBonus" keepMounted className="min-h-0 flex-1 overflow-auto">
+                    <LimitBonusEditorPanel lang={lang} charaTable={charaTable} charaNames={charaNames} />
                 </TabsPanel>
             </Tabs>
         </div>

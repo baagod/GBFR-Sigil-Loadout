@@ -1,6 +1,6 @@
 /*
-    能力编辑页的纯逻辑半边：资产的形状、读回来的记录如何归一化、以及那一行显示什么。不碰 React 也不碰
-    DOM，所以能独立测试（见 ability.test.ts）。
+    能力强化页的纯逻辑半边：资产的形状、读回来的记录如何归一化、以及那一行显示什么。不碰 React 也不碰
+    DOM，所以能独立测试（见 limitbonus.test.ts）。
 
     与因子编辑页（skills.ts）的分工一样：这里放着"由值单独决定"的那部分，组件只负责画。
 
@@ -11,33 +11,74 @@
     （见 valueAt 与 withFirstValue）。
 */
 
-/** assets/abilities.json 里的一个参数行：一条能力挂一个。 */
-export type AbilityParam = {
-    /** limit_bonus_param 那一行的 Key：正好 8 位十六进制，mod 靠它找行。 */
+/** assets/limit_bonus.json（骨架）里的一个参数行：一条能力挂一个。**只有 Key 与默认值**——效果文案在
+ *  当前语言的文案表里（见 LimitBonusText.effects）。 */
+export type LimitBonusParam = {
+    /** limit_bonus_param 那一行的 Key：正好 8 位十六进制，mod 靠它找行，效果模板也按它查。 */
     key: string
-    /** 这一行的效果模板（"冷却时间-{0}%"），{0} 就是这个参数行自己的数值（见 levelLabel）。个别参数行没有文案，那时是空串。 */
-    effect: string
     /** 这一行 Lv1 的游戏默认值：空框的占位符读它（见 valueAt）。只留第一档——这一页只写第一档。 */
     default: number
 }
 
-/** assets/abilities.json 里的一条能力强化条目。 */
+/** assets/limit_bonus.json（骨架）里的一条能力强化条目。 */
 export type Ability = {
-    /** 这条能力在 ability 表里的短名（AB_PL0700_01）：界面拿它认这一行。 */
+    /** 这条能力在 ability 表里的短名（AB_PL0700_01）：界面拿它认这一行，也拿它去文案表里查名字。 */
     key: string
     /** 这条能力的 32 位哈希，8 位大写十六进制。写内存指的行是 param.key，不是它。 */
     hash: string
-    name: string
     /** 这条能力挂的那个参数行：能力强化只挂一个（`limit_bonus` 的 ParamId1）。 */
-    param: AbilityParam
+    param: LimitBonusParam
 }
 
-export type AbilityCharacter = { id: string; name: string; abilities: Ability[] }
+/** 骨架里的一个角色条目：只有 id，名字与属性都在别处（chara.lang.json / chara.json）。 */
+export type LimitBonusCharacter = { id: string; bonuses: Ability[] }
 
-export type AbilityTable = { language: string; characters: AbilityCharacter[] }
+/** assets/limit_bonus.json：整个骨架，**语言无关**。 */
+export type LimitBonusTable = { characters: LimitBonusCharacter[] }
 
-/** abilityedits.json 里的一条：**一个参数行一条**，values[i] 写进 Lv(i+1)；这一页写出来的长度恒为 1。 */
-export type AbilityEdit = {
+/**
+ * assets/limit_bonus.<lang>.json：一门语言的文案，按 id 索引。
+ *
+ * 两张表刻意不同构复制骨架：骨架里的文案重复一份，四门语言就是四棵整树。**没有回退**——表里缺哪个
+ * id，界面就照实显示那个 id 或留白，不拿另一种语言的词冒充。
+ *
+ * 角色名不在这份表里：它只有 chara.lang.json 一个来源（App 的 charaNames），而文件名本身就是语言，
+ * 所以也没有 language 那一栏。
+ */
+export type LimitBonusText = {
+    /** 能力短名（AB_PL0700_01）→ 能力名。与骨架里那份 bonuses 是同一批条目，所以同名。 */
+    bonuses: Record<string, string>
+    /** 参数行 Key（8 位十六进制）→ 效果模板（"晕厥值+{0}%"）；游戏自己没有这行文案时表里就没有这个键。 */
+    effects: Record<string, string>
+}
+
+/**
+ * assets/chara.json 里的一个角色：**颜色就记在它自己身上**（生成期按属性算好写进来的），所以界面拿
+ * PL 码取到这一条就能直接上色，没有第二步查找。
+ *
+ * element 是生成期写下的冗余，只为让这份资产自解释；界面不读它。
+ */
+export type CharaEntry = { hash: string; element: string; color: string }
+
+/** assets/chara.json：语言无关的角色表，**顶层直接以 PL 码为键**（与 chara.lang.json 里每门语言那份
+ *  {PL 码: 名字} 同摆法）。 */
+export type CharaTable = Record<string, CharaEntry>
+
+/**
+ * 骨架里的一个角色条目（只有 id，名字与颜色都在别处）+ 从 chara.json 取来的那两栏。**两个都允许缺席**：
+ * 资产读不出来时角色名显示 PL 码、颜色兜中性灰，而不是让整页画不出来。
+ */
+export const characterRowOf = (
+    character: LimitBonusCharacter,
+    chara: CharaTable,
+): LimitBonusCharacter & { element?: string; color?: string } => ({
+    ...character,
+    element: chara[character.id]?.element,
+    color: chara[character.id]?.color,
+})
+
+/** limit_bonus.json 里的一条：**一个参数行一条**，values[i] 写进 Lv(i+1)；这一页写出来的长度恒为 1。 */
+export type LimitBonusEdit = {
     enabled: boolean
     key: string
     values: number[]
@@ -53,7 +94,7 @@ export type AbilityEdit = {
  * 是空数组）也走这条路：缺格等于没编辑，正是它的含义。（描述里那个 {n} 说的是第几个框，不是数值，见
  * levelLabel。）
  */
-export const valueAt = (param: AbilityParam, record: AbilityEdit | undefined) =>
+export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefined) =>
     record?.values[0] ?? param.default ?? 0
 
 /** 那一行里一个参数槽占的位置：描述里的 {n} 与从左数第 n 个框都是它。 */
@@ -64,7 +105,7 @@ export type LevelSlot = {
      * 这个槽上的参数行；**null = 这条能力没有这个槽**——`limit_bonus` 最多挂 ParamId1/2/3，
      * 而能力强化只有第一个，所以槽 2/3 是空的。空槽在屏幕上显示 0、不可编辑：没有对应的行可写。
      */
-    param: AbilityParam | null
+    param: LimitBonusParam | null
 }
 
 /** 参数槽固定 3 个：这是 `limit_bonus` 能挂的参数行上界（ParamId1/2/3）。 */
@@ -85,19 +126,23 @@ export const slotsAt = (ability: Ability): LevelSlot[] =>
 /**
  * 描述格里的一整段文字：游戏写的效果模板本身，其中 {0} 换成**写死的框号**。
  *
+ * 模板来自当前语言的文案表（见 LimitBonusText.effects），按参数行的 Key 取；表里没有这个 Key 就是游戏
+ * 自己没写这行文案，那一段不占字。
+ *
  * 这与因子编辑页说明里的 {N} 同性质（见 skills.ts 的 slotLabel）：{n} 引用的是第几个数值框，不是
  * 把数值替进去——数字已经在右边的框里了，说不清的正是哪个框对应效果的哪一部分。所以描述与"填了多少"
  * 无关：同一条参数行各档上是同一句话，而这一页只显示第一档那一句。
  *
  * 各槽的效果模板在同一格里用「；」连成一整句，空槽不占字——每条能力只有一个参数行，所以这一句实际
- * 只有一段，连着拼是为了"一行怎么拼"不随能力变。游戏自己就没有文案的参数行不占字，全都没有时得到
- * 空串，由组件画一个占位符。
+ * 只有一段，连着拼是为了"一行怎么拼"不随能力变。全都没有时得到空串，由组件画一个占位符。
  */
-export const levelLabel = (slots: LevelSlot[]): string =>
+export const levelLabel = (slots: LevelSlot[], effects: Record<string, string>): string =>
     slots
-        .map(({ slot, param }) =>
-            param === null ? "" : param.effect.replaceAll("{0}", `{${slot}}`),
-        )
+        .map(({ slot, param }) => {
+            // 表里没有这个 Key 就是游戏自己没写这行文案：那一段不占字（空串，由组件画占位符）。
+            const effect = param === null ? "" : (effects[param.key] ?? "")
+            return effect.replaceAll("{0}", `{${slot}}`)
+        })
         .filter((text) => text !== "")
         .join("；")
 
@@ -108,10 +153,10 @@ export const levelLabel = (slots: LevelSlot[]): string =>
     编辑是按参数行的 Key 索引的（mod 也按 Key 找行），所以这两份条目画出来是同一批开关画两遍：选哪
     一份都是同一个状态。判据用 Key 集合（决定可编辑内容的正是它），不用名字——名字是翻译的事。
 */
-export function dedupeCharacters(characters: AbilityCharacter[]): AbilityCharacter[] {
+export function dedupeCharacters(characters: LimitBonusCharacter[]): LimitBonusCharacter[] {
     const seen = new Set<string>()
     return characters.filter((character) => {
-        const sameContent = character.abilities
+        const sameContent = character.bonuses
             .map((ability) => ability.param.key)
             .sort()
             .join(",")
@@ -133,8 +178,8 @@ export function dedupeCharacters(characters: AbilityCharacter[]): AbilityCharact
  *
  * Key 都没有的空记录返回 null：它不属于任何参数行，也没有地方可以显示。
  */
-export function asEdit(raw: unknown): AbilityEdit | null {
-    const record = (raw ?? {}) as Partial<AbilityEdit>
+export function asEdit(raw: unknown): LimitBonusEdit | null {
+    const record = (raw ?? {}) as Partial<LimitBonusEdit>
     const key = (record.key ?? "").trim().toUpperCase()
     if (key === "") return null
     return {
@@ -151,7 +196,7 @@ export function asEdit(raw: unknown): AbilityEdit | null {
     已启用的。文件里仍可能同时留着两条（旧版本写的，或有人手改了）而列表只能显示一条，于是留最后
     一条已启用的；该 Key 一条已启用的都没有时，留最后一条，不论启用与否。
 */
-export function dedupeEdits(records: AbilityEdit[]): AbilityEdit[] {
+export function dedupeEdits(records: LimitBonusEdit[]): LimitBonusEdit[] {
     const lastEnabled = new Map<string, number>()
     const lastAny = new Map<string, number>()
     records.forEach((record, i) => {
@@ -171,11 +216,11 @@ export function dedupeEdits(records: AbilityEdit[]): AbilityEdit[] {
  * 游戏里保持原值——这正是这一页要的。**绝不按 default 把缺的档位补齐**：那等于把用户从没填过的数
  * 写进游戏，多改了 2 个档位。
  *
- * 清空（value === null）**不产生记录**，由调用方把这一条从列表里删掉（见 AbilityEditorPanel 的
+ * 清空（value === null）**不产生记录**，由调用方把这一条从列表里删掉（见 LimitBonusEditorPanel 的
  * setValue）：整条记录不存在，游戏那边一个字节都没被碰过，这一栏也就回到完全没编辑过的样子。"还原
  * 成默认值"是另一回事——那会留下一条记录，等于替用户写了一个数。
  */
-export function withFirstValue(param: AbilityParam, value: number | null): AbilityEdit | null {
+export function withFirstValue(param: LimitBonusParam, value: number | null): LimitBonusEdit | null {
     if (value === null) return null
 
     return {

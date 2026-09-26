@@ -48,13 +48,14 @@ $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 $zipTemp = "$zipPath.tmp"
 
 # --- 随包数据（assets\）-------------------------------------------------------
-# 十份资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
+# 十四份资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
 # 现成的同名文件，再没有才让 gen 全出一遍（gen 在仓库旁 ..\gen）。
 $assetsDir = Join-Path $root 'SigilLoadout\assets'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.json',
     'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json',
-    'limit_bonus.json')
+    'limit_bonus.json', 'limit_bonus.zh.json', 'limit_bonus.en.json', 'limit_bonus.ja.json',
+    'limit_bonus.ko.json', 'chara.json')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }
@@ -297,7 +298,13 @@ foreach ($requiredFile in @(
     'assets\skill.en.json',
     'assets\skill.ja.json',
     'assets\skill.ko.json',
-    'assets\limit_bonus.json'
+    'assets\limit_bonus.json',
+    # 能力强化：语言无关的骨架 + 每语言一份文案 + 角色属性（颜色只有 chara.json 这一处）。
+    'assets\limit_bonus.zh.json',
+    'assets\limit_bonus.en.json',
+    'assets\limit_bonus.ja.json',
+    'assets\limit_bonus.ko.json',
+    'assets\chara.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {

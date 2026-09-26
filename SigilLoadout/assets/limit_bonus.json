@@ -1,168 +1,133 @@
 {
-  "language": "zh",
   "characters": [
     {
       "id": "PL0000",
-      "name": "主人公",
-      "element": "wind",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0000_01",
           "hash": "BAD9BAA3",
-          "name": "无尽连斩",
           "param": {
             "key": "48D59E25",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_02",
           "hash": "538572D0",
-          "name": "护甲破坏",
           "param": {
             "key": "A0F792FD",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_03",
           "hash": "DBE960DD",
-          "name": "密集方阵",
           "param": {
             "key": "6AED3312",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_04",
           "hash": "E5598482",
-          "name": "全体治疗",
           "param": {
             "key": "FF5E12A7",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_05",
           "hash": "967964C1",
-          "name": "箭雨",
           "param": {
             "key": "0CB04E11",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_06",
           "hash": "42D185D5",
-          "name": "惨雾",
           "param": {
             "key": "D8B8C3BD",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_07",
           "hash": "FB1526C3",
-          "name": "暴怒",
           "param": {
             "key": "A7E419C5",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_08",
           "hash": "B2F74994",
-          "name": "过载爆发",
           "param": {
             "key": "01790F2F",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_09",
           "hash": "1E4C06EC",
-          "name": "全体净化",
           "param": {
             "key": "F3F7A52E",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_10",
           "hash": "6FD0843A",
-          "name": "圣迹",
           "param": {
             "key": "38F46AD1",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_11",
           "hash": "FC0562EC",
-          "name": "缓沼",
           "param": {
             "key": "AA10C797",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_12",
           "hash": "66B7CF9C",
-          "name": "复苏",
           "param": {
             "key": "2B58A259",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_13",
           "hash": "F9492778",
-          "name": "圣纱",
           "param": {
             "key": "B83C2B6A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_14",
           "hash": "F4BB441F",
-          "name": "驱散",
           "param": {
             "key": "07D5FF58",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_15",
           "hash": "ABFE9091",
-          "name": "渡能",
           "param": {
             "key": "D233E54B",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0000_16",
           "hash": "4F634AD4",
-          "name": "挺身而出",
           "param": {
             "key": "A1088E9A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -170,166 +135,132 @@
     },
     {
       "id": "PL0100",
-      "name": "主人公",
-      "element": "wind",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0100_01",
           "hash": "AA949A9E",
-          "name": "无尽连斩",
           "param": {
             "key": "48D59E25",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_02",
           "hash": "FAFF8838",
-          "name": "护甲破坏",
           "param": {
             "key": "A0F792FD",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_03",
           "hash": "EF2108B4",
-          "name": "密集方阵",
           "param": {
             "key": "6AED3312",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_04",
           "hash": "3111FE5E",
-          "name": "全体治疗",
           "param": {
             "key": "FF5E12A7",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_05",
           "hash": "FAD51809",
-          "name": "箭雨",
           "param": {
             "key": "0CB04E11",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_06",
           "hash": "C908857C",
-          "name": "惨雾",
           "param": {
             "key": "D8B8C3BD",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_07",
           "hash": "3C5A7509",
-          "name": "暴怒",
           "param": {
             "key": "A7E419C5",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_08",
           "hash": "401AB759",
-          "name": "过载爆发",
           "param": {
             "key": "01790F2F",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_09",
           "hash": "CCEC1035",
-          "name": "全体净化",
           "param": {
             "key": "F3F7A52E",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_10",
           "hash": "4257541B",
-          "name": "圣迹",
           "param": {
             "key": "38F46AD1",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_11",
           "hash": "2A8EF6C4",
-          "name": "缓沼",
           "param": {
             "key": "AA10C797",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_12",
           "hash": "EB16FD99",
-          "name": "复苏",
           "param": {
             "key": "2B58A259",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_13",
           "hash": "7EF53FF4",
-          "name": "圣纱",
           "param": {
             "key": "B83C2B6A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_14",
           "hash": "8E2BFC26",
-          "name": "驱散",
           "param": {
             "key": "07D5FF58",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_15",
           "hash": "531DD853",
-          "name": "渡能",
           "param": {
             "key": "D233E54B",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0100_16",
           "hash": "D064B37F",
-          "name": "挺身而出",
           "param": {
             "key": "A1088E9A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -337,86 +268,68 @@
     },
     {
       "id": "PL0200",
-      "name": "卡塔莉娜",
-      "element": "water",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0200_01",
           "hash": "9FED6CF3",
-          "name": "附魔剑击",
           "param": {
             "key": "D808FB7E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_02",
           "hash": "E224A3D2",
-          "name": "寒冬冰雨",
           "param": {
             "key": "F5D81BD9",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_03",
           "hash": "66E797CC",
-          "name": "治疗",
           "param": {
             "key": "2A65BECE",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_04",
           "hash": "79A07D8E",
-          "name": "神圣凛风",
           "param": {
             "key": "4DEBD3C3",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_05",
           "hash": "87288538",
-          "name": "苍天之剑",
           "param": {
             "key": "3C5701AD",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_06",
           "hash": "71B81B9C",
-          "name": "光墙屏障",
           "param": {
             "key": "0B553796",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_07",
           "hash": "9F1539D2",
-          "name": "非凡旅程",
           "param": {
             "key": "92FBD076",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0200_08",
           "hash": "ED04D44B",
-          "name": "翡翠之盾",
           "param": {
             "key": "F8BEABDF",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -424,86 +337,68 @@
     },
     {
       "id": "PL0300",
-      "name": "拉卡姆",
-      "element": "fire",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0300_01",
           "hash": "5C1519F8",
-          "name": "烈火射击",
           "param": {
             "key": "393BE587",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_02",
           "hash": "7C63D77A",
-          "name": "枪林弹雨",
           "param": {
             "key": "04513C69",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_03",
           "hash": "D712D990",
-          "name": "双发子弹",
           "param": {
             "key": "7D86FACC",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_04",
           "hash": "A5F5E86C",
-          "name": "以逸待劳",
           "param": {
             "key": "340F36E9",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_05",
           "hash": "099ABF09",
-          "name": "送葬火舌",
           "param": {
             "key": "7922655E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_06",
           "hash": "243ECBFC",
-          "name": "荒野硝烟",
           "param": {
             "key": "0879726E",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_07",
           "hash": "4D598BBD",
-          "name": "霰弹扫射",
           "param": {
             "key": "F10A05EA",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0300_08",
           "hash": "F07B5A9D",
-          "name": "战地余波",
           "param": {
             "key": "D3D750D0",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -511,86 +406,68 @@
     },
     {
       "id": "PL0400",
-      "name": "伊欧",
-      "element": "light",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0400_01",
           "hash": "3D4193DB",
-          "name": "治愈之风",
           "param": {
             "key": "5BDBD96D",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_02",
           "hash": "1C7AA5CC",
-          "name": "寒冰",
           "param": {
             "key": "B2B6C452",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_03",
           "hash": "32B4A16E",
-          "name": "雷霆",
           "param": {
             "key": "653D9B49",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_04",
           "hash": "200663CB",
-          "name": "魔洞",
           "param": {
             "key": "D854D143",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_05",
           "hash": "64A6C124",
-          "name": "火焰",
           "param": {
             "key": "846748A0",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_06",
           "hash": "65083F2D",
-          "name": "专注",
           "param": {
             "key": "AE7C2D50",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_07",
           "hash": "D4C45D64",
-          "name": "花耀七闪",
           "param": {
             "key": "F3B9FCF7",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0400_08",
           "hash": "B40CCD9C",
-          "name": "魔力漩涡",
           "param": {
             "key": "795FD4A6",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -598,86 +475,68 @@
     },
     {
       "id": "PL0500",
-      "name": "欧根",
-      "element": "earth",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0500_01",
           "hash": "D0768C6B",
-          "name": "暮光",
           "param": {
             "key": "4D40C1F0",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_02",
           "hash": "3CF50957",
-          "name": "爆裂射击",
           "param": {
             "key": "D77D90F5",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_03",
           "hash": "772FA1D5",
-          "name": "战术拦截",
           "param": {
             "key": "CDD7B3A2",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_04",
           "hash": "B54C90E4",
-          "name": "穿甲弹",
           "param": {
             "key": "FB1DEF63",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_05",
           "hash": "2EA1B3DB",
-          "name": "剧毒榴弹",
           "param": {
             "key": "FD085A26",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_06",
           "hash": "C3CCADF8",
-          "name": "麻痹弹",
           "param": {
             "key": "38D11B0B",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_07",
           "hash": "2246EEC2",
-          "name": "治疗弹",
           "param": {
             "key": "B11D3621",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0500_08",
           "hash": "D457585D",
-          "name": "驱散射击",
           "param": {
             "key": "CEEC4A0E",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -685,86 +544,68 @@
     },
     {
       "id": "PL0600",
-      "name": "萝赛塔",
-      "element": "dark",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0600_01",
           "hash": "00F6213E",
-          "name": "馥郁幻迹",
           "param": {
             "key": "64D6C4F3",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_02",
           "hash": "3EB33877",
-          "name": "群花之主",
           "param": {
             "key": "214CCFBB",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_03",
           "hash": "C7DB192C",
-          "name": "魅惑芳丛",
           "param": {
             "key": "8E32AADF",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_04",
           "hash": "8C4D811C",
-          "name": "螺旋玫瑰",
           "param": {
             "key": "CC97C87E",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_05",
           "hash": "CD6940DE",
-          "name": "铁娘子",
           "param": {
             "key": "FE6FF98F",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_06",
           "hash": "395E4823",
-          "name": "落花无情",
           "param": {
             "key": "F30CC861",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_07",
           "hash": "CF0B171B",
-          "name": "玫瑰结界",
           "param": {
             "key": "D4DC7311",
-            "effect": "持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0600_08",
           "hash": "8F187F08",
-          "name": "繁花似锦",
           "param": {
             "key": "5161E637",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -772,86 +613,68 @@
     },
     {
       "id": "PL1200",
-      "name": "夏洛特",
-      "element": "light",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1200_01",
           "hash": "ED00C663",
-          "name": "王之盾",
           "param": {
             "key": "A92687AF",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_02",
           "hash": "BD038B68",
-          "name": "耀眼猛攻",
           "param": {
             "key": "C709F71D",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_03",
           "hash": "24B19804",
-          "name": "跳跃反击",
           "param": {
             "key": "BD2D783A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_04",
           "hash": "05CE9CE6",
-          "name": "英勇战姿",
           "param": {
             "key": "BA007D38",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_05",
           "hash": "C07A8E90",
-          "name": "神圣灌注",
           "param": {
             "key": "9550511A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_06",
           "hash": "69FCECC3",
-          "name": "所向披靡",
           "param": {
             "key": "CFB53920",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_07",
           "hash": "D696964E",
-          "name": "卢米埃之剑",
           "param": {
             "key": "AE5F7548",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1200_08",
           "hash": "58E10372",
-          "name": "神圣阶梯",
           "param": {
             "key": "1D91C22D",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -859,86 +682,68 @@
     },
     {
       "id": "PL1500",
-      "name": "冈达葛萨",
-      "element": "fire",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1500_01",
           "hash": "BCB4C311",
-          "name": "罗汉天降击",
           "param": {
             "key": "307E5CFA",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_02",
           "hash": "ABD5990A",
-          "name": "印可掌",
           "param": {
             "key": "FC475964",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_03",
           "hash": "088A1D08",
-          "name": "激震铁山靠",
           "param": {
             "key": "845F0BAF",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_04",
           "hash": "EE1ED3E4",
-          "name": "无明白天",
           "param": {
             "key": "B5CCBC36",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_05",
           "hash": "6B54F359",
-          "name": "威武雄姿",
           "param": {
             "key": "B37DF106",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_06",
           "hash": "0F41D9B0",
-          "name": "力足舞",
           "param": {
             "key": "9AE0F3DC",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_07",
           "hash": "967C9ABC",
-          "name": "古今无双",
           "param": {
             "key": "BE2F2514",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1500_08",
           "hash": "84174BDD",
-          "name": "禅定",
           "param": {
             "key": "17C4A6AC",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -946,86 +751,68 @@
     },
     {
       "id": "PL0700",
-      "name": "菲莉",
-      "element": "light",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0700_01",
           "hash": "A44B77A1",
-          "name": "幻灵之鞭",
           "param": {
             "key": "5A7097CD",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_02",
           "hash": "CEEBAE4A",
-          "name": "蓝灵束缚",
           "param": {
             "key": "7946B9DC",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_03",
           "hash": "03E4D1BC",
-          "name": "吉吉，拖住对手！",
           "param": {
             "key": "91FB5C41",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_04",
           "hash": "512CBA53",
-          "name": "幻灵祝福",
           "param": {
             "key": "7B9A67F9",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_05",
           "hash": "8CBE0423",
-          "name": "幽影幻步",
           "param": {
             "key": "9E219423",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_06",
           "hash": "94DA6B12",
-          "name": "幻灵惩戒",
           "param": {
             "key": "E2176D84",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_07",
           "hash": "82695B1E",
-          "name": "强化之光",
           "param": {
             "key": "24F69549",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0700_08",
           "hash": "5CE11765",
-          "name": "幻灵守护",
           "param": {
             "key": "B08FEF10",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -1033,86 +820,68 @@
     },
     {
       "id": "PL1400",
-      "name": "娜露梅",
-      "element": "dark",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1400_01",
           "hash": "1D6F5C2D",
-          "name": "镜花水月",
           "param": {
             "key": "D428A3A2",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_02",
           "hash": "F74B3C5B",
-          "name": "刹那",
           "param": {
             "key": "C49CB8A2",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_03",
           "hash": "B28D2735",
-          "name": "至人无己",
           "param": {
             "key": "150269FA",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_04",
           "hash": "0ADAC47B",
-          "name": "纤月",
           "param": {
             "key": "743216D0",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_05",
           "hash": "390A6EC6",
-          "name": "泡沫梦幻",
           "param": {
             "key": "F056B9FE",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_06",
           "hash": "41E3C434",
-          "name": "花风·薄红舞",
           "param": {
             "key": "0D0BCF24",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_07",
           "hash": "3614971B",
-          "name": "花风·水缥舞",
           "param": {
             "key": "B827EA3B",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1400_08",
           "hash": "3CAD2DD9",
-          "name": "无二无三",
           "param": {
             "key": "01344577",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         }
@@ -1120,86 +889,68 @@
     },
     {
       "id": "PL0800",
-      "name": "兰斯洛特",
-      "element": "water",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0800_01",
           "hash": "7EB5A896",
-          "name": "剑刃冲击",
           "param": {
             "key": "8357837A",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0800_02",
           "hash": "920DD8B3",
-          "name": "寒冰魔爪",
           "param": {
             "key": "C75F5A81",
-            "effect": "效果持续时间+{0}秒",
             "default": 1
           }
         },
         {
           "key": "AB_PL0800_03",
           "hash": "282FD588",
-          "name": "冰雪飞刃",
           "param": {
             "key": "C7C54DF8",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0800_04",
           "hash": "5D19BBE2",
-          "name": "苍蓝双剑",
           "param": {
             "key": "F7889337",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0800_05",
           "hash": "511571EE",
-          "name": "乱气流",
           "param": {
             "key": "F9E1FC67",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0800_06",
           "hash": "2ECB1F0B",
-          "name": "南十字星",
           "param": {
             "key": "2EADCC8D",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0800_07",
           "hash": "05359B18",
-          "name": "剑魂",
           "param": {
             "key": "3E8642AD",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0800_08",
           "hash": "A4D546AB",
-          "name": "蜃景",
           "param": {
             "key": "C9F21337",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         }
@@ -1207,86 +958,68 @@
     },
     {
       "id": "PL0900",
-      "name": "巴恩",
-      "element": "water",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL0900_01",
           "hash": "12F12CAC",
-          "name": "铜墙铁壁",
           "param": {
             "key": "4A189DCD",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_02",
           "hash": "FBEF06F2",
-          "name": "裂空连斩",
           "param": {
             "key": "EB779566",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_03",
           "hash": "1DD6B65D",
-          "name": "破军之力",
           "param": {
             "key": "7944BCE0",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_04",
           "hash": "050DDCE6",
-          "name": "巨力重击",
           "param": {
             "key": "B4793FEC",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_05",
           "hash": "B9E9ED9F",
-          "name": "英勇打击",
           "param": {
             "key": "D503D58C",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_06",
           "hash": "BD38E05B",
-          "name": "战魂觉醒",
           "param": {
             "key": "0E835A0A",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_07",
           "hash": "BC4EBF36",
-          "name": "活力灭击",
           "param": {
             "key": "6C2C7F8F",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL0900_08",
           "hash": "88BCD098",
-          "name": "龙之荣耀",
           "param": {
             "key": "B83C78B7",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         }
@@ -1294,86 +1027,68 @@
     },
     {
       "id": "PL1000",
-      "name": "珀西瓦尔",
-      "element": "fire",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1000_01",
           "hash": "CAEEDA5D",
-          "name": "烈火突袭",
           "param": {
             "key": "C13D7AFE",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_02",
           "hash": "98E1B356",
-          "name": "烈焰脚步",
           "param": {
             "key": "368E4189",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_03",
           "hash": "01439452",
-          "name": "未知之魂",
           "param": {
             "key": "ADAD356E",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_04",
           "hash": "70FE4DF6",
-          "name": "撕裂",
           "param": {
             "key": "478AF26D",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_05",
           "hash": "6891463E",
-          "name": "梦幻曲",
           "param": {
             "key": "24762848",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_06",
           "hash": "8B70DD12",
-          "name": "力量",
           "param": {
             "key": "88495A4E",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_07",
           "hash": "01051E0B",
-          "name": "王之威势",
           "param": {
             "key": "1F6ED4A1",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1000_08",
           "hash": "241E1792",
-          "name": "赤焰旋涡",
           "param": {
             "key": "67E08981",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -1381,86 +1096,68 @@
     },
     {
       "id": "PL1100",
-      "name": "齐格飞",
-      "element": "earth",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1100_01",
           "hash": "62AAB75D",
-          "name": "无畏之刃",
           "param": {
             "key": "0071F5DB",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_02",
           "hash": "00AACE55",
-          "name": "昨日之影",
           "param": {
             "key": "084E7316",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_03",
           "hash": "94B29689",
-          "name": "计谋",
           "param": {
             "key": "D58625D1",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_04",
           "hash": "A662C045",
-          "name": "蹑龙挪步",
           "param": {
             "key": "C8958F76",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_05",
           "hash": "C6F4CCB1",
-          "name": "救世之力",
           "param": {
             "key": "C77B9640",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_06",
           "hash": "EFF4746C",
-          "name": "幻甲",
           "param": {
             "key": "6C91157B",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_07",
           "hash": "5A356634",
-          "name": "湮灭斩",
           "param": {
             "key": "BD51F38C",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1100_08",
           "hash": "75D65667",
-          "name": "龙气外释",
           "param": {
             "key": "3A473EC2",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -1468,86 +1165,68 @@
     },
     {
       "id": "PL1800",
-      "name": "卡莉奥丝特罗",
-      "element": "earth",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1800_01",
           "hash": "75043B52",
-          "name": "拟态人偶",
           "param": {
             "key": "B0D4071F",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_02",
           "hash": "12A18828",
-          "name": "盘蛇之阵",
           "param": {
             "key": "F9F6F61D",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_03",
           "hash": "2E064364",
-          "name": "幻术光影",
           "param": {
             "key": "4D3386E5",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_04",
           "hash": "85C06563",
-          "name": "固魂",
           "param": {
             "key": "390CE9D0",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_05",
           "hash": "EE45B7EF",
-          "name": "毁散",
           "param": {
             "key": "76037FA7",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_06",
           "hash": "B97BD8D4",
-          "name": "根源之术",
           "param": {
             "key": "36510BF3",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_07",
           "hash": "ED1219CC",
-          "name": "起源之城",
           "param": {
             "key": "BFEA2037",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1800_08",
           "hash": "5B42826C",
-          "name": "蛇行列车",
           "param": {
             "key": "0A268710",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -1555,86 +1234,68 @@
     },
     {
       "id": "PL1300",
-      "name": "尤达拉哈",
-      "element": "wind",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1300_01",
           "hash": "1DEEB111",
-          "name": "十起",
           "param": {
             "key": "95152CE1",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_02",
           "hash": "5D39FF76",
-          "name": "空空漠漠",
           "param": {
             "key": "ECDBEFDB",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_03",
           "hash": "19A55D74",
-          "name": "刀逡巡",
           "param": {
             "key": "859A683C",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_04",
           "hash": "FE554CE1",
-          "name": "千转",
           "param": {
             "key": "FD0D00CF",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_05",
           "hash": "167179D2",
-          "name": "以牙还牙",
           "param": {
             "key": "49E09682",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_06",
           "hash": "5ACC7A93",
-          "name": "百承",
           "param": {
             "key": "DF469A99",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_07",
           "hash": "D7CC0564",
-          "name": "闪空",
           "param": {
             "key": "0646D93E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1300_08",
           "hash": "512DDB88",
-          "name": "惊天动地",
           "param": {
             "key": "37437D79",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         }
@@ -1642,86 +1303,68 @@
     },
     {
       "id": "PL1600",
-      "name": "塞达",
-      "element": "fire",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1600_01",
           "hash": "95E40E12",
-          "name": "无尽奇观",
           "param": {
             "key": "48DFA926",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_02",
           "hash": "67270513",
-          "name": "愤怒之雨",
           "param": {
             "key": "EB1D36FC",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_03",
           "hash": "974342AA",
-          "name": "阿尔贝斯之枪",
           "param": {
             "key": "7B7F668E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_04",
           "hash": "52E3EED1",
-          "name": "符文狂潮",
           "param": {
             "key": "F20A5206",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_05",
           "hash": "2AE2FA9D",
-          "name": "长枪回旋",
           "param": {
             "key": "652514CA",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_06",
           "hash": "8C3C7DDC",
-          "name": "复仇之火",
           "param": {
             "key": "3763BBF8",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_07",
           "hash": "33028D0B",
-          "name": "千炎",
           "param": {
             "key": "2B43CEE3",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1600_08",
           "hash": "A8DD5B10",
-          "name": "威光领域",
           "param": {
             "key": "606683D5",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -1729,86 +1372,68 @@
     },
     {
       "id": "PL1700",
-      "name": "巴萨拉卡",
-      "element": "dark",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1700_01",
           "hash": "3B5C9F6D",
-          "name": "恐怖军势",
           "param": {
             "key": "6F1762E8",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_02",
           "hash": "EC775337",
-          "name": "暴虐暗影",
           "param": {
             "key": "8107A6DC",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_03",
           "hash": "8121F2BF",
-          "name": "巨镰古洛诺斯",
           "param": {
             "key": "1E86BE21",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_04",
           "hash": "3A6C7767",
-          "name": "无畏巨躯",
           "param": {
             "key": "B3EF7C31",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_05",
           "hash": "D71A616C",
-          "name": "遗忘传说",
           "param": {
             "key": "0C81FF69",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_06",
           "hash": "7EA722FC",
-          "name": "灭顶一击",
           "param": {
             "key": "D06BA547",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_07",
           "hash": "CE6A60CF",
-          "name": "暗蚀",
           "param": {
             "key": "7379C670",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1700_08",
           "hash": "90C49270",
-          "name": "地狱之怒",
           "param": {
             "key": "91DC3F95",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -1816,86 +1441,68 @@
     },
     {
       "id": "PL2600",
-      "name": "贝阿朵丽丝",
-      "element": "water",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2600_01",
           "hash": "9887F9A4",
-          "name": "游影自如",
           "param": {
             "key": "5A242B75",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_02",
           "hash": "F1E56FB1",
-          "name": "逐星",
           "param": {
             "key": "3E42189D",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_03",
           "hash": "267FF179",
-          "name": "恩布拉斯克之剑",
           "param": {
             "key": "046305C5",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_04",
           "hash": "24B49FE8",
-          "name": "永恒征程",
           "param": {
             "key": "A2346E69",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_05",
           "hash": "746F18A4",
-          "name": "烈焰之心",
           "param": {
             "key": "71E5158A",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_06",
           "hash": "B85AA34F",
-          "name": "雷鸟",
           "param": {
             "key": "F7D4CF6E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_07",
           "hash": "D16EEEEA",
-          "name": "破缚残影",
           "param": {
             "key": "F5E75919",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2600_08",
           "hash": "2A60F8CA",
-          "name": "新星跃升",
           "param": {
             "key": "37AC42C1",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -1903,86 +1510,68 @@
     },
     {
       "id": "PL2700",
-      "name": "尤斯提斯",
-      "element": "wind",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2700_01",
           "hash": "017117E8",
-          "name": "缓刑",
           "param": {
             "key": "875F0A2B",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_02",
           "hash": "AA6E61E5",
-          "name": "不朽之誓",
           "param": {
             "key": "D3CA3C59",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_03",
           "hash": "E1410C7B",
-          "name": "戏火",
           "param": {
             "key": "294E43E8",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_04",
           "hash": "9ABFC62C",
-          "name": "怒号连击",
           "param": {
             "key": "B4A67F8D",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_05",
           "hash": "9AC21D84",
-          "name": "雷光迅步",
           "param": {
             "key": "A1E02085",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_06",
           "hash": "0026AB65",
-          "name": "不屈之志",
           "param": {
             "key": "C2EDB910",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_07",
           "hash": "A5391991",
-          "name": "弗拉梅克之雷",
           "param": {
             "key": "673C502F",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2700_08",
           "hash": "AEA6D151",
-          "name": "撼地天雷",
           "param": {
             "key": "DF1DBAC4",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -1990,86 +1579,68 @@
     },
     {
       "id": "PL2200",
-      "name": "希耶提",
-      "element": "wind",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2200_01",
           "hash": "D99AD2AD",
-          "name": "横扫剑弧",
           "param": {
             "key": "E5368706",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_02",
           "hash": "A7EB9E69",
-          "name": "无尽剑阵",
           "param": {
             "key": "B3B7F48E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_03",
           "hash": "6E8E210A",
-          "name": "破灭剑陨",
           "param": {
             "key": "A7BBC6E4",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_04",
           "hash": "705A6A63",
-          "name": "聚灵剑气",
           "param": {
             "key": "E8AC93E1",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_05",
           "hash": "0BD7B2E1",
-          "name": "缚魂剑罡",
           "param": {
             "key": "E0C167C5",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_06",
           "hash": "ABAB2642",
-          "name": "碎星剑斩",
           "param": {
             "key": "46AA5F9E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_07",
           "hash": "C6629AE0",
-          "name": "狂风剑气",
           "param": {
             "key": "F712D95D",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2200_08",
           "hash": "3BB98B51",
-          "name": "七星剑闪",
           "param": {
             "key": "9A13EA07",
-            "effect": "等待时间-{0}%",
             "default": 2
           }
         }
@@ -2077,86 +1648,68 @@
     },
     {
       "id": "PL2300",
-      "name": "索恩",
-      "element": "light",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2300_01",
           "hash": "7F683594",
-          "name": "信使神光",
           "param": {
             "key": "FE8D8B61",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_02",
           "hash": "7C0F49FB",
-          "name": "堕落箭雨",
           "param": {
             "key": "24AD07C0",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_03",
           "hash": "BBA467C0",
-          "name": "致命一击",
           "param": {
             "key": "0C326331",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_04",
           "hash": "DA816022",
-          "name": "散矢疾影",
           "param": {
             "key": "EBCD47C0",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_05",
           "hash": "BB425AC9",
-          "name": "圆弧散射",
           "param": {
             "key": "A4AC0AE2",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_06",
           "hash": "A6B54953",
-          "name": "致命箭雨",
           "param": {
             "key": "4FACDEDA",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_07",
           "hash": "D95B6ABA",
-          "name": "弓魄无双",
           "param": {
             "key": "523567B2",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2300_08",
           "hash": "2189F8BA",
-          "name": "二王之诤",
           "param": {
             "key": "1F99A227",
-            "effect": "等待时间-{0}%",
             "default": 2
           }
         }
@@ -2164,86 +1717,68 @@
     },
     {
       "id": "PL2100",
-      "name": "圣德芬",
-      "element": "light",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2100_01",
           "hash": "542F400F",
-          "name": "天司之息",
           "param": {
             "key": "04B51F4D",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_02",
           "hash": "DA860BD8",
-          "name": "无路可逃",
           "param": {
             "key": "060F007D",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_03",
           "hash": "34222EA5",
-          "name": "天光轨迹",
           "param": {
             "key": "664122D7",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_04",
           "hash": "EB81F079",
-          "name": "一人之力",
           "param": {
             "key": "BFE03CEF",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_05",
           "hash": "31E089B9",
-          "name": "极火虹光",
           "param": {
             "key": "0A3D95DE",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_06",
           "hash": "0B1BB3FB",
-          "name": "独守天穹",
           "param": {
             "key": "1E174AE1",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_07",
           "hash": "1031DBD0",
-          "name": "凛冬暗夜",
           "param": {
             "key": "66712D58",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2100_08",
           "hash": "A7C5A324",
-          "name": "定法囚牢",
           "param": {
             "key": "EE0FC138",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -2251,86 +1786,68 @@
     },
     {
       "id": "PL2800",
-      "name": "芙劳",
-      "element": "fire",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2800_01",
           "hash": "355B0DF9",
-          "name": "降咒",
           "param": {
             "key": "9F2D7464",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_02",
           "hash": "6FB5FBDA",
-          "name": "猩红梦魇",
           "param": {
             "key": "6C09E125",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_03",
           "hash": "484B29F5",
-          "name": "暴虐之拳",
           "param": {
             "key": "55138869",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_04",
           "hash": "530600D2",
-          "name": "转瞬之机",
           "param": {
             "key": "7E0BC84B",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_05",
           "hash": "44F5C74F",
-          "name": "夺命领域",
           "param": {
             "key": "D4798E75",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_06",
           "hash": "10FAE6AB",
-          "name": "破面踢",
           "param": {
             "key": "46116BD6",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_07",
           "hash": "87D51BA4",
-          "name": "夺目光辉",
           "param": {
             "key": "19F65A11",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2800_08",
           "hash": "0B84F88D",
-          "name": "力量源泉",
           "param": {
             "key": "A22A3613",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -2338,86 +1855,68 @@
     },
     {
       "id": "PL2900",
-      "name": "菲迪埃尔",
-      "element": "dark",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2900_01",
           "hash": "8F4E9D6F",
-          "name": "碎魂",
           "param": {
             "key": "316AFC8B",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_02",
           "hash": "981A10BC",
-          "name": "逆爪",
           "param": {
             "key": "2CB830BD",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_03",
           "hash": "B2795CA0",
-          "name": "灾兆",
           "param": {
             "key": "DC1E1B4D",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_04",
           "hash": "C3C3D59A",
-          "name": "黑之祝福",
           "param": {
             "key": "F7D5A004",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_05",
           "hash": "724636A8",
-          "name": "本源恐惧",
           "param": {
             "key": "91728863",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_06",
           "hash": "B09EAC4C",
-          "name": "咒葬",
           "param": {
             "key": "23326B77",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_07",
           "hash": "D113989A",
-          "name": "瘴域",
           "param": {
             "key": "1CB2F2F6",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2900_08",
           "hash": "B1C60CAB",
-          "name": "逆核",
           "param": {
             "key": "06719F5D",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         }
@@ -2425,86 +1924,68 @@
     },
     {
       "id": "PL1900",
-      "name": "伊德",
-      "element": "dark",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL1900_01",
           "hash": "E2DC99D9",
-          "name": "圣迹再临",
           "param": {
             "key": "3755AAEE",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_02",
           "hash": "C1D7660C",
-          "name": "无缚之斩",
           "param": {
             "key": "0755E545",
-            "effect": "昏厥值+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_03",
           "hash": "0AF90B6D",
-          "name": "赎罪",
           "param": {
             "key": "0E146781",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_04",
           "hash": "98309953",
-          "name": "末日形态",
           "param": {
             "key": "D521C6E3",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_05",
           "hash": "38B12F6A",
-          "name": "天谴",
           "param": {
             "key": "D3788A5E",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_06",
           "hash": "B132100B",
-          "name": "神愿之力",
           "param": {
             "key": "EE0C1CBC",
-            "effect": "伤害减免+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_07",
           "hash": "968220FA",
-          "name": "永无止境",
           "param": {
             "key": "5C492FDB",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL1900_08",
           "hash": "C516D104",
-          "name": "乐园之噬",
           "param": {
             "key": "B1218F6F",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         }
@@ -2512,86 +1993,68 @@
     },
     {
       "id": "PL2400",
-      "name": "伽兰查",
-      "element": "earth",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2400_01",
           "hash": "966F4A6F",
-          "name": "横枪立马",
           "param": {
             "key": "E0DAE4A5",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_02",
           "hash": "430F5DB4",
-          "name": "华枪天降",
           "param": {
             "key": "88E58FD2",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_03",
           "hash": "915B5131",
-          "name": "穿山一刺",
           "param": {
             "key": "C50CD206",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_04",
           "hash": "BCC01262",
-          "name": "武刹枪",
           "param": {
             "key": "1A73F917",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_05",
           "hash": "642B9935",
-          "name": "风卷残云",
           "param": {
             "key": "45551DEA",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_06",
           "hash": "4C13102E",
-          "name": "锋芒一线",
           "param": {
             "key": "AF60AF33",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_07",
           "hash": "4BC55EE0",
-          "name": "摧山坼地",
           "param": {
             "key": "BC368D04",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2400_08",
           "hash": "6AA831F7",
-          "name": "铁衣玉碎",
           "param": {
             "key": "9A849FD0",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         }
@@ -2599,86 +2062,68 @@
     },
     {
       "id": "PL2500",
-      "name": "玛琪拉菲菈",
-      "element": "light",
-      "abilities": [
+      "bonuses": [
         {
           "key": "AB_PL2500_02",
           "hash": "91D8E40B",
-          "name": "迅雷之锤",
           "param": {
             "key": "4DC1089A",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_03",
           "hash": "55AEDF7B",
-          "name": "必杀魔铳",
           "param": {
             "key": "2A649D4A",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_01",
           "hash": "B9C33C89",
-          "name": "奇迹权杖",
           "param": {
             "key": "21EE055A",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_04",
           "hash": "E69D5C9C",
-          "name": "神威宝枪",
           "param": {
             "key": "B9C54D8C",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_05",
           "hash": "547C38AE",
-          "name": "坚毅戎歌",
           "param": {
             "key": "7F911E9F",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_06",
           "hash": "D6403105",
-          "name": "暗夜离曲",
           "param": {
             "key": "7D4B457C",
-            "effect": "造成的伤害+{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_07",
           "hash": "6B21AFBB",
-          "name": "曲音萦绕",
           "param": {
             "key": "18C94BE6",
-            "effect": "冷却时间-{0}%",
             "default": 2
           }
         },
         {
           "key": "AB_PL2500_08",
           "hash": "D5D1BD18",
-          "name": "英勇颂歌",
           "param": {
             "key": "9AE30EF1",
-            "effect": "效果持续时间+{0}%",
             "default": 2
           }
         }

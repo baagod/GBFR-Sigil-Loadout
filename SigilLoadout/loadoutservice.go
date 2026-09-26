@@ -87,7 +87,7 @@ func readAsset[T any](dir, name string) (T, error) {
 	return out, nil
 }
 
-// 多数随包数据是一张 哈希 -> 什么东西 的表，abilities.json 则是一整个对象：只有这一处不同，
+// 多数随包数据是一张 哈希 -> 什么东西 的表，limit_bonus.json（骨架）则是一整个对象：只有这一处不同，
 // 所以表类资产共用上面那份读法，而不是各自把同两句错误文案再抄一遍。
 func readAssetMap[T any](dir, name string) (map[string]T, error) {
 	return readAsset[map[string]T](dir, name)
@@ -116,9 +116,9 @@ func loadAssetsFrom(dir string) error {
 			return err
 		}
 	}
-	// 能力强化那条链路的资产（见 abilityservice.go）：与上面几张表无关，读法却是同一套，一起在
-	// 启动时读一次。
-	return loadAbilityTable(dir)
+	// 能力强化那条链路的资产（见 limitbonusservice.go）：与上面几张表无关，读法却是同一套，一起在
+	// 启动时读一次（骨架 + 四语言文案 + chara.json）。
+	return loadLimitBonusTables(dir)
 }
 
 // LoadSigils 返回合并后的因子/技能表（assets/sigils.json）：物品行加上非物品的技能行
