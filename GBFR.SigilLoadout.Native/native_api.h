@@ -10,11 +10,13 @@
 
 #define GBFR20_CALL __cdecl
 
-// ABI v20：生命周期导出，一个调用应用整份玩家配置，另一个把编辑后的
+// ABI v21：生命周期导出，一个调用应用整份玩家配置，另一个把编辑后的
 // skill_status 表写进游戏自己解析出的那份拷贝，其地址由原生侧从语义锚点
 // 解出（托管侧不持有也不扫描它；见 src/table_slot.cpp）。专属开关以
 // **skill hash** 传递：slot 表归原生所有，托管侧无需按角色维护一张表。
-constexpr uint32_t GBFR20_ABI_VERSION = 20;
+// v21 起同一套锚点机制也覆盖 limit_bonus_param：按 Key 认行、只写行内
+// Lv1..LvN 的 float（能力强化数值），见 GBFR20_SetLimitBonusLevels。
+constexpr uint32_t GBFR20_ABI_VERSION = 21;
 
 // GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）。
 constexpr int32_t GBFR20_TABLE_NOT_READY = -1;              // 原生核心没初始化好，或正在关机
@@ -24,6 +26,14 @@ constexpr int32_t GBFR20_TABLE_ROW_COUNT_INCONSISTENT = -4; // 首 u64 与传入
 constexpr int32_t GBFR20_TABLE_LENGTH_UNEXPECTED = -5;      // 传入长度不是 8 + 52*行数
 constexpr int32_t GBFR20_TABLE_IDENTITY_MISMATCH = -6;      // 逐行 Key 对不上：不是同一张表
 constexpr int32_t GBFR20_TABLE_WRITE_FAILED = -7;           // 写的时候崩了
+
+// GBFR20_SetLimitBonusLevels 的拒绝码（返回值 < 0）。头四个与上面共用：
+// -1 没初始化 / -2 锚点没解析出 limit_bonus_param 的缓冲区指针字段 /
+// -3 指针字段不可读，或缓冲区不整段可写 / -7 写的时候崩了。
+constexpr int32_t GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED = -8; // level_count 不在 1..10
+constexpr int32_t GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE = -9;  // 头里的行数不在合理区间：指针字段指到了别处
+constexpr int32_t GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE = -10;        // 同一个 Key 出现多次：这不是那张表
+constexpr int32_t GBFR20_LIMIT_BONUS_KEY_NOT_FOUND = -11;         // 表里没有这个 Key
 
 using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 
@@ -85,3 +95,23 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_ApplyLoadout(
 GBFR20_API int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(
     const uint8_t* table,
     uint32_t length);
+// 把一个能力的强化数值写进游戏已经解析好的 limit_bonus_param 活表：key_hash 认行
+// （行里 +52 的 Key），levels 只写行内 Lv1..LvN（+12 起的 float），N = level_count，
+// 上界 10 = 这张表的全部数值槽。调用方按"这个能力有几档"传 N，于是没被用到的槽
+// 一个字节都不碰。
+//
+//   >= 0  成功；1 = 这一行真的被改了，0 = 内存里已经是这些值。
+//   < 0   拒绝（见上面那组码）。三道门都在写之前，任何一条不成立都是一个字节都不写。
+//
+// 闸门顺序（每道都 fail-closed）：锚点已在启动时解出指针字段 -> 指针字段可读且非空
+// -> 头里的行数落在合理区间 -> 整段缓冲区可写 -> 目标 Key 在整张表里**恰好出现
+// 一次**。最后一条是这张表的身份证明：这张表**没有** skill_status 那条发布指令
+//（实测形状不同），所以这里不拿"槽首 = 指针字段 - 8"当第二道证；"Key 唯一"对
+// "这是游戏在用的那张表"来说更强，也不随编辑变化（编辑碰的从来不是 Key）。
+//
+// 值什么时候到游戏里：天赋/能力数值在**读档**（回标题 → 继续）或该页「全部习得」
+// 时才重算；节点描述是实时读表的，所以改完立刻看得见。
+GBFR20_API int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
+    uint32_t key_hash,
+    const float* levels,
+    uint32_t level_count);

@@ -74,17 +74,23 @@ func readModFile(relative string) (string, error) {
 
 // dir 由调用方给（生产是 exeDir()\assets\，测试是源码树的 assets\，测试进程的 exeDir 是临时目录）；
 // 错误里带上路径——缺文件时唯一要看的就是"缺的是哪一份"。
-func readAssetMap[T any](dir, name string) (map[string]T, error) {
+func readAsset[T any](dir, name string) (T, error) {
+	var out T
 	path := filepath.Join(dir, name)
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("读随包数据 %s: %w", path, err)
+		return out, fmt.Errorf("读随包数据 %s: %w", path, err)
 	}
-	out := make(map[string]T)
 	if err := jsonv2.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("随包数据 %s 不是合法 JSON: %w", name, err)
+		return out, fmt.Errorf("随包数据 %s 不是合法 JSON: %w", name, err)
 	}
 	return out, nil
+}
+
+// 多数随包数据是一张 哈希 -> 什么东西 的表，abilities.json 则是一整个对象：只有这一处不同，
+// 所以表类资产共用上面那份读法，而不是各自把同两句错误文案再抄一遍。
+func readAssetMap[T any](dir, name string) (map[string]T, error) {
+	return readAsset[map[string]T](dir, name)
 }
 
 // loadAssets 在启动时把"只有启动期用得着"的那几份读进内存。剩下的 sigils.json 与
@@ -110,7 +116,9 @@ func loadAssetsFrom(dir string) error {
 			return err
 		}
 	}
-	return nil
+	// 能力强化那条链路的资产（见 abilityservice.go）：与上面几张表无关，读法却是同一套，一起在
+	// 启动时读一次。
+	return loadAbilityTable(dir)
 }
 
 // LoadSigils 返回合并后的因子/技能表（assets/sigils.json）：物品行加上非物品的技能行

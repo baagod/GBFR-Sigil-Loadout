@@ -1,0 +1,141 @@
+using System.Globalization;
+
+namespace GBFR.SigilLoadout;
+
+/// <summary>
+/// 按用户编辑的 abilityedits.json 改写 limit_bonus_param 活表里那些行的 Lv 槽——能力强化的数值
+/// （造成的伤害 / 冷却时间 / 效果持续时间）。
+///
+/// 与因子编辑器（<see cref="SigilEditorFeature"/>）的两处不同，都是有意的：
+///   * **不经过 IDataManager**：这张表不在读档时被重新解析（实测：回标题读档之后缓冲区地址与
+///     写入的值都还在），所以没有"重新注册一份表"这件事，只写内存里那一份；
+///   * **输入是"按 Key 改若干个数值"而不是"一整张表"**：Key 是行的身份，由原生逐行找，并要求
+///     它在整张表里恰好出现一次（见 src/table_slot.cpp 的 SetLimitBonusLevels）。
+///
+/// 值什么时候到游戏里：天赋/能力数值在**读档**（回标题 → 继续）或该页「全部习得」时才被重算；
+/// 节点描述是实时读表的，所以改完立刻看得见。
+/// </summary>
+internal sealed class AbilityEditorFeature {
+    private const string ConfigFileName = "abilityedits.json";
+
+    // 编辑列表住在用户配置目录里（见 UserConfig），与 sigiledits.json / loadout.json 挨着：
+    // 可视工具写、这里读。
+    private static readonly string ConfigFile = UserConfig.FilePath(ConfigFileName);
+
+    private const int MaxLevels = 10;
+
+    // 表还没进内存时（原生 -2 / -3）的重试间隔：那是分钟级的事，250ms 一拍没意义，而原生在
+    // 自己那句 "refused" 里打字，托管侧的静默管不到它。
+    private const long RetryIntervalMs = 5000;
+    // 已经落地之后的看护间隔：万一游戏重新解析了这张表（换版本、重新加载），这一版就靠它再落一次。
+    // 原生每次调用都重新读槽里的指针，所以表被换掉之后这一拍写进的是新的那一份。
+    private const long KeepAliveMs = 30000;
+
+    private readonly Action<string> _log;
+    // 门：编辑列表的 mtime 变了才干活，"取 mtime + 比对 + 认领"由 FileStamp 一处完成（与
+    // SigilEditorFeature 共用同一个实现）。判据只在**确实落地之后**才推进，所以拒写不会把这一版吃掉。
+    private readonly FileStamp _stamp = new(ConfigFile);
+    private long _lastAttemptMs;
+    private DateTime _lastAttemptVersion;
+    private DateTime _loggedAttemptVersion;
+    private bool _hasLandedOnce;
+    private int _stopped;
+
+    internal AbilityEditorFeature(Action<string> log) => _log = log;
+
+    /// <summary>失败会重试，而"表还没进内存""原生拒写"在屏幕上是同一件事，所以同一版只报一次。</summary>
+    internal void Tick() {
+        if (Volatile.Read(ref _stopped) != 0)
+            return;
+
+        DateTime current = _stamp.Now();
+        long now = Environment.TickCount64;
+        bool sameVersion = current == _lastAttemptVersion;
+        // 同一版的节奏：还没落地过按重试间隔，落地过按看护间隔。文件变了要立刻处理，那一版不算节流。
+        long interval = _hasLandedOnce ? KeepAliveMs : RetryIntervalMs;
+        if (sameVersion && now - _lastAttemptMs < interval)
+            return;
+
+        bool quiet = current == _loggedAttemptVersion;
+        _loggedAttemptVersion = current;
+        _lastAttemptMs = now;
+        _lastAttemptVersion = current;
+
+        try {
+            if (Apply(quiet))
+                _stamp.MarkApplied(current);
+        }
+        catch (Exception ex) {
+            _log("ability edit EXCEPTION: " + ex);
+        }
+    }
+
+    /// <summary>置上停止标志——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。</summary>
+    internal void Dispose() => Interlocked.Exchange(ref _stopped, 1);
+
+    /// <summary>
+    /// 读一次编辑列表、按它写内存。
+    /// </summary>
+    /// <returns>这一版全都落地了（"内存里已经是一样的值"也算落地）。false = 有拒写或读不出来，
+    /// 还欠着，下一拍按重试间隔再来。</returns>
+    private bool Apply(bool quiet) {
+        AbilityEditConfig config;
+        try {
+            config = AbilityEditConfig.Load(ConfigFile);
+        }
+        catch (FileNotFoundException) {
+            // 没有文件 = 没有编辑，不是错误（与 loadout.json 同一种反应：空列表）。
+            config = new AbilityEditConfig();
+        }
+        catch (DirectoryNotFoundException) {
+            config = new AbilityEditConfig();
+        }
+        catch (Exception ex) {
+            if (!quiet)
+                _log("ability edit: the edit list could not be read (" + ex.Message
+                    + "); nothing was written and this version stays pending");
+            return false;
+        }
+
+        int landed = 0, skipped = 0, refused = 0;
+        foreach (AbilityEdit edit in config.Edits) {
+            if (!edit.Enabled)
+                continue;
+            if (!TryParseKey(edit.Key, out uint keyHash) || edit.Levels < 1 || edit.Levels > MaxLevels) {
+                skipped++;
+                continue;
+            }
+
+            // 同一档位写同一个值：这一版一栏一个数值，分档设值不在这一版里。
+            var levels = new float[edit.Levels];
+            for (int index = 0; index < levels.Length; ++index)
+                levels[index] = edit.Value;
+
+            int result = NativeCore.SetLimitBonusLevels(keyHash, levels);
+            if (result >= 0)
+                landed++;
+            else
+                refused++; // 原生已经落过一行原因（同一种拒写只报一次）
+        }
+
+        if (refused == 0)
+            _hasLandedOnce = true;
+        if (!quiet || skipped > 0 || refused > 0)
+            _log($"ability edit: {landed} applied, {skipped} skipped, {refused} refused"
+                + $" (of {config.Edits.Count} entries in the list)");
+        return refused == 0;
+    }
+
+    /// <summary>
+    /// limit_bonus_param 的 Key：正好 8 位十六进制。与 sigiledits.json 同一个拼法（那一侧直接
+    /// uint.TryParse(..., HexNumber)），这里多一条长度检查——短于 8 位的串在那边是合法的少量前导零，
+    /// 但在这张表里 Key 是 32 位哈希，写错一位就会指到别的行（原生会以"找不到这个 Key"拒写，
+    /// 所以代价只是一条日志，而不是写错地方）。
+    /// </summary>
+    private static bool TryParseKey(string text, out uint keyHash) {
+        keyHash = 0;
+        if (text is null || text.Length != 8)
+            return false;
+        return uint.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out keyHash);
+    }
+}

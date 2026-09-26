@@ -29,8 +29,8 @@
   <ItemGroup>
     <None Include="ModConfig.json" CopyToOutputDirectory="Always" />
     <None Include="README.md" CopyToOutputDirectory="Always" />
-    <!-- 随包数据 = mod 目录的 assets\ 下九份，与源码树的 SigilLoadout\assets\ 同一布局（仓库里只有这一份，
-         也没有"开发副本"）。**只有可视工具按 exeDir()\assets\ 读它**，且九份一份都不嵌进 exe：
+    <!-- 随包数据 = mod 目录的 assets\ 下十份，与源码树的 SigilLoadout\assets\ 同一布局（仓库里只有这一份，
+         也没有"开发副本"）。**只有可视工具按 exeDir()\assets\ 读它**，且十份一份都不嵌进 exe：
          嵌了就成了第二套加载机制，换一份数据还得重编工具。
          native 的限制表已编译进 DLL，C# 只映射载荷。复制这一步是因为打包用的就是本工程的输出目录。
          通配而不是逐份列：多一份资产就少一处会忘的地方，而"有没有全进包"由构建的

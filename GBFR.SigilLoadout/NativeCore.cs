@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace GBFR.SigilLoadout;
 
 internal static unsafe partial class NativeCore {
-    internal const int AbiVersion = 20;
+    internal const int AbiVersion = 21;
 
     private const string LibraryName = "GBFR.SigilLoadout.Native.dll";
     private static readonly object ResolverLock = new();

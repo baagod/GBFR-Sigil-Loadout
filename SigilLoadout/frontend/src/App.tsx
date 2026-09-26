@@ -27,8 +27,9 @@ import {
 import {SlotRow, HEADER_ROW} from "./SlotEditor"
 import {ExclusivePanel} from "./ExclusivePanel"
 import {SigilEditorPanel} from "./SigilEditorPanel"
+import {AbilityEditorPanel} from "./AbilityEditorPanel"
 
-type TabKey = "general" | "exclusive" | "sigilEditor"
+type TabKey = "general" | "exclusive" | "sigilEditor" | "abilityEditor"
 
 /** 外壳唯一的一条失败通道：谁失败都只是把它写进这里，屏幕上只可能显示一条。 */
 type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }
@@ -259,9 +260,9 @@ export default function App() {
         let overlayEscOnKeyDown = false
         const isInOverlay = (e: KeyboardEvent) =>
             !!(e.target as HTMLElement | null)?.closest?.(
-                // Esc 归谁：打开的浮层，以及因子编辑页里的数值框——那一页把 Esc 定义成"放开这个框"
-                // （见 SkillRow），不该同时把整个窗口藏到托盘去。
-                '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .skill-rows input'
+                // Esc 归谁：打开的浮层，以及两个编辑页里的数值框——那两页把 Esc 定义成"放开这个框"
+                // （见 SkillRow 与 AbilityEditorPanel），不该同时把整个窗口藏到托盘去。
+                '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .skill-rows input, .ability-rows input'
             )
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return
@@ -325,6 +326,8 @@ export default function App() {
                             <TabsTrigger value="general">{t.tabGeneral}</TabsTrigger>
                             <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
                             <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
+                            {/* 能力编辑页刻意只做中文：它读的资产也只有中文，所以这一个标签不走 messages.ts。 */}
+                            <TabsTrigger value="abilityEditor">能力编辑</TabsTrigger>
                         </TabsList>
                         {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的
@@ -366,8 +369,8 @@ export default function App() {
                     </div>
                 )}
                 {/*
-                    两页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow（每行两个 Base UI 下拉）。
-                    切页于是只剩显示/隐藏，代价是三页启动时都挂上（专属页 29 行，可忽略）。
+                    四页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow（每行两个 Base UI 下拉）。
+                    切页于是只剩显示/隐藏，代价是四页启动时都挂上（专属页 29 行，可忽略）。
                 */}
                 <TabsPanel value="general" keepMounted className={LOADOUT_FRAME}>
                     <div className={LOADOUT_HEADER}>
@@ -408,6 +411,10 @@ export default function App() {
                 */}
                 <TabsPanel value="sigilEditor" keepMounted className="min-h-0 flex-1 overflow-auto">
                     <SigilEditorPanel lang={lang} />
+                </TabsPanel>
+                {/* keepMounted：理由与因子编辑页相同——这一页的编辑状态活在组件里，而后端落盘要等防抖。 */}
+                <TabsPanel value="abilityEditor" keepMounted className="min-h-0 flex-1 overflow-auto">
+                    <AbilityEditorPanel />
                 </TabsPanel>
             </Tabs>
         </div>

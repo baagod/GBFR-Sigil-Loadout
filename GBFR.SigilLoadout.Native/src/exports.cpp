@@ -155,3 +155,64 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
         return WriteSkillStatusTableEntry(table, length);
     });
 }
+
+// limit_bonus_param 的拒绝码人话解释。与上面那个分开：两张表的槽各自解析，"没解析出来"
+// 指的是不同的锚点。共用 -1/-3/-7 三个码，措辞按这张表说。
+static const char* LimitBonusRefusalReason(int32_t code) {
+    switch (code) {
+    case GBFR20_TABLE_NOT_READY:
+        return "the native core is not initialized yet, or is shutting down.";
+    case GBFR20_TABLE_SLOT_UNRESOLVED:
+        return "the limit_bonus_param pointer field was not resolved from its anchor at startup.";
+    case GBFR20_TABLE_BUFFER_UNREADABLE:
+        return "the pointer field is unreadable, or the table's memory is not writable.";
+    case GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED:
+        return "level_count is not in 1..10.";
+    case GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE:
+        return "the buffer's row count is outside the plausible range; the pointer field points at something else.";
+    case GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE:
+        return "the key appears more than once in the buffer; this is not the table this mod patches.";
+    case GBFR20_LIMIT_BONUS_KEY_NOT_FOUND:
+        return "the key is not in the buffer; either this is not the table this mod patches, or that entry has no row.";
+    case GBFR20_TABLE_WRITE_FAILED:
+        return "the row write faulted after every gate passed; the row may be partially updated.";
+    default:
+        return "unknown refusal code; see native_api.h for the list.";
+    }
+}
+
+static int32_t SetLimitBonusLevelsEntry(
+    uint32_t key_hash,
+    const float* levels,
+    uint32_t level_count) {
+    if (g_shutting_down.load(std::memory_order_acquire))
+        return GBFR20_TABLE_NOT_READY;
+    // 与 WriteSkillStatusTable 同：刻意**不**要求 g_hooks_ready——写的是数据表，与钩子装没装成
+    // 无关。锚点没解析出来时下面返回 SLOT_UNRESOLVED：拒写、一个字节都不动，编辑不丢。
+    EnsureInitialized();
+    // 同一种拒写只报一次：调用方每个能力各调一次，逐条报会把日志刷满，而原因逐字相同。
+    static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
+
+    const int32_t result = SetLimitBonusLevels(key_hash, levels, level_count);
+    if (result < 0) {
+        if (last_refusal.exchange(result, std::memory_order_acq_rel) != result)
+            Log(std::format(
+                "SetLimitBonusLevels: refused ({}): {}",
+                result,
+                LimitBonusRefusalReason(result)));
+    }
+    else {
+        // 成功过就把"上次报过的码"清掉：下一次拒写值得再报一次。
+        last_refusal.store(std::numeric_limits<int32_t>::min(), std::memory_order_release);
+    }
+    return result;
+}
+
+int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
+    uint32_t key_hash,
+    const float* levels,
+    uint32_t level_count) {
+    return GuardAbi("GBFR20_SetLimitBonusLevels", GBFR20_TABLE_WRITE_FAILED, [&] {
+        return SetLimitBonusLevelsEntry(key_hash, levels, level_count);
+    });
+}

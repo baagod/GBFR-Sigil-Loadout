@@ -66,6 +66,27 @@ internal static unsafe partial class NativeCore {
     }
 
     /// <summary>
+    /// 把一个能力强化的数值交给原生，写进**游戏自己已经解析好的**那份 limit_bonus_param；地址由
+    /// 原生从语义锚点解析出来（src/table_slot.cpp），托管侧既不持有地址、也不扫内存。
+    ///
+    /// <paramref name="levels"/> 写 Lv1..LvN（N = 数组长度，1..10）：只写被用到的那几档，没被用到的
+    /// 槽一个字节都不碰。
+    ///
+    /// 返回 1 = 这一行真的被改了，0 = 内存里已经一样；&lt; 0 是拒绝码，一个字节都没写，原因由原生落
+    /// 一行日志（码的含义在 native_api.h / exports.cpp）。
+    /// </summary>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int GBFR20_SetLimitBonusLevels(
+        uint keyHash,
+        float* levels,
+        uint levelCount);
+
+    internal static int SetLimitBonusLevels(uint keyHash, float[] levels) {
+        fixed (float* pointer = levels)
+            return GBFR20_SetLimitBonusLevels(keyHash, pointer, (uint)levels.Length);
+    }
+
+    /// <summary>
     /// 托管侧的 ABI 布局自检，与 native_api.h 的 static_assert 一一对应。
     ///
     /// 版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"——而后者才是结构体错位最可能发生的

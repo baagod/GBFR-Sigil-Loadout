@@ -282,4 +282,13 @@ void EnsureInitialized();
 void ResolveTableSlot();
 // GBFR20_WriteSkillStatusTable 的实现（返回值语义见 native_api.h）。
 int32_t WriteSkillStatusTable(const uint8_t* table, size_t length) noexcept;
+// 同一套语义锚点机制的第二张表：从 limit_bonus_param 的行循环锚点（行步长 0x54）前
+// 0x800 字节窗口里那条唯一的"缓冲区指针加载"解出指针字段 RVA，缓存进 src/table_slot.cpp。
+// 同样只记日志、不挡初始化——没解析出来时那个导出一律拒写，编辑不会丢。
+void ResolveLimitBonusParamPointer();
+// GBFR20_SetLimitBonusLevels 的实现（返回值语义见 native_api.h）。
+int32_t SetLimitBonusLevels(
+    uint32_t key_hash,
+    const float* levels,
+    uint32_t level_count) noexcept;
 }

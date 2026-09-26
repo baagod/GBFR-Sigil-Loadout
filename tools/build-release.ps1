@@ -48,12 +48,13 @@ $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 $zipTemp = "$zipPath.tmp"
 
 # --- 随包数据（assets\）-------------------------------------------------------
-# 九份资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
+# 十份资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
 # 现成的同名文件，再没有才让 gen 全出一遍（gen 在仓库旁 ..\gen）。
 $assetsDir = Join-Path $root 'SigilLoadout\assets'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.json',
-    'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json')
+    'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json',
+    'abilities.json')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }
@@ -295,7 +296,8 @@ foreach ($requiredFile in @(
     'assets\skill.zh.json',
     'assets\skill.en.json',
     'assets\skill.ja.json',
-    'assets\skill.ko.json'
+    'assets\skill.ko.json',
+    'assets\abilities.json'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {

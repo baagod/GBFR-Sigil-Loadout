@@ -1,0 +1,73 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace GBFR.SigilLoadout;
+
+/// <summary>
+/// 一条能力强化覆盖：改 limit_bonus_param 的哪一行，写前几个 Lv 槽、写多少。
+///
+/// 一个能力强化有几档由**游戏自己的表**决定（那条 bonus 在本角色的树上有几个节点就等于几档，
+/// 娜露梅是 3 档），所以 <see cref="Levels"/> 由工具按资产填、这里只按它截取：写 Lv1..LvN，
+/// 没被用到的槽（Lv(N+1)..Lv10）一个字节都不碰。<see cref="Value"/> 是同一个值写满这些档位——
+/// 这一版一栏一个数值，分档设值不在这一版里。
+/// </summary>
+public class AbilityEdit {
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>limit_bonus_param 那一行的 Key hash：8 位十六进制，如 0D0BCF24。</summary>
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = "";
+
+    /// <summary>要写的档位数：写 Lv1..LvN，N ∈ [1,10]。越界的条目整条跳过并记一行日志。</summary>
+    [JsonPropertyName("levels")]
+    public int Levels { get; set; } = 1;
+
+    [JsonPropertyName("value")]
+    public float Value { get; set; }
+}
+
+/// <summary>
+/// 本 mod 的 abilityedits.json。由可视工具（SigilLoadout.exe）写，这里在启动时读。
+///
+/// 形状与 sigiledits.json 同一套规矩：名字就是契约（每个成员都写明 JSON 名，不折叠大小写），
+/// 只有**外层**形状算错误（没有 edits 成员 / 不是数组 / 不是对象），认不出的成员读成默认值、
+/// 由逐条扫描报"跳过"，而不是让整份文件读不出来。
+///
+/// 与 sigiledits.json 的一处不同：空数组在这里是"没有要写的"，**不是**"撤销全部编辑"——这张表
+/// 只写内存、不经过数据管理器，写进去就没有第二份原始值可以拿回来。要还原默认值得由工具把
+/// 默认值当一次编辑写下来（资产里有默认档值）。
+/// </summary>
+public class AbilityEditConfig {
+    [JsonPropertyName("edits")]
+    public List<AbilityEdit> Edits { get; set; } = [];
+
+    private static readonly JsonSerializerOptions Options = new();
+
+    /// <summary>
+    /// <paramref name="path"/> 里的编辑列表。空的 <c>edits</c> 数组是真实答案，返回空列表；
+    /// 其余坏形状都抛异常，由调用方记下原因后什么都不写。
+    /// </summary>
+    public static AbilityEditConfig Load(string path) {
+        // 大小上限与另两份配置同一道：文件可以手改，失控的那份该是一条记进日志的错误，
+        // 而不是一次几个 GB 的读取。
+        var info = new FileInfo(path);
+        if (info.Length > MaxBytes)
+            throw new InvalidDataException($"abilityedits.json exceeds {MaxBytes} bytes");
+
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException(
+                $"abilityedits.json must be a JSON object, got {doc.RootElement.ValueKind}");
+        if (!doc.RootElement.TryGetProperty("edits", out JsonElement editsElement))
+            throw new InvalidDataException(
+                "abilityedits.json has no 'edits' member; an empty array is how the list is emptied");
+        if (editsElement.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException(
+                $"abilityedits.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'nothing to write')");
+
+        return doc.RootElement.Deserialize<AbilityEditConfig>(Options)!;
+    }
+
+    internal const long MaxBytes = 1 * 1024 * 1024;
+}
