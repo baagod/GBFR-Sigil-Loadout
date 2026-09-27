@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
+import type { CharaTable } from "@/lib/chara"
 import { exclusiveSlots, type Exclusive, type ExclusiveState } from "@/lib/model"
 
 export function ExclusivePanel({
@@ -7,6 +8,7 @@ export function ExclusivePanel({
     state,
     names,
     charaNames,
+    charaTable,
     onChange,
 }: {
     table: Exclusive[]
@@ -15,6 +17,8 @@ export function ExclusivePanel({
     names: Record<string, string>
     /** 当前语言的 PL 码 -> 角色名（chara.lang.json）；缺条目的行显示 PL 码。 */
     charaNames: Record<string, string>
+    /** 角色表（chara.json）：PL 码 -> {hash, element, color}。名字按属性上色，与能力强化页同一份来源。 */
+    charaTable: CharaTable
     /** 只报"哪个角色码的哪个技能被切成了什么"；落到文件里的键由 App 决定。 */
     onChange: (player: string, skillHash: string, value: boolean) => void
 }) {
@@ -38,7 +42,12 @@ export function ExclusivePanel({
                         className="flex h-[42px] items-center border-b text-sm last:border-b-0"
                     >
                         <div className="grid w-full grid-cols-[142px_1fr_1fr_1fr] items-center gap-x-2">
-                            <span className="truncate font-medium">{charaNames[e.player] ?? e.player}</span>
+                            <span
+                                className="truncate font-medium"
+                                style={{ color: charaTable[e.player]?.color }}
+                            >
+                                {charaNames[e.player] ?? e.player}
+                            </span>
                             {exclusiveSlots(e, names).map(({ skillHash, label }) => (
                                 <label key={skillHash} className="flex min-w-0 items-center gap-1.5">
                                     <Checkbox

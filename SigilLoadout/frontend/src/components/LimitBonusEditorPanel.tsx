@@ -34,13 +34,13 @@ import {
     valueAt,
     withFirstValue,
     type Ability,
-    type CharaTable,
     type LimitBonusCharacter,
     type LimitBonusEdit,
     type LimitBonusParam,
     type LimitBonusTable,
     type LimitBonusText,
 } from "@/lib/limitbonus";
+import type { CharaTable } from "@/lib/chara";
 import type { Lang } from "@/lib/lang";
 import { messages } from "@/lib/messages";
 import { dedupeBy, slotEdit, stepValue } from "@/lib/skills";
@@ -290,7 +290,7 @@ function CharacterGroup({
             悬停那一层色（#262626）仍给出"这一行能点"。展开的能力住在这个容器里。
         */
         <div className="border-b last:border-b-0">
-            <div className="flex h-11 items-center gap-2 pr-4" onClick={() => setOpen((prev) => !prev)}>
+            <div className="flex h-11 items-center gap-2" onClick={() => setOpen((prev) => !prev)}>
                 {/*
                     属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定，而它已经
                     按角色算好写在 chara.json 里，取一个 PL 码就拿到了；缺那一条时名字继承默认前景色。

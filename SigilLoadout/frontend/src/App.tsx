@@ -29,7 +29,7 @@ import {SlotRow, HEADER_ROW} from "@/components/SlotEditor"
 import {ExclusivePanel} from "@/components/ExclusivePanel"
 import {SigilEditorPanel} from "@/components/SigilEditorPanel"
 import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"
-import type {CharaTable} from "@/lib/limitbonus"
+import type {CharaTable} from "@/lib/chara"
 
 type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus"
 
@@ -415,6 +415,7 @@ export default function App() {
                             state={exclusiveState}
                             names={names}
                             charaNames={charaNames}
+                            charaTable={charaTable}
                             onChange={updateExclusive}
                         />
                     </div>
