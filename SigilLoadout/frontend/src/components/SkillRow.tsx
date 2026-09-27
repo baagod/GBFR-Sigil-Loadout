@@ -162,16 +162,17 @@ function ValueSlots({
                             step(i, e.key === "ArrowUp" ? 1 : -1);
                         }}
                         /*
-                            裸文本，不是输入域：整行读起来就是一行用 | 隔开的数字，唯一的装饰是正在编辑的槽
-                            上一层很淡的底色，让光标有个落脚处。
+                            裸文本，不是输入域：整行读起来就是一行用 | 隔开的数字，聚焦时也不给底色
+                            （那层底色在深色下被 dark:bg-transparent 压掉、只有浅色下可见，两页一起删掉了，
+                            见 style.css 里"数值框"那段）——说明"这里能编辑"的只有光标本身。
 
-                            框就是行高（父行与各等级行都是 h-11）：行自己没有内边距，所以聚焦槽的底色从上到
-                            下盖满整行，点在这条带子上的任何地方都落进框里。
+                            框就是行高（父行与各等级行都是 h-11）：行自己没有内边距，所以整行都是框，点在
+                            这条带子上的任何地方都落进框里。
 
                             每个框都能输入，无论该等级是否打开：还没有编辑的等级把游戏的数值显示为占位符，
                             第一次敲键或步进就开始这条编辑。所以没有需要绕开的禁用态——只有占位符。
                         */
-                        className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus:bg-muted/50 focus-visible:ring-0 dark:bg-transparent"
+                        className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
                     />
                 </Fragment>
             ))}

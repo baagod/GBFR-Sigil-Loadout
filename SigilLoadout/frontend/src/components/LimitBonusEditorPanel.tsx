@@ -149,14 +149,14 @@ function SlotBox({
                     step(e.key === "ArrowUp" ? 1 : -1);
                 }}
                 /*
-                    无边框：框就是行高，读的是数字本身；"这一格能改"由 hover 与 focus 的淡底色回答——
-                    指针或焦点落在框上时它才现出来，所以框在静止时像裸文本，却又不是。
+                    无边框：框就是行高，读的是数字本身，所以静止与聚焦都像裸文本——聚焦态不再给底色
+                    （原先那条 focus:bg-muted/50 在深色下被 dark:bg-transparent 压掉、只有浅色下可见，
+                    两页一起删掉了，见 style.css 里"数值框"那段）。
 
-                    那两条 dark: 不是重复：框自己的深色底色被 dark:bg-transparent 顶掉之后，深色下
-                    focus:bg-muted/50 与它同特异性、又按编译顺序排在后面（见 style.css 里因子页那条同样
-                    的取舍），带 dark: 前缀重写一遍才真的盖得住。
+                    dark:bg-transparent 不是重复（WebStorm 会提示删掉，别删）：基础 Input 自带
+                    .dark:bg-input/30，两者同特异性，只能靠排在编译产物更后面取胜。
                 */
-                className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus:bg-muted/50 focus-visible:ring-0 dark:bg-transparent"
+                className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
             />
         </div>
     );
@@ -286,10 +286,9 @@ function CharacterGroup({
 
     return (
         /*
-            组回到**有下边框的默认样式**（border-b，最后一行不画）：分组靠这条线，不靠底色。
-            悬停那一层色（#262626）仍给出"这一行能点"。展开的能力住在这个容器里。
+            组靠下边框分组，不靠底色（最后一行也画：整块列表以一条线收尾）。展开的能力住在这个容器里。
         */
-        <div className="border-b last:border-b-0">
+        <div className="border-b">
             <div className="flex h-11 items-center gap-2" onClick={() => setOpen((prev) => !prev)}>
                 {/*
                     属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定，而它已经
@@ -413,7 +412,7 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         // 列表还没读回来就不写；不写盘的理由见 editListRead 的声明。
         if (!editListRead) return;
         setEdits(next);
-        SaveLimitBonusEdits([...next.values()]).catch((err) =>
+        SaveLimitBonusEdits([...next.values()]).catch(err =>
             showError({ title: t.writeFailed, detail: String(err) }),
         );
     }
@@ -440,13 +439,13 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
     // min-w-[640px] 是本页排出来的宽度（列宽表的下限加上页面内边距与滚动条沟槽）：外面那一层面板负责
     // 横向滚动，所以窗口更窄时列是被滚动条推到视野外，而不是被裁掉（同因子编辑页）。
     return (
-        <div className="flex h-full min-h-0 min-w-[640px] flex-col page-padding">
+        <div className="flex h-full min-h-0 min-w-160 flex-col page-padding">
             {/*
                 ability-rows 是给外壳那记 Esc 用的（见 App.tsx）：焦点在数值框里时，Esc 是"放开这个框"
                 （见 SlotBox），不该同时把整个窗口藏到托盘去——与因子编辑页的 .skill-rows 同一条规矩。
                 这一页没有用得上它的样式，所以它在这里只是个钩子。
             */}
-            <div className="ability-rows min-h-0 flex-1 overflow-y-auto pr-4 [scrollbar-gutter:stable]">
+            <div className="ability-rows min-h-0 flex-1 overflow-y-auto pr-4 scrollbar-gutter-stable">
                 {characters.map((character) => (
                     <CharacterGroup
                         key={character.id}

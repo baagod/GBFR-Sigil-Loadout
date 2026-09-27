@@ -13,7 +13,7 @@ import { useWheelStep } from "@/hooks/useWheelStep"
 const GRID_COLS =
     "grid grid-cols-[auto_1.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"
 
-export const HEADER_ROW = `${GRID_COLS} min-h-[44px] border-b text-sm font-medium text-foreground`
+export const HEADER_ROW = `${GRID_COLS} min-h-[44px] border-b text-sm font-medium text-[#a0a0a0]`
 const DATA_ROW = `${GRID_COLS} border-b py-2 text-sm last:border-b-0`
 
 function LevelInput({
