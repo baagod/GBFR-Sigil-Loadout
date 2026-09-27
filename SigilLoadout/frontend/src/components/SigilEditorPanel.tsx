@@ -9,12 +9,13 @@ import {
     InputGroupInput,
 } from "@/components/ui/input-group";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { messages } from "@/messages";
-import type { Lang } from "@/lang";
+import { messages } from "@/lib/messages";
+import type { Lang } from "@/lib/lang";
 import { SkillRow, type RowContext } from "./SkillRow";
-import { PanelFailureDialog, usePanelFailure } from "@/usePanelFailure";
-import { useLangTable } from "@/useLangTable";
-import { useRowTooltip } from "@/useRowTooltip";
+import { PanelFailureDialog } from "@/components/PanelFailureDialog";
+import { usePanelFailure } from "@/hooks/usePanelFailure";
+import { useLangTable } from "@/hooks/useLangTable";
+import { useRowTooltip } from "@/hooks/useRowTooltip";
 import {
     addressOf,
     dedupe,
@@ -27,7 +28,7 @@ import {
     type SigilSkill,
     type SkillText,
     type SkillInfo,
-} from "@/skills";
+} from "@/lib/skills";
 
 /** 稍早之前的那个值：否则搜索框每敲一个键都要过滤一遍 200 行的列表。 */
 function useDebounced<T>(value: T, delay = 150): T {

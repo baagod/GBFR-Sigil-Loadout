@@ -6,8 +6,8 @@ import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
 import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/shellservice"
 import {Characters} from "../bindings/sigilloadout/limitbonusservice"
-import {messages, type Messages} from "./messages"
-import {LANGS, LANG_LABEL, initialLang, type Lang} from "./lang"
+import {messages, type Messages} from "@/lib/messages"
+import {LANGS, LANG_LABEL, initialLang, type Lang} from "@/lib/lang"
 import {
     buildLoadoutPayload,
     buildSigilIndex,
@@ -24,12 +24,12 @@ import {
     type Sigil,
     type Slot,
     type Skill
-} from "./model"
+} from "@/lib/model"
 import {SlotRow, HEADER_ROW} from "@/components/SlotEditor"
 import {ExclusivePanel} from "@/components/ExclusivePanel"
 import {SigilEditorPanel} from "@/components/SigilEditorPanel"
 import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"
-import type {CharaTable} from "./limitbonus"
+import type {CharaTable} from "@/lib/limitbonus"
 
 type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus"
 

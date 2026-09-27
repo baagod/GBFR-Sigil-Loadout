@@ -41,14 +41,15 @@ import {
     type LimitBonusParam,
     type LimitBonusTable,
     type LimitBonusText,
-} from "@/limitbonus";
-import { elementColor } from "@/element";
-import type { Lang } from "@/lang";
-import { messages } from "@/messages";
-import { dedupeBy, slotEdit, stepValue } from "@/skills";
-import { PanelFailureDialog, usePanelFailure } from "@/usePanelFailure";
-import { useLangTable } from "@/useLangTable";
-import { useWheelStep } from "@/useWheelStep";
+} from "@/lib/limitbonus";
+import { elementColor } from "@/lib/element";
+import type { Lang } from "@/lib/lang";
+import { messages } from "@/lib/messages";
+import { dedupeBy, slotEdit, stepValue } from "@/lib/skills";
+import { PanelFailureDialog } from "@/components/PanelFailureDialog";
+import { usePanelFailure } from "@/hooks/usePanelFailure";
+import { useLangTable } from "@/hooks/useLangTable";
+import { useWheelStep } from "@/hooks/useWheelStep";
 
 /*
     表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，

@@ -1,7 +1,7 @@
 import { Component, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { initialLang } from "@/lang"
-import { messages } from "@/messages"
+import { initialLang } from "@/lib/lang"
+import { messages } from "@/lib/messages"
 
 /*
     渲染期抛出的异常会被 React 一路抛到根，整棵树随之卸掉——在 WebView 里那就是一扇白窗，

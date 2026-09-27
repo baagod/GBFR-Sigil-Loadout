@@ -58,7 +58,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "MaxSlots（启用槽上限）",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/LoadoutConfig.cs", regexp.MustCompile(`MaxSlots = (\d+)`)},
-				{"TS", "frontend/src/model.ts", regexp.MustCompile(`MAX_SLOTS = (\d+)`)},
+				{"TS", "frontend/src/lib/model.ts", regexp.MustCompile(`MAX_SLOTS = (\d+)`)},
 				{"Go", "loadoutservice.go", regexp.MustCompile(`const MaxSlots = (\d+)`)},
 			},
 		},
@@ -66,7 +66,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "DefaultLevel（缺失 cap 时的回落等级）",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/LoadoutConfig.cs", regexp.MustCompile(`DefaultLevel = (\d+)`)},
-				{"TS", "frontend/src/model.ts", regexp.MustCompile(`DEFAULT_LEVEL = (\d+)`)},
+				{"TS", "frontend/src/lib/model.ts", regexp.MustCompile(`DEFAULT_LEVEL = (\d+)`)},
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`LevelValueCount = (\d+)`)},
 				{"Go", "editservice.go", regexp.MustCompile(`LevelValueCount = (\d+)`)},
-				{"TS", "frontend/src/skills.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
+				{"TS", "frontend/src/lib/skills.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
 			},
 		},
 		// 用户配置目录与两个文件名：两边各自算出同一个字符串，中间没有任何协商。漂了不会报错，
@@ -190,7 +190,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "保存失败事件名（Go 发、前端收）",
 			decls: []decl{
 				{"Go", "editservice.go", regexp.MustCompile(`const saveFailedEvent = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
-				{"TS", "frontend/src/usePanelFailure.tsx", regexp.MustCompile(`const SAVE_FAILED = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
+				{"TS", "frontend/src/hooks/usePanelFailure.ts", regexp.MustCompile(`const SAVE_FAILED = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
 			},
 		},
 	}

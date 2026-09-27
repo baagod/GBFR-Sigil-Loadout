@@ -6,9 +6,9 @@ import {
 } from "@/components/ui/input-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SkillPicker } from "./SkillPicker"
-import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "@/model"
-import type { Messages } from "@/messages"
-import { useWheelStep } from "@/useWheelStep"
+import { DEFAULT_LEVEL, type SigilIndex, type Slot } from "@/lib/model"
+import type { Messages } from "@/lib/messages"
+import { useWheelStep } from "@/hooks/useWheelStep"
 
 const GRID_COLS =
     "grid grid-cols-[auto_1.75rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2"

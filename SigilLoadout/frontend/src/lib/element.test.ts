@@ -16,7 +16,7 @@ import { elementColor } from "./element"
 
 // 与 Go 侧 limitbonusservice_test.go 同一份真相：生成器写进 SigilLoadout\assets\chara.json 的那张表。
 const chara = JSON.parse(
-    readFileSync(new URL("../../assets/chara.json", import.meta.url), "utf8")
+    readFileSync(new URL("../../../assets/chara.json", import.meta.url), "utf8")
 ) as Record<string, { hash: string; element: string; color: string }>
 
 /** 生成器的 elementColors：下标即游戏枚举（0 火 1 水 2 土 3 风 4 光 5 暗）。 */

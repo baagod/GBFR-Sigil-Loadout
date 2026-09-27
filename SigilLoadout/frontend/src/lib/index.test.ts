@@ -18,7 +18,7 @@ import {
 } from "./model"
 
 const rows = parseSigilRows(
-    readFileSync(new URL("../../assets/sigils.json", import.meta.url), "utf8")
+    readFileSync(new URL("../../../assets/sigils.json", import.meta.url), "utf8")
 )
 const sigils = itemRowsOf(rows)
 const skills = skillTableOf(rows)

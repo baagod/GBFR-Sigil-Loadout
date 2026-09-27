@@ -13,7 +13,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { Messages } from "@/messages";
+import type { Messages } from "@/lib/messages";
 import {
     addressOf,
     pad,
@@ -25,8 +25,8 @@ import {
     withSlot,
     type SigilSkill,
     type SkillInfo,
-} from "@/skills";
-import { useWheelStep } from "@/useWheelStep";
+} from "@/lib/skills";
+import { useWheelStep } from "@/hooks/useWheelStep";
 
 type Row = {
     key: string;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { Lang } from "./lang";
+import type { Lang } from "@/lib/lang";
 
 /**
  * 一门语言的资产表：进程内缓存 + 换语言重取。

@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { exclusiveSlots, type Exclusive, type ExclusiveState } from "@/model"
+import { exclusiveSlots, type Exclusive, type ExclusiveState } from "@/lib/model"
 
 export function ExclusivePanel({
     table,
