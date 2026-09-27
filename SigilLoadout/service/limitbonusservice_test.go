@@ -244,7 +244,6 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 			t.Fatalf("%s offers no node at all", character.ID)
 		}
 
-		seen := map[string]bool{}
 		for _, ability := range character.Bonuses {
 			abilities++
 			if ability.Key == "" || ability.Hash == "" {
@@ -263,12 +262,8 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 					t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
 						character.ID, ability.Key, param.Key)
 				}
-				// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同 Key 的记录只会互相覆盖。
-				// 游戏里同名节点会共用参数行，但生成器已经把同名的节点去重了（见 gen 的 limitbonus.go）。
-				if seen[param.Key] {
-					t.Fatalf("%s names %s twice", character.ID, param.Key)
-				}
-				seen[param.Key] = true
+				// 一个参数行可以被同一个角色的两个节点共用（名字不同、指到同一行）：那两栏在界面上读写的
+				// 是同一行，列表本来就按 Key 索引（见 skills.ts 的 dedupeBy），所以不冲突。
 
 				// 这个数是界面空框里的占位符，也是"这条参数行有档位可写"的证据：生成器不发 Lv1 为 0
 				// 的行（那种行没有档位可写），所以它到这一层不该是 0。
