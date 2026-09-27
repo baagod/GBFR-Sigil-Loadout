@@ -178,7 +178,7 @@ export default function App() {
 
             /*
                 角色表（chara.json）：PL 码 → 颜色（按属性在生成期算好）。与语言无关，所以整场只取一次。
-                取不到就留空表——角色名于是画成中性灰（见 element.ts），而不是让整页读不出来。
+                取不到就留空表——角色名于是没有专属颜色（继承默认前景色），而不是让整页读不出来。
             */
             try {
                 const chara = (await Characters()) as CharaTable | null

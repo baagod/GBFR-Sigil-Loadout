@@ -5,14 +5,13 @@
       1. 顶层以 PL 码为键，每个角色自己带着颜色（取色一步到位，没有第二张表）；
       2. 六个属性各有颜色、互不相同，且属性 → 颜色与生成器那张表逐字对上（同一张表里两个属性画成
          同色就等于没配色）；
-      3. 查不到时是中性灰，不抛错也不留空。
+      3. 每个角色写下来的 color 都是能直接上屏的 #rrggbb。
 
-    规则（拿到的东西不像颜色 → 中性灰）在这里测；颜色值在资产里，改配色只需重跑生成器。
+    界面把这一栏**直接交给 CSS**（缺了这一条就不设色，那一行的名字继承默认前景色），所以资产里写下的
+    颜色必须本身就是合法的值——这里不替它兜底，兜了反而会让 "red"、#abc 这类合法写法变成灰的。
 */
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-
-import { elementColor } from "./element"
 
 // 与 Go 侧 limitbonusservice_test.go 同一份真相：生成器写进 SigilLoadout\assets\chara.json 的那张表。
 const chara = JSON.parse(
@@ -29,23 +28,6 @@ const ELEMENT_COLORS: Record<string, string> = {
     dark: "#9a72c9",
 }
 
-describe("elementColor", () => {
-    it("资产里的颜色原样上屏", () => {
-        for (const [id, entry] of Object.entries(chara)) {
-            expect(entry.color, `${id} 的颜色不是 hex`).toMatch(/^#[0-9a-f]{6}$/)
-            expect(elementColor(entry.color)).toBe(entry.color)
-        }
-    })
-
-    it("缺失或不像一个颜色时是中性灰，不抛错也不留空", () => {
-        expect(elementColor(undefined)).toBe("#6b6b6b")
-        expect(elementColor(null)).toBe("#6b6b6b")
-        expect(elementColor("")).toBe("#6b6b6b")
-        expect(elementColor("ice")).toBe("#6b6b6b")
-        expect(elementColor("#12345")).toBe("#6b6b6b")
-    })
-})
-
 describe("chara.json 的角色表", () => {
     it("顶层以 PL 码为键，每一行只带 hash 与颜色（没有第二个消费者要的调色表）", () => {
         const ids = Object.keys(chara)
@@ -58,6 +40,12 @@ describe("chara.json 的角色表", () => {
         // PL1400 是这条链路上一直用来抽查的那个角色（娜露梅，暗）。
         expect(chara.PL1400?.element).toBe("dark")
         expect(chara.PL1400?.color).toBe("#9a72c9")
+    })
+
+    it("每一行的颜色都是 #rrggbb：它要直接上屏，前端不再替它兜底", () => {
+        for (const [id, entry] of Object.entries(chara)) {
+            expect(entry.color, `${id} 的颜色不是 hex`).toMatch(/^#[0-9a-f]{6}$/)
+        }
     })
 
     it("颜色按属性查得出来，六个属性齐全且互不相同", () => {

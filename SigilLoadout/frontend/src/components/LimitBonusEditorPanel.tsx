@@ -41,7 +41,6 @@ import {
     type LimitBonusTable,
     type LimitBonusText,
 } from "@/lib/limitbonus";
-import { elementColor } from "@/lib/element";
 import type { Lang } from "@/lib/lang";
 import { messages } from "@/lib/messages";
 import { dedupeBy, slotEdit, stepValue } from "@/lib/skills";
@@ -252,7 +251,7 @@ function AbilityRow({
 
 /*
     骨架里角色条目只有 id，颜色在 chara.json 里：界面拿 id 去角色表**一次**取值就拿到颜色（没有第二步
-    查找，见下面渲染处传下去的 color）。认不出来时 elementColor 兜成中性灰，所以缺这一条时也不会出岔子。
+    查找，见下面渲染处传下去的 color）。资产里没这一条时它是 undefined，那一行的名字就继承默认前景色。
 */
 
 /**
@@ -273,7 +272,7 @@ function CharacterGroup({
     character: LimitBonusCharacter;
     /** 这个角色在当前语言里的名字；表里没有就显示 PL 码——不拿别的语言兜底。 */
     name: string;
-    /** 这个角色的颜色（chara.json 里那一栏）；资产里没这个角色时是 undefined，由 elementColor 兜底。 */
+    /** 这个角色的颜色（chara.json 里那一栏）；资产里没这个角色时是 undefined（名字继承默认前景色）。 */
     color: string | undefined;
     /** 当前语言的效果模板：一路传给它的能力行。 */
     effects: Record<string, string>;
@@ -294,12 +293,11 @@ function CharacterGroup({
             <div className="flex h-11 items-center gap-2 pr-4" onClick={() => setOpen((prev) => !prev)}>
                 {/*
                     属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定，而它已经
-                    按角色算好写在 chara.json 里（见 element.ts），取一个 PL 码就拿到了，认不出来的值
-                    兜成中性灰，所以缺颜色时也只是灰名字。
+                    按角色算好写在 chara.json 里，取一个 PL 码就拿到了；缺那一条时名字继承默认前景色。
                 */}
                 <span
                     className="truncate text-sm font-[550]"
-                    style={{ color: elementColor(color) }}
+                    style={{ color: color }}
                 >
                     {name}
                 </span>
