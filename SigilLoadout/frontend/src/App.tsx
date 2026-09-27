@@ -25,10 +25,10 @@ import {
     type Slot,
     type Skill
 } from "./model"
-import {SlotRow, HEADER_ROW} from "./SlotEditor"
-import {ExclusivePanel} from "./ExclusivePanel"
-import {SigilEditorPanel} from "./SigilEditorPanel"
-import {LimitBonusEditorPanel} from "./LimitBonusEditorPanel"
+import {SlotRow, HEADER_ROW} from "@/components/SlotEditor"
+import {ExclusivePanel} from "@/components/ExclusivePanel"
+import {SigilEditorPanel} from "@/components/SigilEditorPanel"
+import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"
 import type {CharaTable} from "./limitbonus"
 
 type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus"

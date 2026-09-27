@@ -25,7 +25,7 @@ import {
     LoadLimitBonusCharacters,
     LoadLimitBonusEdits,
     SaveLimitBonusEdits,
-} from "../bindings/sigilloadout/limitbonusservice";
+} from "../../bindings/sigilloadout/limitbonusservice";
 import { Input } from "@/components/ui/input";
 import {
     asEdit,
@@ -41,14 +41,14 @@ import {
     type LimitBonusParam,
     type LimitBonusTable,
     type LimitBonusText,
-} from "./limitbonus";
-import { elementColor } from "./element";
-import type { Lang } from "./lang";
-import { messages } from "./messages";
-import { dedupeBy, slotEdit, stepValue } from "./skills";
-import { PanelFailureDialog, usePanelFailure } from "./usePanelFailure";
-import { useLangTable } from "./useLangTable";
-import { useWheelStep } from "./useWheelStep";
+} from "@/limitbonus";
+import { elementColor } from "@/element";
+import type { Lang } from "@/lang";
+import { messages } from "@/messages";
+import { dedupeBy, slotEdit, stepValue } from "@/skills";
+import { PanelFailureDialog, usePanelFailure } from "@/usePanelFailure";
+import { useLangTable } from "@/useLangTable";
+import { useWheelStep } from "@/useWheelStep";
 
 /*
     表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，

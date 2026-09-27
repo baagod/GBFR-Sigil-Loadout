@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { X } from "lucide-react";
 
-import { LoadEdits, SaveEdits, SkillMap, SkillTable } from "../bindings/sigilloadout/editservice";
+import { LoadEdits, SaveEdits, SkillMap, SkillTable } from "../../bindings/sigilloadout/editservice";
 import {
     InputGroup,
     InputGroupAddon,
@@ -9,12 +9,12 @@ import {
     InputGroupInput,
 } from "@/components/ui/input-group";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { messages } from "./messages";
-import type { Lang } from "./lang";
+import { messages } from "@/messages";
+import type { Lang } from "@/lang";
 import { SkillRow, type RowContext } from "./SkillRow";
-import { PanelFailureDialog, usePanelFailure } from "./usePanelFailure";
-import { useLangTable } from "./useLangTable";
-import { useRowTooltip } from "./useRowTooltip";
+import { PanelFailureDialog, usePanelFailure } from "@/usePanelFailure";
+import { useLangTable } from "@/useLangTable";
+import { useRowTooltip } from "@/useRowTooltip";
 import {
     addressOf,
     dedupe,
@@ -27,7 +27,7 @@ import {
     type SigilSkill,
     type SkillText,
     type SkillInfo,
-} from "./skills";
+} from "@/skills";
 
 /** 稍早之前的那个值：否则搜索框每敲一个键都要过滤一遍 200 行的列表。 */
 function useDebounced<T>(value: T, delay = 150): T {
