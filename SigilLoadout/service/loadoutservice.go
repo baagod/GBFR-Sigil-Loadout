@@ -13,7 +13,7 @@ import (
 const MaxSlots = 16
 
 // LoadoutService 读 mod 目录里的数据文件（sigils.json、sigils.chara.json——都在 exe 旁），把玩家配置写到
-// LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新冲不掉它）。落盘形状由前端给
+// LOCALAPPDATA/GBFRSigilLoadout（对齐 C# 那半的 UserConfig，mod 更新冲不掉它）。落盘形状由前端给
 // （model.ts 的 buildLoadoutPayload）：只认这一种，别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
 	writer appfiles.Debounced[[]byte]

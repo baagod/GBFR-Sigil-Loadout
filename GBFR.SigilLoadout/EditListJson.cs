@@ -14,14 +14,16 @@ internal static class EditListJson {
     private static readonly JsonSerializerOptions Options = new();
 
     /// <summary>
-    /// <paramref name="path"/> 里的编辑列表。<paramref name="fileName"/> 只进错误消息（用户要看的是
-    /// "缺的是哪一份"）；<paramref name="emptyArrayMeans"/> 是"空数组在这份配置里是什么意思"——两份的
-    /// 语义不同（一边是"撤销全部编辑"，一边是"没有要写的"），所以由调用方给。
+    /// <paramref name="path"/> 里的编辑列表。文件名从路径取（错误消息要说清"缺的是哪一份"，而
+    /// 调用方给的永远是 <see cref="UserConfig.FilePath"/> 的结果）；<paramref name="emptyArrayMeans"/>
+    /// 是"空数组在这份配置里是什么意思"——两份的语义不同（一边是"撤销全部编辑"，一边是"没有要写的"），
+    /// 所以由调用方给。
     ///
     /// 空的 <c>edits</c> 数组是真实答案，返回空列表；其余坏形状（没有文件、没有该成员、不是数组、
     /// 不是对象）都抛异常，由调用方记下原因后什么都别写，而不是抹掉本局还活着的编辑。
     /// </summary>
-    internal static T Load<T>(string path, string fileName, string emptyArrayMeans) where T : class {
+    internal static T Load<T>(string path, string emptyArrayMeans) where T : class {
+        string fileName = Path.GetFileName(path);
         // 文件可以手改，失控的那份该是一条记进日志的错误，而不是一次几个 GB 的读取。
         var info = new FileInfo(path);
         if (info.Length > UserConfig.MaxBytes)

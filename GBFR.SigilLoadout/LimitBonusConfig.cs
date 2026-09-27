@@ -44,5 +44,5 @@ public class LimitBonusConfig {
     /// 空的 <c>edits</c> 数组是真实答案，返回空列表；其余坏形状都抛异常，由调用方记下原因后什么都不写。
     /// </summary>
     public static LimitBonusConfig Load(string path) =>
-        EditListJson.Load<LimitBonusConfig>(path, "limit_bonus.json", "'nothing to write'");
+        EditListJson.Load<LimitBonusConfig>(path, "'nothing to write'");
 }

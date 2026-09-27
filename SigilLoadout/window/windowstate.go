@@ -23,12 +23,6 @@ var quitting atomic.Bool
 // fakeHide 隐藏窗口而不隐藏 WebView2：外框保持 shown 但全透明（alpha 0 = 鼠标穿透）、禁用输入
 // （顺带把焦点移走）、脱离任务栏/Alt-Tab（WS_EX_TOOLWINDOW）。WebView 照旧渲染，所以之后再显出
 // 来不会白闪，也根本没有 ShowWindow 那一下切换。真正的动作跑在 UI 线程（见 wmFakeHide / hideNow）。
-// attached 是主程序建好的那扇窗口。窗口的创建归 main（它还要把同一个句柄交给托盘），这里只在
-// "该把它显示出来"时用它——HandleMsg 拿不到 WebviewWindow 的 HWND，所以每条消息兼作一条命令。
-var attached *application.WebviewWindow
-
-// Attach 由 main 在建好窗口之后调一次。
-func Attach(w *application.WebviewWindow) { attached = w }
 
 // MarkQuitting 由关机流程调：之后那记 WM_CLOSE 就不再被当成"用户点了 X"。
 func MarkQuitting() { quitting.Store(true) }
@@ -124,8 +118,8 @@ func toggleActionFor(hidden, selfForeground, gameForeground bool) toggleAction {
 }
 
 // 0x8010（托盘 / 第二个实例）是唯一的激活命令。
-func HandleMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
-	if attached == nil {
+func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
+	if w == nil {
 		return 0, false
 	}
 	switch msg {
@@ -168,9 +162,9 @@ func HandleMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
 			fakeHide(hwnd)
 		} else {
 			revealTool(hwnd)
-			attached.Restore()
-			attached.Show()
-			attached.Focus()
+			w.Restore()
+			w.Show()
+			w.Focus()
 		}
 		return 0, true
 	case wmActivate:
@@ -184,9 +178,9 @@ func HandleMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
 		if toolHidden.Load() {
 			revealTool(hwnd)
 		}
-		attached.Restore()
-		attached.Show()
-		attached.Focus()
+		w.Restore()
+		w.Show()
+		w.Focus()
 		return 0, true
 	}
 	return 0, false

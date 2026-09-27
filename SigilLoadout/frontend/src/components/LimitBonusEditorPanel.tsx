@@ -14,7 +14,7 @@
     limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 limitbonusservice.go）、读取不写回。
 
     屏幕上的那一行是**第一档**：左边一格里是当前语言的效果模板（{0} 写成框号 {1}，见 limitbonus.ts 的
-    effectLabel），右边并排着三个数值框——只有第一个框对应真的参数行（见 limitbonus.ts 的 SLOT_COUNT），
+    effectLabel），右边并排着三个数值框——只有第一个框对应真的参数行（见本文件的 SLOT_COUNT），
     描述里的 {1} 就是从左数第一个框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
 import { Fragment, memo, useEffect, useRef, useState } from "react";
@@ -31,7 +31,6 @@ import {
     asEdit,
     dedupeCharacters,
     effectLabel,
-    SLOT_COUNT,
     valueAt,
     withFirstValue,
     type Ability,
@@ -59,8 +58,11 @@ import { useWheelStep } from "@/hooks/useWheelStep";
     一条能力就是一行，三列各填一格：能力名、描述、那三个槽。
 
     数值那一列按**固定的三个槽**留宽（3 × 56px 的框 + 3 × 6px 的 `|` 分隔 = 186px）：槽数不随能力变
-    （见 limitbonus.ts 的 SLOT_COUNT），能力强化只填第一个，另两个是空槽。
+    （见本文件的 SLOT_COUNT），能力强化只填第一个，另两个是空槽。
 */
+/** 一行画几个数值框：`limit_bonus` 能挂的参数行上界（ParamId1/2/3）。这是版式决定，所以住在画它的人这里。 */
+const SLOT_COUNT = 3
+
 const COLUMNS = "grid grid-cols-[130px_minmax(160px,1fr)_200px] items-center gap-2";
 
 /**
@@ -168,7 +170,7 @@ function SlotBox({
  * 屏幕上不再有 Lv 字样，能力行自己就是那一档。
  *
  * 描述是当前语言里这个参数行的效果模板（见 limitbonus.ts 的 effectLabel 与 LimitBonusText.effects），
- * {1} 指着右边第一个框。框数固定三（`limit_bonus` 能挂的参数行上界，见 limitbonus.ts 的 SLOT_COUNT），
+ * {1} 指着右边第一个框。框数固定三（`limit_bonus` 能挂的参数行上界，见本文件的 SLOT_COUNT），
  * 缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样在每一条上都该是同一件
  * 事（与因子编辑页十个槽并排同理）。
  */

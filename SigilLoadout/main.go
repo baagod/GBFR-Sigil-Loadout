@@ -69,7 +69,10 @@ func main() {
 			DisableQuitOnLastWindowClosed: true,
 			// X 按钮 = 假隐藏到托盘（WebView 保持活着，之后再显出来不会白闪）。这一版 Wails 没有暴露
 			// WebviewWindow 的 HWND 取用口，所以每条消息兼作一条针对该窗口的命令。
-			WndProcInterceptor: window.HandleMsg,
+			// 窗口还没建好时这个闭包也可能被调用（win 还是 nil），HandleMsg 里那道 nil 门照旧 fail closed。
+			WndProcInterceptor: func(hwnd uintptr, msg uint32, wparam, lparam uintptr) (uintptr, bool) {
+				return window.HandleMsg(win, hwnd, msg, wparam, lparam)
+			},
 		},
 	})
 
@@ -84,8 +87,6 @@ func main() {
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
-	window.Attach(win)
-
 	// 因子编辑页的写入带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
 	// 否则最后一次编辑就丢了。
 	app.OnShutdown(editService.FlushNow)

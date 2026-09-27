@@ -25,7 +25,7 @@ func (s *ShellService) MinimiseApp() { window.HideToTray() }
 //
 // 文案不由 Go 持有——界面文案只有前端一份（messages.ts），而 lang.ts 写明"加一种语言要动 lang.ts 和
 // messages.ts 各一次"。Go 再抄一张翻译表就是同一件事的第三处，只在托盘这一条上漂移。唯一的例外是前端
-// 起来之前就得显示的 fatalDialog（startup.go，中文硬编码）：它在坏安装上跑，拿不到任何前端文案。
+// 起来之前就得显示的 window.Fatal（window/startup.go，中文硬编码）：它在坏安装上跑，拿不到任何前端文案。
 //
 // label 为空就不换：Record<Lang, Messages> 只强制键存在、不强制非空，手滑写成 trayExit: "" 的话，
 // 菜单会出现一条空项（从托盘退不掉），保留上一条比换成空条好。

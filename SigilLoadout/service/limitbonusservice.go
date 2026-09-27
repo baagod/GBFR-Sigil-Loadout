@@ -43,7 +43,7 @@ type limitBonusEditList struct {
 	Edits []LimitBonusEdit `json:"edits"`
 }
 
-// limitBonusEditListName 住在 mod 的用户目录里（loadoutservice.go 的 userCfgDir），和 loadout.json /
+// limitBonusEditListName 住在 mod 的用户目录里（appfiles.UserDir()），和 loadout.json /
 // sigiledits.json 挨着；只有这一个位置，mod 轮询的正是它。
 const limitBonusEditListName = "limit_bonus.json"
 
@@ -57,7 +57,7 @@ type LimitBonusService struct {
 //
 // 认不出来的语言拿到空表，而不是中文：这是"缺 key 就是缺"的一部分——界面照实显示 id 或留白，不会拿
 // 另一种语言的词冒充。骨架与 chara.json 与语言无关，由 LoadLimitBonusCharacters 给。
-// 读不出来时应用根本起不来（main.go 的 fatalDialog），所以这里没有出错这条路。
+// 读不出来时应用根本起不来（window.Fatal），所以这里没有出错这条路。
 func (s *LimitBonusService) LoadLimitBonus(lang string) *LimitBonusText {
 	// 大小写不折叠：语言码由界面直接给，不在别处做归一化。
 	if table, ok := limitBonusTexts[strings.TrimSpace(lang)]; ok {
@@ -83,7 +83,7 @@ func (s *LimitBonusService) Characters() CharaTable {
 	return *charaTable
 }
 
-// limitBonusConfigPath 必须走 userCfgDir：mod 那半从 LocalApplicationData 算同一个目录，两边算的是
+// limitBonusConfigPath 必须走 appfiles.UserDir()：mod 那半从 LocalApplicationData 算同一个目录，两边算的是
 // 同一个字符串，中间没有任何协商，只能有一处实现（同 configPath）。
 func limitBonusConfigPath() string {
 	return filepath.Join(appfiles.UserDir(), limitBonusEditListName)
@@ -127,7 +127,7 @@ func (s *LimitBonusService) LoadLimitBonusEdits() ([]LimitBonusEdit, error) {
 //
 // 写入刻意不在这里做，理由与 SaveEdits 相同：每次调用交出整个状态并重置定时器，定时器触发时看到的
 // 就是屏幕上最后的状态；前端因此保持愚笨，每次改动都调用它、从不等待回答。这里也就不会返回错误
-// （定时器触发时的失败已经没有调用方可以返回，于是推给前端，见 debouncedwrite.go 的 flushLocked）。
+// （定时器触发时的失败已经没有调用方可以返回，于是推给前端，见 appfiles/debouncedwrite.go 的 flushLocked）。
 func (s *LimitBonusService) SaveLimitBonusEdits(edits []LimitBonusEdit) error {
 	s.writer.Submit("limit bonus edit", writeLimitBonusEdits, edits)
 	return nil

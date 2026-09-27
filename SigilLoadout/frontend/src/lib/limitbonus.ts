@@ -105,8 +105,6 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
 export const effectLabel = (param: LimitBonusParam, effects: Record<string, string>): string =>
     (effects[param.key] ?? "").replaceAll("{0}", "{1}")
 
-/** 一行画几个数值框：`limit_bonus` 能挂的参数行上界（ParamId1/2/3）。 */
-export const SLOT_COUNT = 3
 
 /*
     角色条目去重：古兰与姬塔是两个 PL 码（PL0000 / PL0100）、名字都是"主人公"，资产里各带一份逐字

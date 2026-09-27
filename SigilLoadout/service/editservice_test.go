@@ -36,7 +36,7 @@ func hermeticHome(t *testing.T) string {
 	return home
 }
 
-// flushNow 在这里代替防抖的定时器，所以断言关心的是列表落到哪里，而不是等上一秒。
+// FlushNow 在这里代替防抖的定时器，所以断言关心的是列表落到哪里，而不是等上一秒。
 func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	hermeticHome(t)
 
@@ -143,15 +143,15 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	log.SetOutput(&logged)
 	defer log.SetOutput(previous)
 
-	// 接受这份列表不依赖磁盘，所以失败的是写入——而 flushNow 正是防抖定时器本该落地的地方。
+	// 接受这份列表不依赖磁盘，所以失败的是写入——而 FlushNow 正是防抖定时器本该落地的地方。
 	service.FlushNow()
 
 	if !strings.Contains(logged.String(), "creating the config folder") {
 		t.Fatalf("a write that could not be made went unrecorded: %q", logged.String())
 	}
 
-	// 失败的这份列表必须还在待写里：不编辑而直接退出时 flushNow 是它唯一的机会。
-	// 把挡路的东西挪开，同一个 flushNow 就该把它写下去。
+	// 失败的这份列表必须还在待写里：不编辑而直接退出时 FlushNow 是它唯一的机会。
+	// 把挡路的东西挪开，同一个 FlushNow 就该把它写下去。
 	if err := os.Remove(blocked); err != nil {
 		t.Fatal(err)
 	}

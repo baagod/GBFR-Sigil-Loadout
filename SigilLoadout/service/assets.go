@@ -52,7 +52,7 @@ var (
 	limitBonusTexts    map[string]*LimitBonusText
 )
 
-// readModFile 每次都从 exe 旁读：mod 目录每次更新都会被换掉（用户配置另住在 userCfgDir）。
+// readModFile 每次都从 exe 旁读：mod 目录每次更新都会被换掉（用户配置另住在 appfiles.UserDir()）。
 func readModFile(relative string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(appfiles.ExeDir(), relative))
 	if err != nil {

@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("LOCALAPPDATA", configDir)
 
 	if err := loadAssetsFrom(filepath.Join("..", "assets")); err != nil {
-		fmt.Fprintf(os.Stderr, "loadAssetsFrom(assets): %v\n", err)
+		fmt.Fprintf(os.Stderr, "loadAssetsFrom(../assets): %v\n", err)
 		os.Exit(1)
 	}
 	code := m.Run()

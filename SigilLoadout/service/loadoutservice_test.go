@@ -158,7 +158,7 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 }
 
 /*
-防抖：还没到点就不落盘——这正是"退出时 flushNow 兜住最后一次编辑"能成立的前提。
+防抖：还没到点就不落盘——这正是"退出时 FlushNow 兜住最后一次编辑"能成立的前提。
 */
 func TestSaveLoadoutDefersTheWrite(t *testing.T) {
 	dir := t.TempDir()
@@ -175,7 +175,7 @@ func TestSaveLoadoutDefersTheWrite(t *testing.T) {
 	svc.FlushNow()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("flushNow must land the pending config: %v", err)
+		t.Fatalf("FlushNow must land the pending config: %v", err)
 	}
 	if string(data) != cfg {
 		t.Errorf("stored config = %q, want %q", data, cfg)
@@ -203,9 +203,9 @@ func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 	if string(raw) != current {
 		t.Errorf("stored config = %q, want %q", raw, current)
 	}
-	// 待写是被取走而不是被读取的：第二次 flushNow 找不到东西，也就不会写第二遍。
-	// 判据用行为而不是内部字段（防抖作家在 appfiles 里，字段是私有的）：在两次 flushNow 之间把文件
-	// 改成一份哨兵，第二次 flushNow 若还压着东西就会把它盖掉。
+	// 待写是被取走而不是被读取的：第二次 FlushNow 找不到东西，也就不会写第二遍。
+	// 判据用行为而不是内部字段（防抖作家在 appfiles 里，字段是私有的）：在两次 FlushNow 之间把文件
+	// 改成一份哨兵，第二次 FlushNow 若还压着东西就会把它盖掉。
 	const sentinel = `{"slots":[],"sentinel":true}`
 	if err := os.WriteFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName), []byte(sentinel), 0o644); err != nil {
 		t.Fatalf("writing the sentinel: %v", err)
@@ -213,10 +213,10 @@ func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 	svc.FlushNow()
 	raw, err = os.ReadFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName))
 	if err != nil {
-		t.Fatalf("read back after the second flushNow: %v", err)
+		t.Fatalf("read back after the second FlushNow: %v", err)
 	}
 	if string(raw) != sentinel {
-		t.Errorf("second flushNow wrote again: %q", raw)
+		t.Errorf("second FlushNow wrote again: %q", raw)
 	}
 }
 

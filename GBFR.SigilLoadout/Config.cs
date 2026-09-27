@@ -44,7 +44,7 @@ public class Config {
     /// 只补这一份特有的规整。
     /// </summary>
     public static Config Load(string path) {
-        Config config = EditListJson.Load<Config>(path, "sigiledits.json", "'undo every edit'");
+        Config config = EditListJson.Load<Config>(path, "'undo every edit'");
 
         // 显式的 "values": null 会盖掉初始化式，之后每个读 Values 的地方都得处理 null；
         // 在这里规整一次，与工具的 padValues 一致。

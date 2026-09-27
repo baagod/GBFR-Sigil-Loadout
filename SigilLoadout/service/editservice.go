@@ -28,7 +28,7 @@ type Config struct {
 	Edits []SigilSkill `json:"edits"`
 }
 
-// editListName 住在 mod 的用户目录里（loadoutservice.go 的 userCfgDir），和 loadout.json 挨着；只有这一个位置。
+// editListName 住在 mod 的用户目录里（appfiles.UserDir()），和 loadout.json 挨着；只有这一个位置。
 const editListName = "sigiledits.json"
 
 // 落盘是防抖的：SaveEdits 把列表交给 appfiles.Debounced，编辑停下来之后才写出，所以落盘的永远是屏幕上
@@ -56,7 +56,7 @@ func padValues(values []*float64) []*float64 {
 	return out
 }
 
-// 必须走 userCfgDir：os.UserConfigDir 在 Windows 是 %APPDATA%（Roaming），而 C# 那半从
+// 必须走 appfiles.UserDir()：os.UserConfigDir 在 Windows 是 %APPDATA%（Roaming），而 C# 那半从
 // LocalApplicationData 算同一个目录——两边算同一个字符串，中间没有任何协商，只能有一处实现。
 func configPath() string {
 	return filepath.Join(appfiles.UserDir(), editListName)
@@ -106,7 +106,7 @@ func (s *EditService) LoadEdits() ([]SigilSkill, error) {
 // 前端保持愚笨——每次改动都调用它，从不等待回答——所以没有状态可以回传。
 //
 // 这里不会返回错误：唯一的准备工作是 padValues，它不做校验。定时器触发时失败的写入已经没有调用方
-// 可以返回，于是改为推给前端（见 debouncedwrite.go 的 flushLocked）。
+// 可以返回，于是改为推给前端（见 appfiles/debouncedwrite.go 的 flushLocked）。
 //
 // nil（前端传 null）与空列表不是同一件事：nil = 这次什么都没交（不写盘），空列表 = 写出一份
 // "所有编辑都关掉了"的文件（对 mod 而言就是撤销全部编辑）。
