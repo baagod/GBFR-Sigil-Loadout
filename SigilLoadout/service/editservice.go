@@ -37,108 +37,15 @@ type EditService struct {
 	writer appfiles.Debounced[[]SigilSkill]
 }
 
-// LangZH 是被问到一种没有对应表的语言时回退使用的语言。
-const LangZH = "zh"
-
-// 三条查表路径只共用这一条回退，除此之外没有共同点。
-func pick[T any](lang string, tables map[string]T) T {
-	if table, ok := tables[lang]; ok {
-		return table
-	}
-	return tables[LangZH]
-}
-
-// ExplainBand 是一段共用同一份说明文案的等级区间。多数技能只有一个分段，少数会在中途换措辞，
-// 前端挑出覆盖它所显示那一行的分段。
-//
-// 资产把它写成 [等级, 文案] 的一对，而不是命名字段：每个分段都只按等级读取，别无所用。
-type ExplainBand struct {
-	Level int
-	Text  string
-}
-
-func (b *ExplainBand) UnmarshalJSON(data []byte) error {
-	pair, err := pairOf(data, "explanation band")
-	if err != nil {
-		return err
-	}
-	if err := jsonv2.Unmarshal(pair[0], &b.Level); err != nil {
-		return err
-	}
-	return jsonv2.Unmarshal(pair[1], &b.Text)
-}
-
-// MarshalJSON 按资产原本的样子写回 [等级, 文案]：序列化成 {"Level":…,"Text":…} 会让前端读不到任何分段。
-func (b ExplainBand) MarshalJSON() ([]byte, error) {
-	return jsonv2.Marshal([2]any{b.Level, b.Text})
-}
-
-// SkillText 是一种语言对一个因子的说法。说明里的 {N} 代表 LevelValue(N+1)，也就是这个可视工具
-// 所编辑的那些数字——参槽的含义就是从这里知道的。
-type SkillText struct {
-	Name    string        `json:"name"`
-	Summary string        `json:"summary"`
-	Explain []ExplainBand `json:"explain"`
-}
-
-// 每种语言里的 Key 都是同一批 8 位十六进制哈希，不同的只是词语。
-var skillTables map[string]map[string]SkillText
-
 // SkillMap 返回某种语言的整张 哈希 -> 文案 表，好让前端在本地解析名称和说明，而不是每行发一次
 // 调用。未知语言拿到的是回退语言，而不是一个空列表。
 func (s *EditService) SkillMap(lang string) map[string]SkillText {
 	return pick(lang, skillTables)
 }
 
-// SkillRow 是一个带数字的因子的某一行 skill_status：等级，以及那一行的十个 LevelValue 参槽。
-// 资产把它写成 [等级, [数值]] 这样的一对。
-type SkillRow struct {
-	Level  int
-	Values []float64
-}
-
-func (r *SkillRow) UnmarshalJSON(data []byte) error {
-	pair, err := pairOf(data, "skill_status row")
-	if err != nil {
-		return err
-	}
-	if err := jsonv2.Unmarshal(pair[0], &r.Level); err != nil {
-		return err
-	}
-	return jsonv2.Unmarshal(pair[1], &r.Values)
-}
-
-// MarshalJSON 按资产原本的样子写回 [等级, [数值]]：前端按这个形状读取行。
-func (r SkillRow) MarshalJSON() ([]byte, error) {
-	return jsonv2.Marshal([2]any{r.Level, r.Values})
-}
-
-// SkillInfo 是生成的 skill_status.json 里的一行：游戏自己给某个因子记下的数字，只在真正带数字的
-// 等级上——每个等级在表里都有行，但大多数行全是零（万能药 30 行里只有 15 和 30 带数值），而指向
-// 零行的编辑写下的值，游戏在那里根本不会读。Key 是游戏其他表拼写这个因子用的短 id（SKILL_156_00）。
-type SkillInfo struct {
-	Key  string     `json:"key"`
-	Rows []SkillRow `json:"rows"`
-}
-
-// 技能哈希（游戏管这些行叫 skills）-> 该因子自己的数字和等级。
-var skillInfo map[string]SkillInfo
-
 // SkillTable 返回整张 哈希 -> 因子 表，让前端在本地解析某个等级的起始数值，而不是每行发一次调用。
 func (s *EditService) SkillTable() map[string]SkillInfo {
 	return skillInfo
-}
-
-// pairOf 从资产里读出一个 [a, b] 对，让形状错误能点出它来自哪一行，而不是把零值反序列化进结构体。
-func pairOf(data []byte, what string) ([]jsontext.Value, error) {
-	var pair []jsontext.Value
-	if err := jsonv2.Unmarshal(data, &pair); err != nil {
-		return nil, err
-	}
-	if len(pair) != 2 {
-		return nil, fmt.Errorf("%s needs 2 items, got %d", what, len(pair))
-	}
-	return pair, nil
 }
 
 // padValues 把 Values 切片补齐到正好 LevelValueCount 长，这样无论手工编辑过的文件里有什么，
