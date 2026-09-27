@@ -47,8 +47,8 @@ var skillInfo map[string]SkillInfo
 // limitBonusSkeleton 与 charaTable 与语言无关，各读一次；limitBonusTexts 一门语言一份。四门语言都在
 // loadAssetsFrom 里读：缺哪一份就在启动时报出来（宁可直接起不来，也不要在屏幕上静默显示一串 id）。
 var (
-	limitBonusSkeleton *LimitBonusTable
-	charaTable         *CharaTable
+	limitBonusSkeleton LimitBonusTable
+	charaTable         CharaTable
 	limitBonusTexts    map[string]*LimitBonusText
 )
 
@@ -131,13 +131,13 @@ func loadLimitBonusTables(dir string) error {
 	if err != nil {
 		return err
 	}
-	limitBonusSkeleton = &skeleton
+	limitBonusSkeleton = skeleton
 
 	chara, err := readAsset[CharaTable](dir, "chara.json")
 	if err != nil {
 		return err
 	}
-	charaTable = &chara
+	charaTable = chara
 
 	limitBonusTexts = make(map[string]*LimitBonusText, len(limitBonusLangCodes()))
 	for _, lang := range limitBonusLangCodes() {

@@ -72,7 +72,7 @@ func (s *LimitBonusService) LoadLimitBonus(lang string) *LimitBonusText {
 // LoadLimitBonusCharacters 返回与语言无关的那一半：骨架（有哪个角色、哪些能力、默认值多少）。文案按
 // 语言另取（见 LoadLimitBonus）。
 func (s *LimitBonusService) LoadLimitBonusCharacters() LimitBonusTable {
-	return *limitBonusSkeleton
+	return limitBonusSkeleton
 }
 
 // Characters 返回 chara.json 里的角色表：PL 码 → {hash, element, color}。界面拿角色的 PL 码
@@ -80,7 +80,7 @@ func (s *LimitBonusService) LoadLimitBonusCharacters() LimitBonusTable {
 //
 // 名字不再是 Elements：它返回的从来就不是"元素表"，而是角色表——颜色只是挂在角色上的一个字段。
 func (s *LimitBonusService) Characters() CharaTable {
-	return *charaTable
+	return charaTable
 }
 
 // limitBonusConfigPath 必须走 appfiles.UserDir()：mod 那半从 LocalApplicationData 算同一个目录，两边算的是

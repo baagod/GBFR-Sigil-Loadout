@@ -220,18 +220,15 @@ func TestLoadLimitBonusEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 （前端只换 {0}，其余的会原样显示到屏幕上）。
 */
 func TestLimitBonusAssetsAreUsable(t *testing.T) {
-	if limitBonusSkeleton == nil {
-		t.Fatal("limit_bonus.json did not load")
-	}
 	if len(limitBonusSkeleton.Characters) == 0 {
 		t.Fatal("limit_bonus.json names no character")
 	}
-	if charaTable == nil || len(*charaTable) == 0 {
+	if len(charaTable) == 0 {
 		t.Fatal("chara.json names no character")
 	}
 
 	// 颜色挂在角色自己身上（那只六色调色表已经删了）：每一行都要有一个能直接上屏的 hex。
-	for id, entry := range *charaTable {
+	for id, entry := range charaTable {
 		if !strings.HasPrefix(entry.Color, "#") {
 			t.Fatalf("chara.json has no colour for %s: %q", id, entry.Color)
 		}
