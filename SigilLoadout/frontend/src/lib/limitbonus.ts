@@ -20,14 +20,16 @@ export type LimitBonusParam = {
     default: number
 }
 
-/** assets/limit_bonus.json（骨架）里的一条能力强化条目。 */
+/** assets/limit_bonus.json（骨架）里的一个「角色强化」节点。 */
 export type Ability = {
-    /** 这条能力在 ability 表里的短名（AB_PL0700_01）：界面拿它认这一行，也拿它去文案表里查名字。 */
+    /** limit_bonus 那一行的 32 位哈希（8 位大写十六进制）：认这一行，也拿它查节点名。 */
     key: string
-    /** 这条能力的 32 位哈希，8 位大写十六进制。写内存指的行是 param.key，不是它。 */
+    /** 与 key 同值（写内存指的行是 params[].key，不是它）。 */
     hash: string
-    /** 这条能力挂的那个参数行：能力强化只挂一个（`limit_bonus` 的 ParamId1）。 */
-    param: LimitBonusParam
+    /** 挂的参数行，按 ParamId1/2/3 的顺序：能力强化 1 个，"全部上限"类 3 个（默认值相同）。 */
+    params: LimitBonusParam[]
+    /** 游戏的分类：0 属性、1 专属、2 能力——非 0 的行在名字前画一个圆点。 */
+    bonusType: number
 }
 
 /** 骨架里的一个角色条目：只有 id，名字与属性都在别处（chara.lang.json / chara.json）。 */
@@ -87,12 +89,10 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
  * 这与因子编辑页说明里的 {N} 同性质（见 skills.ts 的 slotLabel）：{n} 引用的是第几个数值框，不是把数值
  * 替进去——数字已经在右边的框里了，说不清的正是哪个框对应效果的哪一部分。所以描述与"填了多少"无关。
  *
- * 框号写死 1 是因为一条能力强化只有一个参数行，它必然是左边第一个框（另两个是空槽，见
- * LimitBonusEditorPanel 的 AbilityRow）。
+ * 框号写死 1：一个节点一个框（见 LimitBonusEditorPanel 的 AbilityRow），模板里的 {0} 就是那个框。
  */
 export const effectLabel = (param: LimitBonusParam, effects: Record<string, string>): string =>
     (effects[param.key] ?? "").replaceAll("{0}", "{1}")
-
 
 /*
     角色条目去重：古兰与姬塔是两个 PL 码（PL0000 / PL0100）、名字都是"主人公"，资产里各带一份逐字
@@ -105,7 +105,8 @@ export function dedupeCharacters(characters: LimitBonusCharacter[]): LimitBonusC
     const seen = new Set<string>()
     return characters.filter((character) => {
         const sameContent = character.bonuses
-            .map((ability) => ability.param.key)
+            .flatMap((ability) => ability.params)
+            .map((param) => param.key)
             .sort()
             .join(",")
         if (seen.has(sameContent)) return false
@@ -160,3 +161,21 @@ export function withFirstValue(param: LimitBonusParam, value: number | null): Li
         values: [value],
     }
 }
+
+/** 同名只留第一个（游戏里一个名字有十几个逐档节点，界面上分不出也没用）；没名字的按自己的 Key 留。 */
+export function dedupeByName(nodes: Ability[], names: Record<string, string>): Ability[] {
+    const seen = new Set<string>()
+    return nodes.filter((node) => {
+        const identity = names[node.key] ?? node.key
+        if (seen.has(identity)) return false
+        seen.add(identity)
+        return true
+    })
+}
+/** 中文版把拉丁词与汉字连写（"攻击DOWN抗性"）：只在渲染时于 CJK↔拉丁边界补一个空格，首尾不补。 */
+const CJK_RANGES = "\\u2e80-\\u9fff\\u3000-\\u303f\\uff00-\\uffef\\uac00-\\ud7af"
+const CJK_THEN_LATIN = new RegExp(`([${CJK_RANGES}])([0-9A-Za-z])`, "g")
+const LATIN_THEN_CJK = new RegExp(`([0-9A-Za-z])([${CJK_RANGES}])`, "g")
+
+export const spaceCJKAndLatin = (name: string): string =>
+    name.replace(CJK_THEN_LATIN, "$1 $2").replace(LATIN_THEN_CJK, "$1 $2")

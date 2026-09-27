@@ -214,9 +214,9 @@ func TestLoadLimitBonusEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 
 /*
 资产拆成了三份：语言无关的骨架（limit_bonus.json）、每语言一份按 id 索引的文案（limit_bonus.<lang>.json）、
-以及角色属性（chara.json）。这里钉的是**跨层假设**，不是数据本身：Key 与能力的哈希必须是 8 位十六进制
+以及角色属性（chara.json）。这里钉的是**跨层假设**，不是数据本身：Key 与参数行的哈希必须是 8 位十六进制
 （mod 只认这个写法），Lv1 的默认值必须拿得到（界面空框里的占位符），**骨架上的每一个 id 在当前语言的
-文案表里都要有对应的词**（否则一行能力显示的就是一串 AB_PL0700_01），效果文案里除了 {0} 不能有别的东西
+文案表里都要有对应的词**（否则一行节点显示的就是一串哈希），效果文案里除了 {0} 不能有别的东西
 （前端只换 {0}，其余的会原样显示到屏幕上）。
 */
 func TestLimitBonusAssetsAreUsable(t *testing.T) {
@@ -235,12 +235,13 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 	}
 
 	abilities := 0
+	params := 0
 	for _, character := range limitBonusSkeleton.Characters {
 		if character.ID == "" {
 			t.Fatalf("a character came without an id: %+v", character)
 		}
 		if len(character.Bonuses) == 0 {
-			t.Fatalf("%s offers no ability at all", character.ID)
+			t.Fatalf("%s offers no node at all", character.ID)
 		}
 
 		seen := map[string]bool{}
@@ -249,30 +250,39 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 			if ability.Key == "" || ability.Hash == "" {
 				t.Fatalf("%s/%s is missing an identity field: %+v", character.ID, ability.Key, ability)
 			}
-			if !isHexKey(ability.Hash) {
-				t.Fatalf("%s/%s: hash %q is not 8 hex digits", character.ID, ability.Key, ability.Hash)
+			if !isHexKey(ability.Hash) || ability.Hash != ability.Key {
+				t.Fatalf("%s: hash %q and key %q are not the same 8 hex digits", character.ID, ability.Hash, ability.Key)
+			}
+			if len(ability.Params) == 0 {
+				t.Fatalf("%s/%s hangs no parameter row at all", character.ID, ability.Key)
 			}
 
-			param := ability.Param
-			if !isHexKey(param.Key) {
-				t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
-					character.ID, ability.Key, param.Key)
-			}
-			// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同 Key 的记录只会互相覆盖。
-			if seen[param.Key] {
-				t.Fatalf("%s names %s twice", character.ID, param.Key)
-			}
-			seen[param.Key] = true
+			for _, param := range ability.Params {
+				params++
+				if !isHexKey(param.Key) {
+					t.Fatalf("%s/%s: key %q is not 8 hex digits, which the mod refuses",
+						character.ID, ability.Key, param.Key)
+				}
+				// 同一个角色里一个 Key 只能出现一次：mod 按 Key 找行并写值，两条同 Key 的记录只会互相覆盖。
+				// 游戏里同名节点会共用参数行，但生成器已经把同名的节点去重了（见 gen 的 limitbonus.go）。
+				if seen[param.Key] {
+					t.Fatalf("%s names %s twice", character.ID, param.Key)
+				}
+				seen[param.Key] = true
 
-			// 这个数是界面空框里的占位符，也是"这条参数行有档位可写"的证据：生成器不发 Lv1 为 0
-			// 的行（那种行没有档位可写），所以它到这一层不该是 0。
-			if param.Default == 0 {
-				t.Fatalf("%s/%s: %s has no Lv1 default", character.ID, ability.Key, param.Key)
+				// 这个数是界面空框里的占位符，也是"这条参数行有档位可写"的证据：生成器不发 Lv1 为 0
+				// 的行（那种行没有档位可写），所以它到这一层不该是 0。
+				if param.Default == 0 {
+					t.Fatalf("%s/%s: %s has no Lv1 default", character.ID, ability.Key, param.Key)
+				}
 			}
 		}
 	}
 	if abilities == 0 {
-		t.Fatal("limit_bonus.json offers no ability")
+		t.Fatal("limit_bonus.json offers no node")
+	}
+	if params == 0 {
+		t.Fatal("limit_bonus.json offers no parameter row")
 	}
 	if len(limitBonusTexts) != len(limitBonusLangCodes()) {
 		t.Fatalf("limit_bonus.<lang>.json: got %d tables, want %d", len(limitBonusTexts), len(limitBonusLangCodes()))
@@ -292,12 +302,14 @@ func TestLimitBonusTextsCoverTheSkeletonInEveryLanguage(t *testing.T) {
 
 		for _, character := range limitBonusSkeleton.Characters {
 			for _, ability := range character.Bonuses {
-				// 古兰与姬塔是同一个能力树的两个人，能力名因此重复；判"翻译过"要在语言之间比，不是在这里。
+				// 古兰与姬塔是同一棵树上的两个人，节点名会重复：判"翻译过"要在语言之间比。
 				if text.Bonuses[ability.Key] == "" {
-					t.Fatalf("%s: no name for ability %s", lang, ability.Key)
+					t.Fatalf("%s: no name for node %s", lang, ability.Key)
 				}
-				if text.Effects[ability.Param.Key] == "" {
-					t.Fatalf("%s: no effect text for param %s", lang, ability.Param.Key)
+				for _, param := range ability.Params {
+					if text.Effects[param.Key] == "" {
+						t.Fatalf("%s: no effect text for param %s", lang, param.Key)
+					}
 				}
 			}
 		}
@@ -318,15 +330,16 @@ func TestLimitBonusTextsCoverTheSkeletonInEveryLanguage(t *testing.T) {
 	}
 
 	// 四门语言的词是**真的不一样**，不是同一份表抄了四遍（生成器读错了文本目录就会这样）。角色名已经
-	// 不在这几份表里了，所以拿一条能力名当判据。
+	// 文案表里已经没有角色名了，所以拿一条能力名当判据（45E4F42E = 刹那的强化节点）。
+	const sample = "45E4F42E"
 	zh := service.LoadLimitBonus("zh")
-	if zh.Bonuses["AB_PL1400_06"] == "" {
-		t.Fatal("no ability name was found in any language")
+	if zh.Bonuses[sample] == "" {
+		t.Fatal("no node name was found in any language")
 	}
 	for _, other := range []string{"en", "ja", "ko"} {
-		if service.LoadLimitBonus(other).Bonuses["AB_PL1400_06"] == zh.Bonuses["AB_PL1400_06"] {
-			t.Fatalf("zh and %s spell AB_PL1400_06 the same way (%q): the text tables were not generated per language",
-				other, zh.Bonuses["AB_PL1400_06"])
+		if service.LoadLimitBonus(other).Bonuses[sample] == zh.Bonuses[sample] {
+			t.Fatalf("zh and %s spell %s the same way (%q): the text tables were not generated per language",
+				other, sample, zh.Bonuses[sample])
 		}
 	}
 }

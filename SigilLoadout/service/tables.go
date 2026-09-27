@@ -87,16 +87,16 @@ func pairOf(data []byte, what string) ([]jsontext.Value, error) {
 	return pair, nil
 }
 
-// Ability 是 assets/limit_bonus.json（骨架）里的一条能力强化条目。
+// Ability 是骨架里的一个「角色强化」节点。
 type Ability struct {
-	// Key 是这条能力在 ability 表里的短名（AB_PL0700_01）。界面拿它认这一行，也拿它去当前语言的
-	// 文案表里查能力名。
+	// Key 是 limit_bonus 那一行的哈希（8 位大写十六进制）：认这一行，也拿它查节点名。
 	Key string `json:"key"`
-	// Hash 是这条能力的 32 位哈希（8 位大写十六进制）。写内存指的行是 Param.Key，不是它。
+	// Hash 与 Key 同值（写内存指的行是 Params[].Key，不是它）。
 	Hash string `json:"hash"`
-	// Param 是这条强化挂的那个参数行：这一版只出能力强化（limit_bonus 的 BonusType=2），而它们
-	// 只有一个参数行（ParamId1），所以是一个对象。界面按它铺描述与数值框。
-	Param LimitBonusParam `json:"param"`
+	// Params 是挂的参数行，按 ParamId1/2/3 的顺序（能力强化 1 个，"全部上限"类 3 个、默认值相同）。
+	Params []LimitBonusParam `json:"params"`
+	// BonusType 是游戏的分类：0 属性、1 专属、2 能力（界面靠它画名字前那个圆点）。
+	BonusType int `json:"bonusType"`
 }
 
 // LimitBonusParam 是一条强化的参数行。

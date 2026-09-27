@@ -14,10 +14,10 @@
     limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 limitbonusservice.go）、读取不写回。
 
     屏幕上的那一行是**第一档**：左边一格里是当前语言的效果模板（{0} 写成框号 {1}，见 limitbonus.ts 的
-    effectLabel），右边并排着三个数值框——只有第一个框对应真的参数行（见本文件的 SLOT_COUNT），
+    effectLabel），右边是这一栏的数值框（一个参数行一个框），
     描述里的 {1} 就是从左数第一个框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
-import { Fragment, memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import {
@@ -29,6 +29,8 @@ import {
 import { Input } from "@/components/ui/input";
 import {
     asEdit,
+    dedupeByName,
+    spaceCJKAndLatin,
     dedupeCharacters,
     effectLabel,
     valueAt,
@@ -56,13 +58,11 @@ import { useWheelStep } from "@/hooks/useWheelStep";
     勾选框那一列随"有值即启用"一起删掉了（见 limitbonus.ts 的 withFirstValue）：留着空列只会把能力名推右。
     一条能力就是一行，三列各填一格：能力名、描述、那三个槽。
 
-    数值那一列按**固定的三个槽**留宽（3 × 56px 的框 + 3 × 6px 的 `|` 分隔 = 186px）：槽数不随能力变
-    （见本文件的 SLOT_COUNT），能力强化只填第一个，另两个是空槽。
+    数值那一列**固定 64px**（框占满这一列，里面还有 6px 的 `|` 分隔），其余宽度全给描述列
+    （见渲染处），能力强化只有一个参数行。
 */
-/** 一行画几个数值框：`limit_bonus` 能挂的参数行上界（ParamId1/2/3）。这是版式决定，所以住在画它的人这里。 */
-const SLOT_COUNT = 3
 
-const COLUMNS = "grid grid-cols-[130px_minmax(160px,1fr)_200px] items-center gap-2";
+const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_64px] items-center gap-2";
 
 /**
  * 一个数值框：描述里的 {1} 指的就是它。
@@ -114,7 +114,7 @@ function SlotBox({
     );
 
     return (
-        <div ref={host} className="min-w-0 flex-1">
+        <div ref={host} className="w-full min-w-0">
             <Input
                 type="text"
                 inputMode="decimal"
@@ -163,15 +163,8 @@ function SlotBox({
 }
 
 /**
- * 一条能力：**就是一行**——能力名、描述、那三个数值槽（合并前是能力行下面再挂一行 Lv1 行）。
- *
- * 这一页只改第一档（见 limitbonus.ts 的 withFirstValue）：Lv2/Lv3 不写也不显示，游戏里保持原值，所以
- * 屏幕上不再有 Lv 字样，能力行自己就是那一档。
- *
- * 描述是当前语言里这个参数行的效果模板（见 limitbonus.ts 的 effectLabel 与 LimitBonusText.effects），
- * {1} 指着右边第一个框。框数固定三（`limit_bonus` 能挂的参数行上界，见本文件的 SLOT_COUNT），
- * 缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样在每一条上都该是同一件
- * 事（与因子编辑页十个槽并排同理）。
+ * 一条能力：一行——名字、描述、一个数值框。只改第一档，Lv2/Lv3 不写也不显示（见 limitbonus.ts 的 withFirstValue）。
+ * 描述是各参数行的效果模板用空格接起来（框只有一个，框号一律 {1}，见 effectLabel）。
  */
 function AbilityRow({
     ability,
@@ -181,69 +174,66 @@ function AbilityRow({
     onValue,
 }: {
     ability: Ability;
-    /** 这条能力在当前语言里的名字；表里没有就显示它的 Key（AB_PL1400_06）——不拿别的语言兜底。 */
+    /** 当前语言里的名字；表里没有就显示 Key——不拿别的语言兜底。 */
     name: string;
-    /** 当前语言的效果模板：按参数行的 Key 查（见 LimitBonusText.effects）。 */
+    /** 效果模板（按参数行的 Key 查）。 */
     effects: Record<string, string>;
-    /** 按参数行 Key 索引的全部编辑：这一行自己去取它那个参数行的。 */
+    /** 按参数行 Key 索引的全部编辑。 */
     edits: Map<string, LimitBonusEdit>;
-    /** 某一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
-    onValue: (param: LimitBonusParam, value: number | null) => void;
+    /** 一个框算完了：null = 清空（这一栏名下所有记录都删掉）。 */
+    onValue: (ability: Ability, value: number | null) => void;
 }) {
-    const label = effectLabel(ability.param, effects);
+    // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）；框只有一个，框号一律 {1}。
+    const label = ability.params
+        .map((param) => effectLabel(param, effects))
+        .join(" ");
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
-            {/* 能力名用默认前景色：层级交给字号（14 vs 角色名的 16）与 32px 缩进，不靠颜色。 */}
-                {/*
-                    名字里的间隔号（中文 U+00B7 / 日文 U+30FB）都是"小字符"，UI 字体画出来又小又挤；
-                    游戏用自己那套字体画得更大更居中。数据一个字不动，只在这里把它放大 + 两侧留白。
-                */}
-                <span className="truncate text-sm">
-                    {name.split(/([·・])/).map((part, i) =>
-                        /^[·・]$/.test(part) ? (
-                            <span key={i} className="mx-1 text-[1.15em]">
-                                {part}
-                            </span>
-                        ) : (
-                            part
-                        ),
-                    )}
-                </span>
+            {/* 能力名用默认前景色：层级交给字号与缩进，不靠颜色。 */}
+            {/* 间隔号（·/・）在 UI 字体里又小又挤，这里放大 + 两侧留白；数据一个字不动。 */}
             {/*
-                描述显示的是模板本身，不是把数值填进去：数字已经在右边的槽里了，说不清的正是哪个槽对
-                应效果的哪一部分。颜色比能力名淡（#a0a0a0），一行就是一行高。少数参数行游戏自己没有
-                这行文案，那时画一个占位符。
+                名字这一格是定位容器：圆点用 absolute 摆在缩进槽里（-left-4.5、8px 的点 → 与名字正好 10px），
+                所以能力名与属性名左对齐；只有能力 / 专属类（bonusType ≠ 0）有点，属性节点没有。
             */}
+                <div className="relative min-w-0">
+                    {ability.bonusType !== 0 && (
+                        <span
+                            aria-hidden
+                            className="absolute top-1/2 -left-4.5 size-2 -translate-y-1/2 rounded-full bg-[#2b7fff]"
+                        />
+                    )}
+                    <span className="truncate text-sm">
+                        {spaceCJKAndLatin(name).split(/([·・])/).map((part, i) =>
+                            /^[·・]$/.test(part) ? (
+                                <span key={i} className="mx-1 text-[1.15em]">
+                                    {part}
+                                </span>
+                            ) : (
+                                part
+                            ),
+                        )}
+                    </span>
+                </div>
+            {/* 描述是模板本身（不填数值）：数字在右边的框里，说不清的正是哪一段对应哪一个。少数参数行游戏没写文案，画占位符。 */}
             <span className="min-w-0 truncate text-sm text-[#a0a0a0]">
                 {label === "" ? "—" : label}
             </span>
-            <div className="flex items-center">
-                {Array.from({ length: SLOT_COUNT }, (_, index) => index + 1).map((slot) => (
-                    <Fragment key={slot}>
-                        {/*
-                            每个槽前面一个 |，第一个也不例外：它把数值与描述隔开，方式与数值彼此之间
-                            一样（与因子编辑页的 ValueSlots 逐字相同）。
-                        */}
-                        <span className="shrink-0 text-muted-foreground/40" aria-hidden>
-                            |
-                        </span>
-                        {slot === 1 ? (
-                            <SlotBox
-                                name={name}
-                                param={ability.param}
-                                record={edits.get(ability.param.key)}
-                                onValue={(value) => onValue(ability.param, value)}
-                            />
-                        ) : (
-                            // 空槽：`limit_bonus` 的 ParamId2/3 在能力强化这一律是空的（实测 248/248），
-                            // 没有可写的行，所以显示游戏那边的 0 且不可编辑。
-                            <span className="min-w-0 flex-1 text-center text-xs text-[#a0a0a0] tabular-nums select-none">
-                                0
-                            </span>
-                        )}
-                    </Fragment>
-                ))}
+            {/* 数值靠右：这一列比"框 + 分隔"宽，靠左时每行的数字离右边缘远近不一。 */}
+            <div className="flex items-center justify-end">
+                {/*
+                    一个节点一个框：节点要么挂 1 条参数行，要么挂 3 条（"全部上限"类），而那 3 条默认值永远
+                    相同——游戏就是同一个数同时加到三项上。所以填一个值 = 写给这个节点的全部参数行（见 setValue）。
+                */}
+                <span className="shrink-0 text-muted-foreground/40" aria-hidden>
+                    |
+                </span>
+                <SlotBox
+                    name={name}
+                    param={ability.params[0]}
+                    record={edits.get(ability.params[0].key)}
+                    onValue={(value) => onValue(ability, value)}
+                />
             </div>
         </div>
     );
@@ -280,7 +270,7 @@ function CharacterGroup({
     abilityNames: Record<string, string>;
     /** 按参数行 Key 索引的全部编辑：一路传给它的能力行。 */
     edits: Map<string, LimitBonusEdit>;
-    onValue: (param: LimitBonusParam, value: number | null) => void;
+    onValue: (ability: Ability, value: number | null) => void;
 }) {
     const [open, setOpen] = useState(false);
 
@@ -313,7 +303,7 @@ function CharacterGroup({
                 </span>
             </div>
             {open &&
-                character.bonuses.map((ability) => (
+                dedupeByName(character.bonuses, abilityNames).map((ability) => (
                     <AbilityRow
                         key={ability.key}
                         ability={ability}
@@ -425,14 +415,22 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         删掉**——删掉之后这一行回到完全没编辑过的样子，游戏那边一个字节都没被碰过（不是"还原成默认
         值"：那会留下一条记录）。没有记录时清空是空操作，连一次落盘都不必发生。
     */
-    function setValue(param: LimitBonusParam, value: number | null) {
-        const patched = withFirstValue(param, value);
-        // 清空一个没编辑过的参数行：Map 里本来就没有它，没有东西可删。
-        if (patched === null && !edits.has(param.key)) return;
-
+    function setValue(ability: Ability, value: number | null) {
         const next = new Map(edits);
-        if (patched === null) next.delete(param.key);
-        else next.set(param.key, patched);
+        let changed = false;
+
+        for (const param of ability.params) {
+            const patched = withFirstValue(param, value);
+            if (patched === null) {
+                                if (next.delete(param.key)) changed = true;
+                continue;
+            }
+            next.set(param.key, patched);
+            changed = true;
+        }
+
+        // 这批本来就没编辑过、又要求清空：不必落盘。
+        if (!changed) return;
         commit(next);
     }
 

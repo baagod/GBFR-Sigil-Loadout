@@ -80,9 +80,9 @@ func main() {
 		Title: window.Title,
 		// Wails v3 的尺寸是整扇窗口外框（含标题栏）的 DIP：内容再加 16（左右边框）才是外框。
 		Width:            900 + 16,
-		Height:           840,
+		Height:           800 + 39,
 		MinWidth:         900 + 16,
-		MinHeight:        560,
+		MinHeight:        800 + 39,
 		URL:              "/",
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),

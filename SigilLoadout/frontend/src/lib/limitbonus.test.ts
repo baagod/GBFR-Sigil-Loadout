@@ -10,6 +10,8 @@
 import { describe, expect, it } from "vitest"
 import {
     asEdit,
+    dedupeByName,
+    spaceCJKAndLatin,
     dedupeCharacters,
     effectLabel,
     valueAt,
@@ -32,7 +34,8 @@ const param = (patch: Partial<LimitBonusParam> = {}): LimitBonusParam => ({
 const ability = (patch: Partial<Ability> = {}): Ability => ({
     key: "AB_PL1400_06",
     hash: "41E3C434",
-    param: param(),
+    bonusType: 2,
+    params: [param()],
     ...patch,
 })
 
@@ -54,7 +57,7 @@ const edit = (patch: Partial<LimitBonusEdit> = {}): LimitBonusEdit => ({
 
 /** 组件铺出来的那一行描述，逐字是它的拼法：模板本身，{0} 换成框号。 */
 const lineAt = (target: Ability, table: Record<string, string> = effects) =>
-    effectLabel(target.param, table)
+    effectLabel(target.params[0], table)
 
 describe("这一行显示什么", () => {
     it("没编辑过的参数行读游戏自己的 Lv1，有记录时读记录的第一格", () => {
@@ -123,19 +126,19 @@ describe("一个 Key 最多一条编辑", () => {
 
 describe("角色去重", () => {
     it("参数行 Key 集合相同的条目只留一份（古兰与姬塔是同一个能力树的两个人）", () => {
-        const shared = [ability({ param: param({ key: "AAAAAAAA" }) }), ability({ param: param({ key: "BBBBBBBB" }) })]
+        const shared = [ability({ params: [param({ key: "AAAAAAAA" })] }), ability({ params: [param({ key: "BBBBBBBB" })] })]
         const kept = dedupeCharacters([
             character("PL0000", shared),
             character("PL0100", [...shared].reverse()),
-            character("PL1400", [ability({ param: param({ key: "CCCCCCCC" }) })]),
+            character("PL1400", [ability({ params: [param({ key: "CCCCCCCC" })] })]),
         ])
         expect(kept.map((c) => c.id)).toEqual(["PL0000", "PL1400"])
     })
 
     it("名字不同但内容相同的条目同样只留一份：判据是内容，不是名字", () => {
         const kept = dedupeCharacters([
-            character("PL0000", [ability({ param: param({ key: "AAAAAAAA" }) })]),
-            character("PL0100", [ability({ param: param({ key: "AAAAAAAA" }) })]),
+            character("PL0000", [ability({ params: [param({ key: "AAAAAAAA" })] })]),
+            character("PL0100", [ability({ params: [param({ key: "AAAAAAAA" })] })]),
         ])
         expect(kept).toHaveLength(1)
     })
@@ -175,5 +178,52 @@ describe("改第一档落成什么记录", () => {
         // 返回 null 就是"这一条不要了"，由面板把它从列表里删掉——点一下清空之后游戏那边一个字节都
         // 没被碰过。写成 default 的拷贝是另一回事：那会留下一条记录，等于用户填过。
         expect(withFirstValue(param(), null)).toBeNull()
+    })
+})
+describe("同名只留第一个节点", () => {
+    it("后出现的同名节点不列出来，保留的是先出现的那个", () => {
+        // 同名节点（攻击力UP 有 13 个逐档）只留第一个：这一页是挑一个节点改它的数。
+        const kept = dedupeByName(
+            [
+                ability({ key: "3339EFD5", params: [param({ key: "AAAAAAAA", default: 2 })] }),
+                ability({ key: "A4AA64D6", params: [param({ key: "BBBBBBBB", default: 3 })] }),
+                ability({ key: "E5D4F74B", params: [param({ key: "CCCCCCCC", default: 5 })] }),
+            ],
+            { "3339EFD5": "攻击力UP", "A4AA64D6": "攻击力UP", "E5D4F74B": "攻击力UP" },
+        )
+
+        expect(kept).toHaveLength(1)
+        expect(kept[0].key).toBe("3339EFD5")
+        expect(kept[0].params[0].default).toBe(2)
+    })
+
+    it("不同名字各留一行，顺序不变", () => {
+        const kept = dedupeByName(
+            [ability({ key: "A" }), ability({ key: "B" }), ability({ key: "C" })],
+            { A: "攻击力UP", B: "HP UP", C: "攻击力UP" },
+        )
+
+        expect(kept.map((target) => target.key)).toEqual(["A", "B"])
+    })
+
+    it("没有名字的节点按自己的 Key 留：谁也不该被丢掉", () => {
+        const kept = dedupeByName([ability({ key: "A" }), ability({ key: "B" })], {})
+        expect(kept.map((target) => target.key)).toEqual(["A", "B"])
+    })
+})
+describe("中西文之间补空格", () => {
+    it("拉丁词与汉字相连时补一个空格", () => {
+        expect(spaceCJKAndLatin("攻击DOWN抗性")).toBe("攻击 DOWN 抗性")
+    })
+
+    it("开头就是拉丁词：前面不会多出空格", () => {
+        expect(spaceCJKAndLatin("FULL CHAIN时连锁计数提升量")).toBe("FULL CHAIN 时连锁计数提升量")
+        expect(spaceCJKAndLatin("FULL CHAIN时连锁计数提升量").startsWith(" ")).toBe(false)
+    })
+
+    it("纯中文 / 纯拉丁 / 已有空格：原样返回", () => {
+        expect(spaceCJKAndLatin("攻击力")).toBe("攻击力")
+        expect(spaceCJKAndLatin("HP")).toBe("HP")
+        expect(spaceCJKAndLatin("공격 DOWN 내성")).toBe("공격 DOWN 내성")
     })
 })
