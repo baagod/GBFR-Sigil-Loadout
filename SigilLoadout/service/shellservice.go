@@ -1,6 +1,9 @@
-package main
+package service
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"sigilloadout/window"
+)
 
 // ShellService 是界面外壳：窗口显隐与托盘。这些跟载荷数据无关，所以不从 LoadoutService 走——那个
 // 服务的职责是读 mod 数据、把玩家配置写到本地。
@@ -8,9 +11,15 @@ type ShellService struct {
 	exit *application.MenuItem
 }
 
-// MinimiseApp 由前端在 Esc 时调用（见 App.tsx），好把窗口收进托盘；X 按钮走 main.go 的 WndProc
+// NewShellService 接住托盘菜单里那条"退出"：菜单由 main 造（NewMenu 不碰 globalApplication，
+// 所以能在 application.New() 之前造），文案之后由前端按当前语言推过来（见 SetTrayExitLabel）。
+func NewShellService(exit *application.MenuItem) *ShellService {
+	return &ShellService{exit: exit}
+}
+
+// MinimiseApp 由前端在 Esc 时调用（见 App.tsx），好把窗口收进托盘；X 按钮走 window 包的 WndProc
 // 拦截器，不经这里。
-func (s *ShellService) MinimiseApp() { hideToTray() }
+func (s *ShellService) MinimiseApp() { window.HideToTray() }
 
 // SetTrayExitLabel 是前端调用的服务方法：把托盘右键菜单那一条换成界面当前语言的文案。
 //

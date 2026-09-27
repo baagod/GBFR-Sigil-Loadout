@@ -1,10 +1,11 @@
-package main
+package service
 
 import (
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"io/fs"
 	"os"
+	"sigilloadout/appfiles"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -24,7 +25,7 @@ func TestSaveLimitBonusEditsWritesTheAgreedShape(t *testing.T) {
 	if err := service.SaveLimitBonusEdits(edits); err != nil {
 		t.Fatalf("SaveLimitBonusEdits: %v", err)
 	}
-	service.flushNow()
+	service.FlushNow()
 
 	path := localConfig(t, limitBonusEditListName)
 	raw, err := os.ReadFile(path)
@@ -63,7 +64,7 @@ func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{5, 6, 7}}}); err != nil {
 			t.Fatalf("SaveLimitBonusEdits: %v", err)
 		}
-		time.Sleep(debounceDelay / 4)
+		time.Sleep(appfiles.DebounceDelay / 4)
 		if _, err := os.Stat(cfgPath); err == nil {
 			t.Fatal("limit_bonus.json was written while the debounce window was still open")
 		}
@@ -71,12 +72,12 @@ func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{500, 600, 321}}}); err != nil {
 			t.Fatalf("SaveLimitBonusEdits: %v", err)
 		}
-		time.Sleep(debounceDelay / 4)
+		time.Sleep(appfiles.DebounceDelay / 4)
 		if _, err := os.Stat(cfgPath); err == nil {
 			t.Fatal("a second edit did not restart the debounce window")
 		}
 
-		time.Sleep(debounceDelay * 2)
+		time.Sleep(appfiles.DebounceDelay * 2)
 		synctest.Wait()
 
 		raw, err := os.ReadFile(cfgPath)

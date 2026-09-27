@@ -1,4 +1,4 @@
-package main
+package appfiles
 
 import (
 	"log"
@@ -8,11 +8,18 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// debouncedWriter 是"编辑停下来才落盘"的那套骨架：待写只有一份、写盘只在 mu 里发生，所以两次写不会
+// DebounceDelay 是编辑列表必须静止多久才会被写入：一串连续按键只换来一次写入与一次实时应用。
+const DebounceDelay = 500 * time.Millisecond
+
+// SaveFailedEvent 把写入失败送到前端（前端用与即时失败相同的对话框显示它）；镜像在
+// frontend/src/hooks/usePanelFailure.ts 的 SAVE_FAILED，两者之间没有任何关联，改名必须同时改两处。
+const SaveFailedEvent = "GBFR.SigilLoadout.SaveFailed"
+
+// Debounced 是"编辑停下来才落盘"的那套骨架：待写只有一份、写盘只在 mu 里发生，所以两次写不会
 // 并发，退出时也能由 flushNow 把它交出去（见 main.go 的两个 OnShutdown）。两个 service 共用。
 //
 // 落盘由 write 负责（各 service 不同）；"失败就放回待写 + 记日志 + 推给前端"这三件事在这里统一做。
-type debouncedWriter[T any] struct {
+type Debounced[T any] struct {
 	mu      sync.Mutex
 	pending *T
 	timer   *time.Timer
@@ -20,21 +27,21 @@ type debouncedWriter[T any] struct {
 	write   func(T) error
 }
 
-func (w *debouncedWriter[T]) submit(label string, write func(T) error, value T) {
+func (w *Debounced[T]) Submit(label string, write func(T) error, value T) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.label, w.write = label, write
 	w.pending = &value
 	if w.timer == nil {
-		w.timer = time.AfterFunc(debounceDelay, w.flush)
+		w.timer = time.AfterFunc(DebounceDelay, w.flush)
 	} else {
-		w.timer.Reset(debounceDelay)
+		w.timer.Reset(DebounceDelay)
 	}
 }
 
 // flushNow 供关闭流程用：窗口可能在防抖窗口里就关掉，而刚做的那次编辑才是用户想留下的。已经写过的
 // 不在待写里，所以它和 flush 都不会写第二遍。
-func (w *debouncedWriter[T]) flushNow() {
+func (w *Debounced[T]) FlushNow() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.timer != nil {
@@ -43,14 +50,14 @@ func (w *debouncedWriter[T]) flushNow() {
 	w.flushLocked()
 }
 
-func (w *debouncedWriter[T]) flush() {
+func (w *Debounced[T]) flush() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.flushLocked()
 }
 
 // 调用方持有 w.mu。
-func (w *debouncedWriter[T]) flushLocked() {
+func (w *Debounced[T]) flushLocked() {
 	value := w.pending
 	w.pending = nil
 	if value == nil {
@@ -62,7 +69,7 @@ func (w *debouncedWriter[T]) flushLocked() {
 		w.pending = value
 		log.Printf("%s: %v", w.label, err)
 		if app := application.Get(); app != nil {
-			app.Event.Emit(saveFailedEvent, err.Error())
+			app.Event.Emit(SaveFailedEvent, err.Error())
 		}
 	}
 }

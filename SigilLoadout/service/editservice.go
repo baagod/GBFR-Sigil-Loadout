@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"encoding/json/jsontext"
@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
+	"sigilloadout/appfiles"
 )
 
 // LevelValueCount 是 skill_status 一行所带的 LevelValue 参槽数量，也就是一次编辑需要几个数字。
@@ -31,17 +31,10 @@ type Config struct {
 // editListName 住在 mod 的用户目录里（loadoutservice.go 的 userCfgDir），和 loadout.json 挨着；只有这一个位置。
 const editListName = "sigiledits.json"
 
-// debounceDelay 是编辑列表必须静止多久才会被写入：一串连续按键只换来一次写入与一次实时应用。
-const debounceDelay = 500 * time.Millisecond
-
-// saveFailedEvent 把写入失败送到前端（前端用与即时失败相同的对话框显示它）；SigilEditorPanel.tsx
-// 里有镜像，两者之间没有任何关联，改名必须同时改两处。
-const saveFailedEvent = "GBFR.SigilLoadout.SaveFailed"
-
-// 落盘是防抖的：SaveEdits 把列表交给 debouncedWriter，编辑停下来之后才写出，所以落盘的永远是屏幕上
+// 落盘是防抖的：SaveEdits 把列表交给 appfiles.Debounced，编辑停下来之后才写出，所以落盘的永远是屏幕上
 // 最后的状态，绝不会是若干次按键的混合。
 type EditService struct {
-	writer debouncedWriter[[]SigilSkill]
+	writer appfiles.Debounced[[]SigilSkill]
 }
 
 // LangZH 是被问到一种没有对应表的语言时回退使用的语言。
@@ -159,7 +152,7 @@ func padValues(values []*float64) []*float64 {
 // 必须走 userCfgDir：os.UserConfigDir 在 Windows 是 %APPDATA%（Roaming），而 C# 那半从
 // LocalApplicationData 算同一个目录——两边算同一个字符串，中间没有任何协商，只能有一处实现。
 func configPath() string {
-	return filepath.Join(userCfgDir(), editListName)
+	return filepath.Join(appfiles.UserDir(), editListName)
 }
 
 // LoadEdits 从 sigiledits.json 读取当前的编辑列表。
@@ -215,7 +208,7 @@ func (s *EditService) SaveEdits(edits []SigilSkill) error {
 		edits[i].Values = padValues(edits[i].Values)
 	}
 
-	s.writer.submit("sigil edit", writeEdits, edits)
+	s.writer.Submit("sigil edit", writeEdits, edits)
 	return nil
 }
 
@@ -225,7 +218,10 @@ func writeEdits(edits []SigilSkill) error {
 		return fmt.Errorf("serialising the edit list: %w", err)
 	}
 
-	return writeFileAtomic(configPath(), cfgBytes)
+	return appfiles.WriteAtomic(configPath(), cfgBytes)
 }
 
-func (s *EditService) flushNow() { s.writer.flushNow() }
+// FlushNow 是关机的最后一步（见 main.go 的 OnShutdown），前端没有对应调用，所以不进绑定面。
+//
+//wails:ignore
+func (s *EditService) FlushNow() { s.writer.FlushNow() }

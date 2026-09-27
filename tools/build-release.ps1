@@ -139,7 +139,7 @@ $toolDir = Join-Path $root 'SigilLoadout'
 Push-Location $toolDir
 try {
     # bindings 是 git 忽略的生成产物；前端构建前重新生成。
-    & wails3 generate bindings
+    & wails3 generate bindings ./...
     if ($LASTEXITCODE -ne 0) {
         throw "Wails bindings generation failed with exit code $LASTEXITCODE."
     }

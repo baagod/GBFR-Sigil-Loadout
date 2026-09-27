@@ -5,6 +5,9 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"sigilloadout/service"
+	"sigilloadout/window"
 )
 
 //go:embed all:frontend/dist
@@ -27,38 +30,28 @@ var appIconBytes []byte
 //go:embed icon.ico
 var trayIconBytes []byte
 
-// 随包数据一份都不嵌，全部按 `exeDir()\assets\` 读（由 loadAssets 装进来）：再嵌只会多出第二套
-// 加载机制，还让"换一份数据"必须重编 exe。
-var (
-	gemNamesByLang   map[string]map[string]string
-	charaNamesByLang map[string]map[string]string
-)
-
 var app *application.App
 var win *application.WebviewWindow
 
-// toolWindowTitle 是跨层协议常量：C# 那侧按同一个标题找窗口（Hotkey.cs ToolWindowTitle），
-// sharedconstants_test.go 会对拍它。
-const toolWindowTitle = "GBFR Sigil Loadout"
-
 func main() {
-	ensureSingleInstance()
+	window.EnsureSingleInstance()
 
 	// 缺了就是坏安装，当场说清楚。
-	if err := loadAssets(); err != nil {
-		fatalDialog(err)
+	if err := service.LoadAssets(); err != nil {
+		window.Fatal(err)
 	}
 
 	// 三个 service 的防抖都住在实例里，所以关闭钩子要的正是同一个实例（见下面三个 OnShutdown）。
-	loadoutService := &LoadoutService{}
-	editService := &EditService{}
-	limitBonusService := &LimitBonusService{}
-	// 外壳（窗口显隐与托盘）跟载荷数据无关，自成一体（见 shellservice.go）。托盘菜单在这里就造：
+	loadoutService := &service.LoadoutService{}
+	editService := &service.EditService{}
+	limitBonusService := &service.LimitBonusService{}
+	// 外壳（窗口显隐与托盘）跟载荷数据无关，自成一体（见 service/shellservice.go）。托盘菜单在这里就造：
 	// NewMenu / NewMenuItem 只碰包内一张表、不碰 globalApplication，所以能在 application.New() 之前造；
 	// "退出"那一条随结构体一起给出，exit 不可能为 nil。文案先用英文——前端要等 WebView 起来、读完
 	// loadout.json 才知道是哪一种语言（见 SetTrayExitLabel），托盘在那之前就可能被右键了。
 	menu := application.NewMenu()
-	shellService := &ShellService{exit: menu.Add("Exit").OnClick(func(*application.Context) { app.Quit() })}
+	exitItem := menu.Add("Exit").OnClick(func(*application.Context) { app.Quit() })
+	shellService := service.NewShellService(exitItem)
 
 	app = application.New(application.Options{
 		Name: "SigilLoadout",
@@ -76,12 +69,12 @@ func main() {
 			DisableQuitOnLastWindowClosed: true,
 			// X 按钮 = 假隐藏到托盘（WebView 保持活着，之后再显出来不会白闪）。这一版 Wails 没有暴露
 			// WebviewWindow 的 HWND 取用口，所以每条消息兼作一条针对该窗口的命令。
-			WndProcInterceptor: handleWndMsg,
+			WndProcInterceptor: window.HandleMsg,
 		},
 	})
 
 	win = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: toolWindowTitle,
+		Title: window.Title,
 		// Wails v3 的尺寸是整扇窗口外框（含标题栏）的 DIP：内容再加 16（左右边框）才是外框。
 		Width:            900 + 16,
 		Height:           840,
@@ -91,23 +84,25 @@ func main() {
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
+	window.Attach(win)
+
 	// 因子编辑页的写入带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
 	// 否则最后一次编辑就丢了。
-	app.OnShutdown(editService.flushNow)
-	// 配装配置同样走防抖写（见 LoadoutService），退出时也要把压着的那份发出去。
-	app.OnShutdown(loadoutService.flushNow)
-	// 能力强化页的写入也带防抖（见 LimitBonusService），同一个理由。
-	app.OnShutdown(limitBonusService.flushNow)
+	app.OnShutdown(editService.FlushNow)
+	// 配装配置同样走防抖写（见 service.LoadoutService），退出时也要把压着的那份发出去。
+	app.OnShutdown(loadoutService.FlushNow)
+	// 能力强化页的写入也带防抖（见 service.LimitBonusService），同一个理由。
+	app.OnShutdown(limitBonusService.FlushNow)
 	// 关机时要先立这个标志：cleanup() 里的 shutdownTasks 跑在 window.Close() 之前，否则下面那记
-	// WM_CLOSE 会被当成"用户点了 X"而改成假隐藏（见 windowstate.go 的 quitting）。
-	app.OnShutdown(func() { quitting.Store(true) })
+	// WM_CLOSE 会被当成"用户点了 X"而改成假隐藏（见 window/windowstate.go 的 quitting）。
+	app.OnShutdown(window.MarkQuitting)
 
 	tray := app.SystemTray.New()
 	tray.SetIcon(trayIconBytes)
-	tray.SetTooltip(toolWindowTitle)
+	tray.SetTooltip(window.Title)
 	tray.AttachWindow(win)
 
-	tray.OnClick(func() { go trayOnClick() })
+	tray.OnClick(func() { go window.TrayOnClick() })
 	tray.SetMenu(menu)
 	// 这里刻意不调 tray.Show()：app.Run() 之前 SystemTray 的 impl 还是 nil，Show() 立刻返回。
 

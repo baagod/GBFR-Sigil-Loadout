@@ -1,4 +1,4 @@
-package main
+package window
 
 import (
 	"fmt"
@@ -8,9 +8,15 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"sigilloadout/appfiles"
 )
 
 // 这一文件只放 Win32 依赖（DLL/proc 声明、窗口与常量及其薄包装），不持有状态机语义——那在 windowstate.go。
+
+// Title 是跨层协议常量：C# 那侧按同一个标题找窗口（Hotkey.cs ToolWindowTitle），
+// sharedconstants_test.go 会对拍它。
+const Title = "GBFR Sigil Loadout"
 
 const mutexName = "Local\\GBFRSigilLoadout"
 
@@ -71,7 +77,7 @@ var gwlExStyle = ^uintptr(0) - 19
 
 // 只在 exe 旁存在 tool-debug.on 时才写日志：正式安装从不建这个标记，所以一直静默。
 func debugf(format string, args ...any) {
-	dir := exeDir()
+	dir := appfiles.ExeDir()
 	if _, err := os.Stat(filepath.Join(dir, "tool-debug.on")); err != nil {
 		return
 	}
@@ -109,7 +115,7 @@ func nextForegroundWindow(hwnd uintptr) uintptr {
 
 // findToolWindow 没找到时返回 0。
 func findToolWindow() uintptr {
-	title, _ := syscall.UTF16PtrFromString(toolWindowTitle)
+	title, _ := syscall.UTF16PtrFromString(Title)
 	hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(title)))
 	return hwnd
 }

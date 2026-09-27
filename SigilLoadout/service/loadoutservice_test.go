@@ -1,10 +1,11 @@
-package main
+package service
 
 import (
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sigilloadout/appfiles"
 	"sync"
 	"testing"
 )
@@ -32,9 +33,9 @@ func manySlots(n int) []loadoutSlot {
 func TestUserCfgDirMatchesModPath(t *testing.T) {
 	base := filepath.Join("C:", "Users", "someone", "AppData", "Local")
 	t.Setenv("LOCALAPPDATA", base)
-	want := filepath.Join(base, userCfgDirName)
-	if got := userCfgDir(); got != want {
-		t.Errorf("userCfgDir() = %q, want %q", got, want)
+	want := filepath.Join(base, appfiles.UserDirName)
+	if got := appfiles.UserDir(); got != want {
+		t.Errorf("appfiles.UserDir() = %q, want %q", got, want)
 	}
 }
 
@@ -103,8 +104,8 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 		t.Fatalf("SaveLoadout: %v", err)
 	}
 	// 落盘是防抖的（契约见 LoadoutService），测试不等那 500ms，直接压出来。
-	svc.flushNow()
-	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	svc.FlushNow()
+	path := filepath.Join(dir, appfiles.UserDirName, loadoutFileName)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read back: %v", err)
@@ -133,8 +134,8 @@ func TestSaveLoadoutOverwritesExisting(t *testing.T) {
 	if err := svc.SaveLoadout(second); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
-	svc.flushNow()
-	data, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
+	svc.FlushNow()
+	data, err := os.ReadFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	if err := (&LoadoutService{}).SaveLoadout(`{"slots":[{"items":[],"enabled":true}]}`); err == nil {
 		t.Fatal("expected a validation error")
 	}
-	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	path := filepath.Join(dir, appfiles.UserDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
 	}
@@ -167,11 +168,11 @@ func TestSaveLoadoutDefersTheWrite(t *testing.T) {
 	if err := svc.SaveLoadout(cfg); err != nil {
 		t.Fatalf("SaveLoadout: %v", err)
 	}
-	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	path := filepath.Join(dir, appfiles.UserDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("a debounced save must not reach the disk yet (stat err=%v)", err)
 	}
-	svc.flushNow()
+	svc.FlushNow()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("flushNow must land the pending config: %v", err)
@@ -194,8 +195,8 @@ func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 	if err := svc.SaveLoadout(current); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
-	svc.flushNow()
-	raw, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
+	svc.FlushNow()
+	raw, err := os.ReadFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
 	}
@@ -203,8 +204,19 @@ func TestSaveLoadoutWritesOnlyTheLatestSubmission(t *testing.T) {
 		t.Errorf("stored config = %q, want %q", raw, current)
 	}
 	// 待写是被取走而不是被读取的：第二次 flushNow 找不到东西，也就不会写第二遍。
-	if svc.writer.pending != nil {
-		t.Errorf("flushNow left something pending: %q", *svc.writer.pending)
+	// 判据用行为而不是内部字段（防抖作家在 appfiles 里，字段是私有的）：在两次 flushNow 之间把文件
+	// 改成一份哨兵，第二次 flushNow 若还压着东西就会把它盖掉。
+	const sentinel = `{"slots":[],"sentinel":true}`
+	if err := os.WriteFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName), []byte(sentinel), 0o644); err != nil {
+		t.Fatalf("writing the sentinel: %v", err)
+	}
+	svc.FlushNow()
+	raw, err = os.ReadFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName))
+	if err != nil {
+		t.Fatalf("read back after the second flushNow: %v", err)
+	}
+	if string(raw) != sentinel {
+		t.Errorf("second flushNow wrote again: %q", raw)
 	}
 }
 
@@ -231,9 +243,9 @@ func TestConcurrentSavesNeverTearTheFile(t *testing.T) {
 		}(payload)
 	}
 	wg.Wait()
-	svc.flushNow()
+	svc.FlushNow()
 
-	raw, err := os.ReadFile(filepath.Join(dir, userCfgDirName, loadoutFileName))
+	raw, err := os.ReadFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName))
 	if err != nil {
 		t.Fatalf("read back: %v", err)
 	}
@@ -256,7 +268,7 @@ func TestSaveLoadoutRejectsTheOldBareArrayShape(t *testing.T) {
 	if err := (&LoadoutService{}).SaveLoadout(bare); err == nil {
 		t.Fatal("expected the bare-array shape to be rejected")
 	}
-	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	path := filepath.Join(dir, appfiles.UserDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
 	}
@@ -273,7 +285,7 @@ func TestSaveLoadoutRejectsAnObjectWithoutSlots(t *testing.T) {
 	if err := (&LoadoutService{}).SaveLoadout(`{"lang":"zh"}`); err == nil {
 		t.Fatal("expected a missing 'slots' member to be rejected")
 	}
-	path := filepath.Join(dir, userCfgDirName, loadoutFileName)
+	path := filepath.Join(dir, appfiles.UserDirName, loadoutFileName)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("target file must not exist after a rejected save (stat err=%v)", err)
 	}
@@ -290,7 +302,7 @@ func TestSaveLoadoutRejectsAnObjectWithoutSlots(t *testing.T) {
 */
 func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 	// 入库的 sigils.json 与四份名字文件都在 assets\ 里；测试的工作目录是包目录。
-	raw, err := os.ReadFile(filepath.Join("assets", "sigils.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "assets", "sigils.json"))
 	if err != nil {
 		t.Fatalf("reading assets/sigils.json: %v", err)
 	}
@@ -340,7 +352,7 @@ func TestGemNamesCoverTheTableInEveryUILanguage(t *testing.T) {
 生成却不是一个文件：少的那个只是让整行退回 PL 码。
 */
 func TestCharaNamesCoverTheExclusiveTableInEveryUILanguage(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("assets", "sigils.chara.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "assets", "sigils.chara.json"))
 	if err != nil {
 		t.Fatalf("reading assets/sigils.chara.json: %v", err)
 	}

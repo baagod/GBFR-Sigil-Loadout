@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sigilloadout/appfiles"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -22,7 +23,7 @@ func localConfig(t *testing.T, name string) string {
 	if local == "" {
 		t.Fatal("LOCALAPPDATA is unset")
 	}
-	return filepath.Join(local, userCfgDirName, name)
+	return filepath.Join(local, appfiles.UserDirName, name)
 }
 
 // hermeticHome 把这个根指向一个一次性文件夹，这样测试永远不会写进真实的那个。
@@ -44,7 +45,7 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	if err := service.SaveEdits(edits); err != nil {
 		t.Fatalf("SaveEdits: %v", err)
 	}
-	service.flushNow()
+	service.FlushNow()
 
 	wantCfg := localConfig(t, editListName)
 	raw, err := os.ReadFile(wantCfg)
@@ -86,7 +87,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err := service.SaveEdits(first); err != nil {
 			t.Fatalf("SaveEdits: %v", err)
 		}
-		time.Sleep(debounceDelay / 4)
+		time.Sleep(appfiles.DebounceDelay / 4)
 		if _, err := os.Stat(cfgPath); err == nil {
 			t.Fatal("sigiledits.json was written while the debounce window was still open")
 		}
@@ -96,13 +97,13 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err := service.SaveEdits(last); err != nil {
 			t.Fatalf("SaveEdits: %v", err)
 		}
-		time.Sleep(debounceDelay / 4)
+		time.Sleep(appfiles.DebounceDelay / 4)
 		if _, err := os.Stat(cfgPath); err == nil {
 			t.Fatal("a second edit did not restart the debounce window")
 		}
 
 		// 从这里开始安静下来：最后的状态落地，且只落一次（不用轮询：气泡已把定时器回调跑到结束了）。
-		time.Sleep(debounceDelay * 2)
+		time.Sleep(appfiles.DebounceDelay * 2)
 		synctest.Wait()
 
 		raw, err := os.ReadFile(cfgPath)
@@ -127,7 +128,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	home := hermeticHome(t)
 
 	// 一个占着配置文件夹位置的普通文件：它下面每一次 mkdir 和写入都必然失败，正是被锁住或只读的配置目录的模样。
-	blocked := filepath.Join(home, "AppData", "Local", userCfgDirName)
+	blocked := filepath.Join(home, "AppData", "Local", appfiles.UserDirName)
 	writeFile(t, blocked, "not a folder")
 
 	service := &EditService{}
@@ -143,7 +144,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	defer log.SetOutput(previous)
 
 	// 接受这份列表不依赖磁盘，所以失败的是写入——而 flushNow 正是防抖定时器本该落地的地方。
-	service.flushNow()
+	service.FlushNow()
 
 	if !strings.Contains(logged.String(), "creating the config folder") {
 		t.Fatalf("a write that could not be made went unrecorded: %q", logged.String())
@@ -154,7 +155,7 @@ func TestSaveEditsSurvivesAWriteItCannotMake(t *testing.T) {
 	if err := os.Remove(blocked); err != nil {
 		t.Fatal(err)
 	}
-	service.flushNow()
+	service.FlushNow()
 	written, err := os.ReadFile(localConfig(t, editListName))
 	if err != nil {
 		t.Fatalf("the list was dropped after a failed write: %v", err)
@@ -516,7 +517,7 @@ func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
 	if err := service.SaveEdits(edits); err != nil {
 		t.Fatalf("SaveEdits: %v", err)
 	}
-	service.flushNow()
+	service.FlushNow()
 
 	path := localConfig(t, editListName)
 	if _, err := os.Stat(path); err != nil {
@@ -527,7 +528,7 @@ func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	service.flushNow()
+	service.FlushNow()
 	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("a flush with nothing pending wrote the list again")
 	}

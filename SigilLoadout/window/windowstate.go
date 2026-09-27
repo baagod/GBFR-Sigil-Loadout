@@ -1,8 +1,10 @@
-package main
+package window
 
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // 这一文件是窗口显隐状态机的唯一所有者（假隐藏是什么、何时切换、宿主消息怎么映射）；Win32 细节在 win32.go。
@@ -21,6 +23,16 @@ var quitting atomic.Bool
 // fakeHide 隐藏窗口而不隐藏 WebView2：外框保持 shown 但全透明（alpha 0 = 鼠标穿透）、禁用输入
 // （顺带把焦点移走）、脱离任务栏/Alt-Tab（WS_EX_TOOLWINDOW）。WebView 照旧渲染，所以之后再显出
 // 来不会白闪，也根本没有 ShowWindow 那一下切换。真正的动作跑在 UI 线程（见 wmFakeHide / hideNow）。
+// attached 是主程序建好的那扇窗口。窗口的创建归 main（它还要把同一个句柄交给托盘），这里只在
+// "该把它显示出来"时用它——HandleMsg 拿不到 WebviewWindow 的 HWND，所以每条消息兼作一条命令。
+var attached *application.WebviewWindow
+
+// Attach 由 main 在建好窗口之后调一次。
+func Attach(w *application.WebviewWindow) { attached = w }
+
+// MarkQuitting 由关机流程调：之后那记 WM_CLOSE 就不再被当成"用户点了 X"。
+func MarkQuitting() { quitting.Store(true) }
+
 func fakeHide(hwnd uintptr) {
 	debugf("fakeHide post hwnd=%d target=%d", hwnd, returnFocusTo.Load())
 	procPostMessageW.Call(hwnd, wmFakeHide, 0, 0)
@@ -77,9 +89,9 @@ func revealTool(hwnd uintptr) {
 	toolHidden.Store(false)
 }
 
-func hideToTray() {
+func HideToTray() {
 	// 与热键那条路共用同一个 hideNow，所以两条路各留一行日志。
-	debugf("hideToTray (frontend Esc/X)")
+	debugf("HideToTray (frontend Esc/X)")
 	if hwnd := findToolWindow(); hwnd != 0 {
 		fakeHide(hwnd)
 	}
@@ -112,8 +124,8 @@ func toggleActionFor(hidden, selfForeground, gameForeground bool) toggleAction {
 }
 
 // 0x8010（托盘 / 第二个实例）是唯一的激活命令。
-func handleWndMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
-	if win == nil {
+func HandleMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
+	if attached == nil {
 		return 0, false
 	}
 	switch msg {
@@ -156,9 +168,9 @@ func handleWndMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
 			fakeHide(hwnd)
 		} else {
 			revealTool(hwnd)
-			win.Restore()
-			win.Show()
-			win.Focus()
+			attached.Restore()
+			attached.Show()
+			attached.Focus()
 		}
 		return 0, true
 	case wmActivate:
@@ -172,9 +184,9 @@ func handleWndMsg(hwnd uintptr, msg uint32, wparam, _ uintptr) (uintptr, bool) {
 		if toolHidden.Load() {
 			revealTool(hwnd)
 		}
-		win.Restore()
-		win.Show()
-		win.Focus()
+		attached.Restore()
+		attached.Show()
+		attached.Focus()
 		return 0, true
 	}
 	return 0, false

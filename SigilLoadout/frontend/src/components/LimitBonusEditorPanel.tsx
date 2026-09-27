@@ -25,7 +25,7 @@ import {
     LoadLimitBonusCharacters,
     LoadLimitBonusEdits,
     SaveLimitBonusEdits,
-} from "../../bindings/sigilloadout/limitbonusservice";
+} from "../../bindings/sigilloadout/service/limitbonusservice";
 import { Input } from "@/components/ui/input";
 import {
     asEdit,

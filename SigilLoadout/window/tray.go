@@ -1,8 +1,8 @@
-package main
+package window
 
 import "log"
 
-func trayOnClick() {
+func TrayOnClick() {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("tray click panic: %v", r)

@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	jsonv2 "encoding/json/v2"
+	"sigilloadout/appfiles"
 )
 
 // MaxSlots 只限制**启用**的槽数（与 LoadoutConfig.ParseAndValidate 一致）；原生容量必须容得下它。
@@ -16,7 +17,7 @@ const MaxSlots = 16
 // LOCALAPPDATA/GBFRSigilLoadout（对齐 mod 的 userCfgDir，mod 更新冲不掉它）。落盘形状由前端给
 // （model.ts 的 buildLoadoutPayload）：只认这一种，别的拼写都不接受，所以 items[0] 必须带技能 hash。
 type LoadoutService struct {
-	writer debouncedWriter[[]byte]
+	writer appfiles.Debounced[[]byte]
 }
 
 type loadoutItem struct {
@@ -33,32 +34,18 @@ type loadoutSlot struct {
 	Enabled *bool `json:"enabled"`
 }
 
-func exeDir() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return "."
-	}
-	return filepath.Dir(exe)
-}
-
-// userCfgDir 是玩家配置（loadout.json）所在处。mod 目录每次更新都会被整个换掉，这个位置能活
-// 过更新。必须与 C# 侧一致（Environment.SpecialFolder.LocalApplicationData）：**不要**回落到
-// os.UserConfigDir()——它在 Windows 上返回 %AppData%（Roaming）。
-//
-// 目录名与文件名是协议的一部分（mod 那边算的是同一个字符串，中间没有任何协商），各只有这一处
-// 声明——sharedconstants_test.go 把它们和 C# 那份对拍。
-const (
-	userCfgDirName  = "GBFRSigilLoadout"
-	loadoutFileName = "loadout.json"
+// 随包数据一份都不嵌，全部按 `appfiles.ExeDir()\assets\` 读（由 LoadAssets 装进来）：再嵌只会多出
+// 第二套加载机制，还让"换一份数据"必须重编 exe。
+var (
+	gemNamesByLang   map[string]map[string]string
+	charaNamesByLang map[string]map[string]string
 )
 
-func userCfgDir() string {
-	base := os.Getenv("LOCALAPPDATA")
-	if base == "" {
-		base = exeDir()
-	}
-	return filepath.Join(base, userCfgDirName)
-}
+// loadoutFileName 是协议的一部分（mod 那边算的是同一个路径，中间没有任何协商）；
+// sharedconstants_test.go 把它和 C# 那份对拍。目录与写入在 appfiles。
+const (
+	loadoutFileName = "loadout.json"
+)
 
 // assetsDir 是随包发布的数据文件所在的那一级目录名：源码树里是 SigilLoadout\assets\（生成器的
 // 落点），打包后是 mod 目录下的 assets\——**同一个布局，没有第二种**，所以不需要"开发副本"。
@@ -66,14 +53,14 @@ const assetsDir = "assets"
 
 // readModFile 每次都从 exe 旁读：mod 目录每次更新都会被换掉（用户配置另住在 userCfgDir）。
 func readModFile(relative string) (string, error) {
-	data, err := os.ReadFile(filepath.Join(exeDir(), relative))
+	data, err := os.ReadFile(filepath.Join(appfiles.ExeDir(), relative))
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
 }
 
-// dir 由调用方给（生产是 exeDir()\assets\，测试是源码树的 assets\，测试进程的 exeDir 是临时目录）；
+// dir 由调用方给（生产是 appfiles.ExeDir()\assets\，测试是源码树的 assets\，测试进程的 exeDir 是临时目录）；
 // 错误里带上路径——缺文件时唯一要看的就是"缺的是哪一份"。
 func readAsset[T any](dir, name string) (T, error) {
 	var out T
@@ -96,8 +83,8 @@ func readAssetMap[T any](dir, name string) (map[string]T, error) {
 
 // loadAssets 在启动时把"只有启动期用得着"的那几份读进内存。剩下的 sigils.json 与
 // sigils.chara.json 仍按需读——玩家可能替换它们，要拿每次调用时最新的那份。
-func loadAssets() error {
-	return loadAssetsFrom(filepath.Join(exeDir(), assetsDir))
+func LoadAssets() error {
+	return loadAssetsFrom(filepath.Join(appfiles.ExeDir(), assetsDir))
 }
 
 func loadAssetsFrom(dir string) error {
@@ -158,7 +145,7 @@ func (s *LoadoutService) CharaNames(lang string) map[string]string {
 
 // LoadConfig 在没有配置时返回一份空配置：编辑器从零开始，没有内置预设。
 func (s *LoadoutService) LoadConfig() (string, error) {
-	data, err := os.ReadFile(filepath.Join(userCfgDir(), loadoutFileName))
+	data, err := os.ReadFile(filepath.Join(appfiles.UserDir(), loadoutFileName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			// lang 留空不是漏写：空串不在 LANGS 里，前端据此保留 initialLang() 的猜测（系统语言）。
@@ -235,12 +222,15 @@ func (s *LoadoutService) SaveLoadout(config string) error {
 		return err
 	}
 
-	s.writer.submit("loadout", writeLoadoutFile, []byte(config))
+	s.writer.Submit("loadout", writeLoadoutFile, []byte(config))
 	return nil
 }
 
 func writeLoadoutFile(payload []byte) error {
-	return writeFileAtomic(filepath.Join(userCfgDir(), loadoutFileName), payload)
+	return appfiles.WriteAtomic(filepath.Join(appfiles.UserDir(), loadoutFileName), payload)
 }
 
-func (s *LoadoutService) flushNow() { s.writer.flushNow() }
+// FlushNow 是关机的最后一步（见 main.go 的 OnShutdown），前端没有对应调用，所以不进绑定面。
+//
+//wails:ignore
+func (s *LoadoutService) FlushNow() { s.writer.FlushNow() }

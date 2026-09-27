@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"sigilloadout/service"
 )
 
 // 跨语言常量：C# / Go / TS / C++ 各有自己的类型系统，"一处声明"做不到，但"一处漂了立刻红"做得到。
@@ -20,15 +22,29 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 	read := func(name string) string {
 		t.Helper()
 		if name == "*.go" {
-			paths, err := filepath.Glob("*.go")
+			// 递归：声明可能落在任何一个子包里（window/、appfiles/…），"值漂没漂"与它在哪个目录无关。
+			// frontend\ 与 build\ 里的 .go 不属于本模块（前者没有；后者是 Wails 的平台脚手架）。
+			var paths []string
+			err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if entry.IsDir() {
+					if path != "." && (entry.Name() == "frontend" || entry.Name() == "build") {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+					paths = append(paths, path)
+				}
+				return nil
+			})
 			if err != nil {
-				t.Fatalf("globbing *.go: %v", err)
+				t.Fatalf("walking for *.go: %v", err)
 			}
 			var all strings.Builder
 			for _, path := range paths {
-				if strings.HasSuffix(path, "_test.go") {
-					continue
-				}
 				data, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatalf("reading %s: %v", path, err)
@@ -59,7 +75,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/LoadoutConfig.cs", regexp.MustCompile(`MaxSlots = (\d+)`)},
 				{"TS", "frontend/src/lib/model.ts", regexp.MustCompile(`MAX_SLOTS = (\d+)`)},
-				{"Go", "loadoutservice.go", regexp.MustCompile(`const MaxSlots = (\d+)`)},
+				{"Go", "service/loadoutservice.go", regexp.MustCompile(`const MaxSlots = (\d+)`)},
 			},
 		},
 		{
@@ -80,7 +96,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "LevelValue 参槽数",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`LevelValueCount = (\d+)`)},
-				{"Go", "editservice.go", regexp.MustCompile(`LevelValueCount = (\d+)`)},
+				{"Go", "service/editservice.go", regexp.MustCompile(`LevelValueCount = (\d+)`)},
 				{"TS", "frontend/src/lib/skills.ts", regexp.MustCompile(`\bSLOTS = (\d+)`)},
 			},
 		},
@@ -90,28 +106,28 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "用户配置目录名",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/UserConfig.cs", regexp.MustCompile(`,\s*"([A-Za-z]+)",`)},
-				{"Go", "loadoutservice.go", regexp.MustCompile(`userCfgDirName\s*=\s*"([^"]+)"`)},
+				{"Go", "appfiles/paths.go", regexp.MustCompile(`UserDirName\s*=\s*"([^"]+)"`)},
 			},
 		},
 		{
 			name: "配装文件名",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/LoadoutConfig.cs", regexp.MustCompile(`FilePath\("([^"]+)"\)`)},
-				{"Go", "loadoutservice.go", regexp.MustCompile(`loadoutFileName = "([^"]+)"`)},
+				{"Go", "service/loadoutservice.go", regexp.MustCompile(`loadoutFileName = "([^"]+)"`)},
 			},
 		},
 		{
 			name: "因子编辑列表文件名",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/SigilEditorFeature.cs", regexp.MustCompile(`ConfigFileName = "([^"]+)"`)},
-				{"Go", "editservice.go", regexp.MustCompile(`editListName = "([^"]+)"`)},
+				{"Go", "service/editservice.go", regexp.MustCompile(`editListName = "([^"]+)"`)},
 			},
 		},
 		{
 			name: "可视工具窗口标题（mod 靠它找窗口）",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Hotkey.cs", regexp.MustCompile(`ToolWindowTitle = "([^"]+)"`)},
-				{"Go", "*.go", regexp.MustCompile(`const toolWindowTitle = "([^"]+)"`)},
+				{"Go", "*.go", regexp.MustCompile(`const Title = "([^"]+)"`)},
 			},
 		},
 		{
@@ -153,35 +169,35 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "sigiledits.json 的 edits 成员",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(edits)"\)\]`)},
-				{"Go", "editservice.go", regexp.MustCompile("json:\"(edits)\"")},
+				{"Go", "service/editservice.go", regexp.MustCompile("json:\"(edits)\"")},
 			},
 		},
 		{
 			name: "sigiledits.json 的 enabled 成员",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(enabled)"\)\]`)},
-				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(enabled)"`)},
+				{"Go", "service/editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(enabled)"`)},
 			},
 		},
 		{
 			name: "sigiledits.json 的 key 成员",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(key)"\)\]`)},
-				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(key)"`)},
+				{"Go", "service/editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(key)"`)},
 			},
 		},
 		{
 			name: "sigiledits.json 的 level 成员",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(level)"\)\]`)},
-				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(level)"`)},
+				{"Go", "service/editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(level)"`)},
 			},
 		},
 		{
 			name: "sigiledits.json 的 values 成员",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(values)"\)\]`)},
-				{"Go", "editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(values)"`)},
+				{"Go", "service/editservice.go", regexp.MustCompile(`(?s)type SigilSkill struct \{.*?json:"(values)"`)},
 			},
 		},
 		// 防抖写盘失败时由后端推给前端的事件名：两边各写一份字面量，改名只改一边不会编译失败，
@@ -189,7 +205,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 		{
 			name: "保存失败事件名（Go 发、前端收）",
 			decls: []decl{
-				{"Go", "editservice.go", regexp.MustCompile(`const saveFailedEvent = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
+				{"Go", "appfiles/debouncedwrite.go", regexp.MustCompile(`const SaveFailedEvent = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
 				{"TS", "frontend/src/hooks/usePanelFailure.ts", regexp.MustCompile(`const SAVE_FAILED = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
 			},
 		},
@@ -239,7 +255,7 @@ func TestVirtualSlotCapacityFitsPlayerSlots(t *testing.T) {
 
 	room := number(`kVirtualSlotCapacity = (\d+)`) -
 		number(`kBuiltinExclusiveSlotCount = (\d+)`)
-	if MaxSlots > room {
-		t.Errorf("原生只放得下 %d 个通用槽，而 MaxSlots = %d：多的会被截断，只有日志会说", room, MaxSlots)
+	if service.MaxSlots > room {
+		t.Errorf("原生只放得下 %d 个通用槽，而 MaxSlots = %d：多的会被截断，只有日志会说", room, service.MaxSlots)
 	}
 }

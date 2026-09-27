@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"encoding/json/jsontext"
@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sigilloadout/appfiles"
 	"strings"
 )
 
@@ -46,9 +47,9 @@ type limitBonusEditList struct {
 // sigiledits.json 挨着；只有这一个位置，mod 轮询的正是它。
 const limitBonusEditListName = "limit_bonus.json"
 
-// 落盘是防抖的：SaveLimitBonusEdits 把列表交给 debouncedWriter，编辑停下来之后才写出（见 debounceDelay）。
+// 落盘是防抖的：SaveLimitBonusEdits 把列表交给 appfiles.Debounced，编辑停下来之后才写出（见 debounceDelay）。
 type LimitBonusService struct {
-	writer debouncedWriter[[]LimitBonusEdit]
+	writer appfiles.Debounced[[]LimitBonusEdit]
 }
 
 // Ability 是 assets/limit_bonus.json（骨架）里的一条能力强化条目。
@@ -204,7 +205,7 @@ func (s *LimitBonusService) Characters() CharaTable {
 // limitBonusConfigPath 必须走 userCfgDir：mod 那半从 LocalApplicationData 算同一个目录，两边算的是
 // 同一个字符串，中间没有任何协商，只能有一处实现（同 configPath）。
 func limitBonusConfigPath() string {
-	return filepath.Join(userCfgDir(), limitBonusEditListName)
+	return filepath.Join(appfiles.UserDir(), limitBonusEditListName)
 }
 
 // LoadLimitBonusEdits 从 limit_bonus.json 读取当前的编辑列表。
@@ -247,7 +248,7 @@ func (s *LimitBonusService) LoadLimitBonusEdits() ([]LimitBonusEdit, error) {
 // 就是屏幕上最后的状态；前端因此保持愚笨，每次改动都调用它、从不等待回答。这里也就不会返回错误
 // （定时器触发时的失败已经没有调用方可以返回，于是推给前端，见 debouncedwrite.go 的 flushLocked）。
 func (s *LimitBonusService) SaveLimitBonusEdits(edits []LimitBonusEdit) error {
-	s.writer.submit("limit bonus edit", writeLimitBonusEdits, edits)
+	s.writer.Submit("limit bonus edit", writeLimitBonusEdits, edits)
 	return nil
 }
 
@@ -257,7 +258,10 @@ func writeLimitBonusEdits(edits []LimitBonusEdit) error {
 		return fmt.Errorf("serialising the limit bonus edit list: %w", err)
 	}
 
-	return writeFileAtomic(limitBonusConfigPath(), raw)
+	return appfiles.WriteAtomic(limitBonusConfigPath(), raw)
 }
 
-func (s *LimitBonusService) flushNow() { s.writer.flushNow() }
+// FlushNow 是关机的最后一步（见 main.go 的 OnShutdown），前端没有对应调用，所以不进绑定面。
+//
+//wails:ignore
+func (s *LimitBonusService) FlushNow() { s.writer.FlushNow() }

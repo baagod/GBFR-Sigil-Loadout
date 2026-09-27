@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { X } from "lucide-react";
 
-import { LoadEdits, SaveEdits, SkillMap, SkillTable } from "../../bindings/sigilloadout/editservice";
+import { LoadEdits, SaveEdits, SkillMap, SkillTable } from "../../bindings/sigilloadout/service/editservice";
 import {
     InputGroup,
     InputGroupAddon,
