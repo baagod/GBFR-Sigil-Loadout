@@ -13,54 +13,42 @@
     编辑列表与因子编辑页是同一套规矩：按 Key 索引（一个参数行一个 Key，mod 也按 Key 找
     limit_bonus_param 的行）、每次改动把整份列表交给后端防抖落盘（见 limitbonusservice.go）、读取不写回。
 
-    屏幕上的那一行是**第一档**：左边一格里是当前语言的效果模板（{0} 写成框号 {1}），右边并排着三
-    个数值框——只有第一个框对应真的参数行（见 limitbonus.ts 的 slotsAt），描述里的 {1} 就是从左数第一个
-    框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
+    屏幕上的那一行是**第一档**：左边一格里是当前语言的效果模板（{0} 写成框号 {1}，见 limitbonus.ts 的
+    effectLabel），右边并排着三个数值框——只有第一个框对应真的参数行（见 limitbonus.ts 的 SLOT_COUNT），
+    描述里的 {1} 就是从左数第一个框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
 import { Fragment, memo, useEffect, useRef, useState } from "react";
-import { Call, Events } from "@wailsio/runtime";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+    LoadLimitBonus,
+    LoadLimitBonusCharacters,
+    LoadLimitBonusEdits,
+    SaveLimitBonusEdits,
+} from "../bindings/sigilloadout/limitbonusservice";
 import { Input } from "@/components/ui/input";
 import {
     asEdit,
-    characterRowOf,
     dedupeCharacters,
-    dedupeEdits,
-    levelLabel,
-    slotsAt,
+    effectLabel,
+    SLOT_COUNT,
     valueAt,
     withFirstValue,
     type Ability,
+    type CharaTable,
     type LimitBonusCharacter,
     type LimitBonusEdit,
     type LimitBonusParam,
     type LimitBonusTable,
     type LimitBonusText,
-    type CharaTable,
 } from "./limitbonus";
 import { elementColor } from "./element";
 import type { Lang } from "./lang";
 import { messages } from "./messages";
-import { slotEdit, stepValue } from "./skills";
+import { dedupeBy, slotEdit, stepValue } from "./skills";
+import { PanelFailureDialog, usePanelFailure } from "./usePanelFailure";
+import { useLangTable } from "./useLangTable";
 import { useWheelStep } from "./useWheelStep";
-
-const SERVICE = "main.LimitBonusService";
-/*
-    与 editservice.go 的 saveFailedEvent 是同一个事件（两个服务共用一个写入失败通道）：防抖写入
-    发生在请求它的那次调用返回之后，那里的失败没有可返回的答复，只能以这个事件的形式到达。
-*/
-const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
 
 /*
     表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，
@@ -75,22 +63,19 @@ const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
 const COLUMNS = "grid grid-cols-[130px_minmax(160px,1fr)_200px] items-center gap-2";
 
 /**
- * 一个数值框：描述里的 {n} 指的就是它。
+ * 一个数值框：描述里的 {1} 指的就是它。
  *
  * 半成品文本、提交规则与步进与因子编辑页的十个槽逐字相同（见 skills.ts 的 slotEdit 与 stepValue）
  * ——这里只是借它们解析一个框。
  */
 function SlotBox({
     name,
-    slot,
     param,
     record,
     onValue,
 }: {
     /** 能力名：只在读屏里指认这个框用，屏幕上它就在这一行的左端。 */
     name: string;
-    /** 第几个框，从 1 起：描述里的 {n} 是同一个号。 */
-    slot: number;
     param: LimitBonusParam;
     /** 这个参数行的记录；没编辑过就是 undefined。 */
     record: LimitBonusEdit | undefined;
@@ -131,7 +116,7 @@ function SlotBox({
             <Input
                 type="text"
                 inputMode="decimal"
-                aria-label={`${name} Lv1 数值 ${slot}`}
+                aria-label={`${name} Lv1 数值`}
                 placeholder={String(shown)}
                 value={typed ?? (committed === undefined ? "" : String(committed))}
                 onChange={(e) => {
@@ -181,9 +166,10 @@ function SlotBox({
  * 这一页只改第一档（见 limitbonus.ts 的 withFirstValue）：Lv2/Lv3 不写也不显示，游戏里保持原值，所以
  * 屏幕上不再有 Lv 字样，能力行自己就是那一档。
  *
- * 描述是当前语言里这个参数行的效果模板（见 limitbonus.ts 的 levelLabel 与 LimitBonusText.effects），{n}
- * 指着右边第 n 个槽。槽数固定三（`limit_bonus` 能挂的参数行上界），缺的那些是空槽——画一个不会有反应
- * 的 0，而不是把它们藏起来：一条能力长什么样在每一条上都该是同一件事（与因子编辑页十个槽并排同理）。
+ * 描述是当前语言里这个参数行的效果模板（见 limitbonus.ts 的 effectLabel 与 LimitBonusText.effects），
+ * {1} 指着右边第一个框。框数固定三（`limit_bonus` 能挂的参数行上界，见 limitbonus.ts 的 SLOT_COUNT），
+ * 缺的那些是空槽——画一个不会有反应的 0，而不是把它们藏起来：一条能力长什么样在每一条上都该是同一件
+ * 事（与因子编辑页十个槽并排同理）。
  */
 function AbilityRow({
     ability,
@@ -202,14 +188,26 @@ function AbilityRow({
     /** 某一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
     onValue: (param: LimitBonusParam, value: number | null) => void;
 }) {
-    // 这一行的三个槽，按资产里的顺序：从左到右就是描述里的 {1}、{2}、{3}（只有第一个是真的）。
-    const slots = slotsAt(ability);
-    const label = levelLabel(slots, effects);
+    const label = effectLabel(ability.param, effects);
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
             {/* 能力名用默认前景色：层级交给字号（14 vs 角色名的 16）与 32px 缩进，不靠颜色。 */}
-            <span className="truncate text-sm">{name}</span>
+            {/*
+                    名字里的间隔号（中文 U+00B7 / 日文 U+30FB）都是"小字符"，UI 字体画出来又小又挤；
+                    游戏用自己那套字体画得更大更居中。数据一个字不动，只在这里把它放大 + 两侧留白。
+                */}
+                <span className="truncate text-sm">
+                    {name.split(/([·・])/).map((part, i) =>
+                        /^[·・]$/.test(part) ? (
+                            <span key={i} className="mx-1 text-[1.15em]">
+                                {part}
+                            </span>
+                        ) : (
+                            part
+                        ),
+                    )}
+                </span>
             {/*
                 描述显示的是模板本身，不是把数值填进去：数字已经在右边的槽里了，说不清的正是哪个槽对
                 应效果的哪一部分。颜色比能力名淡（#a0a0a0），一行就是一行高。少数参数行游戏自己没有
@@ -219,7 +217,7 @@ function AbilityRow({
                 {label === "" ? "—" : label}
             </span>
             <div className="flex items-center">
-                {slots.map(({ param, slot }) => (
+                {Array.from({ length: SLOT_COUNT }, (_, index) => index + 1).map((slot) => (
                     <Fragment key={slot}>
                         {/*
                             每个槽前面一个 |，第一个也不例外：它把数值与描述隔开，方式与数值彼此之间
@@ -228,20 +226,19 @@ function AbilityRow({
                         <span className="shrink-0 text-muted-foreground/40" aria-hidden>
                             |
                         </span>
-                        {param === null ? (
-                            // 空槽：这条能力没有这个参数行（limit_bonus 的 ParamId2/3 为空），没有可写
-                            // 的行，所以显示游戏那边的 0 且不可编辑。
+                        {slot === 1 ? (
+                            <SlotBox
+                                name={name}
+                                param={ability.param}
+                                record={edits.get(ability.param.key)}
+                                onValue={(value) => onValue(ability.param, value)}
+                            />
+                        ) : (
+                            // 空槽：`limit_bonus` 的 ParamId2/3 在能力强化这一律是空的（实测 248/248），
+                            // 没有可写的行，所以显示游戏那边的 0 且不可编辑。
                             <span className="min-w-0 flex-1 text-center text-xs text-[#a0a0a0] tabular-nums select-none">
                                 0
                             </span>
-                        ) : (
-                            <SlotBox
-                                name={name}
-                                slot={slot}
-                                param={param}
-                                record={edits.get(param.key)}
-                                onValue={(value) => onValue(param, value)}
-                            />
                         )}
                     </Fragment>
                 ))}
@@ -251,11 +248,9 @@ function AbilityRow({
 }
 
 /*
-    骨架里角色条目只有 id，颜色在 chara.json 里（形状见 limitbonus.ts 的 characterRowOf）——这里把它补在
-    上面：界面拿 id 去角色表**一次**取值就拿到颜色（没有第二步查找）。认不出来时 elementColor 兜成
-    中性灰，所以缺这一条时也不会出岔子。
+    骨架里角色条目只有 id，颜色在 chara.json 里：界面拿 id 去角色表**一次**取值就拿到颜色（没有第二步
+    查找，见下面渲染处传下去的 color）。认不出来时 elementColor 兜成中性灰，所以缺这一条时也不会出岔子。
 */
-type CharacterRow = ReturnType<typeof characterRowOf>
 
 /**
  * 一个角色：一行名字，展开后是它的能力，**默认收起**。
@@ -266,14 +261,17 @@ type CharacterRow = ReturnType<typeof characterRowOf>
 function CharacterGroup({
     character,
     name,
+    color,
     effects,
     abilityNames,
     edits,
     onValue,
 }: {
-    character: CharacterRow;
+    character: LimitBonusCharacter;
     /** 这个角色在当前语言里的名字；表里没有就显示 PL 码——不拿别的语言兜底。 */
     name: string;
+    /** 这个角色的颜色（chara.json 里那一栏）；资产里没这个角色时是 undefined，由 elementColor 兜底。 */
+    color: string | undefined;
     /** 当前语言的效果模板：一路传给它的能力行。 */
     effects: Record<string, string>;
     /** 当前语言的能力名。 */
@@ -298,7 +296,7 @@ function CharacterGroup({
                 */}
                 <span
                     className="truncate text-sm font-[550]"
-                    style={{ color: elementColor(character.color) }}
+                    style={{ color: elementColor(color) }}
                 >
                     {name}
                 </span>
@@ -353,22 +351,27 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
 }) {
     // 骨架里的角色（语言无关）：挂载时取一次，之后不再变。
     const [characters, setCharacters] = useState<LimitBonusCharacter[]>([]);
-    // 当前语言的文案。语言一变就重取：能力名与效果模板都在它里面。
-    const [text, setText] = useState<LimitBonusText | null>(null);
     const [edits, setEdits] = useState<Map<string, LimitBonusEdit>>(new Map());
     // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的这份空列表会被后端整体替换
     // 掉（同 SigilEditorPanel 的那条规则），用户其余的编辑就没了。
     const [editListRead, setEditListRead] = useState(false);
-    const [error, setError] = useState<{ title: string; detail: string } | null>(null);
-    const [errorOpen, setErrorOpen] = useState(false);
 
     const t = messages[lang];
+    const { failure, open: failureOpen, setOpen: setFailureOpen, showError } = usePanelFailure(
+        t.writeFailed,
+    );
 
-    // 显示一次失败既记下它，也打开对话框。关闭只是关闭：消息留在 state 里好让退场动画仍有东西可画。
-    function showError(next: { title: string; detail: string }) {
-        setError(next);
-        setErrorOpen(true);
-    }
+    /*
+        当前语言的文案：能力名与效果模板都在这一份里（角色名走 App 的 charaNames，不在这里取）。换语言
+        就重取（与因子编辑页的 SkillMap 同一条路），缓存住的话命中就同步落地，标签与外层文字同一帧换掉。
+    */
+    const text = useLangTable<LimitBonusText>(
+        lang,
+        textCache,
+        (code) => LoadLimitBonus(code) as Promise<LimitBonusText | null>,
+        EMPTY_TEXT,
+        (err) => showError({ title: t.readFailed, detail: String(err) }),
+    );
 
     /*
         骨架与编辑列表只读一次：它们都是语言无关的，换语言不该把屏幕上还没写下去的编辑重读一遍（同
@@ -377,18 +380,20 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
     useEffect(() => {
         void (async () => {
             const [table, list] = await Promise.all([
-                Call.ByName(`${SERVICE}.LoadLimitBonusCharacters`) as Promise<LimitBonusTable | null>,
-                Call.ByName(`${SERVICE}.LoadLimitBonusEdits`) as Promise<LimitBonusEdit[]>,
+                LoadLimitBonusCharacters() as Promise<LimitBonusTable | null>,
+                LoadLimitBonusEdits() as Promise<LimitBonusEdit[]>,
             ]);
             setCharacters(dedupeCharacters(table?.characters ?? []));
             // 只读、不写回：归一化只是为了在屏幕上理顺这份列表，用户文件在下一次真正的编辑之前不该被动过
             // ——"打开一次就等于改过一次"与 App.tsx 那条"启动不写盘"是同一件事。
+            // 一个 Key 一条记录（见 skills.ts 的 dedupeBy），地址就是记录自己的 Key。
             setEdits(
                 new Map(
-                    dedupeEdits(
+                    dedupeBy(
                         (list ?? [])
                             .map(asEdit)
                             .filter((edit): edit is LimitBonusEdit => edit !== null),
+                        (edit) => edit.key,
                     ).map((edit) => [edit.key, edit]),
                 ),
             );
@@ -399,46 +404,6 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
     }, []);
 
     /*
-        当前语言的文案：能力名与效果模板都在这一份里（角色名走 App 的 charaNames，不在这里取）。换语言
-        就重取（与因子编辑页的 SkillMap 同一条路），缓存住的话命中就同步落地，标签与外层文字同一帧换掉。
-    */
-    useEffect(() => {
-        const hit = textCache.get(lang);
-        if (hit) {
-            setText(hit);
-            return;
-        }
-        let cancelled = false;
-        Call.ByName(`${SERVICE}.LoadLimitBonus`, lang)
-            .then((table) => {
-                if (cancelled) return;
-                const entry = (table ?? EMPTY_TEXT) as LimitBonusText;
-                textCache.set(lang, entry);
-                setText(entry);
-            })
-            .catch((err) => {
-                if (cancelled) return;
-                showError({ title: t.readFailed, detail: String(err) });
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [lang]);
-
-    /*
-        防抖之后才失败的写入由后端推送过来（见 SAVE_FAILED）。它和立即失败共用同一个对话框，因为在
-        用户看来它们是同一件事：编辑没有落到磁盘上。语言变化时重新订阅好让标题跟着切换（同
-        SigilEditorPanel）；On 交回的函数就是 React 在退出时运行的取消订阅。
-    */
-    useEffect(
-        () =>
-            Events.On(SAVE_FAILED, (event) => {
-                showError({ title: t.writeFailed, detail: String(event.data) });
-            }),
-        [lang],
-    );
-
-    /*
         每一次改动都经过这里：屏幕上的列表就是全部状态，也是运行中的游戏最终拿到的东西。前端对"何时
         写入"刻意保持无知——每次变化把整份列表交出去，不等答复；后端的尾随防抖把一串敲键变成一次
         limit_bonus.json 写入与一次游戏内的应用。
@@ -447,7 +412,7 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         // 列表还没读回来就不写；不写盘的理由见 editListRead 的声明。
         if (!editListRead) return;
         setEdits(next);
-        Call.ByName(`${SERVICE}.SaveLimitBonusEdits`, [...next.values()]).catch((err) =>
+        SaveLimitBonusEdits([...next.values()]).catch((err) =>
             showError({ title: t.writeFailed, detail: String(err) }),
         );
     }
@@ -484,10 +449,11 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
                 {characters.map((character) => (
                     <CharacterGroup
                         key={character.id}
-                        character={characterRowOf(character, charaTable)}
+                        character={character}
                         name={charaNames[character.id] ?? character.id}
-                        effects={text?.effects ?? EMPTY_TEXT.effects}
-                        abilityNames={text?.bonuses ?? EMPTY_TEXT.bonuses}
+                        color={charaTable[character.id]?.color}
+                        effects={text.effects}
+                        abilityNames={text.bonuses}
                         edits={edits}
                         onValue={setValue}
                     />
@@ -500,20 +466,12 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
             {/*写入失败值得打断用户——编辑没有落到磁盘上，而原因通常要用户自己处理
                (limit_bonus.json 被别的程序锁住、文件夹不可写)。
                两种失败都落到这里：立即失败，以及后端推送的防抖失败。*/}
-            <AlertDialog open={errorOpen} onOpenChange={setErrorOpen}>
-                {/* 不用 size="sm"：那会把页脚切成两列网格，而这个对话框只有一个按钮，应该居中。 */}
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{error?.title}</AlertDialogTitle>
-                        <AlertDialogDescription className="wrap-anywhere">
-                            {error?.detail}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogAction onClick={() => setErrorOpen(false)}>{t.ok}</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <PanelFailureDialog
+                failure={failure}
+                open={failureOpen}
+                onOpenChange={setFailureOpen}
+                okLabel={t.ok}
+            />
         </div>
     );
 }

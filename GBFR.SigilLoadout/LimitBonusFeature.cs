@@ -32,8 +32,10 @@ internal sealed class LimitBonusFeature {
     private const long KeepAliveMs = 30000;
 
     private readonly Action<string> _log;
-    // 门：编辑列表的 mtime 变了才干活，"取 mtime + 比对 + 认领"由 FileStamp 一处完成（与
-    // SigilEditorFeature 共用同一个实现）。判据只在**确实落地之后**才推进，所以拒写不会把这一版吃掉。
+    // 版本判据：mtime 直接取（FileStamp.Now）。"这一版处理完了没有"由 _lastAttemptVersion 自己记——
+    // 它在派人干活**之前**就推进，所以同一版永远会按下面的间隔再来一次（没落地时按重试间隔，落地后
+    // 按看护间隔）。FileStamp 的 Pending + MarkApplied 是"成功即收工"，装不下这里要的看护，那一半
+    // 因此不用：调了也没人读。
     private readonly FileStamp _stamp = new(ConfigFile);
     private long _lastAttemptMs;
     private DateTime _lastAttemptVersion;
@@ -62,8 +64,7 @@ internal sealed class LimitBonusFeature {
         _lastAttemptVersion = current;
 
         try {
-            if (Apply(quiet))
-                _stamp.MarkApplied(current);
+            Apply(quiet);
         }
         catch (Exception ex) {
             _log("limit bonus edit EXCEPTION: " + ex);
@@ -74,11 +75,10 @@ internal sealed class LimitBonusFeature {
     internal void Dispose() => Interlocked.Exchange(ref _stopped, 1);
 
     /// <summary>
-    /// 读一次编辑列表、按它写内存。
+    /// 读一次编辑列表、按它写内存。这一版落地没有不影响下一拍：<see cref="Tick"/> 的版本判据在
+    /// 动手之前就推进了，所以拒写的那一版下一拍还会再来（按重试间隔）。
     /// </summary>
-    /// <returns>这一版全都落地了（"内存里已经是一样的值"也算落地）。false = 有拒写或读不出来，
-    /// 还欠着，下一拍按重试间隔再来。</returns>
-    private bool Apply(bool quiet) {
+    private void Apply(bool quiet) {
         LimitBonusConfig config;
         try {
             config = LimitBonusConfig.Load(ConfigFile);
@@ -94,7 +94,7 @@ internal sealed class LimitBonusFeature {
             if (!quiet)
                 _log("limit bonus edit: the edit list could not be read (" + ex.Message
                     + "); nothing was written and this version stays pending");
-            return false;
+            return;
         }
 
         int landed = 0, skipped = 0, refused = 0;
@@ -123,7 +123,6 @@ internal sealed class LimitBonusFeature {
         if (!quiet || skipped > 0 || refused > 0)
             _log($"limit bonus edit: {landed} applied, {skipped} skipped, {refused} refused"
                 + $" (of {config.Edits.Count} entries in the list)");
-        return refused == 0;
     }
 
     /// <summary>

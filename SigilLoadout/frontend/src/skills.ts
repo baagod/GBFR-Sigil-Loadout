@@ -52,27 +52,34 @@ export const pad = (values: (number | null)[]) =>
     Array.from({ length: SLOTS }, (_, i) => values[i] ?? null);
 
 /*
-    每个地址最多一条编辑，这是整个列表赖以为生的不变量。
+    每个地址最多一条编辑，这是整个列表赖以为生的不变量。地址怎么算由调用方给（因子是"哈希#等级"，
+    能力强化是参数行的 Key），规则本身与地址无关——所以只有这一份实现。
 
-    mod 按顺序遍历编辑列表、把每条已启用的写进它 (因子哈希, 等级) 指定的表行
-    （PatchRows，SigilEditorFeature.cs），所以同一地址上游戏最终拿到的是最后一条已启用的。
-    文件里仍可能同时留着两条（旧版本写的，或有人手改了）而列表只能显示一条，于是留最后一条
-    已启用的；该地址一条已启用的都没有时，留最后一条，不论启用与否。
+    mod 按顺序遍历编辑列表、把每条已启用的写进它地址指定的那一行（SigilEditorFeature.PatchRows /
+    LimitBonusFeature.Apply），所以同一地址上游戏最终拿到的是最后一条已启用的。文件里仍可能同时留着
+    两条（旧版本写的，或有人手改了）而列表只能显示一条，于是留最后一条已启用的；该地址一条已启用的
+    都没有时，留最后一条，不论启用与否。
 */
-export function dedupe(records: SigilSkill[]): SigilSkill[] {
+export function dedupeBy<T extends { enabled: boolean }>(
+    records: T[],
+    keyOf: (record: T) => string,
+): T[] {
     const lastEnabled = new Map<string, number>();
     const lastAny = new Map<string, number>();
     records.forEach((record, i) => {
-        const address = addressOf(record.key, record.level);
+        const address = keyOf(record);
         lastAny.set(address, i);
         if (record.enabled) lastEnabled.set(address, i);
     });
 
-    const kept = records.filter((record, i) => {
-        const address = addressOf(record.key, record.level);
-        return i === (lastEnabled.get(address) ?? lastAny.get(address));
-    });
-    return kept;
+    return records.filter(
+        (record, i) => i === (lastEnabled.get(keyOf(record)) ?? lastAny.get(keyOf(record))),
+    );
+}
+
+/** 因子编辑列表的去重：地址是 (因子哈希, 等级)。 */
+export function dedupe(records: SigilSkill[]): SigilSkill[] {
+    return dedupeBy(records, (record) => addressOf(record.key, record.level));
 }
 
 /*

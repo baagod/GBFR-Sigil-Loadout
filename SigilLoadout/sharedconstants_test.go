@@ -190,7 +190,7 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "保存失败事件名（Go 发、前端收）",
 			decls: []decl{
 				{"Go", "editservice.go", regexp.MustCompile(`const saveFailedEvent = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
-				{"TS", "frontend/src/SigilEditorPanel.tsx", regexp.MustCompile(`const SAVE_FAILED = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
+				{"TS", "frontend/src/usePanelFailure.tsx", regexp.MustCompile(`const SAVE_FAILED = "(GBFR\.SigilLoadout\.SaveFailed)"`)},
 			},
 		},
 	}

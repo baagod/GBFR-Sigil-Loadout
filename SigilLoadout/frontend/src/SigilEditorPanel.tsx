@@ -1,16 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { Call, Events } from "@wailsio/runtime";
 import { X } from "lucide-react";
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { LoadEdits, SaveEdits, SkillMap, SkillTable } from "../bindings/sigilloadout/editservice";
 import {
     InputGroup,
     InputGroupAddon,
@@ -21,6 +12,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { messages } from "./messages";
 import type { Lang } from "./lang";
 import { SkillRow, type RowContext } from "./SkillRow";
+import { PanelFailureDialog, usePanelFailure } from "./usePanelFailure";
+import { useLangTable } from "./useLangTable";
 import { useRowTooltip } from "./useRowTooltip";
 import {
     addressOf,
@@ -35,13 +28,6 @@ import {
     type SkillText,
     type SkillInfo,
 } from "./skills";
-
-const SERVICE = "main.EditService";
-/*
-    与 editservice.go 的 saveFailedEvent 保持一致：防抖写入发生在请求它的那次调用返回之后，
-    那里的失败没有可返回的答复，只能以这个事件的形式到达。
-*/
-const SAVE_FAILED = "GBFR.SigilLoadout.SaveFailed";
 
 /** 稍早之前的那个值：否则搜索框每敲一个键都要过滤一遍 200 行的列表。 */
 function useDebounced<T>(value: T, delay = 150): T {
@@ -60,14 +46,10 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     // 编辑态按**地址**（因子哈希 + 等级）索引：一个地址一条，这个不变量由容器本身保证，
     // 所以没有路径需要手工去重或整体重建列表。
     const [edits, setEdits] = useState<Map<string, SigilSkill>>(new Map());
-    // 所选语言对每个因子的文本；说明的分段读法见 explainAt。
-    const [texts, setTexts] = useState<Record<string, SkillText>>({});
     const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
     // 初始列表读过没有。没读过就**绝不写盘**：此时 edits 是空的，交出去的残缺列表会被后端整体替换
     // （同 editservice.go 的那条注释），用户的其余编辑就没了。
     const [editListRead, setEditListRead] = useState(false);
-    const [error, setError] = useState<{ title: string; detail: string } | null>(null);
-    const [errorOpen, setErrorOpen] = useState(false);
     // 只有跨多个等级的因子会进到这里：只落在一个等级上的没有可展开的东西。
     const [open, setOpen] = useState<Set<string>>(new Set());
     // 列表上的 tooltip 指向哪一行：整套"指针下那一行"的状态与重放都在 useRowTooltip 里，
@@ -88,43 +70,23 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     const searchBox = useRef<HTMLInputElement>(null);
 
     const t = messages[lang];
-
-    // 显示一次失败既记下它，也打开对话框。关闭只是关闭：
-    // 消息留在 state 里好让退场动画仍有东西可画——关掉时清空会让对话框在整个淡出过程中一片空白。
-    function showError(next: { title: string; detail: string }) {
-        setError(next);
-        setErrorOpen(true);
-    }
+    const { failure, open: failureOpen, setOpen: setFailureOpen, showError } = usePanelFailure(
+        t.writeFailed,
+    );
 
     // 因子的名字和说明来自游戏针对所选语言的自有文本。编辑列表与语言无关，这里刻意不动它。
-    useEffect(() => {
-        const hit = textCache.get(lang);
-        if (hit) {
-            setTexts(hit);
-            return;
-        }
-        let cancelled = false;
-        // 整个语言一次调用，名字、概要、说明都从这一份里读，切换语言不会让它们各自描述不同的表。
-        Call.ByName(`${SERVICE}.SkillMap`, lang)
-            .then((map) => {
-                if (cancelled) return;
-                const entry = (map ?? {}) as Record<string, SkillText>;
-                textCache.set(lang, entry);
-                setTexts(entry);
-            })
-            .catch((err) => {
-                if (cancelled) return;
-                showError({ title: t.readFailed, detail: String(err) });
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [lang]);
+    const texts = useLangTable<Record<string, SkillText>>(
+        lang,
+        textCache,
+        (code) => SkillMap(code) as Promise<Record<string, SkillText> | null>,
+        {},
+        (err) => showError({ title: t.readFailed, detail: String(err) }),
+    );
 
     async function loadAll() {
         const [list, skillTable] = await Promise.all([
-            Call.ByName(`${SERVICE}.LoadEdits`) as Promise<SigilSkill[]>,
-            Call.ByName(`${SERVICE}.SkillTable`) as Promise<Record<string, SkillInfo>>,
+            LoadEdits() as Promise<SigilSkill[]>,
+            SkillTable() as Promise<Record<string, SkillInfo>>,
         ]);
         // 不是十六进制的 key 也是用户的一行：留着、用它自己的 hash 当名字，而不是过滤掉——
         // 在这里丢掉它，下一次写入就会把它从 sigiledits.json 里删掉，而一个谁都看不见的编辑
@@ -166,19 +128,6 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     useEffect(() => {
         loadAll().catch((err) => showError({ title: t.readFailed, detail: String(err) }));
     }, []);
-
-    /*
-        防抖之后才失败的写入由后端推送过来（见 SAVE_FAILED）。它和立即失败共用同一个对话框，
-        因为在用户看来它们是同一件事：编辑没有落到磁盘上。语言变化时重新订阅好让标题跟着切换；
-        On 交回的函数就是 React 在退出时运行的取消订阅。
-    */
-    useEffect(
-        () =>
-            Events.On(SAVE_FAILED, (event) => {
-                showError({ title: t.writeFailed, detail: String(event.data) });
-            }),
-        [lang],
-    );
 
     /*
         游戏有的每个因子，而不只是编辑过的那些：一行就是一个因子，它的勾选框是该因子被编辑的
@@ -346,7 +295,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         // 只留编辑仍走 isEdit，好让 "同一条记录连着两次提交" 得到逐字节相同的结果。
         const kept = [...next.values()].filter(isEdit);
         setEdits(new Map(kept.map((record) => [addressOf(record.key, record.level), record])));
-        Call.ByName(`${SERVICE}.SaveEdits`, kept).catch((err) =>
+        SaveEdits(kept).catch((err) =>
             showError({ title: messages[lang].writeFailed, detail: String(err) }),
         );
     }
@@ -469,23 +418,12 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
             {/*写入失败值得打断用户——编辑没有落到磁盘上，而原因通常要用户自己处理
                (sigiledits.json 被别的程序锁住、文件夹不可写)。
                两种失败都落到这里：立即失败，以及后端推送的防抖失败。*/}
-            <AlertDialog
-                open={errorOpen}
-                onOpenChange={setErrorOpen}
-            >
-                {/* 不用 size="sm"：那会把页脚切成两列网格，而这个对话框只有一个按钮，应该居中。 */}
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{error?.title}</AlertDialogTitle>
-                        <AlertDialogDescription className="wrap-anywhere">
-                            {error?.detail}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogAction onClick={() => setErrorOpen(false)}>{t.ok}</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <PanelFailureDialog
+                failure={failure}
+                open={failureOpen}
+                onOpenChange={setFailureOpen}
+                okLabel={t.ok}
+            />
         </div>
     );
 }

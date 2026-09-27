@@ -5,7 +5,7 @@ import {Checkbox} from "@/components/ui/checkbox"
 import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
 import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/shellservice"
-import {Call} from "@wailsio/runtime"
+import {Characters} from "../bindings/sigilloadout/limitbonusservice"
 import {messages, type Messages} from "./messages"
 import {LANGS, LANG_LABEL, initialLang, type Lang} from "./lang"
 import {
@@ -181,7 +181,7 @@ export default function App() {
                 取不到就留空表——角色名于是画成中性灰（见 element.ts），而不是让整页读不出来。
             */
             try {
-                const chara = (await Call.ByName("main.LimitBonusService.Characters")) as CharaTable | null
+                const chara = (await Characters()) as CharaTable | null
                 setCharaTable(chara ?? {})
             } catch {
                 setCharaTable({})

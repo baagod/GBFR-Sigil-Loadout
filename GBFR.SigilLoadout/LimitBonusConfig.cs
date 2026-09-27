@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace GBFR.SigilLoadout;
@@ -40,32 +39,10 @@ public class LimitBonusConfig {
     [JsonPropertyName("edits")]
     public List<LimitBonusEdit> Edits { get; set; } = [];
 
-    private static readonly JsonSerializerOptions Options = new();
-
     /// <summary>
-    /// <paramref name="path"/> 里的编辑列表。空的 <c>edits</c> 数组是真实答案，返回空列表；
-    /// 其余坏形状都抛异常，由调用方记下原因后什么都不写。
+    /// <paramref name="path"/> 里的编辑列表。外层形状与坏形状的处置见 <see cref="EditListJson"/>：
+    /// 空的 <c>edits</c> 数组是真实答案，返回空列表；其余坏形状都抛异常，由调用方记下原因后什么都不写。
     /// </summary>
-    public static LimitBonusConfig Load(string path) {
-        // 大小上限与另两份配置同一道：文件可以手改，失控的那份该是一条记进日志的错误，
-        // 而不是一次几个 GB 的读取。
-        var info = new FileInfo(path);
-        if (info.Length > MaxBytes)
-            throw new InvalidDataException($"limit_bonus.json exceeds {MaxBytes} bytes");
-
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
-        if (doc.RootElement.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException(
-                $"limit_bonus.json must be a JSON object, got {doc.RootElement.ValueKind}");
-        if (!doc.RootElement.TryGetProperty("edits", out JsonElement editsElement))
-            throw new InvalidDataException(
-                "limit_bonus.json has no 'edits' member; an empty array is how the list is emptied");
-        if (editsElement.ValueKind != JsonValueKind.Array)
-            throw new InvalidDataException(
-                $"limit_bonus.json's 'edits' is {editsElement.ValueKind}, not an array (an empty array means 'nothing to write')");
-
-        return doc.RootElement.Deserialize<LimitBonusConfig>(Options)!;
-    }
-
-    internal const long MaxBytes = 1 * 1024 * 1024;
+    public static LimitBonusConfig Load(string path) =>
+        EditListJson.Load<LimitBonusConfig>(path, "limit_bonus.json", "'nothing to write'");
 }

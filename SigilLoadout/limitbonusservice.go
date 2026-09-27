@@ -164,7 +164,8 @@ func limitBonusTextName(lang string) string {
 // limitBonusLangCodes 是能力强化资产有的那几门语言（工具界面有的四门，见 lang.ts）。
 //
 // 不复用 loadoutservice.go 里那句写死的四语言列表：两处资产是两套独立生成的文件，各自的"有哪几门
-// 语言"也就各自说一次，改一处不会悄悄改到另一处。
+// 语言"也就各自说一次，改一处不会悄悄改到另一处。两份清单**不一致**这件事由启动时对拍挡住
+// （见 loadAssetsFrom）——两边各自说一次，不等于可以让它们悄悄分叉。
 func limitBonusLangCodes() []string {
 	return []string{"zh", "en", "ja", "ko"}
 }

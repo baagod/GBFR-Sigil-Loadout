@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	jsonv2 "encoding/json/v2"
 )
@@ -111,14 +112,29 @@ func loadAssetsFrom(dir string) error {
 		return err
 	}
 	skillTables = make(map[string]map[string]SkillText, 4)
-	for _, lang := range []string{LangZH, "en", "ja", "ko"} {
+	for _, lang := range assetLangCodes() {
 		if skillTables[lang], err = readAssetMap[SkillText](dir, "skill."+lang+".json"); err != nil {
 			return err
 		}
 	}
+	// 两套"每语言一份"的资产各自说自己覆盖哪几门语言（见 assetLangCodes 与 limitBonusLangCodes）。
+	// 界面按 lang.ts 的 LANGS 取文案，而认不出来的语言在两边都只会拿到空表——所以两份清单一旦不一致，
+	// 屏幕上出现的是整页 id，而不是一条错误。宁可在启动时就报出来（同"缺一份资产就起不来"）。
+	if !slices.Equal(assetLangCodes(), limitBonusLangCodes()) {
+		return fmt.Errorf(
+			"语言清单对不上：技能资产有 %v，能力强化资产有 %v；界面能选的每一门语言两边都要有",
+			assetLangCodes(), limitBonusLangCodes())
+	}
 	// 能力强化那条链路的资产（见 limitbonusservice.go）：与上面几张表无关，读法却是同一套，一起在
 	// 启动时读一次（骨架 + 四语言文案 + chara.json）。
 	return loadLimitBonusTables(dir)
+}
+
+// assetLangCodes 是那几份"每语言一份"的资产（skill.<lang>.json）覆盖的语言，也正是可视工具界面有的
+// 那几门（lang.ts 的 LANGS）。名字不直接叫 langs：它说的是**这几份资产**有哪几门，而不是"这个工具支持
+// 哪几门"——后者是 lang.ts 的事。
+func assetLangCodes() []string {
+	return []string{LangZH, "en", "ja", "ko"}
 }
 
 // LoadSigils 返回合并后的因子/技能表（assets/sigils.json）：物品行加上非物品的技能行

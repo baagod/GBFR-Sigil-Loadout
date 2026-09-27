@@ -65,19 +65,12 @@ export type CharaEntry = { hash: string; element: string; color: string }
 export type CharaTable = Record<string, CharaEntry>
 
 /**
- * 骨架里的一个角色条目（只有 id，名字与颜色都在别处）+ 从 chara.json 取来的那两栏。**两个都允许缺席**：
- * 资产读不出来时角色名显示 PL 码、颜色兜中性灰，而不是让整页画不出来。
+ * limit_bonus.json 里的一条：**一个参数行一条**，values[i] 写进 Lv(i+1)；这一页写出来的长度恒为 1。
+ *
+ * 一个 Key 最多一条记录，这是整个列表赖以为生的不变量（规则与因子编辑页同一个实现：见 skills.ts 的
+ * dedupeBy）。mod 按顺序遍历、把每条已启用的写进它 Key 指定的行，所以文件里若同时留着两条，游戏最终
+ * 拿到的是最后一条已启用的。
  */
-export const characterRowOf = (
-    character: LimitBonusCharacter,
-    chara: CharaTable,
-): LimitBonusCharacter & { element?: string; color?: string } => ({
-    ...character,
-    element: chara[character.id]?.element,
-    color: chara[character.id]?.color,
-})
-
-/** limit_bonus.json 里的一条：**一个参数行一条**，values[i] 写进 Lv(i+1)；这一页写出来的长度恒为 1。 */
 export type LimitBonusEdit = {
     enabled: boolean
     key: string
@@ -92,59 +85,28 @@ export type LimitBonusEdit = {
  *
  * 输入框的占位符读它——空框读起来就是"这个没碰过，游戏自己的数还留着"。手写过的记录缺第一格（values
  * 是空数组）也走这条路：缺格等于没编辑，正是它的含义。（描述里那个 {n} 说的是第几个框，不是数值，见
- * levelLabel。）
+ * effectLabel。）
  */
 export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefined) =>
     record?.values[0] ?? param.default ?? 0
 
-/** 那一行里一个参数槽占的位置：描述里的 {n} 与从左数第 n 个框都是它。 */
-export type LevelSlot = {
-    /** 第几个参数槽，从 1 起。 */
-    slot: number
-    /**
-     * 这个槽上的参数行；**null = 这条能力没有这个槽**——`limit_bonus` 最多挂 ParamId1/2/3，
-     * 而能力强化只有第一个，所以槽 2/3 是空的。空槽在屏幕上显示 0、不可编辑：没有对应的行可写。
-     */
-    param: LimitBonusParam | null
-}
-
-/** 参数槽固定 3 个：这是 `limit_bonus` 能挂的参数行上界（ParamId1/2/3）。 */
-export const SLOT_COUNT = 3
-
 /**
- * 这一行的三个参数槽，按资产里的顺序——也正是数值框从左到右的顺序。
- *
- * 槽数固定（见 SLOT_COUNT），而资产里的一条能力只挂一个参数行：槽 1 是它，槽 2/3 是空的。三个框
- * 都画出来是因为"一行长什么样"不随能力变（与因子编辑页十个槽并排同理）。
- */
-export const slotsAt = (ability: Ability): LevelSlot[] =>
-    Array.from({ length: SLOT_COUNT }, (_, index) => ({
-        slot: index + 1,
-        param: index === 0 ? ability.param : null,
-    }))
-
-/**
- * 描述格里的一整段文字：游戏写的效果模板本身，其中 {0} 换成**写死的框号**。
+ * 描述格里的那一整段文字：游戏写的效果模板本身，其中 {0} 换成**写死的框号** {1}。
  *
  * 模板来自当前语言的文案表（见 LimitBonusText.effects），按参数行的 Key 取；表里没有这个 Key 就是游戏
- * 自己没写这行文案，那一段不占字。
+ * 自己没写这行文案，那时得到空串，由组件画一个占位符。
  *
- * 这与因子编辑页说明里的 {N} 同性质（见 skills.ts 的 slotLabel）：{n} 引用的是第几个数值框，不是
- * 把数值替进去——数字已经在右边的框里了，说不清的正是哪个框对应效果的哪一部分。所以描述与"填了多少"
- * 无关：同一条参数行各档上是同一句话，而这一页只显示第一档那一句。
+ * 这与因子编辑页说明里的 {N} 同性质（见 skills.ts 的 slotLabel）：{n} 引用的是第几个数值框，不是把数值
+ * 替进去——数字已经在右边的框里了，说不清的正是哪个框对应效果的哪一部分。所以描述与"填了多少"无关。
  *
- * 各槽的效果模板在同一格里用「；」连成一整句，空槽不占字——每条能力只有一个参数行，所以这一句实际
- * 只有一段，连着拼是为了"一行怎么拼"不随能力变。全都没有时得到空串，由组件画一个占位符。
+ * 框号写死 1 是因为一条能力强化只有一个参数行，它必然是左边第一个框（另两个是空槽，见
+ * LimitBonusEditorPanel 的 AbilityRow）。
  */
-export const levelLabel = (slots: LevelSlot[], effects: Record<string, string>): string =>
-    slots
-        .map(({ slot, param }) => {
-            // 表里没有这个 Key 就是游戏自己没写这行文案：那一段不占字（空串，由组件画占位符）。
-            const effect = param === null ? "" : (effects[param.key] ?? "")
-            return effect.replaceAll("{0}", `{${slot}}`)
-        })
-        .filter((text) => text !== "")
-        .join("；")
+export const effectLabel = (param: LimitBonusParam, effects: Record<string, string>): string =>
+    (effects[param.key] ?? "").replaceAll("{0}", "{1}")
+
+/** 一行画几个数值框：`limit_bonus` 能挂的参数行上界（ParamId1/2/3）。 */
+export const SLOT_COUNT = 3
 
 /*
     角色条目去重：古兰与姬塔是两个 PL 码（PL0000 / PL0100）、名字都是"主人公"，资产里各带一份逐字
@@ -184,29 +146,10 @@ export function asEdit(raw: unknown): LimitBonusEdit | null {
     if (key === "") return null
     return {
         // 缺 enabled 的条目在 mod 那边是开着的（C# 的初值），Go 侧已经按那个规矩补过，这里照它读。
-        enabled: record.enabled ?? false,
+        enabled: record.enabled ?? true,
         key: key,
         values: Array.isArray(record.values) ? record.values : [],
     }
-}
-
-/*
-    一个 Key 最多一条编辑，这是整个列表赖以为生的不变量（规则与 skills.ts 的 dedupe 逐字相同）：
-    mod 按顺序遍历、把每条**已启用**的写进它 Key 指定的行，所以同一 Key 上游戏最终拿到的是最后一条
-    已启用的。文件里仍可能同时留着两条（旧版本写的，或有人手改了）而列表只能显示一条，于是留最后
-    一条已启用的；该 Key 一条已启用的都没有时，留最后一条，不论启用与否。
-*/
-export function dedupeEdits(records: LimitBonusEdit[]): LimitBonusEdit[] {
-    const lastEnabled = new Map<string, number>()
-    const lastAny = new Map<string, number>()
-    records.forEach((record, i) => {
-        lastAny.set(record.key, i)
-        if (record.enabled) lastEnabled.set(record.key, i)
-    })
-
-    return records.filter(
-        (record, i) => i === (lastEnabled.get(record.key) ?? lastAny.get(record.key)),
-    )
 }
 
 /**
