@@ -127,9 +127,22 @@ func foregroundWindow() uintptr {
 
 // isGameWindow 判断 hwnd 是否属于 granblue_fantasy_relink.exe，用来把住光标隐藏点击的重放：
 // 那记动作只在游戏里安全（光标出现后的第一下点击会被吞掉、到不了操作），绝不能发给任意前台程序。
-func isGameWindow(hwnd uintptr) bool {
+// windowPID 取窗口所属进程；取不到就是 0。
+func windowPID(hwnd uintptr) uint32 {
 	var pid uint32
 	procGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	return pid
+}
+
+// isOwnWindow 判断窗口是否属于**本工具进程**。工具进程里除了那扇标题窗口，还挂着输入法/TSF 的顶层
+// 窗口（敲字时它们会当前台），所以"我们在前台"只能按 pid 判，不能拿句柄跟主窗口比——否则在工具里
+// 敲字时会被当成"别的程序在前台"，F1 那一记就被 toggleActionFor 判成 actionIgnore 丢掉。
+func isOwnWindow(hwnd uintptr) bool {
+	return windowPID(hwnd) == uint32(os.Getpid())
+}
+
+func isGameWindow(hwnd uintptr) bool {
+	pid := windowPID(hwnd)
 	if pid == 0 {
 		return false
 	}

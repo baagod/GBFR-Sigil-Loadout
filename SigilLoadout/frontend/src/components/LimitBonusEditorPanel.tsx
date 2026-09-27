@@ -195,7 +195,7 @@ function AbilityRow({
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
             {/* 能力名用默认前景色：层级交给字号（14 vs 角色名的 16）与 32px 缩进，不靠颜色。 */}
-            {/*
+                {/*
                     名字里的间隔号（中文 U+00B7 / 日文 U+30FB）都是"小字符"，UI 字体画出来又小又挤；
                     游戏用自己那套字体画得更大更居中。数据一个字不动，只在这里把它放大 + 两侧留白。
                 */}
@@ -296,7 +296,7 @@ function CharacterGroup({
                     按角色算好写在 chara.json 里，取一个 PL 码就拿到了；缺那一条时名字继承默认前景色。
                 */}
                 <span
-                    className="truncate text-sm font-[550]"
+                    className="truncate text-sm font-medium"
                     style={{ color: color }}
                 >
                     {name}

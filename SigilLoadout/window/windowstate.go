@@ -146,7 +146,7 @@ func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _
 		// rf = 打的是**存值之前**的 returnFocusTo；存不存由 fg 决定（fg == hwnd 就不存）。
 		prev := foregroundWindow()
 		hidden := toolHidden.Load()
-		selfFront := prev == hwnd
+		selfFront := isOwnWindow(prev) // 按 pid：工具进程里的输入法/隐藏窗口也算"我们在前台"
 		gameFront := isGameWindow(prev)
 		action := toggleActionFor(hidden, selfFront, gameFront)
 		debugf("wmToggle hwnd=%d fg=%d hidden=%v rf=%d game=%v -> %v",

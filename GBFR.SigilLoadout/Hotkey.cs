@@ -201,18 +201,26 @@ internal static class Hotkey {
             }
         }
         if (existing != IntPtr.Zero) {
-            // 热键是开关：工具可见就收起来，不可见就呼出（当前是哪一态由工具自己持有）。
+            // "游戏在前台"这一件事就等价于"工具侧会 actionReveal"（windowstate.go 的 toggleActionFor：
+            // 游戏在前台 → 放行、且焦点不在工具上 → 叫出来），所以不必去猜工具收没收起。
+            bool summoning = IsGameForeground();
             ActivateWindow(existing);
-            log("Loadout tool is already running; toggled.");
+            if (summoning)
+                log("Hotkey: summoned the loadout editor from in-game.");
             return;
         }
 
-        // 工具还没开：只有这里需要自己判断该不该把它拉起来——工具那套判据此刻还不存在（它没被启动），
-        // 少了这一步，在任何程序里按 F1 都会把工具弹出来。
-        if (!GameOrToolIsForeground()) {
-            log("Hotkey ignored: neither the game nor the tool was in the foreground.");
+        // 有进程却等不到窗口：那扇窗口可能压根没建起来（启动被打断、起来了就崩）。
+        // 再往下走就是每按一次 F1 多堆一个进程（实测过一次开出两个），
+        // 所以就此打住——下次再按会重新找窗口。
+        if (IsToolProcessRunning()) {
+            log("A loadout editor process is running but has no window; not launching another.");
             return;
         }
+
+        // 不在游戏/工具里按的：工具那侧本来也会忽略这一记（toggleActionFor），不启动也不记日志。
+        if (!ShouldOwnTheKey())
+            return;
 
         string toolPath = Path.Combine(_modDirectory, "SigilLoadout.exe");
         if (!File.Exists(toolPath)) {
@@ -222,7 +230,7 @@ internal static class Hotkey {
         using var process = Process.Start(new ProcessStartInfo(toolPath) {
             UseShellExecute = true,
         });
-        log("Launched loadout editor tool.");
+        log("Hotkey: launched the loadout editor from in-game.");
     }
 
     /// <summary>
@@ -242,34 +250,39 @@ internal static class Hotkey {
         IntPtr hwnd = _messageWindow;
         if (hwnd == IntPtr.Zero)
             return;
-        bool want = GameOrToolIsForeground();
+        bool want = ShouldOwnTheKey();
         if (want == _wantRegistered)
             return;
         _wantRegistered = want;
         if (!want) {
             UnregisterHotKey(hwnd, HotkeyId);
             _hotKeyRegistered = false;
-            _log?.Invoke("Hotkey released: another program is in the foreground.");
             return;
         }
         _hotKeyRegistered = RegisterHotKey(hwnd, HotkeyId, ModNoRepeat, (uint)_virtualKey);
-        _log?.Invoke(
-            _hotKeyRegistered
-                ? $"Hotkey registered: {HotkeyName(_virtualKey)} (0x{_virtualKey:X2}) via RegisterHotKey."
-                : "RegisterHotKey unavailable (key may be taken); fallback polling active.");
+        if (!_hotKeyRegistered)
+            _log?.Invoke("RegisterHotKey unavailable (key may be taken); fallback polling active.");
     }
 
-    /// <summary>
-    /// 前台是不是游戏（本进程）或工具自己。mod 活在游戏进程里，所以"游戏在前台"不必按进程名去查——
-    /// 比一下前台窗口的进程 id 就够了。
-    /// </summary>
-    private static bool GameOrToolIsForeground() {
+    // 该不该独占这个键：前台是"我们"（游戏本进程或工具进程）就该。按 pid 判、不按窗口标题——工具进程
+    // 里还挂着输入法/TSF 的顶层窗口，敲字时它们会当前台（见 window/windowstate.go 的 isOwnWindow）。
+    private static bool ShouldOwnTheKey() {
         IntPtr foreground = GetForegroundWindow();
         if (foreground == IntPtr.Zero)
-            return false;
-        if (foreground == FindWindow(null, ToolWindowTitle))
-            return true;
+            return false; // 窗口正在被激活/失去激活：这一拍按"不是我们"处理，下一拍自会纠正
         GetWindowThreadProcessId(foreground, out uint processId);
+        if (processId == (uint)Environment.ProcessId)
+            return true;
+        IntPtr toolWindow = FindWindow(null, ToolWindowTitle);
+        if (toolWindow == IntPtr.Zero)
+            return false;
+        GetWindowThreadProcessId(toolWindow, out uint toolProcessId);
+        return processId == toolProcessId;
+    }
+
+    // 前台是不是游戏本进程——只给"游戏内呼出"那条日志用（mod 活在游戏进程里，比 pid 就够）。
+    private static bool IsGameForeground() {
+        GetWindowThreadProcessId(GetForegroundWindow(), out uint processId);
         return processId == (uint)Environment.ProcessId;
     }
 
@@ -282,10 +295,6 @@ internal static class Hotkey {
         }
     }
 
-    private static string HotkeyName(int virtualKey) =>
-        Enum.IsDefined(typeof(OverlayHotkey), virtualKey)
-            ? ((OverlayHotkey)virtualKey).ToString()
-            : $"0x{virtualKey:X2}";
 
     /// <summary>轮询到给定虚拟键不再按下为止（最多 400 ms），好让 key-up 在游戏还握着输入时被消费掉。</summary>
     private static void WaitForKeyRelease(int vk) {
