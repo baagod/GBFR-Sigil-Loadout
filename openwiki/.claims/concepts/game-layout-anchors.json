@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:4c269e8ff9a5250ed43d3f35324e64166d8f454c30d35703a21e42bff3384da6",
+  "pageVersion": "sha256:46a6abfea67b7d1e6fc5e4b4e9680366a4cfa3143d379d4102bc9130d36f8bfc",
   "claims": [
     {
       "id": "claim_9a4c9d958a044231b70a2ae27485d489",
@@ -50,23 +50,27 @@
     },
     {
       "id": "claim_d6b485e2efdb4485afe5703012946aa3",
-      "statement": "仓库里两套掩码约定刻意并存：layout_resolver.cpp 用显式 'x'/'?' 掩码，table_slot.cpp 的 CountMatches 用 \"0 = 通配\"；后者的前提是每个 0 都落在该通配的位置，否则匹配静默变宽、命中数不等于 1，结果是 fail-closed（槽不解析、热应用只拒写 GBFR20_TABLE_SLOT_UNRESOLVED，只有日志说明原因）。",
+      "statement": "仓库里两套掩码约定刻意并存：layout_resolver.cpp 的 FindUniquePattern 用显式 'x'/'?' 掩码字符串（长度由 MakePattern 的 static_assert 钉住、内容靠人对），table_slot.cpp 的 CountMatches 用「0 = 通配」（非 0 才比）；后者的前提是 pattern 里每个 0 都落在该通配的位置上，否则匹配静默变宽、命中数不等于 1，结果是 fail-closed：对应那张表的定位保持未解析（g_slot_rva / g_limit_bonus_pointer_rva 为 0），热应用只拒写 GBFR20_TABLE_SLOT_UNRESOLVED (-2)，只有日志说明原因；table_slot.cpp 那四条 pattern 没有编译期保护，只能逐个数字对。",
       "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L15-L21",
+          "version": "repo-lines-v1:sha256:16220a1f994f262bec46ac0ba9395927f1e2119c1f4c16f27424f6d2cadf21b1:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTJjYjUwM2FlMmM5NjMzNzdhMjYyNzFmYjVhYjMxN2IxZDM3Yjk5YzYzODQwNmMwNzZmNGI2OGNkM2JmYmJkNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiY2M3MzJmNDcwZDUyNDhkNGJjZWZjMGIzMDFiYWE1ZjBkODVlOGMzMzg5MDg4MTE0YWNhNTRhOGNmNmNiYTNiOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmIyZWNjMTAwNTNiMmVhMjVlZjEzMjQ3NmE3ODFmNDg0MWEwNjAwYmE5NjY0MDMzNjEzMjg4MzFkNWZhZDQ1YyJ9"
+        },
         {
           "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L262-L268",
           "version": "repo-lines-v1:sha256:fb07290dcf4b77a8b9a0e5df88e9f74d4387ba59b8ac059fafe9b4f8d61cc47d:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODczMjc3NWVlZTc3MDAxOGRiN2Q3OWQwMzVhMDE2MzAxNWEwMTZkZTE3ZWJiZjg4ODQ5MDJlYzZkMWQ5ZmNmMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ1ZDQ2ZTEwMDU3MGEzODNmMjNlOWNlZDVhZTVjYjEwY2Q5MGFiNzdlMjgzNjkyNjg5NWJjNDk4NzJlN2ZlNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjFlNmQ0OWYyMDVhNTU2MGE1NzliNDlhNjMyNjBhNmJiODg1MzViNWYwYmFkYTk5OTUzNzE2MjM3NGViNTgzMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdiNzA5ZDRmNWI2MDBjMmZlOGJlZDRkODlmZDZhNWM0ZjAzNDU5Nzk3OTgyODUwOWI1ZGU5MWFjNzY2N2M0NiJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L19-L35",
-          "version": "repo-lines-v1:sha256:6408d5793ab94a167f3db32fa573b0953570f9c9eed200c7d2479efb449531ba:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjOTYzYTU0ZDk5MDY0MWEyNGYxNjdjNmQ2NDZkYzc2MDA0YjQwMzFmNDlkNDJhMmYwNTdhYmVkY2ZjMzA1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2NDNjMWE0YmNkM2MzYjBmOWNkYTVkYzQ1OTg2OTI3ZGU2MzU3ZjZiZmZlNmFmZTJjMjVhYmY0ZjJkMTUzZWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMzU0YWI4YzJlN2UwODNhNDVkZTY5MTk5Zjc0MDA2NzgwNjIwNTI1NjQ4YTZhMGVkYTIyNjljOTIxM2Q0MDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5ZDE3ODI1MzRhODU2ZTBlYTNjYzkyNjMyM2E2Yjc2ZmYxOWViZTYwZGIyMWQ0NGEzMTg5ZmIwNDc3MjhjN2QifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L22-L39",
+          "version": "repo-lines-v1:sha256:a136a973990baad865ab920d4f49720ebb54d5840fcf07897b2e1d22c9708664:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjOTYzYTU0ZDk5MDY0MWEyNGYxNjdjNmQ2NDZkYzc2MDA0YjQwMzFmNDlkNDJhMmYwNTdhYmVkY2ZjMzA1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2NDNjMWE0YmNkM2MzYjBmOWNkYTVkYzQ1OTg2OTI3ZGU2MzU3ZjZiZmZlNmFmZTJjMjVhYmY0ZjJkMTUzZWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMzU0YWI4YzJlN2UwODNhNDVkZTY5MTk5Zjc0MDA2NzgwNjIwNTI1NjQ4YTZhMGVkYTIyNjljOTIxM2Q0MDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5ZDE3ODI1MzRhODU2ZTBlYTNjYzkyNjMyM2E2Yjc2ZmYxOWViZTYwZGIyMWQ0NGEzMTg5ZmIwNDc3MjhjN2QifQ"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L58-L70",
-          "version": "repo-lines-v1:sha256:c1275a30214017bff78fd403d804861b620a748f06b0c160e89cd68dc473732b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5NTQ0YjIzZjI0ZDdhOTU3ZDcyNTA2NDMwNjNmNzYwY2EwZGNmZmM3MTI1NDZjZTg1MzY3MDdhYjZkNzZiNmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkYWNkZmRkNzY2NDRhNGQ0MDk4MGVhMjNkMTZmMDZkYTI2MTAwMDRhZWIxMGY5NGY3MDBiMGIzYmNiMGJmYTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMwMjczMmU0OWEwOWU5NmNmYTZmOWRhMWZlMzQxZTA2YTc2YmFhY2JlYzM1NDJhZGMyOGRhYWIzNTNmN2E1YmQifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L76-L83",
+          "version": "repo-lines-v1:sha256:a3cb3037d851efd9499da7f3c062ff54209338467f644bc7a4ba51ad9fd51cfe:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODczMjc3NWVlZTc3MDAxOGRiN2Q3OWQwMzVhMDE2MzAxNWEwMTZkZTE3ZWJiZjg4ODQ5MDJlYzZkMWQ5ZmNmMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjQ1ZDQ2ZTEwMDU3MGEzODNmMjNlOWNlZDVhZTVjYjEwY2Q5MGFiNzdlMjgzNjkyNjg5NWJjNDk4NzJlN2ZlNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGJlOWVmOTk2YTEwOTg4ODA0ODg1ZjJkYjg1NzBhOWM3MGQwODQ3MWJmZTQxMjBlNjk0MjhhZGI5MWM4NWJmNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzc0ZGY5NTExNmIzYzU2Y2EyN2Q0NTcyMWIyODY3ODY2YzBhZWVkYmY5YmQxYTc5OGJjZWE4NTgwYzIyOTM3NiJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L72-L104",
-          "version": "repo-lines-v1:sha256:ba107dd9803d2e9efa29c854ef55805e077a77b550a55ebc06cc94397c6736af:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MzI3NzVlZWU3NzAwMThkYjdkNzlkMDM1YTAxNjMwMTVhMDE2ZGUxN2ViYmY4ODg0OTAyZWM2ZDFkOWZjZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRiZTllZjk5NmExMDk4ODgwNDg4NWYyZGI4NTcwYTljNzBkMDg0NzFiZmU0MTIwZTY5NDI4YWRiOTFjODViZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiYjAxZTU3MjdhYjBmMDU2ZDBiZWIzM2I4NGJkM2I5MzQ2OGFjZGE1MzQ3NDQyZGI3YTk1OTJjZWIyYzlmOGQifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L85-L108",
+          "version": "repo-lines-v1:sha256:2214bee6842bced18c95d42fcfd89d5f8a42ef634e0249ecb36b2077613529e1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3YzRlOGIyNjMwYWI2OGZiYWQwNjQwODFhZjdmZmFlNjVjMzlmMWQ1MjkyMjNlYzQzMTdjZDMyZTQ2NTRiNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjOTI4YjViZjI4OGZjOWI0MjQ2Y2Q0YTQ0ZWNmZDUyOGFiZWQ4NmFmMDc5MmQzMWI0NWM3N2YxNTY4YTI5MTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiYjAxZTU3MjdhYjBmMDU2ZDBiZWIzM2I4NGJkM2I5MzQ2OGFjZGE1MzQ3NDQyZGI3YTk1OTJjZWIyYzlmOGQifQ"
         }
       ]
     },
@@ -178,19 +182,23 @@
     },
     {
       "id": "claim_8f66fe5e038542a9ae88bfc31c78d01c",
-      "statement": "RevalidateGameLayout 不重新找锚点，只要求 g_layout_ready 为真、g_image_base 非 0，再重建 PE 视图重跑同一份校验；它唯一的生成代码调用点是 InstallHooks 的第一个子阶段 required-byte-rva-preflight，位置在 create_inline（getter，kGetterPreflight 检的正是该函数序言）、create_mid 与 ApplySkillLoopLimits 拓宽上限字节之前——所以锚点解析与复验都必须发生在 safetyhook 改写 .text 之前，且复验不能在循环上限被改写之后跑。",
+      "statement": "RevalidateGameLayout 不重新找锚点，只要求 g_layout_ready 为真、g_image_base 非 0，再重建 PE 视图重跑同一份 ValidateResolvedGameLayout；它唯一的生成代码调用点是 InstallHooks 的第一个子阶段 required-byte-rva-preflight，位置在 create_inline（getter，kGetterPreflight 检的正是该函数序言）、create_mid 与 ApplySkillLoopLimits 拓宽上限字节之前——所以锚点解析与复验都必须发生在 safetyhook 改写 .text 之前（Initialize 也据此把 ResolveTableSlot 与 ResolveLimitBonusParamPointer 排在 InstallHooks 之前），且复验不能在循环上限被改写之后跑。",
       "evidence": [
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L596-L602",
-          "version": "repo-lines-v1:sha256:2ce23e75b2b8f45e7c44eccdd32e681fa40ccc8bea62fbb10fe395463bb39e53:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQxODM0MzkwOTFkYmFiYmVjNWFhZDQxZGU4NWUyYTVlM2FiNTBlNWVmODY5MWFjNWJhMWY1YzFjZjIwNGMxYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFiZDA4MDQ0OGUzNTg0YTk4MzY5ZDZjMTkzYmViNTEzZWQ1OGQxYzgxNmRiYTg5Y2RmZWIyZDk2YWNiZGZjNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L592-L599",
+          "version": "repo-lines-v1:sha256:dfbb2679df7a09aaf5724991d2183fbb0d93916f40e5c1e6f31dcc16e5b1156b:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQxODM0MzkwOTFkYmFiYmVjNWFhZDQxZGU4NWUyYTVlM2FiNTBlNWVmODY5MWFjNWJhMWY1YzFjZjIwNGMxYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTFiZDA4MDQ0OGUzNTg0YTk4MzY5ZDZjMTkzYmViNTEzZWQ1OGQxYzgxNmRiYTg5Y2RmZWIyZDk2YWNiZGZjNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L49-L51",
-          "version": "repo-lines-v1:sha256:78fefc15319e322a6add8e3469ad61186ecd3228ccd5e57b1cf96564fb4af5e2:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWZlMjk4OWM0N2MzMTU4ZmMxOTA2YTM4Y2UxYjFkMDZkNDg1NDY5ZmFlZTE1YTBkMDA4NTJjZDAyMzI3ODUzNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjUyMDUzMDc0YTU1ZjhjZWVhOWI4Yzc2NTNkYjFiNGQ5ODY4ZTVhMjk4MGRlYTJmMzVhODdiNDk5ZjRlMTRmNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmRjZjFiOTk0MDYwZjA3NTZiZDFhMWQ5YjllNDc0ODQ0ZTQ2OTg2NjUxODE5YTAwYmNmM2RhOWU4ZDY2MmE5OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOThkYjI5MWI4NWFkYjUwYjAxZWNiYTczNmY4MWMwMDU3ZjE3NTVlYjRkYjliMTI2MjYyMjIzNGMxMWFhZGM5OSJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L49-L53",
+          "version": "repo-lines-v1:sha256:d98f9676007f4e248c512581e8c7dc71ebc225d3679521975b22fbce25e7d612:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTUxNDM0M2QwZjMyMzQ3ZmIyMjgxODk0MmJjNDhmYzIxMjRlOWVjNWQyZDg1NDI2YzA1YWEzMGNlNTYyZTkzYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTVhZjczZDFkMWUzM2FlZGJmYmIyM2I0Zjg5MWQ1YjNmZmFmZjFmN2Y5ZTQxZjYxM2E3YWNlMThiZjY5ZWZjOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmRjZjFiOTk0MDYwZjA3NTZiZDFhMWQ5YjllNDc0ODQ0ZTQ2OTg2NjUxODE5YTAwYmNmM2RhOWU4ZDY2MmE5OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOThkYjI5MWI4NWFkYjUwYjAxZWNiYTczNmY4MWMwMDU3ZjE3NTVlYjRkYjliMTI2MjYyMjIzNGMxMWFhZGM5OSJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L431-L469",
-          "version": "repo-lines-v1:sha256:00266e2f81f066edae04f4a55ca971dee3447f3700d51392ad00a0d65127f059:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5Y2E4OTFiZmY3YWMxZjdjZWFhZTQwZWYwNTEwNjZiZTllZmU0N2I0ZTQyODFlODZjMzE5YmUyYzU1ZWJjZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNjE1YjczNGNmZmYxZWQ4MmIzZGI0MGIzN2JiZWVlMWM0NDVlZmE3YzEzMTg2NGQ2NzgxNzUwMDNmNmVhMzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkMjQ5MDRkMDJmNWNiYWJhMzk1ZDI5YmQ4NGYwNzFhMTQzMDg2YTNiNDhhMTBiZWNiZmFlZmFiZGRkZGVlMmMifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L420-L427",
+          "version": "repo-lines-v1:sha256:d6bf1298f02db6c9e300784c94f30e13af2583e0357a4e575cf43215a349b7f7:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjljYTg5MWJmZjdhYzFmN2NlYWFlNDBlZjA1MTA2NmJlOWVmZTQ3YjRlNDI4MWU4NmMzMTliZTJjNTVlYmNlNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDg5M2Y0MGUzNzgxZWI4OTZjODJkMDQ2YTA4MDY3YTExZTM1Y2RmMmYxZGZhZjI2ZmVhOTBiOGRiNjY3NjQxMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzE2MTViNzM0Y2ZmZjFlZDgyYjNkYjQwYjM3YmJlZWUxYzQ0NWVmYTdjMTMxODY0ZDY3ODE3NTAwM2Y2ZWEzNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2MxMjc4ODJiYmExNTJkNDM0MmY0NWJlNjk3NzBkZmM2OTFhOTU0MmY0ZjlkMzI0MDUxNmI5YTMyMjNiZjUwMiJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L429-L458",
+          "version": "repo-lines-v1:sha256:5429b81bdf1bc8bb5a1e5f9a272dc74aca35010850bfee38be1d711b81e13c8b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5Y2E4OTFiZmY3YWMxZjdjZWFhZTQwZWYwNTEwNjZiZTllZmU0N2I0ZTQyODFlODZjMzE5YmUyYzU1ZWJjZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNjZhMDgwODU5MzE4MTlmY2I1YmRlM2I0MjQ2Nzc4MDU5Y2QwMTUzYWU3MzUyMWU1ZDRiZWVmNzE1NTFhZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkMjQ5MDRkMDJmNWNiYWJhMzk1ZDI5YmQ4NGYwNzFhMTQzMDg2YTNiNDhhMTBiZWNiZmFlZmFiZGRkZGVlMmMifQ"
         }
       ]
     },
@@ -348,7 +356,7 @@
     },
     {
       "id": "claim_5ed0730e9bf04824bd2b968f2ac4a495",
-      "statement": "PE 视图的所有权与复用边界：ImageView / IsRvaInSection / TryBuildImageView 是 layout_resolver.cpp 匿名命名空间的私有实现，native_internal.h 只对外暴露 IsInWritableImageSection 与 TryGetCodeSection（连 CodeSectionView），并写明\"先按名字找 .text、找不到才取最大可执行段\"的唯一持有者仍是 layout_resolver.cpp；skill_status 表槽解析（table_slot.cpp 的 ResolveTableSlot）复用的就是同一份代码段定义，而 DecodeRipTarget（safe_game_access.cpp）是布局锚点与槽发布锚点共用的唯一 RIP-rel32 算术：位移在指令 +d、指令长 N、目标必须落在映像内。",
+      "statement": "PE 视图的所有权与复用边界：ImageView / IsRvaInSection / TryBuildImageView 是 layout_resolver.cpp 匿名命名空间的私有实现，native_internal.h 只对外暴露 IsInWritableImageSection 与 TryGetCodeSection（连 CodeSectionView），「先按名字找 .text、找不到才取最大可执行段」的唯一持有者仍是 layout_resolver.cpp；table_slot.cpp 里两张活表的定位（ResolveTableSlot 与 ResolveLimitBonusParamPointer）复用的就是同一份代码段定义，而 DecodeRipTarget（safe_game_access.cpp）是布局锚点、skill_status 发布锚点与 limit_bonus_param 指针锚点共用的唯一 RIP-rel32 算术（位移在指令 +d、指令长 N、目标必须落在映像内）。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L204-L228",
@@ -363,8 +371,20 @@
           "version": "repo-lines-v1:sha256:1df93e1bce5874fed21e29375c2e5e7bd002567d4c0a264051267d3673b31504:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3NTI3YWU4NmE1YzNhYTczNWJlN2Y1YmI4ZTEwZDgzYTVlY2JmN2E0YTFiYjc5ZGRhM2MwMDczZjcyNjQ0ZTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM5ZDUxNTMyNzFlNDE1NGMyYzQ4MTU4YzM4ZjZkNzlkNjVmYTVkYzZmNjIzNjFhOWFhMzk2ZGJhYjAwZWNhYTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4MTU2YTJjODQzYWM4Yjg1NzFhZTliY2EwM2RiZmIyMDMyYzgxYzhhNmZkN2ExYmRkZWM3ZTNjYjJlYTA1Y2IifQ"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L188-L217",
-          "version": "repo-lines-v1:sha256:ce6674bfa69d516b4b520f4c32a617fb918d48c24c578b7f91b7f2781d15fb19:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyNWY4ODgzNmJjYmU2OGI2OGMzYmNhNDY2YjkxNWY4NzZhNDQ2ZDFmNDAyNGIwNDg4NjhhYjhlYTM1Y2I4ZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjY2FkNDhhYTM5NTA4YjkwNDUwMDEzYmUwM2FjMWFhNzg4YjdlMmJjM2VjYjQ1YzliMzA1OTYwMjUwMTAzMmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmNmEyNmJmOTdjOTZjOTQ5NjcwZTk0OTM2MjMxOTU4MGQ1ZGMyZWQ2ZWJhODkxOGRkZTAzZjk1OGE3ZGVjYjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI5ZWQzOTM0NzY1MDFkZWU1ODRjNzdlZDM5MDU0ZTE0MzkzYWJhZmRjYzllNjk5NzdhZTk4ZGI5ZmZmMzYwOWEifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L274-L277",
+          "version": "repo-lines-v1:sha256:aabe24754eced2a013b7544091573ba3fcc7954a37a99bc99e43b19ed1efc95b:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjI1Zjg4ODM2YmNiZTY4YjY4YzNiY2E0NjZiOTE1Zjg3NmE0NDZkMWY0MDI0YjA0ODg2OGFiOGVhMzVjYjhlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiNDA1YmExYTRkZDIyY2JkNzc5MGMwNzM3MmU0MjdhOGEzOTQ5MmJmZTc0MjIwZDgxYWJhMjE5ZDcxNmY0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmY2YTI2YmY5N2M5NmM5NDk2NzBlOTQ5MzYyMzE5NTgwZDVkYzJlZDZlYmE4OTE4ZGRlMDNmOTU4YTdkZWNiMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzU5YzY2MTMwMDc4N2JjNWZjYWRhNjkzM2E2OGIzZWRmN2FjM2M4ZWMxOGFiMTAzODViNTdkNzcxNmVjNjM3YSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L300-L304",
+          "version": "repo-lines-v1:sha256:5b5dbd1d8af883684bfd00b999b47d2bca9bce6a9ca4a9b61aa3d12468836cba:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDU5NzYwZDY5MDlhODAxYmQyMDY0YzEwZjQxZjhlNzRlMDkzOTU4OTEyNTgwZjA4ZjUxZjI4MGNkMDE2MDgzMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2NjYWQ0OGFhMzk1MDhiOTA0NTAwMTNiZTAzYWMxYWE3ODhiN2UyYmMzZWNiNDVjOWIzMDU5NjAyNTAxMDMyYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTcwNWIzMjhmNjUxNWI4MWMyMWRlZTJmMGYxZjAyOTg0NTZhMzRlY2QxMzY0OGFlNWY0ZGZjNjMxOTA5YzYzZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjllZDM5MzQ3NjUwMWRlZTU4NGM3N2VkMzkwNTRlMTQzOTNhYmFmZGNjOWU2OTk3N2FlOThkYjlmZmYzNjA5YSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L351-L355",
+          "version": "repo-lines-v1:sha256:9622fae350161d9e77c910493373899e3d4a062ed4717ee66c1d0c23383705db:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjI1Zjg4ODM2YmNiZTY4YjY4YzNiY2E0NjZiOTE1Zjg3NmE0NDZkMWY0MDI0YjA0ODg2OGFiOGVhMzVjYjhlYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiNDA1YmExYTRkZDIyY2JkNzc5MGMwNzM3MmU0MjdhOGEzOTQ5MmJmZTc0MjIwZDgxYWJhMjE5ZDcxNmY0YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGJjYWU0MmY0YTg3ZDYyZGI4ZjIxYTY3NDhmY2FlYzIwZGE3YmY5YTg2ZTRhNmU2NGU0ODhmYTNhMTM4MjdmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzU5YzY2MTMwMDc4N2JjNWZjYWRhNjkzM2E2OGIzZWRmN2FjM2M4ZWMxOGFiMTAzODViNTdkNzcxNmVjNjM3YSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L376-L377",
+          "version": "repo-lines-v1:sha256:c2b059ce2cd8f39e96a245704f861cab12339b4747823516842f93a480aa2f68:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDU5NzYwZDY5MDlhODAxYmQyMDY0YzEwZjQxZjhlNzRlMDkzOTU4OTEyNTgwZjA4ZjUxZjI4MGNkMDE2MDgzMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmZlNGI4YzhlNzlmNDQyMDlkMGU1NzNhZDQwODJhZThjNjRjZmZkZTI1YTVhZjg0NjEyYjkzMGVlZjUyM2EwYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDY3NzJjMTBlNDFkNTFmMmY3OWQ4OGNlMGEzYjQ3ZTkxNzc4NDVlMzM3ZDM0Yzk1NzViN2U0MjljYTFiMjM4OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTUzYzJhYjAzMmJhODI5OWU5YjQ4MjQzNmZmMzQ0MzdkMDZhMzY3NGZhZmFlNDc2OTlhNmY5ZTRmMTBlOGJlMSJ9"
         }
       ]
     },
@@ -407,10 +427,120 @@
           "version": "repo-lines-v1:sha256:a093897b2c788480b5ac0f3b95f9d9bb4999199b4789ffb410cb0b24c199bb25:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkyNTMzZGMzMWZhNmI1MmFjMGYyM2U5MDk3YjAzMmJjOGExNzEyODExNzI2MDZlZTUwM2MxYWRhMzBjNWMwY2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMyZTE5MTI5MzE1MTFmNDM1ODc3OGRiMDNkNTM1MzRkMjBlMWQ0OWVmNzBjY2Y4YjYwMzUzZmExYzA5MTVlN2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyYzViMGY5MDIyOTA4MzBhNDA2MjY4M2U3NzUwMmIwZTY0ZDhmYjFiZGE3MTRlMTlhNDRmYTY2Y2FiNmQ1NjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlN2NmZTU4NWFhZDMxMzQzYzY5MWM0ZjE5NjdjMTI0ZGZjMjJjOTQyNzM2OWY5MDQzZmY1ZGRhNDhmM2Y0NTAifQ"
         }
       ]
+    },
+    {
+      "id": "claim_ce4e7439ff114a47b526801d2f959227",
+      "statement": "skill_status 的定位靠三条 pattern 各恰好命中一次：行循环锚点 kRowLoopSetup（12 字节 imul rdi,rsi,0x34 + add rdi,rbx + vxorps，无 0 字节、全 .text 唯一）加它前 0x800 字节窗口里的两条发布指令 kBufferPointerLoad（mov rbx,[rip+d]）与 kSlotBaseStore（mov [rip+d],rcx 槽首与 vmovups [rip+d],xmm0 指针字段）；两条发布指令都用 DecodeRipTarget(…,3,7) 解（7 字节指令、位移在 +3），解出的槽首与指针字段必须正好差 8，且两者都要落在 READ|WRITE 且不带 EXECUTE 的可写节里（槽首按 24 字节查）；任何一条不成立就只记日志、g_slot_rva 保持 0，之后 GBFR20_WriteSkillStatusTable 每次拒 -2。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/layout_resolver.cpp#L446-L457",
+          "version": "repo-lines-v1:sha256:805f4927b78816fb2fb26a1d3263106f8132658bb906546662d0bd72d8dc8914:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MjZjYjBhNTcxNzdiOGJhMzBiNTQwMTlhZDcyMWY1ZGVlODcwMzMzNzEwNDU5YzZhM2Y0ZWVlNDVhNDhmNGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlYTEzM2IwY2NjNWJiMGMzZTBmMGJiZWRkNTg3MThlMzU2Yjk1ZTJjZjM0MGViMDgxZWJlNWYwMzQ0ZjBmYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiZjljMTc2ZTQ1ZTRjYzJlNTBkMjExMjIyNTlmMWEyMzM4Y2M0YTI1ZWU1ZTdjOTYxMzJlZGQ4NDc2NzNmYmQifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/safe_game_access.cpp#L14-L37",
+          "version": "repo-lines-v1:sha256:613454f128d91dcb672354519dde144d4087eda9a43ae316095a8dadb3bb40ac:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5NjM3MjYwNmVjODY3YmJmYzdjYzY1NTFlZmY2YjU4Njg5N2ZlYmNmZTBmYTM4NDc3ODdiZmZhOTc1NGQyNTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzNzhlYWNmY2I5OTk4MTViZjg1ODZhMmExZWUwMzVmM2ZlYjJmMjM4ZDkwMTBiYWQyZmRkODMxZWY0N2Q3MTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4MTU2YTJjODQzYWM4Yjg1NzFhZTliY2EwM2RiZmIyMDMyYzgxYzhhNmZkN2ExYmRkZWM3ZTNjYjJlYTA1Y2IifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L22-L44",
+          "version": "repo-lines-v1:sha256:a0e2c4535d4618cf74c31b5c7b2d5aa767795213a9931023567922841874726a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjOTYzYTU0ZDk5MDY0MWEyNGYxNjdjNmQ2NDZkYzc2MDA0YjQwMzFmNDlkNDJhMmYwNTdhYmVkY2ZjMzA1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4OWU0ZTgwMDgzM2IyMWI0MWYwNTlmYjVhOGZlMzUzOWNkMzkxMzcwYzY4ODRlZTYzM2U3ZTEyYmY3ZGM2NzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMzU0YWI4YzJlN2UwODNhNDVkZTY5MTk5Zjc0MDA2NzgwNjIwNTI1NjQ4YTZhMGVkYTIyNjljOTIxM2Q0MDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiNGIxYmUyNzA5NzE1ODgyYWNlNDdmN2RiMDMwNWU0YjZmNjUwZjBiMDEzYzMwMTc2NzcwOGIwZTkzZTM5NTAifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L280-L318",
+          "version": "repo-lines-v1:sha256:25576557c63b02094b6779d7e49cd1a2d558a5aa3b6c96918abdd0c34e415499:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmOTY3MDcwMDMwODU1YWM2NDg0NzhmOTdiYjllYzMzNGI1MzAzZTM4ZjQ2ZTE5MGIyOTIxNTY1ZDVhNjQ5OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0NzM1ZjFmNjRlYzE5ZWMzM2ZmMjVlZTNiZDI3NGIxMzM0Mjc0MTYxNWJjODUzYmNiMmY4ZTU5MmQ4Y2EwOWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5ZTViMTI2ODYyNGJjZmI0YTc1YjRkOTAxMDhiODQxNDI3ZDY0ZTY1YjFlYzNiMmVkZWViNDliOWYwODEwYjcifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L62-L74",
+          "version": "repo-lines-v1:sha256:c1275a30214017bff78fd403d804861b620a748f06b0c160e89cd68dc473732b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5NTQ0YjIzZjI0ZDdhOTU3ZDcyNTA2NDMwNjNmNzYwY2EwZGNmZmM3MTI1NDZjZTg1MzY3MDdhYjZkNzZiNmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkYWNkZmRkNzY2NDRhNGQ0MDk4MGVhMjNkMTZmMDZkYTI2MTAwMDRhZWIxMGY5NGY3MDBiMGIzYmNiMGJmYTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMwMjczMmU0OWEwOWU5NmNmYTZmOWRhMWZlMzQxZTA2YTc2YmFhY2JlYzM1NDJhZGMyOGRhYWIzNTNmN2E1YmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7673fcc75ccb4611a30157803f95c4bc",
+      "statement": "limit_bonus_param 的行循环锚点是 7 字节纯语义序列 kLimitBonusRowLoopSetup（imul r14,rsi,0x54 + add r14,rbx），全 .text 恰好一次；它窗口里的门只有「缓冲区指针加载」那一条——kSlotBaseStore 与这张表的发布指令形状不同、实测在该窗口 0 命中，拿它当门等于永远拒写，所以只写进日志；解出的目标是**指针字段本身**的 RVA（这张表没有槽，也没有「槽首 = 指针字段 − 8」可用于静态交叉验证），存进 g_limit_bonus_pointer_rva，运行期 TryGetLiveLimitBonusBuffer 每次现读 g_image_base + pointer_rva；身份改由运行期承担：行数必须落在 1..kLimitBonusMaxPlausibleRows(1<<20)（否则 -9）、目标 Key 在整张表里恰好一次（重复 -10、找不到 -11），失败时该导出每次拒 -2 而不影响初始化。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_api.h#L30-L36",
+          "version": "repo-lines-v1:sha256:8470b55ec71b195089341edc72eb59be5c72375b25a289c500b8807f109d4a9d:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMmU3NzJmMGEyOThjY2IwNjRjOTBlMzBmMzI1MDY5N2M2NGM2NWZkZGM5YWUxYTg2ZmQ5MGU1NzY3NDZjZGJmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWQ0ZWNhYzY1ZGI3OGYyZTNmYTE3ZDIxZWUzM2U4OWY2Y2JkZWQ4MTg1NTk3ZDM1NGQzYmEyMjk3ZjUwZTJhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZjN2RiOWFkNmEzYjcxM2MzN2IwZmUwMjI5NzAwOTg2Y2NlMTY3OGZlODFkNzkzNzY1ZGYxYWUzMjQyNTI0MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQ4MzY3ZjAwZmY0N2VhMzA2NTI2NGVkODhlNGY1YTFmNWQwOTY0NDA2MmUwMjI5ZjFhMTQ1OTdlNmVkODhmYyJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L196-L216",
+          "version": "repo-lines-v1:sha256:6349f96cb78d6eb24198dc315311be428977fa7d1a33eacb4845499e180a3202:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2ZDY5MmRiYWIwNmI4NDhkZWI1NWQ5YWFkYTU1YWMyNzIxMjQ3ZGQwNjUzNmQyNTljZjNmZGE3ZjYyNDJmYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwNjAxZTVjNzIyMDIwNzIwMzI4M2U0YWZhMjk5ZTNhYjc1MjhmZjNlMWViZDY0M2RlZTg4MTM1ZDU5ZjAyYzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5NjgwOWQwOTI2OWZiODk5NTVhNjM0MTAzMTc3Y2VkODk1OTc3OTAwMDdhOWI4ZTQ4Y2QyZjAzZjVkMGYxYTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNhNjc1NDRhMTM4OTE1NGQ0YzAxMmVkOWRhMGM2YWE0ZTZiOWY1ZDZkZTIyMzFmYjNmZDMzNzYxMGEzZWE3ZTEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L218-L231",
+          "version": "repo-lines-v1:sha256:ca34a5847ec8a772a71d8ef1442cb7a692bb791443ceffa0f28f1d5a8af1cf20:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyZTFjOGExYWJlNzFkZTY2ZjY4YzdkMGMwNDM3ZjBjNjgxMGQyNDg4ZDUyOWFlOTI4OGEyMjI3OWI4NTU0OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY3ZjdlYmQxNTQzNzcwZjcxMDkzNTZjODYyZjFhMzgwYTU4YWNlMTQ0YTE3ZTczN2YyYmI2NWMwYzY5NTdkYjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlN2NhYmJmZWVlMDEwZGJlNmZkOTVlZDRlMjdiZTM0ZTcwNzlhZDkxNWIxZTNkZmFhODI5OGUzZTAxOWUxNzQifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L347-L390",
+          "version": "repo-lines-v1:sha256:26ca90bf6d489eee272c2c9c822903553e91a900a2a40e45dcf20b8b5725822a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2MDliMTRkM2I3YzdhZjc0N2JhYTQxNjIxM2RhNTA3NGM3YzNjMTlkMzA1Njg3Y2VhMTAzMWM1Y2EyNzU2ZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk2ZjkzZDVhMjJjYmYxNzYyNjk0NGU2YmZhM2I2ZDM5NDM0NTBkZTRhNjlmNmQwMDg2YzUwODg2N2RlNDFlYTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NzY1N2E0NGFiZWZiNWExMDYyOWRlMzhkMDFiMmZiNWU4NGM0Yjk1Y2MyYWQ4MTY3ODQ5OTI4ZTE3MzgyYTgifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L392-L416",
+          "version": "repo-lines-v1:sha256:77d93b725c3223c7286eb0a53a039373fc76607d538307e8cb02d3d50107ddde:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc5NjQ4NzIyNTgwYWQzMDE3MDZmZWFmNGFlNzMzNmFhMzc1YTVjNzY5N2RjMTZkZWM1ZGM3YjM3MDQzNjg4OTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NGQ1MjI1OWE4YTNmNTA3ODgwMjdjMTVjNDBkYzhmMDg0YTc2MWIwNTlkZDNmYTkxYzAyZDQ3Y2JlYzlmMTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c1b6e45d5f88461e8bba40939acf51c7",
+      "statement": "table_slot.cpp 的 SearchAnchorWindow 把两张表的扫描收在一个 SEH 帧里：行循环 pattern 由调用方以模板参数传入（两张表行步长不同），窗口里那两条发布指令一律数出来，要不要拿哪条当门由调用方决定；窗口宽度是 min(0x800, 锚点之前的字节数)，连 kSlotBaseStore 的长度（20）都不到就直接提前返回、窗口内计数保持 0，失败日志报的是实际扫过的 window_bytes 而不是那个常量（锚点靠段首时会误导排查）；三个计数各自要求恰好 1 由调用方 fail closed。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L110-L156",
+          "version": "repo-lines-v1:sha256:3558948c5063e4a64cd414be070379a02c577ff821059a44c0b75e30782c3050:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjMGZiNWUzZGJlMzUwYTUyNDFlOTNhMzY3N2YwNzU4NGUwNDBkMDZiNTczZWJlM2NlOGE5Y2M4MjYzZjE0ZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJmMmEwYzBlMWYxYTRmMGQxNjYyNGM3NDA5YTZhZDQwMGJlNjM5YjMzYmNhMDNlNThiMzQ5OTY2ZDFkN2UzYjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFlMGE2OTNkNTUwZTBlMzhkYzA4YmY1NzJkMmE1M2NhMWE1OTIzYmMyZDAyZjAzZjk0NTUwMWQzNDY0ODliYTcifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L282-L293",
+          "version": "repo-lines-v1:sha256:fb7047c5db15662c803d8eda4fe78e3f54b5e483e99d93260df48e1ac6a82566:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZWY3ZGM4YmJiMWY4M2ZmZmQ1NThhNjgyNjQwM2RlOTE4OWIyN2UxY2JiYmVkYjRjYjAyYzI1ODI0NmJmM2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFhZGZmMjgyNTZhYTliZTQ4MzFlZTM0ZGJjNDRjMjIzMTI1MTM1N2JmZWZhYzI5NWY5ZmNjMzUyMmViNzE2YWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhYmNmMjQ4OWQ5NWNjNWIxMWVmZjg0ODZkMmIxODQzNmQ2NjFhMGQ0MzQ4ZDdkNDgzOWYxMTNiMzlhOTBiOTIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L362-L373",
+          "version": "repo-lines-v1:sha256:be0fd68704d68967e54fb143e1f9a7990df55aec8895b6fdc7468b7042d0cc75:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxMjdlYmZhN2EzN2ZkOTA1Yjc4MDAwMmEyNjBiMWZkOGQwYmU5YWEyZWJjMWJkODZjYjFhYzIzZTExZmQ2MzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjNTU3NTExZmJjZjFhODJjNDY1MDJjMjViNjMwZGMxMjAxMWVmZGQ0Y2U3MDAwZDEyOTMyYzQ5MjUyYThjZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMxYTdhNWI5YzI2MWY4MWZjZjJiNmE2MGJhODhlMTlkMzIzNDkwMDdmOTg0OGNmOTMyY2FmYjMyYmFjMjYzODAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_86dcb57bc8c84af9a223ed8331e52b6e",
+      "statement": "两张活表的定位都在 Initialize 里、InstallHooks 之前解析（safetyhook 会改写 .text，锚点必须用没被改写的字节匹配）；它们与钩子装没装成无关、不参与 g_hooks_ready，失败只记日志并让对应导出从此一律拒写——所以「钩子装好了但某张表没解出来」与「表解出来了但钩子没装成」都是合法结局，与布局解析失败「什么都不装」的语义刻意不同。",
+      "evidence": [
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/native_internal.h#L280-L293",
+          "version": "repo-lines-v1:sha256:d8db5a295c0f270317fad02890942e4e9f7289ac2a3cfff0fd5eaab036607372:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxMTMzMGE5NmIyYzVlNjg0NDMzZWU5ZWFlNmExZjI2NGNlMTA5NWY2Yzc5MGU4YTVmODQ5NmFjMjhmODlmN2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4NzJlYjJkZjM5MzQxZmI5OGJiYzMzMmQ0MDFkOTU3MWIzMmY2MzE1ZTMxZGYwNWFjNzg3MmJkZDkzNTFhZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzZTIxZmVkZWRiOWY0YjY5NTc2NjI1YTQ1MTZjODU0NGIwZGM3ZWJiZDc3MzMwOTYxNzQzNTMyMjI4Mjk1OGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L42-L58",
+          "version": "repo-lines-v1:sha256:5eb0bb700c3804d6ea0118c840058363614ccedd6fecedfc7f37b1cfb760d6fa:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmZTc1NjA2NWFkNWM0MWZkYzI4MzliMjA4OWViYzg2ZDczOGZkODlhZGNkNjNjMjlkZjJhNmFjNjJhOTM1NWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1MzRhYTJjOGM0ZmM0MWJmOTM5M2Q4MDMzZTJkNzhjM2U3NjViNjM4YTRmNzJiNWU2M2E1YjgwM2NmY2M1NmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0NzM1ZjFmNjRlYzE5ZWMzM2ZmMjVlZTNiZDI3NGIxMzM0Mjc0MTYxNWJjODUzYmNiMmY4ZTU5MmQ4Y2EwOWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlY2JmMzA0MmI0MzE1MGQ3ZjI3MTJhNDMyODg2OTlmNDBkODU0Yzc5ZjkyNWNmYzYwOWI5YTExMzk1MjgxNzYifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L270-L293",
+          "version": "repo-lines-v1:sha256:08017026e8c861602f45d6f171bbdba8115e029eff0be1f8bba52891eaaaff41:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2Yzg4ODRjZDM3OWRlYjA0YjUyZGNjM2I4NjAxNDMwOTIzOGI1ZDZhZTIzMGJkNjA0NDJiNDViYWFiMTM0N2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlYTEzM2IwY2NjNWJiMGMzZTBmMGJiZWRkNTg3MThlMzU2Yjk1ZTJjZjM0MGViMDgxZWJlNWYwMzQ0ZjBmYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhYmNmMjQ4OWQ5NWNjNWIxMWVmZjg0ODZkMmIxODQzNmQ2NjFhMGQ0MzQ4ZDdkNDgzOWYxMTNiMzlhOTBiOTIifQ"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout.Native/src/table_slot.cpp#L347-L373",
+          "version": "repo-lines-v1:sha256:059f6cde2f8b075ee0be246f4bf6df42883baea2877d6724e57044b51469c754:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2MDliMTRkM2I3YzdhZjc0N2JhYTQxNjIxM2RhNTA3NGM3YzNjMTlkMzA1Njg3Y2VhMTAzMWM1Y2EyNzU2ZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk2ZjkzZDVhMjJjYmYxNzYyNjk0NGU2YmZhM2I2ZDM5NDM0NTBkZTRhNjlmNmQwMDg2YzUwODg2N2RlNDFlYTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMxYTdhNWI5YzI2MWY4MWZjZjJiNmE2MGJhODhlMTlkMzIzNDkwMDdmOTg0OGNmOTMyY2FmYjMyYmFjMjYzODAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d1cb82aa676042fcbea883f92b7cd14a",
+      "statement": "验证覆盖面按锚点族切分：tests/NativeLayoutHarness 只编译 layout_resolver.cpp 与 safe_game_access.cpp（run.ps1 的 cl.exe 命令行），所以布局那一族的四条 pattern、九条预检与「翻一位就拒」的 fail-closed 有离线证据；而 table_slot.cpp 的四条 pattern、命中数、+8 关系、可写段判定与两张表写入的每一道闸没有离线证据，只能靠真机日志；并且「解析通过」只说明这些字节在这个 exe 里还认得出来，不等于钩子落点正确、解出的槽就是游戏在用的那张表、或写入在游戏里生效。",
+      "evidence": [
+        {
+          "resource": "repo://tests/NativeLayoutHarness/program.cpp#L1-L7",
+          "version": "repo-lines-v1:sha256:aff79b3fef9618f761304b916be3357e1934313088917dbf652197b02bda25d3:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjc0MWEwNTFjZmNiMjczZTExMjhmNDNmZjdlNTI5MThiNWU1OGIzZDQ5NTAyODA0YTBkNGY1OGNjMjZhOGY4OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDhhMDI3MTQyOWU2MWIxZDM1ODQ1OTBjMzA1OGU3Njc4Njk3MzVmMjIzOWJjODQ4MTc5ZDE2YTEwZWRlY2ZiNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmJiZjQzMzQ1ZjFkMjQyYzZhODA1YjJlODQ2MTdiYjA1YjYzZTc4NzAwYmU3Mzk3NGJkNWFlN2NmNjJmMDlmZCJ9"
+        },
+        {
+          "resource": "repo://tests/NativeLayoutHarness/program.cpp#L63-L77",
+          "version": "repo-lines-v1:sha256:698db752fec24a05b2b9e4ca1cbdbd86b7c5b21367e60967ae8d6c6cb7d6a196:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyMGVkZTRiZWJhNDRiMzI1MTU2Njk3OTE1Nzk0NDRkOTI3ZjdiYTA3NTQ2MzZhOTU2ZTg4N2FiZDdhNWFmYjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzMzNmNzc2MDkyZmYxZWNlYjg1ZTljNmNiZWJmYjIxODZlOWJlMGJiNzgwMzY0MDAzYWJkZDhmM2U3MGNkMTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmYzVkOGVjN2Q1M2E5MTkzMzI1NjYzZGMwZTdjYmZiZDgzZTg3ZGY3N2UxYzk2NmI2NjU3ZmU2NTc4NDBlMGQifQ"
+        },
+        {
+          "resource": "repo://tests/NativeLayoutHarness/run.ps1#L28-L36",
+          "version": "repo-lines-v1:sha256:a17a298279f252e0b57d91d0914e06884a228e867372846628fe60a3890933c8:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODcxZGU5NWU1Y2Q3NGQzZWQ5YTJjNDA3NGU5ODNmMzcyY2I1Zjk5Nzk5YjExZTcwMTNiMjEwZjRkOTE3OTkwMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDNmZDMzOGM4M2M2ZDE5NzAwMjM1MDcxYmM2ZmJiYTJhNmJlNDMxYjZlYThkMjRmODA4N2RiNmY4MjI5ZTMyOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWVkNzQxM2RiMzI3NDNkYmQ0YWVlZGQxNmQ1OTE4MmQ2N2FkNjA0ODBmMDY1ZmMyN2VlODk5ZDkxMjI0MDkwMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzBjMWFlYzdkNTE1ZmIzOGQwMmMyNWNiODNjYTRjODZjMzc3NmU4NTUyZDI3ZTUyNDE3MzIyZjA4ZGRlYzA5NCJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T00:51:14.273Z"
+    "at": "2026-09-27T21:57:50.417Z"
   }
 }

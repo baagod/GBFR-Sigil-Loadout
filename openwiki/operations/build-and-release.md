@@ -51,9 +51,6 @@ sources:
   - id: openwiki-source-10778beddac6e1744ce68515
     resource: repo://tools/deploy.ps1
 generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T18:48:22.808Z
 ---
 
 # 构建、发布与部署链

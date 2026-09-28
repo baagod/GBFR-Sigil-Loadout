@@ -1,8 +1,11 @@
 ---
 type: architecture
 title: 可视工具前端（React）
-description: SigilLoadout\frontend\ 这棵 React 树：三个页签的分工与 keepMounted 的理由、App.tsx 的加载时序与三道「不写盘」门（loadoutRead、数据表为空、editListRead）、单一失败通道 Failure、编辑到载荷到 Go 绑定的单向流、键盘与焦点两组全局监听、语言与显示名及托盘文案的三层分工、两个生成绑定模块（loadoutservice 与 shellservice）的分用，以及 dist 与 bindings 的构建约束与测试边界。
+description: SigilLoadout\frontend\ 这棵 React 树：四个页签（配装 / 专属因子 / 因子编辑 / 能力强化）与 keepMounted 的理由、App.tsx 的加载时序与三道「不写盘」门、单一失败通道 Failure 与来自 Go 的 SaveFailed 事件、编辑到载荷到 Go 绑定的单向流、lib/ 纯逻辑层与 components、hooks（useLangTable / usePanelFailure / useRowTooltip / useWheelStep）的分工、语言与显示名与托盘文案的三层来源、四个生成绑定模块的分用，以及 dist 与 bindings 的构建约束与 vitest 边界。
 tags: [architecture, frontend, react, wails, i18n, state]
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-27T21:57:50.417Z
 sources:
   - id: openwiki-source-39c3295efc089133e87a9c80
     resource: repo://CONTEXT.md
@@ -12,117 +15,145 @@ sources:
     resource: repo://GBFR.SigilLoadout/UserConfig.cs
   - id: openwiki-source-77d89298944beb882bffc37e
     resource: repo://SigilLoadout/.gitignore
-  - id: openwiki-source-28e17aef37a08069d987ca05
-    resource: repo://SigilLoadout/assets/sigils.lang.json
-  - id: openwiki-source-9e45365fcf44633af4489b2c
-    resource: repo://SigilLoadout/editservice.go
-  - id: openwiki-source-dd775deef689d74bf9308776
-    resource: repo://SigilLoadout/frontend/bindings/sigilloadout/editservice.js
-  - id: openwiki-source-a85a1f0fb38686e45b8a923a
-    resource: repo://SigilLoadout/frontend/bindings/sigilloadout/shellservice.js
+  - id: openwiki-source-ee18949472ced70f3a6579cc
+    resource: repo://SigilLoadout/appfiles/debouncedwrite.go
+  - id: openwiki-source-443bdba86cf7de8013f2e871
+    resource: repo://SigilLoadout/frontend/bindings/sigilloadout/service/editservice.js
+  - id: openwiki-source-f8fe6e11f7ffa21f902acea5
+    resource: repo://SigilLoadout/frontend/bindings/sigilloadout/service/limitbonusservice.js
   - id: openwiki-source-fd6c5970b28f6e4327a545e3
     resource: repo://SigilLoadout/frontend/index.html
   - id: openwiki-source-df2192c06b0ec71699fdac08
     resource: repo://SigilLoadout/frontend/package.json
   - id: openwiki-source-49f1f8d8049b397adb1880a2
     resource: repo://SigilLoadout/frontend/src/App.tsx
-  - id: openwiki-source-0220ab7bf8f6670ff54ba0d9
-    resource: repo://SigilLoadout/frontend/src/ErrorBoundary.tsx
-  - id: openwiki-source-c47140156ddd80fe7b801b56
-    resource: repo://SigilLoadout/frontend/src/exclusive.test.ts
-  - id: openwiki-source-35bfa15a0bffce3055471ebd
-    resource: repo://SigilLoadout/frontend/src/index.test.ts
-  - id: openwiki-source-798e7a6a1018647de37a73c1
-    resource: repo://SigilLoadout/frontend/src/lang.ts
+  - id: openwiki-source-fc1fa13fb4dc655cf3a934e0
+    resource: repo://SigilLoadout/frontend/src/components/ErrorBoundary.tsx
+  - id: openwiki-source-1f98652ce70afbb64604d0da
+    resource: repo://SigilLoadout/frontend/src/components/ExclusivePanel.tsx
+  - id: openwiki-source-7a94f090341918c64d365c56
+    resource: repo://SigilLoadout/frontend/src/components/LimitBonusEditorPanel.tsx
+  - id: openwiki-source-8ec35cdd2079d8eed35be2b6
+    resource: repo://SigilLoadout/frontend/src/components/PanelFailureDialog.tsx
+  - id: openwiki-source-75660dcc504a4e2003faea78
+    resource: repo://SigilLoadout/frontend/src/components/SigilEditorPanel.tsx
+  - id: openwiki-source-36806a9e31bb7279d14b78c8
+    resource: repo://SigilLoadout/frontend/src/components/SkillPicker.tsx
+  - id: openwiki-source-443fea0b6577600a0c12e410
+    resource: repo://SigilLoadout/frontend/src/components/SkillRow.tsx
+  - id: openwiki-source-b86772a37aa66dda2f54de97
+    resource: repo://SigilLoadout/frontend/src/components/SlotEditor.tsx
+  - id: openwiki-source-adb666885f41399d22cb8e7f
+    resource: repo://SigilLoadout/frontend/src/hooks/useLangTable.ts
+  - id: openwiki-source-5a9608cb05216eb5aa235b09
+    resource: repo://SigilLoadout/frontend/src/hooks/usePanelFailure.ts
+  - id: openwiki-source-a4d4c91c62ae0a316e451cd9
+    resource: repo://SigilLoadout/frontend/src/hooks/useRowTooltip.ts
+  - id: openwiki-source-c3082bd82d6e3dbf34130541
+    resource: repo://SigilLoadout/frontend/src/hooks/useWheelStep.ts
+  - id: openwiki-source-ea4633ba3ec58bcfe7da1ee9
+    resource: repo://SigilLoadout/frontend/src/lib/chara.test.ts
+  - id: openwiki-source-0fe77b72bae817ccbb6fcb38
+    resource: repo://SigilLoadout/frontend/src/lib/chara.ts
+  - id: openwiki-source-0cb6bb5724c2f67ef95d60da
+    resource: repo://SigilLoadout/frontend/src/lib/exclusive.test.ts
+  - id: openwiki-source-57281430550908a6af1aec8b
+    resource: repo://SigilLoadout/frontend/src/lib/index.test.ts
+  - id: openwiki-source-7b3fec996613d10249195a09
+    resource: repo://SigilLoadout/frontend/src/lib/lang.ts
+  - id: openwiki-source-a5791fb6c254b4ce5b3c1a6c
+    resource: repo://SigilLoadout/frontend/src/lib/limitbonus.test.ts
+  - id: openwiki-source-a20f82cd5bc0831945fe30c1
+    resource: repo://SigilLoadout/frontend/src/lib/limitbonus.ts
+  - id: openwiki-source-f4c19215e37bf7677968c15b
+    resource: repo://SigilLoadout/frontend/src/lib/messages.ts
+  - id: openwiki-source-93d1ab19acc94224bce0296e
+    resource: repo://SigilLoadout/frontend/src/lib/model.ts
+  - id: openwiki-source-4810591fb1e4d56efb6ee384
+    resource: repo://SigilLoadout/frontend/src/lib/skills.test.ts
+  - id: openwiki-source-d3b5bf99650fdebfda6fe975
+    resource: repo://SigilLoadout/frontend/src/lib/skills.ts
+  - id: openwiki-source-a2c2726155e899f5fd47e57e
+    resource: repo://SigilLoadout/frontend/src/lib/variant.test.ts
   - id: openwiki-source-a048add058495ed081532b90
     resource: repo://SigilLoadout/frontend/src/main.tsx
-  - id: openwiki-source-feaf623f526a117e9d09327c
-    resource: repo://SigilLoadout/frontend/src/messages.ts
-  - id: openwiki-source-00406d1c826c7d1ff3bde8c3
-    resource: repo://SigilLoadout/frontend/src/model.ts
-  - id: openwiki-source-d14d5931f805c1b9a18ee717
-    resource: repo://SigilLoadout/frontend/src/SigilEditorPanel.tsx
-  - id: openwiki-source-caf12c75e23e9b65e5a655d3
-    resource: repo://SigilLoadout/frontend/src/SkillPicker.tsx
-  - id: openwiki-source-5f0c170c11463b241ec17c7e
-    resource: repo://SigilLoadout/frontend/src/SkillRow.tsx
-  - id: openwiki-source-c44d7ff9667bd1df7bc748e4
-    resource: repo://SigilLoadout/frontend/src/skills.test.ts
-  - id: openwiki-source-d598ed9d8aa0ee15a7fbb629
-    resource: repo://SigilLoadout/frontend/src/skills.ts
-  - id: openwiki-source-57a5fafa103ff743fd902b0d
-    resource: repo://SigilLoadout/frontend/src/SlotEditor.tsx
   - id: openwiki-source-90451a8152f9323a8fecb044
     resource: repo://SigilLoadout/frontend/src/style.css
-  - id: openwiki-source-d5b4fb230d3870306ef8f993
-    resource: repo://SigilLoadout/frontend/src/useRowTooltip.ts
-  - id: openwiki-source-907399482fab967a385958f7
-    resource: repo://SigilLoadout/frontend/src/useWheelStep.ts
-  - id: openwiki-source-a56bf21419a4cd39540e5ed0
-    resource: repo://SigilLoadout/frontend/src/variant.test.ts
   - id: openwiki-source-db183fc9438957e49306adb6
     resource: repo://SigilLoadout/frontend/tsconfig.json
   - id: openwiki-source-4f89faf1fec1d8e8809ed737
     resource: repo://SigilLoadout/frontend/vite.config.ts
-  - id: openwiki-source-47cff6e6e142f07c1c683a7b
-    resource: repo://SigilLoadout/loadoutservice.go
   - id: openwiki-source-c7e5cf0f4bafb65a385c950e
     resource: repo://SigilLoadout/main.go
+  - id: openwiki-source-44145d1a224cd090d5c63160
+    resource: repo://SigilLoadout/service/assets.go
+  - id: openwiki-source-1364fc25d209813bb2cabf25
+    resource: repo://SigilLoadout/service/editservice.go
+  - id: openwiki-source-61a1d94ae2d70821d7cd572c
+    resource: repo://SigilLoadout/service/limitbonusservice.go
+  - id: openwiki-source-25ad819bf991f7cada152bf7
+    resource: repo://SigilLoadout/service/loadoutservice.go
+  - id: openwiki-source-ffa138a922fb88f75a7582fb
+    resource: repo://SigilLoadout/service/shellservice.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-  - id: openwiki-source-732af211fb1778c973e768f0
-    resource: repo://SigilLoadout/shellservice.go
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T18:48:22.808Z
+generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 ---
 
 # 可视工具前端（React）
 
 可视工具（`SigilLoadout.exe`）的界面是 `SigilLoadout\frontend\` 下的一棵 React 19 单页前端，构建产物是 `frontend/dist/`，由 Go 侧 `//go:embed all:frontend/dist`（`SigilLoadout/main.go`）在**编译期**嵌进 exe，再作为 `application.AssetFileServerFS(assets)` 的资源处理器交给 Wails。所以它**不是第四个交付单元、也没有独立的发布物**：改了 `src/` 之后不重建前端、不重新 `go build`，运行的还是上一次嵌进去的那份界面（顺序见「构建约束」一节）。
 
-本页只讲前端这一个运行时域：模块划分（哪一半能脱离 React 与 DOM 测、哪一半只能留在组件里）、外壳级不变量（加载顺序、写盘顺序、页签与失败通道、键盘与焦点）、`model.ts` 里的载入→保存规则、语言的三层分工（含托盘那一条文案怎么推到 Go 侧），以及两个生成绑定模块、入口与构建约束。
+本页只讲前端这一个运行时域：源码这棵树怎么分层（哪一半能脱离 React 与 DOM 测、哪一半只能留在组件里）、外壳级不变量（加载顺序、写盘顺序、页签与失败通道、键盘与焦点）、`src/lib/` 里载入→保存的规则、语言的三层分工（含托盘那一条文案怎么推到 Go 侧）、四个生成绑定模块、入口与构建约束。
 
-以下内容**不在**本页，请点过去看：载荷字段规则、Go 侧校验与两道 mtime 门、托管侧的三段式应用在 [工作流：配装落盘与应用](/openwiki/workflows/loadout-apply.md)；`sigiledits.json` 的编辑记录规则与热应用在 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)；两个文件的形状、常量对拍范围与「各只有一处声明」的纪律在 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)；专属表的语义在 [虚拟槽位、专属因子与它们的开关语义](/openwiki/concepts/virtual-slots-and-exclusives.md)；Go 外壳、窗口三态与「前端 Esc 调到哪个 Win32 消息」在 [可视工具（Go + Wails）：装配、单实例与窗口状态机](/openwiki/architecture/visual-tool.md)。
+以下内容**不在**本页，请点过去看：载荷字段规则、Go 侧校验与两道 mtime 门、托管侧的三段式应用在 [工作流：配装落盘与应用](/openwiki/workflows/loadout-apply.md)；`sigiledits.json` 的编辑记录规则与热应用在 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)；`limit_bonus.json` 那条链路（`values[i]` → `Lv(i+1)`、mod 侧的整条跳过与热应用）在 [工作流：能力强化落盘与应用](/openwiki/workflows/limit-bonus-apply.md)；三个文件的形状、常量对拍范围与「各只有一处声明」的纪律在 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)；专属表的语义在 [虚拟槽位、专属因子与它们的开关语义](/openwiki/concepts/virtual-slots-and-exclusives.md)；Go 外壳、窗口三态与「前端 Esc 调到哪个 Win32 消息」在 [可视工具（Go + Wails）：装配、单实例与窗口状态机](/openwiki/architecture/visual-tool.md)。
 
-## 模块地图：外壳、页面、纯逻辑、文案
+## 模块地图：外壳、页面、纯逻辑、hook
 
-前端的划界不是按文件夹，而是按**「这段规则能不能脱离 React 与 DOM 测」**：
+前端的划界不是按文件夹，而是按**「这段规则能不能脱离 React 与 DOM 测」**。三个文件夹正好是三层：`src/lib/`（纯逻辑，不 import React，也不碰 DOM）、`src/components/`（渲染与事件）、`src/hooks/`（只碰 DOM 或只碰 Wails 事件的那几个副作用）：
 
 | 位置 | 角色 |
 | --- | --- |
-| `main.tsx` | 入口：右键菜单策略（全局唯一一条）、`createRoot(#app)`、把 `App` 挂进 `ErrorBoundary` |
-| `ErrorBoundary.tsx` | 渲染期异常的兜底：一句话 + 重新载入 |
-| `App.tsx` | 唯一的外壳：全部跨页状态、加载时序、`edit` / `saveNow` 落盘链、三个页签、失败状态条、Esc 与焦点这两组全局监听、托盘文案推送 |
-| `SlotEditor.tsx`（`SlotRow`、`HEADER_ROW`）、`SkillPicker.tsx`、`ExclusivePanel.tsx` | 「通用配装」与「专属因子」两页的行与控件 |
-| `SigilEditorPanel.tsx`、`SkillRow.tsx`、`useRowTooltip.ts`、`useWheelStep.ts` | 「因子编辑」页：列表、行、tooltip 归属、滚轮步进 |
-| `model.ts` | 因子表的**全部**派生关系（`buildSigilIndex`）、载入与落盘载荷、专属状态、变体解析 |
-| `skills.ts` | 一条编辑记录的规则：什么算编辑、地址去重、输入框按键状态机、等级与说明文本 |
-| `lang.ts` / `messages.ts` | 语言身份（有哪些语言、按什么猜）/ 四语文案表 |
-| `style.css` + `components/ui/*` | Tailwind v4 + shadcn（Base UI 版）原语，加上外壳与列表自己的几条覆盖规则 |
-| `bindings/` | **构建期生成物**，不入库；按 Go service 分文件（`loadoutservice.js` / `shellservice.js` / `editservice.js`…），而前端只 import 前两个（见「构建约束」） |
+| `src/main.tsx` | 入口：右键菜单策略（全局唯一一条）、`createRoot(#app)`、把 `App` 挂进 `ErrorBoundary` |
+| `src/components/ErrorBoundary.tsx` | 渲染期异常的兜底：一句话 + 重新载入 |
+| `src/App.tsx` | 唯一的外壳：全部跨页状态、加载时序、`edit` / `saveNow` 落盘链、四个页签、失败状态条、Esc 与焦点这两组全局监听、托盘文案推送 |
+| `src/components/SlotEditor.tsx`（`SlotRow`、`HEADER_ROW`）、`SkillPicker.tsx`、`ExclusivePanel.tsx` | 「通用配装」与「专属因子」两页的行与控件 |
+| `src/components/SigilEditorPanel.tsx`、`SkillRow.tsx` | 「因子编辑」页：列表、行、tooltip 归属、十个参槽 |
+| `src/components/LimitBonusEditorPanel.tsx` | 「能力强化」页：角色分组、一条能力一行、一个数值框 |
+| `src/components/PanelFailureDialog.tsx` | 两个编辑页共用的那个 `AlertDialog`（渲染半边） |
+| `src/lib/model.ts` | 因子表的**全部**派生关系（`buildSigilIndex`）、载入与落盘载荷、专属状态、变体解析 |
+| `src/lib/skills.ts` | 一条编辑记录的规则：什么算编辑、地址去重、输入框按键状态机、等级与说明文本、父行勾选态 |
+| `src/lib/limitbonus.ts` | 能力强化页的资产形状与「只写第一档」：`withFirstValue`、`valueAt`、`effectLabel`、角色与同名节点去重 |
+| `src/lib/chara.ts` | `assets/chara.json` 的形状（PL 码 → `{hash, element, color}`）：两个页签共用，所以不属于任何一页 |
+| `src/lib/lang.ts` / `src/lib/messages.ts` | 语言身份（有哪些语言、按什么猜）/ 四语文案表 |
+| `src/hooks/useLangTable.ts` | 「每语言一份的资产表」的加载器：进程内缓存 + 换语言重取 |
+| `src/hooks/usePanelFailure.ts` | 两个编辑页共用的失败通道：`SaveFailed` 订阅与对话框状态 |
+| `src/hooks/useRowTooltip.ts` / `useWheelStep.ts` | 列表 tooltip 归属（指针下那一行）/ 滚轮步进 |
+| `src/style.css` + `src/components/ui/*` | Tailwind v4 + shadcn（Base UI 版）原语，加上外壳与列表自己的几条覆盖规则 |
+| `bindings/sigilloadout/service/*.js` | **构建期生成物**，不入库；按 Go service 分文件（`loadoutservice` / `shellservice` / `editservice` / `limitbonusservice`），四个都被前端 import（见「构建约束」） |
 
-两条纪律写在这套划分里：
+三条纪律写在这套划分里：
 
-- **凡是由值单独决定的部分都不碰 React 也不碰 DOM**（`skills.ts` 的文件头），所以既能被 vitest 直接驱动，也意味着组件里只留渲染与事件。`skills.ts` 里最重的一条不变量是 `dedupe`：每个地址（`addressOf(key, level)` = `因子哈希#等级`）最多一条编辑，因为 mod 按顺序遍历列表、写进同一行的最后一条已启用的才生效；文件里仍可能有两三条，列表却只能显示一条。
+- **凡是由值单独决定的部分都不碰 React 也不碰 DOM**（`skills.ts` 的文件头与 `limitbonus.ts` 的文件头都把这条写明了），所以既能被 vitest 直接驱动，也意味着组件里只留渲染与事件。这条不变量只有一个实现：`skills.ts` 的 `dedupeBy(records, keyOf)`——「每个地址最多一条编辑」，因为 mod 按顺序遍历编辑列表、把每条已启用的写进它地址指定的那一行（因子是 `SigilEditorFeature.PatchRows`，能力强化是 `LimitBonusFeature`），同一地址最终生效的是**最后一条已启用**的。文件里仍可能有两三条，而列表只能显示一条，于是留最后一条已启用的；该地址一条已启用的都没有时留最后一条。两个页签各给它一个地址：因子编辑页是 `addressOf(key, level)` = `因子哈希#等级`，能力强化页就是记录自己的参数行 `Key`。
 - **因子表的派生关系只构造一处**（`buildSigilIndex`），一个 `SigilIndex` 对象替代七个 prop 传进每一行：下拉取值、显示名、等级上限、合法副集合，以及「保存时这个主因子该写成哪个物品 hash」（`gemOf` → `resolveMainGem`）。
+- **两个编辑页的状态容器本身就是去重的**：两页都用「按地址索引的 `Map`」保存编辑，容器排除了同地址的第二条，所以 `commit` 里没有一条路径需要手工去重或整体重建列表。
 
 ### 组件层剩下什么
 
-按上面那条划线，「值决定的部分」都走了，`SlotEditor` / `SkillPicker` / `SkillRow` / `ExclusivePanel` / `SigilEditorPanel` 里剩下的只有三类东西：把索引与规则算出的值画出来、把事件翻成对某个回调的一次调用、以及**只有 DOM 才知道的那几件事**。第三类正好四处，都值得单独说清，因为它们看起来像「随手写的细节」，其实是没法搬进纯逻辑的：
+按上面那条划线，「值决定的部分」都走了，组件里剩下的只有三类东西：把索引与规则算出的值画出来、把事件翻成对某个回调的一次调用、以及**只有 DOM 才知道的那几件事**。第三类正好六处，都值得单独说清，因为它们看起来像「随手写的细节」，其实是没法搬进纯逻辑的：
 
-- **滚轮步进（`useWheelStep`）必须是原生监听器，而且 `passive: false`**：React 把 `wheel` 注册为 passive，写在 `onWheel` prop 里的 `preventDefault` 毫无作用——浏览器照旧滚动，而数值同时也在变。所以这个 hook 自己 `addEventListener("wheel", onWheel, {passive: false})`，并把 `live` / `apply` 两个回调放进 latest-props ref（一次注册要读到渲染中途才有的最新值，回调变了不该换监听器）。两个使用者各有各的「这一滚算不算数」：`SlotEditor.tsx` 的 `LevelInput` 要求数字框正持有焦点（`document.activeElement === inputRef.current`，否则滚轮不动它、列表照常滚），并把结果夹在 `min`/`max` 里；`SkillRow.tsx` 的 `ValueSlots` 则按元素在容器里的位置找出是哪一个参槽，边界由 `skills.ts` 的 `stepValue` / `MAX_VALUE` 给。
-- **tooltip 归谁（`useRowTooltip`）**：行会在指针底下移动——一次勾选会把打开的内容排到最前——而 `enter`/`leave` 说不出「此刻指针下是哪一行」，所以列表这一层用 `document.elementFromPoint(...).closest("[data-row]")` 问文档，再把答案（`hoveredRow`）交给各行自己去比 `data-row`。两处配套的重放也在这里：Base UI 只在「打开它的那次事件是 mouseenter/mousemove」时才让弹层跟着光标，所以「指针进入」（`onRowPointerEnter`）与「勾选之后重新指向」（`resolveRowUnderPointer`）都要把进入过程在行上重放一遍；而一次勾选会让浏览器把仍然持有焦点的那个勾选框滚回视野，所以勾选之前 `keepScroll()` 记下 `scrollTop`，由同一个 layout effect 放回去。这份状态住在列表上，行只拿它跟自己的 id 比。
-- **方向键与 Esc 归谁**：`SkillPicker` 的触发器在捕获阶段吞掉 `ArrowUp`/`ArrowDown`（Base UI 在触发器上按方向键就会打开列表），方向键才留给字段导航与数值输入框自己的步进；`SkillRow` 的数值框则 `preventDefault` 后自己步进（否则方向键会把光标移到框末尾，在一个可滚动列表上还会顺手把列表也滚了），并把 Esc 定义成 `e.currentTarget.blur()`（外壳那条「Esc 隐藏窗口」因此要把 `.skill-rows input` 当浮层排除，见下一节）。
-- **正在输入的半成品文本暂存在组件里**：一个槽里的一次按键意味着什么、何时提交，由 `skills.ts` 的 `slotEdit` 作为数据返回（`drop` / `half` / `commit`），`SkillRow` 只负责渲染——`half` 的文本进 `halfTyped` 本地 state，`commit` 的 `values` 交上去，`commit.keeps` 让输入框在失焦前继续显示用户敲的那串文本（`0.0`、`0.00` 也是数字，用提交后的数字渲染会把后面输入的内容吃掉）。规则在 `skills.ts`，屏幕上怎么显示在 `SkillRow.tsx`，这条分工本身就是「组件没有单测也不慌」的原因（见「测试边界」一节）。
+- **滚轮步进（`src/hooks/useWheelStep.ts`）必须是原生监听器，而且 `passive: false`**：React 把 `wheel` 注册为 passive，写在 `onWheel` prop 里的 `preventDefault` 毫无作用——浏览器照旧滚动，而数值同时也在变。所以这个 hook 自己 `addEventListener("wheel", onWheel, {passive: false})`，并把 `live` / `apply` 两个回调放进 latest-props ref（一次注册要读到渲染中途才有的最新值，回调变了不该换监听器）。三个使用者各有各的「这一滚算不算数」：`SlotEditor.tsx` 的 `LevelInput` 要求数字框正持有焦点（`document.activeElement === inputRef.current`，否则滚轮不动它、列表照常滚），并把结果夹在 `min`/`max` 里；`SkillRow.tsx` 的 `ValueSlots` 按元素在容器里的位置找出是哪一个参槽，边界由 `skills.ts` 的 `stepValue` / `MAX_VALUE` 给；`LimitBonusEditorPanel.tsx` 的 `SlotBox` 一格只有一个框，所以不必认是哪一个。
+- **tooltip 归谁（`src/hooks/useRowTooltip.ts`）**：行会在指针底下移动——一次勾选会把打开的内容排到最前——而 `enter`/`leave` 说不出「此刻指针下是哪一行」，所以列表这一层用 `document.elementFromPoint(...).closest("[data-row]")` 问文档，再把答案（`hoveredRow`）交给各行自己去比 `data-row`。两处配套的重放也在这里：Base UI（`useClientPoint`）只在「打开它的那次事件是 mouseenter/mousemove」时才让弹层跟着光标，所以「指针进入」（`onRowPointerEnter`）与「勾选之后重新指向」（`resolveRowUnderPointer`）都要把进入过程在行上重放一遍；而一次勾选会让浏览器把仍然持有焦点的那个勾选框滚回视野，所以勾选之前 `keepScroll()` 记下 `scrollTop`，由同一个 layout effect 放回去。这份状态住在列表上，行只拿它跟自己的 id 比。
+- **方向键与 Esc 归谁**：`SkillPicker` 的触发器在捕获阶段吞掉 `ArrowUp`/`ArrowDown`（Base UI 在触发器上按方向键就会打开列表），方向键才留给字段导航与数值框自己的步进；两个编辑页的数值框则 `preventDefault` 后自己步进（否则方向键会把光标移到框末尾，在一个可滚动列表上还会顺手把列表也滚了），并把 Esc 定义成 `e.currentTarget.blur()`（外壳那条「Esc 隐藏窗口」因此要把它们的数值框当浮层排除，见下一节）。
+- **正在输入的半成品文本暂存在组件里**：一个槽里的一次按键意味着什么、何时提交，由 `skills.ts` 的 `slotEdit` 作为数据返回（`drop` / `half` / `commit`），组件只负责渲染——`half` 的文本进本地 state，`commit` 的 `values` 交上去，`commit.keeps` 让输入框在失焦前继续显示用户敲的那串文本（`0.0`、`0.00` 也是数字，用提交后的数字渲染会把后面输入的内容吃掉）。因子行的十个参槽与能力强化页那个框走的是同一条规则：后者把起点给成 `[null]` 再取 `values[0]`，因为「这一格只写第一档」是 `limitbonus.ts` 的 `withFirstValue` 该管的事，不该在组件里再写一遍。
 - **父行勾选框的三种状态与半选那根横杠**：状态由 `skills.ts` 的 `parentState` 给（按这一行**显示的**等级算，不按记录条数，否则「11 个等级开了 1 个」会被读成全选，半选态永远不出现），而画法只有 DOM 知道：Base UI 的 indicator 永远画对勾，所以半选那根横杠由 `SkillRow.tsx` 自己画（14 单位盒子里的一条 y=7.5 的线，落在像素行中点上才不会发虚），`style.css` 只负责把 `[data-indeterminate]` 的盒子刷成选中态填充并藏掉 indicator 里的 svg。
+- **「点的是控件还是行」只有 DOM 能判**：因子行的整行是它内部控件的快捷方式（点文字/箭头/空白都算点在行上、切换展开），判据必须是元素本身——`e.target.closest("input, button, [role='checkbox']")`——而不是 `data-slot` 属性：行里的控件是 `<input>` 与 Base UI 的 `<span role="checkbox">`（它不渲染成 `button`，所以不能只写 `button`），而列表外面也有 `data-slot` 的元素（整个面板就包在 `TabsPanel` 里），拿属性当「这是控件」的代理会把每一行都判成控件、因子再也展不开。
 
 ## 入口纪律：一条全局监听与一个兜底
 
-`main.tsx` 只做三件事，顺序就是全部纪律：
+`src/main.tsx` 只做三件事，顺序就是全部纪律：
 
 ```mermaid
 flowchart TD
@@ -143,12 +174,12 @@ flowchart TD
 
 ## 外壳状态与加载时序
 
-`App.tsx` 拥有全部跨页状态：`skills` / `sigils`（因子表）、`slots`、`loadoutRead`、`failure`、`tab`（`TabKey = "general" | "exclusive" | "sigilEditor"`）、`exclusiveTable` / `exclusiveState`、`names` / `charaNames`、`lang`。派生索引由 `useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])` 重建——`names` 是唯一会随语言变的输入，重建只换标签：索引里的键始终是 hash（名字不是身份）。
+`App.tsx` 拥有全部跨页状态：`skills` / `sigils`（因子表）、`slots`、`loadoutRead`、`failure`、`tab`（`TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus"`）、`exclusiveTable` / `exclusiveState`、`names` / `charaNames` / `charaTable`、`lang`。派生索引由 `useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])` 重建——`names` 是唯一会随语言变的输入，重建只换标签：索引里的键始终是 hash（名字不是身份）。
 
 ```mermaid
 sequenceDiagram
     participant App as App.tsx 外壳
-    participant Go as Go 侧 LoadoutService
+    participant Go as Go 侧 LoadoutService 与 LimitBonusService
     participant Disk as 磁盘
     App->>Go: LoadExclusives
     Note over App: 先挂 catch，稍后再 await，免得出现未处理拒绝
@@ -164,15 +195,19 @@ sequenceDiagram
     App->>App: setLoadoutRead true
     App->>Go: 取 LoadExclusives 的答复
     App->>App: parseExclusiveTable 写进专属表
+    App->>Go: Characters
+    Note over App: 语言无关的角色表 整场只取一次 失败就留空表
+    Go-->>App: PL 码 到 颜色
 ```
 
-加载时序：三条读取在同一个挂载 effect 里发出，但 `LoadConfig` 必须排在因子表解出来之后，`loadoutRead` 只在 `applyConfig` 成功之后才置位。
+加载时序：四条读取在同一个挂载 effect 里发出，但 `LoadConfig` 必须排在因子表解出来之后，`loadoutRead` 只在 `applyConfig` 成功之后才置位。
 
-这张图里三处顺序的理由，都得写清：
+这张图里各处顺序的理由，都得写清：
 
 1. **`LoadConfig` 排在 `LoadSigils` 解出来之后**：它要把存档里的物品 gem 翻译成下拉用的组键，并按技能自己的 cap 夹等级——`configToSlots(cfg, sigilTable, skillTable)` 需要那两张表。所以它不是「一起 await」的第三份，而是第二段的依赖。
-2. **`LoadExclusives` 先发出、最后才 await**：promise 在第一时间创建，`exclusives.catch(() => {})` 当场挂上（否则中间任何一次 await 抛出都会把它变成未处理拒绝），真正的解析与 `setExclusiveTable` 放在第三段。
-3. **三段各自 `try`，各自只写一条失败**：读因子表抛 → `kind: "sigil"`；`applyConfig` 抛 → `kind: "config"`（此时**仍要** `setSlots(padSlots([]))` 把槽位铺满，屏幕上 0 行看起来像什么都没发生）；读专属表抛 → `kind: "exclusive"`。任一段失败都不许挡住后面的段。
+2. **`LoadExclusives` 先发出、最后才 await**：promise 在第一时间创建，`exclusives.catch(() => {})` 当场挂上（否则中间任何一次 await 抛出都会把它变成未处理拒绝），真正的解析与 `setExclusiveTable` 放在后面那段。
+3. **每段各自 `try`，各自只写一条失败**：读因子表抛 → `kind: "sigil"`；`applyConfig` 抛 → `kind: "config"`（此时**仍要** `setSlots(padSlots([]))` 把槽位铺满，屏幕上 0 行看起来像什么都没发生）；读专属表抛 → `kind: "exclusive"`。任一段失败都不许挡住后面的段。
+4. **角色表（`Characters()`，来自 `limitbonusservice`）是这条链上唯一「失败不算失败」的读取**：它与语言无关、整场只取一次，取不到就把 `charaTable` 留成空表——专属页与能力强化页的角色名于是没有专属颜色（继承默认前景色），而不是让整页读不出来。所以它既不进 `Failure` 那五类，也不影响 `loadoutRead`。
 
 加载期还有一处只为观感存在的门：通用配装页表头的「全选」勾选框在 `slots.length === 0` 时不渲染——空数组的 `every()` 是 `true`，配置读回来之前会先勾上、再被真实状态改掉，看起来像闪了一下。
 
@@ -182,11 +217,11 @@ sequenceDiagram
 
 ### 单条失败通道
 
-外壳只有一个失败槽：`type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }`。所有失败都写进这一个状态，屏幕上**不可能出现两条互相矛盾的提示**；文案由 `failureText` 按 `kind` 从当前语言的 `Messages` 里取。
+外壳只有一个失败槽：`type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }`。所有外壳级失败都写进这一个状态，屏幕上**不可能出现两条互相矛盾的提示**；文案由 `failureText` 按 `kind` 从当前语言的 `Messages` 里取。
 
 ```mermaid
 flowchart TD
-    Load["启动三段读取"] -->|"LoadSigils 抛错"| Sigil["kind sigil"]
+    Load["启动四段读取"] -->|"LoadSigils 抛错"| Sigil["kind sigil"]
     Load -->|"applyConfig 抛错"| Config["kind config"]
     Load -->|"LoadExclusives 抛错"| Excl["kind exclusive"]
     Save["saveNow"] -->|"因子表与技能表为空"| Tables["kind tables"]
@@ -196,13 +231,16 @@ flowchart TD
     Excl --> Strip
     Tables --> Strip
     SaveFail --> Strip
-    Editor["因子编辑页"] --> Dlg["页面自己的 AlertDialog"]
+    Editor["两个编辑页：读取失败与立即失败的写入"] --> Dlg["PanelFailureDialog 同一套对话框"]
     GoWrite["Go 防抖写入失败"] -->|"事件 GBFR.SigilLoadout.SaveFailed"| Dlg
+    Characters["角色表取不到"] --> Silent["只留空表：没有颜色，不弹提示"]
 ```
 
-失败往哪里去：外壳五类失败共用一条状态条，因子编辑页另有自己的对话框。
+失败往哪里去：外壳五类失败共用一条状态条，两个编辑页另有自己的对话框，角色表那条读取失败则只降级。
 
-状态条挂在**页签之外**（外壳那一层，`aria-live="polite"`），因为它是外壳级的通知：切到因子编辑页时，那两个配装页的「没保存成功」不该被静默吞掉。另一半是分工：因子编辑页的读取失败与写入失败走它自己的 `AlertDialog`（读不出编辑列表、`SaveEdits` 当场被拒，以及后端防抖之后才失败、只能以 `GBFR.SigilLoadout.SaveFailed` 事件到达的那一类）。`saveNow` 成功时会顺手清掉之前那条 `kind: "save"`（`setFailure((prev) => (prev?.kind === "save" ? null : prev))`），而读取类失败在会话里保留。注意事件的**唯一订阅者**在那个页面上，而它 `keepMounted`，所以配装那条路的防抖写入失败也复用同一个对话框——配装页自己没有监听者。那份订阅挂在 `[lang]` 上（`Events.On` 交回的函数就是 React 退出时运行的取消订阅），语言一变就重挂一次，免得对话框的标题停在旧语言上。事件名是**手抄的镜像常量**（`editservice.go` 的 `saveFailedEvent` 与 `SigilEditorPanel.tsx` 的 `SAVE_FAILED` 之间没有任何关联），改名必须同时改两处——Go 侧的 `sharedconstants_test.go` 有一道对拍断言专门盯着这两个字面量（每条声明必须**正好**匹配一次，其中 TS 那一侧是读 `SigilEditorPanel.tsx` 的**源码文本**），所以单边改名是测试红，而不是那个对话框永远不弹。
+状态条挂在**页签之外**（外壳那一层，`aria-live="polite"`），因为它是外壳级的通知：切到编辑页时，那两个配装页的「没保存成功」不该被静默吞掉。另一半是分工：**两个编辑页各有一份写入失败状态，但共用同一套渲染**——`src/hooks/usePanelFailure.ts` 持有状态与事件订阅，`src/components/PanelFailureDialog.tsx` 只是那个 `AlertDialog`。落到这同一个对话框里的有三类：读取失败（`LoadEdits` / `SkillTable` / `SkillMap` / `LoadLimitBonusCharacters` / `LoadLimitBonusEdits` / `LoadLimitBonus`）、保存当场被拒，以及防抖之后才失败、只能以后端事件 `GBFR.SigilLoadout.SaveFailed` 到达的那一类。`showError` 顺手把对话框打开（一次失败既记下它、也打开它），关闭则只是关闭——消息留在 state 里，退场动画才有东西可画。
+
+那条事件的订阅**只装一次**（`useEffect(..., [])`），标题从 ref 里取最新的那份文案（`writeFailed` 跟着语言走，每次渲染都是新的一句话）。这正是它从「挂在 `[lang]` 上」改成 ref 的原因：重挂订阅不再必要，而且这个订阅住在两个编辑页里，所以**配装那条路的防抖写入失败也复用同一个对话框**（那两个页面自己没有监听者；两页都 `keepMounted`，订阅在整场会话里都活着）。事件名是**手抄的镜像常量**：Go 侧 `appfiles/debouncedwrite.go` 的 `SaveFailedEvent` 与前端 `hooks/usePanelFailure.ts` 的 `SAVE_FAILED` 之间没有任何关联，改名必须同时改两处——`sharedconstants_test.go` 有一道对拍断言专门盯着这两个字面量（每条声明必须**正好**匹配一次，其中 TS 那一侧是读 `usePanelFailure.ts` 的**源码文本**），所以单边改名是测试红，而不是那个对话框永远不弹。`saveNow` 成功时会顺手清掉之前那条 `kind: "save"`（`setFailure((prev) => (prev?.kind === "save" ? null : prev))`），而读取类失败在会话里保留。
 
 ### 编辑 → 状态更新 → 构建载荷 → 调 Go 绑定
 
@@ -234,23 +272,23 @@ sequenceDiagram
 
 编辑到落盘：写入顺序、两道门、`buildLoadoutPayload`、Go 侧防抖与原子写、托管侧的 mtime 门，一环扣一环。
 
-`edit` 的入口一共四个：`updateSlot`（`SlotRow` 的每一处改动）、`toggleAll`（表头全选）、`updateExclusive`（专属页的开关）、以及语言切换按钮。载荷的文本由前端生成（`JSON.stringify(payload, null, 2)`，两空格缩进），Go 只做形状校验然后原样原子落盘。
+`edit` 的入口一共四个：`updateSlot`（`SlotRow` 的每一处改动）、`toggleAll`（表头全选）、`updateExclusive`（专属页的开关）、以及语言切换按钮。`updateSlot` 与 `toggleAll` 都从 `latest.current.slots` 起算而不是从 state 起算，理由与下一条纪律同源。载荷的文本由前端生成（`JSON.stringify(payload, null, 2)`，两空格缩进），Go 只做形状校验然后原样原子落盘。
 
 **纪律一：`edit` 内部的顺序不能换。** 处理器里 `setState` 要等它返回之后才提交，那时 `latest.current` 读到的还是上一次的状态，落盘就永远慢一次（最后一次勾选就是这么丢的）。所以 `edit(patch)` 是「先 `latest.current = {...latest.current, ...patch}` → 再 `setState` → 最后 `void saveNow()`」。`latest` 这个 ref 由 `useLayoutEffect` 写入而不是渲染期：渲染期写 ref 是 React 明令禁止的（会把一次从未提交的渲染里的值发布出去）。
 
 **纪律二：自动保存只由编辑处理器触发，不由状态变化触发。** 挂在 `[slots, lang, exclusiveState]` 上的版本只能靠一个一次性旗标去赌「哪次状态更新先把它消费掉」，而加载期的任何一次额外 `setState` 都会让启动变成一次写盘（旧版本那次 `exclusive` 迁移就是这么把用户的开关状态改坏的）。现在没有旗标：加载不调用任何编辑处理器，就排不出保存。
 
-**纪律三：两道「不写盘」的门。** 因子编辑页还有第三条同类门（它不属于这条链，住在 `SigilEditorPanel.tsx` 的 `commit` 里）：
+**纪律三：三道「不写盘」的门。** 前两道在 `saveNow` 里，第三道在两个编辑页各自的 `commit` 里——它们的形状与理由是同一条，所以只有两个实现：
 
 | 门 | 位置 | 违反后的症状 | 原因 |
 | --- | --- | --- | --- |
-| `loadoutRead` 未就绪 | `saveNow` 的第一行 `if (!loadoutRead) return` | 读配置失败时槽位被铺成 `padSlots([])`，此刻交出去的载荷会把磁盘上那份完整配置**整体替换**掉 | `setLoadoutRead(true)` 只在 `applyConfig` 成功之后执行 |
+| `loadoutRead` 未就绪 | `App.tsx` 的 `saveNow` 第一行 `if (!loadoutRead) return` | 读配置失败时槽位被铺成 `padSlots([])`，此刻交出去的载荷会把磁盘上那份完整配置**整体替换**掉 | `setLoadoutRead(true)` 只在 `applyConfig` 成功之后执行 |
 | 数据表为空 | `index.mainKeys.length === 0` 或 `index.skillHashes.length === 0` 时只写 `{kind: "tables"}` | 交出去的会是一份「所有槽都被跳过」的载荷（空 id 会被下游拒掉整份文件） | 表没读到时给的是横幅「数据表未加载，无法保存」（`tablesNotReady`），不是空载荷 |
-| 编辑列表没读回来 | `commit` 的第一行 `if (!editListRead) return` | 此时 `edits` 是空的，交出去的残缺列表会被 `SaveEdits` 整体替换，用户的其余编辑就没了 | 与上一条同源：读取失败后绝不写盘，只显示「读取失败」 |
+| 编辑列表没读回来 | `SigilEditorPanel.tsx` 与 `LimitBonusEditorPanel.tsx` 的 `commit` 第一行 `if (!editListRead) return` | 此时 `edits` 是空的，交出去的残缺列表会被 `SaveEdits` / `SaveLimitBonusEdits` 整体替换，用户的其余编辑就没了 | 与上一条同源：读取失败后绝不写盘，只显示「读取失败」 |
 
-同一类纪律在因子编辑页还有一条读侧版本：`loadAll` 会归一化（大写 `key`、`pad` 补齐十个参槽）并只在内存里理顺列表，**不写回文件**——「打开一次就等于改过一次」与外壳那条「启动不写盘」是同一条规则。
+同一类纪律在两个编辑页还有一条读侧版本：`loadAll`（因子）与那个挂载 effect（能力强化）都只做归一化——大写 `key`、`pad` 补齐十个参槽、丢掉没有 Key 的记录——并只在内存里理顺列表，**不写回文件**。「打开一次就等于改过一次」与外壳那条「启动不写盘」是同一条规则。
 
-两条与「谁生成文件内容」有关的边界事实：`loadout.json` 的**文本**是前端生成的；`sigiledits.json` 相反——前端交的是结构体数组，序列化由 Go 用 `jsontext.WithIndent("  ")` 完成。字段规则、校验责任与 mtime 门本身都在 [工作流：配装落盘与应用](/openwiki/workflows/loadout-apply.md) 与 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
+两条与「谁生成文件内容」有关的边界事实，现在有三份文件参与：`loadout.json` 的**文本**是前端生成的（`JSON.stringify(payload, null, 2)`）；`sigiledits.json` 与 `limit_bonus.json` 相反——前端交的是结构体数组，序列化由 Go 用 `jsonv2.Marshal(..., jsontext.WithIndent("  "))` 完成。字段规则、校验责任与 mtime 门本身都在 [工作流：配装落盘与应用](/openwiki/workflows/loadout-apply.md)、[工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)、[工作流：能力强化落盘与应用](/openwiki/workflows/limit-bonus-apply.md) 与 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。
 
 ### 语言切换就是一次编辑，代价是整份配装被重新应用
 
@@ -260,11 +298,11 @@ sequenceDiagram
 onClick={() => { edit({lang: option}) }}
 ```
 
-四个按钮包在一个 `ButtonGroup` 里（`aria-label={t.langSwitch}`、`size="icon-sm"`），选中格用 `default` 变体并补一条 `border-input`（该变体不带边框色，组的外框会断一截），再用行内 `translate: none` / `transition: none` 抵掉按下位移与选中格那 150ms 的淡出淡入——行内样式优先于 class，所以这些覆盖不必去改组件原语。
+四个按钮包在一个 `ButtonGroup` 里（`aria-label={t.langSwitch}`、`size="icon-sm"`），选中格用 `default` 变体并补一条 `border-input`（该变体不带边框色，组的外框会断一截），再用行内 `translate: none` / `transition: none` 抵掉按下位移与选中格那 150ms 的淡出淡入——行内样式优先于 class，所以这些覆盖不必去改组件原语。每个按钮还带 `lang={option}`：字体按它自己那门语言选，否则字体会跟着文档语言换、切语言时粗细就变了。
 
 串起来的后果是跨系统的，必须一次说清：
 
-1. `edit({lang})` → `saveNow()` → `SaveLoadout(整份载荷)` → 500ms 防抖后 `writeFileAtomic` 替换 `loadout.json`；
+1. `edit({lang})` → `saveNow()` → `SaveLoadout(整份载荷)` → 500ms 防抖后 `WriteAtomic` 替换 `loadout.json`；
 2. 原子替换写入的是一份新文件，所以这一版的 mtime 与上一版不同——写入侧刻意让 mtime 成为一个可用的版本号（防抖至少隔开两次落盘，远大于 mtime 粒度），而托管侧版本门 `LoadoutConfig.Stamp` 的 `Changed()` 判据就是 mtime **相等**、不看内容，于是「只换了 `lang`」与「改了一整套槽位」是同一件事；
 3. `Changed()` 的语义是「认领后处理」，于是这一版被 `TryApply` 拿去重新 `ParseAndValidate` + `NativeCore.ApplyLoadout`——**整份配装被重新解析并应用到原生侧**，即便用户只是想把界面换成日文；
 4. 而 C# 侧**完全不读** `lang`（它的注释就是「`lang` 只有可视工具在意」）：这个成员是纯工具状态，却寄居在唯一一条跨进程契约里，所以它的每一次变化都要付一次整份应用的钱。
@@ -273,9 +311,9 @@ onClick={() => { edit({lang: option}) }}
 
 ### 更细的一条：`exclusive` 的键与写入形状
 
-「专属因子」页每次点击都走 `edit({exclusiveState: …})`，也就是走同一条落盘链。落盘键是**角色 hash**（身份）而不是屏幕上的 PL 码：古兰/姬塔共享 `PL0000`，一次点击要写到共享该码的每个角色上，面板才继续是一行——所以 `updateExclusive` 先用 `exclusiveTable` 把 `player` 展开成 `charaHashes`。展开后交给 `model.ts` 的 `withExclusiveToggle`（只写 `false`、打开就删键、条目空了整条删），读进来时先过 `sanitizeExclusiveState`（丢掉原型键与非 `false` 的值）——手改过的文件因此不能污染编辑器状态，也不会因为「收下了 `true`」而在下一次自动保存时被原样写回。
+「专属因子」页每次点击都走 `edit({exclusiveState: …})`，也就是走同一条落盘链。落盘键是**角色 hash**（身份）而不是屏幕上的 PL 码：古兰/姬塔共享 `PL0000`，一次点击要写到共享该码的每个角色上，面板才继续是一行——所以 `updateExclusive` 先用 `exclusiveTable` 把 `player` 展开成 `charaHashes`。展开后交给 `model.ts` 的 `withExclusiveToggle`（只写 `false`、打开就删键、条目空了整条删），读进来时先过 `sanitizeExclusiveState`（丢掉原型键与非 `false` 的值）——手改过的文件因此不能污染编辑器状态，也不会因为「收下了 `true`」而在下一次自动保存时被原样写回。这一页与能力强化页共用同一套角色呈现：面板按 `player` 合并成一行、名字取 `charaNames[e.player] ?? e.player`、颜色取 `charaTable[e.player]?.color`（角色表里没有这一条时名字继承默认前景色）。
 
-## `model.ts`：载入 → 保存的往返、专属状态与派生索引
+## `src/lib/model.ts`：载入 → 保存的往返、专属状态与派生索引
 
 `model.ts` 是「因子的值长什么样、文件里长什么样」的唯一出处，也是前端测试最主要的目标。
 
@@ -304,7 +342,7 @@ onClick={() => { edit({lang: option}) }}
 
 ### `padSlots`、`DEFAULT_LEVEL` 与不截断
 
-`padSlots(slots)` 至少补到 `MAX_SLOTS`（= 16，与 Go 的 `loadoutservice.go` 的 `MaxSlots`、C# 的 `LoadoutConfig.cs` 同名常量三处对拍，见 `sharedconstants_test.go` 的 `TestSharedConstantsAgreeAcrossLanguages`），空行由 `emptySlot()` 生成（`mainLevel` / `secLevel` 为 0、`enabled: true`）。存档**多出来**的行照传，不在这里静默截断——交给 Go/C# 校验去拒，静默截断的下一次自动保存就是数据丢失。`DEFAULT_LEVEL`（= 15，与 C# 的 `DefaultLevel` 对拍）是不知道 cap 时的回落，`capOfSkill` / `capOfMain` 也用它。
+`padSlots(slots)` 至少补到 `MAX_SLOTS`（= 16，与 Go 的 `service/loadoutservice.go` 的 `MaxSlots`、C# 的 `LoadoutConfig.cs` 同名常量三处对拍，见 `sharedconstants_test.go` 的 `TestSharedConstantsAgreeAcrossLanguages`），空行由 `emptySlot()` 生成（`mainLevel` / `secLevel` 为 0、`enabled: true`）。存档**多出来**的行照传，不在这里静默截断——交给 Go/C# 校验去拒，静默截断的下一次自动保存就是数据丢失。`DEFAULT_LEVEL`（= 15，与 C# 的 `DefaultLevel` 对拍）是不知道 cap 时的回落，`capOfSkill` / `capOfMain` 也用它。
 
 ### 专属状态：只记「被关掉的槽」
 
@@ -332,16 +370,88 @@ onClick={() => { edit({lang: option}) }}
 
 `index.test.ts` 跑的是**入库的真实 `assets/sigils.json`**（不是手搓夹具，理由写在文件头）：断言每个主下拉取值都有显示名、`lot` 里都是普通技能、唯一持有的组没有合法副、缺失 cap 回落 `DEFAULT_LEVEL`、`gemOf` 给出该组里的真实物品 hash、池族在池里时写池版 hash；另一组断言 `buildLoadoutPayload` 的形状（空槽不写进文件、解析不出的主因子整行跳过、主/副技能的 items 形状、`exclusive` 全空时不写这个成员）。
 
-## 三个页签：都 `keepMounted`
+## 四个页签：都 `keepMounted`
 
-页签是「通用配装 / 专属因子 / 因子编辑」（界面文案按游戏自己的说法，见 `messages.ts` 的 `tabGeneral` / `tabExclusive` / `tabSigilEditor`）。三个 `TabsPanel` 全部 `keepMounted`，而**没有一个「不在这一页就整块不渲染」的分支**。两个配装页共用 `LOADOUT_FRAME`（`page-padding` + 竖向 flex 列）与 `LOADOUT_ROWS`（滚动盒），通用页的表头另放在 `LOADOUT_HEADER` 里——它在滚动盒**外面**，否则下滚时表头跟着走；`overflow-y-hidden` 让它也成为滚动容器，`[scrollbar-gutter:stable]` 才有地方为它预留那条沟槽（常量 `GUTTER` = `pr-4 [scrollbar-gutter:stable]`，行与表头共用）。因子编辑页自带 `page-padding` 与横向最小宽度 `min-w-[888px]`，不套这两个类。
+页签是「通用配装 / 专属因子 / 因子编辑 / 能力强化」（界面文案按游戏自己的说法，见 `messages.ts` 的 `tabGeneral` / `tabExclusive` / `tabSigilEditor` / `tabLimitBonus`；`limitBonus` 那一格的界面文案在中文下是「角色强化」，代码与注释里叫**能力强化页**）。四个 `TabsPanel` 全部 `keepMounted`，而**没有一个「不在这一页就整块不渲染」的分支**。两个配装页共用 `LOADOUT_FRAME`（`page-padding` + 竖向 flex 列）与 `LOADOUT_ROWS`（滚动盒），通用页的表头另放在 `LOADOUT_HEADER` 里——它在滚动盒**外面**，否则下滚时表头跟着走；`overflow-y-hidden` 让它也成为滚动容器，`[scrollbar-gutter:stable]` 才有地方为它预留那条沟槽（常量 `GUTTER` = `pr-4 [scrollbar-gutter:stable]`，行与表头共用）。
 
 两条理由，两条都是「卸载会丢东西」：
 
-- **配装页**：不 `keepMounted` 的话，每次切页都要卸载/重挂整表 `SlotRow`，而每行带两个 Base UI 下拉——切页于是从「显示/隐藏」变成一次真实的重建。代价是三页在启动时都挂上（专属页每行一个 PL 码，几十行，可忽略）。
-- **因子编辑页**：这一页的编辑状态（`edits` 这个按地址索引的 `Map`）活在组件里，而后端要等 500ms 防抖才落盘。切走就卸载的话，在防抖窗口内切回来会读到**还没写下的旧文件**——屏幕上刚敲的数字消失，随后那份旧列表还会把磁盘上的新值覆盖掉。这一页同时用 `memo` 包住（`export const SigilEditorPanel = memo(SigilEditorPanelBase)`），免得 App 的每次重渲染都连带它。页内还有一条同样性质的减速带：搜索框的值经 `useDebounced`（150ms）才进过滤，否则每敲一个键都要重排整张列表（两百行上下）。
+- **配装页**：不 `keepMounted` 的话，每次切页都要卸载/重挂整表 `SlotRow`，而每行带两个 Base UI 下拉——切页于是从「显示/隐藏」变成一次真实的重建。代价是四页在启动时都挂上（专属页每行一个 PL 码、能力强化页每个角色一行分组，几十行，可忽略）。
+- **两个编辑页（因子编辑与能力强化）**：这两页的编辑状态（按地址索引的 `Map`）都活在组件里，而后端要等 500ms 防抖才落盘。切走就卸载的话，在防抖窗口内切回来会读到**还没写下的旧文件**——屏幕上刚敲的数字消失，随后那份旧列表还会把磁盘上的新值覆盖掉。两页都同时用 `memo` 包住（`export const SigilEditorPanel = memo(...)`、`export const LimitBonusEditorPanel = memo(...)`），免得 App 的每次重渲染都连带它。
 
-与这套滚动盒子配套的外壳规则写在 `style.css`：`html, body { overflow: hidden }`，外壳钉在窗口上，只有列表自己滚。否则一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大可滚动区域，窗口自己的滚动条于是从右边冒出来——它要从视口里拿走宽度，整个外壳被推得向左一跳，等它消失才弹回来。同一层还有两条小规则：`body` 收回 I 形光标、只有 `input, textarea` 显式要回（页面上的文字标签因此不必一个个加 `cursor-default`）；`.skill-rows`（因子编辑页那个滚动盒的 class，也是这一页所有勾选框覆盖规则的作用域）里的勾选框有两条自己的覆盖：关掉位移动画（勾一下会让那一行移位，组件自带的 transition 会在行已经跳走之后还在填充颜色），并给 `:focus-visible` 补一条 `box-shadow: 0 0 0 2px var(--ring)`——焦点环是向外长的，会被容器边缘切掉，所以行在左边留了同样 2px（`ml-0.5`）。
+两个编辑页的页内版式不套那两个配装页的类，各自带 `page-padding` 与一个横向最小宽度（因子编辑页 `min-w-[888px]`、能力强化页 `min-w-160` = 640px）：外面那一层 `TabsPanel` 负责横向滚动（`overflow-auto`），所以窗口更窄时列是被滚动条推到视野外，而不是被裁掉。
+
+页内还有一条同样性质的减速带：因子编辑页搜索框的值经 `useDebounced`（150ms）才进过滤，否则每敲一个键都要重排整张列表（两百行上下）。
+
+与这套滚动盒子配套的外壳规则写在 `style.css`：`html, body { overflow: hidden }`，外壳钉在窗口上，只有列表自己滚。否则一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大可滚动区域，窗口自己的滚动条于是从右边冒出来——它要从视口里拿走宽度，整个外壳被推得向左一跳，等它消失才弹回来。同一层还有两条小规则：`body` 收回 I 形光标、只有 `input, textarea` 显式要回；`.skill-rows`（因子编辑页那个滚动盒的 class，也是这一页所有勾选框覆盖规则的作用域）里的勾选框有两条自己的覆盖：关掉位移动画（勾一下会让那一行移位，组件自带的 transition 会在行已经跳走之后还在填充颜色），并给 `:focus-visible` 补一条 `box-shadow: 0 0 0 2px var(--ring)`——焦点环是向外长的，会被容器边缘切掉，所以行在左边留了同样 2px（`ml-0.5`）。`page-padding` 是四个页签共用的那条 `@utility`（`px-5 pt-4 pb-6`）。
+
+## 能力强化页：一行 = 第一档，只写 Lv1
+
+这是它与因子编辑页**最要紧的差异**，也是本页唯一一处「写出去的数组长度是刻意短的」的地方。
+
+### 资产是三份，语言只管其中一份
+
+| 资产 | 内容 | 前端怎么取 |
+| --- | --- | --- |
+| `assets/limit_bonus.json` | 骨架：`characters[]` → `bonuses[]`（`key`、`hash`、`bonusType`）→ `params[]`（`key` 是 `limit_bonus_param` 那一行的身份、`default` 是 Lv1 的游戏默认值）；**语言无关** | `LoadLimitBonusCharacters()`，挂载时一次 |
+| `assets/limit_bonus.<lang>.json` | 一门语言的文案：`bonuses`（能力短名 → 能力名）与 `effects`（参数行 Key → 效果模板） | `LoadLimitBonus(lang)`，**随语言重取** |
+| `assets/chara.json` | PL 码 → `{hash, element, color}`，颜色在生成期按属性算好；**语言无关** | `Characters()`，App 挂载时一次，两页共用 |
+
+这三份都由 Go 侧 `loadAssetsFrom` → `loadLimitBonusTables` 在启动时无条件读进内存，缺一份就是坏安装（`main()` 里 `fatalDialog`）；同一处还有一道启动期对拍：`assetLangCodes()`（`skill.<lang>.json` 覆盖的语言）与 `limitBonusLangCodes()`（`limit_bonus.<lang>.json`）必须相等，否则启动就报错——两份清单分叉的表现是屏幕上整页 id，而不是一条错误。角色名不在任何一份里：它只有 `chara.lang.json` 一个来源，由 `App` 按当前语言取好（`charaNames`）传下来，专属因子页用的也是它。
+
+**没有回退**：文案表里缺哪个 id，界面就照实显示那个 id 或画占位符，不拿另一种语言的词冒充（`LoadLimitBonus` 对认不出来的语言返回空表，而 `App` 那条 `GemNames` / `CharaNames` 仍会回落到中文——两者的差别是刻意的：能力强化页宁可缺，也不要冒充）。
+
+### 编辑列表与因子编辑页是同一套规矩
+
+```mermaid
+sequenceDiagram
+    participant Panel as LimitBonusEditorPanel
+    participant Go as Go 侧 LimitBonusService
+    participant Disk as limit_bonus.json
+    Panel->>Go: LoadLimitBonusCharacters 与 LoadLimitBonusEdits
+    Note over Panel: 骨架与列表语言无关 只在挂载时读一次
+    Go-->>Panel: 骨架 dedupeCharacters 后成为角色列表
+    Go-->>Panel: 编辑列表 asEdit 过滤后按 Key dedupeBy 进 Map
+    Panel->>Panel: setEditListRead true
+    Panel->>Go: LoadLimitBonus lang
+    Note over Panel: 文案随语言重取 命中 textCache 就同步落地
+    Go-->>Panel: bonuses 与 effects
+    Panel->>Panel: 一个框算出一个值 遍历该节点全部参数行 withFirstValue
+    Panel->>Go: SaveLimitBonusEdits 整份列表
+    Go->>Disk: 防抖 500ms 之后原子替换
+```
+
+能力强化页的数据流：骨架与列表只读一次，文案跟着界面语言，每次改动交整份列表。
+
+屏幕上的版式只有一种：一个角色一行（**默认收起**，展开才画它的能力行，展开态由那个分组自己拿着——列表不按展开态过滤或排序），一条能力一行，三列——能力名、描述、那一个数值框（列宽表 `COLUMNS` 只声明一处：名字 288px、描述吃掉剩余宽度、数值列 64px）。名字那一格是定位容器：`bonusType !== 0`（专属与能力类）的行在缩进槽里画一个 8px 圆点，属性节点没有；间隔号（`·` / `・`）在 UI 字体里又小又挤，所以渲染时被放大并两侧留白（数据一个字不动）。一个角色行都没有时画空态 `t.noBonuses`。
+
+- **一条记录 = 一个参数行**（`{enabled, key, values}`），列表按 `key` 索引，读取时 `asEdit` 把 Key 归一成大写并丢掉没有 Key 的记录，再按 `dedupeBy(record => record.key)` 去重后进 `Map`；`commit` 的第一行仍是 `if (!editListRead) return`，落盘前**不**做过滤（哪些记录算一栏由前端决定，但存量列表原样留着）。
+- **读取不写回**：归一化只在内存里理顺屏幕上的列表，用户文件在下一次真正的编辑之前不该被动过。
+- **写入是「整份列表 + 不等答复」**：`SaveLimitBonusEdits([...next.values()])` 不 await，防抖住在 Go 侧（`appfiles.Debounced`，500ms，退出时由 `main.go` 的 `OnShutdown(limitBonusService.FlushNow)` 兜住），失败以 `SaveFailed` 事件或当场拒绝到达同一个 `PanelFailureDialog`。
+- **角色条目按内容去重**：`dedupeCharacters` 的判据是「这一条目下全部参数行 Key 的集合」，不是名字——古兰与姬塔是两个 PL 码、名字都是「主人公」，资产里各带一份逐字相同的 16 条能力，游戏里它们是同一个能力树的两个人；编辑按参数行 Key 索引（mod 也按 Key 找行），所以两份画出来是同一批开关画两遍。同理，展开一个角色后，`dedupeByName` 让同名节点只留第一个（「攻击力UP」有十几个逐档节点，界面上分不出也没用）。
+
+### 一个框、一条记录、只写第一档
+
+```mermaid
+flowchart TD
+    Type["往一个框里输入"] --> Parsed{"slotEdit 的回复"}
+    Parsed -->|"drop"| Ignore["丢弃 框保持原样"]
+    Parsed -->|"half"| Half["半成品文本留在框里"]
+    Parsed -->|"commit 数字"| Keep["提交数字 框保留用户敲的那串文本到失焦"]
+    Keep --> Rec["遍历该节点的每个参数行 withFirstValue"]
+    Clear["清空这个框"] --> Del["整条记录删掉 这一栏回到没编辑过的样子"]
+    Rec --> One["values 长度恒为 1 只写 Lv1"]
+    Del --> One
+```
+
+一次输入落成什么记录：只有第一格，清空就是删除这条记录。
+
+- **`withFirstValue(param, value)`** 产出的记录 `values` 长度恒为 1，也就是**只写 Lv1**；Lv2/Lv3 在游戏里保持原值（契约是 `values[i]` 写进 `Lv(i+1)`）。**绝不按 `default` 把缺的档位补齐**——那等于把用户从没填过的数写进游戏、多改了两个档位。
+- **清空 = 整条记录不存在**：`value === null` 时返回 `null`，由面板把这一条从列表里删掉。删掉之后游戏那边一个字节都没被碰过。「还原成默认值」是另一回事——那会留下一条记录，等于替用户写了一个数。没有记录时清空是空操作，连一次落盘都不必发生。
+- **有值就是启用**：这一页界面上没有启用的开关，记录存在本身就代表这行要生效（mod 跳过 `enabled` 为假的条目，而前端从不写假），所以勾选框那一列已被删掉。文件里缺 `enabled` 的条目按**开着**读（C# 的初值、Go 侧 `UnmarshalJSON` 的补齐、前端的 `asEdit` 三处同一条契约）。
+- **一个框写全该节点的参数行**：一个节点挂 1 条参数行（能力强化），或 3 条（「全部上限」类，默认值永远相同——游戏就是同一个数同时加到三项上），所以 `setValue` 遍历 `ability.params` 逐个 `withFirstValue`，填一个值 = 写给这个节点的全部参数行。`AbilityRow` 只把 `params[0]` 当那个框的记录来源。
+- **框里的数与描述是两回事**：空框的占位符读 `valueAt(param, record)` = `record?.values[0] ?? param.default`（没碰过就是游戏自己的数；手写过的记录缺第一格 `values: []` 也走这条，因为缺格的含义正是没编辑）；描述读 `effectLabel(param, effects)`，即当前语言的效果模板本身，其中 `{0}` 换成**写死的框号** `{1}`（描述与「填了多少」无关，说不清的正是哪个框对应效果的哪一段；表里没有这个 Key 就得到空串，由组件画一个占位符）。
+- **中西文之间补一个空格只在渲染时做**（`spaceCJKAndLatin`，`攻击DOWN抗性` → `攻击 DOWN 抗性`），拉丁词与汉字的连写是中文版资产自己的拼法，数据一个字不动。
 
 ## 键盘与焦点：两组全局监听
 
@@ -365,8 +475,8 @@ Esc 的两条路：浮层内归浮层，浮层外才把窗口假隐藏，而且�
 
 - **捕获阶段**是必需的：Base UI 会在 React 处理 `keydown` 时卸载弹层，冒泡阶段的监听器会看到一个已经摘下来的 target，从而错判成「不在浮层」而把窗口藏掉。
 - **同时听 `keydown` 与 `keyup`**，且浮层判断只在 `keydown` 做（`isInOverlay`），结果留给 `keyup` 用。两条路都会赋值，丢一次 `keyup` 不会把下一次 Esc 也吞掉。
-- **推迟到 `keyup` 才隐藏**（再等 150ms）：`keydown` 就藏掉的话，这一记 `keyup` 会落到已经拿到焦点的游戏窗口上。真正的隐藏动作是绑定 `MinimiseApp()`——注意它来自**另一个**生成模块 `../bindings/sigilloadout/shellservice`（Go 侧 `ShellService`：窗口显隐与托盘自成一体，不挂在读写载荷数据的 `LoadoutService` 上）；之后走的是 [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) 里那条 `hideToTray` 状态机。
-- **哪些东西算浮层**由选择器给出：`[data-slot="combobox-content"]`、`[role="dialog"]`、`[role="alertdialog"]`，以及 `.skill-rows input`——最后这一项是因子编辑页的十个参槽：那一页把 Esc 定义成「放开这个框」（`e.currentTarget.blur()`），不该同时把整个窗口藏到托盘去。
+- **推迟到 `keyup` 才隐藏**（再等 150ms）：`keydown` 就藏掉的话，这一记 `keyup` 会落到已经拿到焦点的游戏窗口上。真正的隐藏动作是绑定 `MinimiseApp()`——注意它来自**另一个**生成模块 `../bindings/sigilloadout/service/shellservice`（Go 侧 `ShellService`：窗口显隐与托盘自成一体，不挂在读写载荷数据的 `LoadoutService` 上）；之后走的是 [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) 里那条 `hideToTray` 状态机。
+- **哪些东西算浮层**由选择器给出：`[data-slot="combobox-content"]`、`[role="dialog"]`、`[role="alertdialog"]`、`.skill-rows input` 以及 `.ability-rows input`——最后两项是两个编辑页的数值框：它们把 Esc 定义成「放开这个框」（`e.currentTarget.blur()`），不该同时把整个窗口藏到托盘。能力强化页那个 `.ability-rows` 唯一的用途就是这个钩子（这一页没有需要它限定的样式）。
 - **菜单热键不在这里处理**：它是 mod 的全局注册，按一下就是开关这个窗口。
 - **另一半键盘判断不在外壳里**：下拉触发器吞方向键、数值框自己步进与 blur，那些是组件层的规则（见「组件层剩下什么」）；外壳只管「不在浮层里就把窗口藏起来」这一层。
 
@@ -395,7 +505,7 @@ sequenceDiagram
 [data-slot="input-group"]:has([data-focus-hold]) { @apply border-ring ring-3 ring-ring/50; }
 ```
 
-补的值必须与 `components/ui` 里的聚焦类一致，否则「窗口失活」与「窗口激活」下同一个框会有两种样子。有一处**有意的取舍**写在 `style.css` 里：因子编辑页的十个数值框不补——深色主题下编译产物把 `focus:bg-muted/50` 压掉了（与 `dark:bg-transparent` 同特异性且排在后面），补了反而与聚焦态不同，于是两边都不补；代价是浅色主题下失活那一刻聚焦底色会消失，而本项目只在深色下使用。
+补的值必须与 `components/ui` 里的聚焦类一致，否则「窗口失活」与「窗口激活」下同一个框会有两种样子。有一处**有意的取舍**写在 `style.css` 里：两个编辑页的数值框根本**没有聚焦底色**，所以没有「聚焦时该显示什么」需要保住，`data-focus-hold` 也不必在它们身上生效。原因是原先那条 `focus:bg-muted/50` 在编译产物里排在 `dark:bg-transparent` 之前、被它压掉，只有浅色主题下才看得见；既然本项目只跑深色，两页就一起把它删了。哪天要给回聚焦底色，得连那条 `data-focus-hold` 规则一起补，否则窗口失活那一刻底色会留在屏幕上。
 
 ## 语言：三层分工
 
@@ -403,18 +513,18 @@ sequenceDiagram
 
 | 问题 | 住哪 | 变它的时候 |
 | --- | --- | --- |
-| 这个可视工具支持哪几种语言、每种在切换键上叫什么、系统要哪一种 | `lang.ts`：`LANGS`、`LANG_LABEL`、`initialLang()` | 加一种语言 |
-| 界面每一句话长什么样 | `messages.ts`：`zh` 这一份就是形状（`Messages = typeof zh`），其余语言按它填 | 改一句话 |
-| 因子的名字、效果概要、等级说明 | Go 侧随包资产：`sigils.lang.json` / `chara.lang.json` / `skill.<lang>.json`，前端只按语言取一次 | 改游戏文本的呈现 |
+| 这个可视工具支持哪几种语言、每种在切换键上叫什么、系统要哪一种 | `src/lib/lang.ts`：`LANGS`、`LANG_LABEL`、`initialLang()` | 加一种语言 |
+| 界面每一句话长什么样 | `src/lib/messages.ts`：`zh` 这一份就是形状（`Messages = typeof zh`），其余语言按它填 | 改一句话 |
+| 因子的名字、效果概要、等级说明，能力强化的能力名与效果模板 | Go 侧随包资产：`sigils.lang.json` / `chara.lang.json` / `skill.<lang>.json` / `limit_bonus.<lang>.json`，前端按语言取一次并缓存 | 改游戏文本的呈现 |
 
 几条不变量：
 
-- **语言身份只存一处**：`loadout.json` 的 `lang`，不进 `localStorage`。同一个窗口里两套语言状态的话，用户在一页切的语言不会带到另一页（因子编辑页因此不自己带语言开关，`lang` 由 `App` 传进去）。
+- **语言身份只存一处**：`loadout.json` 的 `lang`，不进 `localStorage`。同一个窗口里两套语言状态的话，用户在一页切的语言不会带到另一页（两个编辑页因此都不带语言开关，`lang` 由 `App` 传进去）。
 - **`initialLang()` 是整个工具唯一一处「系统要什么语言」的猜测**，只在配置里还没写语言时用一次：`navigator.language` 与四个码互不为前缀，所以「谁先谁后」不影响结果，猜不中回落 `en`。
-- **切换键的文字用它自己的语言写**（`LANG_LABEL` = `中` / `EN` / `日` / `한`），而且每个按钮带 `lang={option}`：字体按它自己那门语言选，否则字体会跟着文档语言换、切语言时粗细就变了。用文字而不是国旗 emoji，因为 Windows 不带国旗字形。
+- **切换键的文字用它自己的语言写**（`LANG_LABEL` = `中` / `EN` / `日` / `한`），并且每个按钮带 `lang={option}`。用文字而不是国旗 emoji，因为 Windows 不带国旗字形。
 - **四种语言一种都不能漏是编译期检查**：`messages: Record<Lang, Messages>`——加一种语言只改 `lang.ts` 而忘了 `messages.ts`，`tsc` 当场报错，四语齐备不靠人眼。
-- **`LANGS` 在 Go 侧有一份手抄的副本**：`loadAssetsFrom` 里硬编码着 `[]string{LangZH, "en", "ja", "ko"}` 去读四份 `skill.<lang>.json`。加第五种语言要同时动 `lang.ts` 与那一行；只动前端的话，界面文字是新语言而因子名会经 `pick` 回落到中文。
-- **界面文案与术语表是两回事**：`CONTEXT.md` 约束代码与文档的用词，但玩家看到的界面按游戏自己的说法——「主因子 / 副因子 / 专属因子 / 因子编辑」。`messages.ts` 的文件头把这条写明了，而且「因子」那三种语言用的是游戏自己的译名（英文 sigil、日文 ジーン、韩文 진），不是音译。
+- **语言集在 Go 侧有两份手抄的副本**：`loadAssetsFrom` 里的 `assetLangCodes()`（`[]string{LangZH, "en", "ja", "ko"}`，读四份 `skill.<lang>.json`）与 `limitBonusLangCodes()`（读四份 `limit_bonus.<lang>.json`）。两处刻意不复用同一份，但启动时会用 `slices.Equal` 对拍，不一致就起不来。加第五种语言要同时动 `lang.ts` 与这两行；只动前端的话，界面文字是新语言而因子名会经 `pick` 回落到中文。
+- **界面文案与术语表是两回事**：`CONTEXT.md` 约束代码、文档与注释的用词，但玩家看到的界面按游戏自己的说法——「主因子 / 副因子 / 专属因子 / 因子编辑」。`messages.ts` 的文件头把这条写明了，而且「因子」那三种语言用的是游戏自己的译名（英文 sigil、日文 ジーン、韩文 진），不是音译。
 
 ### 托盘那一条：唯一由前端推给 Go 的文案
 
@@ -444,62 +554,56 @@ sequenceDiagram
 
 ### 显示名：启动期读一次，按语言缓存一次
 
-界面文案是打包在 `dist` 里的常量，**显示名不是**：它们来自游戏文本表，由 Go 侧在启动时无条件读进内存——`sigils.lang.json`、`chara.lang.json`、`skill_status.json`，以及四份 `skill.<lang>.json` 全部无条件读进来，缺一份就是坏安装（`main()` 里 `fatalDialog`）。之后前端按语言取一次并缓存：
+界面文案是打包在 `dist` 里的常量，**显示名不是**：它们来自游戏文本表，由 Go 侧在启动时无条件读进内存——`sigils.lang.json`、`chara.lang.json`、`skill_status.json`、四份 `skill.<lang>.json`、四份 `limit_bonus.<lang>.json` 与 `chara.json` 全部无条件读进来，缺一份就是坏安装（`main()` 里 `fatalDialog`）。之后前端按语言取一次并缓存，缓存分两处，都由「命中就同步落地」这条要求驱动：
 
-- `App.tsx` 的模块级 `nameCache`（`Map<Lang, {names, charas}>`）按语言缓存 `GemNames(lang)` 与 `CharaNames(lang)` 的结果；命中就同步 `setState`，标签与外层文字同一帧换掉，否则会先显示旧语言的名字、等 IPC 回来再跳一次。并发的那次取用 `cancelled` 旗标防串语言。
-- `SigilEditorPanel.tsx` 的模块级 `textCache` 同理，用 `Call.ByName("main.EditService.SkillMap", lang)` 一次取整张表（名字、概要、说明都从这一份里读），而不是每行一次调用；取失败走页面自己的 `readFailed` 对话框。
-- **取不到名字时回落成裸 hash，而不是换一种语言的名字**：`SkillPicker` 里的 `labels?.[skill] ?? skill`（未在下拉取值集合里的存档技能也按这个规则显示，而不是冒充「无」）、`model.ts` 里 `labels[tr.hash] = names[tr.gem] ?? tr.hash`、`ExclusivePanel` 里的 `charaNames[e.player] ?? e.player` 都是同一条规则——看得见但不好看，比显示一个别的语言的名字强。`exclusive.test.ts` 专门钉住「名字缺失时显示 hash」。
+- **`App.tsx` 的模块级 `nameCache`**（`Map<Lang, {names, charas}>`）缓存 `GemNames(lang)` 与 `CharaNames(lang)` 的结果（`Promise.all` 一起取）；命中就同步 `setState`，标签与外层文字同一帧换掉，否则会先显示旧语言的名字、等 IPC 回来再跳一次。并发的那次取用 `cancelled` 旗标防串语言；取不到名字就都留成空表（同一条回落规则的起点）。`charaTable` 不在这里——它语言无关，只取一次。
+- **两个编辑页各有一张模块级的 `textCache`，经同一个 hook `useLangTable` 使用**（`SigilEditorPanel` 的 `Map<Lang, Record<string, SkillText>>` 用一次 `SkillMap` 调用取整张文本表，`LimitBonusEditorPanel` 的 `Map<Lang, LimitBonusText>` 用一次 `LoadLimitBonus` 取能力名与效果模板），而不是每行一次调用。`useLangTable` 的三条规矩值得单列：命中缓存同步落地（`useState` 的初值也读缓存，所以切回来不再等一次 IPC）；后端答 `null`（这门语言没有表）用 `fallback` 顶上**并照样进缓存**，因为那是一个答案；取失败（reject）**不进缓存**，只报一次错，因为那是一次传输失败，不该被记成「这门语言没有」。`load` / `fallback` / `onError` 每次渲染都是新的，所以放进 ref——它们换一个身份不该重取一次表。
+- **取不到名字时回落成裸 hash，而不是换一种语言的名字**：`SkillPicker` 里的 `labels?.[skill] ?? skill`（未在下拉取值集合里的存档技能也按这个规则显示，而不是冒充「无」）、`model.ts` 里 `labels[tr.hash] = names[tr.gem] ?? tr.hash`、`ExclusivePanel` 里的 `charaNames[e.player] ?? e.player`、能力强化页的 `charaNames[character.id] ?? character.id` 与 `abilityNames[ability.key] ?? ability.key` 都是同一条规则——看得见但不好看，比显示一个别的语言的名字强。`exclusive.test.ts` 专门钉住「名字缺失时显示 hash」。
 - `document.documentElement.lang` 跟着 `lang` 走：`index.html` 里写死的那一个只够第一次渲染，读屏软件看的是这个属性。
 
 ## 构建约束：`dist` 是嵌进 exe 的资产，`bindings/` 是生成物
 
-界面不是第四个交付单元：源码在 `SigilLoadout\frontend\`，产物 `frontend\dist\` 由 `go:embed all:frontend/dist` 在编译期打进 `SigilLoadout.exe`。这带来两条同时成立的边界：**`frontend\dist\` 与 `frontend\bindings\` 都不入库**（`SigilLoadout/.gitignore`），而 `App.tsx` **直接 import 生成物**——而且是**两个**生成模块，一个 service 一个文件：
+界面不是第四个交付单元：源码在 `SigilLoadout\frontend\`，产物 `frontend\dist\` 由 `go:embed all:frontend/dist` 在编译期打进 `SigilLoadout.exe`。这带来两条同时成立的边界：**`frontend\dist\` 与 `frontend\bindings\` 都不入库**（`SigilLoadout/.gitignore`），而 `App.tsx` **直接 import 生成物**——而且是**三个**生成模块，一个 service 一个文件（两个编辑页各自 import 第四个）：
 
 ```ts
-import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/loadoutservice"
-import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/shellservice"
+import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/service/loadoutservice"
+import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/service/shellservice"
+import {Characters} from "../bindings/sigilloadout/service/limitbonusservice"
 ```
 
-数据读写走 `loadoutservice`（对应 Go 的 `LoadoutService`，六条），窗口显隐与托盘文案走 `shellservice`（对应 Go 的 `ShellService`，两条：`MinimiseApp` 与 `SetTrayExitLabel`）。生成物的分文件粒度就是 **service 的粒度**，所以 Go 侧把一个方法从一个 service 搬到另一个，前端这一句 import 也得跟着搬。
+数据读写走 `loadoutservice`（对应 Go 的 `LoadoutService`，六条），窗口显隐与托盘文案走 `shellservice`（对应 Go 的 `ShellService`，两条：`MinimiseApp` 与 `SetTrayExitLabel`），角色表与能力强化资产走 `limitbonusservice`（`Characters` / `LoadLimitBonus` / `LoadLimitBonusCharacters` / `LoadLimitBonusEdits` / `SaveLimitBonusEdits`），因子编辑页走 `editservice`（`LoadEdits` / `SaveEdits` / `SkillTable` / `SkillMap`）。生成物的分文件粒度就是 **service 的粒度**，所以 Go 侧把一个方法从一个 service 搬到另一个，前端这一句 import 也得跟着搬。
 
 所以在源码树里改前端之后，要走的顺序是：
 
 ```powershell
 cd SigilLoadout
-wails3 generate bindings                          # frontend/bindings 是 gitignore 的生成物
+wails3 generate bindings ./...                    # frontend/bindings 是 gitignore 的生成物
 npm --prefix frontend run typecheck               # tsc --noEmit
 npm --prefix frontend test                        # vitest run
 npm --prefix frontend run build                   # -> frontend/dist
 go build -o SigilLoadout.exe .                    # 或直接走 tools\build-release.ps1
 ```
 
-每一步都不是多余的：没有 `bindings/` 时 `npm run typecheck` 与 `vite build` 都会红；`tsconfig.json` 因此保持 `noImplicitAny: false`（生成的 `*.js` 没有 `.d.ts`，打开这一项只会在那两句 import 上报 `TS7016`），并把 `bindings` 列进 `include`；`vite` 只抹掉类型、不做检查，所以编译器必须排在打包之前；没有 `frontend\dist\` 时 `go:embed` 匹配不到文件、`go build` 直接失败（好在是失败，不是静默降级）。发布链在这个顺序之后还有 `wails3 generate syso` → `go vet` → `go test` → `go build`，完整清单与各步失败出口见 [构建、发布与部署链](/openwiki/operations/build-and-release.md)。
+每一步都不是多余的：没有 `bindings/` 时 `npm run typecheck` 与 `vite build` 都会红；`tsconfig.json` 因此保持 `noImplicitAny: false`（生成的 `*.js` 没有 `.d.ts`，打开这一项只会在那几句 import 上报 `TS7016`），并把 `bindings` 列进 `include`；`vite` 只抹掉类型、不做检查，所以编译器必须排在打包之前；没有 `frontend\dist\` 时 `go:embed` 匹配不到文件、`go build` 直接失败（好在是失败，不是静默降级）。发布链在这个顺序之后还有 `wails3 generate syso` → `go vet` → `go test` → `go build`，完整清单与各步失败出口见 [构建、发布与部署链](/openwiki/operations/build-and-release.md)。
 
 `vite.config.ts` 里有三件与源码布局有关的事：`wails("./bindings")` 插件带着同一个路径（开发态与构建态用的是同一份生成物）、`@` 别名指向 `src`、dev server 钉在 `127.0.0.1` 的 `WAILS_VITE_PORT`（默认 9245）并 `strictPort: true`。`package.json` 的脚本就是上面那四条（`dev` / `build` / `test` / `typecheck`）。
 
-前端的绑定调用方式**有两种**，这是现状而不是设计目标：
-
-| | 谁在用 | 形式 |
-| --- | --- | --- |
-| 生成的模块 | `App.tsx`：数据读写用 `loadoutservice`（`LoadSigils` / `LoadConfig` / `SaveLoadout` / `LoadExclusives` / `GemNames` / `CharaNames`），窗口动作用 `shellservice`（`MinimiseApp` / `SetTrayExitLabel`） | import `../bindings/sigilloadout/<service>`，生成代码内部走 `Call.ByID(<数字 id>)` |
-| 字符串派发 | `SigilEditorPanel.tsx`（`EditService` 的 `LoadEdits` / `SkillTable` / `SkillMap` / `SaveEdits`） | `Call.ByName("main.EditService.<方法>")`，`SERVICE` 常量在文件头 |
-
-加一个 `EditService` 方法时，第二种风格不需要碰生成物（也不需要在 `App.tsx` 里多一句 import），但代价是**服务名与方法名成为手写字符串**：Go 侧改名不会有任何编译期报错，只会在运行时失败。相应地，防抖失败事件的字符串同样是手抄的（见「单条失败通道」）。
-
-反过来看第一种风格也别高估它：生成的 `*.js` 没有 `.d.ts`（`tsconfig.json` 的 `noImplicitAny: false` 正是为它留的），整个模块是 `any`，所以 `tsc` 认下的其实只是**这个模块存不存在**——成员名写错、方法搬了 service、或改了 Go 侧签名却忘了重新生成，都不会在 `tsc` 里红，只会在运行时说话。会红的只有「`bindings/` 整个不在」这一种（模块解析不了）。
+四个生成模块**只有一种调用风格**：import 服务模块，生成代码内部走 `Call.ByID(<数字 id>)`（Go 侧一个方法一个编号）。这一侧受 `tsc` 保护的程度也别高估：生成的 `*.js` 没有 `.d.ts`（`tsconfig.json` 的 `noImplicitAny: false` 正是为它留的），整个模块是 `any`，所以 `tsc` 认下的其实只是**这些模块存不存在**——成员名写错、方法搬了 service、或改了 Go 侧签名却忘了重新生成，都不会在 `tsc` 里红，只会在运行时说话。会红的只有「`bindings/` 整个不在」这一种（模块解析不了）。唯一一个跨语言的**字符串**契约留在防抖失败事件名上（`appfiles/debouncedwrite.go` 与 `hooks/usePanelFailure.ts`），由 `sharedconstants_test.go` 盯住（见「单条失败通道」）。
 
 ## 测试边界
 
-外壳与组件**没有单元测试**：`App.tsx`、`SlotEditor.tsx`、`SkillPicker.tsx`、`SkillRow.tsx`、`ExclusivePanel.tsx`、`SigilEditorPanel.tsx` 都不在覆盖范围内——它们的规则已经被抽到 `model.ts` 与 `skills.ts`，剩下的渲染与事件只能人工在工具里点。四个测试文件刻意薄，而且**都跑纯 node**（`package.json` 的依赖里没有任何 DOM 测试库：没有 `jsdom`、没有 `@testing-library`）：
+外壳与组件**没有单元测试**：`App.tsx`、`SlotEditor.tsx`、`SkillPicker.tsx`、`SkillRow.tsx`、`ExclusivePanel.tsx`、两个编辑页都不在覆盖范围内——它们的规则已经被抽到 `src/lib/`，剩下的渲染与事件只能人工在工具里点。六个测试文件刻意薄，而且**都跑纯 node**（`package.json` 的依赖里没有任何 DOM 测试库：没有 `jsdom`、没有 `@testing-library`）：
 
 | 测试文件 | 打的是 | 护住什么 |
 | --- | --- | --- |
-| `index.test.ts` | `model.ts` | 派生索引与落盘载荷，跑的是**入库的真实 `assets/sigils.json`** |
-| `variant.test.ts` | `model.ts` | `configToSlots` → `resolveMainGem` 的变体往返，以及池版 / 固定副技能版的优先级 |
-| `exclusive.test.ts` | `model.ts` | `exclusiveSlots`（标签与状态键各取哪个 hash）、`withExclusiveToggle`（删键而不是写 `true`、写到共享 PL 码的每个角色、空了整条删）、`parseExclusiveTable` 的形状过滤 |
-| `skills.test.ts` | `skills.ts` | 输入框按键状态机（`slotEdit` / `HALF_TYPED` / `NUMBER`）、`stepValue` 的上界、`dedupe`、`isEdit` / `trimGameValues` / `asEdits`、`levelsOf`、`parentState`、`matches`、`explainAt`、`slotLabel` |
+| `lib/index.test.ts` | `model.ts` | 派生索引与落盘载荷，跑的是**入库的真实 `assets/sigils.json`** |
+| `lib/variant.test.ts` | `model.ts` | `configToSlots` → `resolveMainGem` 的变体往返，以及池版 / 固定副技能版的优先级 |
+| `lib/exclusive.test.ts` | `model.ts` | `exclusiveSlots`（标签与状态键各取哪个 hash）、`withExclusiveToggle`（删键而不是写 `true`、写到共享 PL 码的每个角色、空了整条删）、`parseExclusiveTable` 的形状过滤 |
+| `lib/skills.test.ts` | `skills.ts` | 输入框按键状态机（`slotEdit` / `HALF_TYPED` / `NUMBER`）、`stepValue` 的上界、`dedupeBy` / `dedupe`、`isEdit` / `trimGameValues` / `asEdits`、`levelsOf`、`parentState`、`matches`、`explainAt`、`slotLabel` |
+| `lib/limitbonus.test.ts` | `limitbonus.ts` | `valueAt`（只读第一格、缺格等于没编辑）、`effectLabel`（模板本身、`{0}` → `{1}`、缺 key 得空串）、`asEdit` 的归一化、`withFirstValue`（长度恒为 1、清空返回 `null`）、角色按 Key 集合去重、同名节点去重、`spaceCJKAndLatin`；用手搓夹具，资产的不变量交给 Go 侧对真实文件断言 |
+| `lib/chara.test.ts` | 真实的 `assets/chara.json` | 顶层以 PL 码为键、每个角色自带颜色、六属性各有颜色且互不相同、颜色都是能直接上屏的 `#rrggbb`（前端不做兜底） |
 
-由此得到两条必须诚实写下的空洞：**本页讲的外壳行为（加载顺序、三道门、Esc、焦点保持、三个 `keepMounted` 页签、`nameCache`、托盘文案推送）没有任何自动化验证**；`sanitizeExclusiveState` 与 `padSlots` 也只有调用点、没有直接单测。唯一伸进这份前端代码的自动化是 Go 侧的对拍断言——`sharedconstants_test.go` 读 `SigilEditorPanel.tsx` 的**源码文本**去比那个事件名——它比的是字符串，不是行为。各测试分别护住什么、这套验证证明不了什么，见 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。
+由此得到几条必须诚实写下的空洞：**本页讲的外壳行为（加载顺序、三道门、Esc、焦点保持、四个 `keepMounted` 页签、`nameCache`、`useLangTable`、`usePanelFailure`、托盘文案推送）没有任何自动化验证**；`sanitizeExclusiveState`、`padSlots`、两个编辑页的 `loadAll` 归一化也只有调用点、没有直接单测。唯一伸进这份前端代码的自动化是 Go 侧的对拍断言——`sharedconstants_test.go` 读 `hooks/usePanelFailure.ts` 的**源码文本**去比那个事件名（每条声明必须正好匹配一次）——它比的是字符串，不是行为。各测试分别护住什么、这套验证证明不了什么，见 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md)。
 
 ## 不变量与失败语义
 
@@ -510,10 +614,16 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 | 自动保存只由编辑处理器触发 | 加载期任一次额外 `setState` 把启动变成一次写盘，用户的配置被空状态整体替换 |
 | `loadoutRead` 之前绝不写盘 | 读配置失败后交出的 `padSlots([])` 载荷覆盖磁盘上那份完整配置 |
 | 因子表与技能表为空时不写盘，只给横幅 | 一份「所有槽都被跳过」的载荷被判成空配置 |
-| 编辑列表（`editListRead`）没读回来之前绝不写盘 | 空的 `edits` 交出去，用户的其余编辑被整体替换 |
+| 编辑列表（`editListRead`）没读回来之前绝不写盘（两页各一条） | 空的编辑列表交出去，用户的其余编辑被整体替换 |
+| 两个编辑页的读取只归一化、不写回文件 | 「打开一次就等于改过一次」，用户文件被无意的规范化改写 |
 | 读进来的 `exclusive` 只保留 `false`（`sanitizeExclusiveState`） | 收下 `true` 就会在下一次自动保存时把它原样写回文件 |
-| 失败只有一条通道 | 屏幕上出现两条互相矛盾的提示，或一条被静默吞掉 |
-| 三个页签都 `keepMounted` | 在 500ms 防抖窗口内切走再切回：刚敲的数字消失，旧列表随后覆盖磁盘上的新值 |
+| 外壳失败只有一条通道，两个编辑页共用一套 `PanelFailureDialog` | 屏幕上出现两条互相矛盾的提示，或一条被静默吞掉 |
+| 角色表取不到只留空表、不弹提示 | 一个只为颜色存在的读取把整页变成错误状态 |
+| 四个页签都 `keepMounted` | 在 500ms 防抖窗口内切走再切回：刚敲的数字消失，旧列表随后覆盖磁盘上的新值 |
+| 一个地址最多一条编辑（`dedupeBy`） | 文件里同地址的第二条让游戏拿到的那条与屏幕上显示的不是同一条 |
+| 能力强化页写出去的 `values` 长度恒为 1（`withFirstValue`） | 按 `default` 补齐档位，等于替用户改了 Lv2/Lv3 |
+| 能力强化页清空 = 删掉整条记录 | 留下一条记录等于替用户写了一个数；「清空」与「还原成默认值」被混成一件事 |
+| 能力强化页一行一个框，填一个值写给该节点的全部参数行 | 三参数行的「全部上限」类只改了一项，另两项保持旧值 |
 | `resolveMainGem` 第一档必须保住存档指名的变体 | 同一组里名字不同的两个变体被静默改名成组里第一行 |
 | `padSlots` 只补不截断 | 存档多出来的行被静默砍掉，下一次自动保存就是数据丢失 |
 | 落盘前 `gemOf` 解析不出的行整行跳过 | 空 id 让 mod 拒掉整份文件 |
@@ -522,12 +632,14 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 | `useWheelStep` 的 `wheel` 监听器必须是原生的、`passive: false` | React 的 `wheel` 是 passive，`preventDefault` 无效：列表跟着滚，而数值也同时变了 |
 | 方向键在下拉触发器上由捕获阶段吞掉 | 聚焦触发器时按一下方向键就打开列表，而不是做字段导航或数值框步进 |
 | 父行的三种勾选态按这一行**显示的**等级算（`parentState`），不按记录条数 | 「11 个等级只开了 1 个」被读成全选，半选态永远不出现 |
+| 行内的点击判据用元素（`input` / `button` / `[role=checkbox]`）而不是 `data-slot` | 列表外面也有 `data-slot`，代理判据会把每一行都当成控件，因子再也展不开 |
 | 文档不滚（`html, body { overflow: hidden }`） | 一个撑大可滚动区域的 tooltip 让窗口自己的滚动条冒出来，整个外壳被推得向左一跳 |
 | 取不到显示名时回落成 hash | 用别的语言的名字冒充当前语言 |
+| `useLangTable` 里 reject 不进缓存、`null` 进缓存 | 一次传输失败被记成「这门语言没有表」，或每次换语言都白等一次 IPC |
 | `messages` 必须四语齐备（`Record<Lang, Messages>`） | 少一种语言的 `tsc` 就红，不会漏到运行期 |
-| 加语言要同时动 `lang.ts` 与 Go 的 `loadAssets` 四语言列表 | 界面文字换了语言，因子名回落成中文 |
+| 加语言要同时动 `lang.ts`、`assetLangCodes()` 与 `limitBonusLangCodes()` | 界面文字换了语言，因子名回落成中文；两份资产清单分叉则是整页 id，启动期对拍挡住了它 |
 | `bindings/` 必须在 typecheck 与 `vite build` 之前生成 | 缺生成物时 typecheck 与打包直接失败 |
-| 窗口动作走 `shellservice`、数据读写走 `loadoutservice`（一个 service 一个生成模块） | import 到不存在的模块时 `tsc` 与 `vite build` 都红；而把名字挂在已经搬走的 service 上，模块照样解析，于是没有任何编译期反应——Esc 或托盘那一条要等运行时才坏 |
+| 窗口动作走 `shellservice`、数据读写走 `loadoutservice`、角色与能力资产走 `limitbonusservice`（一个 service 一个生成模块） | import 到不存在的模块时 `tsc` 与 `vite build` 都红；而把名字挂在已经搬走的 service 上，模块照样解析，于是没有任何编译期反应——Esc 或托盘那一条要等运行时才坏 |
 | 托盘那条文案由前端推、Go 侧只留英文占位 | 托盘停在英文 `Exit`（或 Go 侧再抄一张翻译表，只在这一条上漂移）；`label` 为空时不换正是防它变成一条空项 |
 | `frontend/dist/` 必须在 `go build` 之前重建 | 嵌进 exe 的还是上一次的界面 |
 
@@ -536,7 +648,8 @@ go build -o SigilLoadout.exe .                    # 或直接走 tools\build-rel
 - [可视工具（Go + Wails）：装配、单实例与窗口状态机](/openwiki/architecture/visual-tool.md) —— 前端之外的那一半：窗口三态、托盘、关机钩子、`go:embed` 的装配位置，以及 `MinimiseApp()` 落到哪条 Win32 消息。
 - [工作流：配装落盘与应用](/openwiki/workflows/loadout-apply.md) —— 载荷字段规则、Go 校验、mtime 门与原生 `ApplyLoadout`。
 - [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md) —— 「因子编辑」页交出去的那份列表之后发生什么。
-- [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md) —— `loadout.json` / `sigiledits.json` 的形状、缺失语义与对拍范围。
+- [工作流：能力强化落盘与应用](/openwiki/workflows/limit-bonus-apply.md) —— 「能力强化」页那个框写下的第一档之后发生什么（`values[i]` → `Lv(i+1)`、mod 侧的整条跳过）。
+- [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md) —— `loadout.json` / `sigiledits.json` / `limit_bonus.json` 的形状、缺失语义与对拍范围。
 - [虚拟槽位、专属因子与它们的开关语义](/openwiki/concepts/virtual-slots-and-exclusives.md) —— 专属页那些开关在原生侧的语义。
-- [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md) —— 前端要取名字与说明的那几份语言表是谁生成的。
+- [外部生成器 gen 与随包数据资产](/openwiki/integrations/external-generator-and-assets.md) —— 前端要取名字、说明与颜色的那几份资产是谁生成的。
 - [构建、发布与部署链](/openwiki/operations/build-and-release.md) 与 [验证地图：测试与门禁各护什么](/openwiki/testing/verification-map.md) —— `bindings` / `dist` 的生成顺序、门禁顺序，以及前端测试护住什么、证明不了什么。

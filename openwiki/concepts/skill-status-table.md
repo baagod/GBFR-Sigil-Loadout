@@ -1,8 +1,11 @@
 ---
 type: concept
 title: skill_status 表与活表写入闸门
-description: 唯一被真正改写的游戏数据表：8 字节行数头 + 52 字节行的行布局与两侧常量的对拍关系、托管侧按 (Key, Level) 打行、原生侧从两步语义锚点解出游戏发布该表的固定槽、写前五道 fail-closed 闸门与 -1..-7 拒绝码，以及为什么删掉的全内存扫描兜底不得再加回来。
+description: 第一张被真正改写的游戏数据表：8 字节行数头 + 52 字节行（LevelValue1..10 @+0、Key @+40、LevelDescription @+44、Level @+48）的行布局与两侧常量的对拍关系、托管侧按 (Key, Level) 打行并经数据管理器重新注册、原生侧从两步语义锚点解出游戏发布该表的固定槽、写前五道 fail-closed 闸门与 -1..-7 拒绝码，以及为什么删掉的全内存扫描兜底不得再加回来；并与第二张活表（limit_bonus_param）说明两者身份证明方式为何不同。
 tags: [skill-status-table, live-table, fail-closed, semantic-anchors, sigil-loadout]
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-27T21:57:50.417Z
 sources:
   - id: openwiki-source-39c3295efc089133e87a9c80
     resource: repo://CONTEXT.md
@@ -22,36 +25,41 @@ sources:
     resource: repo://GBFR.SigilLoadout.Native/src/table_slot.cpp
   - id: openwiki-source-6247cffd54f03f03a6fbff36
     resource: repo://GBFR.SigilLoadout/Config.cs
+  - id: openwiki-source-8ef2d1990c2fef1e911f1040
+    resource: repo://GBFR.SigilLoadout/NativeCore.cs
   - id: openwiki-source-a30f3fb82adda44a835154e4
     resource: repo://GBFR.SigilLoadout/NativeCore.Interop.cs
   - id: openwiki-source-dfc48f2cdc841180abe1899c
     resource: repo://GBFR.SigilLoadout/SigilEditorFeature.cs
-  - id: openwiki-source-9e45365fcf44633af4489b2c
-    resource: repo://SigilLoadout/editservice.go
-  - id: openwiki-source-d598ed9d8aa0ee15a7fbb629
-    resource: repo://SigilLoadout/frontend/src/skills.ts
+  - id: openwiki-source-c7c7eef5cc1a07623f2f34b2
+    resource: repo://SigilLoadout/assets/skill_status.json
+  - id: openwiki-source-d3b5bf99650fdebfda6fe975
+    resource: repo://SigilLoadout/frontend/src/lib/skills.ts
+  - id: openwiki-source-44145d1a224cd090d5c63160
+    resource: repo://SigilLoadout/service/assets.go
+  - id: openwiki-source-1364fc25d209813bb2cabf25
+    resource: repo://SigilLoadout/service/editservice.go
+  - id: openwiki-source-e9c70384ebcbb3b259dad5e3
+    resource: repo://SigilLoadout/service/tables.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 ---
 
 # skill_status 表与活表写入闸门
 
-`skill_status` 是这套 mod 唯一被真正改写的游戏数据表——词表 `CONTEXT.md` 里的**活表**指的就是它：「游戏已经解析好、正在用的那份技能表。不是文件里的那一份」。本页全篇只用这个词义：从归档读出来的那份是候选，游戏手里那份才是活表。其余写游戏内存的地方只有两条技能循环上限立即数与钩子字节（见 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）。它的形状是：
+`skill_status` 是第一张被这套 mod 真正改写的游戏数据表——词表 `CONTEXT.md` 里的**活表**指的就是它：「游戏已经解析好、正在用的那份技能表。不是文件里的那一份」。本页全篇只用这个词义：从归档读出来的那份是候选，游戏手里那份才是活表。写游戏内存的地方除这两张活表之外，只剩两条技能循环上限立即数与钩子字节（见 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）。它的形状是：
 
 ```
 system/table/skill_status.tbl
 [ 8 字节 int64 行数头 ][ 52 字节行 ][ 52 字节行 ] ...
 ```
 
-两侧各有一个二进制、各存一份这个形状的常量，中间通过 ABI v20 的 `GBFR20_WriteSkillStatusTable` 交换**整张表**：
+两侧各有一个二进制、各存一份这个形状的常量，中间通过 ABI v21 的 `GBFR20_WriteSkillStatusTable` 交换**整张表**（版本号两侧各写一份：`native_api.h` 的 `GBFR20_ABI_VERSION` 与托管侧 `NativeCore.AbiVersion`；不一致时托管侧在 `Initialize` 里直接抛，原生核心的钩子也不会装）：
 
 | 谁 | 干什么 | 代码 |
 | --- | --- | --- |
@@ -59,6 +67,8 @@ system/table/skill_status.tbl
 | 原生核心（C++） | 从语义锚点解出「游戏发布该表的那个固定槽」，把传入表与**活表**逐行比对后原地改写 | `src/table_slot.cpp` |
 
 托管侧**不持有也不扫描**活表地址，只交表；地址解析全部在原生侧。端到端链路（mtime 门、重新注册、重试节流）在 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)，本页讲表本身与写入闸门。
+
+从 ABI v21 起 `src/table_slot.cpp` 里住着**两张**活表的定位与写入：本页的 `skill_status`（8 + 52 字节行）与 `limit_bonus_param`（8 + 84 字节行）。两者共用「行循环锚点 + 窗口内的发布指令」这套机制，**身份证明方式却不同**——本页末节把这件事单列出来，因为它是改这张表时最容易读错的一处。
 
 ## 行布局与两侧声明
 
@@ -84,7 +94,7 @@ system/table/skill_status.tbl
 
 对拍组的每一条声明必须**正好**匹配一次、并按大小写不敏感比较值——正则写松了会对着文件里第一个碰巧像它的东西比，比出来还是绿的（假绿）。这里要特别说清一个容易误判的点：**这三个表布局常量没有任何 `static_assert` 兜着**。`native_api.h` 里仅有的两处 `static_assert` 钉的是跨 ABI 的 `GBFR20_TemplateSlot` 与 `GBFR20_ExclusiveOverride` 的尺寸（与托管侧 `EnsureAbiLayout` 的封送尺寸自检一一对应），与表布局无关；钉住行布局的只有上面这份 Go 对拍。
 
-参槽数 `LevelValueCount = 10` 是三处声明（C# `Config.SigilSkill`、Go `editservice.go`、前端 `skills.ts` 的 `SLOTS`），由同一测试的 `LevelValue 参槽数` 组钉住；技能说明里的 `{N}` 就是 `LevelValue(N+1)`。
+参槽数 `LevelValueCount = 10` 是三处声明（C# `Config.SigilSkill`、Go `service/editservice.go`、前端 `frontend/src/lib/skills.ts` 的 `SLOTS`），由同一测试的 `LevelValue 参槽数` 组钉住；技能说明里的 `{N}` 就是 `LevelValue(N+1)`（这层对应关系写在 `service/tables.go` 的 `SkillText` 注释里——参槽含义唯一可得的线索就是描述本身）。可视工具每个参槽框里预填的「游戏自己的值」来自随包资产 `assets/skill_status.json`：`loadAssetsFrom` 把它读成 `skillInfo`，每个因子只在真正带数值的等级上有行（多数行全是零，指向零行的编辑写在游戏根本不读的地方）。那份资产是这张表的一份生成副本，与活表没有直接关系——它只决定工具显示什么，用户填的数字仍由托管侧写进 `LevelValue1..10`。
 
 ## 托管侧：从归档读出、按 `(Key, Level)` 打行
 
@@ -149,9 +159,10 @@ flowchart LR
 - 两条锚点的位移都得用 `DecodeRipTarget`（住在 `safe_game_access.cpp`、与布局锚点共用同一份 RIP-rel32 算术）解出来，并且**必须正好差 8**：槽首那条 `mov [rip+d],rcx` 与指针那条 `mov rbx,[rip+d]`，位移都在指令 `+3`、指令都长 7 字节；解不出这一对就不认。
 - 解出来的 `slot_rva` 与 `slot_rva + 8` 都必须落在**可写**的映像段内（`IsInWritableImageSection` = 段标志含 `IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE` 且不含 `IMAGE_SCN_MEM_EXECUTE`）。这条是「以后能原地写」的前置证明，而不是可选的稳妥。
 - 三条锚点的命中数**各必须恰好 1**，否则整体 fail-closed：只记一行说明日志，槽不解析。失败日志报的是**实际扫过的窗口宽度**（`min(0x800, 锚点之前的字节数)`）而不是那个常量——锚点靠段首时会报一个从没扫过的宽度，排查时会被引到错的方向。窗口宽度连 `kSlotBaseStore` 的长度都不到时**直接提前返回**：此时窗口里根本没扫过，两个窗口内计数保持 0。
+- 这段 `.text` 扫描是**两张活表共用**的：`SearchAnchorWindow` 按调用方给的行循环 pattern 做成模板，窗口里那两条发布指令一律数出来，「哪一条算门」由调用方决定——`skill_status` 这边三处计数都要恰好 1（含槽发布那条），`limit_bonus_param` 那边只要行循环与 `kBufferPointerLoad` 各恰好 1。
 - 成功的记忆只有槽首 RVA 一个原子量 `g_slot_rva`（单写者、读者只 load，不需要锁；并发细节见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)）。**缓冲区指针每次调用现读**（`g_image_base + slot_rva + 8`），所以游戏换掉那份表（重新解析、发布新缓冲区）时下一个调用就跟上了，这里不存在「缓存失效」这个概念。
 
-时机上，`ResolveTableSlot()` 排在 `InstallHooks()` **之前**：safetyhook 会改写 `.text`，而锚点要用没被改写的字节匹配。它与钩子装没装成无关，失败也不拿它当初始化门，只影响热应用——之后每次写入都拒 `-2`。要把这一点读准：这个槽的解出成功与否**不参与** `g_hooks_ready`，所以「钩子装好了但槽没解出来」和「槽解出来了但钩子没装成」都是合法结局。
+时机上，`ResolveTableSlot()` 与 `ResolveLimitBonusParamPointer()` 并排排在 `InstallHooks()` **之前**：safetyhook 会改写 `.text`，而锚点要用没被改写的字节匹配。它们与钩子装没装成无关，失败也不拿它当初始化门，只影响热应用——之后每次写入都拒 `-2`。要把这一点读准：这两个槽的解出成功与否**都不参与** `g_hooks_ready`，所以「钩子装好了但槽没解出来」和「槽解出来了但钩子没装成」都是合法结局。
 
 ## 写入闸门：入场两道 + 五道 fail-closed + 写
 
@@ -217,6 +228,22 @@ flowchart TD
 
 它同时是**别的 mod 改过 `Key` 的表会被拒写而不是被覆盖**的原因：那种表的活体 `Key` 与本 mod 从归档建出来的表对不上，于是 `-6` 拒写，本 mod 不会用一份「按归档重建」的 `Key` 去盖掉别人改过的值。这也是把 `kRowKeyOffset = 40` 放在两侧常量、由 `sharedconstants_test.go` 钉住的原因。
 
+## 第二张活表：两张表的身份证明为什么不一样
+
+`limit_bonus_param`（能力强化数值，8 字节行数头 + 84 字节行）与 `skill_status` 共用同一套锚点机制，但**身份证明的粒度与依据都不同**：
+
+| | `skill_status` | `limit_bonus_param` |
+| --- | --- | --- |
+| 身份证明 | **表级**：逐行比 `Key@+40`（数千行、几十 KB），闸五 `-6` | **行级**：一次调用只认一个 Key，要求它在整张表里**恰好出现一次**（`-10` 出现两次 / `-11` 一次都没有） |
+| 为什么能这样 | 调用方手里有**一整张**从归档读出的表，可以直接拿它当基准逐行比对 | 调用方只交一个 Key 加一行数字，手里没有任何可比对的基准表 |
+| 还有哪条交叉验证 | 槽发布指令 `kSlotBaseStore` 在窗口里实测存在，可以验「槽首 = 指针字段 − 8」 | 这张表**没有**那条发布指令（实测窗口里 0 命中），所以那条验法不存在，身份只能改由运行期的 Key 唯一性承担 |
+| 缓存的是什么 | 槽首 RVA（`g_slot_rva`），指针每次从 `+8` 现读 | 指针字段自己的 RVA（`g_limit_bonus_pointer_rva`） |
+| 返回值 | 实际改写的 52 字节行数（`0` = 内存已一致） | `1` = 这一行真的改了 / `0` = 内存里已经是这些值 |
+
+两条证明的性质其实一样：它们都**不随编辑变化**（两个导出都只写数值、从不写 `Key`），并且都把「这是同一张表」落到活表自己的字节上，而不是落到对锚点的信任上；`-4` 那种「行数一致」在两张表上都不足以当身份。
+
+连带的差别还有三处，改这两张表时都要分开看：那张表的行布局常量**只有原生一处声明**，所以 `sharedconstants_test.go` 的名单里没有任何 `limit_bonus` 项（没有第二个可漂的副本要钉）；它也不经数据管理器，没有「重新注册一份表」这一步；`limit_bonus_param` 的完整布局、六道闸门与 `-8..-11` 四条自有拒绝码见 [limit_bonus_param 活表与能力强化数值](/openwiki/concepts/limit-bonus-table.md)。
+
 ## 不要再加回内存扫描（硬约束）
 
 `table_slot.cpp` 里删掉过一版「全内存扫描」兜底，源码里只剩文件顶部那段「不要再加回来」的注释。**不要再加回来**，理由就是那段注释给的两条：
@@ -228,13 +255,13 @@ flowchart TD
 
 改 `table_slot.cpp` 时另有两条容易踩空的地方：
 
-- **`0 = 通配`这个约定有个前提：pattern 里每个 `0` 字节都必须落在「该通配」的位置上。** 加新 pattern 时若有一个 `0` 是想精确匹配的 `0`，匹配会静默变宽，后果是「命中数 != 1」，于是 fail-closed——槽不解析（之后所有活表写入一律 `-2`），只有日志说得出原因；槽的成败与钩子互不相干，所以游戏照常运行。改这几条 pattern 时**逐个数字对一遍**，别只改个数。（`layout_resolver.cpp` 的 `kXxxPattern` 用显式 mask 字符串，两套约定并存、各自只服务一个文件，见 [语义锚点与布局解析](/openwiki/concepts/game-layout-anchors.md)。）
-- **带 `__try` 的函数里不能有需要析构的局部对象**（MSVC C2712），所以 `.text` 扫描（`SearchAnchorWindow`）、逐行 `Key` 比对（`SameRowIdentity`）、逐行写（`WriteChangedRows`）各自是独立函数，构造消息、拼串留在调用方（`safe_game_access.cpp` 里那个「日志拼串放在外面」的注释说的是同一条约束）。
+- **`0 = 通配`这个约定有个前提：pattern 里每个 `0` 字节都必须落在「该通配」的位置上。** 加新 pattern 时若有一个 `0` 是想精确匹配的 `0`，匹配会静默变宽，后果是「命中数 != 1」，于是 fail-closed——槽不解析（之后所有活表写入一律 `-2`），只有日志说得出原因；槽的成败与钩子互不相干，所以游戏照常运行。改这几条 pattern 时**逐个数字对一遍**，别只改个数。（`kLimitBonusRowLoopSetup` 里一个 `0` 字节都没有，所以不受这套约定影响；`layout_resolver.cpp` 的 `kXxxPattern` 用显式 mask 字符串，两套约定并存、各自只服务一个文件，见 [语义锚点与布局解析](/openwiki/concepts/game-layout-anchors.md)。）
+- **带 `__try` 的函数里不能有需要析构的局部对象**（MSVC C2712），所以 `.text` 扫描（`SearchAnchorWindow`，按行循环模式做成模板、两张活表共用）、逐行 `Key` 比对（`SameRowIdentity`）、`skill_status` 的逐行写（`WriteChangedRows`）、`limit_bonus_param` 的单行写（`WriteLimitBonusRow`）各自是独立函数，构造消息、拼串留在调用方（`safe_game_access.cpp` 里那个「日志拼串放在外面」的注释说的是同一条约束）。
 
-行布局真的变了（游戏更新、列变动）时改什么：先改两侧成对的常量（`FileHeaderSize` / `RowSize` / `KeyOffset` / `LevelOffset` 与 `kTableHeaderBytes` / `kTableRowBytes` / `kRowKeyOffset`，参槽数 `LevelValueCount` / `SLOTS` 同理），再重导行循环锚点与窗口里的两条发布指令。若「52 字节/行」与 `Key@+40` 这两个关系本身还在、只是行数变了，写入路径（校验、逐行写）不用动；若行不再按 52 字节排布，锚点也就认不出来了——那时拒写是唯一正确的反应。
+行布局真的变了（游戏更新、列变动）时改什么：先改两侧成对的常量（`FileHeaderSize` / `RowSize` / `KeyOffset` / `LevelOffset` 与 `kTableHeaderBytes` / `kTableRowBytes` / `kRowKeyOffset`，参槽数 `LevelValueCount` / `SLOTS` 同理），再重导行循环锚点与窗口里的两条发布指令。若「52 字节/行」与 `Key@+40` 这两个关系本身还在、只是行数变了，写入路径（校验、逐行写）不用动；若行不再按 52 字节排布，锚点也就认不出来了——那时拒写是唯一正确的反应。另一张活表同理会先改 `kLimitBonusRowBytes` 与它的行循环立即数，只是那些常量只有原生一处声明。
 
 ## 这份代码被验证到什么程度
 
-- `sharedconstants_test.go` 的 `skill_status 表头字节` / `skill_status 行字节` / `skill_status 行内 Key 偏移` 三组做的是**跨语言对拍**（C# 与 C++ 两处声明，值必须一致，且每处声明必须正好匹配一次）。它是「漂了立刻红」，**不是**「边界已证明」：它不知道这些值对不对，只知道两侧一样。`Level@+48` 不在其中（只有一处声明），原生那三条锚点字节序列也不在其中。
-- `tests/NativeLayoutHarness` 只离线编译 `layout_resolver.cpp` 与 `safe_game_access.cpp`，**不含 `table_slot.cpp`**：锚点命中数、rip 位移的 `+8` 关系、可写段判定、以及写入的每一道闸都没有离线证据（该 harness 自己的三项断言——`ResolveGameLayout` 成功、`RevalidateGameLayout` 通过、翻一位字节后复验必须失败——都只覆盖布局解析那条链）。
+- `sharedconstants_test.go` 的 `skill_status 表头字节` / `skill_status 行字节` / `skill_status 行内 Key 偏移` 三组做的是**跨语言对拍**（C# 与 C++ 两处声明，值必须一致，且每处声明必须正好匹配一次）。它是「漂了立刻红」，**不是**「边界已证明」：它不知道这些值对不对，只知道两侧一样。`Level@+48` 不在其中（只有一处声明），原生那三条锚点字节序列也不在其中，`limit_bonus_param` 的任何常量同样不在其中。
+- `tests/NativeLayoutHarness` 只离线编译 `layout_resolver.cpp` 与 `safe_game_access.cpp`，**不含 `table_slot.cpp`**：两张活表的锚点命中数、rip 位移的 `+8` 关系、可写段判定、以及写入的每一道闸都没有离线证据（该 harness 自己的三项断言——`ResolveGameLayout` 成功、`RevalidateGameLayout` 通过、翻一位字节后复验必须失败——都只覆盖布局解析那条链）。
 - 因此这条路径的实证只能在真机游戏里取得：锚点还认不认得出来（日志 `Table slot: resolved slot=0x...` 或「命中数不是 1」那一行）、写进去几行（托管侧 `hot apply: SUCCESS - rows=<改写行数> ...`）、以及被拒时是哪个码（原生 `WriteSkillStatusTable: refused (<码>): ...`）。读法与故障路由见 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)；各套件护什么见 [验证地图](/openwiki/testing/verification-map.md)。

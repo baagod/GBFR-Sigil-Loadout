@@ -43,9 +43,6 @@ sources:
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
 generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
 ---
 
 # 虚拟槽位、模板因子与专属开关

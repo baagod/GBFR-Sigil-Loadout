@@ -1,8 +1,8 @@
 ---
 type: architecture
 title: 托管 mod（C# Reloaded 外壳）
-description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序（含失败回滚）、250ms 维护拍的三阶段单飞、Dispose 拆除次序、日志双汇与单代轮转、NativeCore 门面（DLL 路径绑定、ABI 尺寸+偏移双检、日志回调与运行时消息）、LoadoutConfig 与 SigilEditorFeature 的职责划分（前者只做载荷映射、不读数据文件、不持有表，等级只判非负、上界不在此判定，专属开关只转发 false）、热键那一半的所有权（配置装配与 F1 回退、后台线程与 message-only 窗口、按前台态动态注册/释放、维护拍每拍请热键线程复核"键归谁"、与工具侧显隐判据的分工）、两个 FileStamp 版本门语义，以及跨语言常量（MaxSlots = 16）各自落在哪一侧、被哪道门对拍。
-tags: [managed-mod, reloaded-ii, lifecycle, maintenance-tick, fail-closed, interop]
+description: GBFR.SigilLoadout.dll 的内部结构：Mod 的 IMod 生命周期与 QueueStart 阶段顺序、250ms 维护拍的四个阶段（LoadoutConfig / SigilEditorFeature / LimitBonusFeature / Hotkey）与单飞守卫、Dispose 拆除次序、日志双汇与单代轮转、NativeCore 门面（DLL 路径绑定、ABI v21 的版本 + 尺寸/偏移双检、日志回调、运行时消息回读，以及 ApplyLoadout / WriteSkillStatusTable / SetLimitBonusLevels 三个 ABI 调用）、三份配置的三种 FileStamp 版本门语义（认领式 / Pending + MarkApplied / 看护式）、EditListJson 的外层形状契约、能力强化按 Key 逐条改数值与 5s 重试 / 30s 看护节流，以及热键那一半的所有权与 F1 回退。
+tags: [managed-mod, reloaded-ii, lifecycle, maintenance-tick, fail-closed, interop, limit-bonus]
 sources:
   - id: openwiki-source-69da4af19a0e23ba6da00bf0
     resource: repo://GBFR.SigilLoadout.Native/native_api.h
@@ -14,12 +14,18 @@ sources:
     resource: repo://GBFR.SigilLoadout/Configuration/Configurable.cs
   - id: openwiki-source-d9cc925612842aacff93a408
     resource: repo://GBFR.SigilLoadout/Configuration/Configurator.cs
+  - id: openwiki-source-2374d8dd302a51c36dd35e25
+    resource: repo://GBFR.SigilLoadout/EditListJson.cs
   - id: openwiki-source-6bdbd0264f10eb5e7452fc42
     resource: repo://GBFR.SigilLoadout/GBFR.SigilLoadout.csproj
   - id: openwiki-source-1687ac29fa6d25687a06387d
     resource: repo://GBFR.SigilLoadout/Hotkey.cs
   - id: openwiki-source-9f6e8954335eb9b3595bd3be
     resource: repo://GBFR.SigilLoadout/HotkeyConfig.cs
+  - id: openwiki-source-235d06344e8b126bcd1ad088
+    resource: repo://GBFR.SigilLoadout/LimitBonusConfig.cs
+  - id: openwiki-source-a39ea0cefc36893b877e8b69
+    resource: repo://GBFR.SigilLoadout/LimitBonusFeature.cs
   - id: openwiki-source-5298fbc43f2a1044d5c67e9e
     resource: repo://GBFR.SigilLoadout/LoadoutConfig.cs
   - id: openwiki-source-6d678759e60f125bb782b9a7
@@ -34,41 +40,46 @@ sources:
     resource: repo://GBFR.SigilLoadout/SigilEditorFeature.cs
   - id: openwiki-source-c21d77428c3f8997d73d3c4d
     resource: repo://GBFR.SigilLoadout/UserConfig.cs
+  - id: openwiki-source-638821983e5edbdf1912747e
+    resource: repo://SigilLoadout/service/limitbonusservice_test.go
   - id: openwiki-source-202d158ec41182431f814976
     resource: repo://SigilLoadout/sharedconstants_test.go
-  - id: openwiki-source-46f7ef112800a873cada707b
-    resource: repo://SigilLoadout/windowstate.go
+  - id: openwiki-source-a0fb543d0627fe6019ebe2a5
+    resource: repo://SigilLoadout/window/windowstate.go
   - id: openwiki-source-97c4458d1932befc35ac1122
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-0fe2d7e44f67bfc9ee4403ca
     resource: repo://tools/build-release.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T18:48:22.808Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T18:48:22.808Z
+    at: 2026-09-27T21:57:50.417Z
 ---
 
 # 托管 mod（C# Reloaded 外壳）
 
-`GBFR.SigilLoadout.dll` 自己既不扫描也不改写游戏内存——所有写入都经 ABI 交给原生核心，地址由原生从语义锚点解析并持有（细节见 [原生核心（C++ DLL）](/openwiki/architecture/native-core.md)）；它没有 overlay UI、没有输入捕获、没有预设存储，也没有 Overlay Broker，因为原生核心自己经 SafetyHook 装钩子，并自动套用内置模板配装。这层外壳只做四件事：**承载宿主生命周期**、**驱动一拍 250ms 的维护循环**、**转发日志**，以及**读两个由可视工具写下的 JSON**（见 [系统总览](/openwiki/architecture/overview.md) 与 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)）。
+`GBFR.SigilLoadout.dll` 自己既不扫描也不改写游戏内存——所有写入都经 ABI 交给原生核心，活表地址由原生从语义锚点解析并持有（细节见 [原生核心（C++ DLL）](/openwiki/architecture/native-core.md)）；它没有 overlay UI、没有输入捕获、没有预设存储，也没有 Overlay Broker，因为原生核心自己经 SafetyHook 装钩子，并自动套用内置模板配装。这层外壳只做四件事：**承载宿主生命周期**、**驱动一拍 250ms 的维护循环**、**转发日志**，以及**读三个由可视工具写下的 JSON**（配装 `loadout.json`，加两份编辑列表 `sigiledits.json` 与 `limit_bonus.json`；见 [系统总览](/openwiki/architecture/overview.md) 与 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md)）。
 
-两条不变量是"这一层为什么能这么薄"的全部理由，改动前先确认没有破坏它们：
+三条不变量是"这一层为什么能这么薄"的全部理由，改动前先确认没有破坏它们：
 
-- **不持有任何游戏地址。** 活表地址、钩子点、代码段锚点全部由原生核心在 `GBFR20_Initialize` 里解析并保存在自己那边；托管侧交出去的只有结构体数组与字节数组，所以这里不存在"基址变了要重扫/要失效"这类状态。
-- **不维护按角色槽表。** 模板表与专属表都在原生侧；托管侧唯一的"表"是因子编辑那条路从游戏归档里读出来、就地打补丁的 `skill_status` 字节。
-
-状态归属的完整表在 [系统总览](/openwiki/architecture/overview.md)，原生侧的容量与配对规则见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)。
+- **不持有任何游戏地址。** 活表地址、钩子点、代码段锚点全部由原生核心在 `GBFR20_Initialize` 里解析并保存在自己那边；托管侧交出去的只有结构体数组、字节数组，以及能力强化那条路的一个 Key + 一个 float 数组，所以这里不存在"基址变了要重扫/要失效"这类状态。
+- **不维护按角色槽表，也不持有任何数据表。** 模板表与专属表都在原生侧，`LoadoutConfig` 只做载荷映射；托管侧唯一的"整张表"是因子编辑那条路从游戏归档读出、就地打补丁的 `skill_status` 字节；能力强化那条路连表都没有——它按 Key 交数值，行由原生逐条去找（并要求那个 Key 在整张表里**恰好出现一次**）。
+- **写入失败就是没写。** 原生的每个写入口都 fail-closed，并且会自己落一行原因；托管侧不重解释拒绝码，只按返回值决定"这一版算不算处理完了"——第 7 节那三种版本门就是这条约定的三种落法。
 
 | 托管侧单元 | 职责（一句话） |
 | --- | --- |
 | `Mod` | 唯一的 `IMod` 实现：幂等启动、阶段日志、创建维护定时器、幂等关停 |
-| `NativeCore`（`NativeCore.cs`） | 原生核心门面：DLL 路径绑定与解析、日志汇、ABI 握手、初始化/关停、运行时消息回读、两次 ABI 调用 |
+| `NativeCore`（`NativeCore.cs`） | 原生核心门面：DLL 路径绑定与解析、日志汇、ABI 握手、初始化/关停、运行时消息回读、三个 ABI 调用 |
 | `NativeCore`（`NativeCore.Interop.cs`） | 只放 P/Invoke 声明、两个跨 ABI 结构体，以及 `EnsureAbiLayout` 的布局自检 |
 | `LoadoutConfig` | 把 `loadout.json` 映射成 ABI 结构并推进原生模板表；不读数据文件、不持有表 |
 | `SigilEditorFeature` | 把 `sigiledits.json` 变成整张 `skill_status` 表，注册给数据管理器并让原生就地写入活表 |
-| `UserConfig` / `FileStamp` | 用户配置目录与两个文件名的唯一推导处；两个特性共用的 mtime 版本门 |
+| `LimitBonusFeature` | 把 `limit_bonus.json` 逐条交给原生，按 Key 改 `limit_bonus_param` 活表里那几行的 Lv 槽；不经数据管理器、不持有表 |
+| `UserConfig` / `FileStamp` | 用户配置目录与三个配置文件名（含目录名）的唯一推导处；三种版本门语义共用的地基 |
+| `EditListJson` / `Config` / `LimitBonusConfig` | 两份编辑列表共用的外层形状契约，以及各自的记录形状 |
 | `Configurator` / `Configurable<T>` / `HotkeyConfig` | `IConfiguratorV3` 配置页连接器与热键那一份配置（本 mod 自己裁过的 `Configurable` 基类） |
 | `Hotkey` | message-only 窗口与 `RegisterHotKey` 消息线程；按前台态动态注册/释放这颗全局独占的裸键，注册不上或窗口建不出来时退回 250ms 轮询；生命周期由 `Mod` 掌握 |
+
+`Mod` 的类头注释就是这份清单的口语版：外壳承载两个编辑器，都由下面 250ms 的维护拍驱动——因子编辑器按编辑列表改写 `skill_status` 行，能力强化编辑器按编辑列表改写 `limit_bonus_param` 活表里那几行。
 
 ABI 导出面的语义（每个导出做什么、拒绝码含义、原生侧生命周期）不在本页：[原生核心（C++ DLL）](/openwiki/architecture/native-core.md) 与 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md) 是它们的权威；本页只讲托管侧**怎么用它**。
 
@@ -130,8 +141,9 @@ flowchart TD
     I --> J["InitializeHotkeyConfiguration 读一次 HotkeyConfig"]
     J --> K["new SigilEditorFeature 并 Start"]
     K --> L["阶段行 sigil-editor"]
-    L --> M["创建 250ms 定时器"]
-    M --> N["阶段行 managed-initialize"]
+    L --> M["new LimitBonusFeature，只构造，没有启动写"]
+    M --> N["创建 250ms 定时器"]
+    N --> O["阶段行 managed-initialize"]
     D -.->|"任意异常"| X["记 Initialization failed 后调 Dispose"]
     F -.->|"任意异常"| X
     G -.->|"任意异常"| X
@@ -151,21 +163,24 @@ Startup phase=<name> state=complete|failed elapsed_ms=<n>.
 
 阶段名依次是 `native-library-load`（DLL 加载与 ABI 握手，归 `NativeCore`）、`native-core`（`GBFR20_Initialize` 的返回值就是 `hooksReady`）、`sigil-editor`、`managed-initialize`（整条 `QueueStart`）。实现只有一处，是因为第一个阶段归 `NativeCore`、其余由 `Mod` 消费（`CompleteStartupPhase` 只是把计时与名字交给它）。
 
-**钩子没装成不算启动失败**：`hooksReady == false` 时只额外记一行 `Native core loaded without hooks: <消息>`（消息来自 `NativeCore.GetRuntimeMessage`），然后照常继续。理由是因子编辑器与原生核心无关——它只读归档、改写 `skill_status` 行，钩子成没成都照样启动。这也是"降级、可诊断、不带走游戏进程"这条全局约定在托管侧的第一处落点。
+**能力强化编辑器没有对应的启动阶段行**，因为它启动时什么都不做：`new LimitBonusFeature(Log)` 只是一句构造，第一次应用与之后的每一次应用都是同一件事，发生在维护拍里（第 7.6 节）。它的失败也不该让启动失败——游戏可能还没把那张表读进内存，原生那时以拒写回话，拍子按 5s 重试即可。
+
+**钩子没装成不算启动失败**：`hooksReady == false` 时只额外记一行 `Native core loaded without hooks: <消息>`（消息来自 `NativeCore.GetRuntimeMessage`），然后照常继续。理由是两个编辑器都与原生钩子无关——因子编辑读归档、改写 `skill_status` 行，能力强化改写数据表行，钩子成没成都照样启动。这也是"降级、可诊断、不带走游戏进程"这条全局约定在托管侧的第一处落点。
 
 ### 启动行的信息量
 
 会话分隔行 `======== Session Start yyyy-MM-dd HH:mm:ss ========` 与紧随的 `GBFR Sigil Loadout v<ModVersion> (ABI <NativeCore.AbiVersion>)` 是跨会话日志里唯一的"新一次运行从这里开始"记号（文件是追加写的，见第 5 节）。`ABI` 那个数字复用 `NativeCore.AbiVersion` 常量，不另抄一份字面量。
 
-## 3. 维护拍：250ms、单飞标志、三个阶段的次序
+## 3. 维护拍：250ms、单飞标志、四个阶段的次序
 
-`System.Threading.Timer` 以 `dueTime = period = 250` 创建，每拍按固定次序调三个阶段：
+`System.Threading.Timer` 以 `dueTime = period = 250` 创建，每拍按固定次序调四个阶段：
 
-| 次序 | 阶段 | "让过去"为什么是正常的 |
+| 次序 | 阶段 | "这一拍被丢掉"为什么是正常的 |
 | --- | --- | --- |
 | 1 | `LoadoutConfig.Tick(Log)` | 版本门 `Changed()` 直接认领，没变就返回，不改任何状态 |
 | 2 | `_sigilEditor?.Tick()` | 未接上数据管理器就只重试 `Bootstrap`；`Pending` 不通过就返回 |
-| 3 | `Hotkey.Tick(Log)` | 先 post 一次 `WM_SYNC_REGISTRATION` 请热键线程复核"键归谁"（这一条在提前返回之前）；已注册时到此为止，否则只是采样 `GetAsyncKeyState` |
+| 3 | `_limitBonusEditor?.Tick()` | 同版本要等间隔到点（5s 或 30s），否则什么都不做 |
+| 4 | `Hotkey.Tick(Log)` | 先 post 一次 `WM_SYNC_REGISTRATION` 请热键线程复核"键归谁"（这一条在提前返回之前）；已注册时到此为止，否则只是采样 `GetAsyncKeyState` |
 
 ```mermaid
 sequenceDiagram
@@ -173,6 +188,7 @@ sequenceDiagram
     participant Mod as Mod
     participant LC as LoadoutConfig
     participant FE as SigilEditorFeature
+    participant LB as LimitBonusFeature
     participant HK as Hotkey
     participant NC as NativeCore
 
@@ -183,6 +199,7 @@ sequenceDiagram
     else 拿到这一拍
         Mod->>LC: Tick
         Mod->>FE: Tick
+        Mod->>LB: Tick
         Mod->>HK: Tick
         Mod->>Mod: finally 里清 _ticking
     end
@@ -190,19 +207,20 @@ sequenceDiagram
     Note over Mod,HK: 之后由 Unload 或 Disposing 触发一次 Dispose
     Mod->>Timer: Dispose 停拍
     Mod->>FE: Dispose 置 _stopped
+    Mod->>LB: Dispose 置 _stopped
     Mod->>HK: Shutdown 拆消息窗口线程
     Mod->>NC: Shutdown 无条件
     NC-->>Mod: DetachNativeLogSink
     Mod->>Mod: 释放文件日志
 ```
 
-一拍的三阶段次序，以及关停时拆除所有托管侧资源、最后无条件调 `NativeCore.Shutdown`。
+一拍的四个阶段次序，以及关停时拆除所有托管侧资源、最后无条件调 `NativeCore.Shutdown`。
 
 三条必须记住的约定：
 
-1. **定时器回调不串行。** 上一拍没跑完，下一拍就会进来。代码用一个 `_ticking` 单飞标志（`Interlocked.Exchange`）统一把重叠的拍丢掉，而不是让每个阶段各防一遍——因为三个阶段本来就把"让过去"当正常情况。新增阶段时，它会继承这条语义：**不能假设自己每 250ms 一定被调到一次**。
-2. **整拍外面套 catch-all。** `try { 三个阶段 } catch { } finally { 清标志 }`：维护拍绝不能把进程带走。于是阶段内部的失败只能靠自己的日志说话，不会升级成异常——单次失败因此被隔离在阶段内部（`LoadoutConfig` 记 `Invalid loadout.json; kept previous configuration`、`SigilEditorFeature` 记自己那几行、`Hotkey` 只是不再采样），不会有任何一条失败路径跳过清理或升级成启动失败。
-3. **250ms 只是投递节奏，不是量。** 数值要到下一场战斗才生效（术语见 `CONTEXT.md` 的"可见"），因子编辑那条路还用 5s 节流与 mtime 门（见第 7 节）。这个数字换掉的是一条阻塞在 `WaitOne` 的线程和一个内核事件对象。
+1. **定时器回调不串行。** 上一拍没跑完，下一拍就会进来。代码用一个 `_ticking` 单飞标志（`Interlocked.Exchange`）统一把重叠的拍丢掉，而不是让每个阶段各防一遍——因为四个阶段本来就把"让过去"当正常情况。新增阶段时，它会继承这条语义：**不能假设自己每 250ms 一定被调到一次**。
+2. **整拍外面套 catch-all。** `try { 四个阶段 } catch { } finally { 清标志 }`：维护拍绝不能把进程带走。于是阶段内部的失败只能靠自己的日志说话，不会升级成异常——单次失败因此被隔离在阶段内部（`LoadoutConfig` 记 `Invalid loadout.json; kept previous configuration`、`SigilEditorFeature` 记自己那几行、`LimitBonusFeature` 记 `limit bonus edit EXCEPTION: …` 或一条汇总结论、`Hotkey` 只是不再采样），不会有任何一条失败路径跳过清理或升级成启动失败。**注意后两个编辑器自己也有 try/catch**：维护拍那层是最后一道兜底，不是唯一的诊断出口。
+3. **250ms 只是投递节奏，不是量。** 数值要到下一场战斗才生效（术语见 `CONTEXT.md` 的"可见"），两条编辑链路还各自带节流与版本门（见第 7 节）。这个数字换掉的是一条阻塞在 `WaitOne` 的线程和一个内核事件对象。
 
 ## 4. `Dispose`：拆除次序与"无条件关停"
 
@@ -210,13 +228,14 @@ sequenceDiagram
 
 1. `_tickTimer?.Dispose()` 并置 null——先断掉拍；
 2. `_sigilEditor?.Dispose()` 并置 null——它只置 `_stopped`（见下）；
-3. `Hotkey.Shutdown()`——拆消息窗口线程；
-4. **无条件** `NativeCore.Shutdown()`（自身异常安全，异常被吞）；
-5. 在 `_logLock` 里释放 `_fileLog` 并置 null。
+3. `_limitBonusEditor?.Dispose()` 并置 null——同样只置 `_stopped`；
+4. `Hotkey.Shutdown()`——拆消息窗口线程；
+5. **无条件** `NativeCore.Shutdown()`（自身异常安全，异常被吞）；
+6. 在 `_logLock` 里释放 `_fileLog` 并置 null。
 
-第 4 条的理由写在代码里，也是这个类里最容易被"顺手改回去"的一处：`Initialize` 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，此后的每一步（阶段日志、`LoadoutConfig.Initialize`、热键配置、因子编辑器构造）都可能抛异常把控制权交给 `Dispose`。以前这个调用被一个"全都成功之后才置位"的标志门着，于是**失败路径会把原生钩子留在游戏里**。现在它不依赖任何成功标志——这正是 fail-closed 在托管侧的另一半：不确定的时候宁可关掉。
+第 5 条的理由写在代码里，也是这个类里最容易被"顺手改回去"的一处：`Initialize` 一旦返回，原生 DLL 已经加载、日志回调已经挂上、钩子可能已经装好，此后的每一步（阶段日志、`LoadoutConfig.Initialize`、热键配置、两个编辑器的构造）都可能抛异常把控制权交给 `Dispose`。以前这个调用被一个"全都成功之后才置位"的标志门着，于是**失败路径会把原生钩子留在游戏里**。现在它不依赖任何成功标志——这正是 fail-closed 在托管侧的另一半：不确定的时候宁可关掉。
 
-因子编辑器那条拆解是弱化的：`SigilEditorFeature.Dispose()` 只做 `Interlocked.Exchange(ref _stopped, 1)`。原因是宿主的定时器不保证在 `Dispose` 返回时回调已经跑完，而 `Apply` 开头会读这个标志，已卸载就不再往游戏内存里写（见第 7 节）。
+两个编辑器的拆解都是弱化的：`SigilEditorFeature.Dispose()` 与 `LimitBonusFeature.Dispose()` 各自只做 `Interlocked.Exchange(ref _stopped, 1)`。原因是宿主的定时器不保证在 `Dispose` 返回时回调已经跑完，而两者都会在动手之前读这个标志，已卸载就不再往游戏内存里写（见第 7 节）。
 
 ## 5. 日志：两个汇、一条行、一轮转
 
@@ -227,7 +246,7 @@ sequenceDiagram
 | 文件 | `mod目录\GBFR.SigilLoadout.log`，追加写、`AutoFlush = true` | 异常被吞（文件日志绝不能影响 mod 生命周期） |
 | 启动器 | `ILogger.WriteLine`（`loader.GetLogger()`） | 异常被吞（外部日志器出错同样不影响生命周期） |
 
-行格式是 `[HH:mm:ss.fff] [GBFR Sigil Loadout] <消息>`，其中 `LogTag` 是面向玩家的显示名前缀（`ModId` 保持技术性）。`_logger` 与 `_fileLog` 都只在 `_logLock` 里被读写，所以 `Log` 可以从任何线程（定时器线程、热键线程、原生回调）安全调用。
+行格式是 `[HH:mm:ss.fff] [GBFR Sigil Loadout] <消息>`，其中 `LogTag` 是面向玩家的显示名前缀（`ModId` 保持技术性）。`_logger` 与 `_fileLog` 都只在 `_logLock` 里被读写，所以 `Log` 可以从任何线程（定时器线程、热键线程、原生回调）安全调用。三个特性都只拿到一个 `Action<string>`（`Mod.Log` 自己），没有第二个日志出口——`LoadoutConfig`、`SigilEditorFeature`、`LimitBonusFeature` 的日志因此与启动日志同源、同样落进两个汇。
 
 文件那一侧的规则：
 
@@ -235,13 +254,13 @@ sequenceDiagram
 - **单份上限 4 MiB**：打开之前先看现有文件长度，超了就删掉旧的 `.1`、把当前份改名成 `.1`（只留一代）。轮转失败被 catch 掉——最坏情况只是这份日志继续变大；
 - 因为文件跨会话追加，**每次运行的第 1 行**（`Session Start`）是唯一的会话边界记号。
 
-原生日志也落进同一个汇，但那是托管侧主动接的线：`NativeCore.Initialize` 把 `Log` 存成 `_nativeLogSink`，原生的 `GBFR20_SetLogCallback` 回调经 `ForwardNativeLog` 加 `Native: ` 前缀转发进来（细节见第 6.4 节）。
+原生日志也落进同一个汇，但那是托管侧主动接的线：`NativeCore.Initialize` 把 `Log` 存成 `_nativeLogSink`，原生的 `GBFR20_SetLogCallback` 回调经 `ForwardNativeLog` 加 `Native: ` 前缀转发进来（细节见第 6.4 节）。能力强化的拒写原因也是这么进日志的（同一种拒写码原生只报一次）。
 
 `Dispose` 之后 `_fileLog` 已被置 null，所以再写日志时文件那一半是空操作（不是"写进已释放的 writer"），启动器那一半照旧尝试、失败被吞。
 
 ## 6. `NativeCore`：最小原生核心门面
 
-这个 `internal static unsafe partial class` 分两个文件：`NativeCore.cs` 是门面逻辑，`NativeCore.Interop.cs` 只放 `DllImport` 声明、两个跨 ABI 结构体，以及布局自检。它派生自的那份原始实现里所有 selector / inventory / preset / input / present API 都已删除——**导出映射就是下面这七个，一个不多**：
+这个 `internal static unsafe partial class` 分两个文件：`NativeCore.cs` 是门面逻辑，`NativeCore.Interop.cs` 只放 `DllImport` 声明、两个跨 ABI 结构体，以及布局自检。它派生自的那份原始实现里所有 selector / inventory / preset / input / present API 都已删除——**导出映射就是下面这八个，一个不多**：
 
 | `DllImport` 声明 | 在门面里的用途 |
 | --- | --- |
@@ -250,13 +269,14 @@ sequenceDiagram
 | `GBFR20_Initialize` / `GBFR20_Shutdown` | 原生核心生命周期 |
 | `GBFR20_CopyRuntimeMessage` | `GetRuntimeMessage` 的两段式回读（`sbyte*` + `uint` 长度） |
 | `GBFR20_ApplyLoadout` | 通用槽数组 + 专属开关数组各带一个 `uint` 计数 |
-| `GBFR20_WriteSkillStatusTable` | `WriteSkillStatusTable` 的 `fixed` 指针封装 |
+| `GBFR20_WriteSkillStatusTable` | `WriteSkillStatusTable` 的 `fixed` 指针封装（整张 `skill_status` 表） |
+| `GBFR20_SetLimitBonusLevels` | `SetLimitBonusLevels` 的 `fixed` 指针封装（一个 Key + 一个 float 数组 = 若干档数值） |
 
 三条刻意的约定：
 
 - **库名只有一个来源。** 每个声明的 `DllImport(LibraryName)` 用的都是 `LibraryName = "GBFR.SigilLoadout.Native.dll"` 这个常量，与 `Configure` 拼绝对路径、`ResolveLibrary` 认的名字同源；声明上带 `ExactSpelling = true` 与 `CallingConvention = Cdecl`（对应 `native_api.h` 的 `GBFR20_CALL`），没有 `.def` 文件，也没有 `EntryPoint` 重命名。
-- **两个跨 ABI 结构体都标 `Pack = 1`**，与 `native_api.h` 的 `#pragma pack(push, 1)` 对应。`ExclusiveOverrideNative` 在托管侧把三个保留字节写成 `Reserved0..2` 三个字段（C# 声明不了 `uint8_t reserved[3]`）：偏移断言只到 `Disabled` +0x08，而**尺寸 0x0C 正是这三个字段补出来的**。
-- **数组参数交给封送器**：`ApplyLoadout` 把托管数组与 `(uint)数组长度` 一起交出去，空的一半传 `null` + 0（语义见 6.5 节）。
+- **两个跨 ABI 结构体都标 `Pack = 1`**，与 `native_api.h` 的 `#pragma pack(push, 1)` 对应。`ExclusiveOverrideNative` 在托管侧把三个保留字节写成 `Reserved0..2` 三个字段（C# 声明不了 `uint8_t reserved[3]`）：偏移断言只到 `Disabled` +0x08，而**尺寸 0x0C 正是这三个字段补出来的**。v21 新增的 `SetLimitBonusLevels` 没有引入结构体：它的参数就是一个 `uint` 和一个 `float*`（见 6.5 节）。
+- **数组参数交给封送器**：`ApplyLoadout` 把托管数组与 `(uint)数组长度` 一起交出去，空的一半传 `null` + 0（语义见 6.5 节）；两个写表的调用用 `fixed` 交出指针与长度。
 
 ### 6.1 DLL 路径绑定与解析
 
@@ -293,7 +313,7 @@ flowchart TD
     J --> K["QueueStart 记 Initialization failed 后 Dispose"]
 ```
 
-ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常，于是整套原生钩子不装。
+ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常，于是整套原生钩子不装（数据表那两条写入口刻意不要求 `hooksReady`）。
 
 三个值得留意的次序细节：
 
@@ -303,7 +323,7 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 
 ### 6.3 ABI 尺寸 + 偏移双检：为什么两样都要
 
-`NativeCore.AbiVersion = 20` 与原生返回的版本号（`native_api.h` 的 `GBFR20_ABI_VERSION`）比对，只挡得住"加载到旧 DLL"。真正跨过 ABI 的是**封送器写出去的字节**，所以 `EnsureAbiLayout` 再对拍一遍：
+`NativeCore.AbiVersion = 21` 与原生返回的版本号（`native_api.h` 的 `GBFR20_ABI_VERSION = 21`）比对，只挡得住"加载到旧 DLL"。真正跨过 ABI 的是**封送器写出去的字节**，所以 `EnsureAbiLayout` 再对拍一遍：
 
 | 结构体 | 期望尺寸 | 逐字段偏移 |
 | --- | --- | --- |
@@ -318,6 +338,8 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 
 字段名用 `nameof` 传进 `AssertOffset<T>`：字段改名时这里跟着改，不会退化成一句"这个字段不存在"的报错。这一条与 `native_api.h` 的 `static_assert` 一一对应，但**没有任何构建或测试门禁钉住这一对**（见第 9 节）。
 
+v21 只加了导出、没有改结构体：`GBFR20_SetLimitBonusLevels` 的参数是 `uint32_t key_hash` + `const float* levels` + `uint32_t level_count`，所以布局自检那两行不动，版本号本身成了"新导出在不在"的唯一守门人（旧 DLL 会先被握手拒掉）。
+
 ### 6.4 日志汇与运行时消息回读
 
 - `_nativeLogSink` 是 `Action<string>`，与 `_logger`/`_fileLog` 一样受锁保护；`ForwardNativeLog` 加 `Native: ` 前缀后调用它，整段包在 try/catch 里——**诊断回调绝不能让异常展开回原生钩子代码**。
@@ -325,28 +347,30 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - `DetachNativeLogSink` 只在 `_libraryHandle != IntPtr.Zero` 时才 `SetLogCallback(IntPtr.Zero)`（进程拆卸期间原生模块可能已经不在了），然后清空 sink；`Shutdown` 用 `try/finally` 保证无论 `GBFR20_Shutdown` 成不成都会摘回调。
 - `GetRuntimeMessage` 是两段式回读：先问所需长度（含结尾 NUL），`<= 1` 视为空串，超过 64 KiB 截断，然后填充缓冲区返回 UTF-8 字符串。它只服务一个用途——`hooksReady == false` 时把原生那句"为什么"记进启动日志。
 
-### 6.5 两个 ABI 调用的托管侧契约
+### 6.5 三个 ABI 调用的托管侧契约
 
 这一层只做形状转换，**两半 `null` 的语义是契约的一部分**：
 
 - `ApplyLoadout(TemplateSlotNative[]?, ExclusiveOverrideNative[]?)`：`null`/空表示"这一半不要"。没有通用槽 = 只用内置模板；没有专属开关 = 专属全开。两半合成一次调用（两半都收尾于原生同一个"重新发布表"步骤）。`LoadoutConfig` 的三种输入情形（无文件、空槽位数组、有槽位）全靠这条语义区分。
 - `WriteSkillStatusTable(byte[])`：把整张表经 `fixed` 指针交出去，返回值 `>= 0` 是真正改写的行数、`< 0` 是拒绝码。托管侧**不解释**拒绝码的含义（权威在 `native_api.h`），只记"被拒 + 码"。
+- `SetLimitBonusLevels(uint keyHash, float[] levels)`：`fixed` 交出 `levels` 的首地址，长度就是 `level_count`，所以"写几档"完全由调用方那一条记录说了算（`levels[i]` → Lv(i+1)，没提到的槽一个字节都不碰）。返回值 `>= 0` 表示原生那边"这一行改没改"（`1` = 改了，`0` = 内存里已经一样），`< 0` 是拒绝码。托管侧同样不解释码，只把它归入"被拒"并计数；原因那行日志由原生落（`SetLimitBonusLevels: refused (码): …`，同一种码只报一次）。
 
-调用的语义与闸门细节见 [原生核心（C++ DLL）](/openwiki/architecture/native-core.md) 与 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)；`LoadoutConfig` 那条链见 [工作流：配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md)，因子编辑那条链见 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)。
+调用的语义与闸门细节见 [原生核心（C++ DLL）](/openwiki/architecture/native-core.md) 与 [skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)；`LoadoutConfig` 那条链见 [工作流：配装从界面到游戏状态](/openwiki/workflows/loadout-apply.md)，因子编辑那条链见 [工作流：因子数值编辑与热应用](/openwiki/workflows/sigil-edit-apply.md)，能力强化那条链见 [工作流：能力强化数值的热应用](/openwiki/workflows/limit-bonus-apply.md)。
 
-## 7. 两个配置读取特性的职责划分
+## 7. 三个配置读取单元：共用一套地基，三种版本门
 
-托管侧读两个文件，两个特性共用同一套地基，但**职责与版本门语义刻意不同**：
+托管侧读三个文件，它们共用同一套地基（`UserConfig` 推路径、`1 MiB` 上限、`FileStamp` 取 mtime），但**职责与版本门语义刻意不同**：
 
-| | `LoadoutConfig` | `SigilEditorFeature` |
-| --- | --- | --- |
-| 输入 | `%LOCALAPPDATA%\GBFRSigilLoadout\loadout.json` | `%LOCALAPPDATA%\GBFRSigilLoadout\sigiledits.json` |
-| 形态 | `static` 类，无实例状态 | 实例，持有 `IModLoader` / `IDataManager` 与当前表 |
-| 唯一职责 | 载荷 → ABI 结构映射，再调 `NativeCore.ApplyLoadout` | 编辑列表 → 表字节 → 注册给数据管理器 + 原生就地写入活表 |
-| 校验责任 | 只做形状校验（JSON 坏、缺 `slots` 数组、缺技能 hash、等级为负、启用槽超过 `MaxSlots`）；不判"选得对不对"，等级也只判非负——上界不在这里 | 只挑 `(Key, Level)` 匹配的行；不改 Key、不猜等级语义 |
-| 版本门 | `FileStamp.Changed()`：**认领后处理**，成败都算处理过 | `FileStamp.Now()` + `Pending()` + `MarkApplied()`：**确认生效后才推进** |
-| 失败之后 | 保留上一份有效配置，等下一次保存改 mtime | 那一版还欠着，下一拍再来（同版本按 5s 节流、只报一次） |
-| 启动那次 | `Initialize` 里过一遍同一道门 | `Bootstrap` 造表后走 `TryApply`，与热应用同一条 `Publish` 路径 |
+| | `LoadoutConfig` | `SigilEditorFeature` | `LimitBonusFeature` |
+| --- | --- | --- | --- |
+| 输入 | `%LOCALAPPDATA%\GBFRSigilLoadout\loadout.json` | `…\sigiledits.json` | `…\limit_bonus.json` |
+| 形态 | `static` 类，无实例状态 | 实例：持有 `IModLoader` / `IDataManager` 与当前表 | 实例：只持有版本与节流状态 |
+| 唯一职责 | 载荷 → ABI 结构映射，再调 `NativeCore.ApplyLoadout` | 编辑列表 → 整张 `skill_status` 表 → 注册给数据管理器 + 原生就地写入活表 | 编辑列表 → 逐条 `NativeCore.SetLimitBonusLevels`（按 Key 改那一行的 Lv 槽） |
+| 通道 | 原生 ABI，一次调用交两半 | `IDataManager` 注册 **加** 原生 ABI 写入 | **只有** 原生 ABI：不经数据管理器 |
+| 校验责任 | 整份：形状坏就整份拒（`Invalid loadout.json; kept previous configuration`） | 只挑 `(Key, Level)` 匹配的行；不改 Key、不猜等级语义 | 只认整条记录：Key 必须正好 8 位十六进制、`values` 长度 1..10；坏记录跳过并计数（不逐条打日志） |
+| 版本门 | `FileStamp.Changed()`：**认领式**，成败都算处理过 | `FileStamp.Now()` + `Pending()` + `MarkApplied()`：**确认生效后才推进** | `FileStamp.Now()` + 自记 `_lastAttemptVersion`：**动手之前就推进**，同版本按间隔重来（看护式） |
+| 失败之后 | 保留上一份有效配置，等下一次保存改 mtime | 那一版还欠着，下一拍再来（同版本重试按 5s 节流、只报一次） | 那一版按间隔重来：没落地过 5s，落地过 30s（看护），同一版不重复刷屏 |
+| 启动那次 | `Initialize` 里过一遍同一道门 | `Bootstrap` 造表后走 `TryApply`，与热应用同一条 `Publish` 路径 | 没有"启动那一次"：构造只是一句 `new`，第一次应用就在维护拍里 |
 
 `LoadoutConfig` 那一侧的边界单列一遍，是因为最常见的误改就是"在这一层顺手多判一点"：
 
@@ -355,27 +379,85 @@ ABI 握手的两道闸与它们的失败落点：任一检查不符就抛异常�
 - **等级只判非负，上界不在这里判。** 上界是**每条技能自己的 cap**，而持有那张表的只有可视工具（它写盘之前已经把等级夹在 cap 内）；在这一层再判一次上界就成了同一规则的第三份副本，判的还不是真正的不变量。这一层能给的只有"负数不行"（`GetLevel` 的注释写的就是这个理由）。
 - **`exclusive` 只转发 `false`。** 只有值恰好为 `false` 的项才变成一条 `(CharacterHash, SkillHash, Disabled = 1)`；`true` 与"没提到"在这里是同一件事，都不生成条目（原生对没被提到的角色一律三槽全开）。两侧的键也都必须是 hash：外层解析不成角色 hash 就记一行 `exclusive: '…' is not a character hash; ignored.` 并整条跳过，内层解析不成 skill hash 的记一行 `… has a non-hash skill key …; ignored.` 并跳过该键。hex 合法但不在原生专属表里的技能 hash 由原生忽略——托管侧不持有那张表，所以它能做的只有转发，`PL` 码只是可视工具显示用的标签。
 
-为什么两种门都要存在，是这一页最该记住的一条：
+### 7.1 两条编辑链路的两处有意差异
+
+因子编辑与能力强化看起来对称（都是一份"编辑列表"驱动一次原生写入），但有两处差异是设计出来的，改动前要认得出它们：
+
+- **能力强化不经数据管理器。** `skill_status.tbl` 在游戏读档/开界面时会被重新解析，所以那条路必须把编辑后的表 `AddOrUpdateExternalFile` 再 `UpdateIndex` 注册回去；`limit_bonus_param` 不在读档时被重新解析（实测：回标题读档之后缓冲区地址与写入的值都还在），所以没有"重新注册一份表"这件事，`LimitBonusFeature` 里也没有任何 `IDataManager` 引用。
+- **能力强化的输入是"按 Key 改若干个数值"，不是"一整张表"。** 因子编辑要先把整张 52 字节行的表建出来（读归档 + 逐行打补丁），再一次交出去；能力强化把每一条记录分别交给原生：Key 是行的身份，由原生逐行去找并要求它在整张表里**恰好出现一次**（这条"Key 唯一"就是那张表的身份证明，替代 `skill_status` 那边的逐行 Key 对拍）。所以托管侧一个表字节都不持有。
+
+由此还派生出一处文件语义的差异：**`limit_bonus.json` 的空数组是"没有要写的"，不是"撤销全部编辑"**。这张表只写内存、没有第二份原始值可以拿回来，所以"删掉列表"和"没有编辑"在这里是同一件事；要还原默认值得由可视工具把默认值当成一次编辑写下来。`sigiledits.json` 那边相反——空列表是把未编辑的 `skill_status` 表发布回去（撤销全部编辑），因为那边始终从归档重建整张表。
+
+### 7.2 两种门都要存在，第三种也要
+
+`FileStamp` 只提供原子动作（取 mtime、比对、认领/推进），"什么时候算处理完"由调用方在那一刻声明。三种页面语义因此都能落在同一个类上：
 
 - `LoadoutConfig` 是**单次应用**：失败时内存里还留着上一份有效配置，"这一版处理过了"是合理的说法，于是 `Changed()` 当场认领最省事——同一份坏配置每 250ms 重试一次只会把同一个报错灌满日志。错误原因照常报，去重靠"版本变了才说"。
 - `SigilEditorFeature` 的失败是**一个字节都没写**：原生拒写时所谓"上一份"并不是一份可用的新配置，认领等于宣告编辑已生效——编辑会静默丢失且不再重试。所以判据只在 `Publish` 里原生**确实改写了行**之后才由 `MarkApplied` 推进。`FileStamp` 把"取 mtime + 比对 + 认领"收在一处，正是为了让"先认领、再干活"不可能被写反。
+- `LimitBonusFeature` 要的不是"成功即收工"，而是**持续看护**：这条路上的失败（表还没进内存、锚点没解出）是分钟级的事，而成功之后游戏仍可能重新解析这张表（换版本、重新加载），那一版需要再落一次。所以它连 `Pending` / `MarkApplied` 都不用（调了也没人读），自己记 `_lastAttemptVersion` 与 `_lastAttemptMs`，并且**在派活之前就推进版本**，于是同一版永远会按间隔再来一次——没落地按 5s，落地过按 30s。原生每次都重新读槽里的指针，所以表被换掉之后那一拍写进的是新的那一份。
 
-`FileStamp` 与 `UserConfig` 的其他约定（`NoFile` = 1601-01-01 与初值 0001-01-01 不同，于是"删了文件"是一版真实的变更；1 MiB 上限；两道门的完整流程图；两个文件的成员级契约）见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。这里只补四条**托管侧**的推论：
+```mermaid
+flowchart TD
+    A["LimitBonusFeature.Tick"] --> B{"_stopped 已置"}
+    B -- "是" --> Z["返回，不动内存"]
+    B -- "否" --> C["current = FileStamp.Now"]
+    C --> D{"current 与 _lastAttemptVersion 相同"}
+    D -- "否" --> F["新版本：不受节流"]
+    D -- "是" --> E{"距 _lastAttemptMs 已超过间隔"}
+    E -- "否" --> Z
+    E -- "是" --> F
+    F --> G["先推进 _lastAttemptVersion 与 _lastAttemptMs"]
+    G --> H["Apply：读列表，逐条调原生"]
+    H --> I{"这一轮有没有被拒"}
+    I -- "没有" --> J["_hasLandedOnce 置真，间隔改用 30s"]
+    I -- "有" --> K["间隔保持 5s，同一版不重复刷屏"]
+```
 
-- **文件不存在是一条真实答案，不是错误。** `LoadoutConfig.TryApply` 在 `mtime == UserConfig.NoFile` 时调 `ApplyLoadout(null, null)` 恢复内置模板并**提前 return**——少了这个 return 就会落到后面的读取上，`new FileInfo(...).Length` 必抛，每局多一条假的"保留上一份"。因子编辑那条路把"列表被删掉"读成空列表，于是把未编辑的表发布回去（撤销全部编辑）。
+能力强化那条路的看护节奏：版本判据在动手之前推进，所以"没落地"和"要再看护一次"用的是同一个机制，只是间隔不同。
+
+`FileStamp` 与 `UserConfig` 的其他约定（`NoFile` = 1601-01-01 与初值 0001-01-01 不同，于是"删了文件"是一版真实的变更；1 MiB 上限；两道门的完整流程图；三个文件的成员级契约）见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)。这里只补四条**托管侧**的推论：
+
+- **文件不存在是一条真实答案，不是错误。** `LoadoutConfig.TryApply` 在 `mtime == UserConfig.NoFile` 时调 `ApplyLoadout(null, null)` 恢复内置模板并**提前 return**——少了这个 return 就会落到后面的读取上，`new FileInfo(...).Length` 必抛，每局多一条假的"保留上一份"。因子编辑那条路把"列表被删掉"读成空列表，于是把未编辑的表发布回去（撤销全部编辑）；能力强化那条路把"没有文件"读成空列表 = 没有要写的（`FileNotFoundException` / `DirectoryNotFoundException` 都当空列表，第 7.6 节）。
 - **三个跨语言常量都住在 `LoadoutConfig.cs` 的类头附近**：`MaxSlots = 16`（只数启用的槽；TS 的 `MAX_SLOTS` 与 Go 的 `loadoutservice.go` 各自还有一处声明）、`DefaultLevel = 15`（载荷漏写 `level` 时的回落）、`UnwornCharacterHash = 0x887AE0B0`（副技能"未选择"的哨兵，原生 `native_internal.h` 的 `kUnwornCharacterHash` 另有一处）。这三组都由 `SigilLoadout/sharedconstants_test.go` 对拍（每条声明必须**正好**匹配一次，再逐组比较；`FilePath("loadout.json")` 那个文件名字面量也在同一份名单里）。值漂了不会编译失败，只会表现成"存盘成功、游戏里什么都没变"或槽位错位。
 - **`MaxSlots` 还有第二道约束，且它不在 C# 里。** `TestVirtualSlotCapacityFitsPlayerSlots` 要求它不超过原生放得下的通用槽数：`kVirtualSlotCapacity − kBuiltinExclusiveSlotCount`（现在是 24 − 3 = 21）。超了不会报错，只会让多出来的槽被原生静默截断——游戏里少几个因子，只有日志会说。所以"把上限调大"这件事的边界由原生容量决定，不是由这个数字本身决定。
-- **这两个文件有意不实现任何 Reloaded 配置接口**：那会让启动器多出一个渲染不了列表的 "Mod configuration" 窗口。所以 `Config` 是纯数据（数据形状与成员名见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)），而热键那份配置走另一套（第 8 节）。
+- **`loadout.json` 与 `sigiledits.json` 有意不实现任何 Reloaded 配置接口**：那会让启动器多出一个渲染不了列表的 "Mod configuration" 窗口。所以 `Config` 是纯数据（数据形状与成员名见 [两个配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md)），而热键那份配置走另一套（第 8 节）。
 
 `LoadoutConfig` 的映射本身只认一种形状：`slots[].items[0]` 是因子（`gem` → `GemId`、`hash` → `Skill1`、`level` → 同时写 `Skill1Level` 与 `SigilLevel`），`items[1]` 可选（`hash` → `Skill2`、`level` → `Skill2Level`）；没有副技能时 `Skill2` 填上面那个哨兵、等级 0。`slots` 缺失或不是数组、`items` 缺失或为空、`gem` / 主技能 hash / 副技能 hash 解析不出来、等级为负、启用槽超过 `MaxSlots`——这些都会让**整份**配置被判为坏（一行 `Invalid loadout.json; kept previous configuration: …`），而不是跳过出问题的那一行；`enabled` 缺失按"启用"算（与 Go / TS 两侧一致），被禁用的行不计数、也不参与校验。这也是为什么前台载荷把解析不出物品 hash 的整行先丢掉：发出去只会让 mod 拒掉整份文件。
 
-`SigilEditorFeature` 的生命周期完全寄生在宿主上：它没有自己的日志、配置目录、文件监听或调度器，状态推进由 `Mod` 的维护拍驱动——未接上 `IDataManager` 时每拍重试 `Bootstrap`（只在第一次没拿到时说一句），并且**构造与启动不受 `hooksReady` 影响**。它自己的 `Dispose` 只置 `_stopped`，因为宿主的定时器回调不保证已经跑完；`Apply` 每次开头读这个标志，已卸载就不再动游戏内存。这条"卸载之后还可能有一拍"的风险由共享的并发约定兜住，见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
+### 7.3 `EditListJson`：两份编辑列表共用的外层形状契约
 
-那条确认生效后才推进的版本门还配了三处细节，缺一个就会退化成"每 250ms 白干一遍"或"用新版本号标记旧内容"：
+`sigiledits.json` 与 `limit_bonus.json` 的外层形状只由一处裁决——只有**外层**算错误，每条记录的成员名由各自的 `[JsonPropertyName]` 决定：
+
+- **必须是一个 JSON 对象**，且**必有 `edits` 成员、它是数组**；不满足就抛（`… must be a JSON object, got …` / `… has no 'edits' member; an empty array is how the list is emptied` / `… 'edits' is …, not an array`）。
+- **空数组是真实答案**，返回空列表——它在两份配置里的含义不同（一边"撤销全部编辑"，一边"没有要写的"），所以由调用方以文本传进去（`Config.Load` 传 `'undo every edit'`，`LimitBonusConfig.Load` 传 `'nothing to write'`）。这句文本会原样出现在那条错误消息里，是"空数组在这里是什么意思"的唯一说明处。
+- **认不出的成员读成默认值**，由各自的逐条扫描报"跳过"，而不是让整份文件读不出来；名字就是契约，`JsonSerializerOptions` 是默认的那份（**不折叠大小写**）。
+- **大小上限也在这里**：先看 `FileInfo.Length` 是否超过 `UserConfig.MaxBytes`（1 MiB），超了直接抛——文件可以手改，失控的那一份该是一条记进日志的错误，而不是一次几个 GB 的读取。
+- 读不出来（没权限、被占用、JSON 坏）都抛异常，由调用方记下原因后**什么都不写**，绝不抹掉本局还活着的编辑。
+
+`Config`（因子）与 `LimitBonusConfig`（能力强化）各自的记录形状只差在字段语义：两份都有 `enabled`（缺省为真）、`key`（8 位十六进制 hash）与 `values`；`Config` 多一个 `level`（要改哪一档）且 `Config.Load` 会把显式的 `"values": null` 规整成定长数组，避免每个读 `Values` 的地方都要处理 null。`LimitBonusEdit.Values` 是 `float[]`，长度就是"这个能力有几档"，1..10。
+
+### 7.4 因子编辑：确认生效后才推进的那条门，配的三处细节
+
+缺一个就会退化成"每 250ms 白干一遍"或"用新版本号标记旧内容"：
 
 - **拒写留下候选**：原生返回 `< 0` 时把这一版建好的表存进 `_retryTable`/`_retryTableStamp`，同一版本重试直接复用它，不必再从归档重建（328 KB 读 + 逐行比较）；
 - **逐字节相同的捷径**：新表与已发布的那份相同时什么都不做，但会 `MarkApplied`——内存里已经是这一版的字节，这一版确实处理完了；不标记的话 `Pending` 永远为真，而这条捷径又让 Tick 的"同版本"节流条件失效；
 - **版本号必须先取**：`Bootstrap` 在读取列表与建表**之前**取 mtime，建完表再复查一次；反过来就会拿 T4 的版本号去标记 T1 的内容（内存里是旧内容而编辑静默丢失），中途变了就什么都不写、也不推进版本，交给下一拍。
+
+`SigilEditorFeature` 的生命周期完全寄生在宿主上：它没有自己的日志、配置目录、文件监听或调度器，状态推进由 `Mod` 的维护拍驱动——未接上 `IDataManager` 时每拍重试 `Bootstrap`（只在第一次没拿到时说一句），并且**构造与启动不受 `hooksReady` 影响**。它自己的 `Dispose` 只置 `_stopped`，因为宿主的定时器回调不保证已经跑完；`Apply` 每次开头读这个标志，已卸载就不再动游戏内存。这条"卸载之后还可能有一拍"的风险由共享的并发约定兜住，见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
+
+### 7.5 能力强化：按 Key 逐条写，5s 重试 / 30s 看护
+
+`LimitBonusFeature` 是三个单元里最短的一条链，它的规则几乎全部关于"什么时候值得再试一次"：
+
+- **Tick 的入口守卫**是先看 `_stopped`（卸载之后不再动内存），再按第 7.2 节那张流程图决定这一拍干不干活；Tick 里那次 `Apply` 调用包着 try/catch，异常记成 `limit bonus edit EXCEPTION: …`，不会升级到维护拍那层。
+- **逐条扫描**：`enabled == false` 的跳过；Key 不是**正好 8 位**十六进制（`LimitBonusFeature.TryParseKey` 比因子编辑那边多一条长度检查——短于 8 位在那边是合法的少量前导零，而这里 Key 是 32 位哈希，写错一位就指到别的行）、`values` 为空或超过 `MaxLevels = 10` 的记录跳过。这些只**计数**，不逐条打日志，也不会让整份列表作废（与 `LoadoutConfig` 的"整份判坏"相反）。
+- **逐条调用**：每条启用的记录各调一次 `NativeCore.SetLimitBonusLevels(keyHash, edit.Values)`；`>= 0` 记作 applied，`< 0` 记作 refused（原因由原生落一行）。
+- **汇总结论**：`limit bonus edit: <applied> applied, <skipped> skipped, <refused> refused (of <总条数> entries in the list)`。它只在"版本变了、或有跳过、或有拒写"时说——`quiet`（这一版已经报过）且一切正常时闭嘴，免得同一版每 5s 刷一行。
+- **间隔切换**：一轮里 `refused == 0` 就把 `_hasLandedOnce` 置真，之后这一版的间隔从 5s 变成 30s（看护）。`RetryIntervalMs` 与 `KeepAliveMs` 这两个数的理由写在常量旁边：表的就绪是分钟级的事，250ms 一拍没意义，而原生在自己那句 `refused` 里打字，托管侧的静默管不到它。
+- **MaxLevels = 10 与原生 `level_count ∈ 1..10` 是两道相同的门**：托管侧先挡掉越界长度，所以原生的 `-8`（`GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED`）不该由这条路触发。
+
+值什么时候到游戏里也与其他两条路不同：天赋/能力数值在**读档**（回标题 → 继续）或该页「全部习得」时才被重算，而节点描述是实时读表的，所以改完立刻看得见；这正是"写入成功"与"玩家看到"分开的两件事（术语见 `CONTEXT.md` 的"可见"）。
 
 ## 8. 热键：配置装配、注册归属与轮询回退
 
@@ -410,16 +492,16 @@ public int VirtualKey =>
 
 ### 8.2 注册/释放的判据：键为什么要在运行期交还
 
-注册的是一颗**无修饰键**（`fsModifiers` 里只有 `MOD_NOREPEAT = 0x4000`，没有 Alt/Ctrl/Shift/Win），而裸键的 `RegisterHotKey` 是**全局独占**的：只要注册着，别的程序就再也收不到这颗键。所以只在"游戏（本进程）或工具自己是前台"时才持有它——那段时间别的程序本来也没有焦点——一旦切走立刻放开，把键还给它们。
+注册的是一颗**无修饰键**（`fsModifiers` 里只有 `MOD_NOREPEAT = 0x4000`，没有 Alt/Ctrl/Shift/Win），而裸键的 `RegisterHotKey` 是**全局独占**的：只要注册着，别的程序就再也收不到这颗键。所以只在"游戏（本进程）或可视工具自己是前台"时才持有它——那段时间别的程序本来也没有焦点——一旦切走立刻放开，把键还给它们。
 
-判据 `GameOrToolIsForeground()` 只有两种放行：前台窗口按标题等于工具窗口（`FindWindow(null, ToolWindowTitle)`），或者前台窗口的进程 id 等于 `Environment.ProcessId`——mod 活在游戏进程里，所以"游戏在前台"不必去查进程名。
+判据 `ShouldOwnTheKey()` 的三步：前台窗口句柄为 0 就返回假（窗口正在被激活/失去激活，这一拍按"不是我们"处理，下一拍自会纠正）；前台窗口的进程 id 等于 `Environment.ProcessId` 就返回真（mod 活在游戏进程里，所以"游戏在前台"不必去查进程名）；否则按标题 `FindWindow(null, ToolWindowTitle)` 找到工具窗口，再比**进程 id**。最后一步按 pid 而不是比窗口句柄，是因为工具进程里还挂着输入法 / TSF 的顶层窗口，敲字时它们会变成前台——按标题或句柄比会漏掉这些情形。
 
 `SyncRegistration()` 只在**期望态变化**时动手，这正是它存在的理由：
 
-| 期望态 | 动作 | 日志 |
+| 期望态变化 | 动作 | 日志 |
 | --- | --- | --- |
-| 从"前台不是我们"变为是 | `RegisterHotKey(hwnd, 0x47B1, MOD_NOREPEAT, vk)` | 成功 `Hotkey registered: <名字> (0x<两位十六进制>) via RegisterHotKey.`；失败 `RegisterHotKey unavailable (key may be taken); fallback polling active.` |
-| 从是变为不是 | `UnregisterHotKey`，并把 `_hotKeyRegistered` 置假 | `Hotkey released: another program is in the foreground.` |
+| 从"前台不是我们"变为是 | `RegisterHotKey(hwnd, 0x47B1, MOD_NOREPEAT, vk)` | 成功静默；失败 `RegisterHotKey unavailable (key may be taken); fallback polling active.` |
+| 从是变为不是 | `UnregisterHotKey`，并把 `_hotKeyRegistered` 置假 | 静默（这一条是常态，不该每 250ms 刷一行） |
 
 `want == _wantRegistered` 就直接返回：少了这道"只在变化时动手"的判断，注册失败（键被别的程序占着）会变成每个维护拍重试一次、每个维护拍刷一条日志。`_wantRegistered` 只在热键线程上读写（所以不必 `volatile`），而 `_messageWindow`、`_hotKeyRegistered`、`_virtualKey`、`_threadExit` 都带 `volatile`，因为它们被维护拍那一侧读。
 
@@ -474,16 +556,17 @@ stateDiagram-v2
 
 两条与"验证"有关的实情，改动前必须知道：
 
-- **托管侧（C#）没有测试工程。** 仓库里只有一个 `.csproj`（就是本工程）；自动化测试集中在可视工具那一侧（Go 的 `SigilLoadout/*_test.go`、前端测试）与 C++ 的 `tests/NativeLayoutHarness`（离线跑原生布局解析与 fail-closed，而且要在 `tools/build-release.ps1` 里设了 `GBFR_EXE` 才会被调用）。C# 这一半的正确性靠运行期日志与人工验证，门禁只覆盖"构建通过"（`tools/build-release.ps1` 跑 `dotnet restore/clean/build`）。
-- **`NativeCore.AbiVersion` 与 `GBFR20_ABI_VERSION` 这一对没有门禁。** 托管侧的 `20` 是 `NativeCore.cs` 里的一处字面量，原生侧的 `20` 是 `native_api.h` 里另一处。发布脚本的门禁覆盖的是别的东西：`ModConfig.json` / `-Version` / `package.json` / `package-lock.json` 的版本号逐处对拍、随包资产在场（缺了先从 `gen\output` 拿、再没有才跑 `gen export`，**只保证在场、不比对内容**）、一份**故意独立**的必需发布文件清单（外加 PDB、非 `win-x64` 的 `runtimes`、遗留 `ExtraSigilSlots` 产物与可变配置文件的 fail-closed 检查）、以及设了 `GBFR_EXE` 才跑的离线布局回归——没有任何一项比较这两个数。它俩漂了只会在运行期表现成 `Native ABI mismatch: managed 20, native N` → 钩子不装（fail-closed，游戏照常）。改 ABI 必须同时改 `native_api.h`、`NativeCore.AbiVersion`、`EnsureAbiLayout` 的期望尺寸与偏移，以及 `NativeCore.Interop.cs` 里的结构体字段顺序。
+- **托管侧（C#）没有测试工程。** 仓库里只有一个 `.csproj`（就是本工程）；自动化测试集中在可视工具那一侧（Go 的 `SigilLoadout/*_test.go`、前端测试）与 C++ 的 `tests/NativeLayoutHarness`（离线跑原生布局解析与 fail-closed，而且要在 `tools/build-release.ps1` 里设了 `GBFR_EXE` 才会被调用）。C# 这一半的正确性靠运行期日志与人工验证，门禁只覆盖"构建通过"（`tools/build-release.ps1` 跑 `dotnet restore/clean/build`）。`limit_bonus.json` 的线格式（文件名与三个成员名）也不在 `sharedconstants_test.go` 的对拍清单里：它由可视工具那侧的 `service/limitbonusservice_test.go` 按字节钉住，托管侧只按 `LimitBonusConfig` 里的字面量读——这条契约目前靠"两侧各自被自己的测试盯着"，而不是被一次对拍钉在同一处。
+- **`NativeCore.AbiVersion` 与 `GBFR20_ABI_VERSION` 这一对没有门禁。** 托管侧的 `21` 是 `NativeCore.cs` 里的一处字面量，原生侧的 `21` 是 `native_api.h` 里另一处。发布脚本的门禁覆盖的是别的东西：`ModConfig.json` / `-Version` / `package.json` / `package-lock.json` 的版本号逐处对拍、随包资产在场（缺了先从 `gen\output` 拿、再没有才跑 `gen export`，**只保证在场、不比对内容**）、一份**故意独立**的必需发布文件清单（外加 PDB、非 `win-x64` 的 `runtimes`、遗留 `ExtraSigilSlots` 产物与可变配置文件的 fail-closed 检查）、以及设了 `GBFR_EXE` 才跑的离线布局回归——没有任何一项比较这两个数。它俩漂了只会在运行期表现成 `Native ABI mismatch: managed 21, native N` → 钩子不装（fail-closed，游戏照常）。改 ABI 必须同时改 `native_api.h`、`NativeCore.AbiVersion`、`EnsureAbiLayout` 的期望尺寸与偏移、`NativeCore.Interop.cs` 里的结构体字段顺序与 `DllImport` 声明，以及原生侧的实现与 `static_assert`。
 
 ## 10. 改这里之前的检查清单
 
-- **在维护拍里加阶段**：新阶段必须能把"这一拍被丢掉"当正常情况（mtime 门不认领、热键只是采样），否则它要自己防重叠；也别忘了整拍的 catch-all 意味着阶段里的异常只会变成一行日志。
-- **加启动阶段**：用 `NativeCore.StartupPhaseLine` 记一行 `Startup phase=…`，阶段名要唯一——这些行是排障时唯一的时序证据；能让启动失败的东西要落在 `QueueStart` 的 try 里，不要新增一条绕过 `Dispose` 的退出路径。
-- **动 `Dispose`**：不要把 `NativeCore.Shutdown()` 重新门到任何"成功"标志后面；也不要指望 `SigilEditorFeature` 的 `_stopped` 之外还能拦住定时器线程。
-- **动 ABI**：见第 9 节末尾那一串同时要改的地方；`EnsureAbiLayout` 的期望值就是 `native_api.h` 的 `static_assert`。
-- **新增一个配置文件**：路径必须经 `UserConfig.FilePath` 推导、版本门必须用 `FileStamp`，并把常量加进 `SigilLoadout/sharedconstants_test.go` 的对拍清单——两侧算同一个字符串而没有任何协商点是这条协议最贵的性质。
+- **在维护拍里加阶段**：新阶段必须能把"这一拍被丢掉"当正常情况（mtime 门不认领、热键只是采样、能力强化按间隔节流），否则它要自己防重叠；也别忘了整拍的 catch-all 意味着阶段里漏出去的异常只会变成一行日志——自己先接一层 try/catch 才说得清"发生了什么"。
+- **加启动阶段**：用 `NativeCore.StartupPhaseLine` 记一行 `Startup phase=…`，阶段名要唯一——这些行是排障时唯一的时序证据；能让启动失败的东西要落在 `QueueStart` 的 try 里，不要新增一条绕过 `Dispose` 的退出路径。**启动时什么都不做的东西不要加阶段行**（能力强化编辑器就是这种）。
+- **动 `Dispose`**：不要把 `NativeCore.Shutdown()` 重新门到任何"成功"标志后面；也不要指望两个编辑器的 `_stopped` 之外还能拦住定时器线程；新增一个被维护拍驱动的单元，就要在这里给它一步（先于 `Hotkey.Shutdown`、先于原生关停）。
+- **动 ABI**：见第 9 节末尾那一串同时要改的地方；`EnsureAbiLayout` 的期望值就是 `native_api.h` 的 `static_assert`，而"只加导出"的改动至少要动版本号、`native_api.h`、`NativeCore.Interop.cs` 与门面里的封装。
+- **新增一个配置文件**：路径必须经 `UserConfig.FilePath` 推导；编辑列表类形状走 `EditListJson.Load<T>`，并明确**空数组在这份配置里是什么意思**（那句文本会出现在错误消息里）；版本门必须选一种语义——认领式（单次应用）、`Pending` + `MarkApplied`（成功即收工）、或自记版本 + 间隔（持续看护）——不要顺手拿 `FileStamp.Changed()`。
+- **改常量**：跨语言常量要么加进 `SigilLoadout/sharedconstants_test.go` 的对拍清单（两侧算同一个字符串而没有任何协商点是这条协议最贵的性质），要么像 `limit_bonus.json` 那样由写入侧的线格式测试盯住，并在注释里写清另一边是谁。
 - **改 `MaxSlots`**：C# / TS / Go 三处都要改（对拍只保证它们相等，不保证这个值合理），并用 `TestVirtualSlotCapacityFitsPlayerSlots` 确认它不超过原生通用槽容量——超了不会报错，只会静默截断多出来的槽。
-- **往 `LoadoutConfig` 加判断**：先问"这张表在哪"。它的边界是只做载荷映射——不读数据文件、不持有表，等级只判非负、上界不在这里判，专属开关只转发 `false`。缺的那几张表（`assets\sigils.json`、原生专属表）都在别处，本地补一份副本就是同一规则的第三份，而且判的往往不是真正的不变量。
+- **往 `LoadoutConfig` 加判断**：先问"这张表在哪"。它的边界是只做载荷映射——不读数据文件、不持有表，等级只判非负、上界不在这里判，专属开关只转发 `false`。缺的那几张表（`assets\sigils.json`、原生专属表）都在别处，本地补一份副本就是同一规则的第三份，而且判的往往不是真正的不变量。同理，别把"能力强化"那条路也拉进数据管理器的注册流程——那张表不重新解析，注册回去只是多一份要维护的事实。
 - **写日志**：一律经 `Mod.Log`（它同时写文件与启动器、两个汇都 fail-soft）；不要在持有 `_logLock` 的路径上重入 `Log`。

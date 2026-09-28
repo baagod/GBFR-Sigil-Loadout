@@ -32,10 +32,10 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
+generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 verified:
   - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+    at: 2026-09-27T21:57:50.417Z
 ---
 
 # 工作流：游戏侧注入运行期（detour 与循环上限）
@@ -67,10 +67,12 @@ verified:
 | 动作 | 线程 | 后果 |
 | --- | --- | --- |
 | 装钩子与首次加宽上限字节 | 调用 `GBFR20_Initialize` 的那条托管线程（mod 启动时一次，`EnsureInitialized` 由 `std::call_once` 门住） | 失败不会被重试，那一会话就是降级状态；见下文「装钩子是一次性动作」 |
-| 两个 detour 体 | 游戏自己跑技能循环的线程 | 一次构建在那条线程上**同步**走完 `13…13+N-1`，所以构建快照与贡献计数帧可以放 `thread_local`（不变量见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)） |
+| 两个 detour 体 | **当时正在跑技能循环的那条线程**：游戏自己构建时是游戏线程；我们自己的那次热重建则是在托管维护拍线程上同步调用游戏的状态重建函数、由它回调进 getter detour | 一次构建在同一线程上**同步**走完 `13…13+N-1`，所以构建快照、贡献计数帧与"这是我们自己的重建"标记都能放 `thread_local`（不变量见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)） |
 | 后续的上限字节加宽 | 托管维护拍线程（250 ms 一拍）经 `GBFR20_ApplyLoadout` | 只在计数真的变了时才写字节；钩子没装成时这个导出在进入 `ApplyLoadout` **之前**就拒绝了（见「装钩子是一次性动作」） |
 | 还原上限字节 + 拆钩子 | 调用 `GBFR20_Shutdown` 的托管线程（`Mod.Dispose()` 无条件调用） | `DllMain` 的 `DLL_PROCESS_DETACH` 只把 `g_shutting_down` 置真，不做拆卸 |
 | 回读运行消息 | 托管启动线程一次（且只在钩子没装成时） | 见「运行消息」一节 |
+
+「两个 detour 体」那一行的两个来源合起来才是完整答案：**detour 体跑在哪条线程上，由"谁在跑游戏那两条循环"决定，而不是由谁调用了原生代码决定。** 热重建那条入口在 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md) 里展开（`SafeInvokeStatusRebuild` 同步跑在维护拍线程上，重建函数回调进 detour，所以 `g_tls_hot_rebuild_build` 这个标记同属那条线程）；本页只需要记住它的后果——`thread_local` 快照、贡献计数帧与那个标记都不跨线程共享，也不需要跨线程同步。
 
 `ActiveCallGuard`（两个 detour 的第一条语句）只负责让拆卸能等到在途调用退空；它的粒度、排空循环与 `reset()` 取舍不在本页，全在 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
 
@@ -90,7 +92,7 @@ call.from_category_loop =
 
 ```mermaid
 flowchart TD
-    subgraph GAME["游戏自己的线程：一次构建同步跑完虚拟槽位 13 到 13+N-1"]
+    subgraph GAME["跑技能循环的那条线程：一次构建同步跑完虚拟槽位 13 到 13+N-1"]
         APPLY["apply 循环：call getter<br/>锚点 +0x24，返回 +0x29"]
         FETCH["category 循环：fetch 段起点<br/>mid hook 落点 = 锚点 +0x1E"]
     end
@@ -322,14 +324,13 @@ flowchart TD
 ```cpp
 const uint8_t expanded_slot_count = static_cast<uint8_t>(GetExpandedInternalSlotCount());
 // 只回退仍是我们那个扩展值的上限字节；已经恢复过（或从未打过补丁）的不能碰。
-const auto restore_limit =
-<!-- openwiki: broken internal link [uintptr_t rva, uint8_t original, const char* failure] file "uintptr_t rva, uint8_t original, const char* failure" does not exist. Fix the href or restore the target, then delete this comment. -->
-    [expanded_slot_count](uintptr_t rva, uint8_t original, const char* failure) {
-        uint8_t current = 0;
-        if (ReadByte(rva, current) && current == expanded_slot_count &&
-             !WriteByte(rva, original))
-            Log(failure);
-    };
+const auto restore_limit = [expanded_slot_count] (
+        uintptr_t rva, uint8_t original, const char* failure) {
+    uint8_t current = 0;
+    if (ReadByte(rva, current) && current == expanded_slot_count &&
+         !WriteByte(rva, original))
+        Log(failure);
+};
 restore_limit(
     g_image_base + g_game_layout.skill_apply_loop_limit_immediate_rva,
     g_game_layout.skill_apply_original_limit,

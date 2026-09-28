@@ -1,8 +1,11 @@
 ---
 type: architecture
 title: 原生核心（C++ DLL）
-description: GBFR.SigilLoadout.Native.dll 的结构与契约：它由托管侧 NativeLibrary.Load 载入（不走 Reloaded-II 的原生 DLL 字段）、编译输入与仓库外生成器 gen 的增量依赖，以及 ABI v20 的导出面与拒绝码、跨 ABI 类型与内部布局的分界、GuardAbi 异常守卫、Initialize 的阶段链与 fail-closed 回滚、运行期状态归属、各翻译单元的分工与安全内存访问层。
+description: GBFR.SigilLoadout.Native.dll 的结构与契约：由托管侧 NativeLibrary.Load 载入（不走 Reloaded-II 原生 DLL 字段）、编译输入与仓库外生成器 gen 的增量依赖，以及 ABI v21 的八个导出与两组活表拒绝码（skill_status -1..-7 / limit_bonus_param -8..-11）、跨 ABI 类型与内部布局的分界、GuardAbi 异常守卫、Initialize 的阶段链与 fail-closed 回滚、运行期状态归属，以及各翻译单元的分工与安全内存访问层。
 tags: [native-core, abi, fail-closed, sigil-loadout, gameplay-hooks]
+verified:
+  - by: openwiki/0.6.0
+    at: 2026-09-27T21:57:50.417Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -32,6 +35,8 @@ sources:
     resource: repo://GBFR.SigilLoadout.Native/src/table_slot.cpp
   - id: openwiki-source-ac7bb7c2f4a36fd9a94d83f1
     resource: repo://GBFR.SigilLoadout.Native/src/template_loadout.cpp
+  - id: openwiki-source-a39ea0cefc36893b877e8b69
+    resource: repo://GBFR.SigilLoadout/LimitBonusFeature.cs
   - id: openwiki-source-5298fbc43f2a1044d5c67e9e
     resource: repo://GBFR.SigilLoadout/LoadoutConfig.cs
   - id: openwiki-source-bdd0795df8ba4586dd351eff
@@ -44,31 +49,28 @@ sources:
     resource: repo://tests/NativeLayoutHarness/program.cpp
   - id: openwiki-source-67c7703ac3037912246261f8
     resource: repo://tests/NativeLayoutHarness/run.ps1
-generated: { by: "openwiki/0.6.0", at: "2026-09-24T01:16:26.192Z" }
-verified:
-  - by: openwiki/0.6.0
-    at: 2026-09-24T01:16:26.192Z
+generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 ---
 
 # 原生核心（C++ DLL）
 
-`GBFR.SigilLoadout.Native.dll` 是这套 mod 里唯一直接改游戏内存的单元。它由 [托管 mod](/openwiki/architecture/managed-mod.md) 在游戏进程内**自己加载**（下文「宿主与构建期依赖」），此后两者之间**只有一条通道**：`native_api.h` 里的 ABI v20 导出。
+`GBFR.SigilLoadout.Native.dll` 是这套 mod 里唯一直接改游戏内存的单元。它由 [托管 mod](/openwiki/architecture/managed-mod.md) 在游戏进程内**自己加载**（下文「宿主与构建期依赖」），此后两者之间**只有一条通道**：`native_api.h` 里的 ABI v21 导出。
 
 它拥有这些东西，托管侧一件都不持有：
 
 | 原生侧拥有的状态 | 说明 |
 | --- | --- |
 | 模板表（`g_runtime_templates`）与选择表（`g_character_selections`） | 虚拟槽位读什么因子、每个角色选哪些槽，都只在这里 |
-| 活表的发布槽（`table_slot.cpp` 的 `g_slot_rva`） | 托管侧既不持有也不扫描游戏那份 `skill_status` 的地址，只把整张表交给原生 |
+| 两张活表的发布位置（`table_slot.cpp` 的 `g_slot_rva` 与 `g_limit_bonus_pointer_rva`） | 托管侧既不持有也不扫描游戏那份 `skill_status` 或 `limit_bonus_param` 的地址，只把整张表（或「按 Key 改几个值」）交给原生 |
 | 语义布局（`g_game_layout`）与两个 gameplay hook | RVA 与钩子从锚点解出、由原生安装；托管侧没有第二份地址常量 |
 
-分工的其余部分（钩子怎么把虚拟槽塞进游戏状态、表布局与写入闸门、锚点怎么认出来）各有专门页面：[游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)、[skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)、[语义锚点与布局解析](/openwiki/concepts/game-layout-anchors.md)。本页只讲**这个 DLL 自身的结构、契约与生命周期**。
+分工的其余部分（钩子怎么把虚拟槽塞进游戏状态、两张活表的布局与写入闸门、锚点怎么认出来）各有专门页面：[游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)、[skill_status 表与活表写入闸门](/openwiki/concepts/skill-status-table.md)、[能力强化活表](/openwiki/concepts/limit-bonus-table.md)、[语义锚点与布局解析](/openwiki/concepts/game-layout-anchors.md)。本页只讲**这个 DLL 自身的结构、契约与生命周期**。
 
 ## 宿主与构建期依赖
 
 原生 DLL **由托管侧自己在游戏进程内加载**：`NativeCore.Configure(modDirectory)` 给托管程序集装上一个 `DllImport` 解析器，把 `GBFR.SigilLoadout.Native.dll` 的查找路径钉在 mod 目录上（同一个进程里改绑到别的路径会直接抛异常），真正的 `NativeLibrary.Load` 发生在第一次 P/Invoke 上——`NativeCore.Initialize` 的第一句就是 `GBFR20_SetLogCallback`；句柄缓存下来，重复解析只是返回它。`ModConfig.json` 的 `ModNativeDll32` / `ModNativeDll64` 两栏都是空串，所以它**不走 Reloaded-II 的「原生 DLL 字段」**，逐字段后果见 [宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md) 与 [系统总览](/openwiki/architecture/overview.md)。
 
-这条「谁加载」的选择有一个直接后果：**加载与校验是同一段托管代码**。`GBFR20_GetAbiVersion` 的版本比对与 `EnsureAbiLayout` 的尺寸/偏移对拍排在加载之后、`GBFR20_Initialize` 之前，任一项不符就抛异常、整套钩子不装（fail-closed）；原生侧自己不做任何版本协商，它把契约违例一律表达成「拒绝值 + 一行日志」——这正是下面 `GuardAbi` 那条规则存在的理由。
+这条「谁加载」的选择有一个直接后果：**加载与校验是同一段托管代码**。`GBFR20_GetAbiVersion` 的版本比对（托管侧的 `NativeCore.AbiVersion` 是 21）与 `EnsureAbiLayout` 的尺寸/偏移对拍排在加载之后、`GBFR20_Initialize` 之前，任一项不符就抛异常、整套钩子不装（fail-closed）；原生侧自己不做任何版本协商，它把契约违例一律表达成「拒绝值 + 一行日志」——这正是下面 `GuardAbi` 那条规则存在的理由。
 
 ### 编译输入与仓库外的生成器
 
@@ -104,21 +106,24 @@ target 尾部那个 `Touch` 是给这套增量判断补的一步：gen 在内容
 - **这一步必须真的跑成功。** `src\exclusive_table.inc` 被 `template_loadout.cpp` 直接 `#include` 编成 `kCharacterExclusives`，没有它连编译都过不去；缺 `gen`（那个 `Exec` 连工作目录都不存在）或缺 Go 工具链时，这里只有 `go run` 的原始报错，编译就此中断。
 - **头文件与它无关。** 两个头文件里没有任何需要生成的东西：ABI 头与内部布局都得手改。
 
-## ABI v20 导出面
+## ABI v21 导出面
 
-导出面的全部内容就是 `native_api.h`。没有 `.def` 文件：`GBFR20_API` 在编译期展开为 `extern "C" __declspec(dllexport)`（vcxproj 两个配置都定义 `GBFR20_NATIVE_EXPORTS`），调用约定统一是 `GBFR20_CALL` = `__cdecl`。下表逐个导出写清参数、返回值语义与「异常跨边界时的兜底值」，签名就是那份头文件里的声明，一个不多、一个不少：
+导出面的全部内容就是 `native_api.h`。没有 `.def` 文件：`GBFR20_API` 在编译期展开为 `extern "C" __declspec(dllexport)`（vcxproj 两个配置都定义 `GBFR20_NATIVE_EXPORTS`），调用约定统一是 `GBFR20_CALL` = `__cdecl`。下表逐个导出写清参数、返回值语义与「异常跨边界时的兜底值」，签名就是那份头文件里的声明，**八个**，一个不多、一个不少：
 
 | 导出 | 参数 | 返回值语义 | 抛出时的兜底 |
 | --- | --- | --- | --- |
-| `GBFR20_GetAbiVersion` | 无 | 常量 `GBFR20_ABI_VERSION`（= 20），无状态 | 不抛，也不经 `GuardAbi` |
+| `GBFR20_GetAbiVersion` | 无 | 常量 `GBFR20_ABI_VERSION`（= 21），无状态 | 不抛，也不经 `GuardAbi` |
 | `GBFR20_SetLogCallback` | `GBFR20_LogCallback callback` | 存进 `g_log_callback`（一次原子 store）；`nullptr` 即卸载回调 | 不抛，也不经 `GuardAbi` |
 | `GBFR20_Initialize` | 无 | 1 = 钩子装好；0 = 没装成（关机中也是 0） | `GuardAbi` 拒绝值 `0` |
 | `GBFR20_Shutdown` | 无 | `void`：置标志、回滚字节、拆钩子，幂等 | 同样走 `GuardAbi`（`void` 上的拒绝值只为统一形状） |
 | `GBFR20_CopyRuntimeMessage` | `char* buffer, uint32_t buffer_size` | 返回所需长度（含结尾 NUL）；`buffer` 为 `nullptr` 或大小为 0 时只问长度 | `GuardAbi` 拒绝值 `0`（当作「没有消息」，它本身只是诊断信息） |
 | `GBFR20_ApplyLoadout` | `const GBFR20_TemplateSlot* slots, uint32_t slot_count, const GBFR20_ExclusiveOverride* overrides, uint32_t override_count` | 1 = 应用；0 = 拒绝 | `GuardAbi` 拒绝值 `0` |
 | `GBFR20_WriteSkillStatusTable` | `const uint8_t* table, uint32_t length` | `>= 0` = 实际改写的 52 字节行数（0 = 内存里已经是这些字节）；`< 0` = 拒绝码 -1..-7 | `GuardAbi` 拒绝值 `GBFR20_TABLE_WRITE_FAILED`（-7） |
+| `GBFR20_SetLimitBonusLevels` | `uint32_t key_hash, const float* levels, uint32_t level_count` | 1 = 这一行真的被改了；0 = 内存里已经是这些值；`< 0` = 拒绝码（除共享的 -1/-2/-3/-7 外还有 -8..-11） | `GuardAbi` 拒绝值 `GBFR20_TABLE_WRITE_FAILED`（-7） |
 
-ABI 版本号是 20，并且是**派生出来的**：这个 mod 的原始版本里 `selector` / `inventory` / `preset` / `input` / `present` / `state` 那些 API 已全部删除，活下来的就是上表这七个。专属开关以 **skill hash** 传递而不是槽位号，所以托管侧不需要按角色维护一张 T1/T2/战气对照表——那张表（`src/exclusive_table.inc`）在原生侧编译进来。槽位模型的完整说明见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)。
+头文件自己点出 v21 相对上一版的增量：**v21 起同一套锚点机制也覆盖 `limit_bonus_param`**（能力强化数值）——所以版本号是派生出来的，改一次契约就 +1，而「生命周期导出」这部分（前七个）没有变。专属开关以 **skill hash** 传递而不是槽位号，所以托管侧不需要按角色维护一张 T1/T2/战气对照表——那张表（`src/exclusive_table.inc`）在原生侧编译进来。槽位模型的完整说明见 [虚拟槽位、模板因子与专属开关](/openwiki/concepts/virtual-slots-and-exclusives.md)。
+
+两个「活表写入」导出的入口各有自己的壳函数（`WriteSkillStatusTableEntry` / `SetLimitBonusLevelsEntry`），第一道闸都是 `g_shutting_down`，第二道都是 `EnsureInitialized()`；**两者都刻意不要求 `g_hooks_ready`**，因为它们写的是数据管理器供给的那张表，与钩子装没装成无关，而那两个表槽的解析本来就排在装钩子之前。这一点和 `GBFR20_ApplyLoadout` 正好相反（它要求钩子已就绪）。
 
 ### 边界异常守卫（`GuardAbi`）与 noexcept 的取舍
 
@@ -140,9 +145,9 @@ T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
 四条推论，改这份代码时必须记住：
 
 - **会抛的内部实现不能标 `noexcept`。** `template_loadout.cpp` 的 `ApplyLoadout`（以及 `SetRuntimeMessage`）会抛——`std::format` / `std::string` / 加锁都可能失败。`native_internal.h` 里对这两者刻意**不**标 `noexcept`，因为标了之后 `throw` 会在函数出口先变成 `std::terminate`，`GuardAbi` 根本来不及接。
-- **每个导出的拒绝值各自取"最保守"的那个。** `GBFR20_Initialize`、`GBFR20_ApplyLoadout` 与 `GBFR20_CopyRuntimeMessage` 用 `0`；`GBFR20_WriteSkillStatusTable` 用 `GBFR20_TABLE_WRITE_FAILED`（-7），因为它是唯一"写之后"的码（表可能只更新了一部分），把"守卫兜住了异常"报成 -7 比报成"一个字节都没动"的码安全。
+- **每个导出的拒绝值各自取"最保守"的那个。** `GBFR20_Initialize`、`GBFR20_ApplyLoadout` 与 `GBFR20_CopyRuntimeMessage` 用 `0`；两个表写入导出都用 `GBFR20_TABLE_WRITE_FAILED`（-7），因为它俩都是唯一"写之后"的码（表或那一行可能只更新了一部分），把"守卫兜住了异常"报成 -7 比报成"一个字节都没动"的码安全。
 - **守卫不是每个导出的统一外壳。** 只有会抛的那些才进 `GuardAbi`；`GBFR20_GetAbiVersion` 返回一个常量、`GBFR20_SetLogCallback` 只做一次原子 store，两者都不可能抛，所以没有被包裹。
-- **反过来，不抛或自己兜住的路径就标 `noexcept`。** 这一侧的清单是 `Log`、`safe_game_access.cpp` 的各读取（`SafeReadUint64` / `SafeReadStatusIdentity` / `SafeCopyToOutput` / `ReadByte` / `IsGameRange` / `DecodeRipTarget` / `SafeInvokeStatusRebuild`）、`WriteSkillStatusTable`、`TryGetRuntimeSlot`、`ApplySkillLoopLimits`、`ResetGameLayout`。这条区分不是风格：它决定了"异常到不到得了 `GuardAbi`"——`ApplyLoadout` 与 `SetRuntimeMessage` 会抛，所以**必须留着不标**。
+- **反过来，不抛或自己兜住的路径就标 `noexcept`。** 这一侧的清单是 `Log`、`safe_game_access.cpp` 的各读取（`SafeReadUint64` / `SafeReadStatusIdentity` / `SafeCopyToOutput` / `ReadByte` / `IsGameRange` / `DecodeRipTarget` / `SafeInvokeStatusRebuild`）、`WriteSkillStatusTable`、`SetLimitBonusLevels`、`TryGetRuntimeSlot`、`ApplySkillLoopLimits`、`ResetGameLayout`。这条区分不是风格：它决定了"异常到不到得了 `GuardAbi`"——`ApplyLoadout` 与 `SetRuntimeMessage` 会抛，所以**必须留着不标**。
 
 守卫覆盖的不只是返回值的那些导出：`GBFR20_Shutdown` 是 `void`，它同样走 `GuardAbi`（拒绝值在 `void` 上无意义，只是为了统一形状）。
 
@@ -158,7 +163,9 @@ T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
 | `GemData`（0x24） | `native_internal.h` | 这是**游戏自己那份**结构的布局，没有任何导出函数收发它。原先挂在 `native_api.h` 里，会让读那份"ABI 契约"的人误以为它跨边界 |
 | `ResolvedGameLayout`、`TemplateGemSlot`、`CharacterTemplate`、`StatusIdentity` | `native_internal.h` | 原生内部地址簿与运行时容器；随游戏构建变化的是它们，不是 ABI |
 
-分界的实际后果：改 `GemData`（游戏更新、字段变了）要重做锚点与预检，但**不必**动 ABI 版本；改 `GBFR20_*` 就必须两边同时改。`native_internal.h` 用 `static_assert` 把 `TemplateGemSlot` 的尺寸与 `gem_id` / `skill1` 偏移钉在 `GBFR20_TemplateSlot` 上——ABI 路径只经 `reinterpret_cast` 读，从不写回调用方内存。
+注意两张活表的行布局常量（`kTableRowBytes` / `kRowKeyOffset`、`kLimitBonusRowBytes` / `kLimitBonusKeyOffset` 等）也不在 ABI 头里，它们住在 `table_slot.cpp` 的匿名命名空间——那是**游戏归档那份表**的形状，不是跨边界的类型。
+
+分界的实际后果：改 `GemData`（游戏更新、字段变了）要重做锚点与预检，但**不必**动 ABI 版本；改 `GBFR20_*` 就必须两边同时改。`native_internal.h` 用 `static_assert` 把 `TemplateGemSlot` 的尺寸与 `gem_id` / `skill1` 偏移钉在 `GBFR20_TemplateSlot` 上（只钉这两个字段，不是六个全钉）——ABI 路径只经 `reinterpret_cast` 读，从不写回调用方内存。
 
 `GBFR20_ExclusiveOverride` 的语义有个容易忽略的约定：调用方**从不发** `disabled == 0` 的条目，所以"没出现的角色"就是三个专属槽全开；而 `skill_hash` **就是名字**，原生侧拿它去专属表里认 T1 / T2 / 战气。
 
@@ -178,23 +185,46 @@ T GuardAbi(const char* what, T refusal, Fn&& body) noexcept {
 
 ### `GBFR20_WriteSkillStatusTable` 的契约与拒绝码
 
-返回值 `>= 0` 是真正被改写的 52 字节行数（0 = 内存里已经是这些字节），`< 0` 是拒绝码。它与 `ApplyLoadout` 的门不一样：**刻意不要求 `g_hooks_ready`**——写的是数据管理器供给的那张表，与钩子装没装成无关，而 `ResolveTableSlot` 本来就排在装钩子之前。关机中返回 `GBFR20_TABLE_NOT_READY`。
+返回值 `>= 0` 是真正被改写的 52 字节行数（0 = 内存里已经是这些字节），`< 0` 是拒绝码。它与 `ApplyLoadout` 的门不一样：**刻意不要求 `g_hooks_ready`**。关机中返回 `GBFR20_TABLE_NOT_READY`。
 
-| 拒绝码 | 含义 |
-| --- | --- |
-| `GBFR20_TABLE_NOT_READY` (-1) | 原生核心没初始化好，或正在关机 |
-| `GBFR20_TABLE_SLOT_UNRESOLVED` (-2) | 启动时锚点没解析出槽 |
-| `GBFR20_TABLE_BUFFER_UNREADABLE` (-3) | 槽里没有指针，或那块内存不可写 |
-| `GBFR20_TABLE_ROW_COUNT_INCONSISTENT` (-4) | 首 `u64` 与传入表的行数不符：不是同一张表 |
-| `GBFR20_TABLE_LENGTH_UNEXPECTED` (-5) | 传入长度不是 `8 + 52*行数` |
-| `GBFR20_TABLE_IDENTITY_MISMATCH` (-6) | 逐行 `Key` 对不上：不是同一张表 |
-| `GBFR20_TABLE_WRITE_FAILED` (-7) | 写的时候崩了；表可能只更新了一部分 |
+| 拒绝码 | 什么情况下返它 | 有没有字节被写 |
+| --- | --- | --- |
+| `GBFR20_TABLE_NOT_READY` (-1) | 入口那道闸看到正在关机 | 没有：一个字节都不动 |
+| `GBFR20_TABLE_LENGTH_UNEXPECTED` (-5) | 传入表为 `nullptr`、`length <= 8`，或 `length - 8` 不是 52 的整数倍（传入的那份表自己就不成整行） | 没有：这是第一道闸，连活表都还没碰 |
+| `GBFR20_TABLE_SLOT_UNRESOLVED` (-2) | 启动时锚点没解出槽（`g_slot_rva == 0`）；原生核心从未初始化过也走这里 | 没有 |
+| `GBFR20_TABLE_BUFFER_UNREADABLE` (-3) | 槽 `+8` 的指针字段落在不可读的区域、读不出来，或指针为 0；或活表整段（`length` 字节）没有整段处于已提交且可写的内存 | 没有 |
+| `GBFR20_TABLE_ROW_COUNT_INCONSISTENT` (-4) | 活表首 `u64` 与传入表算出的行数不符：不是同一张表 | 没有 |
+| `GBFR20_TABLE_IDENTITY_MISMATCH` (-6) | 逐行 `Key` 对不上：不是同一张表 | 没有 |
+| `GBFR20_TABLE_WRITE_FAILED` (-7) | 逐行写的时候崩了（SEH 兜住） | **可能有**：这是唯一"写之后"的码，表可能只更新了一部分 |
 
-**只有 -7 是"写之后"的码**，其余每一道闸拒写时一个字节都不动。闸的顺序与码一一对应：长度不成整行的表在第一道就报 -5 → 槽要在启动时解出（-2）→ 槽里的指针非空（-3）→ 整段内存已提交且可写（-3）→ 缓冲区的行数与传入表一致（-4）→ 逐行 `Key` 也一致（-6，"这是同一张表"因此是可验证的事实而不是对锚点的信任，也是 Key 被别的 mod 改过的表会被拒写而不是被覆盖的原因——编辑碰的从来不是 Key）。每个码的人话解释只有 `exports.cpp` 的 `SkillStatusRefusalReason` 一处，托管侧只记"被拒 + 码"。
+**只有 -7 是"写之后"的码**，其余每一道闸拒写时一个字节都不动。闸的顺序与码一一对应：传入形状先查（-5）→ 槽要在启动时解出（-2）→ 槽里的指针非空（-3）→ 整段内存已提交且可写（-3）→ 缓冲区的行数与传入表一致（-4）→ 逐行 `Key` 也一致（-6，"这是同一张表"因此是可验证的事实而不是对锚点的信任，也是 Key 被别的 mod 改过的表会被拒写而不是被覆盖的原因——编辑碰的从来不是 Key）。每个码的人话解释只有 `exports.cpp` 的 `SkillStatusRefusalReason` 一处，托管侧只记"被拒 + 码"。
 
 槽这一侧还有一个设计选择：锚点解出的是**槽首 RVA**，缓冲区指针就在槽 `+8`，而每次调用都重新读它、不缓存地址——游戏重新解析并发布新缓冲区之后，下一次调用自动跟上，所以这里不存在"缓存失效"这个概念（指针为空时就是 -3，而不是写到一个过期地址）。
 
-拒写**只在码变化时报一次日志**：静态 `last_refusal` 原子量记住上一次报过的码，同一种拒写不再重复，成功过一次就清零（下一次拒写值得再报）。理由是实际噪声——拒写每 5 秒重试一次，而游戏把那张表读进内存之前必然一直是 -3，逐字相同的消息实测 3 行只差时间戳。
+### `GBFR20_SetLimitBonusLevels` 的契约与拒绝码
+
+这是同一套锚点机制覆盖的**第二张活表**（`limit_bonus_param`，能力强化数值），形状是「8 字节行数头 + 84 字节行」，行内 `Key` 在 `+52`、`Lv1..Lv10` 是 `+12` 起的 10 个 float。它与 `skill_status` 那条导出的契约有三处刻意不同：
+
+- **输入是"按 Key 改前 N 档数值"而不是"一整张表"**：`key_hash` 认行，`levels` 只写行内 `Lv1..LvN`（`N = level_count`，上界 10 = 这张表的全部参槽），所以没被用到的槽一个字节都不碰。
+- **返回值是 1 / 0，不是一个计数**：1 = 这一行真的被改了，0 = 内存里已经是这些值。
+- **身份证明不同**：这张表**没有** `skill_status` 那条发布指令（实测形状不同，在窗口里 0 命中），所以这里不拿"槽首 = 指针字段 − 8"当第二道证；"目标 Key 在整张表里**恰好出现一次**"对它来说更强，也不随编辑变化（编辑碰的从来不是 Key）。
+
+| 拒绝码 | 什么情况下返它 | 有没有字节被写 |
+| --- | --- | --- |
+| `GBFR20_TABLE_NOT_READY` (-1) | 入口那道闸看到正在关机 | 没有 |
+| `GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED` (-8) | `levels == nullptr`、`level_count == 0`，或 `level_count > 10` | 没有：这是第一道闸，活表还没碰 |
+| `GBFR20_TABLE_SLOT_UNRESOLVED` (-2) | 启动时没解出 `limit_bonus_param` 的指针字段（`g_limit_bonus_pointer_rva == 0`）；从未初始化也是它 | 没有 |
+| `GBFR20_TABLE_BUFFER_UNREADABLE` (-3) | 指针字段不可读或为 0；或整段缓冲区（`8 + 84 × 行数`）不整段可写 | 没有 |
+| `GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE` (-9) | 头里的行数为 0 或超过合理上界（`1 << 20`）：指针字段被别的东西改写、指到了别处 | 没有 |
+| `GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE` (-10) | 同一个 Key 在整张表里出现多次：这不是那张表 | 没有（发现重复立刻拒写，而不是覆盖第一个——那会把"指错了一段内存"变成一次静默的半成功） |
+| `GBFR20_LIMIT_BONUS_KEY_NOT_FOUND` (-11) | 整张表里没有这个 Key：可能不是那张表，也可能那条能力没有行 | 没有 |
+| `GBFR20_TABLE_WRITE_FAILED` (-7) | 那一次行写崩了（SEH 兜住） | **可能有**：这一行可能只改了一部分 |
+
+闸的顺序同样与码一一对应：档数先查（-8）→ 指针字段已解出（-2）→ 指针可读且非空（-3）→ 头里的行数落在合理区间（-9）→ 整段缓冲区可写（-3）→ 目标 Key 恰好一次（-10 / -11）→ 写（-7 或 1）。
+
+两张表**共用 -1 / -2 / -3 / -7 四个码的数值**，但人话解释来自两个不同的函数（`SkillStatusRefusalReason` 与 `LimitBonusRefusalReason`），因为"没解析出来"对两张表指的是**不同的锚点**，措辞必须按那张表说。幂等上报也是各自一份：两个入口函数各有一个静态 `last_refusal`，同一种拒写只报一次、成功过一次就清零（`SetLimitBonusLevels` 那条尤其需要——调用方每个能力各调一次，逐条报会把日志刷满）。
+
+这张表的写入由托管侧维护拍按 5 秒重试 / 30 秒看护的节奏驱动，见 [能力强化活表](/openwiki/concepts/limit-bonus-table.md)。
 
 ## Initialize 的阶段链与失败即回滚
 
@@ -221,8 +251,8 @@ sequenceDiagram
     Note over Resolver: 任一环节不成立都走 FailResolution，只清 g_layout_ready，运行消息说明卡在哪一步、持久化选择未改动，然后返回 0
     Init->>Templates: 阶段 template-selection-install
     Note over Templates: 数据编译进 DLL，没有失败路径。钩子还没装，所以只发布选择、不排状态重建
-    Init->>Slot: ResolveTableSlot，不计时也不拿它当门
-    Note over Slot: 锚点必须用未被 safetyhook 改写过的字节匹配。失败只记日志，代价是之后热应用一律拒写 -2
+    Init->>Slot: ResolveTableSlot 与 ResolveLimitBonusParamPointer，两张表都不计时
+    Note over Slot: 锚点必须用未被 safetyhook 改写过的字节匹配。两张表各自解析、各自失败只记日志，代价是对应那个导出一律拒写
     Init->>Hooks: 阶段 native-hook-install，InstallHooks
     Hooks->>Hooks: required-byte-rva-preflight 逐字节复验
     Hooks->>Hooks: gem-data-getter-hook 与 skill-fetch-hook
@@ -249,7 +279,7 @@ sequenceDiagram
 - **executable-validation**：路径解析不到、或文件名不是 `granblue_fantasy_relink.exe`（`_wcsicmp`，大小写不敏感）就退出。这是唯一对外部环境做校验的阶段，也是唯一一个**没有任何东西需要回滚**的阶段——它排在一切副作用之前。
 - **semantic-layout-resolution**：`ResolveGameLayout()` 失败走 `FailResolution`——`ResetGameLayout()` 只清 `g_layout_ready`（不动那份已发布的结构体），写一条运行消息说明"钩子未安装、持久化的因子选择未被改动"，然后返回 0。整条链上**没有第二处**可以改游戏字节。
 - **template-selection-install**：装内置模板与默认选择，失败路径不存在（数据是编译进来的），阶段行固定为 `complete`。此处钩子还没装，所以 `PublishTemplateSelections` 只发布选择、不排状态重建。
-- **ResolveTableSlot**：刻意排在 `InstallHooks()` **之前**——safetyhook 会改写 `.text`，而槽发布锚点要用没被改写的字节匹配。它成功与否只影响热应用能否写活表（失败 = 之后只会拒写 -2），所以失败只记日志、不拿它当门。**表槽与钩子的成败因此互相独立**：钩子装好了而槽没解出来（或反过来）都是合法结局，前者只让热应用持续拿 -2。
+- **两张表的槽解析**（`ResolveTableSlot()` 与 `ResolveLimitBonusParamPointer()`）：刻意排在 `InstallHooks()` **之前**——safetyhook 会改写 `.text`，而两张表的锚点都要用没被改写的字节匹配。它们各自成功与否只影响对应那个导出能否写活表（失败 = 之后只会拒写 -2），所以都只记日志、不拿成败当门、也不各自计时。**两张表的槽、以及钩子，三者成败互相独立**：钩子装好了而槽没解出来（或反过来）都是合法结局，前者只让对应的热应用持续拿 -2。
 - **native-hook-install**：见下。
 
 ### InstallHooks 的四个子阶段与统一回滚
@@ -273,7 +303,7 @@ sequenceDiagram
     Managed->>Export: GBFR20_Shutdown
     Export->>Hooks: ShutdownHooks，只有 g_shutdown_complete 交换为 true 的那一次才进来
     Hooks->>Hooks: g_shutting_down 置 true、g_hooks_ready 置 false
-    Hooks->>Hooks: 第 1 步 恢复两条技能循环上限字节，此时两个 detour 还活着、slot 大于等于 13 的请求仍被挡住
+    Hooks->>Hooks: 第 1 步 恢复两条技能循环上限字节，此时两个 detour 还活着、扩展槽索引的请求仍被挡住
     Note over Hooks: 只写当前仍等于我们扩展值的字节，已经恢复过或从未被我们打过补丁的不碰
     Hooks->>Detour: 第 2 步 disable 两个钩子，safetyhook 还原目标字节
     Hooks->>Detour: 第 3 步 最多等 5 秒，等 g_active_getter_calls 与 g_active_mid_calls 归零
@@ -305,16 +335,17 @@ sequenceDiagram
 | `g_image_base` | `Initialize` 第一行 `GetModuleHandleW(nullptr)` | 所有 RVA 的解析基准；为 0 时一切解析快速失败 |
 | `g_initialize_once` | `EnsureInitialized` 的 `std::call_once` | 保证 `Initialize` 只跑一次 |
 | `g_game_layout` / `g_layout_ready` | `ResolveGameLayout` 成功时先赋值、再 release store `true`；`ResetGameLayout` 只清标志 | 读者用 acquire。失败或拆卸时**不清结构体**：已发布的布局在进程余下时间不变，清空它会与"刚在关机/回滚前读到上一份真状态"的读者相争 |
-| `g_hooks_ready` | `InstallHooks` 成功置 `true`；回滚与 `ShutdownHooks` 置 `false` | `GBFR20_Initialize` 的返回值、`ApplyLoadout` 的前置、`SafeInvokeStatusRebuild` 的前置 |
-| `g_shutting_down` | `DllMain` 的 DETACH 与 `ShutdownHooks` | 所有入口的第一道闸：`Initialize` 直接 0、`ApplyLoadout` 直接 0、`WriteSkillStatusTable` 返回 -1、两个 detour 返回 0 而不是转发 |
+| `g_hooks_ready` | `InstallHooks` 成功置 `true`；回滚与 `ShutdownHooks` 置 `false` | `GBFR20_Initialize` 的返回值、`ApplyLoadout` 的前置、`SafeInvokeStatusRebuild` 的前置（两个表写入导出**不**看它） |
+| `g_shutting_down` | `DllMain` 的 DETACH 与 `ShutdownHooks` | 所有入口的第一道闸：`Initialize` 直接 0、`ApplyLoadout` 直接 0、两个表写入导出返回 -1、两个 detour 返回 0 而不是转发 |
 | `g_shutdown_complete` | `GBFR20_Shutdown` 的 `exchange` | 关停幂等 |
 | `g_virtual_slot_count` | 初值 `kBuiltinExclusiveSlotCount`（3）；由 `ApplyLoadout` 发布 | `GetVirtualSlotCount` / `GetExpandedInternalSlotCount`（= 13 + 虚拟槽数），detour 用它给扩展槽设闸 |
 | `g_log_callback` | `GBFR20_SetLogCallback`（一次原子 store，拆卸时由托管侧置 0） | 日志桥 |
 | `g_message_mutex` / `g_runtime_message` | `SetRuntimeMessage` | `GBFR20_CopyRuntimeMessage` 回读；初始值 `"Waiting for initialization."` |
+| 两张活表的槽位 RVA | `ResolveTableSlot` 存 `g_slot_rva`、`ResolveLimitBonusParamPointer` 存 `g_limit_bonus_pointer_rva`（两者都是 `table_slot.cpp` 文件内匿名命名空间的 `atomic_uintptr_t`，单写者、读者只 load） | 每个调用重新读槽里的指针，所以只有"解析出来了没有"这一个事实需要记 |
 | 表与钩子 | `g_template_mutex` + `g_runtime_templates`、`g_selection_mutex` + `g_character_selections`、`g_get_gem_hook`、`g_skill_fetch_hook` | 并发与锁序见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md) |
 | detour 在途计数 | `ActiveCallGuard` 读写 `g_active_getter_calls` / `g_active_mid_calls`；TLS 快照 `g_tls_*` | 拆卸时排空；TLS 用来保证"一次构建用同一套槽位" |
 
-**虚拟槽计数的发布顺序**是一条不变量：`ApplyLoadout` 先把新计数 store 进 `g_virtual_slot_count`，再拓宽游戏的两条循环上限字节，因为 detour 按这个计数给虚拟槽设闸，它必须已经与游戏线程下一轮循环看到的补丁一致；上限字节写失败就把计数回滚成上一次的值。
+**虚拟槽计数的发布顺序**是一条不变量：`ApplyLoadout` 先把新计数 store 进 `g_virtual_slot_count`，再拓宽游戏的两条循环上限字节，因为 detour 按这个计数给虚拟槽设闸，它必须已经与游戏线程下一轮循环看到的计数一致；上限字节写失败就把计数回滚成上一次的值。
 
 ## 每个翻译单元一行职责
 
@@ -323,11 +354,11 @@ sequenceDiagram
 | 翻译单元 | 它拥有的东西 |
 | --- | --- |
 | `dllmain.cpp` | 只有 `DllMain`：ATTACH 时 `DisableThreadLibraryCalls`，DETACH 时置 `g_shutting_down`；不拆钩子、不含别的逻辑 |
-| `exports.cpp` | 七个导出的壳、`GuardAbi`、`SkillStatusRefusalReason`（拒绝码的人话只有这一份）、`ApplyLoadoutEntry` 的三道入口闸 |
+| `exports.cpp` | 八个导出的壳、`GuardAbi`、两份拒绝码人话（`SkillStatusRefusalReason` 与 `LimitBonusRefusalReason`）、三个入口闸（`ApplyLoadoutEntry` / `WriteSkillStatusTableEntry` / `SetLimitBonusLevelsEntry`）与各自的拒写去重 |
 | `runtime.cpp` | 阶段链的编排：`Initialize` 按顺序调用各阶段并逐个计时上报，`EnsureInitialized` 的 `std::call_once`。它**不定义任何状态** |
 | `runtime_state.cpp` | 全部进程级全局量（`g_image_base`、三个就绪/关闭标志、`g_log_callback`、运行消息、`g_virtual_slot_count`）与三个基元 `Log` / `CompleteStartupPhase` / `SetRuntimeMessage` |
 | `layout_resolver.cpp` | PE 视图（`TryBuildImageView` / `TryGetCodeSection` / `IsInWritableImageSection`）、锚点模式与预检字节表（含 `MatchesBytes` 的调用点）、`ResolveGameLayout` / `RevalidateGameLayout` / `ResetGameLayout` 与 `FailResolution` |
-| `table_slot.cpp` | 活表发布槽的锚点与 `g_slot_rva`、`ResolveTableSlot`、`WriteSkillStatusTable` 的 -1..-7 闸顺序与逐行写 |
+| `table_slot.cpp` | **两张活表**的定位与写入：`SearchAnchorWindow` / `CountMatches`（"0 = 通配"那套）、`g_slot_rva` 与 `g_limit_bonus_pointer_rva`、`ResolveTableSlot` / `ResolveLimitBonusParamPointer`、`WriteSkillStatusTable` 的 -1..-7 闸顺序与逐行写、`SetLimitBonusLevels` 的 -8..-11 闸顺序与单行写 |
 | `skill_hooks.cpp` | 两个 detour（`GetGemDataByIndexDetour` / `OnSkillFetch`）、在途计数与 TLS 构建快照、`InstallHooks` 的四个子阶段、两条循环上限字节的写入与条件式还原、`ShutdownHooks` / `DisableGameplayHooksAndRestore` |
 | `template_loadout.cpp` | 模板表 `g_runtime_templates` + 专属开关 `g_exclusive_state` + 下标表、`ApplyLoadout`（计数发布顺序、截断、两半合一的发布）、内置选择填充与 `PublishTemplateSelections` |
 | `selection_store.cpp` | 选择表 `g_character_selections`、队伍/轮次记录（`g_latest_context1_status`、pass_id）与热重建的节流/冷却 |
@@ -336,22 +367,22 @@ sequenceDiagram
 
 跨文件依赖只有一个方向：`table_slot.cpp` 复用的 PE 视图助手（`TryGetCodeSection` / `IsInWritableImageSection`）由 `layout_resolver.cpp` 提供——**PE 视图的唯一持有者是 `layout_resolver.cpp`**，别在第二个文件里再解析一遍映像。
 
-顺带一条顺序上的约束：`runtime.cpp` 把 `ResolveTableSlot()` 摆在 `InstallHooks()` 之前是刻意的（表槽锚点要用没被 safetyhook 改写过的字节），所以这两件事的成败互不牵连——钩子没装成不影响拒写码，槽没解出也不影响钩子安装。
+顺带两条顺序上的约束：`runtime.cpp` 把两个表槽的解析摆在 `InstallHooks()` 之前是刻意的（锚点要用没被 safetyhook 改写过的字节），所以它们与钩子的成败互不牵连；`table_slot.cpp` 里的两张表则各用各的行循环锚点、各解各的槽，互相也不牵连——一张没解出不影响另一张。
 
 ## 安全内存访问层（`safe_game_access.cpp`）
 
 **游戏内存的读取与范围判断都归这一个文件，别在别处再写一份。** 它提供两类东西：
 
-- **SEH 包裹的访问**：`safe_game_access.cpp` 的 `SafeReadUint64`、`SafeReadStatusIdentity`、`SafeCopyToOutput`、`ReadByte`、`WriteByte`，加上 `native_internal.h` 里同样以 `__try` 包裹的 `MatchesBytes` / `MatchesBytesAt` 两个字节比对（布局预检与活表锚点都用它们）。失败一律返回 `false`（并把输出清空），而不是把异常放出去。
-- **范围闸** `IsGameRange(address, size, required_protect)`：一次 `VirtualQuery` 只答一个区域，而整张表有几十万字节（`8 + 52 × 行数`）、可能跨好几个区域，所以它一个区域一个区域往前走，要求每个区域 `MEM_COMMIT`、非 `PAGE_GUARD`、保护位含所需掩码。仅有的两种用法就是两个掩码常量：`kReadableProtect`（读一个指针字段）与 `kWritableProtect`（写整张表）。
+- **SEH 包裹的访问**：`safe_game_access.cpp` 的 `SafeReadUint64`、`SafeReadStatusIdentity`、`SafeCopyToOutput`、`ReadByte`、`WriteByte`，加上 `native_internal.h` 里同样以 `__try` 包裹的 `MatchesBytes` / `MatchesBytesAt` 两个字节比对（布局预检与两张表的锚点都用它们）。失败一律返回 `false`（并把输出清空），而不是把异常放出去。
+- **范围闸** `IsGameRange(address, size, required_protect)`：一次 `VirtualQuery` 只答一个区域，而整张表有几十万字节（`skill_status` 是 `8 + 52 × 行数`，`limit_bonus_param` 是 `8 + 84 × 行数`）、可能跨好几个区域，所以它一个区域一个区域往前走，要求每个区域 `MEM_COMMIT`、非 `PAGE_GUARD`、保护位含所需掩码。仅有的两种用法就是两个掩码常量：`kReadableProtect`（读一个指针字段）与 `kWritableProtect`（写整张表 / 写那一行所在的那一段）。
 
 几个必须保持的细节：
 
 - **`MatchesBytes<Size>`（长度来自数组类型）与 `MatchesBytesAt`（运行期长度）不能互换。** 表驱动的预检长度只有运行期才知道，套数组版本会把缓冲尾部垃圾一起比进去——128 字节的预检在真机上永远不匹配。
-- **`DecodeRipTarget` 不需要 SEH**：它只做算术与范围判断，读的 4 个字节落在已验证过的代码段里。布局锚点与槽发布锚点共用这一份 `mov r,[rip+d]` / `mov [rip+d],r` 的解码。
-- **`WriteByte` 是"写—验"而不是裸写**：`VirtualProtect` 成可写 → 写 → `FlushInstructionCache` → 恢复原保护 → 读回确认值正确。它只用于那两条循环上限字节。
+- **`DecodeRipTarget` 不需要 SEH**：它只做算术与范围判断，读的 4 个字节落在已验证过的代码段里。布局锚点与两张表的锚点共用这一份 `mov r,[rip+d]` / `mov [rip+d],r` 的解码。
+- **`WriteByte` 是"写—验"而不是裸写**：`VirtualProtect` 成可写 → 写 → `FlushInstructionCache` → 恢复原保护 → 读回确认值正确。它只用于那两条循环上限字节。两张活表的写入不走它——那两段内存本来就已被 `kWritableProtect` 那一关认定为可写，写入是 `WriteChangedRows` / `WriteLimitBonusRow` 里的 `memcpy`。
 - **`SafeInvokeStatusRebuild` 是本项目唯一会去动游戏活对象的路径。** 调用前校验身份（`character_hash` 匹配、`context_mode` 合法），置 TLS `g_tls_hot_rebuild_build`（让游戏自己的构建窗口不把我们的调用算成新一轮队伍装配），调用后再验身份没变（对象没被重建函数换掉）。它的闸判的是**对象还新不新，不是指针记不记得住**（2026-09-21 的崩溃物证：`ok=0` 之后 20~30 秒 AV，故障点读 `rcx=0`）；失败即由调用方冷却 60 秒。跳过比补刀便宜，细节见 [并发、锁序与生命周期守卫](/openwiki/concepts/threading-and-locks.md)。
-- **MSVC 的 C2712 约束塑造了函数切分**：带 `__try` 的函数里不能有需要析构的局部对象，所以日志拼串（`LogRebuildProblem`）、`.text` 扫描（`SearchAnchorWindow`）、逐行 `Key` 比对（`SameRowIdentity`）、逐行写（`WriteChangedRows`）都是独立函数。这些是编译器的硬约束，不是风格偏好。
+- **MSVC 的 C2712 约束塑造了函数切分**：带 `__try` 的函数里不能有需要析构的局部对象，所以日志拼串（`LogRebuildProblem`）、`.text` 扫描（`SearchAnchorWindow`）、逐行 `Key` 比对（`SameRowIdentity`）、逐行写（`WriteChangedRows`）、单行写（`WriteLimitBonusRow`）都是独立函数。这些是编译器的硬约束，不是风格偏好。
 
 ## 日志桥与运行消息
 
@@ -364,14 +395,16 @@ sequenceDiagram
 
 运行消息走 `SetRuntimeMessage`：先 `Log` 再在 `g_message_mutex` 下存一份拷贝（顺序是为了不与其他线程的 store 相争）。回读侧 `GBFR20_CopyRuntimeMessage` 是一个常用尺寸协议——传 `nullptr` / 0 得到所需长度（含结尾 NUL），再按该长度拿内容；缓冲区小时截断到 `buffer_size - 1` 并补 NUL，长度溢出 `UINT32_MAX` 就截到 `UINT32_MAX`。托管侧在原生核心没装成钩子时打印它，这是"为什么没装"的唯一出口。
 
-**阶段行契约**：`CompleteStartupPhase` 统一产出 `Startup phase=<名字> state=complete|failed elapsed_ms=<毫秒>.`。`Initialize` 报 `executable-validation`、`semantic-layout-resolution`、`template-selection-install`、`native-hook-install` 与总括的 `native-initialize`；`InstallHooks` 内部报 `required-byte-rva-preflight`、`gem-data-getter-hook`、`skill-fetch-hook`、`skill-loop-limit-patches`。失败行由调用点显式上报（`StartupPhase::Succeeded(false)` 或 `CompleteStartupPhase` 的 `false`），析构只兜住"阶段体抛异常"那一条路——正因如此"卡住的启动"能靠最后一个完成的阶段定位。这些行的读法归 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
+**阶段行契约**：`CompleteStartupPhase` 统一产出 `Startup phase=<名字> state=complete|failed elapsed_ms=<毫秒>.`。`Initialize` 报 `executable-validation`、`semantic-layout-resolution`、`template-selection-install`、`native-hook-install` 与总括的 `native-initialize`；`InstallHooks` 内部报 `required-byte-rva-preflight`、`gem-data-getter-hook`、`skill-fetch-hook`、`skill-loop-limit-patches`；两张表的槽解析**不在阶段行里**（它们不挡初始化，各自成功/失败只有一条 `Table slot:` / `Limit bonus table:` 的普通日志）。失败行由调用点显式上报（`StartupPhase::Succeeded(false)` 或 `CompleteStartupPhase` 的 `false`），析构只兜住"阶段体抛异常"那一条路——正因如此"卡住的启动"能靠最后一个完成的阶段定位。这些行的读法归 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
 
 ## 改这份代码时的边界
 
-- **新增或改动导出**要成对改三处：`native_api.h`、`GBFR.SigilLoadout/NativeCore.Interop.cs` 的 `DllImport` 与结构体声明、以及 `EnsureAbiLayout` 的尺寸与逐字段偏移。别忘了 `GBFR20_ABI_VERSION`——但要知道版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"，后者正是结构体错位最可能发生的方式。新导出若会抛，还要在 `exports.cpp` 里选一个最保守的兜底值并把 `GuardAbi` 套上。
+- **新增或改动导出**要成对改三处：`native_api.h`、`GBFR.SigilLoadout/NativeCore.Interop.cs` 的 `DllImport` 与结构体声明、以及 `EnsureAbiLayout` 的尺寸与逐字段偏移。别忘了 `GBFR20_ABI_VERSION`（托管侧 `NativeCore.AbiVersion` 跟着改）——但要知道版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"，后者正是结构体错位最可能发生的方式。新导出若会抛，还要在 `exports.cpp` 里选一个最保守的兜底值并把 `GuardAbi` 套上，并给它一个 `*Entry` 壳函数放关机闸。
+- **新增拒绝码要在对应那张表的 reason 函数里加一句。** `SkillStatusRefusalReason` 与 `LimitBonusRefusalReason` 是分开的两份，因为两张表共有 -1 / -2 / -3 / -7 这四个数值却指不同的锚点；漏一句就会让 `default` 把一个具体的失败说成另一件事。
 - **会抛的内部实现不要标 `noexcept`**（见上文），否则 `GuardAbi` 就成了摆设。
 - **布局相关的东西留在 `layout_resolver.cpp`**：预检字节表与偏移表在那里成对出现，`RevalidateGameLayout` 负责逐字节复验；锚点必须在 safetyhook 改写 `.text` 之前解析。
 - **别把"全内存扫描"加回 `table_slot.cpp`。** 那一版兜底一次都没跑过，而且它证明不了唯一重要的事——"这块缓冲区就是游戏在用的那块"静态证不出来；拒写的代价只是这一局内存不变（编辑在游戏下一次解析或重启后照样生效），而扫描是 5~6 秒的慢路径。
+- **两张表的身份证明不是同一个，别互相套。** `skill_status` 靠"槽首 = 指针字段 − 8"那条发布指令加逐行 `Key`；`limit_bonus_param` 只有"Key 在整张表里恰好一次"。把 `kSlotBaseStore` 当成后者的门等于永远拒写（实测在它那个窗口里 0 命中），反过来给前者加一条它没有的发布指令也一样。
 - **不要给 `GemData` 加导出收发**：它不跨 ABI 是这个文件结构的前提。
 - **专属表不在这个仓库里**：要改数据就去改仓库外 gen 的 `game/sigils/exclusive.go`——`src\exclusive_table.inc` 会在下一次编译时被重新生成，直接改它下一次编译就没了；`Inputs`/`Outputs` 只是省掉没必要的重跑，不是把这个依赖变成可选。
 
@@ -379,4 +412,4 @@ sequenceDiagram
 
 唯一的自动化验证是 `tests/NativeLayoutHarness`：它把**生产代码**的 `layout_resolver.cpp` 与 `safe_game_access.cpp` 离线编译（stub 掉 `g_image_base`、`g_layout_ready`、`g_hooks_ready`、`g_game_layout`、`Log`、`SetRuntimeMessage`），把真实 exe 按段映射进内存后断言三件事：`ResolveGameLayout()` 必须成功、`RevalidateGameLayout()` 必须过、把一个 hook 点上的字节翻一位后 `RevalidateGameLayout()` **必须**失败。它刻意不硬编码任何期望地址，也不给 `-Exe` / `GBFR_EXE` 时打 `SKIP` 并以 0 退出，所以这道闸门能在任何机器上跑。
 
-它覆盖不到的部分要诚实记住：ABI 边界本身（托管侧的版本与布局检查在游戏里才执行）、钩子实际落点、活表写入、运行消息，都只能在真机游戏里验证。覆盖面与其余套件见 [验证地图](/openwiki/testing/verification-map.md)。
+它覆盖不到的部分要诚实记住：ABI 边界本身（托管侧的版本与布局检查在游戏里才执行）、钩子实际落点、**两张活表**的槽解析与写入、运行消息，都只能在真机游戏里验证。覆盖面与其余套件见 [验证地图](/openwiki/testing/verification-map.md)。

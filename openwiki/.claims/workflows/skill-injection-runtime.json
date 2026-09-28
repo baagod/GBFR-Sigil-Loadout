@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:b7ddc936dc780ea5f90fd48cbe773506a89cf05e0e421fffb836d9bad43905c5",
+  "pageVersion": "sha256:83f4072509f8442e1047119b8eb8cd1edabab26a7aec3e551f4fa80c5d99e9c9",
   "claims": [
     {
       "id": "claim_0f5ad3c0c60e4ba089414e2d524ba945",
@@ -304,7 +304,7 @@
     },
     {
       "id": "claim_83cc79a997664c5f941dbefa76ab5be4",
-      "statement": "线程归属是固定的：两个 detour 体只在游戏自己跑技能循环的那条线程上执行（一次构建在那条线程上同步走完 13…13+N-1，构建快照与贡献计数帧才放 thread_local）；装钩子与首次加宽上限字节发生在调用 GBFR20_Initialize 的那一条托管线程上，并由 EnsureInitialized 的 std::call_once 保证只做一次；还原上限字节与拆钩子发生在调用 GBFR20_Shutdown 的托管线程（Mod.Dispose 无条件调用它），而 DllMain 的 DLL_PROCESS_DETACH 只把 g_shutting_down 置真、不做拆卸。",
+      "statement": "线程归属由\"谁在跑游戏那两条循环\"决定，而不是由谁调用原生代码决定：两个 detour 体落在当时正在执行技能循环的那条线程上——游戏自己构建时是游戏线程，我们自己那次热重建则是在托管维护拍线程上同步调用游戏的状态重建函数、由它回调进 getter detour（一次构建在同一线程上同步走完 13…13+N-1，所以构建快照、贡献计数帧与 g_tls_hot_rebuild_build 标记都只能用 thread_local）；装钩子与首次加宽上限字节发生在调用 GBFR20_Initialize 的那一条托管线程上，并由 EnsureInitialized 的 std::call_once 保证只做一次；还原上限字节与拆钩子发生在调用 GBFR20_Shutdown 的托管线程（Mod.Dispose 无条件调用它、异常被吞掉但调用不跳过），而 DllMain 的 DLL_PROCESS_DETACH 只把 g_shutting_down 置真、不做拆卸。",
       "evidence": [
         {
           "resource": "repo://GBFR.SigilLoadout.Native/src/dllmain.cpp#L3-L11",
@@ -315,16 +315,20 @@
           "version": "repo-lines-v1:sha256:709a4786feadd3bb891326be6c98e2ad2c2923b562d964cf11c9b19f1d91c3a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiMTM2ODcwNTg4MGU0N2ExYjVlMThiMWU5MmNiMGQwM2M0MjhhNjJhZmRkY2U0NzRkZGU0ODA2MzZhMGUwOTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzZmMxNzBhZGI5Y2RhY2Y1YTM2MDBiMmUxYjdmODgxYzQxNjFlNmRhODNkNGJkM2NjOTcyOTUzZjlkYjFkMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5NGQzMjdjZTIwZTdlMzM5YmM5YzVhNGRlMDZmMjdiZDAyODgzNjMwNjY4NGM1N2I0MjQzMjU5NjkyZjA0Y2UifQ"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L53-L61",
-          "version": "repo-lines-v1:sha256:8d6448c7bd8564a3bc903ed95720ff758871bf0ec087382484ae61f2e9ebef7c:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2U2YzgyODQwNTA3YmFmMjYzMjZlMzI2ZDY1NWE4ZWQ1MjhhZmNlNWQyNzhkMzhiYTUzZDBiYWM1MjQzNTcwYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDhlZWFmMzAyNzY0MDBkOTkxOTFhNTQyNTc1ZGFmMDhkZGE5Njg1MGFiZDc4ODUwNzBlM2JiNjc1MjhhNDgxMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/runtime.cpp#L55-L63",
+          "version": "repo-lines-v1:sha256:8d6448c7bd8564a3bc903ed95720ff758871bf0ec087382484ae61f2e9ebef7c:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2U2YzgyODQwNTA3YmFmMjYzMjZlMzI2ZDY1NWE4ZWQ1MjhhZmNlNWQyNzhkMzhiYTUzZDBiYWM1MjQzNTcwYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzk0OTQwNDM1MGZjNmNjMTUyMTQxMTcxOWYxMzMwOGEzMzc1MGRkZjBmZWIxNDc0NWQ0ZDUyYmFlZTAxOWQyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjEsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSJ9"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L13-L15",
-          "version": "repo-lines-v1:sha256:5d96440b938995b4aa5ebe26fba1bd7239468af2d572bf7aa501c7ba4cd156a5:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzA0NmFkNjJmNDAyMzBhYWIyMTliMWY2NjllZGJiMWRkNmI4YjZlNjc1YTM5YjcxOTc0ZmFjZmRjMzZkNjY3OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjA3OGY5ZTk5Mzg2YTcyNDFhZTViOWQ4YWUwYmEzOWNhNzM0MGVhMDAxYzJlNDZlODM5OTZmM2IwYjcxNjU4NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzU0OGU0Y2IzYzMzYjVhZjIzZWQwMGZmMmVhYzM3MjNmYmQwNjNjZWZiYTgyYzU5NjcwZWI4MGU2ZmRjNDRmZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWU4ZTc0ZGZlZGNmZWI3MjU5YzhmOTZhNGE0YzgwN2ViYmRiMmIxNzU0ZDQ4MzEyMWQxYWRkODRmMjQ5Y2IzOSJ9"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/safe_game_access.cpp#L113-L123",
+          "version": "repo-lines-v1:sha256:63de79d98c40cc8902c95dbe0886828b52aa64092970833ad3d1c7e2909f20f6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4Mzg0YzI3YTM4NjdkMTA5ODk2NjMzODQxODRkMTdlZTJiNjVhYmM0MTExNDUzMDRkY2ExYTI4ODJlZmRlOTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMjg2YmI4ODJmNTE0ZmQwMTMzZTMyMTJlMWRkOWRmMzhlZTBjNDEzN2Q4NzQ4ZjUwMDg0OTY5OGZkNDRkZWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYwMWU5NmNkMjQ0NWU3NjRjOTg3YmVjOGQ2MDM1OTZjMTNlNjY1YTMzMDU1MTA2MzFhMWFkZjI4OWU2OTJkZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkMWIyMzhmMDVlNzYzZmNlNDc4NjkyNzU0Y2VlMDhkNDNmNDE3N2QyZDg5MjYxM2Y2YTIwNmY4YzI5ZTdiNjgifQ"
         },
         {
-          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L167-L190",
-          "version": "repo-lines-v1:sha256:4028180acb5859895a240d05f65f3708ac18a0ac81d60946c5721d7ce612a37f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwYzY4NzZlMDE0YzI3YzllMmZmYjJlYzJiOWVhZGJhZGJlNWIzNDMyNTQzYWUwZDRkZGE2OWNlZTMyOWQ5MmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1NDBlMTg0Y2YxOGY5MTYyZjYyNDc5MTY3MTRkMWJlZWJjMmMwMTk5YTk2MDFjNzUzZmNkMWE2Y2U2ZTdmNTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEifQ"
+          "resource": "repo://GBFR.SigilLoadout.Native/src/skill_hooks.cpp#L12-L20",
+          "version": "repo-lines-v1:sha256:a39b8b09091cf9f8e440ce41a53dc1569d883640c9739cd9e051f7087ca23013:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWI3MWJhMGZiN2M1N2E5ZGJiNTAyOWE2ZTQ3MDZlYTdlMGM4MzEyYTIwYTk5OTE2NDRmNWZhYmU3MDBhMzRhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDY2ZGMxZTM0YjExZTc5Zjc1MjFlMDM0YzBmZDc2ZWMyMzE2YzdlMDBlNmU0YjFjMzVjOGQwMDdlNzBjNDg5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTNjMDBmNjg4OGI5MjFlNDYwMTVhMDVlNTRlYjY5MzM1NmJlODc4MGZhMmFmMGFmZjRmYTgyMWIzOTYzM2Y4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODk5OTA2NDY5NmM2NWMyZjM3Njc1MzQ0OWM4NDk0ODQyOGEyNGEyOTY2YWVkZjg2Njk2YzMxYzQ1YjkzNjQ3OSJ9"
+        },
+        {
+          "resource": "repo://GBFR.SigilLoadout/Mod.cs#L177-L196",
+          "version": "repo-lines-v1:sha256:f90417486d3bc99a54987e72cb9dac2d1162cba3aa1dc33d05a90b9016a82161:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwYzY4NzZlMDE0YzI3YzllMmZmYjJlYzJiOWVhZGJhZGJlNWIzNDMyNTQzYWUwZDRkZGE2OWNlZTMyOWQ5MmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1NDBlMTg0Y2YxOGY5MTYyZjYyNDc5MTY3MTRkMWJlZWJjMmMwMTk5YTk2MDFjNzUzZmNkMWE2Y2U2ZTdmNTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc1Y2IyMDY4Y2I5Mzc0ZjI5MGUxODU1OTA5ZmUyYTFmZjM0ZDgzZGZhYTBhZmQ3MWIzMDMwZDgyN2RjNzdiZWYifQ"
         }
       ]
     },
@@ -471,6 +475,6 @@
   ],
   "verification": {
     "by": "openwiki/0.6.0",
-    "at": "2026-09-24T01:16:26.192Z"
+    "at": "2026-09-27T21:57:50.417Z"
   }
 }
