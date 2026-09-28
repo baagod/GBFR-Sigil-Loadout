@@ -81,7 +81,7 @@ function SlotBox({
     param: LimitBonusParam;
     /** 这个参数行的记录；没编辑过就是 undefined。 */
     record: LimitBonusEdit | undefined;
-    /** 这一格算完了一个数：null = 清空（整条记录被删掉，这一行回到没编辑过的样子）。 */
+    /** 这一格算完了一个数：null = 清空（把这一行的原值写回去，见 setValue）。 */
     onValue: (value: number | null) => void;
 }) {
     /*
@@ -180,7 +180,7 @@ function AbilityRow({
     effects: Record<string, string>;
     /** 按参数行 Key 索引的全部编辑。 */
     edits: Map<string, LimitBonusEdit>;
-    /** 一个框算完了：null = 清空（这一栏名下所有记录都删掉）。 */
+    /** 一个框算完了：null = 清空（这一栏名下各参数行各自写回原值）。 */
     onValue: (ability: Ability, value: number | null) => void;
 }) {
     // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）；框只有一个，框号一律 {1}。
@@ -411,26 +411,14 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         一个数值框。往还没有编辑的参数行里输入会开始一条记录，**有值就是启用**——这一页没有启用开关，
         所以这里也从不写 enabled: false（见 limitbonus.ts 的 withFirstValue）。
 
-        "只写第一档"在 withFirstValue 里，这里只管两件事：有值时把那一格放回列表；**清空时把整条记录
-        删掉**——删掉之后这一行回到完全没编辑过的样子，游戏那边一个字节都没被碰过（不是"还原成默认
-        值"：那会留下一条记录）。没有记录时清空是空操作，连一次落盘都不必发生。
+        清空 = **把这一行的 Lv1 原值写回去**（不是"删掉记录"）：游戏不会自己忘掉上一次写入的值，删了
+        记录它就会停在旧值上、而界面显示的是默认值——两边对不上（实测的 bug）。
     */
     function setValue(ability: Ability, value: number | null) {
         const next = new Map(edits);
-        let changed = false;
-
         for (const param of ability.params) {
-            const patched = withFirstValue(param, value);
-            if (patched === null) {
-                                if (next.delete(param.key)) changed = true;
-                continue;
-            }
-            next.set(param.key, patched);
-            changed = true;
+            next.set(param.key, withFirstValue(param, value ?? param.default));
         }
-
-        // 这批本来就没编辑过、又要求清空：不必落盘。
-        if (!changed) return;
         commit(next);
     }
 

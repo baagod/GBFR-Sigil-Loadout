@@ -154,7 +154,7 @@ describe("改第一档落成什么记录", () => {
             // 等于替用户改了 Lv2/Lv3。
             values: [99],
         })
-        expect(withFirstValue(param(), 99)?.values).toHaveLength(1)
+        expect(withFirstValue(param(), 99).values).toHaveLength(1)
     })
 
     it("已有记录改值：写出去的仍只有第一档", () => {
@@ -174,11 +174,6 @@ describe("改第一档落成什么记录", () => {
         expect(dedupeBy([asEdit(written)!], (record) => record.key)).toEqual([written])
     })
 
-    it("清空 = 删掉整条记录：不产生记录，也不替用户写一个默认值", () => {
-        // 返回 null 就是"这一条不要了"，由面板把它从列表里删掉——点一下清空之后游戏那边一个字节都
-        // 没被碰过。写成 default 的拷贝是另一回事：那会留下一条记录，等于用户填过。
-        expect(withFirstValue(param(), null)).toBeNull()
-    })
 })
 describe("同名只留第一个节点", () => {
     it("后出现的同名节点不列出来，保留的是先出现的那个", () => {

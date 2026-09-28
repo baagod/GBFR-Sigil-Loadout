@@ -140,19 +140,16 @@ export function asEdit(raw: unknown): LimitBonusEdit | null {
 }
 
 /**
- * 改过第一档（Lv1）之后的那条记录；null = 清空，也就是这一行要回到没编辑过的状态。
+ * 改过第一档（Lv1）之后的那条记录。
  *
  * 记录里只有第一档这一个数：契约是 `values[i]` 写进 `Lv(i+1)`，长度 1 就是**只写 Lv1**，Lv2/Lv3 在
  * 游戏里保持原值——这正是这一页要的。**绝不按 default 把缺的档位补齐**：那等于把用户从没填过的数
  * 写进游戏，多改了 2 个档位。
  *
- * 清空（value === null）**不产生记录**，由调用方把这一条从列表里删掉（见 LimitBonusEditorPanel 的
- * setValue）：整条记录不存在，游戏那边一个字节都没被碰过，这一栏也就回到完全没编辑过的样子。"还原
- * 成默认值"是另一回事——那会留下一条记录，等于替用户写了一个数。
+ * 清空为什么不是"删掉记录"：游戏不会自己忘掉上一次写入的值，删了它就会停在旧值上、而界面显示默认
+ * 值——两边对不上（实测的 bug）。所以清空由调用方写回**这一行的 Lv1 原值**（见 setValue）。
  */
-export function withFirstValue(param: LimitBonusParam, value: number | null): LimitBonusEdit | null {
-    if (value === null) return null
-
+export function withFirstValue(param: LimitBonusParam, value: number): LimitBonusEdit {
     return {
         // **有值就是启用**：界面上没有启用的开关，记录存在本身就代表这一行要生效（mod 跳过 enabled
         // 为假的条目，而这里从不写假）。
