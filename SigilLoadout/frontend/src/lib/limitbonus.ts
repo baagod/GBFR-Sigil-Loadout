@@ -116,6 +116,35 @@ export function dedupeCharacters(characters: LimitBonusCharacter[]): LimitBonusC
 }
 
 /**
+ * 「专精技能」页的角色去重：与上面同一件事、同一判据。
+ *
+ * 古兰与姬塔同样是两个 PL 码（PL0000 / PL0100），专精这边两份各 111 行、**参数行 Key 逐字相同**
+ * （实测 Key 集合完全相同；只有说明文本的 rowKey 不同 —— 那是各自语言表里的两行同义文本）。
+ * 编辑按 Key 索引、mod 也按 Key 找行，所以画两份就是同一批开关画两遍。
+ *
+ * 判据只看可编辑内容的 Key（即参数行的 Key），不看 rowKey、也不看名字。
+ * 只要求 id 一个字段：调用点在骨架那一层，不必为此把整份骨架类型引进来。
+ */
+export function dedupeSkillboardCharacters<T extends { id: string }>(characters: T[]): T[] {
+    const seen = new Set<string>()
+    return characters.filter((character) => {
+        const c = character as unknown as {
+            types: {
+                rows: { key: string }[]
+                skills: { rows: { key: string }[] }[]
+            }[]
+        }
+        const sameContent = c.types
+            .flatMap((type) => [...type.rows.map((row) => row.key), ...type.skills.flatMap((skill) => skill.rows.map((row) => row.key))])
+            .sort()
+            .join(",")
+        if (seen.has(sameContent)) return false
+        seen.add(sameContent)
+        return true
+    })
+}
+
+/**
  * 文件里读回来的一条记录。
  *
  * Key 归一成大写：可视工具的每张表都以大写 hash 为键（手写进文件的小写 key 在 mod 那边同样合法，

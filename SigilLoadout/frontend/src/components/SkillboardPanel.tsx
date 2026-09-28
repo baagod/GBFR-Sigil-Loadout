@@ -1,16 +1,15 @@
 /*
-    专精技能页（第一版）：只做「专精类型」（图 1），只做炎帝，只有中文。
+    专精技能页。四层：角色 → 专精类型 → 专精技能（1 阶 / 2 阶 / 3 阶 / EX）→ 效果行。
 
-    一个**专精类型**占一个标题（如「真谛：红莲之刃」），它下面挂着这个类型自己的 1~3 阶技能——每阶
-    一行，行首用 ♦ / ♦♦ / ♦♦♦ 表示，行上是这一阶的十个数值槽。
+    一个角色占一行（名字用角色属性色，照「角色强化」页），展开后是它的三个专精类型；每个类型是
+    一个标题（如「真谛：红莲之刃」）+ 一条下划线，下面先跟**类型自己那三条说明**（行首 ♦ / ♦♦ / ♦♦♦，
+    按位置算），再跟它包含的四个阶。
 
-    版式照**因子编辑**：数值槽靠右、占满剩余宽度，槽之间用 | 分隔；说明文字放进**悬停**，悬停挂在
-    **整行**上（照 SkillRow 的写法：触发器渲染成 div，因为行里有输入框，交互内容不能住在 button 里）。
+    每一条效果行都能点开，展开后是这一行的十个数值槽 —— **类型自己那三条也一样**（它们也是可编辑
+    的参数行，不是纯文字）。角色 / 类型 / 阶 / 效果行四层各自独立展开，展开态由本组件自己的 state 管。
 
-    数值框里只显示**用户填过的数**：没编辑过的那一槽是空框，游戏原值当占位符（与角色强化页同一套）。
-    悬停里的说明则填"这一槽现在等于多少"（填过用填的，没填过用游戏原值），{i} 指第 i+1 个槽。
-
-    编辑记法与因子编辑页相同：values[i] = null 表示"那一槽不动"。
+    编辑记法与因子编辑页相同：values[i] = null 表示"那一槽不动"；空串 = 写回游戏原值。
+    文案里的 {i} 填"这一槽现在等于多少"（填过用填的，没填过用游戏原值）。
 */
 import { Fragment, memo, useEffect, useState } from "react";
 
@@ -25,6 +24,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { cn } from "cn";
 import type { Lang } from "@/lib/lang";
 import type { CharaTable } from "@/lib/chara";
+import { dedupeSkillboardCharacters } from "@/lib/limitbonus";
 
 // 一个节点（效果行）：key = 改哪一行（挂的参数行），rowKey = 看哪段字（自己那一行），两件事。
 type Row = { key: string; rowKey: string; values: number[] };
@@ -177,10 +177,14 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     const toggledKey = (prevOpen: string[], nextOpen: string[]) =>
         nextOpen.find(v => !prevOpen.includes(v)) ?? prevOpen.find(v => !nextOpen.includes(v)) ?? null
 
-    // 角色整块的收起态：默认全展开，所以记的是"收起来的那些"。
-    const [collapsedCharacters, setCollapsedCharacters] = useState<Set<string>>(new Set())
+    // 展开的角色：**默认全收起**，所以记的是"打开的那些"（与上面收起来记的写法刚好相反）。
+
+    // 29 个角色 × 每个约 100 行 × 每行 10 个数值框：全展开是十万个 DOM 节点，实测展开一个角色要
+    // 2.7 秒。列表页本来就该从收起开始 —— 一屏只列 29 行，点谁展开谁。折叠时角色内容不渲染
+    // （见下面 AccordionContent 不加 keepMounted），这正是性能的来源。
+    const [expandedCharacters, setExpandedCharacters] = useState<Set<string>>(new Set())
     const toggleCharacter = (id: string) =>
-        setCollapsedCharacters(prev => {
+        setExpandedCharacters(prev => {
             const next = new Set(prev)
             if (next.has(id)) next.delete(id)
             else next.add(id)
@@ -204,7 +208,10 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
             LoadSkillboardEdits() as Promise<{ key: string; values: (number | null)[] }[] | null>,
         ]).then(([loaded, loadedText, loadedEdits]) => {
             if (!alive) return
-            setSkeleton(loaded)
+            // 主人公占两个 PL 码（PL0000 古兰 / PL0100 姬塔），两份的参数行 Key 完全相同 —— 画两遍
+            // 就是同一批开关画两遍。与「角色强化」页同一判据、同一处理（见 lib/limitbonus 的
+            // dedupeSkillboardCharacters）。
+            setSkeleton(loaded ? { characters: dedupeSkillboardCharacters(loaded.characters) } : null)
             setText(loadedText)
             const map = new Map<string, (number | null)[]>()
             for (const edit of loadedEdits ?? []) map.set(edit.key, edit.values)
@@ -329,11 +336,16 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
             <div className="min-h-0 flex-1 overflow-y-auto pr-4 scrollbar-gutter-stable">
                 <div className="min-w-[720px]">
                     {skeleton.characters.map(character => {
-                        const characterOpen = !collapsedCharacters.has(character.id)
+                        const characterOpen = expandedCharacters.has(character.id)
                         return (
-                            <div key={character.id} className="mb-6 last:mb-0">
+                            /*
+                                角色块之间**不留外边距**：照「角色强化」页，分组只靠那条下边框
+                                （`<div className="border-b">` 包住角色行与它的能力行，行高 h-11 一律 44px）。
+                                留 mb-6 的话线是一段一段的、每格看着比 44px 高，名字就显得偏上——
+                                实测文字在 44px 的行里本来就是居中的（上下各 12px），是那 24px 空白骗的眼睛。
+                            */
+                            <div key={character.id}>
                                 <Accordion
-                                    keepMounted
                                     value={characterOpen ? [character.id] : []}
                                     onValueChange={next => {
                                         const changed = toggledKey(characterOpen ? [character.id] : [], next)
@@ -343,9 +355,9 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     {/*
                                         角色行照「角色强化」页的写法：名字贴左（用角色属性色）、行高 h-11、
                                         下边框收口，箭头在最右（AccordionTrigger 自带那对 chevron 就是
-                                        ml-auto）。不再用 mb-8 那种大间距——两张表要能对齐着看。
+                                        ml-auto）。上面不留外边距，分组只靠这条线。
                                     */}
-                                    <AccordionItem value={character.id} className="border-b-0">
+                                    <AccordionItem value={character.id} className="border-b">
                                         <AccordionTrigger className="h-11 items-center gap-2 py-0 text-sm font-medium hover:no-underline focus-visible:ring-0">
                                             <span
                                                 className="truncate"
@@ -355,13 +367,14 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                             </span>
                                         </AccordionTrigger>
                                         {/*
-                                            角色块这一层**不画收口线**。
+                                            这里**刻意不加 keepMounted**（与页内其它 Accordion 相反）。
 
-                                            块内最后一行必定自带 border-b（每个阶的最后一行都画），所以
-                                            再来一条块的收口线，就会和它挨在同一条线上 —— 两条 1px 叠成
-                                            看着"加粗"的一条（只有整页最后一行会这样，中间的收尾线都正常）。
+                                            29 个角色 × 每角色约 100 行 × 每行 10 个数值框 —— 全渲染出来是
+                                            10 万个 DOM 节点，实测量到展开一个角色要 **2.7 秒**。折叠时不渲染才是对的。
+                                            页内那些 Accordion（阶的条目、类型的三条）才需要 keepMounted：
+                                            它们要保住"收起时面板不卸载"这条（见 ui/accordion.tsx 的说明）。
                                         */}
-                                        <AccordionContent className="pb-0" keepMounted>
+                                        <AccordionContent className="pb-0">
                                             {character.types.map((type, typeIndex) => {
                                                 // 类型自己那三条（♦/♦♦/♦♦♦）也是可编辑的数值行，和阶里的条目一样
                                                 // 点开就能改；身份用 type/… 前缀，不跟阶里的条目撞。
