@@ -87,6 +87,28 @@ internal static unsafe partial class NativeCore {
     }
 
     /// <summary>
+    /// 把「专精技能」页某一阶效果的数值交给原生，写进**游戏自己已经解析好的**那份
+    /// skillboard_effect_action_parts；表指针由原生从能力强化那张表的指针字段附近认出来
+    /// （src/table_slot.cpp），托管侧既不持有地址、也不扫内存。
+    ///
+    /// <paramref name="values"/> 写第 1..N 个槽（N = 数组长度，1..10）：这一页一格一档，十个槽都是
+    /// 数值，所以按"整行"交（没动过的格子交的是游戏原值，写下去等于没写）。
+    ///
+    /// 返回 1 = 这一行真的被改了，0 = 内存里已经一样；&lt; 0 是拒绝码，一个字节都没写，原因由原生落
+    /// 一行日志（码的含义在 native_api.h / exports.cpp）。
+    /// </summary>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int GBFR20_SetSkillboardValues(
+        uint keyHash,
+        float* values,
+        uint valueCount);
+
+    internal static int SetSkillboardValues(uint keyHash, float[] values) {
+        fixed (float* pointer = values)
+            return GBFR20_SetSkillboardValues(keyHash, pointer, (uint)values.Length);
+    }
+
+    /// <summary>
     /// 托管侧的 ABI 布局自检，与 native_api.h 的 static_assert 一一对应。
     ///
     /// 版本号只挡得住"加载到旧 DLL"，挡不住"两边被同时改错"——而后者才是结构体错位最可能发生的

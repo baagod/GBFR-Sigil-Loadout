@@ -45,6 +45,7 @@ func main() {
 	loadoutService := &service.LoadoutService{}
 	editService := &service.EditService{}
 	limitBonusService := &service.LimitBonusService{}
+	skillboardService := &service.SkillboardService{}
 	// 外壳（窗口显隐与托盘）跟载荷数据无关，自成一体（见 service/shellservice.go）。托盘菜单在这里就造：
 	// NewMenu / NewMenuItem 只碰包内一张表、不碰 globalApplication，所以能在 application.New() 之前造；
 	// "退出"那一条随结构体一起给出，exit 不可能为 nil。文案先用英文——前端要等 WebView 起来、读完
@@ -60,6 +61,7 @@ func main() {
 			application.NewService(loadoutService),
 			application.NewService(editService),
 			application.NewService(limitBonusService),
+			application.NewService(skillboardService),
 			application.NewService(shellService),
 		},
 		Assets: application.AssetOptions{
@@ -94,6 +96,8 @@ func main() {
 	app.OnShutdown(loadoutService.FlushNow)
 	// 能力强化页的写入也带防抖（见 service.LimitBonusService），同一个理由。
 	app.OnShutdown(limitBonusService.FlushNow)
+	// 专精技能页的写入同样带防抖（见 service.SkillboardService），同一个理由。
+	app.OnShutdown(skillboardService.FlushNow)
 	// 关机时要先立这个标志：cleanup() 里的 shutdownTasks 跑在 window.Close() 之前，否则下面那记
 	// WM_CLOSE 会被当成"用户点了 X"而改成假隐藏（见 window/windowstate.go 的 quitting）。
 	app.OnShutdown(window.MarkQuitting)

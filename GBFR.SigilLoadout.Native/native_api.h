@@ -16,7 +16,7 @@
 // **skill hash** 传递：slot 表归原生所有，托管侧无需按角色维护一张表。
 // v21 起同一套锚点机制也覆盖 limit_bonus_param：按 Key 认行、只写行内
 // Lv1..LvN 的 float（能力强化数值），见 GBFR20_SetLimitBonusLevels。
-constexpr uint32_t GBFR20_ABI_VERSION = 21;
+constexpr uint32_t GBFR20_ABI_VERSION = 22;
 
 // GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）。
 constexpr int32_t GBFR20_TABLE_NOT_READY = -1;              // 原生核心没初始化好，或正在关机
@@ -115,3 +115,20 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
     uint32_t key_hash,
     const float* levels,
     uint32_t level_count);
+
+// 「专精技能」页那三阶效果的实际数值：skillboard_effect_action_parts。行距 136、Key 在行内 +72、
+// 十个 float 槽在行内 +32..+71（都与生成器出的资产逐值对过）。
+//
+// 三道门与上面那张表完全一样（值个数 -> 行数合理 -> 整段可写 -> 目标 Key 全表**恰好一次**）。
+// 不同的只有"表指针从哪来"：这张表没有发布指令可以当锚点，所以从已经解出的能力强化指针字段出发，
+// 在附近的可写内存里找那个"自称行数合理、且首行 Key 对得上"的指针（见 src/table_slot.cpp）。
+// 找不到就照旧拒写——一个字节都不写，日志里说明原因。
+//
+//   >= 0  成功；1 = 真的改了，0 = 内存里已经是这些值。
+//   < 0   拒绝（码与上一张表同名同义）。
+//
+// 值的可见时机：与 limit_bonus 那一页是同一个界面，所以先按"改完当场可见"试；吃不到再回标题重进。
+GBFR20_API int32_t GBFR20_CALL GBFR20_SetSkillboardValues(
+    uint32_t key_hash,
+    const float* values,
+    uint32_t value_count);

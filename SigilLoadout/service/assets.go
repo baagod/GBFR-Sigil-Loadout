@@ -52,6 +52,12 @@ var (
 	limitBonusTexts    map[string]*LimitBonusText
 )
 
+// 专精技能（「专精类型」，图 1）：骨架一份 + 文案一门语言一份（第一版只有中文）。读法与上面那条链相同。
+var (
+	skillboardSkeleton SkillboardSkeleton
+	skillboardTexts    map[string]*SkillboardText
+)
+
 // readModFile 每次都从 exe 旁读：mod 目录每次更新都会被换掉（用户配置另住在 appfiles.UserDir()）。
 func readModFile(relative string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(appfiles.ExeDir(), relative))
@@ -115,7 +121,10 @@ func loadAssetsFrom(dir string) error {
 	}
 	// 能力强化那条链路的资产（见 limitbonusservice.go）：与上面几张表无关，读法却是同一套，一起在
 	// 启动时读一次（骨架 + 四语言文案 + chara.json）。
-	return loadLimitBonusTables(dir)
+	if err := loadLimitBonusTables(dir); err != nil {
+		return err
+	}
+	return loadSkillboardTables(dir)
 }
 
 // assetLangCodes 是那几份"每语言一份"的资产（skill.<lang>.json）覆盖的语言，也正是可视工具界面有的
@@ -162,4 +171,28 @@ func limitBonusTextName(lang string) string {
 // （见 loadAssetsFrom）——两边各自说一次，不等于可以让它们悄悄分叉。
 func limitBonusLangCodes() []string {
 	return []string{"zh", "en", "ja", "ko"}
+}
+
+// loadSkillboardTables 在启动时读专精技能那条链的资产（骨架 + 每语言一份文案）。
+func loadSkillboardTables(dir string) error {
+	skeleton, err := readAsset[SkillboardSkeleton](dir, "skillboard.json")
+	if err != nil {
+		return err
+	}
+	skillboardSkeleton = skeleton
+
+	skillboardTexts = make(map[string]*SkillboardText, len(skillboardLangCodes()))
+	for _, lang := range skillboardLangCodes() {
+		table, err := readAsset[SkillboardText](dir, "skillboard."+lang+".json")
+		if err != nil {
+			return err
+		}
+		skillboardTexts[lang] = &table
+	}
+	return nil
+}
+
+// skillboardLangCodes 是专精技能资产有那几门语言：第一版只有中文（生成器也只出中文）。
+func skillboardLangCodes() []string {
+	return []string{LangZH}
 }

@@ -216,3 +216,38 @@ int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
         return SetLimitBonusLevelsEntry(key_hash, levels, level_count);
     });
 }
+
+// 「专精技能」那一页：同一套三道门（值个数 -> 行数合理 -> 整段可写 -> 目标 Key 全表恰好一次），
+// 不同的只有"表指针从哪来"——见 src/table_slot.cpp 的 ResolveSkillboardPointer。拒绝码沿用同一组
+// （含义逐条相同），所以原因文案也复用 LimitBonusRefusalReason。
+static int32_t SetSkillboardValuesEntry(
+    uint32_t key_hash,
+    const float* values,
+    uint32_t value_count) {
+    if (g_shutting_down.load(std::memory_order_acquire))
+        return GBFR20_TABLE_NOT_READY;
+    EnsureInitialized();
+    static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
+
+    const int32_t result = SetSkillboardValues(key_hash, values, value_count);
+    if (result < 0) {
+        if (last_refusal.exchange(result, std::memory_order_acq_rel) != result)
+            Log(std::format(
+                "SetSkillboardValues: refused ({}): {}",
+                result,
+                LimitBonusRefusalReason(result)));
+    }
+    else {
+        last_refusal.store(std::numeric_limits<int32_t>::min(), std::memory_order_release);
+    }
+    return result;
+}
+
+int32_t GBFR20_CALL GBFR20_SetSkillboardValues(
+    uint32_t key_hash,
+    const float* values,
+    uint32_t value_count) {
+    return GuardAbi("GBFR20_SetSkillboardValues", GBFR20_TABLE_WRITE_FAILED, [&] {
+        return SetSkillboardValuesEntry(key_hash, values, value_count);
+    });
+}

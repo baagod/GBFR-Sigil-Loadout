@@ -1,0 +1,234 @@
+using gbfrelink.utility.manager.Interfaces;
+using Reloaded.Mod.Interfaces;
+
+namespace GBFR.SigilLoadout;
+
+/// <summary>
+/// 按用户编辑的 skillboard_edits.json 改写 skillboard_effect_action_parts.tbl 的行——「专精技能」页那
+/// 三阶效果的实际数值。
+///
+/// 走的是**因子编辑那条路**（见 <see cref="SigilEditorFeature"/>），不是限额表那条：先按用户的编辑造出
+/// 一份**整表**交回 IDataManager（游戏重新解析时必须看到新值），再由原生把活表里那几行**原地**改掉。
+///
+/// 为什么不能只写活表（实测过）：描述是实时读表的，改完立刻变；但**战斗结算**用的是解析期建好的那份
+/// 拷贝，只改活表它不动——重新注册、让游戏把表重建一遍，战斗才会跟着变。
+///
+/// 原表字节从游戏归档里读（<see cref="IDataManager.GetArchiveFile"/>），所以这一版**不带任何游戏数据**，
+/// 也不需要把表复制到别处：读出来、只改要改的那几行、交回去。
+/// </summary>
+internal sealed class SkillboardFeature {
+    private const string ConfigFileName = "skillboard_edits.json";
+
+    // 游戏归档里的路径（与 skill_status.tbl 同一个目录树）。
+    private const string TablePath = "system/table/skillboard_effect_action_parts.tbl";
+
+    // 表布局（与生成器、与 src/table_slot.cpp 的常量一一对应）：8 字节行数头 + 136 字节行，
+    // 十个 float 数值槽在行内 +32，Key 在行内 +72。
+    private const int HeaderBytes = 8;
+    private const int RowBytes = 136;
+    private const int ValuesOffset = 32;
+    private const int KeyOffset = 72;
+    private const int MaxValues = 10;
+
+    private static readonly string ConfigFile = UserConfig.FilePath(ConfigFileName);
+
+    // 表还没进内存 / 还没拿到 IDataManager 时的重试间隔，与落地后的看护间隔（同限额表那条链）。
+    private const long RetryIntervalMs = 5000;
+    private const long KeepAliveMs = 30000;
+
+    private readonly Action<string> _log;
+    private readonly FileStamp _stamp = new(ConfigFile);
+    private IModLoader? _loader;
+    private IDataManager? _dm;
+    private bool _waitedForManager;
+    private long _lastAttemptMs;
+    private DateTime _lastAttemptVersion;
+    private DateTime _loggedAttemptVersion;
+    private bool _hasLandedOnce;
+    private int _stopped;
+
+    internal SkillboardFeature(Action<string> log) => _log = log;
+
+    /// <summary>由外壳在启动时交进 loader（见 Mod.cs），此后每拍靠它拿 IDataManager 控制器。</summary>
+    internal void Start(IModLoader loader) => _loader = loader;
+
+    /// <summary>置上停止标志——否则卸载之后 tick 仍可能叫起一次应用，往游戏内存里写。</summary>
+    internal void Dispose() => Interlocked.Exchange(ref _stopped, 1);
+
+    /// <summary>失败会重试，而"还没拿到 IDataManager""原生拒写"在屏幕上是同一件事，所以同一版只报一次。</summary>
+    internal void Tick() {
+        if (Volatile.Read(ref _stopped) != 0)
+            return;
+
+        DateTime current = _stamp.Now();
+        long now = Environment.TickCount64;
+        bool sameVersion = current == _lastAttemptVersion;
+        long interval = _hasLandedOnce ? KeepAliveMs : RetryIntervalMs;
+        if (sameVersion && now - _lastAttemptMs < interval)
+            return;
+
+        bool quiet = current == _loggedAttemptVersion;
+        _loggedAttemptVersion = current;
+        _lastAttemptMs = now;
+        _lastAttemptVersion = current;
+
+        try {
+            Apply(quiet);
+        }
+        catch (Exception ex) {
+            _log("skillboard edit EXCEPTION: " + ex);
+        }
+    }
+
+    /// <summary>只在第一次没拿到时说一句话，免得每拍都刷屏（同 SigilEditorFeature）。</summary>
+    private bool TryAttachManager() {
+        if (_dm is not null)
+            return true;
+        if (_loader is null)
+            return false;
+        if (!_loader.GetController<IDataManager>().TryGetTarget(out IDataManager? dm) || dm is null) {
+            if (!_waitedForManager) {
+                _waitedForManager = true;
+                _log("skillboard edit: IDataManager is not available yet; the edit list waits for gbfrelink.utility.manager to load");
+            }
+            return false;
+        }
+        _dm = dm;
+        _log("skillboard edit: IDataManager attached");
+        return true;
+    }
+
+    private void Apply(bool quiet) {
+        if (!TryAttachManager())
+            return;
+
+        SkillboardConfig config;
+        try {
+            config = SkillboardConfig.Load(ConfigFile);
+        }
+        catch (FileNotFoundException) {
+            return; // 没有文件 = 没有编辑（同其余几条链）。
+        }
+        catch (DirectoryNotFoundException) {
+            return;
+        }
+        catch (Exception ex) {
+            if (!quiet)
+                _log("skillboard edit: the edit list could not be read (" + ex.Message
+                    + "); nothing was written and this version stays pending");
+            return;
+        }
+
+        // 造表：读游戏归档里的原表 → 只改要改的行。造不出来就说清原因（由 BuildEditedTable 记）。
+        byte[]? table = BuildEditedTable(config, out int applied);
+        if (table is null)
+            return;
+
+        // 注册在前：它便宜，而且游戏若真的重新解析送达的文件，那次解析也必须看到新值（同因子那条链）。
+        try {
+            _dm!.AddOrUpdateExternalFile(TablePath, table);
+            _dm!.UpdateIndex();
+        }
+        catch (Exception ex) {
+            _log("skillboard edit: re-register EXCEPTION (continuing with the memory write): " + ex);
+        }
+
+        // 再把活表里那几行原地改掉：描述是实时读表的，这一步让界面当场跟上；战斗那份拷贝等游戏重新解析。
+        int landed = 0, refused = 0;
+        foreach (SkillboardEdit edit in config.Edits) {
+            if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
+                continue;
+            float[]? values = Flatten(edit.Values);
+            if (values is null)
+                continue;
+
+            int result = NativeCore.SetSkillboardValues(keyHash, values);
+            if (result >= 0)
+                landed++;
+            else
+                refused++; // 原生已经落过一行原因（同一种拒写只报一次）
+        }
+
+        if (refused == 0)
+            _hasLandedOnce = true;
+        _stamp.MarkApplied(_lastAttemptVersion);
+        if (!quiet || refused > 0)
+            _log($"skillboard edit: table re-registered ({applied} rows patched), {landed} rows written in place, {refused} refused");
+    }
+
+    /// <summary>读游戏归档里的原表，按编辑列表打补丁。读不到/布局不对就返回 null 并记一行原因。</summary>
+    private byte[]? BuildEditedTable(SkillboardConfig config, out int applied) {
+        applied = 0;
+        byte[]? file = _dm!.GetArchiveFile(TablePath);
+        if (file is null) {
+            _log($"skillboard edit FAIL: GetArchiveFile('{TablePath}') returned nothing");
+            return null;
+        }
+        if (file.Length < HeaderBytes || (file.Length - HeaderBytes) % RowBytes != 0) {
+            _log($"skillboard edit FAIL: {TablePath} is not the {HeaderBytes}-byte header + {RowBytes}-byte rows shape");
+            return null;
+        }
+
+        long rows = (file.Length - HeaderBytes) / RowBytes;
+        foreach (SkillboardEdit edit in config.Edits) {
+            if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
+                continue;
+            float[]? values = Flatten(edit.Values);
+            if (values is null)
+                continue;
+
+            // Key 是行的身份：整张表里必须恰好出现一次（与原生那三道门同一条理由）。
+            int found = -1;
+            for (long row = 0; row < rows; row++) {
+                int at = (int)(HeaderBytes + row * RowBytes + KeyOffset);
+                if (BitConverter.ToUInt32(file, at) != keyHash)
+                    continue;
+                if (found >= 0) {
+                    _log($"skillboard edit FAIL: key {edit.Key} appears more than once; nothing patched");
+                    return null;
+                }
+                found = (int)row;
+            }
+            if (found < 0) {
+                _log($"skillboard edit: key {edit.Key} is not in the table; that entry is skipped");
+                continue;
+            }
+
+            int valuesAt = (int)(HeaderBytes + (long)found * RowBytes + ValuesOffset);
+            for (int i = 0; i < values.Length; i++)
+                BitConverter.GetBytes(values[i]).CopyTo(file, valuesAt + i * sizeof(float));
+            applied++;
+        }
+        return file;
+    }
+
+    /// <summary>
+    /// 把记录里的十个槽化成连续前缀：砍掉尾部的 null，中间若还剩 null 就整条跳过（原生按连续前缀写）。
+    /// </summary>
+    private static float[]? Flatten(float?[] slots) {
+        if (slots is null || slots.Length == 0 || slots.Length > MaxValues)
+            return null;
+
+        int last = -1;
+        for (int i = 0; i < slots.Length; i++) {
+            if (slots[i] is not null)
+                last = i;
+        }
+        if (last < 0)
+            return null;
+
+        var values = new float[last + 1];
+        for (int i = 0; i <= last; i++) {
+            if (slots[i] is not float value)
+                return null;
+            values[i] = value;
+        }
+        return values;
+    }
+
+    private static bool TryParseKey(string key, out uint hash) {
+        hash = 0;
+        return key.Length == 8 && uint.TryParse(key, System.Globalization.NumberStyles.HexNumber,
+            System.Globalization.CultureInfo.InvariantCulture, out hash);
+    }
+}

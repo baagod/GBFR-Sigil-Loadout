@@ -387,6 +387,9 @@ void ResolveLimitBonusParamPointer() {
 
     g_limit_bonus_pointer_rva.store(pointer_rva, std::memory_order_release);
     Log(std::format("Limit bonus table: resolved pointer field=0x{:X}.", pointer_rva));
+
+    // 专精表没有发布指令可以当锚点，就在这张表指针字段附近认它（见 ResolveSkillboardPointer）。
+    ResolveSkillboardPointer();
 }
 
 int32_t SetLimitBonusLevels(
@@ -413,5 +416,142 @@ int32_t SetLimitBonusLevels(
         return GBFR20_TABLE_BUFFER_UNREADABLE;
 
     return WriteLimitBonusRow(buffer, row_count, key_hash, levels, level_count);
+}
+
+// ---- skillboard_effect_action_parts（「专精技能」页那三阶效果的实际数值） ----
+
+inline constexpr uint64_t kSkillboardHeaderBytes = 8;
+inline constexpr uint64_t kSkillboardRowBytes = 136;
+// 行里 Key 的位置（相对行首）。写的是数值槽，从不碰 Key，所以 Key 是这张表的身份。
+inline constexpr uint64_t kSkillboardKeyOffset = 72;
+// 十个 float 槽从行内 +32 起（与生成器出的资产逐值对过）。
+inline constexpr uint64_t kSkillboardValueOffset = 32;
+inline constexpr uint64_t kSkillboardMaxValues = 10;
+inline constexpr uint64_t kSkillboardMaxPlausibleRows = 1u << 20;
+// 首行的 Key：运行期那份缓冲区与 tbl 文件逐字节同序，所以拿它当"这就是专精表"的指纹。
+inline constexpr uint32_t kSkillboardFirstRowKey = 0x52450C8B;
+// 在能力强化指针字段附近找多远：两张表由同一个加载器发布，槽记在同一片存储里，不会离得太远。
+inline constexpr uintptr_t kSkillboardProbeBytes = 4u << 20;
+
+std::atomic_uintptr_t g_skillboard_pointer_rva{0};
+
+// 候选指针得像这张表：它指向的缓冲区"自称的行数在合理区间"，且"首行 Key 对得上"。两条都过才认。
+bool LooksLikeSkillboardBuffer(uintptr_t candidate) noexcept {
+    const uintptr_t span = kSkillboardHeaderBytes + kSkillboardRowBytes;
+    if (!IsGameRange(candidate, static_cast<size_t>(span), kReadableProtect))
+        return false;
+    uint64_t row_count = 0;
+    if (!SafeReadUint64(candidate, row_count) || row_count == 0 ||
+        row_count > kSkillboardMaxPlausibleRows) {
+        return false;
+    }
+    uint64_t key = 0;
+    if (!SafeReadUint64(candidate + kSkillboardHeaderBytes + kSkillboardKeyOffset, key))
+        return false;
+    return static_cast<uint32_t>(key) == kSkillboardFirstRowKey;
+}
+
+void ResolveSkillboardPointer() {
+    if (g_skillboard_pointer_rva.load(std::memory_order_acquire) != 0 || g_image_base == 0)
+        return;
+
+    const uintptr_t hint_rva = g_limit_bonus_pointer_rva.load(std::memory_order_acquire);
+    if (hint_rva == 0) {
+        Log("Skillboard table: the limit bonus pointer is not resolved yet; nothing resolved.");
+        return;
+    }
+
+    const uintptr_t hint = g_image_base + hint_rva;
+    const uintptr_t low = hint > kSkillboardProbeBytes ? hint - kSkillboardProbeBytes : g_image_base;
+    const uintptr_t high = hint + kSkillboardProbeBytes;
+    for (uintptr_t at = low; at + sizeof(uintptr_t) <= high; at += sizeof(uintptr_t)) {
+        uint64_t pointer = 0;
+        if (!SafeReadUint64(at, pointer) || pointer == 0)
+            continue;
+        if (!LooksLikeSkillboardBuffer(static_cast<uintptr_t>(pointer)))
+            continue;
+        g_skillboard_pointer_rva.store(at - g_image_base, std::memory_order_release);
+        Log(std::format("Skillboard table: resolved pointer field=0x{:X}.", at - g_image_base));
+        return;
+    }
+    Log("Skillboard table: no pointer found near the limit bonus field; writes will be refused.");
+}
+
+int32_t TryGetLiveSkillboardBuffer(uintptr_t& buffer) noexcept {
+    const uintptr_t pointer_rva = g_skillboard_pointer_rva.load(std::memory_order_acquire);
+    if (pointer_rva == 0)
+        return GBFR20_TABLE_SLOT_UNRESOLVED;
+    const uintptr_t pointer_address = g_image_base + pointer_rva;
+    if (!IsGameRange(pointer_address, sizeof(uintptr_t), kReadableProtect))
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
+    uint64_t pointer = 0;
+    if (!SafeReadUint64(pointer_address, pointer) || pointer == 0)
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
+    buffer = static_cast<uintptr_t>(pointer);
+    return 0;
+}
+
+// 逐行找 Key、只写那一行的前 value_count 个数值槽。SEH 帧里只许有平凡类型，所以它单独一个函数。
+int32_t WriteSkillboardRow(
+    uintptr_t buffer,
+    uint64_t row_count,
+    uint32_t key_hash,
+    const float* values,
+    uint32_t value_count) noexcept {
+    __try {
+        auto* live = reinterpret_cast<uint8_t*>(buffer);
+        uint8_t* target = nullptr;
+        for (uint64_t row = 0; row < row_count; ++row) {
+            uint8_t* candidate = live + kSkillboardHeaderBytes + kSkillboardRowBytes * row;
+            uint32_t key = 0;
+            std::memcpy(&key, candidate + kSkillboardKeyOffset, sizeof(key));
+            if (key != key_hash)
+                continue;
+            // 同一个 Key 出现两次就不是这张表（Key 是行的身份）。发现重复立刻拒写，而不是覆盖第一个。
+            if (target != nullptr)
+                return GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE;
+            target = candidate;
+        }
+        if (target == nullptr)
+            return GBFR20_LIMIT_BONUS_KEY_NOT_FOUND;
+
+        const size_t bytes = static_cast<size_t>(value_count) * sizeof(float);
+        if (std::memcmp(target + kSkillboardValueOffset, values, bytes) == 0)
+            return 0;
+        std::memcpy(target + kSkillboardValueOffset, values, bytes);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return GBFR20_TABLE_WRITE_FAILED;
+    }
+    return 1;
+}
+
+int32_t SetSkillboardValues(
+    uint32_t key_hash,
+    const float* values,
+    uint32_t value_count) noexcept {
+    if (values == nullptr || value_count == 0 || value_count > kSkillboardMaxValues)
+        return GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED;
+
+    uintptr_t buffer = 0;
+    int32_t refusal = TryGetLiveSkillboardBuffer(buffer);
+    if (refusal != 0) {
+        // 启动期没认出来（比如那时能力强化指针还没解出），写之前再试一次——认出来之后会缓存住。
+        ResolveSkillboardPointer();
+        refusal = TryGetLiveSkillboardBuffer(buffer);
+        if (refusal != 0)
+            return refusal;
+    }
+
+    uint64_t row_count = 0;
+    if (!SafeReadUint64(buffer, row_count) || row_count == 0 ||
+        row_count > kSkillboardMaxPlausibleRows) {
+        return GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE;
+    }
+    const uint64_t length = kSkillboardHeaderBytes + kSkillboardRowBytes * row_count;
+    if (!IsGameRange(buffer, static_cast<size_t>(length), kWritableProtect))
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
+
+    return WriteSkillboardRow(buffer, row_count, key_hash, values, value_count);
 }
 }

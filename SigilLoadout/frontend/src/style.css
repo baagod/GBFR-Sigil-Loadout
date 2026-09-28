@@ -30,7 +30,16 @@
         --radius-3xl:                 calc(var(--radius) * 2.2);
         --radius-4xl:                 calc(var(--radius) * 2.6);
         --font-heading:               var(--font-sans);
-        --font-sans:                  'Geist Variable', sans-serif;
+        /*
+            中文一对一指定，不再靠 sans-serif 撞。
+
+            Geist 只有拉丁/西里尔/越南字形（构建产物里就是 geist-latin / -cyrillic / -vietnamese
+            那几个 woff2），所以中文一直是走 sans-serif 兜底、字体不受控。这里把 Noto Sans SC
+            排进第二顺位：它和游戏里那种 CJK 黑体同源（思源黑体），本机已装
+            （C:\Windows\Fonts\NotoSansSC-VF.ttf），零下载；没装的机器退到微软雅黑，仍可用。
+            拉丁数字仍由 Geist 出字（排在最前），于是数字是 Geist 的等宽感。
+        */
+        --font-sans:                  'Geist Variable', 'Noto Sans SC', 'Microsoft YaHei UI', sans-serif;
 }
 
 :root {

@@ -29,9 +29,10 @@ import {SlotRow, HEADER_ROW} from "@/components/SlotEditor"
 import {ExclusivePanel} from "@/components/ExclusivePanel"
 import {SigilEditorPanel} from "@/components/SigilEditorPanel"
 import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"
+import {SkillboardPanel} from "@/components/SkillboardPanel"
 import type {CharaTable} from "@/lib/chara"
 
-type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus"
+type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus" | "skillboard"
 
 /** 外壳唯一的一条失败通道：谁失败都只是把它写进这里，屏幕上只可能显示一条。 */
 type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }
@@ -343,6 +344,7 @@ export default function App() {
                             <TabsTrigger value="exclusive">{t.tabExclusive}</TabsTrigger>
                             <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
                             <TabsTrigger value="limitBonus">{t.tabLimitBonus}</TabsTrigger>
+                            <TabsTrigger value="skillboard">{t.tabSkillboard}</TabsTrigger>
                         </TabsList>
                         {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的
@@ -431,6 +433,10 @@ export default function App() {
                 {/* keepMounted：理由与因子编辑页相同——这一页的编辑状态活在组件里，而后端落盘要等防抖。 */}
                 <TabsPanel value="limitBonus" keepMounted className="min-h-0 flex-1 overflow-auto">
                     <LimitBonusEditorPanel lang={lang} charaTable={charaTable} charaNames={charaNames} />
+                </TabsPanel>
+                {/* keepMounted：理由同上——这一页的编辑状态也活在组件里，落盘要走防抖。 */}
+                <TabsPanel value="skillboard" keepMounted className="min-h-0 flex-1 overflow-auto">
+                    <SkillboardPanel lang={lang} charaNames={charaNames} charaTable={charaTable} />
                 </TabsPanel>
             </Tabs>
         </div>

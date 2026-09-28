@@ -291,4 +291,12 @@ int32_t SetLimitBonusLevels(
     uint32_t key_hash,
     const float* levels,
     uint32_t level_count) noexcept;
+// 专精表（skillboard_effect_action_parts）的表指针：它没有发布指令可当锚点，所以从已解出的能力
+// 强化指针字段附近找（同一片槽存储），缓存进 src/table_slot.cpp。只记日志、不挡初始化。
+void ResolveSkillboardPointer();
+// GBFR20_SetSkillboardValues 的实现（返回值语义见 native_api.h）。
+int32_t SetSkillboardValues(
+    uint32_t key_hash,
+    const float* values,
+    uint32_t value_count) noexcept;
 }

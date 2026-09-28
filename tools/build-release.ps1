@@ -11,6 +11,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# --- MSBuild 与大小写重复的代理变量 ------------------------------------------
+# 某些启动器会把 HTTPS_PROXY 注入两次（HTTPS_PROXY + https_proxy）。MSBuild 的
+# ProcessStartInfo.Environment 是大小写敏感的字典，遇到同名不同形的键会直接
+# 抛 MSB6001「已添加项。字典中的关键字:"HTTPS_PROXY"所添加的关键字:"https_proxy"」，
+# CL.exe 一次都跑不起来。构建只走本地文件，清掉这几个变量即可（含大小写两种写法）。
+foreach ($proxyName in @('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')) {
+    Remove-Item -LiteralPath "Env:$proxyName" -ErrorAction SilentlyContinue
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 
 # --- 版本号：唯一权威源 -------------------------------------------------------

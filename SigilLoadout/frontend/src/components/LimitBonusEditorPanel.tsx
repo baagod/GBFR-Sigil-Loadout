@@ -191,7 +191,6 @@ function AbilityRow({
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
             {/* 能力名用默认前景色：层级交给字号与缩进，不靠颜色。 */}
-            {/* 间隔号（·/・）在 UI 字体里又小又挤，这里放大 + 两侧留白；数据一个字不动。 */}
             {/*
                 名字这一格是定位容器：圆点用 absolute 摆在缩进槽里（-left-4.5、8px 的点 → 与名字正好 10px），
                 所以能力名与属性名左对齐；只有能力 / 专属类（bonusType ≠ 0）有点，属性节点没有。
@@ -203,17 +202,12 @@ function AbilityRow({
                             className="absolute top-1/2 -left-4.5 size-2 -translate-y-1/2 rounded-full bg-[#2b7fff]"
                         />
                     )}
-                    <span className="truncate text-sm">
-                        {spaceCJKAndLatin(name).split(/([·・])/).map((part, i) =>
-                            /^[·・]$/.test(part) ? (
-                                <span key={i} className="mx-1 text-[1.15em]">
-                                    {part}
-                                </span>
-                            ) : (
-                                part
-                            ),
-                        )}
-                    </span>
+                    {/*
+                        名字里的间隔号不再上样式：生成器已经把各语言的写法统一成 U+30FB（・），
+                        它在 Noto Sans SC 里本来就是全宽、居中的字形（之前放大 1.15 倍 + mx-1 是为了
+                        救中文原文的 U+00B7 —— 那个在微软雅黑下只有 24% 宽）。见 gen/game/display。
+                    */}
+                    <span className="truncate text-sm">{spaceCJKAndLatin(name)}</span>
                 </div>
             {/* 描述是模板本身（不填数值）：数字在右边的框里，说不清的正是哪一段对应哪一个。少数参数行游戏没写文案，画占位符。 */}
             <span className="min-w-0 truncate text-sm text-[#a0a0a0]">

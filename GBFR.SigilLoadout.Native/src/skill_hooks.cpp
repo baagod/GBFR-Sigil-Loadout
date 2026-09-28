@@ -448,6 +448,10 @@ bool InstallHooks() {
             return fail_installation("Failed to install the skill fetch-path hook.");
     }
 
+    // 2026-09-28：那一晚的定位探针（文件打开 / 调试寄存器 / 装载链）使命已完成，全部停用。
+    // 结论：专精数值只在开机从归档文件读一次；改内存表只影响界面，战斗必须重启才变。
+    // 代码保留以备将来复用，但不安装——它们会刷日志，且调试寄存器那套有额外风险。
+
     {
         auto phase = StartupPhase("skill-loop-limit-patches");
         const bool loop_patches_ready = ApplySkillLoopLimits(GetVirtualSlotCount());
