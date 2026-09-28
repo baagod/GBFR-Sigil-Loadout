@@ -4,13 +4,11 @@
       "id": "PL1000",
       "types": [
         {
-          "typeIndex": 0,
           "nameKey": "173BF2C7",
           "rows": [
             {
               "key": "F55F4D8A",
               "rowKey": "19B5F235",
-              "diamonds": 0,
               "values": [
                 7,
                 10,
@@ -27,7 +25,6 @@
             {
               "key": "6CEDDBE6",
               "rowKey": "28B55274",
-              "diamonds": 0,
               "values": [
                 5,
                 5,
@@ -44,7 +41,6 @@
             {
               "key": "21FA7919",
               "rowKey": "4DA09694",
-              "diamonds": 0,
               "values": [
                 7,
                 15,
@@ -67,7 +63,6 @@
                 {
                   "key": "48CD9AF6",
                   "rowKey": "3DA42C61",
-                  "diamonds": 1,
                   "values": [
                     5,
                     0,
@@ -79,12 +74,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "31D18074",
                   "rowKey": "FBE1A97F",
-                  "diamonds": 0,
                   "values": [
                     2,
                     0,
@@ -96,12 +91,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "030BB9A3",
                   "rowKey": "0148F6F7",
-                  "diamonds": 0,
                   "values": [
                     20,
                     0,
@@ -113,12 +108,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "70072B1F",
                   "rowKey": "17D247FD",
-                  "diamonds": 0,
                   "values": [
                     15000,
                     0,
@@ -130,7 +125,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -141,7 +137,6 @@
                 {
                   "key": "28D6731E",
                   "rowKey": "0F5E7DEA",
-                  "diamonds": 1,
                   "values": [
                     0,
                     5,
@@ -153,12 +148,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "4014A1CA",
                   "rowKey": "2BDC0304",
-                  "diamonds": 1,
                   "values": [
                     35,
                     0,
@@ -170,12 +165,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "4B0C27DA",
                   "rowKey": "F6CE927A",
-                  "diamonds": 0,
                   "values": [
                     0,
                     0,
@@ -187,12 +182,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "20961D8D",
                   "rowKey": "5E7AD010",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -204,12 +199,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "18D99A83",
                   "rowKey": "25D64E43",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -221,12 +216,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "13203C66",
                   "rowKey": "D89C08B4",
-                  "diamonds": 0,
                   "values": [
                     25,
                     0,
@@ -238,12 +233,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "686E6C7C",
                   "rowKey": "DD04EBFF",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -255,12 +250,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "007474E9",
                   "rowKey": "C8DB2268",
-                  "diamonds": 0,
                   "values": [
                     100,
                     0,
@@ -272,7 +267,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -283,7 +279,6 @@
                 {
                   "key": "F2B5A80C",
                   "rowKey": "8468CD55",
-                  "diamonds": 2,
                   "values": [
                     0,
                     5,
@@ -295,12 +290,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 2
                 },
                 {
                   "key": "7B03969B",
                   "rowKey": "14D0F894",
-                  "diamonds": 3,
                   "values": [
                     0,
                     10,
@@ -312,12 +307,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 3
                 },
                 {
                   "key": "0E602050",
                   "rowKey": "192A5120",
-                  "diamonds": 3,
                   "values": [
                     0,
                     0,
@@ -329,12 +324,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 3
                 },
                 {
                   "key": "7C7A3647",
                   "rowKey": "6476E397",
-                  "diamonds": 0,
                   "values": [
                     35,
                     0,
@@ -346,12 +341,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "86294C6A",
                   "rowKey": "FA9D0F8C",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -363,12 +358,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "F7FC3E21",
                   "rowKey": "6C1F5ECF",
-                  "diamonds": 0,
                   "values": [
                     20,
                     5,
@@ -380,12 +375,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "01114529",
                   "rowKey": "EA2C8697",
-                  "diamonds": 0,
                   "values": [
                     7,
                     0,
@@ -397,12 +392,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "0B193CAB",
                   "rowKey": "9F0C4E7F",
-                  "diamonds": 0,
                   "values": [
                     15000,
                     0,
@@ -414,7 +409,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -425,7 +421,6 @@
                 {
                   "key": "CEE87FE9",
                   "rowKey": "D0D1784D",
-                  "diamonds": 2,
                   "values": [
                     0,
                     0,
@@ -437,12 +432,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 2
                 },
                 {
                   "key": "80ED6D68",
                   "rowKey": "D9BAB0FD",
-                  "diamonds": 0,
                   "values": [
                     45,
                     0,
@@ -454,12 +449,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "38946ABE",
                   "rowKey": "C0BB4CF5",
-                  "diamonds": 0,
                   "values": [
                     45,
                     0,
@@ -471,12 +466,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "F3608FF6",
                   "rowKey": "9B66E6ED",
-                  "diamonds": 0,
                   "values": [
                     1000,
                     0,
@@ -488,12 +483,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "4881A902",
                   "rowKey": "D17FCF8D",
-                  "diamonds": 0,
                   "values": [
                     20,
                     5,
@@ -505,12 +500,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "E6D2AF27",
                   "rowKey": "F6784079",
-                  "diamonds": 0,
                   "values": [
                     25,
                     0,
@@ -522,12 +517,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "215C2B2C",
                   "rowKey": "A02BE403",
-                  "diamonds": 0,
                   "values": [
                     9,
                     0,
@@ -539,12 +534,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "C3F18385",
                   "rowKey": "A6478048",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -556,12 +551,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "BD83583E",
                   "rowKey": "9BF3769A",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -573,12 +568,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "4757200C",
                   "rowKey": "3DE7570E",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -590,20 +585,19 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             }
           ]
         },
         {
-          "typeIndex": 1,
           "nameKey": "67D9E9EE",
           "rows": [
             {
               "key": "87388E05",
               "rowKey": "9553B16E",
-              "diamonds": 0,
               "values": [
                 3,
                 2,
@@ -620,7 +614,6 @@
             {
               "key": "16269178",
               "rowKey": "C042812A",
-              "diamonds": 0,
               "values": [
                 6,
                 2,
@@ -637,7 +630,6 @@
             {
               "key": "478197E2",
               "rowKey": "5814C88A",
-              "diamonds": 0,
               "values": [
                 9,
                 2,
@@ -660,7 +652,6 @@
                 {
                   "key": "9E49EC47",
                   "rowKey": "75D5ECB2",
-                  "diamonds": 1,
                   "values": [
                     5,
                     0,
@@ -672,12 +663,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "3C983A65",
                   "rowKey": "4C5BA46E",
-                  "diamonds": 0,
                   "values": [
                     3,
                     0,
@@ -689,12 +680,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "285B9CD6",
                   "rowKey": "948F73A6",
-                  "diamonds": 0,
                   "values": [
                     20,
                     0,
@@ -706,12 +697,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "473C770A",
                   "rowKey": "23E995AF",
-                  "diamonds": 0,
                   "values": [
                     5,
                     0,
@@ -723,7 +714,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -734,7 +726,6 @@
                 {
                   "key": "52021F46",
                   "rowKey": "8218E593",
-                  "diamonds": 1,
                   "values": [
                     0,
                     1,
@@ -746,12 +737,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "2FA5B917",
                   "rowKey": "E2B3F055",
-                  "diamonds": 1,
                   "values": [
                     10,
                     0,
@@ -763,12 +754,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "FF7229DF",
                   "rowKey": "FBBC5703",
-                  "diamonds": 2,
                   "values": [
                     0,
                     0,
@@ -780,12 +771,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 2
                 },
                 {
                   "key": "C82CB79F",
                   "rowKey": "CC38828F",
-                  "diamonds": 0,
                   "values": [
                     5,
                     0,
@@ -797,12 +788,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "20186D34",
                   "rowKey": "D18D3B9E",
-                  "diamonds": 0,
                   "values": [
                     5,
                     0,
@@ -814,12 +805,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "1DFFBA40",
                   "rowKey": "3ED4D35B",
-                  "diamonds": 0,
                   "values": [
                     35,
                     0,
@@ -831,12 +822,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "331FBDA8",
                   "rowKey": "1091254B",
-                  "diamonds": 0,
                   "values": [
                     15000,
                     0,
@@ -848,12 +839,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "605BD2D8",
                   "rowKey": "46052DC1",
-                  "diamonds": 0,
                   "values": [
                     100,
                     0,
@@ -865,7 +856,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -876,7 +868,6 @@
                 {
                   "key": "E155311E",
                   "rowKey": "0D35309F",
-                  "diamonds": 0,
                   "values": [
                     0,
                     0,
@@ -888,12 +879,12 @@
                     2,
                     10,
                     500
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "64C764AC",
                   "rowKey": "95A36BA2",
-                  "diamonds": 3,
                   "values": [
                     30,
                     75,
@@ -905,12 +896,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 3
                 },
                 {
                   "key": "501B59F0",
                   "rowKey": "3AB1BBFE",
-                  "diamonds": 0,
                   "values": [
                     10,
                     30,
@@ -922,12 +913,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "D959E31F",
                   "rowKey": "92F87A2E",
-                  "diamonds": 1,
                   "values": [
                     35,
                     0,
@@ -939,12 +930,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "A789F049",
                   "rowKey": "B04D2D11",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -956,12 +947,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "9108EE40",
                   "rowKey": "C8397ABA",
-                  "diamonds": 0,
                   "values": [
                     10,
                     5,
@@ -973,12 +964,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "4E897C95",
                   "rowKey": "0969AC1E",
-                  "diamonds": 0,
                   "values": [
                     40,
                     0,
@@ -990,12 +981,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "9E223414",
                   "rowKey": "46D98F5A",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1007,7 +998,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -1018,7 +1010,6 @@
                 {
                   "key": "52DFF418",
                   "rowKey": "185435FD",
-                  "diamonds": 0,
                   "values": [
                     25,
                     25,
@@ -1030,12 +1021,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "EEB6BAE9",
                   "rowKey": "FDB6560F",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1047,12 +1038,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "D7A3BC31",
                   "rowKey": "5887EF97",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1064,12 +1055,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "7D03001A",
                   "rowKey": "9837853A",
-                  "diamonds": 0,
                   "values": [
                     45,
                     0,
@@ -1081,12 +1072,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "B213D5E7",
                   "rowKey": "F46B41D9",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1098,12 +1089,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "93E445CC",
                   "rowKey": "B1F9E8C7",
-                  "diamonds": 0,
                   "values": [
                     50,
                     0,
@@ -1115,12 +1106,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "206BE5C9",
                   "rowKey": "1A3ED5F8",
-                  "diamonds": 0,
                   "values": [
                     10,
                     5,
@@ -1132,12 +1123,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "16828E7F",
                   "rowKey": "DD33B4EE",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1149,12 +1140,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "7142E2E2",
                   "rowKey": "24D3B923",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1166,12 +1157,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "9DB0519E",
                   "rowKey": "599CEFF6",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1183,20 +1174,19 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             }
           ]
         },
         {
-          "typeIndex": 2,
           "nameKey": "964937C6",
           "rows": [
             {
               "key": "D728FB46",
               "rowKey": "45F93675",
-              "diamonds": 1,
               "values": [
                 10,
                 0,
@@ -1213,7 +1203,6 @@
             {
               "key": "ABB0DDB5",
               "rowKey": "F04435EB",
-              "diamonds": 0,
               "values": [
                 3,
                 5,
@@ -1230,7 +1219,6 @@
             {
               "key": "B6E2CBA6",
               "rowKey": "F4D5CED1",
-              "diamonds": 0,
               "values": [
                 5,
                 5,
@@ -1253,7 +1241,6 @@
                 {
                   "key": "4B529EF4",
                   "rowKey": "A8FA1985",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1265,12 +1252,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "F5F7F3D1",
                   "rowKey": "684C800F",
-                  "diamonds": 1,
                   "values": [
                     10,
                     0,
@@ -1282,12 +1269,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "92076795",
                   "rowKey": "79C10551",
-                  "diamonds": 0,
                   "values": [
                     20,
                     0,
@@ -1299,12 +1286,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "ED5AAB5E",
                   "rowKey": "AF9E0A81",
-                  "diamonds": 0,
                   "values": [
                     15000,
                     0,
@@ -1316,7 +1303,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -1327,7 +1315,6 @@
                 {
                   "key": "DB84B03E",
                   "rowKey": "58FF132A",
-                  "diamonds": 1,
                   "values": [
                     5,
                     0,
@@ -1339,12 +1326,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "D8DF74F7",
                   "rowKey": "C97D1A7E",
-                  "diamonds": 2,
                   "values": [
                     0,
                     0,
@@ -1356,12 +1343,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 2
                 },
                 {
                   "key": "C596B507",
                   "rowKey": "2D15A1C8",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1373,12 +1360,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "3E219D59",
                   "rowKey": "0A6BE759",
-                  "diamonds": 0,
                   "values": [
                     5,
                     0,
@@ -1390,12 +1377,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "A236BDE2",
                   "rowKey": "F61D37D0",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1407,12 +1394,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "E16E0647",
                   "rowKey": "9EBFA2D7",
-                  "diamonds": 1,
                   "values": [
                     35,
                     0,
@@ -1424,12 +1411,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 1
                 },
                 {
                   "key": "166C7575",
                   "rowKey": "2A7DE638",
-                  "diamonds": 0,
                   "values": [
                     15,
                     0,
@@ -1441,12 +1428,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "8FF04AA7",
                   "rowKey": "3F17EDD4",
-                  "diamonds": 0,
                   "values": [
                     100,
                     0,
@@ -1458,7 +1445,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -1469,7 +1457,6 @@
                 {
                   "key": "B6129B13",
                   "rowKey": "20EDEB1D",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1481,12 +1468,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "7E71C87B",
                   "rowKey": "863FF783",
-                  "diamonds": 2,
                   "values": [
                     0,
                     5,
@@ -1498,12 +1485,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 2
                 },
                 {
                   "key": "3C1F20A1",
                   "rowKey": "E7C11D6D",
-                  "diamonds": 3,
                   "values": [
                     0,
                     0,
@@ -1515,12 +1502,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 3
                 },
                 {
                   "key": "EDE719A9",
                   "rowKey": "3C86E735",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1532,12 +1519,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "933BF8B0",
                   "rowKey": "378929C5",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1549,12 +1536,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "5DEFBBB2",
                   "rowKey": "E1C6BA8A",
-                  "diamonds": 0,
                   "values": [
                     10000,
                     4,
@@ -1566,12 +1553,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "A645AD40",
                   "rowKey": "EA88EEF1",
-                  "diamonds": 0,
                   "values": [
                     9,
                     0,
@@ -1583,12 +1570,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "B6B0576E",
                   "rowKey": "B99D6496",
-                  "diamonds": 0,
                   "values": [
                     25,
                     0,
@@ -1600,7 +1587,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             },
@@ -1611,7 +1599,6 @@
                 {
                   "key": "AE2ACAE8",
                   "rowKey": "1AD31A90",
-                  "diamonds": 3,
                   "values": [
                     0,
                     0,
@@ -1623,12 +1610,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 3
                 },
                 {
                   "key": "361E2501",
                   "rowKey": "B22A050F",
-                  "diamonds": 0,
                   "values": [
                     45,
                     0,
@@ -1640,12 +1627,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "F67D3600",
                   "rowKey": "D2575C21",
-                  "diamonds": 0,
                   "values": [
                     45,
                     0,
@@ -1657,12 +1644,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "11508ED9",
                   "rowKey": "EF3AC157",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1674,12 +1661,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "0C3A4D84",
                   "rowKey": "00B11216",
-                  "diamonds": 0,
                   "values": [
                     6,
                     5,
@@ -1691,12 +1678,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "B0A1246F",
                   "rowKey": "9CDE7953",
-                  "diamonds": 0,
                   "values": [
                     0.4,
                     0,
@@ -1708,12 +1695,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "C31C03DD",
                   "rowKey": "BCC0E463",
-                  "diamonds": 0,
                   "values": [
                     10,
                     0,
@@ -1725,12 +1712,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "89E72DF1",
                   "rowKey": "55DBE865",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1742,12 +1729,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "ABFFAC14",
                   "rowKey": "4795C47E",
-                  "diamonds": 0,
                   "values": [
                     25,
                     0,
@@ -1759,12 +1746,12 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 },
                 {
                   "key": "65324C9B",
                   "rowKey": "D31587B4",
-                  "diamonds": 0,
                   "values": [
                     30,
                     0,
@@ -1776,7 +1763,8 @@
                     0,
                     0,
                     0
-                  ]
+                  ],
+                  "diamonds": 0
                 }
               ]
             }

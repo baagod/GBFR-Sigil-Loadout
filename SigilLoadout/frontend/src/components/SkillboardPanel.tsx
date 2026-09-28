@@ -26,19 +26,22 @@ import { cn } from "cn";
 import type { Lang } from "@/lib/lang";
 import type { CharaTable } from "@/lib/chara";
 
-// 一个节点：key = 改哪一行（挂的参数行），rowKey = 看哪段字（自己那一行），两件事。
-// diamonds = 游戏在这一行前面画几个 ♦（生成器已从原文的 <d> 数出来）。
-type Row = { key: string; rowKey: string; diamonds: number; values: number[] };
-// 该专精类型包含的一个阶（1 阶 / 2 阶 / 3 阶 / EX），label 就是"1阶"这类标签。
-type Skill = { key: string; label: string; rows: Row[] };
+// 一个节点（效果行）：key = 改哪一行（挂的参数行），rowKey = 看哪段字（自己那一行），两件事。
+type Row = { key: string; rowKey: string; values: number[] };
+// 阶里的条目比类型行多一个"行首画几个 ♦"：那来自原文的 <d> 标记，每行真不一样，所以落盘。
+type SkillRow = Row & { diamonds: number };
+// 该专精类型包含的一个阶（1 阶 / 2 阶 / 3 阶 / EX），label 就是"1 阶"这类标签。
+type Skill = { key: string; label: string; rows: SkillRow[] };
 // 一个专精类型：rows 是类型自己的三条说明（界面上画 ♦ / ♦♦ / ♦♦♦），skills 是它包含的四个阶。
-type Type = { typeIndex: number; nameKey: string; rows: Row[]; skills: Skill[] };
+// 没有"类型序号"字段 —— 数组下标就是序号（生成器按 typeCategories 顺序 append，中间不排序）。
+type Type = { nameKey: string; rows: Row[]; skills: Skill[] };
 type Character = { id: string; types: Type[] };
 type Skeleton = { characters: Character[] };
 type Text = { names: Record<string, string>; lines: Record<string, string> };
 
-// 类型自己的三条说明画 ♦ / ♦♦ / ♦♦♦，阶里的条目一律一个 ♦（照游戏的画法）。
-const diamonds = (tier: number) => "♦".repeat(tier + 1)
+// 类型自己的三条说明画 ♦ / ♦♦ / ♦♦♦：个数只由**位置**决定（第 i 条 → i+1 个），所以按参数算，
+// 不从数据取（原文那三行没有 <d> 标记）。
+const diamonds = (index: number) => "♦".repeat(index + 1)
 
 // 游戏给每一阶留的等级槽数（与生成器的 Value1..Value10 对齐）。
 const SLOTS = 10
@@ -47,12 +50,12 @@ const SLOTS = 10
 const SLOT =
     "min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
 
-// ♦ 的颜色：所有行一致（专精特化技能那几条也不变）。
+// ♦ 的颜色：阶里的条目用浅灰。
 const DIAMOND_COLOR = "#cbd5e1"
 
-// 专精特化技能（专精类型自己那几条）的**文字**颜色：跟游戏里那几条的浅米白一致，
-// 把这一组和阶里的条目区分开。♦ 不着这个色——它保持 DIAMOND_COLOR。
-const TYPE_SKILL_COLOR = "#eeeebe"
+// 专精特化技能（专精类型自己那几条）的 ♦：紫色，把这一组跟阶里的条目分开。
+// 只给 ♦ 上色，文字仍是默认前景色。
+const TYPE_SKILL_DIAMOND_COLOR = "#6e11b0"
 
 /*
     专精页里所有行的上下留白：只有这一个来源（py-1.5 = 上下各 6px），不加 min-height。
@@ -269,12 +272,13 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
 
     // 说明行：左边「阶标签 + 几个 ♦」，右边是游戏原文（全显、按原文换行）。
     // items-center：♦ 是行内最高的那件东西，说明换行成两三行时它得**垂直居中**，不能贴顶。
-    // 字色：阶里的条目用默认前景色；**专精特化技能**那三条（类型自己那几条）文字用米白 #eeeebe，
-    // 一眼能看出"这几条属于上面那个类型"。♦ 不跟着变——它一律是 #cbd5e1，与阶里的条目同色。
+    // 文字一律默认前景色；**专精特化技能**那三条（类型自己那几条）靠它的 ♦ 换成紫色来区分，
+    // 不用字色——它们的文字和阶里的条目一样是正文。
+    // ♦ 文本按参数传进去：两条调用路径的取值方式不同——阶条目读数据里的 diamonds，
+    // 类型行按下标算（见 diamonds()）。
     // tier 只在阶里的条目上给（"1 阶"/…/"EX"），专精类型那三条没有阶，那一格留空占位。
-    const descriptionRow = (row: Row, diamondText: string, tier: string, amber = false) => {
+    const descriptionRow = (row: Row, diamondText: string, tier: string, typeSkill = false) => {
         const description = spaceBrackets(lineText(text.lines[row.rowKey], effective(row)))
-        const color = amber ? TYPE_SKILL_COLOR : undefined
         return (
             <div className={`flex items-center gap-3 ${ROW_BOX}`}>
                 <span className="w-8 shrink-0 text-xs text-muted-foreground">{tier}</span>
@@ -285,17 +289,14 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                 */}
                 <span
                     className="w-16 shrink-0 select-text text-lg leading-none"
-                    style={{ color: DIAMOND_COLOR }}
+                    style={{ color: typeSkill ? TYPE_SKILL_DIAMOND_COLOR : DIAMOND_COLOR }}
                 >
                     {diamondText}
                 </span>
                 {/* select-text：说明是可以选中复制的文字（默认继承不到用户选择就别扭）。
                     字号 14（text-sm）、行高 24px（leading-6）：游戏原文一行里有说明、效果量、条件好几段，
                     行高松一点才不"密密麻麻"；行高是固定值，不跟着字号变。 */}
-                <span
-                    className="min-w-0 flex-1 select-text whitespace-pre-line text-sm leading-6 text-foreground"
-                    style={{ color }}
-                >
+                <span className="min-w-0 flex-1 select-text whitespace-pre-line text-sm leading-6 text-foreground">
                     {renderMarks(description)}
                 </span>
             </div>
@@ -306,7 +307,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // 每行都画下划线，**除了每一组的最后一行**（last:border-b-0）：它后面紧跟下一个类型的名字，
     // 再多一条线就成了"两行平行线"，最后一组也因为下面是页面底边同样不需要。分隔改由类型块
     // 之间的间距承担。
-    const effectRow = (row: Row, tier: string, path: string) => (
+    const effectRow = (row: SkillRow, tier: string, path: string) => (
         <AccordionItem key={row.key} value={path} className="border-b last:border-b-0">
             <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
                 {descriptionRow(row, "♦".repeat(row.diamonds), tier)}
@@ -361,19 +362,19 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                             看着"加粗"的一条（只有整页最后一行会这样，中间的收尾线都正常）。
                                         */}
                                         <AccordionContent className="pb-0" keepMounted>
-                                            {character.types.map(type => {
+                                            {character.types.map((type, typeIndex) => {
                                                 // 类型自己那三条（♦/♦♦/♦♦♦）也是可编辑的数值行，和阶里的条目一样
                                                 // 点开就能改；身份用 type/… 前缀，不跟阶里的条目撞。
                                                 const typeRows = type.rows.map((row, i) => ({
                                                     row,
-                                                    path: `${character.id}/${type.typeIndex}/type/${i}`,
+                                                    path: `${character.id}/${typeIndex}/type/${i}`,
                                                 }))
                                                 // 这一类型下每一条的 value（= 展开态的身份）+ 它所属的阶标签。
                                                 const rows = type.skills.flatMap(skill =>
                                                     skill.rows.map((row, i) => ({
                                                         row,
                                                         tier: skill.label,
-                                                        path: `${character.id}/${type.typeIndex}/${skill.key}/${i}`,
+                                                        path: `${character.id}/${typeIndex}/${skill.key}/${i}`,
                                                     })),
                                                 )
                                                 const openTypeRows = typeRows
@@ -383,7 +384,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                                     .filter(entry => expanded.has(entry.path))
                                                     .map(entry => entry.path)
                                                 return (
-                                                    <div key={type.typeIndex} className="-mt-2 mb-6 last:mb-0">
+                                                    <div key={typeIndex} className="-mt-2 mb-6 last:mb-0">
                                                         {/*
                                                             专精类型：名字 + 一条下划线 + 它自己的三条说明（白字，点开有数值槽）。
 

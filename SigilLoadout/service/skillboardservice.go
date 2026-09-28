@@ -19,30 +19,42 @@ import (
 // skillboardEditListName 住在 mod 的用户目录里（appfiles.UserDir()），和 loadout.json 挨着；只有这一个位置。
 const skillboardEditListName = "skillboard_edits.json"
 
-// SkillboardRow 是一个节点：Key 是**改哪一行**（它挂的参数行哈希），RowKey 是**看哪段字**
-// （它自己那一行的哈希，界面拿它查说明），Diamonds 是游戏在这一行前面画的 ♦ 个数。
-type SkillboardRow struct {
-	Key      string    `json:"key"`
-	RowKey   string    `json:"rowKey"`
-	Diamonds int       `json:"diamonds"`
-	Values   []float64 `json:"values"`
+// skillboardRowBase 是一个节点的两类行都有的部分：Key 是**改哪一行**（它挂的参数行哈希），
+// RowKey 是**看哪段字**（它自己那一行的哈希，界面拿它查说明）。
+//
+// 抽出来给 SkillboardSkillRow 嵌入——这样"类型行没有 ♦ 个数"这件事在类型上就成立。
+type skillboardRowBase struct {
+	Key    string    `json:"key"`
+	RowKey string    `json:"rowKey"`
+	Values []float64 `json:"values"`
+}
+
+// SkillboardRow 是**专精类型自己那几条说明**（♦ / ♦♦ / ♦♦♦ 那三行）——没有"画几个 ♦"这个字段：
+// 那是位置决定的（第 1/2/3 条 → 1/2/3 个），由界面按下标算，不进数据。
+type SkillboardRow = skillboardRowBase
+
+// SkillboardSkillRow 是**阶里的一个条目**，比类型行多一个 Diamonds（来自原文行首的 <d> 标记）。
+// 嵌入 base：JSON 仍是平铺的 {key,rowKey,values,diamonds}（Go 按字段提升处理，不嵌套）。
+type SkillboardSkillRow struct {
+	skillboardRowBase
+	Diamonds int `json:"diamonds"`
 }
 
 // SkillboardSkill 是该专精类型包含的一个阶（1 阶 / 2 阶 / 3 阶 / EX），Label 就是"2阶"这类标签。
 type SkillboardSkill struct {
-	Key   string          `json:"key"`
-	Label string          `json:"label"`
-	Rows  []SkillboardRow `json:"rows"`
+	Key   string               `json:"key"`
+	Label string               `json:"label"`
+	Rows  []SkillboardSkillRow `json:"rows"`
 }
 
 // SkillboardType 是一个专精类型（觉醒 / 真谛 / 秘义）：名字按 NameKey 去文案表里查。
 //
+// 不存"类型序号"：数组顺序就是它（生成器按 typeCategories 依次 append），界面用下标即可。
 // Rows 是类型自己的三条说明（对应界面上的 ♦ / ♦♦ / ♦♦♦）；Skills 是它包含的四个阶。
 type SkillboardType struct {
-	TypeIndex int               `json:"typeIndex"`
-	NameKey   string            `json:"nameKey"`
-	Rows      []SkillboardRow   `json:"rows"`
-	Skills    []SkillboardSkill `json:"skills"`
+	NameKey string            `json:"nameKey"`
+	Rows    []SkillboardRow   `json:"rows"`
+	Skills  []SkillboardSkill `json:"skills"`
 }
 
 // SkillboardCharacter 是一个角色的专精类型。
