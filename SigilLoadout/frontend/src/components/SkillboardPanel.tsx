@@ -489,26 +489,26 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                 所以照样"滚过本类型就被下一个类型顶掉"。两层各自的包装都是有界的，
                                 这正是"顶掉上一块"能成立的原因。
                             */
-                            <div key={character.id}>
+                            <div key={character.id} className={!characterOpen && !isLastCharacter ? "border-b" : ""}>
                                 {/*
                                     `.skillboard-row`（sticky top-0 / z-30 / 底色，见 style.css）**只在
                                     展开时挂**：收起态 28 行都只有 44px、行间没有任何内容，吸顶会把本该
                                     显示的那一行压在下面 —— 那时行与行只是列表，正常滚动才对。
 
-                                    下划线**也只在收起时画**：收起态它是列表的分隔（28 行光秃秃的不好看）；
-                                    展开后内容自己有几条线收口，角色行再来一条是多余的 —— 而且它当时会与
-                                    内容最后一行落在同一个 y 上叠成"加粗"的一条（那时的起因是角色块有
-                                    mb-6、内容底边比角色行底边还往下 175px）。现在虽然外边距去掉了、
-                                    不会再叠，但展开后那条线本来就多余，所以维持"展开不画"。
+                                    **收起时的下边框挂在外面这层、不挂在按钮上**：`h-11` 是 border-box，
+                                    边框画在按钮上就会从 44px 里扣掉 1px（内容只占 43px），整行 44px；
+                                    挂在外层则是 44 + 1 = 45px，与「角色强化」页的角色行（那边也是
+                                    外层 border-b + 内层 h-11）**逐像素一致**。实测两页同高 800px 时，
+                                    那边 708÷45 = 15.7 行、这边 708÷44 = 16.1 行，差的就是这 1px。
 
-                                    这一行照「角色强化」页的写法：名字贴左（用角色属性色）、行高 h-11、
-                                    箭头在最右。用 button 而不是 div：键盘也能展开/收起。
+                                    展开后那条线不画（内容自己有几条线收口，角色行再来一条是多余的）；
+                                    最后一个角色也不画（列表末尾不需要收尾线）。
                                 */}
                                 <button
                                     type="button"
                                     aria-expanded={characterOpen}
                                     onClick={() => toggleCharacter(character.id)}
-                                    className={`${characterOpen ? "skillboard-row " : isLastCharacter ? "" : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
+                                    className={`${characterOpen ? "skillboard-row " : ""}flex h-11 w-full items-center gap-2 px-0 text-left`}
                                 >
                                     <span
                                         className="truncate text-sm font-medium"

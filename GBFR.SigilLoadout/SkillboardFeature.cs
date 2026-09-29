@@ -135,10 +135,17 @@ internal sealed class SkillboardFeature {
 
         // 再把活表里那几行原地改掉：描述是实时读表的，这一步让界面当场跟上；战斗那份拷贝等游戏重新解析。
         //
-        // 拒写的 key 与返回码**在这里记下来**：原生那边是按"拒绝码"去重的（同一种只报一次），
-        // 所以同一码的后续拒写不会再有日志 —— 只看摘要就分不清是哪一行没写进去。
-        int landed = 0, refused = 0;
-        List<string> refusedKeys = [];
+        // 开机后的**第一次**写入常会吃一发拒写（-2）：专精表的指针要拿"能力强化表指针"当锚点才认得出
+        // （见原生 ResolveSkillboardPointer），而这一步可能还没就绪。原生的写入里头已经就地重试过一次，
+        // 但有时仍然不够 —— 实测第一行就那样被拒，后面的行因为指针已经解出来而正常。
+        //
+        // 所以这里**对被拒的行再重试一遍**（整批写完之后）：那时指针基本一定已经解出来了。代价是每行
+        // 多一次原生调用（微秒级），换来的是"第一次就全部落地"，不再白等下一次 5 秒 tick。
+        //
+        // 计数按**行**算、不按调用次数算：一行重试后仍失败才是 1 条 refused，否则摘要会失真。
+        // 拒写的 key 与返回码一并记下来：原生按"拒绝码"去重（同一种只报一次），只看摘要分不清是哪一行。
+        int landed = 0;
+        List<(string Key, uint Hash, float[] Values)> retry = [];
         foreach (SkillboardEdit edit in config.Edits) {
             if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
                 continue;
@@ -146,14 +153,21 @@ internal sealed class SkillboardFeature {
             if (values is null)
                 continue;
 
-            int result = NativeCore.SetSkillboardValues(keyHash, values);
+            if (NativeCore.SetSkillboardValues(keyHash, values) >= 0)
+                landed++;
+            else
+                retry.Add((edit.Key, keyHash, values));
+        }
+
+        List<string> refusedKeys = [];
+        foreach ((string key, uint hash, float[] values) in retry) {
+            int result = NativeCore.SetSkillboardValues(hash, values);
             if (result >= 0)
                 landed++;
-            else {
-                refused++;
-                refusedKeys.Add($"{edit.Key}={result}");
-            }
+            else
+                refusedKeys.Add($"{key}={result}");
         }
+        int refused = refusedKeys.Count;
 
         if (refused == 0)
             _hasLandedOnce = true;
