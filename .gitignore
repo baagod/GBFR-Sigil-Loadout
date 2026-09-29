@@ -17,3 +17,6 @@ GBFR.SigilLoadout.Native/src/exclusive_table.inc
 
 # OpenWiki 的运行检查点：跑到一半才有，成功收尾时由它自己删掉，用来续跑中断的那一次
 openwiki/.run.json
+
+# deploy 留档的 mod 日志（排查用，不入库）
+/logs/

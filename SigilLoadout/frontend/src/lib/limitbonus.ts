@@ -81,7 +81,7 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
     record?.values[0] ?? param.default ?? 0
 
 /**
- * 描述格里的那一整段文字：游戏写的效果模板本身，其中 {0} 换成**写死的框号** {1}。
+ * 描述格里的那一整段文字：游戏写的效果模板本身，其中 {0} 换成**写死的框号**。
  *
  * 模板来自当前语言的文案表（见 LimitBonusText.effects），按参数行的 Key 取；表里没有这个 Key 就是游戏
  * 自己没写这行文案，那时得到空串，由组件画一个占位符。
@@ -89,10 +89,17 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
  * 这与因子编辑页说明里的 {N} 同性质（见 skills.ts 的 slotLabel）：{n} 引用的是第几个数值框，不是把数值
  * 替进去——数字已经在右边的框里了，说不清的正是哪个框对应效果的哪一部分。所以描述与"填了多少"无关。
  *
- * 框号写死 1：一个节点一个框（见 LimitBonusEditorPanel 的 AbilityRow），模板里的 {0} 就是那个框。
+ * 框号是**这条参数行在节点里的第几格**（slot 从 0 起）：一个节点最多挂三条参数行、各有各的文字，
+ * 每条的 {0} 指的是**它自己那一格**（游戏里它们是三行独立效果）。所以按格编号：
+ * 第 1 条 → {1}、第 2 条 → {2}、第 3 条 → {3}，与右边三个槽一一对上。
+ * （原先一律写 {1}：三条接在一行里时看起来像"三格都指第 1 格"，实测数据里每条又只用 {0}，
+ * 所以这里能一条一条编下去。）
  */
-export const effectLabel = (param: LimitBonusParam, effects: Record<string, string>): string =>
-    (effects[param.key] ?? "").replaceAll("{0}", "{1}")
+export const effectLabel = (
+    param: LimitBonusParam,
+    effects: Record<string, string>,
+    slot = 0,
+): string => (effects[param.key] ?? "").replaceAll("{0}", `{${slot + 1}}`)
 
 /*
     角色条目去重：古兰与姬塔是两个 PL 码（PL0000 / PL0100）、名字都是"主人公"，资产里各带一份逐字

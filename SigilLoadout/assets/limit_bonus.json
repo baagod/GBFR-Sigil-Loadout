@@ -103,6 +103,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "66122B87",
+                    "hash": "66122B87",
+                    "params": [
+                        {
+                            "key": "949BA815",
+                            "default": 20
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "D50D9ECC",
                     "hash": "D50D9ECC",
                     "params": [
@@ -145,6 +156,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "EB2E72DD",
+                    "hash": "EB2E72DD",
+                    "params": [
+                        {
+                            "key": "FAB18078",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "23BF0A5C",
@@ -798,6 +820,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "5C8AEBA2",
+                    "hash": "5C8AEBA2",
+                    "params": [
+                        {
+                            "key": "949BA815",
+                            "default": 20
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "D50D9ECC",
                     "hash": "D50D9ECC",
                     "params": [
@@ -840,6 +873,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "B2481D74",
+                    "hash": "B2481D74",
+                    "params": [
+                        {
+                            "key": "FAB18078",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "23BF0A5C",
@@ -1504,6 +1548,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "B87039CA",
+                    "hash": "B87039CA",
+                    "params": [
+                        {
+                            "key": "2DEE5EED",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "D50D9ECC",
                     "hash": "D50D9ECC",
                     "params": [
@@ -1546,6 +1601,21 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "299BE2B4",
+                    "hash": "299BE2B4",
+                    "params": [
+                        {
+                            "key": "E76BC6C1",
+                            "default": 10
+                        },
+                        {
+                            "key": "525216E4",
+                            "default": 1
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -2089,6 +2159,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "90ABB59C",
+                    "hash": "90ABB59C",
+                    "params": [
+                        {
+                            "key": "D466D2D3",
+                            "default": 15
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "1B8429CB",
                     "hash": "1B8429CB",
                     "params": [
@@ -2109,6 +2190,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "4B5EB7B9",
+                    "hash": "4B5EB7B9",
+                    "params": [
+                        {
+                            "key": "713933ED",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "D50D9ECC",
@@ -2729,6 +2821,21 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "E8F0E19D",
+                    "hash": "E8F0E19D",
+                    "params": [
+                        {
+                            "key": "C42DB8ED",
+                            "default": 5
+                        },
+                        {
+                            "key": "BF71D05D",
+                            "default": 0
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "A9E4C2EE",
                     "hash": "A9E4C2EE",
                     "params": [
@@ -2760,6 +2867,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "13509300",
+                    "hash": "13509300",
+                    "params": [
+                        {
+                            "key": "7CC3E4B7",
+                            "default": 100
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -3303,6 +3421,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "90074F04",
+                    "hash": "90074F04",
+                    "params": [
+                        {
+                            "key": "018A77D2",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "9933E8F4",
                     "hash": "9933E8F4",
                     "params": [
@@ -3378,6 +3507,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "E359C6A2",
+                    "hash": "E359C6A2",
+                    "params": [
+                        {
+                            "key": "FA311A2C",
+                            "default": 30
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "FF5FCFD4",
@@ -3943,6 +4083,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "83C0094C",
+                    "hash": "83C0094C",
+                    "params": [
+                        {
+                            "key": "D9BE8EC5",
+                            "default": 15
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "A9E4C2EE",
                     "hash": "A9E4C2EE",
                     "params": [
@@ -3974,6 +4125,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "75EA78CF",
+                    "hash": "75EA78CF",
+                    "params": [
+                        {
+                            "key": "4CF1CA6B",
+                            "default": 1
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -4539,6 +4701,21 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "BEDEBB5A",
+                    "hash": "BEDEBB5A",
+                    "params": [
+                        {
+                            "key": "76448253",
+                            "default": 5
+                        },
+                        {
+                            "key": "22C8B147",
+                            "default": 0
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "A3E5A39E",
                     "hash": "A3E5A39E",
                     "params": [
@@ -4592,6 +4769,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "828BD033",
+                    "hash": "828BD033",
+                    "params": [
+                        {
+                            "key": "1D62C504",
+                            "default": 10
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "FF5FCFD4",
@@ -5168,6 +5356,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "6964B542",
+                    "hash": "6964B542",
+                    "params": [
+                        {
+                            "key": "AA142697",
+                            "default": 15
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "4FEE00FA",
                     "hash": "4FEE00FA",
                     "params": [
@@ -5188,6 +5387,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "2479DC1A",
+                    "hash": "2479DC1A",
+                    "params": [
+                        {
+                            "key": "6D9039CA",
+                            "default": 10
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -5784,6 +5994,32 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "004ACA10",
+                    "hash": "004ACA10",
+                    "params": [
+                        {
+                            "key": "4D2183E4",
+                            "default": 20
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "C07F50E1",
+                    "hash": "C07F50E1",
+                    "params": [
+                        {
+                            "key": "89F8A99F",
+                            "default": 5
+                        },
+                        {
+                            "key": "62ACE5EC",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "23BF0A5C",
@@ -6404,6 +6640,36 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "305D5FE7",
+                    "hash": "305D5FE7",
+                    "params": [
+                        {
+                            "key": "A00E10FA",
+                            "default": 5
+                        },
+                        {
+                            "key": "87C39144",
+                            "default": 0
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "74B4954F",
+                    "hash": "74B4954F",
+                    "params": [
+                        {
+                            "key": "9BB8E79F",
+                            "default": 5
+                        },
+                        {
+                            "key": "79D673D4",
+                            "default": 0
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "F3F54BE0",
                     "hash": "F3F54BE0",
                     "params": [
@@ -6945,6 +7211,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "BEEA5D1F",
+                    "hash": "BEEA5D1F",
+                    "params": [
+                        {
+                            "key": "E2FB2ADC",
+                            "default": 3
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "1B8429CB",
                     "hash": "1B8429CB",
                     "params": [
@@ -6998,6 +7275,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "192F783F",
+                    "hash": "192F783F",
+                    "params": [
+                        {
+                            "key": "5559A0FE",
+                            "default": 1
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -7585,6 +7873,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "E6614A2F",
+                    "hash": "E6614A2F",
+                    "params": [
+                        {
+                            "key": "1A0F15F9",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "A9E4C2EE",
                     "hash": "A9E4C2EE",
                     "params": [
@@ -7866,6 +8165,21 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "A63DE1F4",
+                    "hash": "A63DE1F4",
+                    "params": [
+                        {
+                            "key": "45AD9601",
+                            "default": 5
+                        },
+                        {
+                            "key": "5768265F",
+                            "default": 2
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "0CA58DC2",
@@ -8214,6 +8528,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "1669DEBA",
+                    "hash": "1669DEBA",
+                    "params": [
+                        {
+                            "key": "465436B5",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "23BF0A5C",
                     "hash": "23BF0A5C",
                     "params": [
@@ -8234,6 +8559,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "7C017DC1",
+                    "hash": "7C017DC1",
+                    "params": [
+                        {
+                            "key": "BAA345F3",
+                            "default": 20
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "FF5FCFD4",
@@ -8733,6 +9069,21 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "7364CDD4",
+                    "hash": "7364CDD4",
+                    "params": [
+                        {
+                            "key": "CF5E0D39",
+                            "default": 5
+                        },
+                        {
+                            "key": "638F4407",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "39123F9E",
                     "hash": "39123F9E",
                     "params": [
@@ -8819,6 +9170,21 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "4A285490",
+                    "hash": "4A285490",
+                    "params": [
+                        {
+                            "key": "7EF42E2C",
+                            "default": 5
+                        },
+                        {
+                            "key": "14DB5CD2",
+                            "default": 10
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "23BF0A5C",
@@ -9395,6 +9761,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "BD886758",
+                    "hash": "BD886758",
+                    "params": [
+                        {
+                            "key": "CE4AE06B",
+                            "default": 10
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "A3E5A39E",
                     "hash": "A3E5A39E",
                     "params": [
@@ -9448,6 +9825,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "33949900",
+                    "hash": "33949900",
+                    "params": [
+                        {
+                            "key": "A982ADE1",
+                            "default": 20
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "FF5FCFD4",
@@ -10013,6 +10401,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "9D4D7649",
+                    "hash": "9D4D7649",
+                    "params": [
+                        {
+                            "key": "B8A83434",
+                            "default": 10
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "4FEE00FA",
                     "hash": "4FEE00FA",
                     "params": [
@@ -10044,6 +10443,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "5573C38B",
+                    "hash": "5573C38B",
+                    "params": [
+                        {
+                            "key": "E329E521",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -10143,6 +10553,17 @@
                         }
                     ],
                     "bonusType": 2
+                },
+                {
+                    "key": "7F8296C3",
+                    "hash": "7F8296C3",
+                    "params": [
+                        {
+                            "key": "A7049C6F",
+                            "default": 1
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "D5C3C52A",
@@ -10651,6 +11072,32 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "D5DE8930",
+                    "hash": "D5DE8930",
+                    "params": [
+                        {
+                            "key": "167D0633",
+                            "default": 2
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "8B596279",
+                    "hash": "8B596279",
+                    "params": [
+                        {
+                            "key": "CA41028C",
+                            "default": 2
+                        },
+                        {
+                            "key": "FC5075DF",
+                            "default": 3
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -11249,6 +11696,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "E1D23CA7",
+                    "hash": "E1D23CA7",
+                    "params": [
+                        {
+                            "key": "69516E16",
+                            "default": 2
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "23BF0A5C",
                     "hash": "23BF0A5C",
                     "params": [
@@ -11508,6 +11966,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "7F28689F",
+                    "hash": "7F28689F",
+                    "params": [
+                        {
+                            "key": "1A2155E5",
+                            "default": 2
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "0CA58DC2",
@@ -11845,6 +12314,28 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "67F2C420",
+                    "hash": "67F2C420",
+                    "params": [
+                        {
+                            "key": "D0D9AC56",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "7E110FF8",
+                    "hash": "7E110FF8",
+                    "params": [
+                        {
+                            "key": "7369A8CF",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "A9E4C2EE",
                     "hash": "A9E4C2EE",
                     "params": [
@@ -12071,6 +12562,28 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "EED9C399",
+                    "hash": "EED9C399",
+                    "params": [
+                        {
+                            "key": "4450922E",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "A9F359E6",
+                    "hash": "A9F359E6",
+                    "params": [
+                        {
+                            "key": "26C81783",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "9EF08A91",
@@ -12461,6 +12974,28 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "ED5C3CFE",
+                    "hash": "ED5C3CFE",
+                    "params": [
+                        {
+                            "key": "B09E08F1",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "76ED1E4B",
+                    "hash": "76ED1E4B",
+                    "params": [
+                        {
+                            "key": "E77A7791",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "F3F54BE0",
@@ -13103,6 +13638,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "E900F5A6",
+                    "hash": "E900F5A6",
+                    "params": [
+                        {
+                            "key": "C0D8DA9B",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "97892849",
                     "hash": "97892849",
                     "params": [
@@ -13156,6 +13702,17 @@
                         }
                     ],
                     "bonusType": 2
+                },
+                {
+                    "key": "69C5EECE",
+                    "hash": "69C5EECE",
+                    "params": [
+                        {
+                            "key": "CCC01064",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "2340009B",
@@ -13699,6 +14256,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "442299AE",
+                    "hash": "442299AE",
+                    "params": [
+                        {
+                            "key": "C3A88B71",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "FF5FCFD4",
                     "hash": "FF5FCFD4",
                     "params": [
@@ -13752,6 +14320,25 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "2061E77D",
+                    "hash": "2061E77D",
+                    "params": [
+                        {
+                            "key": "3AE7525A",
+                            "default": 10
+                        },
+                        {
+                            "key": "003E8436",
+                            "default": 10
+                        },
+                        {
+                            "key": "E9004CC9",
+                            "default": 10
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "CBD30A2D",
@@ -14317,6 +14904,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "3E197BA4",
+                    "hash": "3E197BA4",
+                    "params": [
+                        {
+                            "key": "9A76A2E6",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "D0F552F0",
                     "hash": "D0F552F0",
                     "params": [
@@ -14370,6 +14968,17 @@
                         }
                     ],
                     "bonusType": 2
+                },
+                {
+                    "key": "8D289C6E",
+                    "hash": "8D289C6E",
+                    "params": [
+                        {
+                            "key": "5CBD0042",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "8C2F27D2",
@@ -14979,6 +15588,17 @@
                     "bonusType": 2
                 },
                 {
+                    "key": "F4BC2CA0",
+                    "hash": "F4BC2CA0",
+                    "params": [
+                        {
+                            "key": "77914DB6",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "5D3339FB",
                     "hash": "5D3339FB",
                     "params": [
@@ -15216,6 +15836,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "9898ABBE",
+                    "hash": "9898ABBE",
+                    "params": [
+                        {
+                            "key": "238C704A",
+                            "default": 80
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "3328F5C5",
@@ -15608,6 +16239,17 @@
                     "bonusType": 2
                 },
                 {
+                    "key": "E6576864",
+                    "hash": "E6576864",
+                    "params": [
+                        {
+                            "key": "9F52A38D",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "53EF7401",
                     "hash": "53EF7401",
                     "params": [
@@ -15823,6 +16465,17 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "0F1D8C79",
+                    "hash": "0F1D8C79",
+                    "params": [
+                        {
+                            "key": "8166C97F",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "07A23E95",
@@ -16136,6 +16789,36 @@
                         }
                     ],
                     "bonusType": 0
+                },
+                {
+                    "key": "6699595C",
+                    "hash": "6699595C",
+                    "params": [
+                        {
+                            "key": "A58400C0",
+                            "default": 20
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
+                    "key": "54100C4B",
+                    "hash": "54100C4B",
+                    "params": [
+                        {
+                            "key": "6E2C409B",
+                            "default": 5
+                        },
+                        {
+                            "key": "E541156C",
+                            "default": 5
+                        },
+                        {
+                            "key": "2957AC4C",
+                            "default": 0
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "55EF2B70",
@@ -16734,6 +17417,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "2BD86189",
+                    "hash": "2BD86189",
+                    "params": [
+                        {
+                            "key": "18422F74",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "FF5FCFD4",
                     "hash": "FF5FCFD4",
                     "params": [
@@ -16776,6 +17470,17 @@
                         }
                     ],
                     "bonusType": 2
+                },
+                {
+                    "key": "33AA56AE",
+                    "hash": "33AA56AE",
+                    "params": [
+                        {
+                            "key": "D4F63534",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "BE149AE8",
@@ -17341,6 +18046,17 @@
                     "bonusType": 0
                 },
                 {
+                    "key": "7462AD32",
+                    "hash": "7462AD32",
+                    "params": [
+                        {
+                            "key": "928AFED5",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
+                },
+                {
                     "key": "FF5FCFD4",
                     "hash": "FF5FCFD4",
                     "params": [
@@ -17394,6 +18110,17 @@
                         }
                     ],
                     "bonusType": 2
+                },
+                {
+                    "key": "7E950E5B",
+                    "hash": "7E950E5B",
+                    "params": [
+                        {
+                            "key": "348BD86E",
+                            "default": 5
+                        }
+                    ],
+                    "bonusType": 1
                 },
                 {
                     "key": "22A712AF",

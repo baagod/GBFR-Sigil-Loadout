@@ -17,7 +17,7 @@
     effectLabel），右边是这一栏的数值框（一个参数行一个框），
     描述里的 {1} 就是从左数第一个框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
-import { memo, useEffect, useState } from "react";
+import { Fragment, memo, useEffect, useState } from "react";
 
 
 import {
@@ -39,6 +39,7 @@ import {
     type Ability,
     type LimitBonusCharacter,
     type LimitBonusEdit,
+    type LimitBonusParam,
     type LimitBonusTable,
     type LimitBonusText,
 } from "@/lib/limitbonus";
@@ -61,7 +62,15 @@ import { useLangTable } from "@/hooks/useLangTable";
     （见渲染处），能力强化只有一个参数行。
 */
 
-const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_64px] items-center gap-2";
+/*
+    数值那一列**固定 200px**：每行三个槽（见 SLOTS_PER_ROW），一个槽 64px + 槽间 4px gap。
+    槽的位置每一行都一样——挂不满三个参数的节点，空位留白，这样行与行之间框的位置仍然对齐。
+*/
+const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_160px] items-center gap-2";
+
+// 每行固定三个槽。与「专精技能」页永远给一组十个槽同一套做法：游戏一个节点最多挂 3 条参数行，
+// 空着的位置不省掉——省掉之后同一列在不同行会左右漂。
+const SLOTS_PER_ROW = 3;
 
 /*
     数值框的样式：框就是行高（h-11），读的是数字本身，所以静止与聚焦都像裸文本。
@@ -75,12 +84,17 @@ const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_64px] items-center gap-
     框内行为（半成品文本、解析规则、滚轮/方向键/Esc）全在共享的 SlotInput 里，不在这里重写。
 */
 const SLOT_BOX =
-    "h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
+    "h-11! w-12 min-w-0 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
 
 
 /**
- * 一条能力：一行——名字、描述、一个数值框。只改第一档，Lv2/Lv3 不写也不显示（见 limitbonus.ts 的 withFirstValue）。
- * 描述是各参数行的效果模板用空格接起来（框只有一个，框号一律 {1}，见 effectLabel）。
+ * 一条能力：**一行**——名字、各参数的效果模板（空格接起来）、以及**三个槽**。
+ * 只改第一档，Lv2/Lv3 不写也不显示（见 limitbonus.ts 的 withFirstValue）。
+ *
+ * 槽数固定三个，不按节点挂了几条参数行变：游戏一个节点最多挂 3 条（属性节点 1 条、`伤害上限`
+ * 那种挂 3 条、专属强化挂 2 条），按实际条数伸缩的话，同一条竖线上的框会在行与行之间左右漂。
+ * 空着的槽留白（见 SLOTS_PER_ROW），每一格只写**它自己那一条**参数行——专属强化的两条是不同
+ * 的效果（实测 [10, 1]、[5, 0]），写错一格就会把另一条覆盖掉。
  */
 function AbilityRow({
     ability,
@@ -96,55 +110,66 @@ function AbilityRow({
     effects: Record<string, string>;
     /** 按参数行 Key 索引的全部编辑。 */
     edits: Map<string, LimitBonusEdit>;
-    /** 一个框算完了：null = 清空（这一栏名下各参数行各自写回原值）。 */
-    onValue: (ability: Ability, value: number | null) => void;
+    /** 一个框算完了：null = 清空（这一格写回它自己的原值）。 */
+    onValue: (param: LimitBonusParam, value: number | null) => void;
 }) {
-    // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）；框只有一个，框号一律 {1}。
-    const label = ability.params
-        .map((param) => effectLabel(param, effects))
-        .join(" ");
+    // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）。
+    const label = ability.params.map((param, i) => effectLabel(param, effects, i)).join(" ");
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
             {/* 能力名用默认前景色：层级交给字号与缩进，不靠颜色。 */}
             {/*
-                名字这一格是定位容器：圆点用 absolute 摆在缩进槽里（-left-4.5、8px 的点 → 与名字正好 10px），
-                所以能力名与属性名左对齐；只有能力 / 专属类（bonusType ≠ 0）有点，属性节点没有。
+                名字这一格是定位容器：圆点用 absolute 摆在缩进槽里（-left-4.5、8px 的点 → 与名字
+                正好 10px），所以能力名与属性名左对齐；只有能力 / 专属类（bonusType ≠ 0）有点，
+                属性节点没有。
             */}
-                <div className="relative min-w-0">
-                    {ability.bonusType !== 0 && (
-                        <span
-                            aria-hidden
-                            className="absolute top-1/2 -left-4.5 size-2 -translate-y-1/2 rounded-full bg-[#2b7fff]"
-                        />
-                    )}
-                    {/*
-                        名字里的间隔号不再上样式：生成器已经把各语言的写法统一成 U+30FB（・），
-                        它在 Noto Sans SC 里本来就是全宽、居中的字形（之前放大 1.15 倍 + mx-1 是为了
-                        救中文原文的 U+00B7 —— 那个在微软雅黑下只有 24% 宽）。见 gen/game/display。
-                    */}
-                    <span className="truncate text-sm">{spaceCJKAndLatin(name)}</span>
-                </div>
+            <div className="relative min-w-0">
+                {/*
+                    圆点按节点类型着色（只有能力 / 专属类有点，属性节点没有）：
+                    专属强化（BonusType 1）绿 #963c00、能力强化（2）蓝 #2b7fff。
+                */}
+                {ability.bonusType !== 0 && (
+                    <span
+                        aria-hidden
+                        className={`absolute top-1/2 -left-4.5 size-2 -translate-y-1/2 rounded-full ${
+                            ability.bonusType === 1 ? "bg-[#016630]" : "bg-[#2b7fff]"
+                        }`}
+                    />
+                )}
+                {/*
+                    名字里的间隔号不再上样式：生成器已经把各语言的写法统一成 U+30FB（・），
+                    它在 Noto Sans SC 里本来就是全宽、居中的字形（之前放大 1.15 倍 + mx-1 是为了
+                    救中文原文的 U+00B7 —— 那个在微软雅黑下只有 24% 宽）。见 gen/game/display。
+                */}
+                <span className="truncate text-sm">{spaceCJKAndLatin(name)}</span>
+            </div>
             {/* 描述是模板本身（不填数值）：数字在右边的框里，说不清的正是哪一段对应哪一个。少数参数行游戏没写文案，画占位符。 */}
-            <span className="min-w-0 truncate text-sm text-[#a0a0a0]">
-                {label === "" ? "—" : label}
-            </span>
+            <span className="min-w-0 truncate text-sm text-[#a0a0a0]">{label === "" ? "—" : label}</span>
             {/* 数值靠右：这一列比"框 + 分隔"宽，靠左时每行的数字离右边缘远近不一。 */}
             <div className="flex items-center justify-end">
-                {/*
-                    一个节点一个框：节点要么挂 1 条参数行，要么挂 3 条（"全部上限"类），而那 3 条默认值永远
-                    相同——游戏就是同一个数同时加到三项上。所以填一个值 = 写给这个节点的全部参数行（见 setValue）。
-                */}
-                <span className="shrink-0 text-muted-foreground/40" aria-hidden>
-                    |
-                </span>
-                <SlotInput
-                    label={`${name} Lv1 数值`}
-                    original={valueAt(ability.params[0], edits.get(ability.params[0].key))}
-                    value={edits.get(ability.params[0].key)?.values[0] ?? null}
-                    onCommit={(value) => onValue(ability, value)}
-                    className={SLOT_BOX}
-                />
+                {Array.from({ length: SLOTS_PER_ROW }, (_, i) => {
+                    const param = ability.params[i];
+                    return (
+                        // 空槽也占同样的宽度（flex-1，与框一样），所以框的位置逐行对齐。
+                        <Fragment key={param?.key ?? `empty-${i}`}>
+                            <span className="shrink-0 text-muted-foreground/40" aria-hidden>
+                                |
+                            </span>
+                            {param ? (
+                                <SlotInput
+                                    label={`${name} Lv1 数值`}
+                                    original={valueAt(param, edits.get(param.key))}
+                                    value={edits.get(param.key)?.values[0] ?? null}
+                                    onCommit={(value) => onValue(param, value)}
+                                    className={SLOT_BOX}
+                                />
+                            ) : (
+                                <span className="w-12 shrink-0" aria-hidden />
+                            )}
+                        </Fragment>
+                    );
+                })}
             </div>
         </div>
     );
@@ -181,7 +206,7 @@ function CharacterGroup({
     abilityNames: Record<string, string>;
     /** 按参数行 Key 索引的全部编辑：一路传给它的能力行。 */
     edits: Map<string, LimitBonusEdit>;
-    onValue: (ability: Ability, value: number | null) => void;
+    onValue: (param: LimitBonusParam, value: number | null) => void;
 }) {
     const [open, setOpen] = useState(false);
 
@@ -327,11 +352,11 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         清空 = **把这一行的 Lv1 原值写回去**（不是"删掉记录"）：游戏不会自己忘掉上一次写入的值，删了
         记录它就会停在旧值上、而界面显示的是默认值——两边对不上（实测的 bug）。
     */
-    function setValue(ability: Ability, value: number | null) {
+    function setValue(param: LimitBonusParam, value: number | null) {
         const next = new Map(edits);
-        for (const param of ability.params) {
-            next.set(param.key, withFirstValue(param, value ?? param.default));
-        }
+        // 只写**这一个**参数行：每一格对应节点的一条参数行（专属强化的两条是不同效果，实测 [10, 1]），
+        // 一格写全部会把另外几条覆盖成同一个数。
+        next.set(param.key, withFirstValue(param, value ?? param.default));
         commit(next);
     }
 

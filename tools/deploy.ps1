@@ -39,6 +39,27 @@ Stop-SigilLoadout
 
 # 4. 先删旧再解压（zip 根目录就是 GBFR.SigilLoadout\）；失败重跑即可。
 #    不设暂存目录换回滚：那会在 Mods 下多一个目录，而 Mods 是 Reloaded-II 扫描的地方。
+#
+#    删之前先把日志留档：mod 那半把日志写在它自己目录里（Mod.cs 的 GBFR.SigilLoadout.log），
+#    直接清掉就等于把上一次运行的全部证据丢了——排查"游戏卡住/被拒写"时正是要看它。
+#    留在仓库的 logs\ 下（那里的旧档自己按时间清理，日志不进版本库）。
+$logDir = Join-Path $PSScriptRoot '..\logs'
+if (Test-Path -LiteralPath $modDir) {
+    $logs = Get-ChildItem -LiteralPath $modDir -File -Filter '*.log*' -ErrorAction SilentlyContinue
+    if ($logs) {
+        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        foreach ($log in $logs) {
+            Copy-Item -LiteralPath $log.FullName -Destination (Join-Path $logDir "$stamp-$($log.Name)") -Force
+        }
+        Write-Host "Kept $($logs.Count) log file(s) in $logDir"
+        # 只留最近 20 份，免得越攒越多
+        Get-ChildItem -LiteralPath $logDir -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -Skip 20 |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Remove-Item -LiteralPath $modDir -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $zip.FullName -DestinationPath $Target -Force
 
