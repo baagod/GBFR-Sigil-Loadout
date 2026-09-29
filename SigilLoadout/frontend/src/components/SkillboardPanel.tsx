@@ -27,8 +27,13 @@ import type { Lang } from "@/lib/lang";
 import type { CharaTable } from "@/lib/chara";
 import { dedupeSkillboardCharacters } from "@/lib/limitbonus";
 
-// 一个节点（效果行）：key = 改哪一行（挂的参数行），rowKey = 看哪段字（自己那一行），两件事。
-type Row = { key: string; rowKey: string; values: number[] };
+// 一组参数：一组 10 个槽，key 是这一组所在参数行的哈希（编辑按它索引，原生也按它找行）。
+//
+// 一个效果行最多挂**三组**（生成器从 skillboard_effect 的 ActionPartsId1/2/3 取），
+// 与文案里的 {n} 一一对应：{0}..{9} 第 1 组、{10}..{19} 第 2 组、{20}..{29} 第 3 组。
+type ParamGroup = { key: string; values: number[] };
+// 一个节点（效果行）：key = 改哪一行（第 1 组参数行），rowKey = 看哪段字（自己那一行），两件事。
+type Row = { key: string; rowKey: string; values: number[]; more?: ParamGroup[] };
 // 阶里的条目比类型行多一个"行首画几个 ♦"：那来自原文的 <d> 标记，每行真不一样，所以落盘。
 type SkillRow = Row & { diamonds: number };
 // 该专精类型包含的一个阶（1 阶 / 2 阶 / 3 阶 / EX），label 就是"1 阶"这类标签。
@@ -43,6 +48,13 @@ type Text = { names: Record<string, string>; lines: Record<string, string> };
 // 类型自己的三条说明画 ♦ / ♦♦ / ♦♦♦：个数只由**位置**决定（第 i 条 → i+1 个），所以按参数算，
 // 不从数据取（原文那三行没有 <d> 标记）。
 const diamonds = (index: number) => "♦".repeat(index + 1)
+
+// 一行的全部参数组：第 1 组就是 key/values，第 2/3 组在 more 里（没有就不出现）。
+// 单独一个取值口子，是为了"文案填数"与"画数值框"两处用同一份顺序。
+const groupsOf = (row: Row): ParamGroup[] => [
+    { key: row.key, values: row.values },
+    ...(row.more ?? []),
+]
 
 // 游戏给每一阶留的等级槽数（与生成器的 Value1..Value10 对齐）。
 const SLOTS = 10
@@ -134,16 +146,18 @@ function Slot({ original, value, onInput, className }: {
     )
 }
 
-// 说明里的 {i} 换成第 i+1 个槽当前等于多少（填过用填的，没填过用游戏原值）。
-// 下标是**一位或两位**（文案里出现过 {10}、{20}）；超出十个槽的那些原样留着。
+// 说明文字 = 游戏写的效果模板本身，**不把数值填进去**：数字就在下面那几行框里，说不清的正是
+// "这个效果的哪一部分由第几个框决定"。与「角色强化」页同一条规矩（见 lib/limitbonus.ts 的 effectLabel）。
+//
+// 里面 {n} 是"第几个框"（不是数值）：
+//   游戏是 0 起（{0} = 第 1 格、{10} = 第 11 格），界面一律写成 1 起 —— 与角色强化页一样，
+//   那里把 {0} 写成 {1}。跨组也一样：一个效果最多三组、每组 10 格，所以 {10} 就是第 11 格。
+//
 // 顺带脱掉 <d> —— 游戏富文本里的内联图标标记，界面上没有对应图标，留着会显示成一串尖括号。
-function lineText(template: string, values: (number | null)[]): string {
+export function boxNumbers(template: string): string {
     return template
         .replace(/<d>/g, "")
-        .replace(/\{(\d+)\}/g, (whole, digits) => {
-            const value = values[Number(digits)]
-            return value === null || value === undefined ? whole : String(value)
-        })
+        .replace(/\{(\d+)\}/g, (_, digits) => `{${Number(digits) + 1}}`)
 }
 
 // 行首那几个 <d>（= 游戏画几个 ♦）已经由生成器数成 Row.Diamonds，这里不再解析。
@@ -229,27 +243,27 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // 记录里的值**等于游戏原值**也算"没填过"：清空一槽时按规矩要把原值写回游戏（否则游戏停在旧值
     // 上），那会留下一条"值就是原值"的记录——它不该让界面一启动就显示成编辑状态，更不该被将来某份
     // 残留的编辑文件点着。所以判据是"和原值不一样"，不是"记录在不在"。
-    function editAt(row: Row, slot: number): number | null {
-        const value = edits.get(row.key)?.[slot] ?? null
-        if (value === null || value === row.values[slot]) return null
+    function editAt(group: ParamGroup, slot: number): number | null {
+        const value = edits.get(group.key)?.[slot] ?? null
+        if (value === null || value === group.values[slot]) return null
         return value
     }
 
-    // 这一行的十个槽"现在等于多少"：填过用填的，没填过用游戏原值。悬停里的说明按它填。
-    function effective(row: Row): (number | null)[] {
-        return Array.from({ length: SLOTS }, (_, slot) => editAt(row, slot) ?? row.values[slot] ?? null)
+    // 这一组里某一槽"现在等于多少"：填过用填的，没填过用游戏原值。
+    function slotOf(group: ParamGroup, slot: number): number | null {
+        return editAt(group, slot) ?? group.values[slot] ?? null
     }
 
-    function setSlot(row: Row, slot: number, raw: string) {
+    function setSlot(group: ParamGroup, slot: number, raw: string) {
         // 空串 = 清空这一槽：写回游戏原值（游戏不会自己忘掉上一次写入的值，与角色强化页同一条规矩）。
-        const value = raw.trim() === "" ? row.values[slot] : Number(raw)
+        const value = raw.trim() === "" ? group.values[slot] : Number(raw)
         if (value === null || Number.isNaN(value)) return
         const next = new Map(edits)
-        // 交出去的永远是**完整的十个值**（没动过的格子交游戏原值）：原生按连续前缀写，中间挖空写不了。
-        // 界面判"这一格填过没有"靠的是"值 ≠ 原值"（见 editAt），所以整行交满不影响显示。
-        const values = [...effective(row)]
+        // 交出去的永远是**这一组完整的十个值**（没动过的格子交游戏原值）：原生按连续前缀写，
+        // 中间挖空写不了。界面判"这一格填过没有"靠的是"值 ≠ 原值"（见 editAt），整组交满不影响显示。
+        const values = Array.from({ length: SLOTS }, (_, i) => slotOf(group, i))
         values[slot] = value
-        next.set(row.key, values)
+        next.set(group.key, values)
         setEdits(next)
         SaveSkillboardEdits([...next].map(([key, v]) => ({ key, values: v }))).catch(() => {})
     }
@@ -258,28 +272,38 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
 
     // 十个数值框：展开后才铺出来。框自己是 h-8（输入框有 padding，min-height 撑起来的是另一种高度），
     // 所以传字面量而不是 ROW_BOX；行容器仍吃 ROW_BOX，上下留白与说明行一致。
-    const valuesOf = (row: Row) => (
-        <div className={`flex items-center ${ROW_BOX}`}>
-            {Array.from({ length: SLOTS }, (_, slot) => {
-                const edited = editAt(row, slot)
-                return (
-                    <Fragment key={slot}>
-                        {slot > 0 && (
-                            <span className="shrink-0 text-muted-foreground/40" aria-hidden>
-                                |
-                            </span>
-                        )}
-                        <Slot
-                            className={SLOT_HEIGHT}
-                            original={row.values[slot] ?? 0}
-                            value={edited}
-                            onInput={raw => setSlot(row, slot, raw)}
-                        />
-                    </Fragment>
-                )
-            })}
-        </div>
-    )
+    //
+    // 一组参数一行（最多三组，见 groupsOf）。不标组号：第 1 组是主参数，2/3 组只是同一效果的
+    // 另外两组槽，按顺序排下去即可，写上"参数组 N"是噪音。
+    //
+    // 左端对齐说明文字那 120px 缩进由**调用点**给（AccordionContent 里那层 paddingLeft），不在这里补
+    // —— 两头都加会把框推右 120px。
+    const valuesOf = (row: Row) => {
+        const groups = groupsOf(row)
+        return (
+            <>
+                {groups.map(group => (
+                    <div key={group.key} className={`flex items-center ${ROW_BOX}`}>
+                        {Array.from({ length: SLOTS }, (_, slot) => (
+                            <Fragment key={slot}>
+                                {slot > 0 && (
+                                    <span className="shrink-0 text-muted-foreground/40" aria-hidden>
+                                        |
+                                    </span>
+                                )}
+                                <Slot
+                                    className={SLOT_HEIGHT}
+                                    original={group.values[slot] ?? 0}
+                                    value={editAt(group, slot)}
+                                    onInput={raw => setSlot(group, slot, raw)}
+                                />
+                            </Fragment>
+                        ))}
+                    </div>
+                ))}
+            </>
+        )
+    }
 
     // 说明行：左边「阶标签 + 几个 ♦」，右边是游戏原文（全显、按原文换行）。
     // items-center：♦ 是行内最高的那件东西，说明换行成两三行时它得**垂直居中**，不能贴顶。
@@ -291,8 +315,12 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // 判据直接用 editAt（它是"值 ≠ 原值才算改过"的那一条），所以"清空后又写回原值"那种残留记录
     // 不会把行染白 —— 与输入框是否显示数字是同一个判据，不会出现"框空的但字是白的"。
     const descriptionRow = (row: Row, diamondText: string, tier: string, typeSkill = false) => {
-        const description = spaceBrackets(lineText(text.lines[row.rowKey], effective(row)))
-        const edited = Array.from({ length: SLOTS }, (_, slot) => editAt(row, slot)).some(value => value !== null)
+        const groups = groupsOf(row)
+        // 文案是模板本身（{n} = 第几个框），与填了多少无关。
+        const description = spaceBrackets(boxNumbers(text.lines[row.rowKey]))
+        const edited = groups.some(group =>
+            Array.from({ length: SLOTS }, (_, slot) => editAt(group, slot)).some(value => value !== null),
+        )
         return (
             <div className={`flex items-center gap-3 ${ROW_BOX}`}>
                 <span className="w-8 shrink-0 text-xs text-muted-foreground">{tier}</span>
@@ -337,7 +365,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
             </AccordionTrigger>
             <AccordionContent className="pb-0" keepMounted>
                 {/* 缩进 = 上面那三格（阶标签 w-8 + 间距 + ♦ w-16 + 间距）= 32+12+64+12 = 120px，
-                    十个框与说明文字左端对齐。Tailwind 的间距刻度到 24 就没有 30，所以用内联值。 */}
+                    框与说明文字左端对齐。Tailwind 的间距刻度到 24 就没有 30，所以用内联值。 */}
                 <div style={{ paddingLeft: 120 }}>{valuesOf(row)}</div>
             </AccordionContent>
         </AccordionItem>

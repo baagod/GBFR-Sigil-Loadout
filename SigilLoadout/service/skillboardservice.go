@@ -24,8 +24,19 @@ const skillboardEditListName = "skillboard_edits.json"
 //
 // 抽出来给 SkillboardSkillRow 嵌入——这样"类型行没有 ♦ 个数"这件事在类型上就成立。
 type skillboardRowBase struct {
+	Key    string                 `json:"key"`
+	RowKey string                 `json:"rowKey"`
+	Values []float64              `json:"values"` // 第 1 组参数的 10 个槽
+	More   []SkillboardParamGroup `json:"more,omitempty"`
+}
+
+// SkillboardParamGroup 是**第 2 / 第 3 组参数**：一个效果行最多挂三组参数行
+// （skillboard_effect 的 ActionPartsId1/2/3），每组 10 个槽。
+//
+// 文案里的 {n} 是跨组编号的：{0}..{9} 第 1 组、{10}..{19} 第 2 组、{20}..{29} 第 3 组。
+// 只带第 1 组时界面填不了 n≥10 的占位符，会把 "{10}" 原样显示出来（见生成器 ParamGroup 的说明）。
+type SkillboardParamGroup struct {
 	Key    string    `json:"key"`
-	RowKey string    `json:"rowKey"`
 	Values []float64 `json:"values"`
 }
 

@@ -1,5 +1,30 @@
 import { describe, expect, it } from "vitest"
-import { spaceBrackets } from "@/components/SkillboardPanel"
+import { boxNumbers, spaceBrackets } from "@/components/SkillboardPanel"
+
+/*
+    说明文字是**游戏模板本身**，不填数值 —— 与「角色强化」页同一条规矩（lib/limitbonus.ts 的 effectLabel）。
+    里面的 {n} 说的是"第几个框"，且界面一律写成 1 起（游戏是 0 起）。
+*/
+describe("说明里的框号", () => {
+    it("下标整体 +1：{0} 是第 1 个框", () => {
+        expect(boxNumbers("效果量：攻击力+{0}%")).toBe("效果量：攻击力+{1}%")
+    })
+
+    it("跨组的两位数也一样：{10} 是第 11 个框、{20} 是第 21 个", () => {
+        expect(boxNumbers("攻击力+{10}％ / 伤害上限+{20}% / 蓄力时间+{0}%")).toBe(
+            "攻击力+{11}％ / 伤害上限+{21}% / 蓄力时间+{1}%",
+        )
+    })
+
+    it("脱掉 <d>，一个不留", () => {
+        expect(boxNumbers("[红莲之刃<d>]效果持续时间+{0}%")).toBe("[红莲之刃]效果持续时间+{1}%")
+    })
+
+    it("没有占位符的文字原样返回", () => {
+        expect(boxNumbers("最大HP+15000")).toBe("最大HP+15000")
+        expect(boxNumbers("")).toBe("")
+    })
+})
 
 // 文案里的方括号按「角色强化」的 CJK↔拉丁 规则补空格（见 lib/limitbonus.ts 的 spaceCJKAndLatin），
 // 但空格是写进文本的，所以行首 / 行尾的方括号必须保持零空白。
