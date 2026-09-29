@@ -336,8 +336,13 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
         <div className="flex h-full min-h-0 flex-col page-padding">
             <div className="min-h-0 flex-1 overflow-y-auto pr-4 scrollbar-gutter-stable">
                 <div className="min-w-[720px]">
-                    {skeleton.characters.map(character => {
+                    {skeleton.characters.map((character, charIndex) => {
                         const characterOpen = expandedCharacters.has(character.id)
+                        // 最后一个角色行不画下划线：列表末尾不需要一条收尾线（照「角色强化」页
+                        // 能力行的 last:border-b-0 那条规矩）。用下标显式判断而不是 CSS 的
+                        // `last:` 选择器 —— 角色行外面还有一层包装（sticky 的包含块），
+                        // 那一层里按钮并不是最后一个子元素，`last:` 会落错。
+                        const isLastCharacter = charIndex === skeleton.characters.length - 1
                         /*
                             展开的内容**不作为角色的 AccordionContent 渲染**，而是作为滚动容器的
                             直接子元素。两级吸顶（角色行 top-0、专精类型名 top-11）都要求那个 sticky
@@ -431,7 +436,17 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                             : null
 
                         return (
-                            <Fragment key={character.id}>
+                            /*
+                                每个角色套一层**有界**的包装：sticky 元素被它的**包含块**限制住，
+                                角色行的包含块就是这层 —— 于是滚完这个角色的内容、下一个角色行压上来时，
+                                它会被顶走。不套的话包含块是整张列表，角色行会一直粘在最上面不走了
+                                （实测：滚过好几个角色，顶部还是那个早就滚完的角色名）。
+
+                                类型名那一级不受影响：它的包含块仍是它自己那层类型包装（更近的那一层），
+                                所以照样"滚过本类型就被下一个类型顶掉"。两层各自的包装都是有界的，
+                                这正是"顶掉上一块"能成立的原因。
+                            */
+                            <div key={character.id}>
                                 {/*
                                     `.skillboard-row`（sticky top-0 / z-30 / 底色，见 style.css）**只在
                                     展开时挂**：收起态 28 行都只有 44px、行间没有任何内容，吸顶会把本该
@@ -443,11 +458,6 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     mb-6、内容底边比角色行底边还往下 175px）。现在虽然外边距去掉了、
                                     不会再叠，但展开后那条线本来就多余，所以维持"展开不画"。
 
-                                    没有套 Accordion：展开的内容早就搬到下面平铺了，这层 Accordion
-                                    没东西可管；更要紧的是套上它会让那个 45px 高的根 div 成为 sticky
-                                    元素的**包含块**，`sticky` 只能在 45px 里粘（实测 rowOffsetFromBoxTop
-                                    一路 -900，等于没吸住）。去掉之后包含块是整张列表，吸顶才成立。
-
                                     这一行照「角色强化」页的写法：名字贴左（用角色属性色）、行高 h-11、
                                     箭头在最右。用 button 而不是 div：键盘也能展开/收起。
                                 */}
@@ -455,7 +465,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     type="button"
                                     aria-expanded={characterOpen}
                                     onClick={() => toggleCharacter(character.id)}
-                                    className={`${characterOpen ? "skillboard-row " : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
+                                    className={`${characterOpen ? "skillboard-row " : isLastCharacter ? "" : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
                                 >
                                     <span
                                         className="truncate text-sm font-medium"
@@ -471,7 +481,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     </span>
                                 </button>
                                 {typeSections}
-                            </Fragment>
+                            </div>
                         )
                     })}
                 </div>
