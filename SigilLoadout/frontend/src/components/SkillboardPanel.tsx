@@ -509,8 +509,14 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     onClick={() => toggleCharacter(character.id)}
                                     className={`${characterOpen ? "skillboard-row " : isLastCharacter ? "" : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
                                 >
+                                    {/*
+                                        select-text 不能省：这一行的按钮是 `<button>`，而浏览器默认
+                                        不让选按钮里的文字（实测：不加时真实鼠标拖拽拿到的选区是空串）
+                                        —— 于是角色名复制不出来。同一页的说明文字与 ♦ 早就加了它，
+                                        这里原先漏了。
+                                    */}
                                     <span
-                                        className="truncate text-sm font-medium"
+                                        className="select-text truncate text-sm font-medium"
                                         style={{ color: charaTable[character.id]?.color }}
                                     >
                                         {charaNames[character.id] ?? character.id}
