@@ -134,7 +134,11 @@ internal sealed class SkillboardFeature {
         }
 
         // 再把活表里那几行原地改掉：描述是实时读表的，这一步让界面当场跟上；战斗那份拷贝等游戏重新解析。
+        //
+        // 拒写的 key 与返回码**在这里记下来**：原生那边是按"拒绝码"去重的（同一种只报一次），
+        // 所以同一码的后续拒写不会再有日志 —— 只看摘要就分不清是哪一行没写进去。
         int landed = 0, refused = 0;
+        List<string> refusedKeys = [];
         foreach (SkillboardEdit edit in config.Edits) {
             if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
                 continue;
@@ -145,15 +149,18 @@ internal sealed class SkillboardFeature {
             int result = NativeCore.SetSkillboardValues(keyHash, values);
             if (result >= 0)
                 landed++;
-            else
-                refused++; // 原生已经落过一行原因（同一种拒写只报一次）
+            else {
+                refused++;
+                refusedKeys.Add($"{edit.Key}={result}");
+            }
         }
 
         if (refused == 0)
             _hasLandedOnce = true;
         _stamp.MarkApplied(_lastAttemptVersion);
         if (!quiet || refused > 0)
-            _log($"skillboard edit: table re-registered ({applied} rows patched), {landed} rows written in place, {refused} refused");
+            _log($"skillboard edit: table re-registered ({applied} rows patched), {landed} rows written in place, {refused} refused"
+                + (refused > 0 ? $" [{string.Join(", ", refusedKeys)}]" : string.Empty));
     }
 
     /// <summary>读游戏归档里的原表，按编辑列表打补丁。读不到/布局不对就返回 null 并记一行原因。</summary>

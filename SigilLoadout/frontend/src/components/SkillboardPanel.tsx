@@ -88,7 +88,10 @@ const SLOT_HEIGHT = "h-5! self-center border-0 py-0 text-xs md:text-xs"
 const CJK_RANGES = "\\u2e80-\\u9fff\\u3000-\\u303f\\uff00-\\uffef\\uac00-\\ud7af"
 const CJK = new RegExp(`[${CJK_RANGES}]`)
 const CJK_OR_GROUP = new RegExp(`[${CJK_RANGES}]|\\[[^\\]]*\\]`, "g")
-const GROUP_THEN_CJK = new RegExp(`(\\])([${CJK_RANGES}])`, "g")
+// 例外：`]` 后面紧跟**中文左括号 `（`**（U+FF08）时不补。那个括号是紧贴在名字后面的补充说明
+// （"[连击收招强化]（最大Lv5）"），中间空一格反而不像一句话；`（` 本身在我们的 CJK 区间里，
+// 不排除的话就会被当普通汉字补上空格。
+const GROUP_THEN_CJK = new RegExp(`(\\])(?!（)([${CJK_RANGES}])`, "g")
 
 export const spaceBrackets = (text: string): string =>
     text
@@ -280,13 +283,16 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
 
     // 说明行：左边「阶标签 + 几个 ♦」，右边是游戏原文（全显、按原文换行）。
     // items-center：♦ 是行内最高的那件东西，说明换行成两三行时它得**垂直居中**，不能贴顶。
-    // 文字一律默认前景色；**专精特化技能**那三条（类型自己那几条）靠它的 ♦ 换成紫色来区分，
-    // 不用字色——它们的文字和阶里的条目一样是正文。
     // ♦ 文本按参数传进去：两条调用路径的取值方式不同——阶条目读数据里的 diamonds，
     // 类型行按下标算（见 diamonds()）。
     // tier 只在阶里的条目上给（"1 阶"/…/"EX"），专精类型那三条没有阶，那一格留空占位。
+    //
+    // **字色是"改过没有"的指示**：这一行有任何一个槽与游戏原值不同就是**白字**，否则灰字。
+    // 判据直接用 editAt（它是"值 ≠ 原值才算改过"的那一条），所以"清空后又写回原值"那种残留记录
+    // 不会把行染白 —— 与输入框是否显示数字是同一个判据，不会出现"框空的但字是白的"。
     const descriptionRow = (row: Row, diamondText: string, tier: string, typeSkill = false) => {
         const description = spaceBrackets(lineText(text.lines[row.rowKey], effective(row)))
+        const edited = Array.from({ length: SLOTS }, (_, slot) => editAt(row, slot)).some(value => value !== null)
         return (
             <div className={`flex items-center gap-3 ${ROW_BOX}`}>
                 <span className="w-8 shrink-0 text-xs text-muted-foreground">{tier}</span>
@@ -303,8 +309,17 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                 </span>
                 {/* select-text：说明是可以选中复制的文字（默认继承不到用户选择就别扭）。
                     字号 14（text-sm）、行高 24px（leading-6）：游戏原文一行里有说明、效果量、条件好几段，
-                    行高松一点才不"密密麻麻"；行高是固定值，不跟着字号变。 */}
-                <span className="min-w-0 flex-1 select-text whitespace-pre-line text-sm leading-6 text-foreground">
+                    行高松一点才不"密密麻麻"；行高是固定值，不跟着字号变。
+
+                    灰字用 **text-muted-foreground**（主题 token）：深色下是 oklch(0.708 0 0)，
+                    画到屏幕上是 #a1a1a1 —— 与「角色强化」页那几个写死的 #a0a0a0 差 1，肉眼无差；
+                    用 token 的好处是跟着主题走，不写死一个色值。 */}
+                <span
+                    className={cn(
+                        "min-w-0 flex-1 select-text whitespace-pre-line text-sm leading-6",
+                        edited ? "text-foreground" : "text-muted-foreground",
+                    )}
+                >
                     {renderMarks(description)}
                 </span>
             </div>

@@ -18,6 +18,12 @@ describe("专精说明的方括号留白", () => {
         expect(spaceBrackets("但未获得[征战之剑]期间")).toBe("但未获得 [征战之剑] 期间")
     })
 
+    // 例外的唯一一处：`]` 后面紧跟中文左括号「（」时不补 —— 那个括号是紧贴在名字后面的补充说明。
+    it("] 后接中文左括号：右侧不补空格", () => {
+        expect(spaceBrackets("[连击收招强化]（最大Lv5）")).toBe("[连击收招强化]（最大Lv5）")
+        expect(spaceBrackets("赋予效果[红莲之刃]（最大Lv3）期间")).toBe("赋予效果 [红莲之刃]（最大Lv3）期间")
+    })
+
     it("没有 CJK 邻居时不补空格", () => {
         expect(spaceBrackets("[HP]")).toBe("[HP]")
         expect(spaceBrackets("[A][B]")).toBe("[A][B]")
