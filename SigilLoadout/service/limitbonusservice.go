@@ -136,6 +136,10 @@ func (s *LimitBonusService) SaveLimitBonusEdits(edits []LimitBonusEdit) error {
 func writeLimitBonusEdits(edits []LimitBonusEdit) error {
 	raw, err := jsonv2.Marshal(limitBonusEditList{Edits: edits}, jsontext.WithIndent("  "))
 	if err != nil {
+		return err
+	}
+	raw = compactNumberArrays(raw)
+	if err != nil {
 		return fmt.Errorf("serialising the limit bonus edit list: %w", err)
 	}
 

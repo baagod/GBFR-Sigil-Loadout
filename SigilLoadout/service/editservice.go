@@ -122,6 +122,10 @@ func (s *EditService) SaveEdits(edits []SigilSkill) error {
 func writeEdits(edits []SigilSkill) error {
 	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))
 	if err != nil {
+		return err
+	}
+	cfgBytes = compactNumberArrays(cfgBytes)
+	if err != nil {
 		return fmt.Errorf("serialising the edit list: %w", err)
 	}
 

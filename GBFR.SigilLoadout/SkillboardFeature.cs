@@ -4,7 +4,7 @@ using Reloaded.Mod.Interfaces;
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// 按用户编辑的 skillboard_edits.json 改写 skillboard_effect_action_parts.tbl 的行——「专精技能」页那
+/// 按用户编辑的 skillboard.json（旧名 skillboard_edits.json）改写 skillboard_effect_action_parts.tbl 的行——「专精技能」页那
 /// 三阶效果的实际数值。
 ///
 /// 走的是**因子编辑那条路**（见 <see cref="SigilEditorFeature"/>），不是限额表那条：先按用户的编辑造出
@@ -17,7 +17,13 @@ namespace GBFR.SigilLoadout;
 /// 也不需要把表复制到别处：读出来、只改要改的那几行、交回去。
 /// </summary>
 internal sealed class SkillboardFeature {
-    private const string ConfigFileName = "skillboard_edits.json";
+    // 编辑列表的文件名。与可视工具（skillboardservice.go 的 skillboardEditListName）必须逐字相同：
+    // 两边各算一次路径，谁也不能替对方决定。命名跟「角色强化」那条链一致（那边是 limit_bonus.json）。
+    private const string ConfigFileName = "skillboard.json";
+
+    // 改名前的名字。**只用于兼容读取**：mod 可能先于可视工具运行，那时旧文件还在原名下。
+    // 真正的改名由可视工具做（它是唯一写这份配置的一方），本类不写、更不删任何配置。
+    private const string LegacyConfigFileName = "skillboard_edits.json";
 
     // 游戏归档里的路径（与 skill_status.tbl 同一个目录树）。
     private const string TablePath = "system/table/skillboard_effect_action_parts.tbl";
@@ -31,6 +37,7 @@ internal sealed class SkillboardFeature {
     private const int MaxValues = 10;
 
     private static readonly string ConfigFile = UserConfig.FilePath(ConfigFileName);
+    private static readonly string LegacyConfigFile = UserConfig.FilePath(LegacyConfigFileName);
 
     // 表还没进内存 / 还没拿到 IDataManager 时的重试间隔，与落地后的看护间隔（同限额表那条链）。
     private const long RetryIntervalMs = 5000;
@@ -104,7 +111,10 @@ internal sealed class SkillboardFeature {
 
         SkillboardConfig config;
         try {
-            config = SkillboardConfig.Load(ConfigFile);
+            // 新名字优先；只有它还不存在时才读旧名字（可视工具还没跑过一次改名）。
+            // 两个都不存在就是"一次都没编辑过"，与原来同义。
+            string path = File.Exists(ConfigFile) ? ConfigFile : LegacyConfigFile;
+            config = SkillboardConfig.Load(path);
         }
         catch (FileNotFoundException) {
             return; // 没有文件 = 没有编辑（同其余几条链）。

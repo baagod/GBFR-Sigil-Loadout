@@ -24,7 +24,7 @@ public class SkillboardEdit {
 }
 
 /// <summary>
-/// 本 mod 的 skillboard_edits.json（可视工具写、这里读）。形状与 limit_bonus.json 同一套规矩：
+/// 本 mod 的 skillboard.json（可视工具写、这里读；旧名 skillboard_edits.json 只做兼容读取）。形状与 limit_bonus.json 同一套规矩：
 /// 只有**外层**形状算错误，认不出的成员读成默认值、由逐条扫描报"跳过"。
 /// </summary>
 public class SkillboardConfig {

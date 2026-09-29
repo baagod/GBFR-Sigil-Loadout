@@ -37,11 +37,7 @@ func TestSaveLimitBonusEditsWritesTheAgreedShape(t *testing.T) {
     {
       "enabled": true,
       "key": "0D0BCF24",
-      "values": [
-        500,
-        600,
-        321
-      ]
+      "values": [500, 600, 321]
     }
   ]
 }`

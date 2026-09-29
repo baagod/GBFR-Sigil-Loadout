@@ -355,7 +355,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                         edited ? "text-foreground" : "text-muted-foreground",
                     )}
                 >
-                    {renderMarks(description)}
+                    {renderMarks(shown)}
                 </span>
             </div>
         )
