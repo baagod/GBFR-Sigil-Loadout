@@ -20,12 +20,12 @@ import (
 const skillboardEditListName = "skillboard_edits.json"
 
 // skillboardRowBase 是一个节点的两类行都有的部分：Key 是**改哪一行**（它挂的参数行哈希），
-// RowKey 是**看哪段字**（它自己那一行的哈希，界面拿它查说明）。
+// Hash 是**看哪段字**（它自己那一行的哈希）—— 文案按**类型哈希**索引，行文案在那份数组里按下标取。
 //
 // 抽出来给 SkillboardSkillRow 嵌入——这样"类型行没有 ♦ 个数"这件事在类型上就成立。
 type skillboardRowBase struct {
 	Key    string                 `json:"key"`
-	RowKey string                 `json:"rowKey"`
+	Hash   string                 `json:"hash"`
 	Values []float64              `json:"values"` // 第 1 组参数的 10 个槽
 	More   []SkillboardParamGroup `json:"more,omitempty"`
 }
@@ -45,7 +45,7 @@ type SkillboardParamGroup struct {
 type SkillboardRow = skillboardRowBase
 
 // SkillboardSkillRow 是**阶里的一个条目**，比类型行多一个 Diamonds（来自原文行首的 <d> 标记）。
-// 嵌入 base：JSON 仍是平铺的 {key,rowKey,values,diamonds}（Go 按字段提升处理，不嵌套）。
+// 嵌入 base：JSON 仍是平铺的 {key,hash,values,diamonds}（Go 按字段提升处理，不嵌套）。
 type SkillboardSkillRow struct {
 	skillboardRowBase
 	Diamonds int `json:"diamonds"`
@@ -58,14 +58,14 @@ type SkillboardSkill struct {
 	Rows  []SkillboardSkillRow `json:"rows"`
 }
 
-// SkillboardType 是一个专精类型（觉醒 / 真谛 / 秘义）：名字按 NameKey 去文案表里查。
+// SkillboardType 是一个专精类型（觉醒 / 真谛 / 秘义）：Hash 既是它自己那一行（名字）的哈希，也是文案表里的键。
 //
 // 不存"类型序号"：数组顺序就是它（生成器按 typeCategories 依次 append），界面用下标即可。
 // Rows 是类型自己的三条说明（对应界面上的 ♦ / ♦♦ / ♦♦♦）；Skills 是它包含的四个阶。
 type SkillboardType struct {
-	NameKey string            `json:"nameKey"`
-	Rows    []SkillboardRow   `json:"rows"`
-	Skills  []SkillboardSkill `json:"skills"`
+	Hash   string            `json:"hash"`
+	Rows   []SkillboardRow   `json:"rows"`
+	Skills []SkillboardSkill `json:"skills"`
 }
 
 // SkillboardCharacter 是一个角色的专精类型。
@@ -75,15 +75,21 @@ type SkillboardCharacter struct {
 }
 
 // SkillboardSkeleton 是语言无关的骨架（角色、类型、每行的原值）。
-type SkillboardSkeleton struct {
-	Characters []SkillboardCharacter `json:"characters"`
+// **顶层直接就是角色数组** —— 生成器出的是这个形状，这里跟着走。
+type SkillboardSkeleton = []SkillboardCharacter
+
+// SkillboardTypeText 是一个专精类型在**一门语言**里的文案。
+//
+// Rows 是**数组**、顺序 = 界面渲染顺序（先类型自己的三条，再按 Skills 依次接下去）：
+// 骨架里每一行都有自己的 Hash，两边同一次生成（生成器还会断言长度相等），所以下标直接可用。
+// 键从"每行一个"变成"每类型一个"，文件更小也更可读。
+type SkillboardTypeText struct {
+	Name string   `json:"name"`
+	Rows []string `json:"rows"`
 }
 
-// SkillboardText 是一门语言的文案：类型名与每一行的说明，都按哈希索引（与骨架同一个键空间）。
-type SkillboardText struct {
-	Names map[string]string `json:"names"`
-	Lines map[string]string `json:"lines"`
-}
+// SkillboardText 是一门语言的文案：按**类型哈希**索引（87 个类型）。
+type SkillboardText map[string]SkillboardTypeText
 
 // SkillboardEdit 是一行参数行的编辑：10 个槽，null = 那个槽不动（与因子编辑页同一套记法）。
 type SkillboardEdit struct {

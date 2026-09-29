@@ -37,27 +37,32 @@ export function ExclusivePanel({
             {rows.map((e) => {
                     const st = state?.[e.hash]
                     return (
+                    /*
+                        行高 44px：`h-11` 与边框**同一层**，Tailwind 默认 border-box，边框从 44px 里
+                        扣 1px。与因子编辑页、角色强化页、专精技能页的角色行一致。
+
+                        别写成"外层挂 border-b + 内层 h-11"（那样 45px），也别用 h-[42px]（那是 42px）。
+                        行高基准：**除通用配装与专精技能的内容行外，一律 44px**。
+                    */
                     <div
                         key={e.player}
-                        className="flex h-[42px] items-center border-b text-sm last:border-b-0"
+                        className="grid h-11 w-full grid-cols-[142px_1fr_1fr_1fr] items-center gap-x-2 border-b text-sm last:border-b-0"
                     >
-                        <div className="grid w-full grid-cols-[142px_1fr_1fr_1fr] items-center gap-x-2">
-                            <span
-                                className="truncate font-medium"
-                                style={{ color: charaTable[e.player]?.color }}
-                            >
-                                {charaNames[e.player] ?? e.player}
-                            </span>
-                            {exclusiveSlots(e, names).map(({ skillHash, label }) => (
-                                <label key={skillHash} className="flex min-w-0 items-center gap-1.5">
-                                    <Checkbox
-                                        checked={st?.[skillHash] ?? true}
-                                        onCheckedChange={(v) => onChange(e.player, skillHash, v === true)}
-                                    />
-                                    <span className="truncate">{label}</span>
-                                </label>
-                            ))}
-                        </div>
+                        <span
+                            className="truncate font-medium"
+                            style={{ color: charaTable[e.player]?.color }}
+                        >
+                            {charaNames[e.player] ?? e.player}
+                        </span>
+                        {exclusiveSlots(e, names).map(({ skillHash, label }) => (
+                            <label key={skillHash} className="flex min-w-0 items-center gap-1.5">
+                                <Checkbox
+                                    checked={st?.[skillHash] ?? true}
+                                    onCheckedChange={(v) => onChange(e.player, skillHash, v === true)}
+                                />
+                                <span className="truncate">{label}</span>
+                            </label>
+                        ))}
                     </div>
                 )
             })}

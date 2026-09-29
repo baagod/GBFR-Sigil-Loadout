@@ -32,18 +32,25 @@ import { dedupeSkillboardCharacters } from "@/lib/limitbonus";
 // 一个效果行最多挂**三组**（生成器从 skillboard_effect 的 ActionPartsId1/2/3 取），
 // 与文案里的 {n} 一一对应：{0}..{9} 第 1 组、{10}..{19} 第 2 组、{20}..{29} 第 3 组。
 type ParamGroup = { key: string; values: number[] };
-// 一个节点（效果行）：key = 改哪一行（第 1 组参数行），rowKey = 看哪段字（自己那一行），两件事。
-type Row = { key: string; rowKey: string; values: number[]; more?: ParamGroup[] };
+// 一个节点（效果行）：**两个哈希说的是两件事** ——
+//   key  参数行：改哪一行（原生按它找行写入）。全表**不唯一**（古兰/姬塔共用同一批参数行）。
+//   hash 效果行：看哪段字。每行唯一，文案表就是按类型哈希 + 数组下标取的。
+type Row = { key: string; hash: string; values: number[]; more?: ParamGroup[] };
 // 阶里的条目比类型行多一个"行首画几个 ♦"：那来自原文的 <d> 标记，每行真不一样，所以落盘。
 type SkillRow = Row & { diamonds: number };
 // 该专精类型包含的一个阶（1 阶 / 2 阶 / 3 阶 / EX），label 就是"1 阶"这类标签。
 type Skill = { key: string; label: string; rows: SkillRow[] };
 // 一个专精类型：rows 是类型自己的三条说明（界面上画 ♦ / ♦♦ / ♦♦♦），skills 是它包含的四个阶。
 // 没有"类型序号"字段 —— 数组下标就是序号（生成器按 typeCategories 顺序 append，中间不排序）。
-type Type = { nameKey: string; rows: Row[]; skills: Skill[] };
+// hash 既是这一类型（名字那一行）的哈希，也是文案表里的键。
+type Type = { hash: string; rows: Row[]; skills: Skill[] };
 type Character = { id: string; types: Type[] };
-type Skeleton = { characters: Character[] };
-type Text = { names: Record<string, string>; lines: Record<string, string> };
+// 骨架**顶层就是角色数组**（生成器出这个形状，不套 {"characters": …} 那层空包装）。
+type Skeleton = Character[];
+// 一门语言的文案：按**类型哈希**索引；行文案是数组，顺序 = 渲染顺序（先类型自己的三条，
+// 再按 skills 依次接下去）。骨架里每行都有自己的 hash，两边同一次生成，所以下标直接可用。
+type TypeText = { name: string; rows: string[] };
+type Text = Record<string, TypeText>;
 
 // 类型自己的三条说明画 ♦ / ♦♦ / ♦♦♦：个数只由**位置**决定（第 i 条 → i+1 个），所以按参数算，
 // 不从数据取（原文那三行没有 <d> 标记）。
@@ -229,7 +236,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
             // 主人公占两个 PL 码（PL0000 古兰 / PL0100 姬塔），两份的参数行 Key 完全相同 —— 画两遍
             // 就是同一批开关画两遍。与「角色强化」页同一判据、同一处理（见 lib/limitbonus 的
             // dedupeSkillboardCharacters）。
-            setSkeleton(loaded ? { characters: dedupeSkillboardCharacters(loaded.characters) } : null)
+            setSkeleton(loaded ? dedupeSkillboardCharacters(loaded) : null)
             setText(loadedText)
             const map = new Map<string, (number | null)[]>()
             for (const edit of loadedEdits ?? []) map.set(edit.key, edit.values)
@@ -314,10 +321,10 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // **字色是"改过没有"的指示**：这一行有任何一个槽与游戏原值不同就是**白字**，否则灰字。
     // 判据直接用 editAt（它是"值 ≠ 原值才算改过"的那一条），所以"清空后又写回原值"那种残留记录
     // 不会把行染白 —— 与输入框是否显示数字是同一个判据，不会出现"框空的但字是白的"。
-    const descriptionRow = (row: Row, diamondText: string, tier: string, typeSkill = false) => {
+    const descriptionRow = (row: Row, description: string, diamondText: string, tier: string, typeSkill = false) => {
         const groups = groupsOf(row)
-        // 文案是模板本身（{n} = 第几个框），与填了多少无关。
-        const description = spaceBrackets(boxNumbers(text.lines[row.rowKey]))
+        // 文案是模板本身（{n} = 第几个框），与填了多少无关。取哪一段由调用点给（见 lineOf）。
+        const shown = spaceBrackets(boxNumbers(description))
         const edited = groups.some(group =>
             Array.from({ length: SLOTS }, (_, slot) => editAt(group, slot)).some(value => value !== null),
         )
@@ -358,10 +365,13 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // 每行都画下划线，**除了每一组的最后一行**（last:border-b-0）：它后面紧跟下一个类型的名字，
     // 再多一条线就成了"两行平行线"，最后一组也因为下面是页面底边同样不需要。分隔改由类型块
     // 之间的间距承担。
-    const effectRow = (row: SkillRow, tier: string, path: string) => (
+    //
+    // 文案由调用点给（`lineOf(row)`）——文案是按类型哈希索引、行文案在数组里按下标取的，
+    // 所以在类型那一层把下标算好传下来，这一层不必知道顺序。
+    const effectRow = (row: SkillRow, description: string, tier: string, path: string) => (
         <AccordionItem key={row.key} value={path} className="border-b last:border-b-0">
             <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
-                {descriptionRow(row, "♦".repeat(row.diamonds), tier)}
+                {descriptionRow(row, description, "♦".repeat(row.diamonds), tier)}
             </AccordionTrigger>
             <AccordionContent className="pb-0" keepMounted>
                 {/* 缩进 = 上面那三格（阶标签 w-8 + 间距 + ♦ w-16 + 间距）= 32+12+64+12 = 120px，
@@ -379,13 +389,13 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
         <div className="flex h-full min-h-0 flex-col page-padding">
             <div className="min-h-0 flex-1 overflow-y-auto pr-4 scrollbar-gutter-stable">
                 <div className="min-w-[720px]">
-                    {skeleton.characters.map((character, charIndex) => {
+                    {skeleton.map((character, charIndex) => {
                         const characterOpen = expandedCharacters.has(character.id)
                         // 最后一个角色行不画下划线：列表末尾不需要一条收尾线（照「角色强化」页
                         // 能力行的 last:border-b-0 那条规矩）。用下标显式判断而不是 CSS 的
                         // `last:` 选择器 —— 角色行外面还有一层包装（sticky 的包含块），
                         // 那一层里按钮并不是最后一个子元素，`last:` 会落错。
-                        const isLastCharacter = charIndex === skeleton.characters.length - 1
+                        const isLastCharacter = charIndex === skeleton.length - 1
                         /*
                             展开的内容**不作为角色的 AccordionContent 渲染**，而是作为滚动容器的
                             直接子元素。两级吸顶（角色行 top-0、专精类型名 top-11）都要求那个 sticky
@@ -414,31 +424,48 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                       .filter(entry => expanded.has(entry.path))
                                       .map(entry => entry.path)
                                   const openRows = rows.filter(entry => expanded.has(entry.path)).map(entry => entry.path)
-                                  /*
-                                      -mt-2：把整块上移 8px，抵掉类型名那个 pt-2 的上内边距。不抵的话
-                                      "角色 → 第一个类型名"的间距会平白多 8px（当初就是为这个加的，
-                                      做吸顶重构时漏掉了，实测间距从 12px 变成 20px）。
 
-                                      负上边距挂在这层包装上、不挂在 sticky 元素上：sticky 元素的包含块
-                                      就是这层包装，包装上移只是让它的"可粘范围"高 8px，粘住时的位置
-                                      （top: 43px）不受影响。
+                                  // 这一类型的文案：按**类型哈希**取，行文案在数组里按**渲染顺序**铺
+                                  // （先类型自己的三条，再按 skills 依次接下去 —— 与上面 typeRows/rows
+                                  // 的构造顺序一致）。骨架里每行都有自己的 hash，两边同一次生成，
+                                  // 所以下标直接可用；缺一条退化成空串（生成器有长度断言，正常不会缺）。
+                                  const typeText = text[type.hash]
+                                  const lineByHash = new Map<string, string>()
+                                  {
+                                      let i = 0
+                                      for (const row of type.rows) lineByHash.set(row.hash, typeText?.rows[i++] ?? "")
+                                      for (const skill of type.skills)
+                                          for (const row of skill.rows) lineByHash.set(row.hash, typeText?.rows[i++] ?? "")
+                                  }
+                                  const lineOf = (row: Row) => lineByHash.get(row.hash) ?? ""
+                                  /*
+                                      类型名那一行自己就是 44px；块与块之间不留外边距，**第一个块反而要上移 5px**。
+
+                                      为什么需要这 5px —— 上面那一行的"文字下方余量"不一样：
+                                      角色行（第一个类型的上一条）文字居中在 44px 里，文字底下余 12px；
+                                      阶行是 `py-1.5` + 下边框，文字底下只余 7px。于是"上一条文字底 → 类型名文字顶"
+                                      实测 29px（第一个）vs 25px（后面两个），肉眼看得出来不是一个间距。
+
+                                      目标是**统一成 25px**（后面的那一档），所以把第一个块上移 5px。
+                                      上移不能只写这一处：第一个类型名的"自然位置"会变成 39px，比 `.skillboard-type`
+                                      的吸顶阈值（44px）小 → 会被判成"已经吸住"、强行推回 44px，等于白改。
+                                      因此 style.css 里那个 top 也一起降到 39px（44 − 5），两处是一对。
                                   */
                                   return (
-                                      <div key={typeIndex} className="-mt-2 mb-6 last:mb-0">
+                                      <div key={typeIndex} className={typeIndex === 0 ? "-mt-[5px]" : ""}>
                                           {/*
                                               专精类型名：吸顶的第二级（`.skillboard-type` 里有
-                                              sticky top-11：让开角色行那 44px）。滚到下一个类型时，
+                                              sticky top-11：正好让开角色行那 44px）。滚到下一个类型时，
                                               新的那一行从下面顶上来盖住它 —— 这是 sticky 的"顶掉上一块"
                                               行为，不需要自己算。
 
-                                              上内边距放在这层包装上、不放 sticky 元素本身：带了 padding
-                                              的 sticky 盒子其顶边就压不到 44px，那一段会漏出下面的内容。
-                                              见 style.css 里 `.skillboard-type` 的说明。
+                                              这一行**自己就是 44px**、垂直居中、不带上下 padding ——
+                                              与角色行、以及「角色强化」等页的行高一致。sticky 盒子与这一行
+                                              是同一个（44px 全被不透明底色盖住），所以不需要再套一层包装去
+                                              补 padding 露出的那一段。
                                           */}
-                                          <div className="skillboard-type">
-                                              <div className="border-b pb-2 pt-2 text-base font-medium text-foreground">
-                                                  {text.names[type.nameKey]}
-                                              </div>
+                                          <div className="skillboard-type flex h-11 items-center border-b text-base font-medium text-foreground">
+                                              {typeText?.name}
                                           </div>
                                           <Accordion
                                               multiple
@@ -452,7 +479,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                               {typeRows.map((entry, i) => (
                                                   <AccordionItem key={entry.row.key} value={entry.path} className="border-b">
                                                       <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
-                                                          {descriptionRow(entry.row, diamonds(i), "", true)}
+                                                          {descriptionRow(entry.row, lineOf(entry.row), diamonds(i), "", true)}
                                                       </AccordionTrigger>
                                                       <AccordionContent keepMounted>
                                                           {/* 缩进 = 阶标签 w-8 + 间距 + ♦ w-16 + 间距 = 120px。 */}
@@ -471,7 +498,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                                   if (changed) toggleExpanded(changed)
                                               }}
                                           >
-                                              {rows.map(entry => effectRow(entry.row, entry.tier, entry.path))}
+                                              {rows.map(entry => effectRow(entry.row, lineOf(entry.row), entry.tier, entry.path))}
                                           </Accordion>
                                       </div>
                                   )
@@ -489,17 +516,17 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                 所以照样"滚过本类型就被下一个类型顶掉"。两层各自的包装都是有界的，
                                 这正是"顶掉上一块"能成立的原因。
                             */
-                            <div key={character.id} className={!characterOpen && !isLastCharacter ? "border-b" : ""}>
+                            <div key={character.id}>
                                 {/*
                                     `.skillboard-row`（sticky top-0 / z-30 / 底色，见 style.css）**只在
                                     展开时挂**：收起态 28 行都只有 44px、行间没有任何内容，吸顶会把本该
                                     显示的那一行压在下面 —— 那时行与行只是列表，正常滚动才对。
 
-                                    **收起时的下边框挂在外面这层、不挂在按钮上**：`h-11` 是 border-box，
-                                    边框画在按钮上就会从 44px 里扣掉 1px（内容只占 43px），整行 44px；
-                                    挂在外层则是 44 + 1 = 45px，与「角色强化」页的角色行（那边也是
-                                    外层 border-b + 内层 h-11）**逐像素一致**。实测两页同高 800px 时，
-                                    那边 708÷45 = 15.7 行、这边 708÷44 = 16.1 行，差的就是这 1px。
+                                    **收起时的下边框与 h-11 同一层**（都在按钮上）：Tailwind 默认
+                                    border-box，边框从 44px 里扣 1px，整行就是 44px —— 与因子编辑页的
+                                    角色行、以及另外几页的行高一致。别把边框挂到外面那层包装上：那样是
+                                    44 + 1 = 45px，比别的页高 1px（踩过，三页因此对不齐）。
+                                    行高基准：**除通用配装与专精技能的内容行外，一律 44px**。
 
                                     展开后那条线不画（内容自己有几条线收口，角色行再来一条是多余的）；
                                     最后一个角色也不画（列表末尾不需要收尾线）。
@@ -508,7 +535,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     type="button"
                                     aria-expanded={characterOpen}
                                     onClick={() => toggleCharacter(character.id)}
-                                    className={`${characterOpen ? "skillboard-row " : ""}flex h-11 w-full items-center gap-2 px-0 text-left`}
+                                    className={`${characterOpen ? "skillboard-row " : isLastCharacter ? "" : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
                                 >
                                     <span
                                         className="truncate text-sm font-medium"

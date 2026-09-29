@@ -270,10 +270,17 @@ function CharacterGroup({
 
     return (
         /*
-            组靠下边框分组，不靠底色（最后一行也画：整块列表以一条线收尾）。展开的能力住在这个容器里。
+            角色行 44px：`h-11` 与边框**同一层**，Tailwind 默认 border-box，边框从 44px 里扣 1px
+            （内容区 43px）。这与因子编辑页的角色行、以及本页能力行的写法一致。
+
+            别写成"外层 div 挂 border-b + 内层 h-11"——那样是 44 + 1 = 45px，比其它页高 1px
+            （这条踩过：三页的角色行因此对不齐，行数也数得出来差一截）。
+            行高基准：**除通用配装与专精技能的内容行外，一律 44px**。
+
+            Fragment 是因为角色行与展开的能力要并列返回（原先靠那层 border-b 的包装凑成一个根）。
         */
-        <div className="border-b last:border-b-0">
-            <div className="flex h-11 items-center gap-2" onClick={() => setOpen((prev) => !prev)}>
+        <>
+            <div className="flex h-11 items-center gap-2 border-b" onClick={() => setOpen((prev) => !prev)}>
                 {/*
                     属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定，而它已经
                     按角色算好写在 chara.json 里，取一个 PL 码就拿到了；缺那一条时名字继承默认前景色。
@@ -307,7 +314,7 @@ function CharacterGroup({
                         onValue={onValue}
                     />
                 ))}
-        </div>
+        </>
     );
 }
 
