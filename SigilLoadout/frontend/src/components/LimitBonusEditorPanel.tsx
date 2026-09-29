@@ -127,7 +127,7 @@ function AbilityRow({
             <div className="relative min-w-0">
                 {/*
                     圆点按节点类型着色（只有能力 / 专属类有点，属性节点没有）：
-                    专属强化（BonusType 1）绿 #963c00、能力强化（2）蓝 #2b7fff。
+                    专属强化（BonusType 1）绿 #016630、能力强化（2）蓝 #2b7fff。
                 */}
                 {ability.bonusType !== 0 && (
                     <span

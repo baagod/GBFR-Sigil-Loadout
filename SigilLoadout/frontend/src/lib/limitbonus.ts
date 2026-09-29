@@ -98,7 +98,7 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
 export const effectLabel = (
     param: LimitBonusParam,
     effects: Record<string, string>,
-    slot = 0,
+    slot: number,
 ): string => (effects[param.key] ?? "").replaceAll("{0}", `{${slot + 1}}`)
 
 /*

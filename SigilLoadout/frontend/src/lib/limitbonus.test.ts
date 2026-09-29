@@ -57,7 +57,7 @@ const edit = (patch: Partial<LimitBonusEdit> = {}): LimitBonusEdit => ({
 
 /** 组件铺出来的那一行描述，逐字是它的拼法：模板本身，{0} 换成框号。 */
 const lineAt = (target: Ability, table: Record<string, string> = effects) =>
-    effectLabel(target.params[0], table)
+    effectLabel(target.params[0], table, 0)
 
 describe("这一行显示什么", () => {
     it("没编辑过的参数行读游戏自己的 Lv1，有记录时读记录的第一格", () => {
