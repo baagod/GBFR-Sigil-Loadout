@@ -17,8 +17,8 @@
     effectLabel），右边是这一栏的数值框（一个参数行一个框），
     描述里的 {1} 就是从左数第一个框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
 */
-import { memo, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { memo, useEffect, useState } from "react";
+
 
 import {
     LoadLimitBonus,
@@ -26,7 +26,8 @@ import {
     LoadLimitBonusEdits,
     SaveLimitBonusEdits,
 } from "../../bindings/sigilloadout/service/limitbonusservice";
-import { Input } from "@/components/ui/input";
+import { DisclosureChevron } from "@/components/DisclosureChevron";
+import { SlotInput } from "@/components/SlotInput";
 import {
     asEdit,
     dedupeByName,
@@ -38,18 +39,16 @@ import {
     type Ability,
     type LimitBonusCharacter,
     type LimitBonusEdit,
-    type LimitBonusParam,
     type LimitBonusTable,
     type LimitBonusText,
 } from "@/lib/limitbonus";
 import type { CharaTable } from "@/lib/chara";
 import type { Lang } from "@/lib/lang";
 import { messages } from "@/lib/messages";
-import { dedupeBy, slotEdit, stepValue } from "@/lib/skills";
+import { dedupeBy } from "@/lib/skills";
 import { PanelFailureDialog } from "@/components/PanelFailureDialog";
 import { usePanelFailure } from "@/hooks/usePanelFailure";
 import { useLangTable } from "@/hooks/useLangTable";
-import { useWheelStep } from "@/hooks/useWheelStep";
 
 /*
     表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，
@@ -64,103 +63,20 @@ import { useWheelStep } from "@/hooks/useWheelStep";
 
 const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_64px] items-center gap-2";
 
-/**
- * 一个数值框：描述里的 {1} 指的就是它。
- *
- * 半成品文本、提交规则与步进与因子编辑页的十个槽逐字相同（见 skills.ts 的 slotEdit 与 stepValue）
- * ——这里只是借它们解析一个框。
- */
-function SlotBox({
-    name,
-    param,
-    record,
-    onValue,
-}: {
-    /** 能力名：只在读屏里指认这个框用，屏幕上它就在这一行的左端。 */
-    name: string;
-    param: LimitBonusParam;
-    /** 这个参数行的记录；没编辑过就是 undefined。 */
-    record: LimitBonusEdit | undefined;
-    /** 这一格算完了一个数：null = 清空（把这一行的原值写回去，见 setValue）。 */
-    onValue: (value: number | null) => void;
-}) {
-    /*
-        编辑中的框正在显示的文本，前提是它与已提交数字渲染出来的样子不同："-" 与 "0." 是通往一个数字
-        路上的状态（受控输入框没有别的办法显示它们），而一个数字的前缀往往本身也是数字——0.004 用已
-        提交的数字渲染会变成 4。
-    */
-    const [typed, setTyped] = useState<string | null>(null);
+/*
+    数值框的样式：框就是行高（h-11），读的是数字本身，所以静止与聚焦都像裸文本。
 
-    // 这一格有没有用户填过的数：手写过的记录缺第一格（values 是空的）与"没编辑过"一样，显示占位符。
-    // 读的永远是记录的第一格——这一页只写、只显示第一档（见 limitbonus.ts 的 valueAt）。
-    const committed = record?.values[0];
-    // 框里的占位符读的是 Lv1 的数（见 limitbonus.ts 的 valueAt）。
-    const shown = valueAt(param, record);
+    无边框、无聚焦底色（原先那条 focus:bg-muted/50 在深色下被 dark:bg-transparent 压掉、
+    只有浅色下可见，两页一起删掉了，见 style.css 里"数值框"那段）。
 
-    function step(delta: 1 | -1) {
-        setTyped(null);
-        onValue(stepValue(shown, delta));
-    }
+    dark:bg-transparent 不是重复（WebStorm 会提示删掉，别删）：基础 Input 自带 .dark:bg-input/30，
+    两者同特异性，只能靠排在编译产物更后面取胜。
 
-    /*
-        滚轮让聚焦的框步进，而列表不能跟着滚——监听器为什么必须是原生的、passive: false 的，见
-        useWheelStep。一格只有一个框，所以不必像因子行那样按位置认是哪一个。
-    */
-    const host = useRef<HTMLDivElement>(null);
-    useWheelStep(
-        host,
-        (target) => document.activeElement === target,
-        (_target, delta) => step(delta),
-    );
+    框内行为（半成品文本、解析规则、滚轮/方向键/Esc）全在共享的 SlotInput 里，不在这里重写。
+*/
+const SLOT_BOX =
+    "h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
 
-    return (
-        <div ref={host} className="w-full min-w-0">
-            <Input
-                type="text"
-                inputMode="decimal"
-                aria-label={`${name} Lv1 数值`}
-                placeholder={String(shown)}
-                value={typed ?? (committed === undefined ? "" : String(committed))}
-                onChange={(e) => {
-                    /*
-                        只借 slotEdit 的解析规则（"-" 与 "0." 这类半成品文本、前导零、清空成 null）：起点
-                        给 [null] 是因为结果只取 [0]，而"只写第一档"那条规矩在 withFirstValue 里（见
-                        limitbonus.ts），不该在这里再写一遍。
-                    */
-                    const edit = slotEdit(e.target.value, 0, [null]);
-                    if (edit.kind === "drop") return;
-                    if (edit.kind === "half") {
-                        setTyped(edit.text);
-                        return;
-                    }
-                    // 数字已提交，但框保留用户敲的那串文本直到离开它（见 typed 的声明）；清空得到 null。
-                    setTyped(edit.keeps ?? null);
-                    onValue(edit.values[0]);
-                }}
-                onBlur={() => setTyped(null)}
-                onKeyDown={(e) => {
-                    // Escape 让人放开这个框；方向键步进（否则它会把光标移到末尾，列表还会跟着滚）。
-                    if (e.key === "Escape") {
-                        e.currentTarget.blur();
-                        return;
-                    }
-                    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-                    e.preventDefault();
-                    step(e.key === "ArrowUp" ? 1 : -1);
-                }}
-                /*
-                    无边框：框就是行高，读的是数字本身，所以静止与聚焦都像裸文本——聚焦态不再给底色
-                    （原先那条 focus:bg-muted/50 在深色下被 dark:bg-transparent 压掉、只有浅色下可见，
-                    两页一起删掉了，见 style.css 里"数值框"那段）。
-
-                    dark:bg-transparent 不是重复（WebStorm 会提示删掉，别删）：基础 Input 自带
-                    .dark:bg-input/30，两者同特异性，只能靠排在编译产物更后面取胜。
-                */
-                className="h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
-            />
-        </div>
-    );
-}
 
 /**
  * 一条能力：一行——名字、描述、一个数值框。只改第一档，Lv2/Lv3 不写也不显示（见 limitbonus.ts 的 withFirstValue）。
@@ -222,11 +138,12 @@ function AbilityRow({
                 <span className="shrink-0 text-muted-foreground/40" aria-hidden>
                     |
                 </span>
-                <SlotBox
-                    name={name}
-                    param={ability.params[0]}
-                    record={edits.get(ability.params[0].key)}
-                    onValue={(value) => onValue(ability, value)}
+                <SlotInput
+                    label={`${name} Lv1 数值`}
+                    original={valueAt(ability.params[0], edits.get(ability.params[0].key))}
+                    value={edits.get(ability.params[0].key)?.values[0] ?? null}
+                    onCommit={(value) => onValue(ability, value)}
+                    className={SLOT_BOX}
                 />
             </div>
         </div>
@@ -296,12 +213,7 @@ function CharacterGroup({
                     展开箭头在行末，与能力行、因子编辑页一致：一个普通图标、自己没有点击，展开是整行的
                     活——会响应点击的图标会成为同一件事的第二个、更安静的控制。
                 */}
-                <span
-                    aria-hidden
-                    className="grid size-7 shrink-0 place-content-center text-muted-foreground"
-                >
-                    {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                </span>
+                <DisclosureChevron open={open} />
             </div>
             {open &&
                 dedupeByName(character.bonuses, abilityNames).map((ability) => (

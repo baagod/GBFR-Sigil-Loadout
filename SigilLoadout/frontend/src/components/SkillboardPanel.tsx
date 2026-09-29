@@ -12,7 +12,6 @@
     文案里的 {i} 填"这一槽现在等于多少"（填过用填的，没填过用游戏原值）。
 */
 import { Fragment, memo, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
 
 import {
     LoadSkillboard,
@@ -20,9 +19,10 @@ import {
     LoadSkillboardEdits,
     SaveSkillboardEdits,
 } from "../../bindings/sigilloadout/service/skillboardservice";
-import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "cn";
+import { DisclosureChevron } from "@/components/DisclosureChevron";
+import { SlotInput } from "@/components/SlotInput";
 import type { Lang } from "@/lib/lang";
 import type { CharaTable } from "@/lib/chara";
 import { dedupeSkillboardCharacters } from "@/lib/limitbonus";
@@ -126,32 +126,6 @@ export const spaceBrackets = (text: string): string =>
     inline-flex，平级返回多个节点会被拆成多个 flex 子项、文字排成好几列（踩过的坑）。
 */
 const renderMarks = (text: string) => <span className="inline">{text}</span>
-
-// 一个数值框：照角色强化页的 SlotBox——敲进去的那串文本在离开框之前一直显示（所以能删空、能清空），
-// 空框时显示游戏原值当占位符；离开框之后回到"以记录为准"的样子。
-// 数值框：照角色强化页的 SlotBox，但高度压到与说明行一致（见 SLOT_IN_ROW）——专精页一行里说明和
-// 十个框要齐平，用整页的 h-11 会把数值行撑得比说明行高。
-function Slot({ original, value, onInput, className }: {
-    original: number
-    value: number | null
-    onInput: (raw: string) => void
-    className?: string
-}) {
-    const [typed, setTyped] = useState<string | null>(null)
-    return (
-        <Input
-            className={cn(SLOT, className)}
-            inputMode="decimal"
-            placeholder={String(original)}
-            value={typed ?? (value === null ? "" : String(value))}
-            onChange={event => {
-                setTyped(event.target.value)
-                onInput(event.target.value)
-            }}
-            onBlur={() => setTyped(null)}
-        />
-    )
-}
 
 // 说明文字 = 游戏写的效果模板本身，**不把数值填进去**：数字就在下面那几行框里，说不清的正是
 // "这个效果的哪一部分由第几个框决定"。与「角色强化」页同一条规矩（见 lib/limitbonus.ts 的 effectLabel）。
@@ -261,15 +235,13 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
         return editAt(group, slot) ?? group.values[slot] ?? null
     }
 
-    function setSlot(group: ParamGroup, slot: number, raw: string) {
-        // 空串 = 清空这一槽：写回游戏原值（游戏不会自己忘掉上一次写入的值，与角色强化页同一条规矩）。
-        const value = raw.trim() === "" ? group.values[slot] : Number(raw)
-        if (value === null || Number.isNaN(value)) return
+    /** 提交一槽：null = 清空（写回游戏原值）；解析与半成品文本的规则全在共享的 SlotInput 里。 */
+    function setSlot(group: ParamGroup, slot: number, value: number | null) {
         const next = new Map(edits)
         // 交出去的永远是**这一组完整的十个值**（没动过的格子交游戏原值）：原生按连续前缀写，
         // 中间挖空写不了。界面判"这一格填过没有"靠的是"值 ≠ 原值"（见 editAt），整组交满不影响显示。
         const values = Array.from({ length: SLOTS }, (_, i) => slotOf(group, i))
-        values[slot] = value
+        values[slot] = value ?? group.values[slot]
         next.set(group.key, values)
         setEdits(next)
         SaveSkillboardEdits([...next].map(([key, v]) => ({ key, values: v }))).catch(() => {})
@@ -298,11 +270,11 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                         |
                                     </span>
                                 )}
-                                <Slot
-                                    className={SLOT_HEIGHT}
+                                <SlotInput
+                                    className={cn(SLOT, SLOT_HEIGHT)}
                                     original={group.values[slot] ?? 0}
                                     value={editAt(group, slot)}
-                                    onInput={raw => setSlot(group, slot, raw)}
+                                    onCommit={value => setSlot(group, slot, value)}
                                 />
                             </Fragment>
                         ))}
@@ -543,12 +515,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     >
                                         {charaNames[character.id] ?? character.id}
                                     </span>
-                                    <span
-                                        aria-hidden
-                                        className="ml-auto grid size-7 shrink-0 place-content-center text-muted-foreground"
-                                    >
-                                        {characterOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                    </span>
+                                    <DisclosureChevron open={characterOpen} className="ml-auto" />
                                 </button>
                                 {typeSections}
                             </div>

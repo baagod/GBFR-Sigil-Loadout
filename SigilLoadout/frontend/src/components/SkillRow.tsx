@@ -4,9 +4,9 @@
     App 那几个回调组成的 context。
 */
 import { Fragment, useRef, useState, type MouseEvent, type PointerEvent, type ReactElement } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { DisclosureChevron } from "@/components/DisclosureChevron";
 import { Input } from "@/components/ui/input";
 import {
     Tooltip,
@@ -402,16 +402,7 @@ export function SkillRow({
                         第二个、更安静的控制。做成 ghost 按钮时它还会在指针下涂一层底色，读起来像一个有事
                         可做的按钮。
                     */}
-                    <span
-                        aria-hidden
-                        className="grid size-7 shrink-0 place-content-center text-muted-foreground"
-                    >
-                        {isOpen ? (
-                            <ChevronDown className="size-4" />
-                        ) : (
-                            <ChevronRight className="size-4" />
-                        )}
-                    </span>
+                    <DisclosureChevron open={isOpen} />
                 </TooltipTrigger>
             </RowTooltip>
 
