@@ -12,6 +12,7 @@
     文案里的 {i} 填"这一槽现在等于多少"（填过用填的，没填过用游戏原值）。
 */
 import { Fragment, memo, useEffect, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import {
     LoadSkillboard,
@@ -337,130 +338,140 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                 <div className="min-w-[720px]">
                     {skeleton.characters.map(character => {
                         const characterOpen = expandedCharacters.has(character.id)
+                        /*
+                            展开的内容**不作为角色的 AccordionContent 渲染**，而是作为滚动容器的
+                            直接子元素。两级吸顶（角色行 top-0、专精类型名 top-11）都要求那个 sticky
+                            元素的**滚动祖先是这个滚动容器**；包在角色块的 AccordionContent 里的话，
+                            `sticky` 会被关进那个盒子里，滚到下一个角色就跟着走了。
+
+                            所以角色的 AccordionItem 里只放那一行，内容在它后面平铺出来。
+                        */
+                        const typeSections = characterOpen
+                            ? character.types.map((type, typeIndex) => {
+                                  // 类型自己那三条（♦/♦♦/♦♦♦）也是可编辑的数值行，和阶里的条目一样
+                                  // 点开就能改；身份用 type/… 前缀，不跟阶里的条目撞。
+                                  const typeRows = type.rows.map((row, i) => ({
+                                      row,
+                                      path: `${character.id}/${typeIndex}/type/${i}`,
+                                  }))
+                                  // 这一类型下每一条的 value（= 展开态的身份）+ 它所属的阶标签。
+                                  const rows = type.skills.flatMap(skill =>
+                                      skill.rows.map((row, i) => ({
+                                          row,
+                                          tier: skill.label,
+                                          path: `${character.id}/${typeIndex}/${skill.key}/${i}`,
+                                      })),
+                                  )
+                                  const openTypeRows = typeRows
+                                      .filter(entry => expanded.has(entry.path))
+                                      .map(entry => entry.path)
+                                  const openRows = rows.filter(entry => expanded.has(entry.path)).map(entry => entry.path)
+                                  /*
+                                      -mt-2：把整块上移 8px，抵掉类型名那个 pt-2 的上内边距。不抵的话
+                                      "角色 → 第一个类型名"的间距会平白多 8px（当初就是为这个加的，
+                                      做吸顶重构时漏掉了，实测间距从 12px 变成 20px）。
+
+                                      负上边距挂在这层包装上、不挂在 sticky 元素上：sticky 元素的包含块
+                                      就是这层包装，包装上移只是让它的"可粘范围"高 8px，粘住时的位置
+                                      （top: 43px）不受影响。
+                                  */
+                                  return (
+                                      <div key={typeIndex} className="-mt-2 mb-6 last:mb-0">
+                                          {/*
+                                              专精类型名：吸顶的第二级（`.skillboard-type` 里有
+                                              sticky top-11：让开角色行那 44px）。滚到下一个类型时，
+                                              新的那一行从下面顶上来盖住它 —— 这是 sticky 的"顶掉上一块"
+                                              行为，不需要自己算。
+
+                                              上内边距放在这层包装上、不放 sticky 元素本身：带了 padding
+                                              的 sticky 盒子其顶边就压不到 44px，那一段会漏出下面的内容。
+                                              见 style.css 里 `.skillboard-type` 的说明。
+                                          */}
+                                          <div className="skillboard-type">
+                                              <div className="border-b pb-2 pt-2 text-base font-medium text-foreground">
+                                                  {text.names[type.nameKey]}
+                                              </div>
+                                          </div>
+                                          <Accordion
+                                              multiple
+                                              keepMounted
+                                              value={openTypeRows}
+                                              onValueChange={next => {
+                                                  const changed = toggledKey(openTypeRows, next)
+                                                  if (changed) toggleExpanded(changed)
+                                              }}
+                                          >
+                                              {typeRows.map((entry, i) => (
+                                                  <AccordionItem key={entry.row.key} value={entry.path} className="border-b">
+                                                      <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
+                                                          {descriptionRow(entry.row, diamonds(i), "", true)}
+                                                      </AccordionTrigger>
+                                                      <AccordionContent keepMounted>
+                                                          {/* 缩进 = 阶标签 w-8 + 间距 + ♦ w-16 + 间距 = 120px。 */}
+                                                          <div style={{ paddingLeft: 120 }}>{valuesOf(entry.row)}</div>
+                                                      </AccordionContent>
+                                                  </AccordionItem>
+                                              ))}
+                                          </Accordion>
+                                          {/* 四个阶的条目：每条各自可展开十个数值框。 */}
+                                          <Accordion
+                                              multiple
+                                              keepMounted
+                                              value={openRows}
+                                              onValueChange={next => {
+                                                  const changed = toggledKey(openRows, next)
+                                                  if (changed) toggleExpanded(changed)
+                                              }}
+                                          >
+                                              {rows.map(entry => effectRow(entry.row, entry.tier, entry.path))}
+                                          </Accordion>
+                                      </div>
+                                  )
+                              })
+                            : null
+
                         return (
-                            /*
-                                角色块之间**不留外边距**：照「角色强化」页，分组只靠那条下边框
-                                （`<div className="border-b">` 包住角色行与它的能力行，行高 h-11 一律 44px）。
-                                留 mb-6 的话线是一段一段的、每格看着比 44px 高，名字就显得偏上——
-                                实测文字在 44px 的行里本来就是居中的（上下各 12px），是那 24px 空白骗的眼睛。
-                            */
-                            <div key={character.id}>
-                                <Accordion
-                                    value={characterOpen ? [character.id] : []}
-                                    onValueChange={next => {
-                                        const changed = toggledKey(characterOpen ? [character.id] : [], next)
-                                        if (changed) toggleCharacter(changed)
-                                    }}
+                            <Fragment key={character.id}>
+                                {/*
+                                    `.skillboard-row`（sticky top-0 / z-30 / 底色，见 style.css）**只在
+                                    展开时挂**：收起态 28 行都只有 44px、行间没有任何内容，吸顶会把本该
+                                    显示的那一行压在下面 —— 那时行与行只是列表，正常滚动才对。
+
+                                    下划线**也只在收起时画**：收起态它是列表的分隔（28 行光秃秃的不好看）；
+                                    展开后内容自己有几条线收口，角色行再来一条是多余的 —— 而且它当时会与
+                                    内容最后一行落在同一个 y 上叠成"加粗"的一条（那时的起因是角色块有
+                                    mb-6、内容底边比角色行底边还往下 175px）。现在虽然外边距去掉了、
+                                    不会再叠，但展开后那条线本来就多余，所以维持"展开不画"。
+
+                                    没有套 Accordion：展开的内容早就搬到下面平铺了，这层 Accordion
+                                    没东西可管；更要紧的是套上它会让那个 45px 高的根 div 成为 sticky
+                                    元素的**包含块**，`sticky` 只能在 45px 里粘（实测 rowOffsetFromBoxTop
+                                    一路 -900，等于没吸住）。去掉之后包含块是整张列表，吸顶才成立。
+
+                                    这一行照「角色强化」页的写法：名字贴左（用角色属性色）、行高 h-11、
+                                    箭头在最右。用 button 而不是 div：键盘也能展开/收起。
+                                */}
+                                <button
+                                    type="button"
+                                    aria-expanded={characterOpen}
+                                    onClick={() => toggleCharacter(character.id)}
+                                    className={`${characterOpen ? "skillboard-row " : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
                                 >
-                                    {/*
-                                        角色行照「角色强化」页的写法：名字贴左（用角色属性色）、行高 h-11、
-                                        下边框收口，箭头在最右（AccordionTrigger 自带那对 chevron 就是
-                                        ml-auto）。上面不留外边距，分组只靠这条线。
-                                    */}
-                                    <AccordionItem value={character.id} className="border-b">
-                                        <AccordionTrigger className="h-11 items-center gap-2 py-0 text-sm font-medium hover:no-underline focus-visible:ring-0">
-                                            <span
-                                                className="truncate"
-                                                style={{ color: charaTable[character.id]?.color }}
-                                            >
-                                                {charaNames[character.id] ?? character.id}
-                                            </span>
-                                        </AccordionTrigger>
-                                        {/*
-                                            这里**刻意不加 keepMounted**（与页内其它 Accordion 相反）。
-
-                                            29 个角色 × 每角色约 100 行 × 每行 10 个数值框 —— 全渲染出来是
-                                            10 万个 DOM 节点，实测量到展开一个角色要 **2.7 秒**。折叠时不渲染才是对的。
-                                            页内那些 Accordion（阶的条目、类型的三条）才需要 keepMounted：
-                                            它们要保住"收起时面板不卸载"这条（见 ui/accordion.tsx 的说明）。
-                                        */}
-                                        <AccordionContent className="pb-0">
-                                            {character.types.map((type, typeIndex) => {
-                                                // 类型自己那三条（♦/♦♦/♦♦♦）也是可编辑的数值行，和阶里的条目一样
-                                                // 点开就能改；身份用 type/… 前缀，不跟阶里的条目撞。
-                                                const typeRows = type.rows.map((row, i) => ({
-                                                    row,
-                                                    path: `${character.id}/${typeIndex}/type/${i}`,
-                                                }))
-                                                // 这一类型下每一条的 value（= 展开态的身份）+ 它所属的阶标签。
-                                                const rows = type.skills.flatMap(skill =>
-                                                    skill.rows.map((row, i) => ({
-                                                        row,
-                                                        tier: skill.label,
-                                                        path: `${character.id}/${typeIndex}/${skill.key}/${i}`,
-                                                    })),
-                                                )
-                                                const openTypeRows = typeRows
-                                                    .filter(entry => expanded.has(entry.path))
-                                                    .map(entry => entry.path)
-                                                const openRows = rows
-                                                    .filter(entry => expanded.has(entry.path))
-                                                    .map(entry => entry.path)
-                                                return (
-                                                    <div key={typeIndex} className="-mt-2 mb-6 last:mb-0">
-                                                        {/*
-                                                            专精类型：名字 + 一条下划线 + 它自己的三条说明（白字，点开有数值槽）。
-
-                                                            这条线不只是分组：没有它的时候，名字到第一行之间的间距**没有共同基准**
-                                                            ——下面是单行时眼睛拿"一行字"去比，是多行时拿"一整块字"去比，
-                                                            明明数值一样（都是 pb 4px + 行 padding 6px），看着却像单行更紧。
-                                                            加一条线之后两边都从这条线起算，观感就一致了。
-                                                            用 py-2：名字上下各留 8px，线正好夹在这 8px 之下。
-                                                            而 -mt-2 把整块上移 8px 抵掉那 8px 上内边距 —— 否则角色到名字
-                                                            的间距会跟着变大。这样三处互不牵连：角色↔名字回到原来的观感、
-                                                            名字下仍 8px、名字到第一行仍 8px。
-                                                        */}
-                                                        <div className="border-b py-2 text-base font-medium text-foreground">
-                                                            {text.names[type.nameKey]}
-                                                        </div>
-                                                        <Accordion
-                                                            multiple
-                                                            keepMounted
-                                                            value={openTypeRows}
-                                                            onValueChange={next => {
-                                                                const changed = toggledKey(openTypeRows, next)
-                                                                if (changed) toggleExpanded(changed)
-                                                            }}
-                                                        >
-                                                            {typeRows.map((entry, i) => (
-                                                                <AccordionItem
-                                                                    key={entry.row.key}
-                                                                    value={entry.path}
-                                                                    className="border-b"
-                                                                >
-                                                                    <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
-                                                                        {descriptionRow(entry.row, diamonds(i), "", true)}
-                                                                    </AccordionTrigger>
-                                                                    <AccordionContent keepMounted>
-                                                                        {/* 缩进 = 阶标签 w-8 + 间距 + ♦ w-16 + 间距 = 120px。 */}
-                                                                        <div style={{ paddingLeft: 120 }}>
-                                                                            {valuesOf(entry.row)}
-                                                                        </div>
-                                                                    </AccordionContent>
-                                                                </AccordionItem>
-                                                            ))}
-                                                        </Accordion>
-                                                        {/* 四个阶的条目：每条各自可展开十个数值框。 */}
-                                                        <Accordion
-                                                            multiple
-                                                            keepMounted
-                                                            value={openRows}
-                                                            onValueChange={next => {
-                                                                const changed = toggledKey(openRows, next)
-                                                                if (changed) toggleExpanded(changed)
-                                                            }}
-                                                        >
-                                                            {rows.map(entry =>
-                                                                effectRow(entry.row, entry.tier, entry.path),
-                                                            )}
-                                                        </Accordion>
-                                                    </div>
-                                                )
-                                            })}
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                </Accordion>
-                            </div>
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        style={{ color: charaTable[character.id]?.color }}
+                                    >
+                                        {charaNames[character.id] ?? character.id}
+                                    </span>
+                                    <span
+                                        aria-hidden
+                                        className="ml-auto grid size-7 shrink-0 place-content-center text-muted-foreground"
+                                    >
+                                        {characterOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                    </span>
+                                </button>
+                                {typeSections}
+                            </Fragment>
                         )
                     })}
                 </div>
