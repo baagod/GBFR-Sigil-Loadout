@@ -222,3 +222,23 @@ describe("中西文之间补空格", () => {
         expect(spaceCJKAndLatin("공격 DOWN 내성")).toBe("공격 DOWN 내성")
     })
 })
+/*
+    清空 → 记录里存 null（而不是在这里换成原值）：界面靠它区分"我清空了"（框回占位符）与"我输入了一个
+    正好等于原值的数"（框里就该是这个数）。换成原值的活由服务端落盘时做（见 limitbonusservice.go 的
+    服务端），所以 valueAt 读到 null 时要回落到游戏原值。
+*/
+describe("清空一格", () => {
+    const param = { key: "0D0BCF24", default: 5 }
+
+    it("存进记录的是 null，不是原值", () => {
+        expect(withFirstValue(param, null).values).toEqual([null])
+        expect(withFirstValue(param, 5).values).toEqual([5])
+    })
+
+    it("读回来时 null 回落到游戏原值（框里显示占位符）", () => {
+        expect(valueAt(param, withFirstValue(param, null))).toBe(5)
+        expect(valueAt(param, withFirstValue(param, 5))).toBe(5)
+        expect(valueAt(param, withFirstValue(param, 20))).toBe(20)
+        expect(valueAt(param, undefined)).toBe(5)
+    })
+})

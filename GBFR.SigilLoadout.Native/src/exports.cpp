@@ -171,7 +171,7 @@ static const char* LimitBonusRefusalReason(int32_t code) {
     case GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE:
         return "the buffer's row count is outside the plausible range; the pointer field points at something else.";
     case GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE:
-        return "the key appears more than once in the buffer; this is not the table this mod patches.";
+        return "the rows matching this key disagree on the values being written, or there are more of them than expected; this is not the table this mod patches.";
     case GBFR20_LIMIT_BONUS_KEY_NOT_FOUND:
         return "the key is not in the buffer; either this is not the table this mod patches, or that entry has no row.";
     case GBFR20_TABLE_WRITE_FAILED:

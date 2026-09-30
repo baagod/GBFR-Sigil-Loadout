@@ -207,6 +207,9 @@ inline constexpr uint64_t kLimitBonusKeyOffset = 52;
 // Lv1..Lv10 是行内 +12 起的 10 个 float；调用方按"这个能力强化有几档"给前 N 个。
 inline constexpr uint64_t kLimitBonusLevelOffset = 12;
 inline constexpr uint64_t kLimitBonusMaxLevels = 10;
+// 同一个 Key 最多认几行。实测这张表里重复的 Key 都只占两行，8 是充裕余量；超了就拒写，
+// 免得把"不止一处重复"变成"只改了一部分"的半成功。
+inline constexpr size_t kLimitBonusMaxMatchedRows = 8;
 // 行数的合理上界，用来挡"指针字段被别的东西改写、指到一段随便可读的内存"。真机 1123 行，
 // 1<<20 是充裕余量，又足以让"指到别处"几乎撞不进来。
 inline constexpr uint64_t kLimitBonusMaxPlausibleRows = 1u << 20;
@@ -230,7 +233,17 @@ int32_t TryGetLiveLimitBonusBuffer(uintptr_t& buffer) noexcept {
     return 0;
 }
 
-// 逐行找 Key、只写那一行的前 level_count 个 Lv 槽。SEH 帧里只许有平凡类型，所以它单独一个函数。
+// 逐行找 Key，把它命中的**每一行**的前 level_count 个 Lv 槽都写成同一组值。
+// SEH 帧里只许有平凡类型，所以它单独一个函数，命中行用一个定长数组记。
+//
+// 为什么不再要求"恰好一行"：这张表里**同一个 Key 会排两行**（实测 25 个 Key 各占两行，
+// 两行 84 字节完全一致）——一个参数被"单条节点"和"组合节点"各引用一次，游戏就给每个引用
+// 各排一份。所以"命中多行"是这张表的正常形态，不是"指错了内存"。
+//
+// 身份证明因此改成：**命中的这几行，在要被写的那段数值上必须完全一致**。
+//   一致   = 它们是同一参数的姊妹副本（正常形态）→ 逐行都写，不管游戏读哪一行都对；
+//   不一致 = 这不是那张表 → 照旧拒写。
+// 既认得出重复行的正常形态，又保住了原来那道"防写错内存"的闸。
 int32_t WriteLimitBonusRow(
     uintptr_t buffer,
     uint64_t row_count,
@@ -239,31 +252,45 @@ int32_t WriteLimitBonusRow(
     uint32_t level_count) noexcept {
     __try {
         auto* live = reinterpret_cast<uint8_t*>(buffer);
-        uint8_t* target = nullptr;
+        uint8_t* matched[kLimitBonusMaxMatchedRows]{};
+        size_t matched_count = 0;
         for (uint64_t row = 0; row < row_count; ++row) {
             uint8_t* candidate = live + kLimitBonusHeaderBytes + kLimitBonusRowBytes * row;
             uint32_t key = 0;
             std::memcpy(&key, candidate + kLimitBonusKeyOffset, sizeof(key));
             if (key != key_hash)
                 continue;
-            // 同一个 Key 出现两次就不是这张表（Key 是行的身份）。发现重复立刻拒写，而不是覆盖
-            // 第一个——那会把"指错了一段内存"变成一次静默的半成功。
-            if (target != nullptr)
+            // 命中数超出上界：不做"只改了一部分"的半成功，直接拒。
+            if (matched_count == kLimitBonusMaxMatchedRows)
                 return GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE;
-            target = candidate;
+            matched[matched_count++] = candidate;
         }
-        if (target == nullptr)
+        if (matched_count == 0)
             return GBFR20_LIMIT_BONUS_KEY_NOT_FOUND;
 
         const size_t bytes = static_cast<size_t>(level_count) * sizeof(float);
-        if (std::memcmp(target + kLimitBonusLevelOffset, levels, bytes) == 0)
-            return 0;
-        std::memcpy(target + kLimitBonusLevelOffset, levels, bytes);
+        for (size_t index = 1; index < matched_count; ++index) {
+            if (std::memcmp(
+                    matched[0] + kLimitBonusLevelOffset,
+                    matched[index] + kLimitBonusLevelOffset,
+                    bytes) != 0)
+                return GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE;
+        }
+
+        // 逐行写：只碰真的变了的那几行（同 SkillStatus 那条，缩小"半更新"的窗口）。
+        int32_t written = 0;
+        for (size_t index = 0; index < matched_count; ++index) {
+            uint8_t* row = matched[index];
+            if (std::memcmp(row + kLimitBonusLevelOffset, levels, bytes) == 0)
+                continue;
+            std::memcpy(row + kLimitBonusLevelOffset, levels, bytes);
+            ++written;
+        }
+        return written;
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return GBFR20_TABLE_WRITE_FAILED;
     }
-    return 1;
 }
 }
 

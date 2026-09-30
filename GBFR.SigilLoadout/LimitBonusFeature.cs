@@ -101,17 +101,22 @@ internal sealed class LimitBonusFeature {
         foreach (LimitBonusEdit edit in config.Edits) {
             if (!edit.Enabled)
                 continue;
-            if (!TryParseKey(edit.Key, out uint keyHash)
-                || edit.Values is null
-                || edit.Values.Length < 1
-                || edit.Values.Length > MaxLevels) {
+            if (!TryParseKey(edit.Key, out uint keyHash)) {
+                skipped++;
+                continue;
+            }
+
+            // 可空槽位 → 原生要的连续数组：全是 null（工具里"清空了这一格"）或中间有缺口就跳过这一条。
+            // 跳过等于"这一行一个字节都不碰"，与因子编辑那条链的规矩一致。
+            float[]? levels = SlotValues.Flatten(edit.Values, MaxLevels);
+            if (levels is null) {
                 skipped++;
                 continue;
             }
 
             // 逐档写：values[i] 进 Lv(i+1)。没提到的槽一个字节都不碰——原生的 level_count 就是数组
             // 长度，所以"写几档"完全由这一条记录说了算。
-            int result = NativeCore.SetLimitBonusLevels(keyHash, edit.Values);
+            int result = NativeCore.SetLimitBonusLevels(keyHash, levels);
             if (result >= 0)
                 landed++;
             else

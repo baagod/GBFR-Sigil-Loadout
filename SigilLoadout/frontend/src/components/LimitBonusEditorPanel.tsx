@@ -115,6 +115,10 @@ function AbilityRow({
 }) {
     // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）。
     const label = ability.params.map((param, i) => effectLabel(param, effects, i)).join(" ");
+    // 这一行有没有被编辑过（任一格有一条"有值"的记录）→ 决定描述格的颜色（白 / 灰）。
+    // 判的是 `values[0] != null`：记录存在但那一格是 null（被清空）不算编辑——框里那时显示占位符，
+    // 描述也该是灰的。
+    const edited = ability.params.some((param) => edits.get(param.key)?.values[0] != null);
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
@@ -127,13 +131,13 @@ function AbilityRow({
             <div className="relative min-w-0">
                 {/*
                     圆点按节点类型着色（只有能力 / 专属类有点，属性节点没有）：
-                    专属强化（BonusType 1）绿 #016630、能力强化（2）蓝 #2b7fff。
+                    专属强化（BonusType 1）粉 #a3004c、能力强化（2）蓝 #2b7fff。
                 */}
                 {ability.bonusType !== 0 && (
                     <span
                         aria-hidden
                         className={`absolute top-1/2 -left-4.5 size-2 -translate-y-1/2 rounded-full ${
-                            ability.bonusType === 1 ? "bg-[#016630]" : "bg-[#2b7fff]"
+                            ability.bonusType === 1 ? "bg-[#a3004c]" : "bg-[#2b7fff]"
                         }`}
                     />
                 )}
@@ -145,7 +149,9 @@ function AbilityRow({
                 <span className="truncate text-sm">{spaceCJKAndLatin(name)}</span>
             </div>
             {/* 描述是模板本身（不填数值）：数字在右边的框里，说不清的正是哪一段对应哪一个。少数参数行游戏没写文案，画占位符。 */}
-            <span className="min-w-0 truncate text-sm text-[#a0a0a0]">{label === "" ? "—" : label}</span>
+            <span className={`min-w-0 truncate text-sm ${edited ? "text-foreground" : "text-[#a0a0a0]"}`}>
+                {label === "" ? "—" : label}
+            </span>
             {/* 数值靠右：这一列比"框 + 分隔"宽，靠左时每行的数字离右边缘远近不一。 */}
             <div className="flex items-center justify-end">
                 {Array.from({ length: SLOTS_PER_ROW }, (_, i) => {
@@ -356,7 +362,11 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         const next = new Map(edits);
         // 只写**这一个**参数行：每一格对应节点的一条参数行（专属强化的两条是不同效果，实测 [10, 1]），
         // 一格写全部会把另外几条覆盖成同一个数。
-        next.set(param.key, withFirstValue(param, value ?? param.default));
+        //
+        // 清空（value === null）就存 null，**不再在这里换成原值**：界面要能分清"我清空了"（框回占位符）
+        // 与"我输入了一个正好等于原值的数"（框里就该是这个数、描述也该变白）。换回原值由服务端在落盘
+        // 时由服务端原样落盘（null 就是 null）——C# 那边的 float?[] 把它读成"这一格不动"。
+        next.set(param.key, withFirstValue(param, value));
         commit(next);
     }
 
@@ -366,7 +376,7 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         <div className="flex h-full min-h-0 min-w-160 flex-col page-padding">
             {/*
                 ability-rows 是给外壳那记 Esc 用的（见 App.tsx）：焦点在数值框里时，Esc 是"放开这个框"
-                （见 SlotBox），不该同时把整个窗口藏到托盘去——与因子编辑页的 .skill-rows 同一条规矩。
+                （见 SlotInput），不该同时把整个窗口藏到托盘去——与因子编辑页的 .skill-rows 同一条规矩。
                 这一页没有用得上它的样式，所以它在这里只是个钩子。
             */}
             <div className="ability-rows min-h-0 flex-1 overflow-y-auto pr-4 scrollbar-gutter-stable">

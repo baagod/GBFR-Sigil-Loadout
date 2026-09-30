@@ -111,8 +111,40 @@ if (-not $msbuild) {
     throw 'MSBuild was not found. Install Visual Studio 2022 Build Tools with the C++ workload.'
 }
 
+# 原生那半：**源码内容变了才 /t:Rebuild**，否则走增量。
+#
+# Rebuild 一次约 15s、增量 0.7s，而这条链的源码变动远少于托管/前端那边——每次构建都全量重编 C++ 是
+# 白等。守卫用**内容哈希**而不是 mtime：从压缩包/robocopy 解出来的源码可能带着旧时间戳，那时 mtime
+# 守卫会漏掉改动、编出旧 dll ✗。哈希只看本目录（bin/obj 除外），改这里的 .cpp/.h/.vcxproj 一定触发。
+#
+# 覆盖不到的是"目录之外的东西变了"——VS/SDK 工具链升级那种；真遇到怪异现象，删掉 bin\ 跑一次即可。
+$nativeDir = Split-Path -Parent $nativeProject
+$nativeOut = Join-Path $nativeDir "bin\$Configuration\GBFR.SigilLoadout.Native.dll"
+$hashFile = Join-Path $nativeDir "bin\$Configuration\.source-hash"
+
+$signature = (Get-ChildItem -LiteralPath $nativeDir -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '\\bin\\|\\obj\\' } |
+    Sort-Object FullName |
+    ForEach-Object {
+        $relative = $_.FullName.Substring($nativeDir.Length)
+        "$relative=$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
+    }) -join "`n"
+
+$nativeTarget = '/t:Rebuild'
+$reason = '产物不存在'
+if (Test-Path -LiteralPath $nativeOut) {
+    if ((Test-Path -LiteralPath $hashFile) -and (Get-Content -LiteralPath $hashFile -Raw).Trim() -eq $signature) {
+        $nativeTarget = '/t:Build'
+        $reason = '源码未变'
+    }
+    else {
+        $reason = '源码变了'
+    }
+}
+Write-Output "native: $nativeTarget ($reason)"
+
 & $msbuild $nativeProject `
-    /t:Rebuild `
+    $nativeTarget `
     /p:Configuration=$Configuration `
     /p:Platform=$Platform `
     /m `
@@ -121,6 +153,9 @@ if (-not $msbuild) {
 if ($LASTEXITCODE -ne 0) {
     throw "Native build failed with exit code $LASTEXITCODE."
 }
+# 构建成功之后才记下这次的源签名：失败时留下的旧签名会让下一次仍然全量编（宁多编、不漏编）。
+New-Item -ItemType Directory -Path (Split-Path -Parent $hashFile) -Force | Out-Null
+Set-Content -LiteralPath $hashFile -Value $signature -NoNewline
 
 # NuGetAudit=false 让离线构建保持绿的；环境允许时另跑一次
 # `dotnet list package --vulnerable` 查漏洞。
@@ -132,14 +167,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "Managed restore failed with exit code $LASTEXITCODE."
 }
 
-& dotnet clean $managedProject -c $Configuration --nologo
-if ($LASTEXITCODE -ne 0) {
-    throw "Managed clean failed with exit code $LASTEXITCODE."
-}
-
+# 这里**不**跑 `dotnet clean`、也**不**加 --no-incremental：C# 的增量编译可靠，全量重编一次约多花
+# 4-6s。真遇到陈旧的 obj/ 捣乱时，手动 `dotnet clean` 一次即可。
+#
 # /nodeReuse:false 与 -p:UseSharedCompilation=false：MSBuild 节点与 Roslyn 编译器服务器是**常驻**进程，
 # 它们继承调用者的 stdout/stderr 并活过构建，调用者那根管道就永不关闭——CI/agent 里表现为"任务永不结束"。
-& dotnet build $managedProject -c $Configuration --nologo --no-incremental --no-restore -p:UseSharedCompilation=false
+& dotnet build $managedProject -c $Configuration --nologo --no-restore -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) {
     throw "Managed build failed with exit code $LASTEXITCODE."
 }

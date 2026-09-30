@@ -219,29 +219,32 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
         return () => { alive = false }
     }, [lang])
 
-    // 编辑里那一槽的值：null = 用户没填过（框里就是空的，原值只当占位符）。
-    //
-    // 记录里的值**等于游戏原值**也算"没填过"：清空一槽时按规矩要把原值写回游戏（否则游戏停在旧值
-    // 上），那会留下一条"值就是原值"的记录——它不该让界面一启动就显示成编辑状态，更不该被将来某份
-    // 残留的编辑文件点着。所以判据是"和原值不一样"，不是"记录在不在"。
+    /*
+        编辑里那一槽的值：null = 用户没填过、或被清空过（框里是空的，原值只当占位符）。
+
+        记录里**没动过的格子就是 null**（见 setSlot）：与因子编辑那条链同一个模型——C# 的
+        SkillboardConfig.Values 也是 float?[]，注释写着"nil 就是游戏自己的值"。服务端**不解析**这些
+        null（不换成原值）：换掉之后文件里就没有"没动过"这个信息了，重开界面会把整组十格都显示成
+        数字、默认值当不成占位符（实测被骂过两次）。
+    */
     function editAt(group: ParamGroup, slot: number): number | null {
-        const value = edits.get(group.key)?.[slot] ?? null
-        if (value === null || value === group.values[slot]) return null
-        return value
+        return edits.get(group.key)?.[slot] ?? null
     }
 
     // 这一组里某一槽"现在等于多少"：填过用填的，没填过用游戏原值。
-    function slotOf(group: ParamGroup, slot: number): number | null {
-        return editAt(group, slot) ?? group.values[slot] ?? null
-    }
-
-    /** 提交一槽：null = 清空（写回游戏原值）；解析与半成品文本的规则全在共享的 SlotInput 里。 */
+    /** 提交一槽：null = 清空；解析与半成品文本的规则全在共享的 SlotInput 里。 */
     function setSlot(group: ParamGroup, slot: number, value: number | null) {
         const next = new Map(edits)
-        // 交出去的永远是**这一组完整的十个值**（没动过的格子交游戏原值）：原生按连续前缀写，
-        // 中间挖空写不了。界面判"这一格填过没有"靠的是"值 ≠ 原值"（见 editAt），整组交满不影响显示。
-        const values = Array.from({ length: SLOTS }, (_, i) => slotOf(group, i))
-        values[slot] = value ?? group.values[slot]
+        /*
+            记录里**没动过的格子存 null**（不是游戏原值）。
+
+            从前这里填的是原值（"交出去的永远是这一组完整的十个值"），于是记录一存在，十格全被判成
+            "编辑过"——你只改一格，整行十个数字全亮起来（实测过的症状）。原值由服务端在落盘时补
+            （服务端原样落盘，null 就是 null），所以配置里仍然是没动过的那些
+            数字、原生那套"按连续前缀写"照旧。
+        */
+        const values = Array.from({ length: SLOTS }, (_, i) => editAt(group, i))
+        values[slot] = value
         next.set(group.key, values)
         setEdits(next)
         SaveSkillboardEdits([...next].map(([key, v]) => ({ key, values: v }))).catch(() => {})

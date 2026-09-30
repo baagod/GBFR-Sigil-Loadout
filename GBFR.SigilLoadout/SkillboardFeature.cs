@@ -159,7 +159,7 @@ internal sealed class SkillboardFeature {
         foreach (SkillboardEdit edit in config.Edits) {
             if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
                 continue;
-            float[]? values = Flatten(edit.Values);
+            float[]? values = SlotValues.Flatten(edit.Values, MaxValues);
             if (values is null)
                 continue;
 
@@ -204,7 +204,7 @@ internal sealed class SkillboardFeature {
         foreach (SkillboardEdit edit in config.Edits) {
             if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
                 continue;
-            float[]? values = Flatten(edit.Values);
+            float[]? values = SlotValues.Flatten(edit.Values, MaxValues);
             if (values is null)
                 continue;
 
@@ -233,29 +233,8 @@ internal sealed class SkillboardFeature {
         return file;
     }
 
-    /// <summary>
-    /// 把记录里的十个槽化成连续前缀：砍掉尾部的 null，中间若还剩 null 就整条跳过（原生按连续前缀写）。
-    /// </summary>
-    private static float[]? Flatten(float?[] slots) {
-        if (slots is null || slots.Length == 0 || slots.Length > MaxValues)
-            return null;
-
-        int last = -1;
-        for (int i = 0; i < slots.Length; i++) {
-            if (slots[i] is not null)
-                last = i;
-        }
-        if (last < 0)
-            return null;
-
-        var values = new float[last + 1];
-        for (int i = 0; i <= last; i++) {
-            if (slots[i] is not float value)
-                return null;
-            values[i] = value;
-        }
-        return values;
-    }
+    // "把可空的十个槽化成连续前缀"搬去了 SlotValues（角色强化那条链也要用同一套）。
+    // 它为什么会在"中间有缺口"时整条跳过、以及跳过的后果落在那条路上，都写在那边的注释里。
 
     private static bool TryParseKey(string key, out uint hash) {
         hash = 0;

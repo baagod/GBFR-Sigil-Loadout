@@ -64,7 +64,11 @@ export type LimitBonusText = {
 export type LimitBonusEdit = {
     enabled: boolean
     key: string
-    values: number[]
+    /**
+     * 按档位排的覆写值。**可空**（与编辑服务那边的 SigilSkill 同一形状）：`null` = 这一格被清空了，
+     * 界面回到占位符（游戏原值）。服务端落盘时会把 null 解析成原值——配置文件与 C# 只看到数字。
+     */
+    values: (number | null)[]
 }
 
 /**
@@ -185,7 +189,7 @@ export function asEdit(raw: unknown): LimitBonusEdit | null {
  * 清空为什么不是"删掉记录"：游戏不会自己忘掉上一次写入的值，删了它就会停在旧值上、而界面显示默认
  * 值——两边对不上（实测的 bug）。所以清空由调用方写回**这一行的 Lv1 原值**（见 setValue）。
  */
-export function withFirstValue(param: LimitBonusParam, value: number): LimitBonusEdit {
+export function withFirstValue(param: LimitBonusParam, value: number | null): LimitBonusEdit {
     return {
         // **有值就是启用**：界面上没有启用的开关，记录存在本身就代表这一行要生效（mod 跳过 enabled
         // 为假的条目，而这里从不写假）。

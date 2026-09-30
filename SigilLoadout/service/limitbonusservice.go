@@ -15,10 +15,15 @@ import (
 // LimitBonusEdit 对应 mod 的 LimitBonusConfig.cs 里的 LimitBonusEdit：对一个参数行（limit_bonus_param
 // 的一行）的覆写。Values 按档位排、写成 Lv1..LvN —— 写几个槽完全由这个数组的长度决定，没提到的槽
 // 一个字节都不碰（形状与 sigiledits.json 的 values 有意一致）。
+//
+// Values 是**可空**的（与编辑服务那边的 SigilSkill 一致）：`null` = 这一格被清空了，界面回到占位符。
+// 落盘时由 writeLimitBonusEdits 把 null 解析成这一行的游戏原值——于是**配置文件与 C# 那半看到的仍然
+// 全是数字**，null 只活在界面与这条 DTO 之间。清空不能写成"删掉记录"：游戏不会自己忘掉上一次写入的
+// 值，删了记录它会停在旧值上、而界面显示默认值，两边对不上（实测过的 bug）。
 type LimitBonusEdit struct {
-	Enabled bool      `json:"enabled"`
-	Key     string    `json:"key"`
-	Values  []float64 `json:"values"`
+	Enabled bool       `json:"enabled"`
+	Key     string     `json:"key"`
+	Values  []*float64 `json:"values"`
 }
 
 /*
@@ -120,7 +125,40 @@ func (s *LimitBonusService) LoadLimitBonusEdits() ([]LimitBonusEdit, error) {
 	if edits == nil {
 		edits = []LimitBonusEdit{}
 	}
-	return edits, nil
+	return normalizeLimitBonusEdits(edits), nil
+}
+
+// normalizeLimitBonusEdits 把"值恰好等于该参数行游戏原值"的槽归一成 null。
+//
+// 与专精那条链同一个理由、同一个位置（见 normalizeSkillboardEdits）：更早的版本落盘时会把被清空的
+// 格子写成原值（那时 C# 那份 Values 还是不可空的 float[]），于是重开界面分不清"用户填了个正好等于
+// 原值的数"和"这里本来就没动过"。现在写出去的是 null，旧文件在这里归一。
+//
+// 判"等于原值 = 没编辑"是安全的：值就是原值，写不写出去都一样。
+func normalizeLimitBonusEdits(edits []LimitBonusEdit) []LimitBonusEdit {
+	defaults := map[string]float64{}
+	for _, character := range limitBonusSkeleton.Characters {
+		for _, bonus := range character.Bonuses {
+			for _, param := range bonus.Params {
+				defaults[param.Key] = param.Default
+			}
+		}
+	}
+
+	out := make([]LimitBonusEdit, 0, len(edits))
+	for _, edit := range edits {
+		values := make([]*float64, len(edit.Values))
+		for i, value := range edit.Values {
+			if value != nil {
+				if original, ok := defaults[edit.Key]; ok && original == *value {
+					continue // 就是游戏原值：当作没编辑
+				}
+				values[i] = value
+			}
+		}
+		out = append(out, LimitBonusEdit{Enabled: edit.Enabled, Key: edit.Key, Values: values})
+	}
+	return out
 }
 
 // SaveLimitBonusEdits 接过最新的编辑列表并重启防抖，好让写入发生在编辑停下来之后（见 debounceDelay）。

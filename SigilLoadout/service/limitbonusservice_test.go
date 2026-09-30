@@ -3,6 +3,7 @@ package service
 import (
 	jsonv2 "encoding/json/v2"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"sigilloadout/appfiles"
@@ -21,7 +22,7 @@ func TestSaveLimitBonusEditsWritesTheAgreedShape(t *testing.T) {
 	hermeticHome(t)
 
 	service := &LimitBonusService{}
-	edits := []LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{500, 600, 321}}}
+	edits := []LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: ptrs(500, 600, 321)}}
 	if err := service.SaveLimitBonusEdits(edits); err != nil {
 		t.Fatalf("SaveLimitBonusEdits: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
 		service := &LimitBonusService{}
 		cfgPath := localConfig(t, limitBonusEditListName)
 
-		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{5, 6, 7}}}); err != nil {
+		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: ptrs(5, 6, 7)}}); err != nil {
 			t.Fatalf("SaveLimitBonusEdits: %v", err)
 		}
 		time.Sleep(appfiles.DebounceDelay / 4)
@@ -65,7 +66,7 @@ func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
 			t.Fatal("limit_bonus.json was written while the debounce window was still open")
 		}
 
-		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: []float64{500, 600, 321}}}); err != nil {
+		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: ptrs(500, 600, 321)}}); err != nil {
 			t.Fatalf("SaveLimitBonusEdits: %v", err)
 		}
 		time.Sleep(appfiles.DebounceDelay / 4)
@@ -84,7 +85,7 @@ func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
 			t.Fatalf("limit_bonus.json is not valid JSON: %v", err)
 		}
-		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 || cfg.Edits[0].Values[2] != 321 {
+		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 || deref(cfg.Edits[0].Values[2]) != 321 {
 			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
 		}
 	})
@@ -101,9 +102,60 @@ func TestLoadLimitBonusEditsReadsTheUserConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadLimitBonusEdits: %v", err)
 	}
-	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || len(loaded[0].Values) != 3 || loaded[0].Values[2] != 321 || !loaded[0].Enabled {
+	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || len(loaded[0].Values) != 3 || deref(loaded[0].Values[2]) != 321 || !loaded[0].Enabled {
 		t.Fatalf("limit_bonus.json was not read back: %+v", loaded)
 	}
+}
+
+/*
+旧文件里"被清空的格子写成了原值"要读成"没编辑"（null）——那是更早版本的落盘形状：那时 C# 那份
+Values 还是不可空的 float[]，落盘必须给个数字，于是界面上"清空"与"输入了一个正好等于原值的数"
+再也分不开，重开界面整组都显示成数字（见 normalizeLimitBonusEdits）。
+*/
+func TestLoadLimitBonusEditsDropsAValueThatIsJustTheOriginal(t *testing.T) {
+	hermeticHome(t)
+	if err := loadLimitBonusTables("../assets"); err != nil {
+		t.Fatalf("loadLimitBonusTables: %v", err)
+	}
+
+	key, original, ok := anyLimitBonusParam()
+	if !ok {
+		t.Fatal("骨架里没有参数行")
+	}
+	writeFile(t, localConfig(t, limitBonusEditListName),
+		fmt.Sprintf(`{"edits":[{"enabled":true,"key":%q,"values":[%v]}]}`, key, original))
+
+	loaded, err := (&LimitBonusService{}).LoadLimitBonusEdits()
+	if err != nil {
+		t.Fatalf("LoadLimitBonusEdits: %v", err)
+	}
+	if len(loaded) != 1 || loaded[0].Values[0] != nil {
+		t.Fatalf("a value equal to the original came back as %+v, want null", loaded)
+	}
+
+	// 而"不等于原值"的照旧留着：归一化不能把真实的编辑吃掉。
+	writeFile(t, localConfig(t, limitBonusEditListName),
+		fmt.Sprintf(`{"edits":[{"enabled":true,"key":%q,"values":[%v]}]}`, key, original+7))
+
+	loaded, err = (&LimitBonusService{}).LoadLimitBonusEdits()
+	if err != nil {
+		t.Fatalf("LoadLimitBonusEdits: %v", err)
+	}
+	if len(loaded) != 1 || loaded[0].Values[0] == nil || *loaded[0].Values[0] != original+7 {
+		t.Fatalf("a real edit was dropped: %+v", loaded)
+	}
+}
+
+// anyLimitBonusParam 取骨架里任意一条参数行（key 与它的默认值），给上面的归一化测试用。
+func anyLimitBonusParam() (string, float64, bool) {
+	for _, character := range limitBonusSkeleton.Characters {
+		for _, bonus := range character.Bonuses {
+			for _, param := range bonus.Params {
+				return param.Key, param.Default, true
+			}
+		}
+	}
+	return "", 0, false
 }
 
 /*
@@ -215,6 +267,10 @@ func TestLoadLimitBonusEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 文案表里都要有对应的词**（否则一行节点显示的就是一串哈希），效果文案里除了 {0} 不能有别的东西
 （前端只换 {0}，其余的会原样显示到屏幕上）。
 */
+// limitBonusParamWithoutEffectText 是游戏自己的文本表里**唯一**没有效果文本的参数行（四门语言都缺
+// 同一条）。它仍然进骨架（那一格照样能写值），只是文案表里没有它，界面上画占位符 "—"。
+const limitBonusParamWithoutEffectText = "2957AC4C"
+
 func TestLimitBonusAssetsAreUsable(t *testing.T) {
 	if len(limitBonusSkeleton.Characters) == 0 {
 		t.Fatal("limit_bonus.json names no character")
@@ -261,11 +317,10 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 				// 一个参数行可以被同一个角色的两个节点共用（名字不同、指到同一行）：那两栏在界面上读写的
 				// 是同一行，列表本来就按 Key 索引（见 skills.ts 的 dedupeBy），所以不冲突。
 
-				// 这个数是界面空框里的占位符，也是"这条参数行有档位可写"的证据：生成器不发 Lv1 为 0
-				// 的行（那种行没有档位可写），所以它到这一层不该是 0。
-				if param.Default == 0 {
-					t.Fatalf("%s/%s: %s has no Lv1 default", character.ID, ability.Key, param.Key)
-				}
+				// 这个数是界面空框里的占位符。**允许 0**：专属强化（LB_PLxxxx_UQ_xx）的 B 侧参数
+				// 就是"Lv1/Lv2 都是 0、只有 Lv3 有值"——它在游戏里有自己的介绍文字，界面该给一格。
+				// 从前按"Lv1 是 0 就是没有档位可写"整条丢掉，正是「角色专属」整族消失的一半原因
+				// （见 gen/game/limitbonus 的 buildType）。
 			}
 		}
 	}
@@ -298,6 +353,12 @@ func TestLimitBonusTextsCoverTheSkeletonInEveryLanguage(t *testing.T) {
 					t.Fatalf("%s: no name for node %s", lang, ability.Key)
 				}
 				for _, param := range ability.Params {
+					// 游戏自己的文本表里有 1 个参数行没写效果文本（四门语言都缺同一条），生成器只在
+					// 文本非空时才写进文案表，所以这里放它过去：界面上那一格画占位符 "—"（见
+					// LimitBonusEditorPanel 的 AbilityRow）。
+					if param.Key == limitBonusParamWithoutEffectText {
+						continue
+					}
 					if text.Effects[param.Key] == "" {
 						t.Fatalf("%s: no effect text for param %s", lang, param.Key)
 					}
@@ -309,6 +370,11 @@ func TestLimitBonusTextsCoverTheSkeletonInEveryLanguage(t *testing.T) {
 	// 效果模板的占位符：前端只换 {0}，别的占位符会原样显示到屏幕上。
 	for _, lang := range limitBonusLangCodes() {
 		for key, effect := range service.LoadLimitBonus(lang).Effects {
+			// 少数参数行的文案里游戏把数直接写死了（实测例如 89F8A99F 在 zh 下是
+			// "根据召唤的宠物数量\n攻击力+2.5%"），没有占位符可填——那不是错，放过去。
+			if !strings.Contains(effect, "{") {
+				continue
+			}
 			if !strings.Contains(effect, "{0}") {
 				t.Fatalf("%s: effect %q of %s has no {0} to fill in", lang, effect, key)
 			}
@@ -376,4 +442,20 @@ func isHexKey(text string) bool {
 		}
 	}
 	return true
+}
+
+// ptrs 把若干数值包成指针切片：LimitBonusEdit.Values 可空（null = 这一格被清空）。
+func ptrs(values ...float64) []*float64 {
+	out := make([]*float64, len(values))
+	for i := range values {
+		out[i] = &values[i]
+	}
+	return out
+}
+
+func deref(value *float64) float64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

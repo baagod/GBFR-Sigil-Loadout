@@ -12,8 +12,8 @@ import { slotEdit, stepValue } from "@/lib/skills"
  *  - 清空 = 提交 null；"回到游戏原值"怎么写由调用方决定（各页规矩相同、落点不同）。
  *  - 滚轮步进（useWheelStep）、方向键步进、Esc 放开焦点。
  *
- * 抽出来的理由：这些行为原先在本页与角色强化页各写了一遍，专精那份还漏了滚轮/方向键/Esc
- * ——三份实现里只有一份是全的。样式仍由调用点给（各页的行高、宽度不同）。
+ * 以**因子编辑页的数值槽为准**：slotEdit / stepValue / useWheelStep 那套本来就出自它，另两页原先各
+ * 写了一遍（专精那份还漏了滚轮/方向键/Esc）。现在三页都用这一个框，样式由调用点给（行高与宽度不同）。
  */
 export function SlotInput({
     original,

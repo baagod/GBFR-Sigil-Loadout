@@ -19,9 +19,15 @@ public class LimitBonusEdit {
     [JsonPropertyName("key")]
     public string Key { get; set; } = "";
 
-    /// <summary>按档位排的数值，写 Lv1..LvN，N ∈ [1,10]。越界的条目整条跳过并记一行日志。</summary>
+    /// <summary>
+    /// 按档位排的数值，写 Lv1..LvN，N ∈ [1,10]。越界的条目整条跳过并记一行日志。
+    ///
+    /// **可空**（与 SigilSkill / SkillboardConfig 同一形状）：<c>null</c> = 这一格没动过、用游戏自己的
+    /// 值。工具"清空一格"写下来的就是这一种——不写默认值回去，因为写下去就再没有第二份原始值可以
+    /// 拿回来了；界面那一格显示成占位符（就是游戏原值），语义一致。
+    /// </summary>
     [JsonPropertyName("values")]
-    public float[] Values { get; set; } = [];
+    public float?[] Values { get; set; } = [];
 }
 
 /// <summary>
