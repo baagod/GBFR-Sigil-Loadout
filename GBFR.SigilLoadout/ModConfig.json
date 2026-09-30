@@ -3,7 +3,7 @@
     "ModName": "GBFR Sigil Loadout (2.0.5)",
     "ModAuthor": "baagod",
     "ModVersion": "0.8.0",
-    "ModDescription": "为全角色预装备因子，不占用原生槽位，无需库存、不写存档。可编辑因子技能与角色强化数值。",
+    "ModDescription": "可为全角色预装备因子（不占原生槽位）；支持编辑因子、角色强化与专精数值。",
     "ModDll": "GBFR.SigilLoadout.dll",
     "ModIcon": "icon.png",
     "ModR2RManagedDll32": "",
