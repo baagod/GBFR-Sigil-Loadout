@@ -1,6 +1,6 @@
 # GBFR Sigil Loadout
 
-派生自 [GBFR Extra Sigil Slots](https://github.com/cajoxorize366-oss/GBFR-Extra-Sigil-Slots) 的《碧蓝幻想：Relink》因子配装 mod：**为全角色预装备因子**，不占用游戏本体槽位，无需库存、不写存档。可编辑 **因子技能**、**角色强化** 数值。
+派生自 [GBFR Extra Sigil Slots](https://github.com/cajoxorize366-oss/GBFR-Extra-Sigil-Slots) 的《碧蓝幻想：Relink》因子配装 mod：**为全角色预装备因子**，不占用游戏本体槽位，无需库存、不写存档。可编辑 **因子技能**、**角色强化** 与 **专精技能** 数值。
 
 > **AI 辅助开发声明：**
 >
@@ -22,6 +22,7 @@
 1. 游戏中按 F1 呼出配装工具 ( 或手动运行 `Mods/GBFR.SigilLoadout/SigilLoadout.exe` )。
 2. **因子编辑**：改动时，游戏中对应的 **因子描述** 同步更新，**实际** 在下一次战斗开始时生效。
 3. **角色强化**：改动时，游戏中对应 “角色强化：攻击、HP · 抗性” 里的 “Lv1 节点” 同步更新，**实际** 在下一次 **读档** 后生效 ( 返回标题开始游戏即可 )。
+4. **专精技能**：改动后 **必须** 重启游戏才能生效。
 
 
 ## 致谢 ( Credit )
