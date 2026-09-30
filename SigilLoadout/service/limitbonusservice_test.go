@@ -108,11 +108,12 @@ func TestLoadLimitBonusEditsReadsTheUserConfig(t *testing.T) {
 }
 
 /*
-旧文件里"被清空的格子写成了原值"要读成"没编辑"（null）——那是更早版本的落盘形状：那时 C# 那份
-Values 还是不可空的 float[]，落盘必须给个数字，于是界面上"清空"与"输入了一个正好等于原值的数"
-再也分不开，重开界面整组都显示成数字（见 normalizeLimitBonusEdits）。
+	落盘就是"用户填了什么"，读回来必须**原样**——不拿游戏原值做任何比较（与专精那条链同一规矩）。
+
+	曾经的回归：读入时把"恰好等于游戏原值"的槽归一成 null，于是"我就是要填这个原值"这种输入在重开
+	界面后变回占位符。原值只是输入框的占位符，不该参与任何判断。
 */
-func TestLoadLimitBonusEditsDropsAValueThatIsJustTheOriginal(t *testing.T) {
+func TestLoadLimitBonusEditsKeepsAValueThatIsJustTheOriginal(t *testing.T) {
 	hermeticHome(t)
 	if err := loadLimitBonusTables("../assets"); err != nil {
 		t.Fatalf("loadLimitBonusTables: %v", err)
@@ -129,24 +130,12 @@ func TestLoadLimitBonusEditsDropsAValueThatIsJustTheOriginal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadLimitBonusEdits: %v", err)
 	}
-	if len(loaded) != 1 || loaded[0].Values[0] != nil {
-		t.Fatalf("a value equal to the original came back as %+v, want null", loaded)
-	}
-
-	// 而"不等于原值"的照旧留着：归一化不能把真实的编辑吃掉。
-	writeFile(t, localConfig(t, limitBonusEditListName),
-		fmt.Sprintf(`{"edits":[{"enabled":true,"key":%q,"values":[%v]}]}`, key, original+7))
-
-	loaded, err = (&LimitBonusService{}).LoadLimitBonusEdits()
-	if err != nil {
-		t.Fatalf("LoadLimitBonusEdits: %v", err)
-	}
-	if len(loaded) != 1 || loaded[0].Values[0] == nil || *loaded[0].Values[0] != original+7 {
-		t.Fatalf("a real edit was dropped: %+v", loaded)
+	if len(loaded) != 1 || loaded[0].Values[0] == nil || *loaded[0].Values[0] != original {
+		t.Fatalf("a value equal to the original came back as %+v, want %v", loaded, original)
 	}
 }
 
-// anyLimitBonusParam 取骨架里任意一条参数行（key 与它的默认值），给上面的归一化测试用。
+// anyLimitBonusParam 取骨架里任意一条参数行（key 与它的默认值），给上面的测试用。
 func anyLimitBonusParam() (string, float64, bool) {
 	for _, character := range limitBonusSkeleton.Characters {
 		for _, bonus := range character.Bonuses {

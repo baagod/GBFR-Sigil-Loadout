@@ -173,52 +173,7 @@ func (s *SkillboardService) LoadSkillboardEdits() ([]SkillboardEdit, error) {
 	if edits == nil {
 		edits = []SkillboardEdit{}
 	}
-	return normalizeSkillboardEdits(edits), nil
-}
-
-// normalizeSkillboardEdits 把"值恰好等于该槽游戏原值"的槽归一成 null。
-//
-// 为什么要有这一步：**更早的版本**落盘时会把没动过的格子补成原值（那时是为了满足原生"按连续前缀
-// 写"）。文件里一旦没有 null，"这一格没动过"就丢了，重开界面会把整组十格都显示成数字、默认值当不成
-// 占位符。现在写出去的是原样的 null（见 writeSkillboardEdits），但**已经在盘上的旧文件**还带着那批
-// 原值，于是在读入处归一一次：界面立刻回到占位符，下一次保存写出干净的 null。
-//
-// 判定"等于原值 = 没编辑"在这里是安全的：值就是游戏原值，写不写出去都一样。
-func normalizeSkillboardEdits(edits []SkillboardEdit) []SkillboardEdit {
-	defaults := map[string][]float64{}
-	addGroup := func(key string, values []float64, more []SkillboardParamGroup) {
-		defaults[key] = values
-		for _, group := range more {
-			defaults[group.Key] = group.Values
-		}
-	}
-	for _, character := range skillboardSkeleton {
-		for _, class := range character.Types {
-			for _, row := range class.Rows {
-				addGroup(row.Key, row.Values, row.More)
-			}
-			for _, skill := range class.Skills {
-				for _, row := range skill.Rows {
-					addGroup(row.Key, row.Values, row.More)
-				}
-			}
-		}
-	}
-
-	out := make([]SkillboardEdit, 0, len(edits))
-	for _, edit := range edits {
-		values := make([]*float64, len(edit.Values))
-		for i, value := range edit.Values {
-			if value != nil {
-				if group := defaults[edit.Key]; i < len(group) && group[i] == *value {
-					continue // 就是游戏原值：当作没编辑
-				}
-				values[i] = value
-			}
-		}
-		out = append(out, SkillboardEdit{Key: edit.Key, Values: values})
-	}
-	return out
+	return edits, nil
 }
 
 // SaveSkillboardEdits 接过最新的编辑列表并重启防抖，写入发生在编辑停下来之后（同 SaveLimitBonusEdits）。

@@ -125,40 +125,7 @@ func (s *LimitBonusService) LoadLimitBonusEdits() ([]LimitBonusEdit, error) {
 	if edits == nil {
 		edits = []LimitBonusEdit{}
 	}
-	return normalizeLimitBonusEdits(edits), nil
-}
-
-// normalizeLimitBonusEdits 把"值恰好等于该参数行游戏原值"的槽归一成 null。
-//
-// 与专精那条链同一个理由、同一个位置（见 normalizeSkillboardEdits）：更早的版本落盘时会把被清空的
-// 格子写成原值（那时 C# 那份 Values 还是不可空的 float[]），于是重开界面分不清"用户填了个正好等于
-// 原值的数"和"这里本来就没动过"。现在写出去的是 null，旧文件在这里归一。
-//
-// 判"等于原值 = 没编辑"是安全的：值就是原值，写不写出去都一样。
-func normalizeLimitBonusEdits(edits []LimitBonusEdit) []LimitBonusEdit {
-	defaults := map[string]float64{}
-	for _, character := range limitBonusSkeleton.Characters {
-		for _, bonus := range character.Bonuses {
-			for _, param := range bonus.Params {
-				defaults[param.Key] = param.Default
-			}
-		}
-	}
-
-	out := make([]LimitBonusEdit, 0, len(edits))
-	for _, edit := range edits {
-		values := make([]*float64, len(edit.Values))
-		for i, value := range edit.Values {
-			if value != nil {
-				if original, ok := defaults[edit.Key]; ok && original == *value {
-					continue // 就是游戏原值：当作没编辑
-				}
-				values[i] = value
-			}
-		}
-		out = append(out, LimitBonusEdit{Enabled: edit.Enabled, Key: edit.Key, Values: values})
-	}
-	return out
+	return edits, nil
 }
 
 // SaveLimitBonusEdits 接过最新的编辑列表并重启防抖，好让写入发生在编辑停下来之后（见 debounceDelay）。
