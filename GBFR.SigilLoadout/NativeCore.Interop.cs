@@ -69,21 +69,22 @@ internal static unsafe partial class NativeCore {
     /// 把一个能力强化的数值交给原生，写进**游戏自己已经解析好的**那份 limit_bonus_param；地址由
     /// 原生从语义锚点解析出来（src/table_slot.cpp），托管侧既不持有地址、也不扫内存。
     ///
-    /// <paramref name="levels"/> 写 Lv1..LvN（N = 数组长度，1..10）：只写被用到的那几档，没被用到的
-    /// 槽一个字节都不碰。
+    /// <paramref name="levelMask"/> 的低 10 位 = Lv1..Lv10 里**哪几档要写**：原生从第 1 档遍历到
+    /// 第 10 档，只写置位的那些，其余档一个字节都不碰。<paramref name="values"/> 十个，与档位一一
+    /// 对应（只有置位的会被读）——"没动过的档"因此不必拿游戏原值去填。
     ///
-    /// 返回 1 = 这一行真的被改了，0 = 内存里已经一样；&lt; 0 是拒绝码，一个字节都没写，原因由原生落
-    /// 一行日志（码的含义在 native_api.h / exports.cpp）。
+    /// 返回 &gt;= 0 是真正被改写的行数（0 = 内存里已经一样）；&lt; 0 是拒绝码，一个字节都没写，原因由
+    /// 原生落一行日志（码的含义在 native_api.h / exports.cpp）。
     /// </summary>
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int GBFR20_SetLimitBonusLevels(
         uint keyHash,
-        float* levels,
-        uint levelCount);
+        uint levelMask,
+        float* values);
 
-    internal static int SetLimitBonusLevels(uint keyHash, float[] levels) {
-        fixed (float* pointer = levels)
-            return GBFR20_SetLimitBonusLevels(keyHash, pointer, (uint)levels.Length);
+    internal static int SetLimitBonusLevels(uint keyHash, uint levelMask, float[] values) {
+        fixed (float* pointer = values)
+            return GBFR20_SetLimitBonusLevels(keyHash, levelMask, pointer);
     }
 
     /// <summary>
@@ -91,21 +92,22 @@ internal static unsafe partial class NativeCore {
     /// skillboard_effect_action_parts；表指针由原生从能力强化那张表的指针字段附近认出来
     /// （src/table_slot.cpp），托管侧既不持有地址、也不扫内存。
     ///
-    /// <paramref name="values"/> 写第 1..N 个槽（N = 数组长度，1..10）：这一页一格一档，十个槽都是
-    /// 数值，所以按"整行"交（没动过的格子交的是游戏原值，写下去等于没写）。
+    /// <paramref name="valueMask"/> 的低 10 位 = 十格里**哪几格要写**：原生从第 1 格遍历到第 10 格，
+    /// 只写置位的那些，其余格一个字节都不碰。<paramref name="values"/> 十个，与格子一一对应
+    /// （只有置位的会被读）——"只改第 4 格"于是就是 mask 的第 4 位，前面几格真的没写。
     ///
-    /// 返回 1 = 这一行真的被改了，0 = 内存里已经一样；&lt; 0 是拒绝码，一个字节都没写，原因由原生落
-    /// 一行日志（码的含义在 native_api.h / exports.cpp）。
+    /// 返回 &gt;= 0 是真正被改写的行数（0 = 内存里已经一样）；&lt; 0 是拒绝码，一个字节都没写，原因由
+    /// 原生落一行日志（码的含义在 native_api.h / exports.cpp）。
     /// </summary>
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int GBFR20_SetSkillboardValues(
         uint keyHash,
-        float* values,
-        uint valueCount);
+        uint valueMask,
+        float* values);
 
-    internal static int SetSkillboardValues(uint keyHash, float[] values) {
+    internal static int SetSkillboardValues(uint keyHash, uint valueMask, float[] values) {
         fixed (float* pointer = values)
-            return GBFR20_SetSkillboardValues(keyHash, pointer, (uint)values.Length);
+            return GBFR20_SetSkillboardValues(keyHash, valueMask, pointer);
     }
 
     /// <summary>

@@ -1,32 +1,50 @@
 namespace GBFR.SigilLoadout;
 
 /// <summary>
-/// 把配置里那份**可空**的槽位数组变成原生要的连续 <c>float[]</c>。
+/// 把配置里那份**可空**的槽位数组化成原生要的两样东西：**哪几格要写**（掩码）+ 那十格的值。
 ///
-/// 两条链的配置都是 <c>float?[]</c>（见 SigilSkill.Values / SkillboardConfig.Values /
-/// LimitBonusConfig.Values）：<c>null</c> 的意思是"这一格没动过，用游戏自己的值"——与
-/// sigiledits.json 的 Values 同一套规矩（注释原话：nil 就是"游戏自己的值"，补齐等于什么都没说）。
+/// 两条链的配置都是 <c>float?[]</c>（见 SkillboardConfig.Values / LimitBonusConfig.Values）：
+/// <c>null</c> 的意思是"这一格没动过，用游戏自己的值"——与 sigiledits.json 的 Values 同一套规矩。
 ///
-/// 原生按**连续前缀**写（没提到的槽一个字节都不碰），中间挖空写不了，所以这里：
-///   * 末尾的 null 直接截掉（正好等于"没提到"）；
-///   * 中间出现 null 就返回 null —— 调用方跳过这一条。跳过的后果只落在"就地写"这条快路上；
-///     重建表那条路照旧按 null = 游戏原值打补丁（见 SkillboardFeature.BuildEditedTable）。
+/// 原生按掩码写：位 i 置位才写第 i+1 格，其余格**一个字节都不碰**。所以"只改第 4 格"就是
+/// mask 的第 4 位 + values[3]，前面几格真的不写——不需要拿游戏原值把它们填满（旧接口只收
+/// "从第 1 格开始的连续一串值"，中间挖空就写不了，于是那种编辑会被整条跳过：实测"填了值
+/// 什么都没发生"，因为两条路上各被跳过了一次）。
+///
+/// 值为 null 的格子：掩码不置位，values 里留 0——原生理都不会读它。
 /// </summary>
 internal static class SlotValues {
-    internal static float[]? Flatten(float?[]? slots, int maxSlots) {
-        if (slots is null || slots.Length == 0 || slots.Length > maxSlots)
-            return null;
+    /// <summary>
+    /// <paramref name="slots"/> 里非 null 的格子。返回值里 <c>Mask == 0</c> 表示"这一条什么都没填"，
+    /// 调用方跳过它（没有要写的东西）。
+    /// </summary>
+    internal static (uint Mask, float[] Values) Mask(float?[]? slots, int maxSlots) {
+        var values = new float[maxSlots];
+        uint mask = 0;
+        if (slots is null)
+            return (0, values);
 
-        int last = Array.FindLastIndex(slots, slot => slot is not null);
-        if (last < 0)
-            return null;
-
-        var values = new float[last + 1];
-        for (int i = 0; i <= last; i++) {
+        int count = Math.Min(slots.Length, maxSlots);
+        for (int i = 0; i < count; i++) {
             if (slots[i] is not float value)
-                return null;
+                continue;
             values[i] = value;
+            mask |= 1u << i;
         }
-        return values;
+        return (mask, values);
+    }
+
+    /// <summary>
+    /// 日志里怎么念"写的是哪几格"：只列掩码选中的那些，如 <c>slot 4 = 9</c> 或 <c>L1 = 100, L3 = 250</c>。
+    /// 两条链只差一个叫法（专精叫 "slot "、能力强化叫 "L"），所以由调用方给（带不带空格也由它决定）。
+    /// </summary>
+    internal static string Spell(uint mask, float[] values, string slotLabel) {
+        var parts = new List<string>();
+        for (int i = 0; i < values.Length; i++) {
+            if ((mask & (1u << i)) == 0)
+                continue;
+            parts.Add($"{slotLabel}{i + 1} = {values[i]}");
+        }
+        return string.Join(", ", parts);
     }
 }

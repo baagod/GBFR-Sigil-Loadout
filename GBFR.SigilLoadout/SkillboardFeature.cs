@@ -130,7 +130,10 @@ internal sealed class SkillboardFeature {
         }
 
         // 造表：读游戏归档里的原表 → 只改要改的行。造不出来就说清原因（由 BuildEditedTable 记）。
-        byte[]? table = BuildEditedTable(config, out int applied);
+        //
+        // patched 就是"这一趟真正要写的行"（Key + 掩码 + 十个值），下面就地写直接用它：两处各自
+        // 重算一遍时，同一条编辑会在两处各被跳过一次，用户看到的就是"填了值什么都没发生"。
+        byte[]? table = BuildEditedTable(config, out List<(string Key, uint Hash, uint Mask, float[] Values)> patched);
         if (table is null)
             return;
 
@@ -152,44 +155,53 @@ internal sealed class SkillboardFeature {
         // 所以这里**对被拒的行再重试一遍**（整批写完之后）：那时指针基本一定已经解出来了。代价是每行
         // 多一次原生调用（微秒级），换来的是"第一次就全部落地"，不再白等下一次 5 秒 tick。
         //
-        // 计数按**行**算、不按调用次数算：一行重试后仍失败才是 1 条 refused，否则摘要会失真。
-        // 拒写的 key 与返回码一并记下来：原生按"拒绝码"去重（同一种只报一次），只看摘要分不清是哪一行。
-        int landed = 0;
-        List<(string Key, uint Hash, float[] Values)> retry = [];
-        foreach (SkillboardEdit edit in config.Edits) {
-            if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
-                continue;
-            float[]? values = SlotValues.Flatten(edit.Values, MaxValues);
-            if (values is null)
-                continue;
+        // 日志只记"写了哪一行的哪一格"：一行重试后仍失败才算 1 条 refused（不按调用次数算），
+        // 拒写的那几条在收尾时并成一行报出来。
+        bool TryWrite(string key, uint hash, uint mask, float[] values, out string refusal) {
+            int result = NativeCore.SetSkillboardValues(hash, mask, values);
+            if (result < 0) {
+                refusal = $"{key}={result}";
+                return false;
+            }
+            refusal = string.Empty;
+            // 只报**真的被改写的那一行与格子**（这一拍 native 说改了才算）：没变化时不说话。
+            if (result > 0)
+                _log($"skillboard edit: {key} {SlotValues.Spell(mask, values, "slot ")}");
+            return true;
+        }
 
-            if (NativeCore.SetSkillboardValues(keyHash, values) >= 0)
-                landed++;
-            else
-                retry.Add((edit.Key, keyHash, values));
+        List<(string Key, uint Hash, uint Mask, float[] Values)> retry = [];
+        foreach ((string key, uint hash, uint mask, float[] values) in patched) {
+            if (!TryWrite(key, hash, mask, values, out _))
+                retry.Add((key, hash, mask, values));
         }
 
         List<string> refusedKeys = [];
-        foreach ((string key, uint hash, float[] values) in retry) {
-            int result = NativeCore.SetSkillboardValues(hash, values);
-            if (result >= 0)
-                landed++;
-            else
-                refusedKeys.Add($"{key}={result}");
+        foreach ((string key, uint hash, uint mask, float[] values) in retry) {
+            if (!TryWrite(key, hash, mask, values, out string refusal))
+                refusedKeys.Add(refusal);
         }
         int refused = refusedKeys.Count;
 
         if (refused == 0)
             _hasLandedOnce = true;
         _stamp.MarkApplied(_lastAttemptVersion);
-        if (!quiet || refused > 0)
-            _log($"skillboard edit: table re-registered ({applied} rows patched), {landed} rows written in place, {refused} refused"
-                + (refused > 0 ? $" [{string.Join(", ", refusedKeys)}]" : string.Empty));
+        // 汇总只在**有拒写**时报，说明是哪几条：写成功那些上面已经逐行逐格报过了。
+        if (refused > 0)
+            _log($"skillboard edit: {refused} refused [{string.Join(", ", refusedKeys)}]");
     }
 
-    /// <summary>读游戏归档里的原表，按编辑列表打补丁。读不到/布局不对就返回 null 并记一行原因。</summary>
-    private byte[]? BuildEditedTable(SkillboardConfig config, out int applied) {
-        applied = 0;
+    /// <summary>
+    /// 读游戏归档里的原表，按编辑列表打补丁。读不到/布局不对就返回 null 并记一行原因。
+    ///
+    /// <paramref name="patched"/> 是**这一趟真正落进镜像的那些行**（Key + 交出去的那组值）：
+    /// 后面"就地写活表"直接用它，不再自己重算一遍——两处各算一次时，中间挖空的编辑会在两处
+    /// 各被跳过一次（实测：填了第 4 格却什么都没发生）。
+    /// </summary>
+    private byte[]? BuildEditedTable(
+        SkillboardConfig config,
+        out List<(string Key, uint Hash, uint Mask, float[] Values)> patched) {
+        patched = [];
         byte[]? file = _dm!.GetArchiveFile(TablePath);
         if (file is null) {
             _log($"skillboard edit FAIL: GetArchiveFile('{TablePath}') returned nothing");
@@ -203,9 +215,6 @@ internal sealed class SkillboardFeature {
         long rows = (file.Length - HeaderBytes) / RowBytes;
         foreach (SkillboardEdit edit in config.Edits) {
             if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
-                continue;
-            float[]? values = SlotValues.Flatten(edit.Values, MaxValues);
-            if (values is null)
                 continue;
 
             // Key 是行的身份：整张表里必须恰好出现一次（与原生那三道门同一条理由）。
@@ -225,16 +234,25 @@ internal sealed class SkillboardFeature {
                 continue;
             }
 
+            // 可空槽位 → "掩码 + 十个值"：null 的格掩码不置位。镜像里那几格**保持原字节**不动，
+            // 于是"只改第 4 格"不需要任何人去补原值——没被选中的格就是没被碰过。
+            (uint valueMask, float[] values) = SlotValues.Mask(edit.Values, MaxValues);
+            if (valueMask == 0)
+                continue;
+
             int valuesAt = (int)(HeaderBytes + (long)found * RowBytes + ValuesOffset);
-            for (int i = 0; i < values.Length; i++)
+            for (int i = 0; i < MaxValues; i++) {
+                if ((valueMask & (1u << i)) == 0)
+                    continue;
                 BitConverter.GetBytes(values[i]).CopyTo(file, valuesAt + i * sizeof(float));
-            applied++;
+            }
+            patched.Add((edit.Key, keyHash, valueMask, values));
         }
         return file;
     }
 
     // "把可空的十个槽化成连续前缀"搬去了 SlotValues（角色强化那条链也要用同一套）。
-    // 它为什么会在"中间有缺口"时整条跳过、以及跳过的后果落在那条路上，都写在那边的注释里。
+    // 空洞由调用方给的原值补齐、补不了才整条跳过，都写在那边的注释里。
 
     private static bool TryParseKey(string key, out uint hash) {
         hash = 0;
@@ -242,3 +260,7 @@ internal sealed class SkillboardFeature {
             System.Globalization.CultureInfo.InvariantCulture, out hash);
     }
 }
+
+
+
+

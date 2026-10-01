@@ -97,37 +97,38 @@ internal sealed class LimitBonusFeature {
             return;
         }
 
-        int landed = 0, skipped = 0, refused = 0;
+        int refused = 0;
         foreach (LimitBonusEdit edit in config.Edits) {
             if (!edit.Enabled)
                 continue;
-            if (!TryParseKey(edit.Key, out uint keyHash)) {
-                skipped++;
-                continue;
-            }
+            if (!TryParseKey(edit.Key, out uint keyHash))
+                continue; // 键不是 8 位十六进制：这一条没有要写的东西
 
-            // 可空槽位 → 原生要的连续数组：全是 null（工具里"清空了这一格"）或中间有缺口就跳过这一条。
-            // 跳过等于"这一行一个字节都不碰"，与因子编辑那条链的规矩一致。
-            float[]? levels = SlotValues.Flatten(edit.Values, MaxLevels);
-            if (levels is null) {
-                skipped++;
-                continue;
-            }
+            // 可空槽位 → 原生要的"掩码 + 十个值"：null 的档掩码不置位，原生一个字节都不碰。
+            // 全是 null（工具里清空了）就是 mask = 0：这一条没有要写的东西，跳过。
+            (uint levelMask, float[] values) = SlotValues.Mask(edit.Values, MaxLevels);
+            if (levelMask == 0)
+                continue; // 一格都没填（工具里清空了）：这一条没有要写的东西
 
-            // 逐档写：values[i] 进 Lv(i+1)。没提到的槽一个字节都不碰——原生的 level_count 就是数组
-            // 长度，所以"写几档"完全由这一条记录说了算。
-            int result = NativeCore.SetLimitBonusLevels(keyHash, levels);
-            if (result >= 0)
-                landed++;
-            else
+            // 逐档写：位 i 置位就把 values[i] 写进 Lv(i+1)。没置位的档一个字节都不碰——"哪几档要写"
+            // 完全由这一条记录说了算。
+            int result = NativeCore.SetLimitBonusLevels(keyHash, levelMask, values);
+            if (result < 0) {
                 refused++; // 原生已经落过一行原因（同一种拒写只报一次）
+                continue;
+            }
+            // 只报**真的被改写的那一格**（这一拍 native 说改了才算），并且写清是第几档、多少：
+            // "又是这些"不报。看护每一拍都会跑一遍，报"没变化"会把日志刷满。
+            if (result > 0)
+                _log($"limit bonus edit: {edit.Key} {SlotValues.Spell(levelMask, values, "L")}");
         }
 
         if (refused == 0)
             _hasLandedOnce = true;
-        if (!quiet || skipped > 0 || refused > 0)
-            _log($"limit bonus edit: {landed} applied, {skipped} skipped, {refused} refused"
-                + $" (of {config.Edits.Count} entries in the list)");
+        // 汇总只在**有拒写**时报，说明是哪几条：写成功那些上面已经逐格报过了。
+        // （从前这里还把 skipped 写进条件：一条空记录会永远 skipped，于是这一行每拍都打。）
+        if (refused > 0)
+            _log($"limit bonus edit: {refused} refused of {config.Edits.Count} entries");
     }
 
     /// <summary>
@@ -143,3 +144,4 @@ internal sealed class LimitBonusFeature {
         return uint.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out keyHash);
     }
 }
+

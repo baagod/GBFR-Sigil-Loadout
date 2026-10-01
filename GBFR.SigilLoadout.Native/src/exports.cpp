@@ -167,7 +167,7 @@ static const char* LimitBonusRefusalReason(int32_t code) {
     case GBFR20_TABLE_BUFFER_UNREADABLE:
         return "the pointer field is unreadable, or the table's memory is not writable.";
     case GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED:
-        return "level_count is not in 1..10.";
+        return "the slot mask selects nothing, or reaches past the tenth slot.";
     case GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE:
         return "the buffer's row count is outside the plausible range; the pointer field points at something else.";
     case GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE:
@@ -183,8 +183,8 @@ static const char* LimitBonusRefusalReason(int32_t code) {
 
 static int32_t SetLimitBonusLevelsEntry(
     uint32_t key_hash,
-    const float* levels,
-    uint32_t level_count) {
+    uint32_t level_mask,
+    const float* values) {
     if (g_shutting_down.load(std::memory_order_acquire))
         return GBFR20_TABLE_NOT_READY;
     // 与 WriteSkillStatusTable 同：刻意**不**要求 g_hooks_ready——写的是数据表，与钩子装没装成
@@ -193,7 +193,7 @@ static int32_t SetLimitBonusLevelsEntry(
     // 同一种拒写只报一次：调用方每个能力各调一次，逐条报会把日志刷满，而原因逐字相同。
     static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
 
-    const int32_t result = SetLimitBonusLevels(key_hash, levels, level_count);
+    const int32_t result = SetLimitBonusLevels(key_hash, level_mask, values);
     if (result < 0) {
         if (last_refusal.exchange(result, std::memory_order_acq_rel) != result)
             Log(std::format(
@@ -210,26 +210,26 @@ static int32_t SetLimitBonusLevelsEntry(
 
 int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
     uint32_t key_hash,
-    const float* levels,
-    uint32_t level_count) {
+    uint32_t level_mask,
+    const float* values) {
     return GuardAbi("GBFR20_SetLimitBonusLevels", GBFR20_TABLE_WRITE_FAILED, [&] {
-        return SetLimitBonusLevelsEntry(key_hash, levels, level_count);
+        return SetLimitBonusLevelsEntry(key_hash, level_mask, values);
     });
 }
 
-// 「专精技能」那一页：同一套三道门（值个数 -> 行数合理 -> 整段可写 -> 目标 Key 全表恰好一次），
+// 「专精技能」那一页：同一套门（掩码合法 -> 行数合理 -> 整段可写 -> 命中行的被选中格一致），
 // 不同的只有"表指针从哪来"——见 src/table_slot.cpp 的 ResolveSkillboardPointer。拒绝码沿用同一组
 // （含义逐条相同），所以原因文案也复用 LimitBonusRefusalReason。
 static int32_t SetSkillboardValuesEntry(
     uint32_t key_hash,
-    const float* values,
-    uint32_t value_count) {
+    uint32_t value_mask,
+    const float* values) {
     if (g_shutting_down.load(std::memory_order_acquire))
         return GBFR20_TABLE_NOT_READY;
     EnsureInitialized();
     static std::atomic_int32_t last_refusal{std::numeric_limits<int32_t>::min()};
 
-    const int32_t result = SetSkillboardValues(key_hash, values, value_count);
+    const int32_t result = SetSkillboardValues(key_hash, value_mask, values);
     if (result < 0) {
         if (last_refusal.exchange(result, std::memory_order_acq_rel) != result)
             Log(std::format(
@@ -245,9 +245,10 @@ static int32_t SetSkillboardValuesEntry(
 
 int32_t GBFR20_CALL GBFR20_SetSkillboardValues(
     uint32_t key_hash,
-    const float* values,
-    uint32_t value_count) {
+    uint32_t value_mask,
+    const float* values) {
     return GuardAbi("GBFR20_SetSkillboardValues", GBFR20_TABLE_WRITE_FAILED, [&] {
-        return SetSkillboardValuesEntry(key_hash, values, value_count);
+        return SetSkillboardValuesEntry(key_hash, value_mask, values);
     });
 }
+

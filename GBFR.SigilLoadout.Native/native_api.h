@@ -16,7 +16,7 @@
 // **skill hash** 传递：slot 表归原生所有，托管侧无需按角色维护一张表。
 // v21 起同一套锚点机制也覆盖 limit_bonus_param：按 Key 认行、只写行内
 // Lv1..LvN 的 float（能力强化数值），见 GBFR20_SetLimitBonusLevels。
-constexpr uint32_t GBFR20_ABI_VERSION = 22;
+constexpr uint32_t GBFR20_ABI_VERSION = 23;
 
 // GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）。
 constexpr int32_t GBFR20_TABLE_NOT_READY = -1;              // 原生核心没初始化好，或正在关机
@@ -30,7 +30,7 @@ constexpr int32_t GBFR20_TABLE_WRITE_FAILED = -7;           // 写的时候崩�
 // GBFR20_SetLimitBonusLevels 的拒绝码（返回值 < 0）。头四个与上面共用：
 // -1 没初始化 / -2 锚点没解析出 limit_bonus_param 的缓冲区指针字段 /
 // -3 指针字段不可读，或缓冲区不整段可写 / -7 写的时候崩了。
-constexpr int32_t GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED = -8; // level_count 不在 1..10
+constexpr int32_t GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED = -8; // 掩码没选中任何格，或伸出了第 10 格
 constexpr int32_t GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE = -9;  // 头里的行数不在合理区间：指针字段指到了别处
 constexpr int32_t GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE = -10;        // 同一个 Key 命中的几行内容不一致（或行数超出上界）：这不是那张表
 constexpr int32_t GBFR20_LIMIT_BONUS_KEY_NOT_FOUND = -11;         // 表里没有这个 Key
@@ -95,17 +95,19 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_ApplyLoadout(
 GBFR20_API int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(
     const uint8_t* table,
     uint32_t length);
-// 把一个能力的强化数值写进游戏已经解析好的 limit_bonus_param 活表：key_hash 认行
-// （行里 +52 的 Key），levels 只写行内 Lv1..LvN（+12 起的 float），N = level_count，
-// 上界 10 = 这张表的全部数值槽。调用方按"这个能力有几档"传 N，于是没被用到的槽
-// 一个字节都不碰。
+// 把一个能力的强化数值写进游戏已经解析好的 limit_bonus_param 活表：key_hash 认行（行里 +52 的
+// Key），level_mask 的低 10 位 = Lv1..Lv10 里**哪几档要写**（原生从第 1 档遍历到第 10 档，只写
+// 置位的那些，其余档一个字节都不碰），values 是十个 float、与档位一一对应（只有置位的会被读）。
+//
+// 于是"只改第 3 档"就是 mask = 第 3 位、values[2] = 新值：前两档真的没写，不需要拿游戏原值
+// 把它们填满（旧接口只收"从 Lv1 开始的连续一串"，中间挖空就写不了）。
 //
 //   >= 0  成功；命中几行就写几行，返回**真正被改写的行数**（0 = 内存里已经是这些值）。
 //   < 0   拒绝（见上面那组码）。三道门都在写之前，任何一条不成立都是一个字节都不写。
 //
 // 闸门顺序（每道都 fail-closed）：锚点已在启动时解出指针字段 -> 指针字段可读且非空
-// -> 头里的行数落在合理区间 -> 整段缓冲区可写 -> 命中该 Key 的**每一行**在"要被写的
-// 那段数值"上完全一致。最后一条同时承担两件事：认出这张表的身份，以及认出"一个参数被
+// -> 头里的行数落在合理区间 -> 整段缓冲区可写 -> 掩码合法 -> 命中该 Key 的**每一行**在
+// "被选中的那几档"上完全一致。最后一条同时承担两件事：认出这张表的身份，以及认出"一个参数被
 // 多个节点引用"这种正常形态——这张表**没有** skill_status 那条发布指令（实测形状不同），
 // 所以不拿"槽首 = 指针字段 - 8"当第二道证。
 //
@@ -117,22 +119,29 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(
 // 时才重算；节点描述是实时读表的，所以改完立刻看得见。
 GBFR20_API int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
     uint32_t key_hash,
-    const float* levels,
-    uint32_t level_count);
+    uint32_t level_mask,
+    const float* values);
 
 // 「专精技能」页那三阶效果的实际数值：skillboard_effect_action_parts。行距 136、Key 在行内 +72、
 // 十个 float 槽在行内 +32..+71（都与生成器出的资产逐值对过）。
 //
-// 三道门与上面那张表完全一样（值个数 -> 行数合理 -> 整段可写 -> 目标 Key 全表**恰好一次**）。
-// 不同的只有"表指针从哪来"：这张表没有发布指令可以当锚点，所以从已经解出的能力强化指针字段出发，
-// 在附近的可写内存里找那个"自称行数合理、且首行 Key 对得上"的指针（见 src/table_slot.cpp）。
-// 找不到就照旧拒写——一个字节都不写，日志里说明原因。
+//   slot_mask  低 10 位 = 十格"这一格要不要写"。原生从第 1 格遍历到第 10 格，**只写置位的那些**，
+//              其余槽一个字节都不碰。于是"只改第 4 格"就是 mask = 0b1000（第 4 位）而 values[3]
+//              是新值：前面三格真的没写，不需要拿游戏原值把它们填满（旧接口只收"从第 1 格开始的
+//              一串值"，中间挖空就写不了，只好补原值）。
+//   values     十个，与槽一一对应；只有 mask 置位的那些会被读。
 //
-//   >= 0  成功；1 = 真的改了，0 = 内存里已经是这些值。
-//   < 0   拒绝（码与上一张表同名同义）。
+// 三道门与上面那张表同构（掩码合法 -> 行数合理 -> 整段可写 -> 目标 Key 命中的每一行在**被写的
+// 那几格**上完全一致）。不同的只有"表指针从哪来"：这张表没有发布指令可以当锚点，所以从已经解出的
+// 能力强化指针字段出发，在附近的可写内存里找那个"自称行数合理、且首行 Key 对得上"的指针
+// （见 src/table_slot.cpp）。找不到就照旧拒写——一个字节都不写，日志里说明原因。
+//
+//   >= 0  成功；命中几行就写几行，返回**真正被改写的行数**（0 = 内存里已经是这些值）。
+//   < 0   拒绝（码与上面那张表同名同义）。
 //
 // 值的可见时机：与 limit_bonus 那一页是同一个界面，所以先按"改完当场可见"试；吃不到再回标题重进。
 GBFR20_API int32_t GBFR20_CALL GBFR20_SetSkillboardValues(
     uint32_t key_hash,
-    const float* values,
-    uint32_t value_count);
+    uint32_t slot_mask,
+    const float* values);
+

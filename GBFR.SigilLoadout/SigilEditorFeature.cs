@@ -437,6 +437,6 @@ internal sealed class SigilEditorFeature {
     }
 
     private static string RowValues(byte[] data, int row) =>
-        string.Join(" / ", Enumerable.Range(0, SigilSkill.LevelValueCount)
+        string.Join(" | ", Enumerable.Range(0, SigilSkill.LevelValueCount)
             .Select(i => BitConverter.ToSingle(data, row + i * 4)));
 }
