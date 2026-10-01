@@ -175,11 +175,15 @@ internal static class Hotkey {
 
         // 每个维护拍请热键线程对一次"现在该不该独占这个键"（裸键注册是全局独占的，见 SyncRegistration）。
         //
-        // 呼出只有消息那一条路，**没有轮询兜底**：注册失败（键被别的程序占了）时这个键唤不出工具，
-        // 但工具本身照常能从托盘/开始菜单打开，代价只是 "热键暂时不可用"；
-        // 而轮询那种兜底会让一次按键被处理两遍（消息半边与轮询半边同时命中），
-        // 还要一直吞 GetAsyncKeyState。状态再变时SyncRegistration 会重新尝试注册，
-        // 所以被占用的键在对方放手后仍能自己恢复。
+        // 呼出只有消息那一条路，**没有轮询兜底**（原先这里的 GetAsyncKeyState + _wasDown 边沿检测已删）：
+        // 注册失败（键被别的程序占了）或消息窗口建不出来时，这个键唤不出工具——但工具本身照常能从
+        // 托盘/开始菜单打开，状态再变时 SyncRegistration 会重新注册，被占用的键在对方放手后仍能自己恢复。
+        //
+        // 删它的理由不是省几行：那条路**绕过 WaitForKeyRelease**，于是恰恰在它想救的那种情形里，按键
+        // 抬起会落到启动器窗口上（那边把这一下读成"收起工具"）；而且它是与消息半边并行的第二条呼出
+        // 路径，两边只靠 _hotKeyRegistered 互斥——那个标志由热键线程写、这里读，注册状态在"按下"与
+        // "这一拍"之间翻转时两条路会各呼出一次，而 TryLaunchTool 是**切换**语义，两次就是"显示完立刻
+        // 收起"（属于窄竞态，不是每次按键都发生）。
         IntPtr hwnd = _messageWindow;
         if (hwnd != IntPtr.Zero)
             PostMessage(hwnd, (uint)WmSyncRegistration, IntPtr.Zero, IntPtr.Zero);

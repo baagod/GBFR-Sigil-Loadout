@@ -13,7 +13,7 @@ public class Configurator : IConfiguratorV3 {
 
     private IUpdatableConfigurable[] MakeConfigurations() =>
         new IUpdatableConfigurable[] {
-            HotkeyConfig.FromFile(
+            HotkeyConfig.Load(
                 Path.Combine(ConfigFolder!, HotkeyConfig.FileName),
                 HotkeyConfig.ConfigurationName),
         };

@@ -143,8 +143,17 @@ internal static class LoadoutConfig {
         int index = 0;
         foreach (JsonElement slot in slots.EnumerateArray()) {
             index++;
-            bool enabled = !slot.TryGetProperty("enabled", out JsonElement enabledElement) ||
-                           enabledElement.GetBoolean();
+            // 形状错误逐条自己判：TryGetProperty 对非对象、GetBoolean/GetInt32 对错类型会抛
+            // InvalidOperationException，缺成员会抛 KeyNotFoundException——那些是框架措辞
+            // （"The given key was not present in the dictionary."），用户看不出该改哪里。
+            if (slot.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException($"slot {index}: is not an object");
+            bool enabled = true;
+            if (slot.TryGetProperty("enabled", out JsonElement enabledElement)) {
+                if (enabledElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    throw new InvalidDataException($"slot {index}: 'enabled' must be true or false");
+                enabled = enabledElement.GetBoolean();
+            }
             if (!enabled)
                 continue;
             if (result.Count >= MaxSlots)
@@ -155,23 +164,34 @@ internal static class LoadoutConfig {
                 throw new InvalidDataException($"slot {index}: missing 'items' array");
 
             JsonElement main = items[0];
-            string mainGem = Hx(main.GetProperty("gem"));
+            if (main.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException($"slot {index}: main item is not an object");
+            if (!main.TryGetProperty("gem", out JsonElement gem) ||
+                gem.ValueKind != JsonValueKind.String)
+                throw new InvalidDataException($"slot {index}: main item carries no 'gem'");
+            string mainGem = Hx(gem);
             uint mainGemHash = PU(mainGem);
             if (mainGemHash == 0)
                 throw new InvalidDataException($"slot {index}: bad sigil hash '{mainGem}'");
             // 主技能由可视工具写进来（唯一读 sigils.json 的一方），这一层不查表、也不猜。
-            if (!main.TryGetProperty("hash", out JsonElement mainHash))
+            if (!main.TryGetProperty("hash", out JsonElement mainHash) ||
+                mainHash.ValueKind != JsonValueKind.String)
                 throw new InvalidDataException($"slot {index}: main item carries no skill hash");
             uint mainSkill = PU(Hx(mainHash));
             if (mainSkill == 0)
-                throw new InvalidDataException($"slot {index}: bad main skill hash");
+                throw new InvalidDataException($"slot {index}: bad main skill hash '{Hx(mainHash)}'");
             int level1 = GetLevel(main, "level", index);
 
             uint skill2Hash = UnwornCharacterHash; // "未选择"哨兵，永不为 0
             int skill2Level = 0;
             if (items.GetArrayLength() >= 2) {
                 JsonElement sec = items[1];
-                string secHash = Hx(sec.GetProperty("hash"));
+                if (sec.ValueKind != JsonValueKind.Object)
+                    throw new InvalidDataException($"slot {index}: secondary item is not an object");
+                if (!sec.TryGetProperty("hash", out JsonElement secHashElement) ||
+                    secHashElement.ValueKind != JsonValueKind.String)
+                    throw new InvalidDataException($"slot {index}: secondary item carries no skill hash");
+                string secHash = Hx(secHashElement);
                 skill2Hash = PU(secHash);
                 if (skill2Hash == 0)
                     throw new InvalidDataException($"slot {index}: bad secondary skill hash '{secHash}'");
@@ -194,7 +214,8 @@ internal static class LoadoutConfig {
     private static int GetLevel(JsonElement item, string propertyName, int index) {
         if (!item.TryGetProperty(propertyName, out JsonElement element))
             return DefaultLevel;
-        int level = element.GetInt32();
+        if (element.ValueKind != JsonValueKind.Number || !element.TryGetInt32(out int level))
+            throw new InvalidDataException($"slot {index}: {propertyName} must be a whole number");
         if (level < 0)
             throw new InvalidDataException($"slot {index}: {propertyName} must not be negative");
         return level;
@@ -203,6 +224,12 @@ internal static class LoadoutConfig {
     private static string Hx(JsonElement e) =>
         e.ValueKind == JsonValueKind.String ? (e.GetString() ?? "").Trim().ToUpperInvariant() : "";
 
+    // 必须是**正好 8 位**十六进制：可视工具写下的值全来自 assets，实测 sigils.json 的 203 个 hash 与
+    // 玩家那份真实 loadout.json 里的每个 gem/hash 都是 8 位；短于 8 位的写法只可能来自手改，而那种值
+    // 不可能是真的哈希——放它过去就等于把一个不存在的 id 写进游戏（原生只做复制，不查表）。
     private static uint PU(string hex) =>
-        uint.TryParse(hex, NumberStyles.HexNumber, null, out uint value) ? value : 0;
+        hex.Length == 8 &&
+        uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint value)
+            ? value
+            : 0;
 }
