@@ -15,7 +15,7 @@
 
     屏幕上的那一行是**第一档**：左边一格里是当前语言的效果模板（{0} 写成框号 {1}，见 limitbonus.ts 的
     effectLabel），右边是这一栏的数值框（一个参数行一个框），
-    描述里的 {1} 就是从左数第一个框。每条能力都是这个版式：能力强化只挂一个参数行，另两个框是空的。
+    描述里的 {1} 就是从左数第一个框（一个节点最多挂几条参数行、空位怎么留，见 SLOTS_PER_ROW）。
 */
 import { Fragment, memo, useEffect, useState } from "react";
 
@@ -35,6 +35,8 @@ import {
     dedupeCharacters,
     effectLabel,
     valueAt,
+    isOverridden,
+    shownValue,
     withFirstValue,
     type Ability,
     type LimitBonusCharacter,
@@ -52,24 +54,16 @@ import { usePanelFailure } from "@/hooks/usePanelFailure";
 import { useLangTable } from "@/hooks/useLangTable";
 
 /*
-    表头（已移除）与每一行共用这张列宽表：宽度只在这一处声明。描述那一列吃掉剩下的宽度——它最长，
-    而其余两列的内容都是定长的（名字、三个数值槽）。
+    列宽表：宽度只在这一处声明。一条能力一行、三列各填一格（能力名 288px、描述、数值那一列 160px）——
+    描述那一列吃掉剩下的宽度（它最长），数值那一列定长（每行最多三个槽，槽宽 w-12，槽间用 `|` 隔开）。
 
     勾选框那一列随"有值即启用"一起删掉了（见 limitbonus.ts 的 withFirstValue）：留着空列只会把能力名推右。
-    一条能力就是一行，三列各填一格：能力名、描述、那三个槽。
-
-    数值那一列**固定 64px**（框占满这一列，里面还有 6px 的 `|` 分隔），其余宽度全给描述列
-    （见渲染处），能力强化只有一个参数行。
-*/
-
-/*
-    数值那一列**固定 200px**：每行三个槽（见 SLOTS_PER_ROW），一个槽 64px + 槽间 4px gap。
-    槽的位置每一行都一样——挂不满三个参数的节点，空位留白，这样行与行之间框的位置仍然对齐。
 */
 const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_160px] items-center gap-2";
 
-// 每行固定三个槽。与「专精技能」页永远给一组十个槽同一套做法：游戏一个节点最多挂 3 条参数行，
-// 空着的位置不省掉——省掉之后同一列在不同行会左右漂。
+// 每行固定三个槽。与「专精技能」页永远给一组十个槽同一套做法：游戏一个节点最多挂 3 条参数行
+// （属性节点 1 条、`伤害上限`那种挂 3 条、专属强化挂 2 条），空着的位置留白不省掉——省掉之后同一列
+// 在不同行会左右漂。
 const SLOTS_PER_ROW = 3;
 
 /*
@@ -85,10 +79,13 @@ const SLOT_BOX = "h-11! w-12"
  * 一条能力：**一行**——名字、各参数的效果模板（空格接起来）、以及**三个槽**。
  * 只改第一档，Lv2/Lv3 不写也不显示（见 limitbonus.ts 的 withFirstValue）。
  *
- * 槽数固定三个，不按节点挂了几条参数行变：游戏一个节点最多挂 3 条（属性节点 1 条、`伤害上限`
- * 那种挂 3 条、专属强化挂 2 条），按实际条数伸缩的话，同一条竖线上的框会在行与行之间左右漂。
- * 空着的槽留白（见 SLOTS_PER_ROW），每一格只写**它自己那一条**参数行——专属强化的两条是不同
+ * 槽数固定三个（见 SLOTS_PER_ROW），每一格只写**它自己那一条**参数行——专属强化的两条是不同
  * 的效果（实测 [10, 1]、[5, 0]），写错一格就会把另一条覆盖掉。
+ *
+ * 专属强化里 4 个节点（源氏/神乐起手式、崇高之姿、高速咏唱时能力值）的第二条参数行**第 1 档设计值
+ * 就是 0**（非零值在 Lv3），而游戏给它第 1 档写的文案正是第一条的副本——所以默认不显示（游戏不画
+ * 值为 0 的效果），看着像"同一句话写了两遍"。那一格不是死格：实测填 2，游戏那一栏立刻由一行变两行
+ * （`防御力+5%` / `防御力+2%`）。
  */
 function AbilityRow({
     ability,
@@ -112,11 +109,10 @@ function AbilityRow({
 }) {
     // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）。
     const label = ability.params.map((param, i) => effectLabel(param, effects, i)).join(" ");
-    // 这一行有没有被编辑过（任一格有一条非 null 的记录）→ 决定描述格的颜色（白 / 灰）。
-    // 判的是 `values[0] != null`：与框里显示什么是同一个判据——框里是数字就是白的，是占位符就是灰的。
-    // 所以"清空"之后是白的：withFirstValue 把这一档的原值写成了数字（见那边的 doc），游戏里那一格
-    // 真的被覆写了。**只有第一格参与判断**：这一页只读写 Lv1，手写记录里后面几档有值不该把行染白。
-    const edited = ability.params.some((param) => edits.get(param.key)?.values[0] != null);
+    // 这一行改过没有 → 描述格的颜色（白 / 灰）。判据是"值与原值不同"（见 limitbonus.ts 的
+    // isOverridden），不是"有没有记录"：清空会留下一条等于原值的记录，那种在游戏里就是原值。
+    // 只有第一格参与判断：这一页只读写 Lv1，手写记录里后面几档有值不该把行染白。
+    const edited = ability.params.some((param) => isOverridden(param, edits.get(param.key)));
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
@@ -164,7 +160,7 @@ function AbilityRow({
                                 <SlotInput
                                     label={`${name} Lv1 ${valueLabel}`}
                                     original={valueAt(param, edits.get(param.key))}
-                                    value={edits.get(param.key)?.values[0] ?? null}
+                                    value={shownValue(param, edits.get(param.key))}
                                     onCommit={(value) => onValue(param, value)}
                                     className={SLOT_BOX}
                                 />

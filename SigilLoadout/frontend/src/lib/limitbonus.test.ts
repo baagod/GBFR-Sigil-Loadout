@@ -16,6 +16,8 @@ import {
     dedupeCharacters,
     effectLabel,
     valueAt,
+    isOverridden,
+    shownValue,
     withFirstValue,
     type Ability,
     type LimitBonusCharacter,
@@ -204,5 +206,38 @@ describe("清空一格", () => {
         expect(valueAt(fixture, withFirstValue(fixture, 5))).toBe(5)
         expect(valueAt(fixture, withFirstValue(fixture, 20))).toBe(20)
         expect(valueAt(fixture, undefined)).toBe(5)
+    })
+})
+/*
+    框里显示成"数字"还是"占位符"：判据是**值与原值不同**，不是"有没有记录"。
+    记录里恰好等于原值的那种正是清空留下的（见上面那段），它在游戏里就是原值，界面该回到占位符——
+    否则清空之后框里永远留着一个数，再也回不到灰字（实测踩过：源氏起手式第二格清空后仍显示 0）。
+*/
+describe("框里显示覆写值还是占位符", () => {
+    const fixture = { key: "0D0BCF24", default: 5 }
+    const record = (value: number | null): LimitBonusEdit => ({
+        enabled: true,
+        key: fixture.key,
+        values: [value],
+    })
+
+    it("没有记录 / 记录等于原值（清空留下的）→ 占位符", () => {
+        expect(shownValue(fixture, undefined)).toBeNull()
+        expect(shownValue(fixture, record(5))).toBeNull()
+        expect(isOverridden(fixture, undefined)).toBe(false)
+        expect(isOverridden(fixture, record(5))).toBe(false)
+        // 描述格的颜色跟着这个判据走：清空之后行该回到灰的。
+        expect(isOverridden(fixture, withFirstValue(fixture, null))).toBe(false)
+    })
+
+    it("记录与原值不同、以及手写文件里的 null → 只有前者算覆写", () => {
+        expect(shownValue(fixture, record(20))).toBe(20)
+        expect(isOverridden(fixture, record(20))).toBe(true)
+        expect(shownValue(fixture, record(0))).toBe(0) // 0 也是有效覆写（原值非 0 时）
+        expect(isOverridden(fixture, record(0))).toBe(true)
+        expect(shownValue(fixture, record(null))).toBeNull()
+        expect(isOverridden(fixture, record(null))).toBe(false)
+        // values 缺第一格（手写记录只写了后面几档）同样算没编辑。
+        expect(isOverridden(fixture, { enabled: true, key: fixture.key, values: [] })).toBe(false)
     })
 })

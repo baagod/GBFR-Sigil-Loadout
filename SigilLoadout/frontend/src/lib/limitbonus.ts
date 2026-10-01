@@ -89,6 +89,23 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
     record?.values[0] ?? param.default ?? 0
 
 /**
+ * 这一格**算不算覆写**：记录里的第一格与这一行的原值**不同**才算。
+ *
+ * 不能只看"有没有记录"：清空留下的正是"等于原值"的记录（见 withFirstValue），它在游戏里就是原值，
+ * 画成数字就成了"清空后永远回不到占位符"（实测踩过）。
+ */
+export const isOverridden = (param: LimitBonusParam, record: LimitBonusEdit | undefined) => {
+    const override = record?.values[0] ?? null
+    return override !== null && override !== param.default
+}
+
+/** 框里该显示的覆写值：不算覆写就是 null → 显示成占位符（颜色与"改过没有"也跟着走）。 */
+export const shownValue = (param: LimitBonusParam, record: LimitBonusEdit | undefined): number | null => {
+    const override = record?.values[0] ?? null
+    return override !== null && override !== param.default ? override : null
+}
+
+/**
  * 描述格里的那一整段文字：游戏写的效果模板本身，其中 {0} 换成**写死的框号**。
  *
  * 模板来自当前语言的文案表（见 LimitBonusText.effects），按参数行的 Key 取；表里没有这个 Key 就是游戏
@@ -193,9 +210,11 @@ export function asEdit(raw: unknown): LimitBonusEdit | null {
  * 上一次写进去的数上，而界面显示的是占位符，两边对不上（实测过）。把原值当一次编辑写下去，那一格才
  * 真的回到默认。
  *
- * 代价要说清：清空之后重开界面，那一格显示成数字而不是占位符——数字的含义正是"这一格有覆写"，与界面
- * 判"改过没有"的判据（`values[0] != null`，见 LimitBonusEditorPanel 的 edited）是同一个。
- * 手写文件里的 `values: [null]` 照旧读：mod 那边掩码不置位、一个字节都不碰。
+ * 界面不受这条影响：那一格照旧显示占位符——显示层判的是"值与原值不同"（见 isOverridden），不是
+ * "有没有记录"。手写文件里的 `values: [null]` 照旧读：mod 那边掩码不置位、一个字节都不碰。
+ *
+ * 有一族参数行的第一档**本来就设计成 0**（专属强化的第二条：`Lv1`/`Lv2` 都是 0、只有 `Lv3` 有值），
+ * 所以给那一格填数就是把这条追加效果提到第 1 档（效果与实测见 LimitBonusEditorPanel 的 AbilityRow）。
  */
 export function withFirstValue(param: LimitBonusParam, value: number | null): LimitBonusEdit {
     return {
