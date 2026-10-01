@@ -121,7 +121,7 @@ public sealed class Mod : IMod {
                         _sigilEditor?.Tick();
                         _limitBonusEditor?.Tick();
                         _skillboardEditor?.Tick();
-                        Hotkey.Tick(Log);
+                        Hotkey.Tick();
                     }
                     catch {
                         // 维护拍绝不能把进程带走。

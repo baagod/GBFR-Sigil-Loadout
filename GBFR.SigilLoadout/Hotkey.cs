@@ -92,7 +92,6 @@ internal static class Hotkey {
     private static volatile bool _threadExit;
     private static volatile int _virtualKey = -1;
     private static string _modDirectory = "";
-    private static bool _wasDown;
     private static Action<string>? _log;
 
     /// <summary>
@@ -104,7 +103,6 @@ internal static class Hotkey {
         _modDirectory = modDirectory;
         _virtualKey = virtualKey;
         _log = log;
-        _wasDown = false;
 
         _threadExit = false;
         var thread = new Thread(HotkeyLoop) {
@@ -134,7 +132,7 @@ internal static class Hotkey {
             0, 0, 0, 0,
             (IntPtr)HwndMessage, IntPtr.Zero, GetModuleHandle(null), IntPtr.Zero);
         if (hwnd == IntPtr.Zero) {
-            _log?.Invoke("Hotkey message window creation failed; fallback polling active.");
+            _log?.Invoke("Hotkey message window creation failed; the hotkey is unavailable this session.");
             return;
         }
         // 句柄要先发布：Tick 每个维护拍会往它发同步请求；注册与否不在这里定（见 SyncRegistration）。
@@ -171,24 +169,20 @@ internal static class Hotkey {
         DestroyWindow(hwnd);
     }
 
-    internal static void Tick(Action<string> log) {
+    internal static void Tick() {
         if (_virtualKey < 0 || _modDirectory.Length == 0)
             return;
 
-        // 每个维护拍请热键线程对一次"现在该不该独占这个键"（裸键注册是全局独占的，见
-        // SyncRegistration）。这一条必须在下面的提前返回之前。
+        // 每个维护拍请热键线程对一次"现在该不该独占这个键"（裸键注册是全局独占的，见 SyncRegistration）。
+        //
+        // 呼出只有消息那一条路，**没有轮询兜底**：注册失败（键被别的程序占了）时这个键唤不出工具，
+        // 但工具本身照常能从托盘/开始菜单打开，代价只是 "热键暂时不可用"；
+        // 而轮询那种兜底会让一次按键被处理两遍（消息半边与轮询半边同时命中），
+        // 还要一直吞 GetAsyncKeyState。状态再变时SyncRegistration 会重新尝试注册，
+        // 所以被占用的键在对方放手后仍能自己恢复。
         IntPtr hwnd = _messageWindow;
         if (hwnd != IntPtr.Zero)
             PostMessage(hwnd, (uint)WmSyncRegistration, IntPtr.Zero, IntPtr.Zero);
-
-        // 注册着的时候响应的责任在消息那半边，轮询这半边要闭嘴，否则一次按键被处理两遍。
-        if (_hotKeyRegistered)
-            return;
-
-        bool down = (GetAsyncKeyState(_virtualKey) & 0x8000) != 0;
-        if (down && !_wasDown)
-            TryLaunchTool(log);
-        _wasDown = down;
     }
 
     private static void TryLaunchTool(Action<string> log) {
@@ -261,7 +255,7 @@ internal static class Hotkey {
         }
         _hotKeyRegistered = RegisterHotKey(hwnd, HotkeyId, ModNoRepeat, (uint)_virtualKey);
         if (!_hotKeyRegistered)
-            _log?.Invoke("RegisterHotKey unavailable (key may be taken); fallback polling active.");
+            _log?.Invoke("RegisterHotKey unavailable (the key may be taken); it is retried whenever the registration state changes again.");
     }
 
     // 该不该独占这个键：前台是"我们"（游戏本进程或工具进程）就该。按 pid 判、不按窗口标题——工具进程
