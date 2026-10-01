@@ -101,12 +101,18 @@ internal sealed class LimitBonusFeature {
         foreach (LimitBonusEdit edit in config.Edits) {
             if (!edit.Enabled)
                 continue;
-            if (!TryParseKey(edit.Key, out uint keyHash))
+            if (!HexKey.TryParse(edit.Key, out uint keyHash))
                 continue; // 键不是 8 位十六进制：这一条没有要写的东西
 
             // 可空槽位 → 原生要的"掩码 + 十个值"：null 的档掩码不置位，原生一个字节都不碰。
             // 全是 null（工具里清空了）就是 mask = 0：这一条没有要写的东西，跳过。
-            (uint levelMask, float[] values) = SlotValues.Mask(edit.Values, MaxLevels);
+            (uint levelMask, float[] values) = SlotValues.Mask(edit.Values, MaxLevels, out bool outOfRange);
+            if (outOfRange) {
+                // 超过十格的记录（只可能来自手改）同样不写，但要说出来：不然界面上填了值、游戏里
+                // 没动静，日志里一个字都没有。
+                _log($"limit bonus edit: {edit.Key}: {edit.Values!.Length} values (max {MaxLevels}); skipped");
+                continue;
+            }
             if (levelMask == 0)
                 continue; // 一格都没填（工具里清空了）：这一条没有要写的东西
 
@@ -130,12 +136,4 @@ internal sealed class LimitBonusFeature {
         if (refused > 0)
             _log($"limit bonus edit: {refused} refused of {config.Edits.Count} entries");
     }
-
-    /// <summary>
-    /// limit_bonus_param 的 Key：正好 8 位十六进制。与 sigiledits.json 同一个拼法（那一侧直接
-    /// uint.TryParse(..., HexNumber)），这里多一条长度检查——短于 8 位的串在那边是合法的少量前导零，
-    /// 但在这张表里 Key 是 32 位哈希，写错一位就会指到别的行（原生会以"找不到这个 Key"拒写，
-    /// 所以代价只是一条日志，而不是写错地方）。
-    /// </summary>
-    private static bool TryParseKey(string text, out uint keyHash) => HexKey.TryParse(text, out keyHash);
 }

@@ -16,7 +16,6 @@ import {
     dedupeCharacters,
     effectLabel,
     valueAt,
-    isOverridden,
     shownValue,
     withFirstValue,
     type Ability,
@@ -224,20 +223,15 @@ describe("框里显示覆写值还是占位符", () => {
     it("没有记录 / 记录等于原值（清空留下的）→ 占位符", () => {
         expect(shownValue(fixture, undefined)).toBeNull()
         expect(shownValue(fixture, record(5))).toBeNull()
-        expect(isOverridden(fixture, undefined)).toBe(false)
-        expect(isOverridden(fixture, record(5))).toBe(false)
-        // 描述格的颜色跟着这个判据走：清空之后行该回到灰的。
-        expect(isOverridden(fixture, withFirstValue(fixture, null))).toBe(false)
+        // 描述格的颜色读同一个判据（非 null 即"改过"）：清空之后行该回到灰的。
+        expect(shownValue(fixture, withFirstValue(fixture, null))).toBeNull()
     })
 
     it("记录与原值不同、以及手写文件里的 null → 只有前者算覆写", () => {
         expect(shownValue(fixture, record(20))).toBe(20)
-        expect(isOverridden(fixture, record(20))).toBe(true)
         expect(shownValue(fixture, record(0))).toBe(0) // 0 也是有效覆写（原值非 0 时）
-        expect(isOverridden(fixture, record(0))).toBe(true)
         expect(shownValue(fixture, record(null))).toBeNull()
-        expect(isOverridden(fixture, record(null))).toBe(false)
         // values 缺第一格（手写记录只写了后面几档）同样算没编辑。
-        expect(isOverridden(fixture, { enabled: true, key: fixture.key, values: [] })).toBe(false)
+        expect(shownValue(fixture, { enabled: true, key: fixture.key, values: [] })).toBeNull()
     })
 })

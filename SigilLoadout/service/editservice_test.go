@@ -498,3 +498,30 @@ func writeFile(t *testing.T, path, body string) {
 		t.Fatal(err)
 	}
 }
+
+// 没有东西待写，就什么都不写：一串编辑就是一次写入，无论 flush 被调用多少次——盯的是
+// appfiles.Debounced.flushLocked 里 `pending == nil` 那个提前返回。
+func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
+	hermeticHome(t)
+
+	service := &EditService{}
+	edits := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
+	if err := service.SaveEdits(edits); err != nil {
+		t.Fatalf("SaveEdits: %v", err)
+	}
+	service.FlushNow()
+
+	path := localConfig(t, editListName)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the list was not written: %v", err)
+	}
+
+	// 把文件拿走：第二次 flush 什么都不该做，所以它不会回来。
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	service.FlushNow()
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatal("a flush with nothing pending wrote the list again")
+	}
+}

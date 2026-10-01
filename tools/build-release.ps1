@@ -334,9 +334,9 @@ foreach ($requiredFile in @(
     }
 }
 
-# 上面那份名单挡的是"我记得的那些资产被删了/没进包"，挡不住"新加了一份资产、谁都没想起来"。
-# 这一道查的是**源目录 ⊆ 包目录**（csproj 的 <None Include="..\SigilLoadout\assets\*"> 是这条契约的
-# 另一半）：assets\ 里每一个文件都必须出现在包里。两件不同的事，都要有。
+# 这一道补的是上面那份取数名单**查不到**的那种漏法：源里新加了一份资产、谁都没想起来把它列进去——
+# 于是它压根没被拷进包。查的是**源目录 ⊆ 包目录**（csproj 的 <None Include="..\SigilLoadout\assets\*">
+# 是这条契约的另一半）：assets\ 里每一个文件都必须出现在包里。两件不同的事，都要有。
 $missingAssets = Get-ChildItem -LiteralPath $assetsDir -File |
     Where-Object { -not (Test-Path -LiteralPath (Join-Path $packageDir "assets\$($_.Name)") -PathType Leaf) }
 if ($missingAssets) {

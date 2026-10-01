@@ -17,13 +17,16 @@ internal static class SlotValues {
     /// <summary>
     /// <paramref name="slots"/> 里非 null 的格子。返回值里 <c>Mask == 0</c> 表示"这一条什么都没填"，
     /// 调用方跳过它（没有要写的东西）。
+    ///
+    /// <paramref name="outOfRange"/> 单独说清"这条记录比十个槽还长"（只可能来自手改）：它和"什么都没
+    /// 填"一样不写一个字节，但原因不同，调用方要报出来——否则界面上填了值、游戏里没动静，日志里一个字
+    /// 都没有。
     /// </summary>
-    internal static (uint Mask, float[] Values) Mask(float?[]? slots, int maxSlots) {
+    internal static (uint Mask, float[] Values) Mask(float?[]? slots, int maxSlots, out bool outOfRange) {
         var values = new float[maxSlots];
         uint mask = 0;
-        // 长度越界（手写文件里的怪记录）整条跳过：宁可不写，也不按前 maxSlots 格写一半——那会把
-        // "这份文件坏了"变成一次静默的部分写入。
-        if (slots is null || slots.Length > maxSlots)
+        outOfRange = slots is not null && slots.Length > maxSlots;
+        if (slots is null || outOfRange)
             return (0, values);
 
         for (int i = 0; i < slots.Length; i++) {

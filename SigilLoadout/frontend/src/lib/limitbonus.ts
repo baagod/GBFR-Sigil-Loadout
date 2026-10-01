@@ -89,17 +89,11 @@ export const valueAt = (param: LimitBonusParam, record: LimitBonusEdit | undefin
     record?.values[0] ?? param.default ?? 0
 
 /**
- * 这一格**算不算覆写**：记录里的第一格与这一行的原值**不同**才算。
+ * 框里该显示的覆写值：记录里的第一格与这一行的原值**不同**才算覆写，否则是 null → 显示成占位符。
  *
  * 不能只看"有没有记录"：清空留下的正是"等于原值"的记录（见 withFirstValue），它在游戏里就是原值，
- * 画成数字就成了"清空后永远回不到占位符"（实测踩过）。
+ * 画成数字就成了"清空后永远回不到占位符"（实测踩过）。"这一行改过没有"也读它（非 null 即改过）。
  */
-export const isOverridden = (param: LimitBonusParam, record: LimitBonusEdit | undefined) => {
-    const override = record?.values[0] ?? null
-    return override !== null && override !== param.default
-}
-
-/** 框里该显示的覆写值：不算覆写就是 null → 显示成占位符（颜色与"改过没有"也跟着走）。 */
 export const shownValue = (param: LimitBonusParam, record: LimitBonusEdit | undefined): number | null => {
     const override = record?.values[0] ?? null
     return override !== null && override !== param.default ? override : null

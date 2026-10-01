@@ -6,15 +6,12 @@ import { cn } from "cn"
 
 /*
     数值框的底样式：三页共用（原先三个文件各抄了一份逐字相同的字符串）。身份是"读起来像裸文本"——
-    无边框、无内边距、无聚焦底色（原先那条 focus:bg-muted/50 在深色下本来就被压掉，只有浅色下可见，
-    两页一起删掉了，见 style.css 里"数值框"那段），说明"这里能编辑"的只有光标本身；tabular-nums 让
-    十格即使数字不同也对得齐。
+    无边框、无内边距、无聚焦底色，说明"这里能编辑"的只有光标本身；tabular-nums 让十格即使数字不同也
+    对得齐。**高度与宽度由调用点给**（三页的行高与列宽各不相同），传进来的 className 经 cn() 与这一份
+    合并，冲突项以后者为准。
 
     dark:bg-transparent 不是重复（WebStorm 会提示删掉，别删）：基础 Input 自带 .dark:bg-input/30，
     两者同特异性，只能靠排在编译产物更后面取胜。
-
-    **高度与宽度由调用点给**：三页的行高与列宽各不相同（h-11 的行、h-5 的小框、w-12 的定宽），
-    传进来的 className 经 cn() 与这一份合并，冲突项以后者为准。
 */
 const SLOT_BASE =
     "min-w-0 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"

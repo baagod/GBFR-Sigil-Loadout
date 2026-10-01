@@ -186,7 +186,8 @@ internal sealed class SkillboardFeature {
 
         if (refused == 0)
             _hasLandedOnce = true;
-        _stamp.MarkApplied(_lastAttemptVersion);
+        // 这里不用 FileStamp 的 Pending/MarkApplied：本类按"版本 + 间隔"自己记账（见 Tick），
+        // 那一半在这里没有读取方。
         // 汇总只在**有拒写**时报，说明是哪几条：写成功那些上面已经逐行逐格报过了。
         if (refused > 0)
             _log($"skillboard edit: {refused} refused [{string.Join(", ", refusedKeys)}]");
@@ -215,7 +216,7 @@ internal sealed class SkillboardFeature {
 
         long rows = (file.Length - HeaderBytes) / RowBytes;
         foreach (SkillboardEdit edit in config.Edits) {
-            if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
+            if (!edit.Enabled || !HexKey.TryParse(edit.Key, out uint keyHash))
                 continue;
 
             // Key 是行的身份，而且这张表要求它**恰好出现一次**：镜像交出去的是一整张表，同一 Key 若有多行
@@ -242,7 +243,13 @@ internal sealed class SkillboardFeature {
 
             // 可空槽位 → "掩码 + 十个值"：null 的格掩码不置位。镜像里那几格**保持原字节**不动，
             // 于是"只改第 4 格"不需要任何人去补原值——没被选中的格就是没被碰过。
-            (uint valueMask, float[] values) = SlotValues.Mask(edit.Values, MaxValues);
+            (uint valueMask, float[] values) = SlotValues.Mask(edit.Values, MaxValues, out bool outOfRange);
+            if (outOfRange) {
+                // 超过十格的记录（只可能来自手改）同样不写，但要说出来：不然界面上填了值、游戏里
+                // 没动静，日志里一个字都没有。
+                _log($"skillboard edit: {edit.Key}: {edit.Values!.Length} values (max {MaxValues}); skipped");
+                continue;
+            }
             if (valueMask == 0)
                 continue;
 
@@ -257,7 +264,5 @@ internal sealed class SkillboardFeature {
         return file;
     }
 
-    // "可空槽 → 掩码 + 十个值"在 SlotValues：角色强化那条链共用同一套。
-
-    private static bool TryParseKey(string key, out uint hash) => HexKey.TryParse(key, out hash);
+    // "可空槽 → 掩码 + 十个值"在 SlotValues：能力强化那条链（LimitBonusFeature）共用同一套。
 }

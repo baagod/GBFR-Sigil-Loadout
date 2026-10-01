@@ -35,7 +35,6 @@ import {
     dedupeCharacters,
     effectLabel,
     valueAt,
-    isOverridden,
     shownValue,
     withFirstValue,
     type Ability,
@@ -109,10 +108,10 @@ function AbilityRow({
 }) {
     // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）。
     const label = ability.params.map((param, i) => effectLabel(param, effects, i)).join(" ");
-    // 这一行改过没有 → 描述格的颜色（白 / 灰）。判据是"值与原值不同"（见 limitbonus.ts 的
-    // isOverridden），不是"有没有记录"：清空会留下一条等于原值的记录，那种在游戏里就是原值。
+    // 这一行改过没有 → 描述格的颜色（白 / 灰）。判据是"值与原值不同"（见 limitbonus.ts 的 shownValue
+    // 的 doc），不是"有没有记录"：清空会留下一条等于原值的记录，那种在游戏里就是原值。
     // 只有第一格参与判断：这一页只读写 Lv1，手写记录里后面几档有值不该把行染白。
-    const edited = ability.params.some((param) => isOverridden(param, edits.get(param.key)));
+    const edited = ability.params.some((param) => shownValue(param, edits.get(param.key)) !== null);
 
     return (
         <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
