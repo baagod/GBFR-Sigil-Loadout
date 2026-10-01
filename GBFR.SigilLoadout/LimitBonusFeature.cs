@@ -10,7 +10,7 @@ namespace GBFR.SigilLoadout;
 ///   * **不经过 IDataManager**：这张表不在读档时被重新解析（实测：回标题读档之后缓冲区地址与
 ///     写入的值都还在），所以没有"重新注册一份表"这件事，只写内存里那一份；
 ///   * **输入是"按 Key 改若干个数值"而不是"一整张表"**：Key 是行的身份，由原生逐行找，并要求
-///     它在整张表里恰好出现一次（见 src/table_slot.cpp 的 SetLimitBonusLevels）。
+///     命中该 Key 的每一行在**要被写的那几档上一致**（见 src/table_slot.cpp 的 SetLimitBonusLevels）。
 ///
 /// 值什么时候到游戏里：天赋/能力数值在**读档**（回标题 → 继续）或该页「全部习得」时才被重算；
 /// 节点描述是实时读表的，所以改完立刻看得见。
@@ -137,11 +137,5 @@ internal sealed class LimitBonusFeature {
     /// 但在这张表里 Key 是 32 位哈希，写错一位就会指到别的行（原生会以"找不到这个 Key"拒写，
     /// 所以代价只是一条日志，而不是写错地方）。
     /// </summary>
-    private static bool TryParseKey(string text, out uint keyHash) {
-        keyHash = 0;
-        if (text is null || text.Length != 8)
-            return false;
-        return uint.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out keyHash);
-    }
+    private static bool TryParseKey(string text, out uint keyHash) => HexKey.TryParse(text, out keyHash);
 }
-

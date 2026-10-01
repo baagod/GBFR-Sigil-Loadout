@@ -5,14 +5,8 @@
 package service
 
 import (
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 
-	"encoding/json/jsontext"
-	jsonv2 "encoding/json/v2"
 	"sigilloadout/appfiles"
 )
 
@@ -102,11 +96,6 @@ type SkillboardEdit struct {
 	Values []*float64 `json:"values"`
 }
 
-// skillboardEditList 是编辑文件的顶层形状（与 limit bonus 那份同构）。
-type skillboardEditList struct {
-	Edits []SkillboardEdit `json:"edits"`
-}
-
 // SkillboardService 是这一页的服务：骨架与文案走启动期资产，编辑列表走它自己的文件。
 type SkillboardService struct {
 	writer appfiles.Debounced[[]SkillboardEdit]
@@ -128,52 +117,17 @@ func skillboardConfigPath() string {
 	return filepath.Join(appfiles.UserDir(), skillboardEditListName)
 }
 
-// skillboardLegacyConfigPath 是改名前的文件名（skillboard_edits.json）。只用于一次性迁移，
-// 迁完就不再有人读它。C# 那半也留了一条同样的兼容读取（见 SkillboardFeature.ConfigFileName）。
+// skillboardLegacyConfigPath 是改名前的文件名（skillboard_edits.json）。只用于一次性迁移（见
+// editlist.go 的 migrateEditList），迁完就不再有人读它。C# 那半也留了一条同样的兼容读取（见
+// SkillboardFeature.ConfigFileName）。
 func skillboardLegacyConfigPath() string {
 	return filepath.Join(appfiles.UserDir(), skillboardLegacyEditListName)
 }
 
-// migrateSkillboardConfig 把改名前的编辑文件挪到新名字下。只在**新文件还不存在**时动，
-// 用 Rename（同一目录内是原子的）：失败就当没迁，用户的旧文件原样留着 —— 宁可这次读不到，
-// 也不能把唯一的编辑数据弄丢。
-func migrateSkillboardConfig() error {
-	if _, err := os.Stat(skillboardConfigPath()); err == nil {
-		return nil // 新文件已经在，什么都不做
-	}
-	if _, err := os.Stat(skillboardLegacyConfigPath()); err != nil {
-		return nil // 新旧都没有 = 用户还没编辑过
-	}
-	if err := os.Rename(skillboardLegacyConfigPath(), skillboardConfigPath()); err != nil {
-		return fmt.Errorf("renaming %s to %s: %w",
-			skillboardLegacyEditListName, skillboardEditListName, err)
-	}
-	return nil
-}
-
 // LoadSkillboardEdits 读编辑列表；文件不存在就是"一次都没编辑过"（空列表，不是错误）。
+// 改名前的 skillboard_edits.json 由 loadEditList 在读取前原子迁移过来。
 func (s *SkillboardService) LoadSkillboardEdits() ([]SkillboardEdit, error) {
-	if err := migrateSkillboardConfig(); err != nil {
-		return nil, err
-	}
-	path := skillboardConfigPath()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return []SkillboardEdit{}, nil
-		}
-		return nil, fmt.Errorf("reading %s: %w", path, err)
-	}
-
-	var cfg skillboardEditList
-	if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
-	edits := cfg.Edits
-	if edits == nil {
-		edits = []SkillboardEdit{}
-	}
-	return edits, nil
+	return loadEditList[SkillboardEdit](skillboardConfigPath(), skillboardLegacyConfigPath(), nil)
 }
 
 // SaveSkillboardEdits 接过最新的编辑列表并重启防抖，写入发生在编辑停下来之后（同 SaveLimitBonusEdits）。
@@ -183,15 +137,7 @@ func (s *SkillboardService) SaveSkillboardEdits(edits []SkillboardEdit) error {
 }
 
 func writeSkillboardEdits(edits []SkillboardEdit) error {
-	raw, err := jsonv2.Marshal(skillboardEditList{Edits: edits}, jsontext.WithIndent("  "))
-	if err != nil {
-		return err
-	}
-	raw = compactNumberArrays(raw)
-	if err != nil {
-		return fmt.Errorf("serialising the skillboard edit list: %w", err)
-	}
-	return appfiles.WriteAtomic(skillboardConfigPath(), raw)
+	return writeEditList(skillboardConfigPath(), edits, "the skillboard edit list")
 }
 
 // FlushNow 是关机的最后一步（见 main.go 的 OnShutdown），前端没有对应调用，所以不进绑定面。

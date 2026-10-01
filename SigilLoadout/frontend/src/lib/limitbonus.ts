@@ -65,8 +65,11 @@ export type LimitBonusEdit = {
     enabled: boolean
     key: string
     /**
-     * 按档位排的覆写值。**可空**（与编辑服务那边的 SigilSkill 同一形状）：`null` = 这一格被清空了，
-     * 界面回到占位符（游戏原值）。服务端落盘时会把 null 解析成原值——配置文件与 C# 只看到数字。
+     * 按档位排的覆写值。**可空**（与编辑服务那边的 SigilSkill 同一形状）：`null` = 这一格不动，mod
+     * 那边掩码不置位、一个字节都不碰。
+     *
+     * 这一页**不写 null**：清空由 withFirstValue 换成这一档的游戏原值再交出去（那张表不重新解析，
+     * 理由写在它的 doc 里）。null 只会从手写文件里读回来。
      */
     values: (number | null)[]
 }
@@ -74,8 +77,9 @@ export type LimitBonusEdit = {
 /**
  * 第一档（Lv1）**当前**的数值：有记录就是记录的第一格，没有就是游戏自己的。
  *
- * 契约是 `values[i]` 写进 `Lv(i+1)`（mod 与 Go 测试都按这个钉着），而这一页只写、只显示第一档，所以
- * 读的永远是下标 0。写出去的记录长度恒为 1（见 withFirstValue），文件里手写的长记录也只读第一格。
+ * 契约是 `values[i]` 写进 `Lv(i+1)`，而**只有非 null 的档会被写**（mod 那边按它算掩码）；这一页只写、
+ * 只显示第一档，所以读的永远是下标 0。写出去的记录长度恒为 1（见 withFirstValue），文件里手写的长
+ * 记录也只读第一格。
  *
  * 输入框的占位符读它——空框读起来就是"这个没碰过，游戏自己的数还留着"。手写过的记录缺第一格（values
  * 是空数组）也走这条路：缺格等于没编辑，正是它的含义。（描述里那个 {n} 说的是第几个框，不是数值，见
@@ -180,14 +184,18 @@ export function asEdit(raw: unknown): LimitBonusEdit | null {
 }
 
 /**
- * 改过第一档（Lv1）之后的那条记录。
+ * 改过第一档（Lv1）之后的那条记录。这一页只写第一档：`values[0]` 进 Lv1，Lv2/Lv3 留给游戏原值——
+ * 这正是这一页要的。**绝不按 default 把缺的档位补齐**：那等于把用户从没填过的数写进游戏，多改了
+ * 后面几档。
  *
- * 记录里只有第一档这一个数：契约是 `values[i]` 写进 `Lv(i+1)`，长度 1 就是**只写 Lv1**，Lv2/Lv3 在
- * 游戏里保持原值——这正是这一页要的。**绝不按 default 把缺的档位补齐**：那等于把用户从没填过的数
- * 写进游戏，多改了 2 个档位。
+ * 清空（`value === null`）存的是**这一行的 Lv1 原值**，不是 null：这张表只写内存、不经过数据管理器，
+ * 读档也不会重新解析它（见 LimitBonusFeature.cs 的 doc），所以"不写"并不等于"回到原值"——游戏会停在
+ * 上一次写进去的数上，而界面显示的是占位符，两边对不上（实测过）。把原值当一次编辑写下去，那一格才
+ * 真的回到默认。
  *
- * 清空为什么不是"删掉记录"：游戏不会自己忘掉上一次写入的值，删了它就会停在旧值上、而界面显示默认
- * 值——两边对不上（实测的 bug）。所以清空由调用方写回**这一行的 Lv1 原值**（见 setValue）。
+ * 代价要说清：清空之后重开界面，那一格显示成数字而不是占位符——数字的含义正是"这一格有覆写"，与界面
+ * 判"改过没有"的判据（`values[0] != null`，见 LimitBonusEditorPanel 的 edited）是同一个。
+ * 手写文件里的 `values: [null]` 照旧读：mod 那边掩码不置位、一个字节都不碰。
  */
 export function withFirstValue(param: LimitBonusParam, value: number | null): LimitBonusEdit {
     return {
@@ -195,7 +203,7 @@ export function withFirstValue(param: LimitBonusParam, value: number | null): Li
         // 为假的条目，而这里从不写假）。
         enabled: true,
         key: param.key,
-        values: [value],
+        values: [value ?? param.default],
     }
 }
 

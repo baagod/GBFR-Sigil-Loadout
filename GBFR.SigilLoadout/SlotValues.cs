@@ -21,11 +21,12 @@ internal static class SlotValues {
     internal static (uint Mask, float[] Values) Mask(float?[]? slots, int maxSlots) {
         var values = new float[maxSlots];
         uint mask = 0;
-        if (slots is null)
+        // 长度越界（手写文件里的怪记录）整条跳过：宁可不写，也不按前 maxSlots 格写一半——那会把
+        // "这份文件坏了"变成一次静默的部分写入。
+        if (slots is null || slots.Length > maxSlots)
             return (0, values);
 
-        int count = Math.Min(slots.Length, maxSlots);
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < slots.Length; i++) {
             if (slots[i] is not float value)
                 continue;
             values[i] = value;

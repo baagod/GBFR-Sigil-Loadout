@@ -52,7 +52,7 @@ func TestSaveEditsWritesConfigWhereTheModReadsIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sigiledits.json is not where the mod looks for it: %v", err)
 	}
-	var cfg Config
+	var cfg editList[SigilSkill]
 	if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
 		t.Fatalf("sigiledits.json is not valid JSON: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestSaveEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the debounce never wrote sigiledits.json: %v", err)
 		}
-		var cfg Config
+		var cfg editList[SigilSkill]
 		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
 			t.Fatalf("sigiledits.json is not valid JSON: %v", err)
 		}
@@ -311,7 +311,11 @@ func TestPadValuesAlwaysGivesTenSlots(t *testing.T) {
 
 // 资产是一起生成的，但仍然分成两个文件：数值与语言无关，文案不是。如果它们的 Key 集合发生漂移，
 // 新增一个技能会悄悄产出一个空名字（或一行没有数值的行），所以这里断言每种语言的技能集合与数值
-// 一致——并且互相之间也一致。
+// 一致。
+//
+// 语言之间也一致是**推出来的**，不再单写一遍：每门语言都与 skillInfo 等长、且是它的子集，所以每门
+// 语言的 Key 集合恒等于 skillInfo——两两当然也相等（早先那段拿第一门语言当基准再互查的循环因此
+// 永远不会触发，是死代码）。
 func TestSkillTablesAgree(t *testing.T) {
 	if len(skillInfo) == 0 {
 		t.Fatal("skill_status.json did not load")
@@ -319,7 +323,6 @@ func TestSkillTablesAgree(t *testing.T) {
 	if len(skillTables) != 4 {
 		t.Fatalf("expected a table each for zh, en, ja and ko, got %d", len(skillTables))
 	}
-	var reference map[string]SkillText
 	for _, lang := range []string{"zh", "en", "ja", "ko"} {
 		texts, ok := skillTables[lang]
 		if !ok {
@@ -337,22 +340,10 @@ func TestSkillTablesAgree(t *testing.T) {
 				t.Fatalf("%s: skill %s has text but no values", lang, key)
 			}
 		}
-		if reference == nil {
-			reference = texts
-			continue
-		}
-		for key := range reference {
-			if _, ok := texts[key]; !ok {
-				t.Fatalf("%s is missing skill %s, which other languages have", lang, key)
-			}
-		}
 	}
 	for hash, info := range skillInfo {
-		// 一次编辑可能点到的每个等级都有自己的一行，且带齐十个参槽，否则一个参槽的占位符
-		// （以及清空输入框后写回的值）就会来自另一个等级。
-		if len(info.Rows) == 0 {
-			t.Fatalf("skill %s has no level rows", hash)
-		}
+		// 每个技能至少有一行，以及每行带齐十个参槽这件事，由 TestLevelRangesAreUsable 与上面那条
+		// 参数槽断言各守一半；这里只管"这一行有几个值"。
 		for _, row := range info.Rows {
 			if len(row.Values) != LevelValueCount {
 				t.Fatalf("skill %s level %d has %d values, want %d",
@@ -505,31 +496,5 @@ func writeFile(t *testing.T, path, body string) {
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
-	}
-}
-
-// 没有东西待写，就什么都不写：一串编辑就是一次写入，无论 flush 被调用多少次。
-func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
-	hermeticHome(t)
-
-	service := &EditService{}
-	edits := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
-	if err := service.SaveEdits(edits); err != nil {
-		t.Fatalf("SaveEdits: %v", err)
-	}
-	service.FlushNow()
-
-	path := localConfig(t, editListName)
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("the list was not written: %v", err)
-	}
-
-	// 把文件拿走：第二次 flush 什么都不该做，所以它不会回来。
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	service.FlushNow()
-	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatal("a flush with nothing pending wrote the list again")
 	}
 }

@@ -59,14 +59,11 @@ export type RowContext = {
  * 一次敲键意味着什么、正在输入时框里显示什么，由 skills.ts（slotEdit）决定。
  */
 /*
-    数值框的样式：裸文本，不是输入域——整行读起来就是一行用 | 隔开的数字，聚焦时也不给底色（那层底色
-    在深色下被 dark:bg-transparent 压掉、只有浅色下可见，见 style.css 里"数值框"那段）——说明"这里能
-    编辑"的只有光标本身。框就是行高（父行与各等级行都是 h-11）：行没有内边距，整行都是框。
-
-    这三页（因子编辑 / 专精技能 / 角色强化）的框现在都是 SlotInput，样式由各自传入。
+    数值框的样子：底样式（裸文本、无边框底色、tabular-nums）在 SlotInput，三页共用；这里只给这一页的
+    高度与弹性——框就是行高（父行与各等级行都是 h-11），行没有内边距，所以整行都是框；行里唯一有弹性
+    的就是这些框，十个平分整行。
 */
-const VALUE_SLOT =
-    "h-11! min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent";
+const VALUE_SLOT = "h-11! flex-1";
 
 function ValueSlots({
     values,

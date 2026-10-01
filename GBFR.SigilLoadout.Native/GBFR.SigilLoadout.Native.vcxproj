@@ -31,12 +31,9 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings" />
-  <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <TargetName>GBFR.SigilLoadout.Native</TargetName>
     <TargetExt>.dll</TargetExt>
@@ -113,7 +110,6 @@
     <ClInclude Include="third_party\Zydis.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
   <!-- Inputs/Outputs 让 MSBuild 只在源比产物新时才跑它（新克隆少了 .inc 时也会跑）：
          src\exclusive_table.inc                     编译输入（#include，不入库）
          ..\SigilLoadout\assets\sigils.chara.json    随包资产（入库）

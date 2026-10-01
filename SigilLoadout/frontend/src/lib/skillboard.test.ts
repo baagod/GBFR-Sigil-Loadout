@@ -6,10 +6,6 @@ import { boxNumbers, spaceBrackets } from "@/components/SkillboardPanel"
     里面的 {n} 说的是"第几个框"，且界面一律写成 1 起（游戏是 0 起）。
 */
 describe("说明里的框号", () => {
-    it("下标整体 +1：{0} 是第 1 个框", () => {
-        expect(boxNumbers("效果量：攻击力+{0}%")).toBe("效果量：攻击力+{1}%")
-    })
-
     it("跨组的两位数也一样：{10} 是第 11 个框、{20} 是第 21 个", () => {
         expect(boxNumbers("攻击力+{10}％ / 伤害上限+{20}% / 蓄力时间+{0}%")).toBe(
             "攻击力+{11}％ / 伤害上限+{21}% / 蓄力时间+{1}%",
@@ -31,12 +27,10 @@ describe("说明里的框号", () => {
 describe("专精说明的方括号留白", () => {
     it("方括号在行首：左边不补空格", () => {
         expect(spaceBrackets("[红莲之刃]最大可提升至Lv10")).toBe("[红莲之刃] 最大可提升至Lv10")
-        expect(spaceBrackets("[红莲之刃]最大可提升至Lv10").startsWith(" ")).toBe(false)
     })
 
     it("方括号在行尾：右边不补空格", () => {
         expect(spaceBrackets("赋予自身强化效果[红莲之刃]")).toBe("赋予自身强化效果 [红莲之刃]")
-        expect(spaceBrackets("赋予自身强化效果[红莲之刃]").endsWith(" ")).toBe(false)
     })
 
     it("行内的方括号与相邻汉字分开", () => {

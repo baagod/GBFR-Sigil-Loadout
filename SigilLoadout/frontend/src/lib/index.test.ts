@@ -52,11 +52,16 @@ describe("真实 sigils.json 上的派生索引", () => {
         for (const s of sigils) {
             if (s.onlyone !== "1" && s.hash !== s.skill1 && s.mix === "0") ordinary.add(s.skill1)
         }
+        let checked = 0
         for (const s of sigils) {
             for (const h of s.lot ?? []) {
+                checked++
                 expect(ordinary.has(h), `${s.hash} 的 lot 里有非普通技能 ${h}`).toBe(true)
             }
         }
+        // 一条 lot 都没有时上面那层一次都不进，这条会**空转通过**（资产换了形状也照样绿）：这一句把
+        // "真的查过东西"钉住。
+        expect(checked, "资产里一条 lot 都没有，这条断言什么都没查").toBeGreaterThan(0)
     })
 
     it("唯一持有的组没有合法副技能", () => {

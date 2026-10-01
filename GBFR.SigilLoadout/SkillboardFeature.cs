@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using gbfrelink.utility.manager.Interfaces;
 using Reloaded.Mod.Interfaces;
 
@@ -217,7 +218,12 @@ internal sealed class SkillboardFeature {
             if (!edit.Enabled || !TryParseKey(edit.Key, out uint keyHash))
                 continue;
 
-            // Key 是行的身份：整张表里必须恰好出现一次（与原生那三道门同一条理由）。
+            // Key 是行的身份，而且这张表要求它**恰好出现一次**：镜像交出去的是一整张表，同一 Key 若有多行
+            // 而只改中一行，游戏读到另一行就是旧值——所以这里宁可不做，也不做一半（整份编辑因此被拒）。
+            // 原生那一侧放宽到"命中的几行在被写的那几格上一致"（姊妹副本，见 src/table_slot.cpp），是为
+            // limit_bonus_param 那张表准备的：实测它 1123 行 / 1098 个 Key、25 个 Key 各占两行。而**这张**
+            // 表实测 2915 行 / 2915 个 Key、一个重复都没有，所以这里的强判据不是没修完的债，是更强的身份
+            // 证明——别照着原生那条去放宽它。
             int found = -1;
             for (long row = 0; row < rows; row++) {
                 int at = (int)(HeaderBytes + row * RowBytes + KeyOffset);
@@ -244,23 +250,14 @@ internal sealed class SkillboardFeature {
             for (int i = 0; i < MaxValues; i++) {
                 if ((valueMask & (1u << i)) == 0)
                     continue;
-                BitConverter.GetBytes(values[i]).CopyTo(file, valuesAt + i * sizeof(float));
+                BinaryPrimitives.WriteSingleLittleEndian(file.AsSpan(valuesAt + i * sizeof(float)), values[i]);
             }
             patched.Add((edit.Key, keyHash, valueMask, values));
         }
         return file;
     }
 
-    // "把可空的十个槽化成连续前缀"搬去了 SlotValues（角色强化那条链也要用同一套）。
-    // 空洞由调用方给的原值补齐、补不了才整条跳过，都写在那边的注释里。
+    // "可空槽 → 掩码 + 十个值"在 SlotValues：角色强化那条链共用同一套。
 
-    private static bool TryParseKey(string key, out uint hash) {
-        hash = 0;
-        return key.Length == 8 && uint.TryParse(key, System.Globalization.NumberStyles.HexNumber,
-            System.Globalization.CultureInfo.InvariantCulture, out hash);
-    }
+    private static bool TryParseKey(string key, out uint hash) => HexKey.TryParse(key, out hash);
 }
-
-
-
-

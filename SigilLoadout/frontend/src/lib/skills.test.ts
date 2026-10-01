@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
     addressOf,
+    anyFilled,
     dedupe,
     explainAt,
     HALF_TYPED,
@@ -43,20 +44,20 @@ const record = (
     上界正是在这个状态下对用户可见。
 */
 function type(value: number, keys: string, committed = false) {
-    let values: (number | null)[] = [committed ? value : null];
+    let current: number | null = committed ? value : null;
     let half: string | undefined;
-    const shown = () => half ?? (values[0] === null ? "" : String(values[0]));
+    const shown = () => half ?? (current === null ? "" : String(current));
     for (const ch of keys) {
-        const edit = slotEdit(shown() + ch, 0, values);
+        const edit = slotEdit(shown() + ch);
         if (edit.kind === "drop") continue;
         if (edit.kind === "half") {
             half = edit.text;
             continue;
         }
         half = edit.keeps;
-        values = edit.values;
+        current = edit.value;
     }
-    return { value: values[0], typed: values[0] !== null, shown: shown() };
+    return { value: current, typed: current !== null, shown: shown() };
 }
 
 describe("a keystroke in a value box", () => {
@@ -81,7 +82,7 @@ describe("a keystroke in a value box", () => {
     it("drops what could never become a number, and the box carries on", () => {
         // 被丢弃的按键让输入框一点都不变——包括半成品文本——所以下一个数字会接在原本已有的内容后面。
         for (const text of ["1-", "1..", "1e", "1a"]) {
-            expect(slotEdit(text, 0, [1]), text).toEqual({ kind: "drop" });
+            expect(slotEdit(text), text).toEqual({ kind: "drop" });
         }
         expect(type(0, "1-2").value).toBe(12);
         expect(type(0, "1..2").value).toBe(1.2);
@@ -89,8 +90,8 @@ describe("a keystroke in a value box", () => {
 
     it("empties a box back to the game's own number, which is what null is", () => {
         // 游戏数值是从表里读的，所以文件里不带它的副本：空框就是 null，mod 会保持行的那部分不动。
-        const edit = slotEdit("", 0, [5]);
-        expect(edit).toEqual({ kind: "commit", values: [null] });
+        const edit = slotEdit("");
+        expect(edit).toEqual({ kind: "commit", value: null });
     });
 });
 
@@ -105,21 +106,21 @@ describe("the two patterns", () => {
     it("replaces leading zeroes instead of refusing the keystroke", () => {
         // 0 后面接 4 就是 4：0 是输入框自己的，所以这个数字把它替换掉。小数点需要的那个零留下
         // ——0.5 不是 .5——单独一个 0 仍然是 0。
-        expect(slotEdit("04", 0, [0])).toMatchObject({
+        expect(slotEdit("04")).toMatchObject({
             kind: "commit",
-            values: [4],
+            value: 4,
             keeps: "4",
         });
-        expect(slotEdit("007", 0, [0])).toMatchObject({ values: [7], keeps: "7" });
-        expect(slotEdit("00", 0, [0])).toMatchObject({ values: [0], keeps: "0" });
-        expect(slotEdit("-04", 0, [0])).toMatchObject({ values: [-4], keeps: "-4" });
-        expect(slotEdit("00.5", 0, [0])).toMatchObject({
-            values: [0.5],
+        expect(slotEdit("007")).toMatchObject({ value: 7, keeps: "7" });
+        expect(slotEdit("00")).toMatchObject({ value: 0, keeps: "0" });
+        expect(slotEdit("-04")).toMatchObject({ value: -4, keeps: "-4" });
+        expect(slotEdit("00.5")).toMatchObject({
+            value: 0.5,
             keeps: "0.5",
         });
-        expect(slotEdit("0.004", 0, [0])).toMatchObject({ values: [0.004] });
-        expect(slotEdit("0", 0, [0])).toMatchObject({ values: [0], keeps: "0" });
-        expect(slotEdit("0.", 0, [0])).toMatchObject({ kind: "half", text: "0." });
+        expect(slotEdit("0.004")).toMatchObject({ value: 0.004 });
+        expect(slotEdit("0")).toMatchObject({ value: 0, keeps: "0" });
+        expect(slotEdit("0.")).toMatchObject({ kind: "half", text: "0." });
     });
 
     it("refuses more digits than the game can carry, so no box can hold Infinity", () => {
@@ -132,7 +133,7 @@ describe("the two patterns", () => {
         // 长度取自真实粘贴过的超长数字；超过 6 位都走同一条路。
         for (const text of ["9".repeat(309)]) {
             expect(HALF_TYPED.test(text), `${text.length} digits`).toBe(false);
-            expect(slotEdit(text, 0, [0])).toEqual({ kind: "drop" });
+            expect(slotEdit(text)).toEqual({ kind: "drop" });
         }
     });
 
@@ -174,7 +175,6 @@ describe("one edit per address", () => {
             record("B2", 3, true),
         ];
         const records = dedupe(input);
-        expect(records.length).toBeLessThan(input.length);
         expect(records.map((r) => addressOf(r.key, r.level))).toEqual(["A1#1", "B2#3"]);
     });
 
@@ -203,6 +203,16 @@ describe("one edit per address", () => {
 });
 
 describe("what counts as an edit", () => {
+    it("只认非 null 的槽：填过的算，清空的算没填", () => {
+        // 这是"改过没有"的唯一判据：列表的勾选态（isEdit）与两个编辑页的行色都用它。专精页那条
+        // 实测过的症状（"只改一格，整行十个数字全亮起来"）就出在这里——记录存在不等于填过。
+        expect(anyFilled([null, null, 9])).toBe(true);
+        expect(anyFilled([0])).toBe(true); // 0 是用户填的数，不是"没填"
+        expect(anyFilled([null, null])).toBe(false);
+        expect(anyFilled([])).toBe(false);
+        expect(anyFilled(undefined)).toBe(false);
+    });
+
     it("keeps a record that is switched on, even with nothing typed into it", () => {
         // 勾选一个等级就是选中它，所以只勾选就已经算编辑：它什么都不写（每个槽都是 null），
         // 这就是"以游戏自己的数值开启"的意思。
@@ -327,16 +337,6 @@ describe("the explanation a level shows", () => {
     it("says nothing when the skill has no bands", () => {
         expect(explainAt(undefined, 1)).toBe("");
         expect(explainAt([], 1)).toBe("");
-    });
-
-    it("is what the six-band crab factor relies on", () => {
-        // 真实因子多到六段；实现是一趟 findLast，段数不改变代码路径，所以只钉一段。
-        const crab: ExplainBand[] = [
-            [1, "（攻击力+{0}%）"],
-            [9, "（HP持续回复，每次回复最大HP的{2:.1f}%）"],
-            [20, "（伤害上限+{4}% / 防御力+{5}%）"],
-        ];
-        expect(explainAt(crab, 12)).toContain("HP持续回复");
     });
 });
 

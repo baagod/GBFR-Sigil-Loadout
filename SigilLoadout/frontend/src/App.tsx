@@ -25,7 +25,7 @@ import {
     type Slot,
     type Skill
 } from "@/lib/model"
-import {SlotRow, HEADER_ROW} from "@/components/SlotEditor"
+import {SlotRow, HEADER_ROW} from "@/components/SlotRow"
 import {ExclusivePanel} from "@/components/ExclusivePanel"
 import {SigilEditorPanel} from "@/components/SigilEditorPanel"
 import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"

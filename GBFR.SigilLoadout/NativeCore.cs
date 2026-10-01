@@ -159,4 +159,3 @@ internal static unsafe partial class NativeCore {
         }
     }
 }
-

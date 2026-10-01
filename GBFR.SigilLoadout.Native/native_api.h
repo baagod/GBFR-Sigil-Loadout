@@ -10,12 +10,11 @@
 
 #define GBFR20_CALL __cdecl
 
-// ABI v21：生命周期导出，一个调用应用整份玩家配置，另一个把编辑后的
-// skill_status 表写进游戏自己解析出的那份拷贝，其地址由原生侧从语义锚点
-// 解出（托管侧不持有也不扫描它；见 src/table_slot.cpp）。专属开关以
-// **skill hash** 传递：slot 表归原生所有，托管侧无需按角色维护一张表。
-// v21 起同一套锚点机制也覆盖 limit_bonus_param：按 Key 认行、只写行内
-// Lv1..LvN 的 float（能力强化数值），见 GBFR20_SetLimitBonusLevels。
+// ABI 版本号：托管侧与原生必须一致（不一致时原生拒绝一切调用，见 exports.cpp 的 GuardAbi）。
+//
+// 这里**不再记"哪一版加了什么"的流水账**：那份账烂过两次——v22 加了专精表的写入、v23 把两张活表的
+// 接口从"连续前缀"换成"掩码 + 十个值"，而这段文字只跟着数字走、内容一直停在 v21。现在每张表的契约
+// 写在它自己的导出声明上（下面按顺序：生命周期 + skill_status / limit_bonus_param / skillboard）。
 constexpr uint32_t GBFR20_ABI_VERSION = 23;
 
 // GBFR20_WriteSkillStatusTable 的拒绝码（返回值 < 0）。
@@ -27,13 +26,14 @@ constexpr int32_t GBFR20_TABLE_LENGTH_UNEXPECTED = -5;      // 传入长度不�
 constexpr int32_t GBFR20_TABLE_IDENTITY_MISMATCH = -6;      // 逐行 Key 对不上：不是同一张表
 constexpr int32_t GBFR20_TABLE_WRITE_FAILED = -7;           // 写的时候崩了
 
-// GBFR20_SetLimitBonusLevels 的拒绝码（返回值 < 0）。头四个与上面共用：
-// -1 没初始化 / -2 锚点没解析出 limit_bonus_param 的缓冲区指针字段 /
-// -3 指针字段不可读，或缓冲区不整段可写 / -7 写的时候崩了。
-constexpr int32_t GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED = -8; // 掩码没选中任何格，或伸出了第 10 格
-constexpr int32_t GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE = -9;  // 头里的行数不在合理区间：指针字段指到了别处
-constexpr int32_t GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE = -10;        // 同一个 Key 命中的几行内容不一致（或行数超出上界）：这不是那张表
-constexpr int32_t GBFR20_LIMIT_BONUS_KEY_NOT_FOUND = -11;         // 表里没有这个 Key
+// -8..-11 是**两张活表共用**的拒绝码（GBFR20_SetLimitBonusLevels / GBFR20_SetSkillboardValues
+// 都可能返回），所以名字里不带任何一张表的名字：它们描述的是"这段内存不像那张表"，不是哪一张表。
+// -1/-3/-7 与上面那组共用（含义逐条相同）：-1 没初始化 / -3 指针字段不可读或缓冲区不整段可写 /
+// -7 写的时候崩了。-2 在这里的含义是"这张表的指针字段还没从锚点解析出来"。
+constexpr int32_t GBFR20_SLOT_MASK_UNEXPECTED = -8;         // 掩码没选中任何格，或伸出了第 10 格
+constexpr int32_t GBFR20_TABLE_ROW_COUNT_IMPLAUSIBLE = -9;  // 头里的行数不在合理区间：指针字段指到了别处
+constexpr int32_t GBFR20_TABLE_KEY_NOT_UNIQUE = -10;        // 同一个 Key 命中的几行内容不一致（或行数超出上界）：这不是那张表
+constexpr int32_t GBFR20_TABLE_KEY_NOT_FOUND = -11;         // 表里没有这个 Key
 
 using GBFR20_LogCallback = void(GBFR20_CALL*)(const char* message);
 
@@ -103,7 +103,7 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(
 // 把它们填满（旧接口只收"从 Lv1 开始的连续一串"，中间挖空就写不了）。
 //
 //   >= 0  成功；命中几行就写几行，返回**真正被改写的行数**（0 = 内存里已经是这些值）。
-//   < 0   拒绝（见上面那组码）。三道门都在写之前，任何一条不成立都是一个字节都不写。
+//   < 0   拒绝（见上面那组码）。每道闸都在写之前，任何一条不成立都是一个字节都不写。
 //
 // 闸门顺序（每道都 fail-closed）：锚点已在启动时解出指针字段 -> 指针字段可读且非空
 // -> 头里的行数落在合理区间 -> 整段缓冲区可写 -> 掩码合法 -> 命中该 Key 的**每一行**在
@@ -131,7 +131,7 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
 //              一串值"，中间挖空就写不了，只好补原值）。
 //   values     十个，与槽一一对应；只有 mask 置位的那些会被读。
 //
-// 三道门与上面那张表同构（掩码合法 -> 行数合理 -> 整段可写 -> 目标 Key 命中的每一行在**被写的
+// 四道门与上面那张表同构（掩码合法 -> 行数合理 -> 整段可写 -> 目标 Key 命中的每一行在**被写的
 // 那几格**上完全一致）。不同的只有"表指针从哪来"：这张表没有发布指令可以当锚点，所以从已经解出的
 // 能力强化指针字段出发，在附近的可写内存里找那个"自称行数合理、且首行 Key 对得上"的指针
 // （见 src/table_slot.cpp）。找不到就照旧拒写——一个字节都不写，日志里说明原因。
@@ -144,4 +144,3 @@ GBFR20_API int32_t GBFR20_CALL GBFR20_SetSkillboardValues(
     uint32_t key_hash,
     uint32_t slot_mask,
     const float* values);
-

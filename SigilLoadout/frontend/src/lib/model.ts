@@ -171,9 +171,10 @@ export function resolveMainGem(
 /** 至少补到 MAX_SLOTS 行，用户只管往里填。存档多出来的行照传：交给 Go/C# 校验去拒，
  * 不在这里静默截断（下次自动保存就是数据丢失）。 */
 export function padSlots(slots: Slot[]): Slot[] {
-    const out = [...slots]
-    while (out.length < MAX_SLOTS) out.push(emptySlot())
-    return out
+    return [
+        ...slots,
+        ...Array.from({ length: Math.max(0, MAX_SLOTS - slots.length) }, emptySlot),
+    ]
 }
 
 const clampLevel = (level: number, cap: number | undefined) =>

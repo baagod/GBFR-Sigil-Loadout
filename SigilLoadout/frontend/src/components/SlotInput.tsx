@@ -2,6 +2,22 @@ import { useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { useWheelStep } from "@/hooks/useWheelStep"
 import { slotEdit, stepValue } from "@/lib/skills"
+import { cn } from "cn"
+
+/*
+    数值框的底样式：三页共用（原先三个文件各抄了一份逐字相同的字符串）。身份是"读起来像裸文本"——
+    无边框、无内边距、无聚焦底色（原先那条 focus:bg-muted/50 在深色下本来就被压掉，只有浅色下可见，
+    两页一起删掉了，见 style.css 里"数值框"那段），说明"这里能编辑"的只有光标本身；tabular-nums 让
+    十格即使数字不同也对得齐。
+
+    dark:bg-transparent 不是重复（WebStorm 会提示删掉，别删）：基础 Input 自带 .dark:bg-input/30，
+    两者同特异性，只能靠排在编译产物更后面取胜。
+
+    **高度与宽度由调用点给**：三页的行高与列宽各不相同（h-11 的行、h-5 的小框、w-12 的定宽），
+    传进来的 className 经 cn() 与这一份合并，冲突项以后者为准。
+*/
+const SLOT_BASE =
+    "min-w-0 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
 
 /**
  * 一个数值框（「参槽」）。三页共用同一套**框内行为**：
@@ -9,7 +25,7 @@ import { slotEdit, stepValue } from "@/lib/skills"
  *  - 编辑期间把**用户敲的那串文本**留在屏幕上。"-" 与 "0." 是通往一个数字路上的状态，受控输入框
  *    没有别的办法显示它们；离开框之后回到"以记录为准"的样子。
  *  - 解析规则只有一份：lib/skills.ts 的 slotEdit（半成品文本、前导零、清空成 null）。
- *  - 清空 = 提交 null；"回到游戏原值"怎么写由调用方决定（各页规矩相同、落点不同）。
+ *  - 清空 = 提交 null。这个 null 在游戏里怎么落地由调用方决定，三页并不一样（见各页的 onCommit）。
  *  - 滚轮步进（useWheelStep）、方向键步进、Esc 放开焦点。
  *
  * 以**因子编辑页的数值槽为准**：slotEdit / stepValue / useWheelStep 那套本来就出自它，另两页原先各
@@ -26,7 +42,7 @@ export function SlotInput({
     original: number
     /** 已提交的值；null = 没编辑过（于是显示占位符）。 */
     value: number | null
-    /** 提交：null = 清空（调用方按各自规矩写回游戏原值）。 */
+    /** 提交：null = 清空（这一格交给调用方处置，三页的落点不同）。 */
     onCommit: (value: number | null) => void
     className?: string
     /** 读屏用的名字，如「攻击力 Lv1 数值」。 */
@@ -57,7 +73,7 @@ export function SlotInput({
             placeholder={String(original)}
             value={typed ?? (value === null ? "" : String(value))}
             onChange={(event) => {
-                const edit = slotEdit(event.target.value, 0, [null])
+                const edit = slotEdit(event.target.value)
                 if (edit.kind === "drop") return
                 if (edit.kind === "half") {
                     setTyped(edit.text)
@@ -65,7 +81,7 @@ export function SlotInput({
                 }
                 // 数字已提交，但框保留用户敲的那串文本直到离开它（见上面 typed 的说明）；清空得到 null。
                 setTyped(edit.keeps ?? null)
-                onCommit(edit.values[0])
+                onCommit(edit.value)
             }}
             onBlur={() => setTyped(null)}
             onKeyDown={(event) => {
@@ -78,7 +94,7 @@ export function SlotInput({
                 event.preventDefault()
                 step(event.key === "ArrowUp" ? 1 : -1)
             }}
-            className={className}
+            className={cn(SLOT_BASE, className)}
         />
     )
 }

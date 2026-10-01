@@ -16,8 +16,9 @@ public class SkillboardEdit {
     public string Key { get; set; } = "";
 
     /// <summary>
-    /// 十个槽的数值，写前 N 个（N = 数组长度，1..10）。中间出现 null 就整条跳过——原生按"连续前缀"
-    /// 写，中间挖空写不了；界面那边每条记录交的都是完整的十个值（没动过的格子交的是游戏原值）。
+    /// 十个槽的数值：<c>null</c> = 这一格不动（原生那边掩码不置位，一个字节都不碰），数字 = 写下去。
+    /// 于是"只改第 4 格"就是前三个 null——**长度不再是契约**，哪几格要写完全由 null/数字决定。
+    /// 长度超过十格的记录整条跳过（见 <see cref="SlotValues.Mask"/>）：那是坏文件，宁可不写也不写一半。
     /// </summary>
     [JsonPropertyName("values")]
     public float?[] Values { get; set; } = [];

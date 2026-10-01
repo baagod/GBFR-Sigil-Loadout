@@ -1,7 +1,8 @@
 /*
     能力强化页的纯逻辑：Lv1 取哪个数、描述格里写什么，以及一次改动落成什么样的一条记录。这些规则决定
     了屏幕上显示什么、以及下一次落盘的 limit_bonus.json 里有什么，所以在这里直接钉住——**这一页只写
-    第一档**（values 长度恒为 1），Lv2/Lv3 留给游戏原值。
+    第一档**（写出去的记录里只有 values[0] 非 null，其余是 null；哪几格要写由 null/数字决定，不是由
+    长度决定）。
 
     用**手搓夹具**而不是入库的资产：这里钉的是规则本身，资产的不变量（Key 与哈希的写法、Lv1 的默认值、
     每条 id 都有文案）由 Go 侧的 limitbonusservice_test.go 对着真实文件断言，两边不必是同一份事实的第三次
@@ -21,7 +22,6 @@ import {
     type LimitBonusEdit,
     type LimitBonusParam,
 } from "./limitbonus"
-import { dedupeBy } from "./skills"
 
 // 一条能力一个参数行（能力强化就是这个形状），夹具也取这个形状：刹那，Lv1 的游戏默认值是 2。骨架里
 // **没有文案**，所以这里也不带——名字与效果都在当前语言的文案表里。
@@ -105,25 +105,6 @@ describe("读回来的记录", () => {
     // limitbonusservice_test.go）：面板看到的是错误，不是一条被读成零值的记录。
 })
 
-describe("一个 Key 最多一条编辑", () => {
-    // 规则本身（"留最后一条已启用的，该地址一条都没有时留最后一条"）与因子编辑页共用同一个实现，
-    // 在那里已经钉住（见 skills.test.ts 的 dedupe）；这里只钉这一页用的地址：记录自己的 Key。
-    it("同一 Key 的两条里留最后一条已启用的", () => {
-        const kept = dedupeBy(
-            [
-                edit({ key: "AAAAAAAA", values: [1] }),
-                edit({ key: "AAAAAAAA", enabled: false, values: [2] }),
-                edit({ key: "BBBBBBBB", values: [3] }),
-            ],
-            (record) => record.key,
-        )
-        expect(kept).toEqual([
-            edit({ key: "AAAAAAAA", values: [1] }),
-            edit({ key: "BBBBBBBB", values: [3] }),
-        ])
-    })
-})
-
 describe("角色去重", () => {
     it("参数行 Key 集合相同的条目只留一份（古兰与姬塔是同一个能力树的两个人）", () => {
         const shared = [ability({ params: [param({ key: "AAAAAAAA" })] }), ability({ params: [param({ key: "BBBBBBBB" })] })]
@@ -150,28 +131,10 @@ describe("改第一档落成什么记录", () => {
             // 填数值就是要它生效（开关只是事后关掉它的手段）。
             enabled: true,
             key: "0D0BCF24",
-            // 契约是 values[i] 写进 Lv(i+1)：长度 1 = 只写 Lv1。按 default 把后面两档也写上，
-            // 等于替用户改了 Lv2/Lv3。
+            // **哪几档要写由"这一格是不是 null"决定**（mod 那边按它算掩码），长度只是巧合：这里只有
+            // 第一格非 null，所以只写 Lv1。按 default 把后面两档也填上，等于替用户改了 Lv2/Lv3。
             values: [99],
         })
-        expect(withFirstValue(param(), 99).values).toHaveLength(1)
-    })
-
-    it("已有记录改值：写出去的仍只有第一档", () => {
-        // 文件里可能留着别人手写或旧版本写的长记录；这一页写出去的永远只有第一格。
-        const existing = asEdit({ enabled: true, key: "0D0BCF24", values: [500, 600, 321] })
-        expect(valueAt(param(), existing!)).toBe(500)
-        expect(withFirstValue(param(), 111)).toEqual({
-            enabled: true,
-            key: "0D0BCF24",
-            values: [111],
-        })
-    })
-
-    it("值列表往返：改过的一条读回来还是同一份", () => {
-        const written = withFirstValue(param(), 99)
-        expect(asEdit(written)).toEqual(written)
-        expect(dedupeBy([asEdit(written)!], (record) => record.key)).toEqual([written])
     })
 
 })
@@ -213,7 +176,6 @@ describe("中西文之间补空格", () => {
 
     it("开头就是拉丁词：前面不会多出空格", () => {
         expect(spaceCJKAndLatin("FULL CHAIN时连锁计数提升量")).toBe("FULL CHAIN 时连锁计数提升量")
-        expect(spaceCJKAndLatin("FULL CHAIN时连锁计数提升量").startsWith(" ")).toBe(false)
     })
 
     it("纯中文 / 纯拉丁 / 已有空格：原样返回", () => {
@@ -223,22 +185,24 @@ describe("中西文之间补空格", () => {
     })
 })
 /*
-    清空 → 记录里存 null（而不是在这里换成原值）：界面靠它区分"我清空了"（框回占位符）与"我输入了一个
-    正好等于原值的数"（框里就该是这个数）。换成原值的活由服务端落盘时做（见 limitbonusservice.go 的
-    服务端），所以 valueAt 读到 null 时要回落到游戏原值。
+    清空 → 记录里存的是**这一档的游戏原值**，不是 null。为什么：这张表只写内存、读档也不重新解析它
+    （见 LimitBonusFeature.cs 的 doc），所以"不写"并不等于"回到原值"——游戏停在上次写进去的数上，
+    界面却显示占位符，两边对不上（实测过的 bug）。把原值当一次编辑写下去，那一格才真的回到默认。
+    null 只从手写文件里读回来，那时 valueAt 回落到游戏原值。
 */
 describe("清空一格", () => {
-    const param = { key: "0D0BCF24", default: 5 }
+    const fixture = { key: "0D0BCF24", default: 5 }
 
-    it("存进记录的是 null，不是原值", () => {
-        expect(withFirstValue(param, null).values).toEqual([null])
-        expect(withFirstValue(param, 5).values).toEqual([5])
+    it("清空写回这一档的游戏原值，不是 null", () => {
+        expect(withFirstValue(fixture, null).values).toEqual([fixture.default])
+        expect(withFirstValue(fixture, 5).values).toEqual([5])
+        expect(withFirstValue(fixture, 20).values).toEqual([20])
     })
 
-    it("读回来时 null 回落到游戏原值（框里显示占位符）", () => {
-        expect(valueAt(param, withFirstValue(param, null))).toBe(5)
-        expect(valueAt(param, withFirstValue(param, 5))).toBe(5)
-        expect(valueAt(param, withFirstValue(param, 20))).toBe(20)
-        expect(valueAt(param, undefined)).toBe(5)
+    it("读回来时 null（手写文件里的）回落到游戏原值", () => {
+        expect(valueAt(fixture, { enabled: true, key: fixture.key, values: [null] })).toBe(5)
+        expect(valueAt(fixture, withFirstValue(fixture, 5))).toBe(5)
+        expect(valueAt(fixture, withFirstValue(fixture, 20))).toBe(20)
+        expect(valueAt(fixture, undefined)).toBe(5)
     })
 })

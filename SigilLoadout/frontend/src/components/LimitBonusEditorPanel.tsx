@@ -73,18 +73,12 @@ const COLUMNS = "grid grid-cols-[288px_minmax(160px,1fr)_160px] items-center gap
 const SLOTS_PER_ROW = 3;
 
 /*
-    数值框的样式：框就是行高（h-11），读的是数字本身，所以静止与聚焦都像裸文本。
+    数值框的样子：底样式（裸文本、无边框底色、tabular-nums）在 SlotInput，三页共用；这里只给这一页
+    的尺寸——框就是行高（h-11），宽度钉死 12 个刻度，三个槽因此与右边那一列对齐。
 
-    无边框、无聚焦底色（原先那条 focus:bg-muted/50 在深色下被 dark:bg-transparent 压掉、
-    只有浅色下可见，两页一起删掉了，见 style.css 里"数值框"那段）。
-
-    dark:bg-transparent 不是重复（WebStorm 会提示删掉，别删）：基础 Input 自带 .dark:bg-input/30，
-    两者同特异性，只能靠排在编译产物更后面取胜。
-
-    框内行为（半成品文本、解析规则、滚轮/方向键/Esc）全在共享的 SlotInput 里，不在这里重写。
+    框内行为（半成品文本、解析规则、滚轮/方向键/Esc）也全在共享的 SlotInput 里，不在这里重写。
 */
-const SLOT_BOX =
-    "h-11! w-12 min-w-0 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
+const SLOT_BOX = "h-11! w-12"
 
 
 /**
@@ -102,6 +96,7 @@ function AbilityRow({
     effects,
     edits,
     onValue,
+    valueLabel,
 }: {
     ability: Ability;
     /** 当前语言里的名字；表里没有就显示 Key——不拿别的语言兜底。 */
@@ -112,12 +107,15 @@ function AbilityRow({
     edits: Map<string, LimitBonusEdit>;
     /** 一个框算完了：null = 清空（这一格写回它自己的原值）。 */
     onValue: (param: LimitBonusParam, value: number | null) => void;
+    /** 这个槽在读屏里叫什么（"数值"/"value"/…），随界面语言走。 */
+    valueLabel: string;
 }) {
     // 各参数行的模板用空格接起来（游戏自己就这么写："被回复量+{0}% 回复量+{0}%"）。
     const label = ability.params.map((param, i) => effectLabel(param, effects, i)).join(" ");
-    // 这一行有没有被编辑过（任一格有一条"有值"的记录）→ 决定描述格的颜色（白 / 灰）。
-    // 判的是 `values[0] != null`：记录存在但那一格是 null（被清空）不算编辑——框里那时显示占位符，
-    // 描述也该是灰的。
+    // 这一行有没有被编辑过（任一格有一条非 null 的记录）→ 决定描述格的颜色（白 / 灰）。
+    // 判的是 `values[0] != null`：与框里显示什么是同一个判据——框里是数字就是白的，是占位符就是灰的。
+    // 所以"清空"之后是白的：withFirstValue 把这一档的原值写成了数字（见那边的 doc），游戏里那一格
+    // 真的被覆写了。**只有第一格参与判断**：这一页只读写 Lv1，手写记录里后面几档有值不该把行染白。
     const edited = ability.params.some((param) => edits.get(param.key)?.values[0] != null);
 
     return (
@@ -164,7 +162,7 @@ function AbilityRow({
                             </span>
                             {param ? (
                                 <SlotInput
-                                    label={`${name} Lv1 数值`}
+                                    label={`${name} Lv1 ${valueLabel}`}
                                     original={valueAt(param, edits.get(param.key))}
                                     value={edits.get(param.key)?.values[0] ?? null}
                                     onCommit={(value) => onValue(param, value)}
@@ -200,6 +198,7 @@ function CharacterGroup({
     abilityNames,
     edits,
     onValue,
+    valueLabel,
 }: {
     character: LimitBonusCharacter;
     /** 这个角色在当前语言里的名字；表里没有就显示 PL 码——不拿别的语言兜底。 */
@@ -213,6 +212,8 @@ function CharacterGroup({
     /** 按参数行 Key 索引的全部编辑：一路传给它的能力行。 */
     edits: Map<string, LimitBonusEdit>;
     onValue: (param: LimitBonusParam, value: number | null) => void;
+    /** 数值槽在读屏里叫什么（读屏用的名字要随界面语言走），一路传给它的能力行。 */
+    valueLabel: string;
 }) {
     const [open, setOpen] = useState(false);
 
@@ -255,6 +256,7 @@ function CharacterGroup({
                         effects={effects}
                         edits={edits}
                         onValue={onValue}
+                        valueLabel={valueLabel}
                     />
                 ))}
         </>
@@ -363,9 +365,9 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
         // 只写**这一个**参数行：每一格对应节点的一条参数行（专属强化的两条是不同效果，实测 [10, 1]），
         // 一格写全部会把另外几条覆盖成同一个数。
         //
-        // 清空（value === null）就存 null，**不再在这里换成原值**：界面要能分清"我清空了"（框回占位符）
-        // 与"我输入了一个正好等于原值的数"（框里就该是这个数、描述也该变白）。换回原值由服务端在落盘
-        // 时由服务端原样落盘（null 就是 null）——C# 那边的 float?[] 把它读成"这一格不动"。
+        // 清空（value === null）交给 withFirstValue 换成这一行的 Lv1 原值：这张表只写内存、读档也不重新
+        // 解析，"不写"就等于停在旧值上、而界面显示占位符（实测过的 bug）。所以清空在这里是一次**写原值
+        // 的编辑**，不是留一个 null；手写文件里留着的 null 照旧读（mod 那边掩码不置位）。
         next.set(param.key, withFirstValue(param, value));
         commit(next);
     }
@@ -390,6 +392,7 @@ function LimitBonusEditorPanelBase({ lang, charaTable, charaNames }: {
                         abilityNames={text.bonuses}
                         edits={edits}
                         onValue={setValue}
+                        valueLabel={t.valueLabel}
                     />
                 ))}
                 {characters.length === 0 && (

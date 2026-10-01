@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using gbfrelink.utility.manager.Interfaces;
 using Reloaded.Mod.Interfaces;
 
@@ -319,7 +321,7 @@ internal sealed class SigilEditorFeature {
                 continue;
             }
 
-            if (!uint.TryParse(edit.Key, System.Globalization.NumberStyles.HexNumber, null, out uint key)) {
+            if (!HexKey.TryParse(edit.Key, out uint key)) {
                 LogAttempt($"sigil edit:   skip (key is not an 8-digit hex hash yet): {edit.Key}");
                 continue;
             }
@@ -421,7 +423,7 @@ internal sealed class SigilEditorFeature {
                     LogAttempt($"sigil edit:   {key:X8} L{level}: slot {i + 1} is not a finite number ({value}); left as the game has it");
                     continue;
                 }
-                BitConverter.GetBytes(value).CopyTo(data, row + i * 4);
+                BinaryPrimitives.WriteSingleLittleEndian(data.AsSpan(row + i * 4), value);
             }
 
             // 只在**这一行相对上一次真的变了**时才说一行：这一行现在是什么值。不报 "was"：它恒等于归档里
@@ -437,6 +439,6 @@ internal sealed class SigilEditorFeature {
     }
 
     private static string RowValues(byte[] data, int row) =>
-        string.Join(" | ", Enumerable.Range(0, SigilSkill.LevelValueCount)
-            .Select(i => BitConverter.ToSingle(data, row + i * 4)));
+        string.Join(" | ", MemoryMarshal.Cast<byte, float>(
+            data.AsSpan(row, SigilSkill.LevelValueCount * sizeof(float))).ToArray());
 }

@@ -86,7 +86,8 @@ func debugf(format string, args ...any) {
 		return
 	}
 	defer f.Close()
-	fmt.Fprintf(f, "%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
+	// 一个 Fprintf 就够：格式串拼在时间戳后面，参数直接摊开（不必先 Sprintf 再当字符串打一遍）。
+	fmt.Fprintf(f, "%s "+format+"\n", append([]any{time.Now().Format("15:04:05.000")}, args...)...)
 }
 
 // nextForegroundWindow 沿 Z 序往下找"焦点该还回去的窗口"（找不到返回 0）。

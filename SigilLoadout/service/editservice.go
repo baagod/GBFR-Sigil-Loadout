@@ -1,13 +1,8 @@
 package service
 
 import (
-	"encoding/json/jsontext"
-	jsonv2 "encoding/json/v2"
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
+
 	"sigilloadout/appfiles"
 )
 
@@ -23,12 +18,8 @@ type SigilSkill struct {
 	Values  []*float64 `json:"values"`
 }
 
-// Config 对应 mod 的 Config.cs。mod 反序列化的正是这个形状。
-type Config struct {
-	Edits []SigilSkill `json:"edits"`
-}
-
 // editListName 住在 mod 的用户目录里（appfiles.UserDir()），和 loadout.json 挨着；只有这一个位置。
+// 线格式（{"edits":[…]}）那份声明在 editlist.go 的 editList，三条链共用。
 const editListName = "sigiledits.json"
 
 // 落盘是防抖的：SaveEdits 把列表交给 appfiles.Debounced，编辑停下来之后才写出，所以落盘的永远是屏幕上
@@ -62,7 +53,7 @@ func configPath() string {
 	return filepath.Join(appfiles.UserDir(), editListName)
 }
 
-// LoadEdits 从 sigiledits.json 读取当前的编辑列表。
+// LoadEdits 从 sigiledits.json 读取当前的编辑列表（读法与三条链共用，见 editlist.go 的 loadEditList）。
 //
 // 文件不存在就是空列表：没有内置的起始编辑。面板在应用启动时就挂载（见 App.tsx 的 keepMounted），
 // 一份起始编辑会让"打开可视工具"本身就是一次对游戏的改动，用户什么都没点。
@@ -70,34 +61,12 @@ func configPath() string {
 // 存在但读不出或解析不了的文件是错误，而不是空列表：空列表是一个真实状态（所有编辑都关掉了），
 // 而把坏文件显示成空列表，会让用户的下一次按键把这份空覆盖回他自己的编辑内容。
 func (s *EditService) LoadEdits() ([]SigilSkill, error) {
-	path := configPath()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return []SigilSkill{}, nil
-		}
-		return nil, fmt.Errorf("reading %s: %w", path, err)
-	}
+	return loadEditList(configPath(), "", padSigilSkill)
+}
 
-	var cfg Config
-	// 成员名精确匹配、不做大小写折叠：对不上任何成员的文件读出来就是空列表——"从头来过"的既定形状，
-	// 下一次保存写出当前格式。不认得的成员被忽略而不是报错（json/v2 默认如此）。
-
-	if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
-
-	// 这里不做任何过滤：哪些记录算编辑由前端决定（见 skills.ts 的 isEdit），Go 只负责补齐。
-	// nil 归一成空切片：没有 edits 成员（或它是 null）读出来是 nil，
-	// 而 nil 在线格式上写作 null 而不是 []，同一个 “空列表” 就会有两种拼写。
-	edits := cfg.Edits
-	if edits == nil {
-		edits = []SigilSkill{}
-	}
-	for i := range edits {
-		edits[i].Values = padValues(edits[i].Values)
-	}
-	return edits, nil
+// padSigilSkill 把一条记录的参槽补齐到正好 LevelValueCount 长。
+func padSigilSkill(edit *SigilSkill) {
+	edit.Values = padValues(edit.Values)
 }
 
 // SaveEdits 接过最新的编辑列表并重启防抖，好让写入发生在编辑停下来之后（见 debounceDelay）。
@@ -111,25 +80,13 @@ func (s *EditService) LoadEdits() ([]SigilSkill, error) {
 // nil（前端传 null）与空列表不是同一件事：nil = 这次什么都没交（不写盘），空列表 = 写出一份
 // "所有编辑都关掉了"的文件（对 mod 而言就是撤销全部编辑）。
 func (s *EditService) SaveEdits(edits []SigilSkill) error {
-	for i := range edits {
-		edits[i].Values = padValues(edits[i].Values)
-	}
-
+	padAll(edits, padSigilSkill)
 	s.writer.Submit("sigil edit", writeEdits, edits)
 	return nil
 }
 
 func writeEdits(edits []SigilSkill) error {
-	cfgBytes, err := jsonv2.Marshal(Config{Edits: edits}, jsontext.WithIndent("  "))
-	if err != nil {
-		return err
-	}
-	cfgBytes = compactNumberArrays(cfgBytes)
-	if err != nil {
-		return fmt.Errorf("serialising the edit list: %w", err)
-	}
-
-	return appfiles.WriteAtomic(configPath(), cfgBytes)
+	return writeEditList(configPath(), edits, "the edit list")
 }
 
 // FlushNow 是关机的最后一步（见 main.go 的 OnShutdown），前端没有对应调用，所以不进绑定面。

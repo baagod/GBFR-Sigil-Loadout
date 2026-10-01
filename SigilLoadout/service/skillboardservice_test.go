@@ -7,10 +7,10 @@ import (
 )
 
 /*
-	落盘就是"用户填了什么"，读回来必须**原样**——不拿游戏原值做任何比较。
+落盘就是"用户填了什么"，读回来必须**原样**——不拿游戏原值做任何比较。
 
-	曾经的回归：读入时把"恰好等于游戏原值"的槽归一成 null，于是"我就是要填这个原值"这种输入在重开
-	界面后变回占位符。那个比较本来就不需要：格式里 null = 没填过、数字 = 填过，两者已经分得开。
+曾经的回归：读入时把"恰好等于游戏原值"的槽归一成 null，于是"我就是要填这个原值"这种输入在重开
+界面后变回占位符。那个比较本来就不需要：格式里 null = 没填过、数字 = 填过，两者已经分得开。
 */
 func TestLoadSkillboardEditsKeepsValuesEvenWhenTheyEqualTheOriginals(t *testing.T) {
 	hermeticHome(t)
@@ -37,6 +37,10 @@ func TestLoadSkillboardEditsKeepsValuesEvenWhenTheyEqualTheOriginals(t *testing.
 	}
 	if len(loaded) != 1 {
 		t.Fatalf("want one record, got %+v", loaded)
+	}
+	// 槽数先锁死：下面那个循环遍历的是**读回来的**数组，它空了就会一次都不进、这条测试空转通过。
+	if len(loaded[0].Values) != len(originals) {
+		t.Fatalf("want %d slots, got %d: %+v", len(originals), len(loaded[0].Values), loaded[0].Values)
 	}
 	for i, value := range loaded[0].Values {
 		if value == nil {

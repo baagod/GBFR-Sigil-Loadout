@@ -1,34 +1,18 @@
-import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 
-const buttonGroupVariants = cva(
-    "flex w-fit items-stretch *:focus-visible:relative *:focus-visible:z-10 has-[>[data-slot=button-group]]:gap-2 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
-    {
-        variants: {
-            orientation: {
-                horizontal:
-                    "*:data-slot:rounded-r-none [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-md! [&>[data-slot]~[data-slot]]:rounded-l-none [&>[data-slot]~[data-slot]]:border-l-0",
-                vertical:
-                    "flex-col *:data-slot:rounded-b-none [&>[data-slot]:not(:has(~[data-slot]))]:rounded-b-md! [&>[data-slot]~[data-slot]]:rounded-t-none [&>[data-slot]~[data-slot]]:border-t-0",
-            },
-        },
-        defaultVariants: {
-            orientation: "horizontal",
-        },
-    }
-)
-
-function ButtonGroup({
-    className,
-    orientation,
-    ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof buttonGroupVariants>) {
+/*
+    一组并排的按钮（语言切换那种）。只有一个方向：全应用唯一的调用点不传 orientation，所以原先那套
+    cva 的 horizontal/vertical 两支收敛成这一个 div —— 竖排要用时再加回来，比留着一支没人走的分支便宜。
+*/
+function ButtonGroup({ className, ...props }: React.ComponentProps<"div">) {
     return (
         <div
             role="group"
             data-slot="button-group"
-            data-orientation={orientation}
-            className={cn(buttonGroupVariants({ orientation }), className)}
+            className={cn(
+                "flex w-fit items-stretch *:focus-visible:relative *:focus-visible:z-10 has-[>[data-slot=button-group]]:gap-2 *:data-slot:rounded-r-none [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-md! [&>[data-slot]~[data-slot]]:rounded-l-none [&>[data-slot]~[data-slot]]:border-l-0 [&>input]:flex-1",
+                className
+            )}
             {...props}
         />
     )

@@ -156,23 +156,28 @@ int32_t GBFR20_CALL GBFR20_WriteSkillStatusTable(const uint8_t* table, uint32_t 
     });
 }
 
-// limit_bonus_param 的拒绝码人话解释。与上面那个分开：两张表的槽各自解析，"没解析出来"
-// 指的是不同的锚点。共用 -1/-3/-7 三个码，措辞按这张表说。
-static const char* LimitBonusRefusalReason(int32_t code) {
+// 两张活表的拒绝码人话解释（GBFR20_SetLimitBonusLevels 与 GBFR20_SetSkillboardValues 共用）。
+// 与上面那个 SkillStatusRefusalReason 分开：这里的 -2 指的是"活表的指针字段还没解析出来"，
+// 而 skill_status 那张表有自己的槽锚点，"没解析出来"是另一回事。
+//
+// 文案里**不点表名**：调用方那句日志开头已经写了是哪张表（"SetLimitBonusLevels: refused ..."），
+// 而这两条路共用一个格式化器——早先这里写死了 limit_bonus_param，于是专精那边的 -2 会报出一句
+// 指错表的话。
+static const char* TableRefusalReason(int32_t code) {
     switch (code) {
     case GBFR20_TABLE_NOT_READY:
         return "the native core is not initialized yet, or is shutting down.";
     case GBFR20_TABLE_SLOT_UNRESOLVED:
-        return "the limit_bonus_param pointer field was not resolved from its anchor at startup.";
+        return "the live table's pointer field was not resolved from its anchor at startup.";
     case GBFR20_TABLE_BUFFER_UNREADABLE:
         return "the pointer field is unreadable, or the table's memory is not writable.";
-    case GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED:
+    case GBFR20_SLOT_MASK_UNEXPECTED:
         return "the slot mask selects nothing, or reaches past the tenth slot.";
-    case GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE:
+    case GBFR20_TABLE_ROW_COUNT_IMPLAUSIBLE:
         return "the buffer's row count is outside the plausible range; the pointer field points at something else.";
-    case GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE:
+    case GBFR20_TABLE_KEY_NOT_UNIQUE:
         return "the rows matching this key disagree on the values being written, or there are more of them than expected; this is not the table this mod patches.";
-    case GBFR20_LIMIT_BONUS_KEY_NOT_FOUND:
+    case GBFR20_TABLE_KEY_NOT_FOUND:
         return "the key is not in the buffer; either this is not the table this mod patches, or that entry has no row.";
     case GBFR20_TABLE_WRITE_FAILED:
         return "the row write faulted after every gate passed; the row may be partially updated.";
@@ -199,7 +204,7 @@ static int32_t SetLimitBonusLevelsEntry(
             Log(std::format(
                 "SetLimitBonusLevels: refused ({}): {}",
                 result,
-                LimitBonusRefusalReason(result)));
+                TableRefusalReason(result)));
     }
     else {
         // 成功过就把"上次报过的码"清掉：下一次拒写值得再报一次。
@@ -219,7 +224,7 @@ int32_t GBFR20_CALL GBFR20_SetLimitBonusLevels(
 
 // 「专精技能」那一页：同一套门（掩码合法 -> 行数合理 -> 整段可写 -> 命中行的被选中格一致），
 // 不同的只有"表指针从哪来"——见 src/table_slot.cpp 的 ResolveSkillboardPointer。拒绝码沿用同一组
-// （含义逐条相同），所以原因文案也复用 LimitBonusRefusalReason。
+// （含义逐条相同），所以原因文案也复用 TableRefusalReason。
 static int32_t SetSkillboardValuesEntry(
     uint32_t key_hash,
     uint32_t value_mask,
@@ -235,7 +240,7 @@ static int32_t SetSkillboardValuesEntry(
             Log(std::format(
                 "SetSkillboardValues: refused ({}): {}",
                 result,
-                LimitBonusRefusalReason(result)));
+                TableRefusalReason(result)));
     }
     else {
         last_refusal.store(std::numeric_limits<int32_t>::min(), std::memory_order_release);
@@ -251,4 +256,3 @@ int32_t GBFR20_CALL GBFR20_SetSkillboardValues(
         return SetSkillboardValuesEntry(key_hash, value_mask, values);
     });
 }
-

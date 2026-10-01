@@ -11,7 +11,7 @@ namespace {
 // 定位分两步，靠语义而不是靠地址常量。这个文件覆盖**两张**活表：
 //   * skill_status（因子技能）：8 字节头 + 52 字节行，有发布指令（槽首那条）可交叉验证；
 //   * limit_bonus_param（能力强化数值）：8 字节头 + 84 字节行，**没有**那条发布指令，
-//     身份改由运行期的"Key 在整张表里恰好一次"承担（见 SetLimitBonusLevels）。
+//     身份改由运行期的"命中该 Key 的每一行，在被写的那几格上一致"承担（见 SetLimitBonusLevels）。
 //
 // 第一步，行循环锚点：skill_status 那张表按"8 字节行数头 + 52 字节行"读出来，行尾 = rows + rowCount*52：
 //   48 6B FE 34        imul rdi, rsi, 0x34        ; end = count*52
@@ -202,6 +202,17 @@ inline constexpr std::array<uint8_t, 7> kLimitBonusRowLoopSetup = {
 
 inline constexpr uint64_t kLimitBonusHeaderBytes = 8;
 inline constexpr uint64_t kLimitBonusRowBytes = 84;
+
+// 一张表的行布局。两张表**只差这四个偏移**，其余逐字相同，所以只留一份写入实现（见 WriteMaskedRows）：
+// 早先两份各写一遍，规矩就在两边漂移过（专精那张要求"Key 恰好一行"，能力强化那张认"姊妹副本"，
+// 于是同一个 Key 在一张表里能写、在另一张表里被拒）。合成一份之后这类漂移不会再发生。
+struct RowLayout {
+    uint64_t header_bytes;
+    uint64_t row_bytes;
+    uint64_t key_offset;
+    uint64_t values_offset;
+};
+
 // 两张表共用的：槽数与掩码（十格，低 10 位有效）、同一个 Key 最多认几行。
 // 上界取 8：实测重复的 Key 都只占两行，8 是充裕余量；超了就拒写，免得把"不止一处重复"
 // 变成"只改了一部分"的半成功。
@@ -213,12 +224,15 @@ inline constexpr size_t kMaxMatchedRows = 8;
 inline constexpr uint64_t kLimitBonusKeyOffset = 52;
 // Lv1..Lv10 是行内 +12 起的 10 个 float。
 inline constexpr uint64_t kLimitBonusLevelOffset = 12;
+inline constexpr RowLayout kLimitBonusLayout{
+    kLimitBonusHeaderBytes, kLimitBonusRowBytes, kLimitBonusKeyOffset, kLimitBonusLevelOffset};
 // 行数的合理上界，用来挡"指针字段被别的东西改写、指到一段随便可读的内存"。真机 1123 行，
 // 1<<20 是充裕余量，又足以让"指到别处"几乎撞不进来。
 inline constexpr uint64_t kLimitBonusMaxPlausibleRows = 1u << 20;
 
 // 解析成功后记住**指针字段**（槽 +8）的 RVA（0 = 还没解析出来）。这张表不另存槽首：它没有
-// skill_status 那条发布指令可以交叉验证"槽首 = 指针字段 - 8"，身份改由运行期的 Key 唯一性承担。
+// skill_status 那条发布指令可以交叉验证"槽首 = 指针字段 - 8"，身份改由运行期的"命中该 Key 的
+// 每一行，在被写的那几格上一致"承担。
 std::atomic_uintptr_t g_limit_bonus_pointer_rva{0};
 
 // 取到返回 0，否则返回 native_api.h 里的拒绝码（负数）。每次问都重新读指针，理由同 skill_status。
@@ -236,7 +250,7 @@ int32_t TryGetLiveLimitBonusBuffer(uintptr_t& buffer) noexcept {
     return 0;
 }
 
-// 掩码选中的那几格，两行是否逐字节相同。
+// 掩码选中的那几格，两行是否逐字节相同。两个指针**都以行首为基准**（同一套行内偏移）。
 bool MaskedRowsEqual(const uint8_t* left, const uint8_t* right, size_t values_offset, uint32_t mask) noexcept {
     for (uint32_t slot = 0; slot < kSlotCount; ++slot) {
         if ((mask & (1u << slot)) == 0)
@@ -248,6 +262,21 @@ bool MaskedRowsEqual(const uint8_t* left, const uint8_t* right, size_t values_of
     return true;
 }
 
+// 掩码选中的那几格，行里是不是已经是 values 里对应的值。
+//
+// **与上面那个不是同一件事**：values 是调用方交来的十格数组，槽 i 就在 values[i]——它没有行头，
+// 不能套行内偏移去读（拿 values + values_offset 比较等于读数组之外，且比的根本不是同一格）。
+bool MaskedRowHoldsValues(
+    const uint8_t* row, size_t values_offset, uint32_t mask, const float* values) noexcept {
+    for (uint32_t slot = 0; slot < kSlotCount; ++slot) {
+        if ((mask & (1u << slot)) == 0)
+            continue;
+        const size_t at = values_offset + static_cast<size_t>(slot) * sizeof(float);
+        if (std::memcmp(row + at, &values[slot], sizeof(float)) != 0)
+            return false;
+    }
+    return true;
+}
 
 // 把掩码选中的那几格写成 values 里对应的值。没选中的槽一个字节都不碰——这就是"只改第 4 格"
 // 不必拿原值把前面几格填满的原因。
@@ -261,22 +290,15 @@ void WriteMaskedSlots(uint8_t* row, size_t values_offset, uint32_t mask, const f
             sizeof(float));
     }
 }
-// 一张表的行布局。两张表**只差这四个偏移**，其余逐字相同，所以只留一份写入实现：
-// 早先两份各写一遍，规矩就在两边漂移过（专精那张要求"Key 恰好一行"，能力强化那张认"姊妹副本"，
-// 于是同一个 Key 在一张表里能写、在另一张表里被拒）。合成一份之后这类漂移不会再发生。
-struct RowLayout {
-    uint64_t header_bytes;
-    uint64_t row_bytes;
-    uint64_t key_offset;
-    uint64_t values_offset;
-};
 
 // 逐行找 Key，把它命中的**每一行**在 value_mask 选中的那几格上写成同一组值。
 // SEH 帧里只许有平凡类型，所以它单独一个函数，命中行用一个定长数组记。
 //
-// 为什么不再要求"恰好一行"：两张表里**同一个 Key 都可能排多行**（能力强化那张实测 25 个 Key
-// 各占两行、两行 84 字节完全一致）——一个参数被"单条节点"和"组合节点"各引用一次，游戏就给每个
-// 引用各排一份。所以"命中多行"是正常形态，不是"指错了内存"。
+// 为什么不再要求"恰好一行"：**同一个 Key 排多行是实测存在的形态**——limit_bonus_param 实测
+// 1123 行 / 1098 个 Key，其中 25 个 Key 各占两行、两行的十个 float 逐字节相同（一个参数被"单条
+// 节点"和"组合节点"各引用一次，游戏就给每个引用各排一份）。所以"命中多行"是正常形态，不是"指错
+// 了内存"。（专精那张表实测 2915 行 / 2915 个 Key，一个重复都没有；那份判据在这条共用实现里
+// 永远不触发，但它不花任何代价。）
 //
 // 为什么收掩码而不是"前 N 格"：旧接口只收"从第 1 格开始的连续一串"，于是"只改第 4 格"这种编辑
 // 要么写不出去、要么得先拿游戏原值把前面几格填满。掩码让"哪几格要写"和"写什么"分开，
@@ -304,23 +326,22 @@ int32_t WriteMaskedRows(
                 continue;
             // 命中数超出上界：不做"只改了一部分"的半成功，直接拒。
             if (matched_count == kMaxMatchedRows)
-                return GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE;
+                return GBFR20_TABLE_KEY_NOT_UNIQUE;
             matched[matched_count++] = candidate;
         }
         if (matched_count == 0)
-            return GBFR20_LIMIT_BONUS_KEY_NOT_FOUND;
+            return GBFR20_TABLE_KEY_NOT_FOUND;
 
         for (size_t index = 1; index < matched_count; ++index) {
             if (!MaskedRowsEqual(matched[0], matched[index], layout.values_offset, value_mask))
-                return GBFR20_LIMIT_BONUS_KEY_NOT_UNIQUE;
+                return GBFR20_TABLE_KEY_NOT_UNIQUE;
         }
 
         // 逐行写：只碰真的变了的那几行（缩小"半更新"的窗口）。
         int32_t written = 0;
         for (size_t index = 0; index < matched_count; ++index) {
             uint8_t* row = matched[index];
-            if (MaskedRowsEqual(
-                    row, reinterpret_cast<const uint8_t*>(values), layout.values_offset, value_mask))
+            if (MaskedRowHoldsValues(row, layout.values_offset, value_mask, values))
                 continue;
             WriteMaskedSlots(row, layout.values_offset, value_mask, values);
             ++written;
@@ -330,19 +351,6 @@ int32_t WriteMaskedRows(
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return GBFR20_TABLE_WRITE_FAILED;
     }
-}
-
-// 能力强化那张表：偏移不同，规矩与专精那张共用上面那一份实现。
-int32_t WriteLimitBonusRow(
-    uintptr_t buffer,
-    uint64_t row_count,
-    uint32_t key_hash,
-    uint32_t level_mask,
-    const float* values) noexcept {
-    return WriteMaskedRows(
-        RowLayout{
-            kLimitBonusHeaderBytes, kLimitBonusRowBytes, kLimitBonusKeyOffset, kLimitBonusLevelOffset},
-        buffer, row_count, key_hash, level_mask, values);
 }
 }
 
@@ -471,31 +479,44 @@ void ResolveLimitBonusParamPointer() {
     ResolveSkillboardPointer();
 }
 
+// 掩码合法性：两张活表共用的第一道闸（选中了至少一格，且没伸出第 10 格）。不成立就一个字节都不写。
+bool SlotMaskValid(const float* values, uint32_t value_mask) noexcept {
+    return values != nullptr && value_mask != 0 && (value_mask & ~kSlotMaskAll) == 0;
+}
+
+// 拿到缓冲区之后的共同尾部：行数落在合理区间（后面按它算长度才有意义）-> 整段（头 + 全部行）可写
+// -> 逐行写。两条链只差 layout 与行数上界，取缓冲区那一步各自留在调用方（专精那张还要重试一次）。
+int32_t WriteSlotsInBuffer(
+    const RowLayout& layout,
+    uint64_t max_plausible_rows,
+    uintptr_t buffer,
+    uint32_t key_hash,
+    uint32_t value_mask,
+    const float* values) noexcept {
+    uint64_t row_count = 0;
+    if (!SafeReadUint64(buffer, row_count) || row_count == 0 || row_count > max_plausible_rows)
+        return GBFR20_TABLE_ROW_COUNT_IMPLAUSIBLE;
+    const uint64_t length = layout.header_bytes + layout.row_bytes * row_count;
+    if (!IsGameRange(buffer, static_cast<size_t>(length), kWritableProtect))
+        return GBFR20_TABLE_BUFFER_UNREADABLE;
+    return WriteMaskedRows(layout, buffer, row_count, key_hash, value_mask, values);
+}
+
+// 能力强化那张表 = 上面那份尾部 + 它自己的偏移与上界。
 int32_t SetLimitBonusLevels(
     uint32_t key_hash,
     uint32_t level_mask,
     const float* values) noexcept {
-    // 掩码必须真的选中了某些档，且只落在低 10 位里：否则一律拒写，一个字节都不写。
-    if (values == nullptr || level_mask == 0 || (level_mask & ~kSlotMaskAll) != 0)
-        return GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED;
+    if (!SlotMaskValid(values, level_mask))
+        return GBFR20_SLOT_MASK_UNEXPECTED;
 
     uintptr_t buffer = 0;
     const int32_t refusal = TryGetLiveLimitBonusBuffer(buffer);
     if (refusal != 0)
         return refusal;
 
-    // 三道门全在写之前：行数落在合理区间（后面按它算长度才有意义）→ 整段（头 + 全部行）可写
-    // → 目标 Key 命中的每一行在被选中的那几档上一致。
-    uint64_t row_count = 0;
-    if (!SafeReadUint64(buffer, row_count) || row_count == 0 ||
-        row_count > kLimitBonusMaxPlausibleRows) {
-        return GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE;
-    }
-    const uint64_t length = kLimitBonusHeaderBytes + kLimitBonusRowBytes * row_count;
-    if (!IsGameRange(buffer, static_cast<size_t>(length), kWritableProtect))
-        return GBFR20_TABLE_BUFFER_UNREADABLE;
-
-    return WriteLimitBonusRow(buffer, row_count, key_hash, level_mask, values);
+    return WriteSlotsInBuffer(
+        kLimitBonusLayout, kLimitBonusMaxPlausibleRows, buffer, key_hash, level_mask, values);
 }
 
 // ---- skillboard_effect_action_parts（「专精技能」页那三阶效果的实际数值） ----
@@ -507,6 +528,8 @@ inline constexpr uint64_t kSkillboardKeyOffset = 72;
 // 十个 float 槽从行内 +32 起（与生成器出的资产逐值对过）。
 inline constexpr uint64_t kSkillboardValueOffset = 32;
 inline constexpr uint64_t kSkillboardMaxPlausibleRows = 1u << 20;
+inline constexpr RowLayout kSkillboardLayout{
+    kSkillboardHeaderBytes, kSkillboardRowBytes, kSkillboardKeyOffset, kSkillboardValueOffset};
 // 首行的 Key：运行期那份缓冲区与 tbl 文件逐字节同序，所以拿它当"这就是专精表"的指纹。
 inline constexpr uint32_t kSkillboardFirstRowKey = 0x52450C8B;
 // 在能力强化指针字段附近找多远：两张表由同一个加载器发布，槽记在同一片存储里，不会离得太远。
@@ -571,26 +594,13 @@ int32_t TryGetLiveSkillboardBuffer(uintptr_t& buffer) noexcept {
 }
 
 // 逐行找 Key，把它命中的**每一行**在 value_mask 选中的那几格上写成同一组值。
-// 专精那张表：偏移不同（Key 在行内 +72、十个槽在 +32），规矩与能力强化那张共用上面那一份实现。
-int32_t WriteSkillboardRow(
-    uintptr_t buffer,
-    uint64_t row_count,
-    uint32_t key_hash,
-    uint32_t value_mask,
-    const float* values) noexcept {
-    return WriteMaskedRows(
-        RowLayout{
-            kSkillboardHeaderBytes, kSkillboardRowBytes, kSkillboardKeyOffset, kSkillboardValueOffset},
-        buffer, row_count, key_hash, value_mask, values);
-}
-
+// 专精那张表 = 上面那份尾部 + 它自己的偏移与上界；不同的只有"表指针从哪来"。
 int32_t SetSkillboardValues(
     uint32_t key_hash,
     uint32_t value_mask,
     const float* values) noexcept {
-    // 掩码必须真的选中了某些格，且只落在低 10 位里：否则一律拒写，一个字节都不写。
-    if (values == nullptr || value_mask == 0 || (value_mask & ~kSlotMaskAll) != 0)
-        return GBFR20_LIMIT_BONUS_LEVEL_COUNT_UNEXPECTED;
+    if (!SlotMaskValid(values, value_mask))
+        return GBFR20_SLOT_MASK_UNEXPECTED;
 
     uintptr_t buffer = 0;
     int32_t refusal = TryGetLiveSkillboardBuffer(buffer);
@@ -602,17 +612,7 @@ int32_t SetSkillboardValues(
             return refusal;
     }
 
-    uint64_t row_count = 0;
-    if (!SafeReadUint64(buffer, row_count) || row_count == 0 ||
-        row_count > kSkillboardMaxPlausibleRows) {
-        return GBFR20_LIMIT_BONUS_ROW_COUNT_IMPLAUSIBLE;
-    }
-    const uint64_t length = kSkillboardHeaderBytes + kSkillboardRowBytes * row_count;
-    if (!IsGameRange(buffer, static_cast<size_t>(length), kWritableProtect))
-        return GBFR20_TABLE_BUFFER_UNREADABLE;
-
-    return WriteSkillboardRow(buffer, row_count, key_hash, value_mask, values);
+    return WriteSlotsInBuffer(
+        kSkillboardLayout, kSkillboardMaxPlausibleRows, buffer, key_hash, value_mask, values);
 }
 }
-
-

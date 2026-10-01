@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	jsonv2 "encoding/json/v2"
 	"sigilloadout/appfiles"
@@ -82,11 +81,8 @@ func readAsset[T any](dir, name string) (T, error) {
 	return out, nil
 }
 
-// 多数随包数据是一张 哈希 -> 什么东西 的表，limit_bonus.json（骨架）则是一整个对象：只有这一处不同，
-// 所以表类资产共用上面那份读法，而不是各自把同两句错误文案再抄一遍。
-func readAssetMap[T any](dir, name string) (map[string]T, error) {
-	return readAsset[map[string]T](dir, name)
-}
+// 多数随包数据是一张 哈希 -> 什么东西 的表，limit_bonus.json（骨架）则是一整个对象——表类资产因此
+// 直接写 readAsset[map[string]T]，不再为它多包一层同义的类型参数。
 
 // loadAssets 在启动时把"只有启动期用得着"的那几份读进内存。剩下的 sigils.json 与
 // sigils.chara.json 仍按需读——玩家可能替换它们，要拿每次调用时最新的那份。
@@ -96,28 +92,20 @@ func LoadAssets() error {
 
 func loadAssetsFrom(dir string) error {
 	var err error
-	if gemNamesByLang, err = readAssetMap[map[string]string](dir, "sigils.lang.json"); err != nil {
+	if gemNamesByLang, err = readAsset[map[string]map[string]string](dir, "sigils.lang.json"); err != nil {
 		return err
 	}
-	if charaNamesByLang, err = readAssetMap[map[string]string](dir, "chara.lang.json"); err != nil {
+	if charaNamesByLang, err = readAsset[map[string]map[string]string](dir, "chara.lang.json"); err != nil {
 		return err
 	}
-	if skillInfo, err = readAssetMap[SkillInfo](dir, "skill_status.json"); err != nil {
+	if skillInfo, err = readAsset[map[string]SkillInfo](dir, "skill_status.json"); err != nil {
 		return err
 	}
 	skillTables = make(map[string]map[string]SkillText, 4)
 	for _, lang := range assetLangCodes() {
-		if skillTables[lang], err = readAssetMap[SkillText](dir, "skill."+lang+".json"); err != nil {
+		if skillTables[lang], err = readAsset[map[string]SkillText](dir, "skill."+lang+".json"); err != nil {
 			return err
 		}
-	}
-	// 两套"每语言一份"的资产各自说自己覆盖哪几门语言（见 assetLangCodes 与 limitBonusLangCodes）。
-	// 界面按 lang.ts 的 LANGS 取文案，而认不出来的语言在两边都只会拿到空表——所以两份清单一旦不一致，
-	// 屏幕上出现的是整页 id，而不是一条错误。宁可在启动时就报出来（同"缺一份资产就起不来"）。
-	if !slices.Equal(assetLangCodes(), limitBonusLangCodes()) {
-		return fmt.Errorf(
-			"语言清单对不上：技能资产有 %v，能力强化资产有 %v；界面能选的每一门语言两边都要有",
-			assetLangCodes(), limitBonusLangCodes())
 	}
 	// 能力强化那条链路的资产（见 limitbonusservice.go）：与上面几张表无关，读法却是同一套，一起在
 	// 启动时读一次（骨架 + 四语言文案 + chara.json）。
@@ -127,9 +115,13 @@ func loadAssetsFrom(dir string) error {
 	return loadSkillboardTables(dir)
 }
 
-// assetLangCodes 是那几份"每语言一份"的资产（skill.<lang>.json）覆盖的语言，也正是可视工具界面有的
-// 那几门（lang.ts 的 LANGS）。名字不直接叫 langs：它说的是**这几份资产**有哪几门，而不是"这个工具支持
-// 哪几门"——后者是 lang.ts 的事。
+// assetLangCodes 是"每语言一份"那几类资产（skill.<lang>.json / limit_bonus.<lang>.json）共同覆盖的
+// 语言，也正是可视工具界面有的那几门（lang.ts 的 LANGS）。名字不直接叫 langs：它说的是**这几份资产**
+// 有哪几门，而不是"这个工具支持哪几门"——后者是 lang.ts 的事。
+//
+// 所有"每语言一份"的资产共用这一份清单：早先能力强化那条链自己又写了一遍逐字相同的列表、外加一句
+// 启动期 slices.Equal 对拍——两条字面量摆在同一个文件里，对拍只可能在有人手改其中之一时红，于是
+// 那层对拍与那份重复清单一起去掉了。真的只有中文的专精链另有 skillboardLangCodes。
 func assetLangCodes() []string {
 	return []string{LangZH, "en", "ja", "ko"}
 }
@@ -148,8 +140,8 @@ func loadLimitBonusTables(dir string) error {
 	}
 	charaTable = chara
 
-	limitBonusTexts = make(map[string]*LimitBonusText, len(limitBonusLangCodes()))
-	for _, lang := range limitBonusLangCodes() {
+	limitBonusTexts = make(map[string]*LimitBonusText, len(assetLangCodes()))
+	for _, lang := range assetLangCodes() {
 		table, err := readAsset[LimitBonusText](dir, limitBonusTextName(lang))
 		if err != nil {
 			return err
@@ -162,15 +154,6 @@ func loadLimitBonusTables(dir string) error {
 // limitBonusTextName 是某一门语言的文案文件名（limit_bonus.zh.json）。
 func limitBonusTextName(lang string) string {
 	return "limit_bonus." + lang + ".json"
-}
-
-// limitBonusLangCodes 是能力强化资产有的那几门语言（工具界面有的四门，见 lang.ts）。
-//
-// 不复用 loadoutservice.go 里那句写死的四语言列表：两处资产是两套独立生成的文件，各自的"有哪几门
-// 语言"也就各自说一次，改一处不会悄悄改到另一处。两份清单**不一致**这件事由启动时对拍挡住
-// （见 loadAssetsFrom）——两边各自说一次，不等于可以让它们悄悄分叉。
-func limitBonusLangCodes() []string {
-	return []string{"zh", "en", "ja", "ko"}
 }
 
 // loadSkillboardTables 在启动时读专精技能那条链的资产（骨架 + 每语言一份文案）。

@@ -8,7 +8,9 @@
     每一条效果行都能点开，展开后是这一行的十个数值槽 —— **类型自己那三条也一样**（它们也是可编辑
     的参数行，不是纯文字）。角色 / 类型 / 阶 / 效果行四层各自独立展开，展开态由本组件自己的 state 管。
 
-    编辑记法与因子编辑页相同：values[i] = null 表示"那一槽不动"；空串 = 写回游戏原值。
+    编辑记法与因子编辑页相同：values[i] = null 表示"那一槽不动"（mod 那边掩码不置位），数字才是写下去
+    的值。"清空"这一槽就是写回 null——这条链每拍都把重建好的整张表交回数据管理器，没动过的格子因此
+    天然等于归档里的原值（与「角色强化」页不同，见 LimitBonusEditorPanel 的 setValue）。
     文案里的 {i} 填"这一槽现在等于多少"（填过用填的，没填过用游戏原值）。
 */
 import { Fragment, memo, useEffect, useState } from "react";
@@ -26,6 +28,7 @@ import { SlotInput } from "@/components/SlotInput";
 import type { Lang } from "@/lib/lang";
 import type { CharaTable } from "@/lib/chara";
 import { dedupeSkillboardCharacters } from "@/lib/limitbonus";
+import { SLOTS, anyFilled, pad, withSlot } from "@/lib/skills";
 
 // 一组参数：一组 10 个槽，key 是这一组所在参数行的哈希（编辑按它索引，原生也按它找行）。
 //
@@ -33,7 +36,11 @@ import { dedupeSkillboardCharacters } from "@/lib/limitbonus";
 // 与文案里的 {n} 一一对应：{0}..{9} 第 1 组、{10}..{19} 第 2 组、{20}..{29} 第 3 组。
 type ParamGroup = { key: string; values: number[] };
 // 一个节点（效果行）：**两个哈希说的是两件事** ——
-//   key  参数行：改哪一行（原生按它找行写入）。全表**不唯一**（古兰/姬塔共用同一批参数行）。
+//   key  参数行：改哪一行（原生按它找行写入）。在**骨架**里不唯一（古兰/姬塔共用同一批参数行，
+//        所以同一个 Key 会出现在两个角色名下）；运行期那张表里它是唯一的：实测
+//        skillboard_effect_action_parts.tbl 2915 行 / 2915 个 Key、一个重复都没有（有重复的是
+//        limit_bonus_param：1123 行 / 1098 个 Key，25 对姊妹行）。所以"逐行找 Key"两边判据不同形是
+//        有理由的，别照着这一行去放宽 C# 那边的"恰好一次"。
 //   hash 效果行：看哪段字。每行唯一，文案表就是按类型哈希 + 数组下标取的。
 type Row = { key: string; hash: string; values: number[]; more?: ParamGroup[] };
 // 阶里的条目比类型行多一个"行首画几个 ♦"：那来自原文的 <d> 标记，每行真不一样，所以落盘。
@@ -63,13 +70,8 @@ const groupsOf = (row: Row): ParamGroup[] => [
     ...(row.more ?? []),
 ]
 
-// 游戏给每一阶留的等级槽数（与生成器的 Value1..Value10 对齐）。
-const SLOTS = 10
-
-// 数值框的样式取因子编辑页那一套（SkillRow 与角色强化页用的是同一个类）。
-const SLOT =
-    "min-w-0 flex-1 border-0 bg-transparent px-0 text-center text-xs md:text-xs tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
-
+// 游戏给每一阶留的等级槽数（SLOTS）、"这一组槽里有没有填过"的判据（anyFilled）、以及一格怎么换进
+// 整组（withSlot / pad），都在 lib/skills.ts 一处持有——因子编辑页用的是同一个 10、同一个判据。
 // ♦ 的颜色：阶里的条目用浅灰。
 const DIAMOND_COLOR = "#cbd5e1"
 
@@ -95,7 +97,7 @@ const ROW_BOX = `${ROW_PAD_Y}`
 // 数值框：高度必须自己定死。Input 的默认类是 h-9（36px）+ py-1 + text-base/md:text-sm，三件事一起
 // 把框撑到 41px；只写 h-8 时 flex 的 stretch 还会把它拉成整行高。所以除了高度还要 self-center，
 // 再把 py 与字号收掉——32px 的行里要留得下 20px 的框（与说明文字那一行等高）。
-const SLOT_HEIGHT = "h-5! self-center border-0 py-0 text-xs md:text-xs"
+const SLOT_HEIGHT = "h-5! self-center py-0 flex-1"
 
 // 说明文字里的分隔符：照「角色强化」处理 "攻击DOWN抗性" 那一套（见 lib/limitbonus.ts 的
 // spaceCJKAndLatin），在 CJK 与 [xxx] 的边界补一个空格，写进文本本身而不是靠 CSS 留白。
@@ -223,29 +225,27 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
         编辑里那一槽的值：null = 用户没填过、或被清空过（框里是空的，原值只当占位符）。
 
         记录里**没动过的格子就是 null**（见 setSlot）：与因子编辑那条链同一个模型——C# 的
-        SkillboardConfig.Values 也是 float?[]，注释写着"nil 就是游戏自己的值"。服务端**不解析**这些
-        null（不换成原值）：换掉之后文件里就没有"没动过"这个信息了，重开界面会把整组十格都显示成
-        数字、默认值当不成占位符（实测被骂过两次）。
+        SkillboardConfig.Values 也是 float?[]，注释写着"null 就是游戏自己的值"。落盘**原样**保留
+        这些 null（Go 侧不换、也不补）：换掉之后文件里就没有"没动过"这个信息了，重开界面会把整组
+        十格都显示成数字、默认值当不成占位符（实测被骂过两次）。哪几格要写由原生按掩码决定。
     */
     function editAt(group: ParamGroup, slot: number): number | null {
-        return edits.get(group.key)?.[slot] ?? null
+        return pad(edits.get(group.key) ?? [])[slot]
     }
 
-    // 这一组里某一槽"现在等于多少"：填过用填的，没填过用游戏原值。
     /** 提交一槽：null = 清空；解析与半成品文本的规则全在共享的 SlotInput 里。 */
     function setSlot(group: ParamGroup, slot: number, value: number | null) {
         const next = new Map(edits)
         /*
-            记录里**没动过的格子存 null**（不是游戏原值）。
+            记录里**没动过的格子存 null**（不是游戏原值），原生按掩码只写非 null 的那几格。
+            交给原生的是**整组十格**（pad 补齐），缺的那些是 null —— 它比"交原值"少一层解释：
+            "没动过"在文件里就是 null，不必再靠"值 ≠ 原值"反推。
 
             从前这里填的是原值（"交出去的永远是这一组完整的十个值"），于是记录一存在，十格全被判成
-            "编辑过"——你只改一格，整行十个数字全亮起来（实测过的症状）。原值由服务端在落盘时补
-            （服务端原样落盘，null 就是 null），所以配置里仍然是没动过的那些
-            数字、原生那套"按连续前缀写"照旧。
+            "编辑过"——你只改一格，整行十个数字全亮起来（实测过的症状）。填原值还有一个后果：文件里
+            再也没有"没动过"这个信息，重开界面默认值当不成占位符。
         */
-        const values = Array.from({ length: SLOTS }, (_, i) => editAt(group, i))
-        values[slot] = value
-        next.set(group.key, values)
+        next.set(group.key, withSlot(pad(edits.get(group.key) ?? []), slot, value))
         setEdits(next)
         SaveSkillboardEdits([...next].map(([key, v]) => ({ key, values: v }))).catch(() => {})
     }
@@ -260,8 +260,11 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     //
     // 左端对齐说明文字那 120px 缩进由**调用点**给（AccordionContent 里那层 paddingLeft），不在这里补
     // —— 两头都加会把框推右 120px。
-    const valuesOf = (row: Row) => {
+    const valuesOf = (row: Row, description: string) => {
         const groups = groupsOf(row)
+        // 读屏用的行名：这一行显示的那段说明（框号已经是 {1}/{2} 那样的写法）。文案表里没这条时退回
+        // 它自己的 Key——上千个框靠这个才分得开（同因子编辑页给每个框起名的理由）。
+        const rowName = spaceBrackets(boxNumbers(description)) || row.key
         return (
             <>
                 {groups.map(group => (
@@ -274,7 +277,8 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     </span>
                                 )}
                                 <SlotInput
-                                    className={cn(SLOT, SLOT_HEIGHT)}
+                                    className={SLOT_HEIGHT}
+                                    label={`${rowName} ${slot + 1}`}
                                     original={group.values[slot] ?? 0}
                                     value={editAt(group, slot)}
                                     onCommit={value => setSlot(group, slot, value)}
@@ -293,16 +297,14 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // 类型行按下标算（见 diamonds()）。
     // tier 只在阶里的条目上给（"1 阶"/…/"EX"），专精类型那三条没有阶，那一格留空占位。
     //
-    // **字色是"改过没有"的指示**：这一行有任何一个槽与游戏原值不同就是**白字**，否则灰字。
-    // 判据直接用 editAt（它是"值 ≠ 原值才算改过"的那一条），所以"清空后又写回原值"那种残留记录
-    // 不会把行染白 —— 与输入框是否显示数字是同一个判据，不会出现"框空的但字是白的"。
+    // **字色是"改过没有"的指示**：这一行有任何一个槽不是 null 就是**白字**，否则灰字。
+    // 判据与输入框显示什么是同一个（见 editAt）：框里是数字行就白、框空的就灰，不会出现"框空的但字是
+    // 白的"。（对比「角色强化」页：那边清空写的是原值、所以清空之后是白的，见 withFirstValue。）
     const descriptionRow = (row: Row, description: string, diamondText: string, tier: string, typeSkill = false) => {
         const groups = groupsOf(row)
         // 文案是模板本身（{n} = 第几个框），与填了多少无关。取哪一段由调用点给（见 lineOf）。
         const shown = spaceBrackets(boxNumbers(description))
-        const edited = groups.some(group =>
-            Array.from({ length: SLOTS }, (_, slot) => editAt(group, slot)).some(value => value !== null),
-        )
+        const edited = groups.some(group => anyFilled(edits.get(group.key)))
         return (
             <div className={`flex items-center gap-3 ${ROW_BOX}`}>
                 <span className="w-8 shrink-0 text-xs text-muted-foreground">{tier}</span>
@@ -351,7 +353,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
             <AccordionContent className="pb-0" keepMounted>
                 {/* 缩进 = 上面那三格（阶标签 w-8 + 间距 + ♦ w-16 + 间距）= 32+12+64+12 = 120px，
                     框与说明文字左端对齐。Tailwind 的间距刻度到 24 就没有 30，所以用内联值。 */}
-                <div style={{ paddingLeft: 120 }}>{valuesOf(row)}</div>
+                <div style={{ paddingLeft: 120 }}>{valuesOf(row, description)}</div>
             </AccordionContent>
         </AccordionItem>
     )
@@ -458,7 +460,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                                       </AccordionTrigger>
                                                       <AccordionContent keepMounted>
                                                           {/* 缩进 = 阶标签 w-8 + 间距 + ♦ w-16 + 间距 = 120px。 */}
-                                                          <div style={{ paddingLeft: 120 }}>{valuesOf(entry.row)}</div>
+                                                          <div style={{ paddingLeft: 120 }}>{valuesOf(entry.row, lineOf(entry.row))}</div>
                                                       </AccordionContent>
                                                   </AccordionItem>
                                               ))}

@@ -1,25 +1,21 @@
 package service
 
 import (
-	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"sigilloadout/appfiles"
 	"strings"
 )
 
 // LimitBonusEdit 对应 mod 的 LimitBonusConfig.cs 里的 LimitBonusEdit：对一个参数行（limit_bonus_param
-// 的一行）的覆写。Values 按档位排、写成 Lv1..LvN —— 写几个槽完全由这个数组的长度决定，没提到的槽
-// 一个字节都不碰（形状与 sigiledits.json 的 values 有意一致）。
+// 的一行）的覆写。Values 按档位排：**非 null 的那几档才写**（mod 那边按它算掩码），其余档——包括中间
+// 挖空的——一个字节都不碰（形状与 sigiledits.json 的 values 有意一致）。
 //
-// Values 是**可空**的（与编辑服务那边的 SigilSkill 一致）：`null` = 这一格被清空了，界面回到占位符。
-// 落盘时由 writeLimitBonusEdits 把 null 解析成这一行的游戏原值——于是**配置文件与 C# 那半看到的仍然
-// 全是数字**，null 只活在界面与这条 DTO 之间。清空不能写成"删掉记录"：游戏不会自己忘掉上一次写入的
-// 值，删了记录它会停在旧值上、而界面显示默认值，两边对不上（实测过的 bug）。
+// Values 是可空的（与编辑服务那边的 SigilSkill 一致）：`null` = 这一格不动。**落盘原样保留 null**，
+// 这里不做任何解析——null 一路到配置文件与 C# 那半，掩码不置位。界面那一页目前不写 null（清空是"把
+// 这一档的原值当一次编辑写下去"，见 limitbonus.ts 的 withFirstValue），null 只从手写文件里读回来。
+// 清空不能写成"删掉记录"：游戏不会自己忘掉上一次写入的值，删了记录它会停在旧值上、而界面显示默认值，
+// 两边对不上（实测过的 bug）。
 type LimitBonusEdit struct {
 	Enabled bool       `json:"enabled"`
 	Key     string     `json:"key"`
@@ -41,11 +37,6 @@ func (e *LimitBonusEdit) UnmarshalJSON(data []byte) error {
 	}
 	*e = LimitBonusEdit(edit)
 	return nil
-}
-
-// limitBonusEditList 是 limit_bonus.json 的外层形状，与 C# 的 LimitBonusConfig 对应。
-type limitBonusEditList struct {
-	Edits []LimitBonusEdit `json:"edits"`
 }
 
 // limitBonusEditListName 住在 mod 的用户目录里（appfiles.UserDir()），和 loadout.json /
@@ -102,30 +93,7 @@ func limitBonusConfigPath() string {
 // 存在但读不出或解析不了的文件是错误，而不是空列表：空列表是一个真实状态（一栏都没开），而把坏
 // 文件显示成空列表，会让用户的下一次按键把这份空覆盖回他自己的编辑内容。
 func (s *LimitBonusService) LoadLimitBonusEdits() ([]LimitBonusEdit, error) {
-	path := limitBonusConfigPath()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return []LimitBonusEdit{}, nil
-		}
-		return nil, fmt.Errorf("reading %s: %w", path, err)
-	}
-
-	var cfg limitBonusEditList
-	// 成员名精确匹配、不做大小写折叠：对不上任何成员的文件读出来就是空列表——"从头来过"的既定形状，
-	// 下一次保存写出当前格式（与 LoadEdits 同一套规矩）。
-	if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
-
-	// 这里不做过滤、也不补齐：哪些记录算一栏由前端决定（它拿着资产），档位数越界由 mod 那边整条跳过
-	// （见 LimitBonusFeature.cs）——在这里再写一遍就是同一条规则的第三份副本。
-	// nil 归一成空切片：没有 edits 成员读出来是 nil，而 nil 在线格式上写作 null 而不是 []。
-	edits := cfg.Edits
-	if edits == nil {
-		edits = []LimitBonusEdit{}
-	}
-	return edits, nil
+	return loadEditList[LimitBonusEdit](limitBonusConfigPath(), "", nil)
 }
 
 // SaveLimitBonusEdits 接过最新的编辑列表并重启防抖，好让写入发生在编辑停下来之后（见 debounceDelay）。
@@ -139,16 +107,7 @@ func (s *LimitBonusService) SaveLimitBonusEdits(edits []LimitBonusEdit) error {
 }
 
 func writeLimitBonusEdits(edits []LimitBonusEdit) error {
-	raw, err := jsonv2.Marshal(limitBonusEditList{Edits: edits}, jsontext.WithIndent("  "))
-	if err != nil {
-		return err
-	}
-	raw = compactNumberArrays(raw)
-	if err != nil {
-		return fmt.Errorf("serialising the limit bonus edit list: %w", err)
-	}
-
-	return appfiles.WriteAtomic(limitBonusConfigPath(), raw)
+	return writeEditList(limitBonusConfigPath(), edits, "the limit bonus edit list")
 }
 
 // FlushNow 是关机的最后一步（见 main.go 的 OnShutdown），前端没有对应调用，所以不进绑定面。

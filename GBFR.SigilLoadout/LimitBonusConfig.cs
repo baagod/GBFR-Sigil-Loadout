@@ -6,7 +6,7 @@ namespace GBFR.SigilLoadout;
 /// 一条能力强化覆盖：改 limit_bonus_param 的哪一行，把哪些数值写进它的 Lv 槽。
 ///
 /// 一条记录对应**一个参数行**（一条强化最多 3 个参数行：ParamId1/2/3），<see cref="Values"/> 按档位
-/// 排列、写成 Lv1..LvN：只写这几个槽，没被用到的槽（Lv(N+1)..Lv10）一个字节都不碰。能力强化只有
+/// 排列：非 null 的那几档才写，其余档（含中间挖空的）一个字节都不碰。能力强化只有
 /// 一个参数行，所以一条强化就是一条记录；将来扩到"一条强化多个参数"时也只是多条记录。
 ///
 /// 形状与 sigiledits.json 的 Values 有意一致：都是"按槽位写、没提到的槽不动"。
@@ -20,10 +20,11 @@ public class LimitBonusEdit {
     public string Key { get; set; } = "";
 
     /// <summary>
-    /// 按档位排的数值，写 Lv1..LvN，N ∈ [1,10]。越界的条目整条跳过并记一行日志。
+    /// 按档位排的数值：非 null 的档才写（哪几档要写由 null/数字决定，不是由长度决定）。
+    /// 长度超过十档的记录整条跳过（见 <see cref="SlotValues.Mask"/>）。
     ///
-    /// **可空**（与 SigilSkill / SkillboardConfig 同一形状）：<c>null</c> = 这一格没动过、用游戏自己的
-    /// 值。工具"清空一格"写下来的就是这一种——不写默认值回去，因为写下去就再没有第二份原始值可以
+    /// **可空**（与 <see cref="SkillboardEdit"/> 同一形状）：<c>null</c> = 这一格不动、用游戏自己的值。
+    /// 工具"清空一格"写下来的就是这一种——不写默认值回去，因为写下去就再没有第二份原始值可以
     /// 拿回来了；界面那一格显示成占位符（就是游戏原值），语义一致。
     /// </summary>
     [JsonPropertyName("values")]
@@ -39,7 +40,8 @@ public class LimitBonusEdit {
 ///
 /// 与 sigiledits.json 的一处不同：空数组在这里是"没有要写的"，**不是**"撤销全部编辑"——这张表
 /// 只写内存、不经过数据管理器，写进去就没有第二份原始值可以拿回来。要还原默认值得由工具把
-/// 默认值当一次编辑写下来（资产里有默认档值）。
+/// 默认值当一次编辑写下来（资产里有默认档值；界面上的"清空"就是这么做的，见 limitbonus.ts 的
+/// withFirstValue）。
 /// </summary>
 public class LimitBonusConfig {
     [JsonPropertyName("edits")]

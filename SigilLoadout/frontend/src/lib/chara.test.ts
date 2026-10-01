@@ -4,8 +4,8 @@
 
       1. 顶层以 PL 码为键，每个角色自己带着颜色（取色一步到位，没有第二张表）；
       2. 六个属性各有颜色、互不相同，且属性 → 颜色与生成器那张表逐字对上（同一张表里两个属性画成
-         同色就等于没配色）；
-      3. 每个角色写下来的 color 都是能直接上屏的 #rrggbb。
+         同色就等于没配色）。这一条同时管住了"每一行的 color 都是能直接上屏的 #rrggbb"：断言颜色
+         等于表里那六个字面量，也就断言了它是合法 hex——原来单写一条正则的用例因此是纯重复，删了。
 
     界面把这一栏**直接交给 CSS**（缺了这一条就不设色，那一行的名字继承默认前景色），所以资产里写下的
     颜色必须本身就是合法的值——这里不替它兜底，兜了反而会让 "red"、#abc 这类合法写法变成灰的。
@@ -37,15 +37,8 @@ describe("chara.json 的角色表", () => {
             expect(id, "键应该是 PL 码").toMatch(/^(PL|NP)\d{4}$/)
             expect(chara[id].hash, `${id} 缺 hash`).toMatch(/^[0-9A-F]{8}$/)
         }
-        // PL1400 是这条链路上一直用来抽查的那个角色（娜露梅，暗）。
+        // PL1400 是这条链路上一直用来抽查的那个角色（娜露梅，暗）；颜色由下面那条与属性表对拍。
         expect(chara.PL1400?.element).toBe("dark")
-        expect(chara.PL1400?.color).toBe("#9a72c9")
-    })
-
-    it("每一行的颜色都是 #rrggbb：它要直接上屏，前端不再替它兜底", () => {
-        for (const [id, entry] of Object.entries(chara)) {
-            expect(entry.color, `${id} 的颜色不是 hex`).toMatch(/^#[0-9a-f]{6}$/)
-        }
     })
 
     it("颜色按属性查得出来，六个属性齐全且互不相同", () => {
@@ -58,18 +51,7 @@ describe("chara.json 的角色表", () => {
             )
             drawn.add(entry.color)
         }
+        // 六种颜色**都被用到**：上面每条都等于表里的值，所以"画出来六种"就等价于"六个属性都有角色"。
         expect(drawn.size).toBe(Object.keys(ELEMENT_COLORS).length)
-    })
-
-    it("六种颜色各出现的次数加起来就是全部角色（每个角色恰有一种属性）", () => {
-        const counts = Object.values(chara).reduce<Record<string, number>>((acc, entry) => {
-            acc[entry.color] = (acc[entry.color] ?? 0) + 1
-            return acc
-        }, {})
-        const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
-        expect(total).toBe(Object.keys(chara).length)
-        for (const color of Object.values(ELEMENT_COLORS)) {
-            expect(counts[color], `${color} 一个角色都没分到`).toBeGreaterThan(0)
-        }
     })
 })

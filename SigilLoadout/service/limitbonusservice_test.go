@@ -81,11 +81,16 @@ func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the debounce never wrote limit_bonus.json: %v", err)
 		}
-		var cfg limitBonusEditList
+		var cfg editList[LimitBonusEdit]
 		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
 			t.Fatalf("limit_bonus.json is not valid JSON: %v", err)
 		}
-		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 || deref(cfg.Edits[0].Values[2]) != 321 {
+		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 {
+			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
+		}
+		// 值必须**原样**写下去：这一条护的正是"数字与 null 分得开"，所以判 nil 要判在这里，不能借一个
+		// 把 nil 读成 0 的辅助函数。
+		if got := cfg.Edits[0].Values[2]; got == nil || *got != 321 {
 			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
 		}
 	})
@@ -102,16 +107,19 @@ func TestLoadLimitBonusEditsReadsTheUserConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadLimitBonusEdits: %v", err)
 	}
-	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || len(loaded[0].Values) != 3 || deref(loaded[0].Values[2]) != 321 || !loaded[0].Enabled {
+	if len(loaded) != 1 || loaded[0].Key != "0D0BCF24" || len(loaded[0].Values) != 3 || !loaded[0].Enabled {
+		t.Fatalf("limit_bonus.json was not read back: %+v", loaded)
+	}
+	if got := loaded[0].Values[2]; got == nil || *got != 321 {
 		t.Fatalf("limit_bonus.json was not read back: %+v", loaded)
 	}
 }
 
 /*
-	落盘就是"用户填了什么"，读回来必须**原样**——不拿游戏原值做任何比较（与专精那条链同一规矩）。
+落盘就是"用户填了什么"，读回来必须**原样**——不拿游戏原值做任何比较（与专精那条链同一规矩）。
 
-	曾经的回归：读入时把"恰好等于游戏原值"的槽归一成 null，于是"我就是要填这个原值"这种输入在重开
-	界面后变回占位符。原值只是输入框的占位符，不该参与任何判断。
+曾经的回归：读入时把"恰好等于游戏原值"的槽归一成 null，于是"我就是要填这个原值"这种输入在重开
+界面后变回占位符。原值只是输入框的占位符，不该参与任何判断。
 */
 func TestLoadLimitBonusEditsKeepsAValueThatIsJustTheOriginal(t *testing.T) {
 	hermeticHome(t)
@@ -252,9 +260,9 @@ func TestLoadLimitBonusEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 /*
 资产拆成了三份：语言无关的骨架（limit_bonus.json）、每语言一份按 id 索引的文案（limit_bonus.<lang>.json）、
 以及角色属性（chara.json）。这里钉的是**跨层假设**，不是数据本身：Key 与参数行的哈希必须是 8 位十六进制
-（mod 只认这个写法），Lv1 的默认值必须拿得到（界面空框里的占位符），**骨架上的每一个 id 在当前语言的
-文案表里都要有对应的词**（否则一行节点显示的就是一串哈希），效果文案里除了 {0} 不能有别的东西
-（前端只换 {0}，其余的会原样显示到屏幕上）。
+（mod 只认这个写法）；参数行的 Lv1 默认值是界面空框里的占位符（**允许为 0**，见下面那条注释）；
+**骨架上的每一个 id 在当前语言的文案表里都要有对应的词**（否则一行节点显示的就是一串哈希），
+效果文案里除了 {0} 不能有别的东西（前端只换 {0}，其余的会原样显示到屏幕上）。
 */
 // limitBonusParamWithoutEffectText 是游戏自己的文本表里**唯一**没有效果文本的参数行（四门语言都缺
 // 同一条）。它仍然进骨架（那一格照样能写值），只是文案表里没有它，界面上画占位符 "—"。
@@ -268,15 +276,9 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 		t.Fatal("chara.json names no character")
 	}
 
-	// 颜色挂在角色自己身上（那只六色调色表已经删了）：每一行都要有一个能直接上屏的 hex。
-	for id, entry := range charaTable {
-		if !strings.HasPrefix(entry.Color, "#") {
-			t.Fatalf("chara.json has no colour for %s: %q", id, entry.Color)
-		}
-	}
-
 	abilities := 0
 	params := 0
+	sawZeroDefault := false
 	for _, character := range limitBonusSkeleton.Characters {
 		if character.ID == "" {
 			t.Fatalf("a character came without an id: %+v", character)
@@ -306,10 +308,14 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 				// 一个参数行可以被同一个角色的两个节点共用（名字不同、指到同一行）：那两栏在界面上读写的
 				// 是同一行，列表本来就按 Key 索引（见 skills.ts 的 dedupeBy），所以不冲突。
 
-				// 这个数是界面空框里的占位符。**允许 0**：专属强化（LB_PLxxxx_UQ_xx）的 B 侧参数
-				// 就是"Lv1/Lv2 都是 0、只有 Lv3 有值"——它在游戏里有自己的介绍文字，界面该给一格。
-				// 从前按"Lv1 是 0 就是没有档位可写"整条丢掉，正是「角色专属」整族消失的一半原因
-				// （见 gen/game/limitbonus 的 buildType）。
+				// 这个数是界面空框里的占位符，**允许 0**：专属强化（LB_PLxxxx_UQ_xx）的 B 侧参数就是
+				// "Lv1/Lv2 都是 0、只有 Lv3 有值"——它在游戏里有自己的介绍文字，界面该给一格。从前按
+				// "Lv1 是 0 就是没有档位可写"整条丢掉，正是「角色专属」整族消失的一半原因（见
+				// gen/game/limitbonus 的 buildType）。这条断言把那个回归现场钉住：资产里必须真的存在
+				// 默认值为 0 的参数行（实测 1715 行里 5 行是 0）。
+				if param.Default == 0 {
+					sawZeroDefault = true
+				}
 			}
 		}
 	}
@@ -319,8 +325,11 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 	if params == 0 {
 		t.Fatal("limit_bonus.json offers no parameter row")
 	}
-	if len(limitBonusTexts) != len(limitBonusLangCodes()) {
-		t.Fatalf("limit_bonus.<lang>.json: got %d tables, want %d", len(limitBonusTexts), len(limitBonusLangCodes()))
+	if !sawZeroDefault {
+		t.Fatal("no parameter row has a zero Lv1 default; the 'zero is allowed' case is no longer covered by the asset")
+	}
+	if len(limitBonusTexts) != len(assetLangCodes()) {
+		t.Fatalf("limit_bonus.<lang>.json: got %d tables, want %d", len(limitBonusTexts), len(assetLangCodes()))
 	}
 }
 
@@ -332,7 +341,7 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 func TestLimitBonusTextsCoverTheSkeletonInEveryLanguage(t *testing.T) {
 	service := &LimitBonusService{}
 
-	for _, lang := range limitBonusLangCodes() {
+	for _, lang := range assetLangCodes() {
 		text := service.LoadLimitBonus(lang)
 
 		for _, character := range limitBonusSkeleton.Characters {
@@ -357,7 +366,7 @@ func TestLimitBonusTextsCoverTheSkeletonInEveryLanguage(t *testing.T) {
 	}
 
 	// 效果模板的占位符：前端只换 {0}，别的占位符会原样显示到屏幕上。
-	for _, lang := range limitBonusLangCodes() {
+	for _, lang := range assetLangCodes() {
 		for key, effect := range service.LoadLimitBonus(lang).Effects {
 			// 少数参数行的文案里游戏把数直接写死了（实测例如 89F8A99F 在 zh 下是
 			// "根据召唤的宠物数量\n攻击力+2.5%"），没有占位符可填——那不是错，放过去。
@@ -401,21 +410,19 @@ func TestLoadLimitBonusDoesNotFallBack(t *testing.T) {
 	}
 }
 
-// 骨架与 chara.json 是语言无关的：每门语言拿到的角色集合与默认值必须逐字相同。
-func TestTheSkeletonIsTheSameForEveryLanguage(t *testing.T) {
+// 这两个绑定交回来的就是启动时装好的那两份表：骨架（语言无关）与 chara.json。它们没有"按语言"这一维，
+// 所以这里钉的是"绑定没有交回空表/别的表"，以及 chara.json 每行的颜色都能直接上屏。
+func TestBindingsHandBackTheLoadedTables(t *testing.T) {
 	skeleton := (&LimitBonusService{}).LoadLimitBonusCharacters()
-	if len(skeleton.Characters) != len(limitBonusSkeleton.Characters) {
-		t.Fatalf("LoadLimitBonusCharacters returned %d characters, want %d",
-			len(skeleton.Characters), len(limitBonusSkeleton.Characters))
+	if len(skeleton.Characters) == 0 {
+		t.Fatal("LoadLimitBonusCharacters returned no character at all")
 	}
 
-	// chara.json 直接以 PL 码为键，颜色挂在角色上：每一行都要有属性名与颜色，一次取值就能上屏。
+	// chara.json 直接以 PL 码为键，颜色挂在角色上。属性名、以及"颜色与属性对得上"那两条不变量由前端
+	// chara.test.ts 对着资产文件断言（见 CharaInfo 的注释：Go 这边不再声明那两个冗余字段）。
 	for id, entry := range (&LimitBonusService{}).Characters() {
-		if entry.Element == "" {
-			t.Fatalf("%s came from chara.json without an element", id)
-		}
 		if !strings.HasPrefix(entry.Color, "#") {
-			t.Fatalf("%s is %s, which comes without a colour", id, entry.Element)
+			t.Fatalf("%s came from chara.json without a colour: %q", id, entry.Color)
 		}
 	}
 }
@@ -440,11 +447,4 @@ func ptrs(values ...float64) []*float64 {
 		out[i] = &values[i]
 	}
 	return out
-}
-
-func deref(value *float64) float64 {
-	if value == nil {
-		return 0
-	}
-	return *value
 }

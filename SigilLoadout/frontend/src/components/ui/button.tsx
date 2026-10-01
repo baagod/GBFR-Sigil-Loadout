@@ -10,17 +10,12 @@ const buttonVariants = cva(
                 default: "bg-primary text-primary-foreground hover:bg-primary/80",
                 outline:
                     "border-border bg-background shadow-xs hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-                secondary:
-                    "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
                 ghost:
                     "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-                destructive:
-                    "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
             },
             size: {
                 default:
                     "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-                sm: "h-8 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
                 "icon-xs":
                     "size-6 rounded-[min(var(--radius-md),8px)] in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
                 "icon-sm":
@@ -49,4 +44,6 @@ function Button({
     )
 }
 
-export { Button, buttonVariants }
+// 变体只留这一处用得上的：default / outline / ghost 与 default / icon-xs / icon-sm（全应用扫过一遍，
+// secondary 与 destructive 一次都没人传——destructive 作为**类名**仍在 aria-invalid 那几条里）。
+export { Button }

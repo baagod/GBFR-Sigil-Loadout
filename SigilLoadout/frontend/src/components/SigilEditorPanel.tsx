@@ -351,9 +351,8 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                             它马上就会消失，没有这一步下一次敲键就不知去向。
                         */}
                         {query !== "" && (
-                            <InputGroupAddon align="inline-end">
+                            <InputGroupAddon>
                                 <InputGroupButton
-                                    size="icon-xs"
                                     aria-label={t.clearSearch}
                                     onClick={() => {
                                         setQuery("");

@@ -63,7 +63,7 @@ function LevelInput({
                 }}
                 className="h-8 py-0 pb-px text-center leading-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
-            <InputGroupAddon align="inline-end" className="text-[#a0a0a0] tabular-nums">
+            <InputGroupAddon className="text-[#a0a0a0] tabular-nums">
                 / {max}
             </InputGroupAddon>
         </InputGroup>

@@ -147,12 +147,11 @@ type LimitBonusText struct {
 type CharaTable map[string]CharaInfo
 
 type CharaInfo struct {
-	// Hash 是 chara 那一行的哈希（生成器用 game.HashOf 从 PL 码解出来）。
-	Hash string `json:"hash"`
-	// Element 是游戏六属性之一（fire/water/earth/wind/light/dark）。界面不读它，它只是让这份资产自
-	// 解释；颜色已经在 Color 里，所以这里缺失也不会让哪一行画错色。
-	Element string `json:"element"`
 	// Color 是这个角色属性的颜色（#9a72c9）。认不出来的属性在生成期就落到中性灰，所以它总是一个
 	// 能直接上屏的值。
+	//
+	// 资产里那两栏（hash、element）这里**不声明**：它们是生成期的冗余字段，托管侧没有读者。而"每行
+	// 的颜色都是合法 hex、且与属性对得上"这条不变量由前端直接对着资产文件断言（见 chara.test.ts 与
+	// lib/chara.ts 的 CharaEntry），所以在 Go 这边留一份只给测试看的字段没有意义。
 	Color string `json:"color"`
 }

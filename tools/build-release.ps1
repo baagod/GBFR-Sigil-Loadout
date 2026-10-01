@@ -4,9 +4,7 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
     [ValidateSet('x64')]
-    [string]$Platform = 'x64',
-    [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z._-]*$')]
-    [string]$Version
+    [string]$Platform = 'x64'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,15 +21,11 @@ foreach ($proxyName in @('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')) 
 $root = Split-Path -Parent $PSScriptRoot
 
 # --- 版本号：唯一权威源 -------------------------------------------------------
-# ModConfig.json 是版本号的唯一权威源；-Version 只是发布时的可选覆盖手段。
+# ModConfig.json 是版本号的唯一权威源。原先还有个 -Version 覆盖参数，只在"它正好等于 ModConfig 里
+# 那个值"时才不抛——覆盖不了任何东西，全仓也没有一处传它，去掉。
 $manifestVersion = (Get-Content -LiteralPath (
     Join-Path $root 'GBFR.SigilLoadout\ModConfig.json') -Raw | ConvertFrom-Json).ModVersion
-if (-not $Version) {
-    $Version = $manifestVersion
-}
-elseif ($Version -ne $manifestVersion) {
-    throw "Version mismatch: -Version $Version but ModConfig.json declares $manifestVersion."
-}
+$Version = $manifestVersion
 $npmPackage = Get-Content -LiteralPath (
     Join-Path $root 'SigilLoadout\frontend\package.json') -Raw | ConvertFrom-Json
 if ($npmPackage.version -ne $Version) {
@@ -64,7 +58,9 @@ $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.json',
     'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json',
     'limit_bonus.json', 'limit_bonus.zh.json', 'limit_bonus.en.json', 'limit_bonus.ja.json',
-    'limit_bonus.ko.json', 'chara.json')
+    'limit_bonus.ko.json', 'chara.json',
+    # 专精技能页那两张：缺了 loadSkillboardTables 直接返错，工具启动即挂。
+    'skillboard.json', 'skillboard.zh.json')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }
@@ -122,17 +118,22 @@ $nativeDir = Split-Path -Parent $nativeProject
 $nativeOut = Join-Path $nativeDir "bin\$Configuration\GBFR.SigilLoadout.Native.dll"
 $hashFile = Join-Path $nativeDir "bin\$Configuration\.source-hash"
 
-$signature = (Get-ChildItem -LiteralPath $nativeDir -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '\\bin\\|\\obj\\' } |
-    Sort-Object FullName |
+$signature = (Get-ChildItem -LiteralPath $nativeDir -Recurse -File |
     ForEach-Object {
-        $relative = $_.FullName.Substring($nativeDir.Length)
+        # bin/obj 按**相对路径**排除：按全路径匹配时，仓库只要住在任何叫 bin\ / obj\ 的目录下，整个
+        # 签名就会变成空串——而空串等于空串，守卫从此静默失效。
+        $relative = $_.FullName.Substring($nativeDir.Length).TrimStart('\')
+        if ($relative -match '^(bin|obj)[\\/]') { return }
         "$relative=$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
-    }) -join "`n"
+    } |
+    Sort-Object) -join "`n"
 
 $nativeTarget = '/t:Rebuild'
 $reason = '产物不存在'
 if (Test-Path -LiteralPath $nativeOut) {
+    if (-not $signature) {
+        throw "native 源码签名是空串（$nativeDir 下一个文件都没扫到）：内容哈希守卫会永久失效。"
+    }
     if ((Test-Path -LiteralPath $hashFile) -and (Get-Content -LiteralPath $hashFile -Raw).Trim() -eq $signature) {
         $nativeTarget = '/t:Build'
         $reason = '源码未变'
@@ -166,6 +167,12 @@ Set-Content -LiteralPath $hashFile -Value $signature -NoNewline
 if ($LASTEXITCODE -ne 0) {
     throw "Managed restore failed with exit code $LASTEXITCODE."
 }
+
+# 随包资产是用 PreserveNewest 拷进输出目录的：**删掉或改名的资产不会跟着删**（那件事本来由
+# `dotnet clean` 负责，而它已经不跑了），旧副本会一路被拷进包。所以这里只清输出目录里那一份 assets\
+# ——不碰 C# 自己的增量状态，代价是每次多拷一遍资产。删/改了资产之后包里就不会留着旧那一份。
+$staleAssets = Join-Path $managedOutput 'assets'
+Remove-Item -LiteralPath $staleAssets -Recurse -Force -ErrorAction SilentlyContinue
 
 # 这里**不**跑 `dotnet clean`、也**不**加 --no-incremental：C# 的增量编译可靠，全量重编一次约多花
 # 4-6s。真遇到陈旧的 obj/ 捣乱时，手动 `dotnet clean` 一次即可。
@@ -267,16 +274,6 @@ if ($env:GBFR_EXE) {
 }
 else { Write-Output 'layout harness: skipped (set GBFR_EXE to run it).' }
 
-# 随包数据只有一份：SigilLoadout\assets\。工具按 exeDir()\assets\ 找它，所以从源码目录直接跑与跑
-# 打包出来的那份用的是同一布局。
-foreach ($staleData in @('sigils.json', 'sigils.chara.json')) {
-    $staleCopy = Join-Path $toolDir $staleData
-    if (Test-Path -LiteralPath $staleCopy) {
-        Remove-Item -LiteralPath $staleCopy -Force
-        Write-Output "Removed a stale dev copy outside assets\: SigilLoadout\$staleData"
-    }
-}
-
 # 模块名（sigilloadout）与产物名（SigilLoadout.exe）只差大小写，而 Windows 不区分大小写：所以
 # **不能**有"清理裸 go build 残留"那一步——它与产物是同一个文件，等于把产品删掉；要拿 `go build`
 # 做编译检查就加 `-o <临时路径>`（README「构建与部署」里写了）。
@@ -292,7 +289,7 @@ if (-not $resolvedPackage.StartsWith($resolvedDist, [StringComparison]::OrdinalI
     throw "Refusing to clean a package path outside dist: $packageDir"
 }
 
-# 工具锁着 dist 里的 SigilLoadout.exe，会让下面那次递归清理失败（脚本末尾会重新打开它）。
+# 工具锁着 dist 里的 SigilLoadout.exe，会让下面那次递归清理失败（重开工具是 deploy.ps1 的事）。
 $loadoutProcesses = Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue
 if ($loadoutProcesses) {
     $loadoutProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -322,31 +319,14 @@ Copy-Item -Path $toolExe -Destination $packageDir -Force
 Copy-Item -Path (Join-Path $toolDir 'icon.png') -Destination $packageDir -Force
 
 # 必需的发布文件——「一个包该有哪些文件」只有这一份持有者（deploy.ps1 只问"这到底是不是一个包"）。
-# sigils.json 由 csproj 拷进输出目录。
+# 资产**不在这里逐个列**：漏法有两种，各由一道不漂的门禁挡着——"源里没了"由上面 $assets 那份取数
+# 名单挡（缺了就找 gen\output、再缺就跑 gen export，都拿不到直接抛），"源里有但没进包"由下面那道
+# "源目录 ⊆ 包目录"挡。原先这里还手抄了 20 条 assets\，与 $assets 共享同一个真相却要维护两遍。
 foreach ($requiredFile in @(
     'GBFR.SigilLoadout.dll',
     'GBFR.SigilLoadout.Native.dll',
     'SigilLoadout.exe',
-    'icon.png',
-    # 漏一份就等于发一个启动即报错的工具。
-    # 名单**故意独立**，不从源目录或 csproj 派生：派生的清单与它们共享同一个真相，于是"忘了加"和
-    # "被误删"两种漏法它都查不到（实测过：藏掉一份资产，派生版门禁退出码仍是 0）。
-    'assets\sigils.json',
-    'assets\sigils.chara.json',
-    'assets\sigils.lang.json',
-    'assets\chara.lang.json',
-    'assets\skill_status.json',
-    'assets\skill.zh.json',
-    'assets\skill.en.json',
-    'assets\skill.ja.json',
-    'assets\skill.ko.json',
-    'assets\limit_bonus.json',
-    # 能力强化：语言无关的骨架 + 每语言一份文案 + 角色属性（颜色只有 chara.json 这一处）。
-    'assets\limit_bonus.zh.json',
-    'assets\limit_bonus.en.json',
-    'assets\limit_bonus.ja.json',
-    'assets\limit_bonus.ko.json',
-    'assets\chara.json'
+    'icon.png'
 )) {
     $requiredPath = Join-Path $packageDir $requiredFile
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
@@ -354,18 +334,20 @@ foreach ($requiredFile in @(
     }
 }
 
+# 上面那份名单挡的是"我记得的那些资产被删了/没进包"，挡不住"新加了一份资产、谁都没想起来"。
+# 这一道查的是**源目录 ⊆ 包目录**（csproj 的 <None Include="..\SigilLoadout\assets\*"> 是这条契约的
+# 另一半）：assets\ 里每一个文件都必须出现在包里。两件不同的事，都要有。
+$missingAssets = Get-ChildItem -LiteralPath $assetsDir -File |
+    Where-Object { -not (Test-Path -LiteralPath (Join-Path $packageDir "assets\$($_.Name)") -PathType Leaf) }
+if ($missingAssets) {
+    throw "Assets missing from the package: $($missingAssets.Name -join ', ')"
+}
+
 # 托管 PDB 绝不能随包发布。可变的配置文件不在这里删：下面的门禁把被打进包的那种当错误
 # （fail closed）。
 $pdbPath = Join-Path $packageDir 'GBFR.SigilLoadout.pdb'
 if (Test-Path -LiteralPath $pdbPath) {
     Remove-Item -LiteralPath $pdbPath -Force
-}
-
-$runtimesPath = Join-Path $packageDir 'runtimes'
-if (Test-Path -LiteralPath $runtimesPath) {
-    Get-ChildItem -LiteralPath $runtimesPath -Directory |
-        Where-Object { $_.Name -ne 'win-x64' } |
-        Remove-Item -Recurse -Force
 }
 
 $packagedFiles = Get-ChildItem -LiteralPath $packageDir -Recurse -File

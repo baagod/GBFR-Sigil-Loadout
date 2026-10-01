@@ -73,6 +73,9 @@ internal static unsafe partial class NativeCore {
     /// 第 10 档，只写置位的那些，其余档一个字节都不碰。<paramref name="values"/> 十个，与档位一一
     /// 对应（只有置位的会被读）——"没动过的档"因此不必拿游戏原值去填。
     ///
+    /// "十个"这条约定签名里写不下（C 那边只收一个指针）：由 <see cref="SlotValues.Mask"/> 按十个
+    /// 建数组保证，两个调用点都拿它的返回值来，别手工传短数组。
+    ///
     /// 返回 &gt;= 0 是真正被改写的行数（0 = 内存里已经一样）；&lt; 0 是拒绝码，一个字节都没写，原因由
     /// 原生落一行日志（码的含义在 native_api.h / exports.cpp）。
     /// </summary>
@@ -94,7 +97,8 @@ internal static unsafe partial class NativeCore {
     ///
     /// <paramref name="valueMask"/> 的低 10 位 = 十格里**哪几格要写**：原生从第 1 格遍历到第 10 格，
     /// 只写置位的那些，其余格一个字节都不碰。<paramref name="values"/> 十个，与格子一一对应
-    /// （只有置位的会被读）——"只改第 4 格"于是就是 mask 的第 4 位，前面几格真的没写。
+    /// （只有置位的会被读）——"只改第 4 格"于是就是 mask 的第 4 位，前面几格真的没写。长度这条约定
+    /// 同样由 <see cref="SlotValues.Mask"/> 保证。
     ///
     /// 返回 &gt;= 0 是真正被改写的行数（0 = 内存里已经一样）；&lt; 0 是拒绝码，一个字节都没写，原因由
     /// 原生落一行日志（码的含义在 native_api.h / exports.cpp）。

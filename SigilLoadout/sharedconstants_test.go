@@ -169,7 +169,9 @@ func TestSharedConstantsAgreeAcrossLanguages(t *testing.T) {
 			name: "sigiledits.json 的 edits 成员",
 			decls: []decl{
 				{"C#", "../GBFR.SigilLoadout/Config.cs", regexp.MustCompile(`\[JsonPropertyName\("(edits)"\)\]`)},
-				{"Go", "service/editservice.go", regexp.MustCompile("json:\"(edits)\"")},
+				// Go 侧这条声明住在 editlist.go：三条链（因子 / 能力强化 / 专精）的编辑文件共用同一个
+				// 外层形状 editList[T]，所以这一处同时也就是另外两份文件的 edits 成员。
+				{"Go", "service/editlist.go", regexp.MustCompile("json:\"(edits)\"")},
 			},
 		},
 		{

@@ -42,11 +42,17 @@ export const SLOTS = 10;
 export const addressOf = (key: string, level: number) => `${key}#${level}`;
 
 /**
+ * 一组槽里有没有**填过**（任一格不是 null）。"没动过"在这份格式里就是 null，所以这是唯一的判据：
+ * 列表面板的勾选态（isEdit）与两个编辑页的行色（"这一行改过没有"）都用它，不各自再写一遍。
+ */
+export const anyFilled = (values: (number | null)[] | undefined) =>
+    (values ?? []).some((value) => value !== null);
+
+/**
  * 一条记录算不算编辑——列表显示什么、sigiledits.json 里留什么，都由它一处说了算。
  * 被勾选或带着数字就够；两者都没有，就是用户勾了又取消的那一行，文件里不会有这样的行。
  */
-export const isEdit = (record: SigilSkill) =>
-    record.enabled || record.values.some((value) => value !== null);
+export const isEdit = (record: SigilSkill) => record.enabled || anyFilled(record.values);
 
 export const pad = (values: (number | null)[]) =>
     Array.from({ length: SLOTS }, (_, i) => values[i] ?? null);
@@ -115,17 +121,16 @@ export const withSlot = (values: (number | null)[], i: number, v: number | null)
  * 输入框有焦点时把半成品文本留在屏幕上（"-" 和 "0." 是通往数字路上的状态，受控输入框没有
  * 别的办法显示它们）；永远成不了数字的东西直接丢弃，输入框保持原样。结果作为数据返回而不是
  * 直接应用，这样规则就是一个函数，测试能一个键一个键地驱动它。
+ *
+ * **只吐出这一格的新值**，不吐整个数组：换进哪个数组由调用方自己做（withSlot / pad），因为三个
+ * 页面持有值的方式不同（因子页按地址索引的十个槽、专精页一整组、能力强化页只有第一格）。
  */
 export type SlotEdit =
     | { kind: "drop" }
     | { kind: "half"; text: string }
-    | { kind: "commit"; values: (number | null)[]; keeps?: string };
+    | { kind: "commit"; value: number | null; keeps?: string };
 
-export function slotEdit(
-    text: string,
-    i: number,
-    values: (number | null)[],
-): SlotEdit {
+export function slotEdit(text: string): SlotEdit {
     /*
         往已经显示 0 的框里输入数字，意思就是那个数字：0 是输入框自己的。所以判断之前先去掉
         整数部分的前导零——"04" 是 4，"007" 是 7，"00" 是 0——而小数点需要的那个零留下，
@@ -137,7 +142,7 @@ export function slotEdit(
     if (tidied === "") {
         // 清空：该槽回到游戏自己的数值，输入框从这儿起把它显示成占位符——null 就是它，
         // 而游戏数值是从表里读的，不写回文件（见 SigilSkill.values）。
-        return { kind: "commit", values: withSlot(values, i, null) };
+        return { kind: "commit", value: null };
     }
     if (!NUMBER.test(tidied)) return { kind: "half", text: tidied };
 
@@ -147,11 +152,7 @@ export function slotEdit(
         就是数字——0.0 是 0，0.00 是 0——用提交后的数字渲染输入框会丢掉后面输入的内容：0.004
         变成 4，5.05 变成 50。失焦时输入框重新渲染数字，这才让 06 读回成 6。
     */
-    return {
-        kind: "commit",
-        values: withSlot(values, i, Number(tidied)),
-        keeps: tidied,
-    };
+    return { kind: "commit", value: Number(tidied), keeps: tidied };
 }
 
 /**
