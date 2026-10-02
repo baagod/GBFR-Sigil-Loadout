@@ -1,0 +1,5 @@
+<SeqRoot>
+  <EffectTrack SeqNum="1">
+    <Seq LayerFlag="4294967295" StartTime="0.300000" SeqFlag="1" EffDataType="1" EffDataId="0" EffNo="640" PartsNo="-1" ControlType="0" Scale="1.000000" OffsetX="0.000000" OffsetY="0.000000" OffsetZ="0.000000" ParentSetId="0" />
+  </EffectTrack>
+</SeqRoot>

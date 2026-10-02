@@ -94,9 +94,16 @@ var defaultActionIDs = []string{"4", "6", "954"}
 // 要么是旧的、要么是新的。
 type ActionsService struct {
 	mu sync.Mutex
-	// touched 是这次会话改过的 motion：211 份 flags 轨里绝大多数跟这一页无关，部署时不该把没动过的
+	// touched 是这次会话改过的**轨**：解包目录里几万份轨绝大多数跟这一页无关，部署时不该把没动过的
 	// 也搬过去（搬了还会盖掉别处的手工改动）。
-	touched map[string]bool
+	touched map[trackRef]bool
+}
+
+// trackRef 是一条轨的身份：同一个动画可能有好几条轨（子轨号不同、种类不同），改了一条只该重搬那一条。
+type trackRef struct {
+	motion string
+	sub    string
+	kind   string
 }
 
 // Path 是当前配置的动作表文件（没配过就是解包出来的那份副本）。
@@ -295,15 +302,6 @@ func charCode(cfg actionConfig) string {
 	return filepath.Base(filepath.Dir(cfg.Path))
 }
 
-// flagXMLPath 是某个 motion 的 flags 轨：解包时已经离线转成 XML，读它不需要任何工具。
-func flagXMLPath(cfg actionConfig, motion string) (string, error) {
-	if !isMotion(motion) {
-		return "", fmt.Errorf("motion %q 不是四位十六进制小写（例如 3400）", motion)
-	}
-	char := charCode(cfg)
-	return filepath.Join(cfg.FlagsDir, char+"_"+motion+"_0_seq_edit_flags.xml"), nil
-}
-
 // isMotion 认 motion 的写法：**四位十六进制小写**（3400 / 3451）。它会被拼进文件名，不认的写法一律
 // 挡在外面——免得界面给一段带斜杠的文本就把文件指到别处去。
 func isMotion(motion string) bool {
@@ -318,15 +316,10 @@ func isMotion(motion string) bool {
 	return true
 }
 
-// deployActionPath / deployFlagPath 是两份产物在 mod 目录里的落点：游戏原本的布局，直接拼出来。
+// deployActionPath 是动作表在 mod 目录里的落点：游戏原本的布局，直接拼出来。
 func deployActionPath(cfg actionConfig) string {
 	char := charCode(cfg)
 	return filepath.Join(actionsModDir, "system", "player", "data", char, char+"_action.msg")
-}
-
-func deployFlagPath(cfg actionConfig, motion string) string {
-	char := charCode(cfg)
-	return filepath.Join(actionsModDir, "pl", char, char+"_"+motion+"_0_seq_edit_flags.bxm")
 }
 
 /*
@@ -403,7 +396,7 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 // LoadFlags 读某个 motion 的 flags 轨并解析成行。
 func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
 	cfg := s.config()
-	path, err := flagXMLPath(cfg, motion)
+	path, err := trackXMLPath(cfg, motion, flagSub, flagsKind)
 	if err != nil {
 		return nil, err
 	}
@@ -417,13 +410,14 @@ func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
 // SaveFlags 把行写回那个 motion 的 flags 轨，并部署到 Mods。
 //
 // 源是 XML：先写回源文件（下一次读到的就是刚存下的），再让工具把它转成 BXM（mod 要的是 BXM）。
-// 整页只有这一步要跑工具，锁护的也正是它。
+// 整页只有写这一步要跑工具，锁护的也正是它——转换与部署那段管线在 writeAndDeployTracks 里，
+// 与通用轨（attack / effect / speed）共用。
 func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cfg := s.config()
-	path, err := flagXMLPath(cfg, motion)
+	path, err := trackXMLPath(cfg, motion, flagSub, flagsKind)
 	if err != nil {
 		return err
 	}
@@ -434,15 +428,11 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	if err := appfiles.WriteAtomic(path, raw); err != nil {
 		return err
 	}
-	if err := s.deployFlags(cfg, motion, raw); err != nil {
-		return err
-	}
-	s.markTouched(motion)
-	return nil
+	return s.writeAndDeployTracks(cfg, []trackWrite{{motion: motion, sub: flagSub, kind: flagsKind, raw: raw}})
 }
 
-// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；flags 轨只搬这次会话改过的 motion（源是 XML，
-// 每一份都得让工具转一次——211 份全转一遍既慢，又会盖掉别处的手工改动）。
+// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨只搬这次会话改过的（源是 XML，每一条都得让工具
+// 转一次——几万份全转一遍既慢，又会盖掉别处的手工改动）。
 func (s *ActionsService) Deploy() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -452,25 +442,34 @@ func (s *ActionsService) Deploy() error {
 		return err
 	}
 
-	motions := make([]string, 0, len(s.touched))
-	for motion := range s.touched {
-		motions = append(motions, motion)
+	refs := make([]trackRef, 0, len(s.touched))
+	for ref := range s.touched {
+		refs = append(refs, ref)
 	}
-	sort.Strings(motions) // 顺序稳一点：真出错时日志里才看得出进行到哪一份
-	for _, motion := range motions {
-		path, err := flagXMLPath(cfg, motion)
+	// 顺序稳一点：真出错时日志里才看得出进行到哪一条。
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].motion != refs[j].motion {
+			return refs[i].motion < refs[j].motion
+		}
+		if refs[i].kind != refs[j].kind {
+			return refs[i].kind < refs[j].kind
+		}
+		return refs[i].sub < refs[j].sub
+	})
+
+	items := make([]trackWrite, 0, len(refs))
+	for _, ref := range refs {
+		path, err := trackXMLPath(cfg, ref.motion, ref.sub, ref.kind)
 		if err != nil {
 			return err
 		}
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("读 flags 轨 %s: %w", path, err)
+			return fmt.Errorf("读轨 %s: %w", path, err)
 		}
-		if err := s.deployFlags(cfg, motion, raw); err != nil {
-			return err
-		}
+		items = append(items, trackWrite{motion: ref.motion, sub: ref.sub, kind: ref.kind, raw: raw})
 	}
-	return nil
+	return s.writeAndDeployTracks(cfg, items)
 }
 
 // ListFsm 列出这个角色的 FSM 名：**扫目录**得来（<角色>_<名>_fsm_ingame.msg），不写死清单——
@@ -531,32 +530,55 @@ func fsmPath(cfg actionConfig, name string) (string, error) {
 	return filepath.Join(cfg.FsmDir, char+"_"+name+"_fsm_ingame.msg"), nil
 }
 
-// markTouched 记下这个 motion 被改过（零值可用的 service 也能用：第一次写的时候才建 map）。
-func (s *ActionsService) markTouched(motion string) {
+// markTouched 记下这条轨被改过（零值可用的 service 也能用：第一次写的时候才建 map）。
+func (s *ActionsService) markTouched(motion, sub, kind string) {
 	if s.touched == nil {
-		s.touched = map[string]bool{}
+		s.touched = map[trackRef]bool{}
 	}
-	s.touched[motion] = true
+	s.touched[trackRef{motion: motion, sub: sub, kind: kind}] = true
 }
 
-// deployFlags 把一份 flags XML 转成 BXM 再写进 mod 目录。调用方持有 s.mu（工具同一时刻只能有一个
-// 实例），中转文件落在临时目录里，不污染源目录。
-func (s *ActionsService) deployFlags(cfg actionConfig, motion string, raw []byte) error {
-	dir, err := os.MkdirTemp("", "gbfr-flags-")
+// trackWrite 是一条要写出去的轨：身份 + 已经拼好的 XML 字节。
+type trackWrite struct {
+	motion string
+	sub    string
+	kind   string
+	raw    []byte
+}
+
+/*
+writeAndDeployTracks 把若干条轨的 XML 写进一个临时目录、逐条转成 BXM、再搬进 mod 目录。
+
+flags 的保存、通用轨的保存、以及 Deploy 里"把这次改过的轨重新搬一遍"都走这里 —— **同一把锁、同一个
+临时目录、同一段转换与部署**（调用方持有 s.mu：GBFRDataTools 同一时刻只能有一个实例）。
+顺序也是稳的：按传进来的先后一条条走完，真出错时日志里看得出停在哪一条。
+*/
+func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWrite) error {
+	if len(items) == 0 {
+		return nil
+	}
+	dir, err := os.MkdirTemp("", "gbfr-tracks-")
 	if err != nil {
 		return fmt.Errorf("建临时目录: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
-	xmlPath := filepath.Join(dir, "flags.xml")
-	bxmPath := filepath.Join(dir, "flags.bxm")
-	if err := os.WriteFile(xmlPath, raw, 0o644); err != nil {
-		return fmt.Errorf("写中转 XML: %w", err)
+	for _, item := range items {
+		base := fmt.Sprintf("%s_%s_%s_seq_edit_%s", charCode(cfg), item.motion, item.sub, item.kind)
+		xmlPath := filepath.Join(dir, base+".xml")
+		bxmPath := filepath.Join(dir, base+".bxm")
+		if err := os.WriteFile(xmlPath, item.raw, 0o644); err != nil {
+			return fmt.Errorf("写中转 XML: %w", err)
+		}
+		if err := xmlToBxm(cfg.ToolPath, xmlPath, bxmPath); err != nil {
+			return err
+		}
+		if err := deployFile(bxmPath, deployTrackPath(cfg, item.motion, item.sub, item.kind)); err != nil {
+			return err
+		}
+		s.markTouched(item.motion, item.sub, item.kind)
 	}
-	if err := xmlToBxm(cfg.ToolPath, xmlPath, bxmPath); err != nil {
-		return err
-	}
-	return deployFile(bxmPath, deployFlagPath(cfg, motion))
+	return nil
 }
 
 // xmlToBxm 跑一次 GBFRDataTools（整页唯一用到它的地方）。

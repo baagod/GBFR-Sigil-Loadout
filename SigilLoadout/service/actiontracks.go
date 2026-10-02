@@ -1,0 +1,364 @@
+package service
+
+import (
+	"encoding/xml"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"sigilloadout/appfiles"
+)
+
+/*
+attack / effect / speed 三种轨：与 flags 同一族（同一套 XML 布局、同一份解包目录），只是字段各不相同，
+所以这里用**一套通用解析**吃它们（不是一种写一遍）。形状：
+
+	<SeqRoot>
+	  <AttackTrack SeqNum="1">
+	    <Seq LayerFlag="4294967295" StartTime="0.383333" ...>
+	      <Ailment00 category="..." type="..." sec="..." rate="..." />   ← 只有 attack 有子元素
+	    </Seq>
+	    <Seq ... />
+	  </AttackTrack>
+	</SeqRoot>
+
+三条规矩都是为了**没改过的轨能一个字节不差地写回去**（写回 mod 的 BXM 是拿这份 XML 转的，差一个字节
+就是另外一份文件）。下面每条都拿全部 17929 份轨、54777 行实测过：
+
+  - 列 = 所有 <Seq> 属性的并集，顺序按**首次出现**；每行只写自己有的那些，缺的**不补**。
+    （全库 0 份存在"某行属性顺序 ≠ 并集顺序"，所以按并集顺序写出来就是原顺序。）
+  - 属性值**原样保留字符串**，不转数字再格式化（"1.46667" 与 "1.466670" 不是同一份字节）。
+  - 值为空的属性不写（全库 0 处；flags 那边也是这条规矩，保持一致）。
+  - SeqNum 重算成行数（全库没有一份对不上）。
+
+flags 不走这里：它有自己的专用解析与专用渲染（见 actionflags.go，那边的位含义解码是它的价值）。
+*/
+
+// TrackInfo 是"这个动画有哪几条轨"里的一条 —— 界面上的「Attack 3 行」。
+type TrackInfo struct {
+	Sub  string `json:"sub"`
+	Kind string `json:"kind"`
+	Rows int    `json:"rows"`
+}
+
+// TrackTable 是一条轨的整份内容。Sub/Kind 是它的身份（写回哪个文件要靠它俩），Columns 是表头，
+// ChildColumns 是子元素（<AilmentNN>）的表头；行里没有的列**没有那个键**（缺的属性不补）。
+type TrackTable struct {
+	Sub          string     `json:"sub"`
+	Kind         string     `json:"kind"`
+	SeqNum       string     `json:"seqNum"`
+	Columns      []string   `json:"columns"`
+	ChildColumns []string   `json:"childColumns"`
+	Rows         []TrackRow `json:"rows"`
+}
+
+// TrackRow 是一行：Values 是那一行的属性（列名 → 原样的字符串），Children 是它的子元素（多数轨没有）。
+type TrackRow struct {
+	Index    int               `json:"index"`
+	Values   map[string]string `json:"values"`
+	Children []TrackChild      `json:"children"`
+}
+
+// TrackChild 是行里的一个子元素：Tag 是标签名（Ailment00…），Values 同上一层的规矩。
+type TrackChild struct {
+	Tag    string            `json:"tag"`
+	Values map[string]string `json:"values"`
+}
+
+const (
+	flagsKind = "flags"
+	// flagSub 是 flags 轨的子轨号：界面上的 flags 一直是 0 号（老代码也是这么拼的），保留不动。
+	flagSub = "0"
+)
+
+// trackKinds 是这一页认的四种轨。它们会被拼进文件名，所以**只认这几种**（同 isMotion 的道理：
+// 别让界面给一段带斜杠的文本把文件指到别处去）。
+var trackKinds = []string{flagsKind, "attack", "effect", "speed"}
+
+// trackKindOrder 是界面上的分区顺序（提交给前端时也按它排）。
+var trackKindOrder = map[string]int{flagsKind: 0, "attack": 1, "effect": 2, "speed": 3}
+
+// isSubTrack 认子轨号的写法：十进制数字（0 / 1 / 5…，可不连续）。
+func isSubTrack(sub string) bool {
+	if sub == "" || len(sub) > 3 {
+		return false
+	}
+	for i := 0; i < len(sub); i++ {
+		if sub[i] < '0' || sub[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isTrackKind(kind string) bool {
+	for _, k := range trackKinds {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// trackXMLPath 是某条轨的源文件：<角色>_<动画号>_<子轨号>_seq_edit_<种类>.xml —— 解包时已经离线转成
+// XML 躺在那儿，读它不需要任何工具。
+func trackXMLPath(cfg actionConfig, motion, sub, kind string) (string, error) {
+	if !isMotion(motion) {
+		return "", fmt.Errorf("动画号 %q 不是四位十六进制小写（例如 3400）", motion)
+	}
+	if !isSubTrack(sub) {
+		return "", fmt.Errorf("子轨号 %q 不是十进制数字", sub)
+	}
+	if !isTrackKind(kind) {
+		return "", fmt.Errorf("轨种类 %q 不认识（只认 %s）", kind, strings.Join(trackKinds, " / "))
+	}
+	char := charCode(cfg)
+	return filepath.Join(cfg.FlagsDir, fmt.Sprintf("%s_%s_%s_seq_edit_%s.xml", char, motion, sub, kind)), nil
+}
+
+// deployTrackPath 是产物在 mod 目录里的落点：游戏原本的布局，直接拼出来。
+func deployTrackPath(cfg actionConfig, motion, sub, kind string) string {
+	char := charCode(cfg)
+	return filepath.Join(actionsModDir, "pl", char, fmt.Sprintf("%s_%s_%s_seq_edit_%s.bxm", char, motion, sub, kind))
+}
+
+// 读那一步的形状：轨的种类名各不相同（AttackTrack / EffectTrack / SpeedTrack），所以用 ",any" 收，
+// 名字从元素标签上认。属性用 []xml.Attr 是为了**保住顺序**（写出时按它拼）。
+type trackElement struct {
+	XMLName  xml.Name
+	Attrs    []xml.Attr     `xml:",any,attr"`
+	Children []trackElement `xml:",any"`
+}
+
+type trackFile struct {
+	XMLName xml.Name
+	Track   trackElement `xml:",any"`
+}
+
+// parseTrackXML 把一份通用轨的 XML 解成表。
+//
+// 轨必须**正好一条**、行必须都是 <Seq>：别的东西说明这份文件不是这里认得的东西，按自己的理解写回去
+// 等于把不认识的省掉，所以宁可当场报错。
+func parseTrackXML(raw []byte) (*TrackTable, error) {
+	var doc trackFile
+	if err := xml.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("轨 XML 解析不了: %w", err)
+	}
+	if doc.XMLName.Local != "SeqRoot" {
+		return nil, fmt.Errorf("轨 XML 的根是 <%s>，不是 <SeqRoot>", doc.XMLName.Local)
+	}
+	name := doc.Track.XMLName.Local
+	if !strings.HasSuffix(name, "Track") {
+		return nil, fmt.Errorf("轨 XML 里第一条是 <%s>，不像 <XxxTrack>", name)
+	}
+
+	table := &TrackTable{
+		Kind:   strings.ToLower(strings.TrimSuffix(name, "Track")),
+		SeqNum: trackAttr(doc.Track.Attrs, "SeqNum"),
+		Rows:   make([]TrackRow, 0, len(doc.Track.Children)),
+	}
+	columns := map[string]bool{}
+	childColumns := map[string]bool{}
+
+	for _, seq := range doc.Track.Children {
+		if seq.XMLName.Local != "Seq" {
+			return nil, fmt.Errorf("轨里出现 <%s>，只认 <Seq>", seq.XMLName.Local)
+		}
+		row := TrackRow{Index: len(table.Rows), Values: make(map[string]string, len(seq.Attrs))}
+		for _, attr := range seq.Attrs {
+			row.Values[attr.Name.Local] = attr.Value
+			if !columns[attr.Name.Local] {
+				columns[attr.Name.Local] = true
+				table.Columns = append(table.Columns, attr.Name.Local)
+			}
+		}
+		for _, kid := range seq.Children {
+			child := TrackChild{Tag: kid.XMLName.Local, Values: make(map[string]string, len(kid.Attrs))}
+			for _, attr := range kid.Attrs {
+				child.Values[attr.Name.Local] = attr.Value
+				if !childColumns[attr.Name.Local] {
+					childColumns[attr.Name.Local] = true
+					table.ChildColumns = append(table.ChildColumns, attr.Name.Local)
+				}
+			}
+			row.Children = append(row.Children, child)
+		}
+		table.Rows = append(table.Rows, row)
+	}
+	return table, nil
+}
+
+// buildTrackXML 把表拼回 XML。**自己拼字符串**而不是用 encoding/xml：属性顺序、缩进、自闭合、
+// 空值不写，都要跟对面那个工具认的格式一样（见文件头那三条规矩）。
+func buildTrackXML(table *TrackTable) ([]byte, error) {
+	if !isTrackKind(table.Kind) {
+		return nil, fmt.Errorf("轨种类 %q 不认识（只认 %s）", table.Kind, strings.Join(trackKinds, " / "))
+	}
+	tag := strings.ToUpper(table.Kind[:1]) + table.Kind[1:] + "Track"
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "<SeqRoot>\r\n  <%s SeqNum=\"%d\">\r\n", tag, len(table.Rows))
+	for i, row := range table.Rows {
+		where := fmt.Sprintf("第 %d 行", i+1)
+		attrs, err := trackAttrs(table.Columns, row.Values, where)
+		if err != nil {
+			return nil, err
+		}
+		if len(row.Children) == 0 {
+			fmt.Fprintf(&b, "    <Seq%s />\r\n", attrs)
+			continue
+		}
+		fmt.Fprintf(&b, "    <Seq%s>\r\n", attrs)
+		for _, child := range row.Children {
+			if child.Tag == "" {
+				return nil, fmt.Errorf("%s 有子元素没有标签名", where)
+			}
+			childAttrs, err := trackAttrs(table.ChildColumns, child.Values, where+"的 "+child.Tag)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Fprintf(&b, "      <%s%s />\r\n", child.Tag, childAttrs)
+		}
+		b.WriteString("    </Seq>\r\n")
+	}
+	fmt.Fprintf(&b, "  </%s>\r\n</SeqRoot>", tag)
+	return []byte(b.String()), nil
+}
+
+// trackAttrs 按**列顺序**拼一行属性，值为空的（以及这一行没有的列）整个不写。
+// 时间那两栏顺手校验一下"是不是个数"：写不出来的当场报错，而不是把残值写进文件。
+func trackAttrs(columns []string, values map[string]string, where string) (string, error) {
+	var b strings.Builder
+	for _, name := range columns {
+		value, ok := values[name]
+		if !ok || value == "" {
+			continue
+		}
+		if name == "StartTime" || name == "EndTime" {
+			checked, err := flagTime(where+"的"+name, value)
+			if err != nil {
+				return "", err
+			}
+			value = checked
+		}
+		b.WriteString(flagAttrPair(name, value))
+	}
+	return b.String(), nil
+}
+
+// trackAttr 取一个属性（没有就是空串）。
+func trackAttr(attrs []xml.Attr, name string) string {
+	for _, attr := range attrs {
+		if attr.Name.Local == name {
+			return attr.Value
+		}
+	}
+	return ""
+}
+
+/*
+ListTracks 列出这个动画有的所有轨（界面上的「Attack 3 行」）。行数就是 <Seq> 的条数——不靠数标签，
+是真解析一遍：这几份文件都很小，解析一次的代价换来的是"行数"跟加载出来的表永远一致。
+
+没有轨的动画（比如只有动作表里那一行、没有对应轨文件）返回空表，不是错误：那是正常情况。
+*/
+func (s *ActionsService) ListTracks(motion string) ([]TrackInfo, error) {
+	if !isMotion(motion) {
+		return nil, fmt.Errorf("动画号 %q 不是四位十六进制小写（例如 3400）", motion)
+	}
+	cfg := s.config()
+	char := charCode(cfg)
+	matches, err := filepath.Glob(filepath.Join(cfg.FlagsDir, fmt.Sprintf("%s_%s_*_seq_edit_*.xml", char, motion)))
+	if err != nil {
+		return nil, fmt.Errorf("找轨文件: %w", err)
+	}
+
+	infos := make([]TrackInfo, 0, len(matches))
+	for _, path := range matches {
+		sub, kind, ok := parseTrackName(filepath.Base(path), char, motion)
+		if !ok {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("读轨 %s: %w", path, err)
+		}
+		table, err := parseTrackXML(raw)
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, TrackInfo{Sub: sub, Kind: kind, Rows: len(table.Rows)})
+	}
+	// 分区顺序固定成 flags / attack / effect / speed，同一分区里按子轨号。
+	sort.Slice(infos, func(i, j int) bool {
+		if a, b := trackKindOrder[infos[i].Kind], trackKindOrder[infos[j].Kind]; a != b {
+			return a < b
+		}
+		return infos[i].Sub < infos[j].Sub
+	})
+	return infos, nil
+}
+
+// parseTrackName 从 `<角色>_<动画号>_<子轨号>_seq_edit_<种类>.xml` 里取后两段。
+func parseTrackName(base, char, motion string) (sub, kind string, ok bool) {
+	prefix := char + "_" + motion + "_"
+	if !strings.HasPrefix(base, prefix) {
+		return "", "", false
+	}
+	rest := strings.TrimSuffix(strings.TrimPrefix(base, prefix), ".xml")
+	sub, kind, ok = strings.Cut(rest, "_seq_edit_")
+	if !ok || !isSubTrack(sub) || !isTrackKind(kind) {
+		return "", "", false
+	}
+	return sub, kind, true
+}
+
+// LoadTrack 读一条轨（通用解析，见文件头）。
+func (s *ActionsService) LoadTrack(motion, sub, kind string) (*TrackTable, error) {
+	cfg := s.config()
+	path, err := trackXMLPath(cfg, motion, sub, kind)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("读轨 %s: %w", path, err)
+	}
+	table, err := parseTrackXML(raw)
+	if err != nil {
+		return nil, err
+	}
+	table.Sub = sub
+	return table, nil
+}
+
+/*
+SaveTracks 一次把若干条改过的轨写完并部署（界面上详情页那一个「保存」）。
+
+先写回各自源 XML（下一次读到的就是刚存下的），再逐条转 BXM 搬进 mod —— 与 flags 的保存走同一段管线
+（同一把锁、同一个临时目录、同一个部署函数，见 writeAndDeployTracks）。
+*/
+func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cfg := s.config()
+	items := make([]trackWrite, 0, len(tables))
+	for _, table := range tables {
+		path, err := trackXMLPath(cfg, motion, table.Sub, table.Kind)
+		if err != nil {
+			return err
+		}
+		raw, err := buildTrackXML(&table)
+		if err != nil {
+			return err
+		}
+		if err := appfiles.WriteAtomic(path, raw); err != nil {
+			return err
+		}
+		items = append(items, trackWrite{motion: motion, sub: table.Sub, kind: table.Kind, raw: raw})
+	}
+	return s.writeAndDeployTracks(cfg, items)
+}

@@ -1,0 +1,22 @@
+<SeqRoot>
+  <AttackTrack SeqNum="1">
+    <Seq LayerFlag="4294967295" StartTime="0.000000" EndTime="16.666668" SeqFlag="0" No="0" Shape="0" Dir="0" Power="0" PartsNo="-1" Offset="0.000000 -0.000000 1.000000" Rot="0.000000 0.000000 -0.000000" Size="0.500000 1.000000 1.000000 0.000000" AttackRate="1.000000" BreakRate="1.000000" SpArtsRate="1.000000" AddAbilityGage="1" HitStopSec="0.000000" AtkType="2" AtkGlobalType="0" AtkCategoryFlag="0" Reaction="2" AtkFlag="32" ElementType="0" Condition="0" isSwept="0" hitEffectRotZ="0.000000" knockBackRate="1.000000" damageMovementRate="1.000000" damageMovementRateY="1.000000">
+      <Ailment00 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment01 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment02 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment03 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment04 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment05 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment06 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment07 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment08 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment09 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment10 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment11 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment12 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment13 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment14 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+      <Ailment15 category="1739476053" type="3177074653" sec="0.000000" rate="0.000000" />
+    </Seq>
+  </AttackTrack>
+</SeqRoot>

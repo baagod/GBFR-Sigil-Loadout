@@ -26,3 +26,8 @@ GBFR.SigilLoadout.Native/third_party/** -text
 *.iobj binary
 *.ipdb binary
 *.woff2 binary
+
+# 字节级往返的夹具：这几个文件的**字节就是测试数据**（XML 里是 CRLF，见 actiontracks_test.go 的
+# TestTrackRoundTripIsByteExact）。按上面那条 `* text=auto eol=lf` 会被规范化成 LF，
+# 别的机器一检出夹具就变样、往返测试必挂 —— 所以这里显式关掉行尾转换。
+SigilLoadout/service/testdata/** -text

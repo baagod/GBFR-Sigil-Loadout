@@ -1,0 +1,5 @@
+<SeqRoot>
+  <AttackTrack SeqNum="1">
+    <Seq LayerFlag="4294967295" StartTime="0.383333" EndTime="0.433333" SeqFlag="0" No="1" Shape="2" Dir="0" Power="0" PartsNo="-1" Offset="0.200000 1.000000 1.600000" Rot="0.000000 0.000000 -1.221731" Size="1.100000 2.000000 1.400000 0.000000" AttackRate="1.400000" BreakRate="1.000000" AddAbilityGage="0" HitStopSec="0.200000" AtkType="1" AtkGlobalType="0" Reaction="0" AtkFlag="0" ElementType="0" Condition="0" />
+  </AttackTrack>
+</SeqRoot>
