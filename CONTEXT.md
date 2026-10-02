@@ -46,3 +46,9 @@ _Avoid_: 工具（单独用时）、界面工具、编辑器
 
 **数据管理器**: 提供游戏归档访问的那个插件角色。游戏自己的状态管理器不是它。
 _Avoid_: StatusManager、管理器（指游戏那侧时）
+
+**动作**: 动作表（`plXXXX_action.msg`）里的一条记录。
+_Avoid_: 行动
+
+**动画**: 一段可播的动画单元，指向动作表的 `saveMotId01_` ~ `saveMotId12_` 字段。
+_Avoid_: 动作段、motion、mot

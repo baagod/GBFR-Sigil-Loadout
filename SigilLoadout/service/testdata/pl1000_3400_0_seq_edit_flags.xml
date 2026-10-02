@@ -1,0 +1,13 @@
+<SeqRoot>
+  <FlagsTrack SeqNum="9">
+    <Seq LayerFlag="4294967295" StartTime="0.000000" EndTime="0.016667" Config="1" Flag0="32" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.000000" EndTime="0.416667" Config="0" Flag0="16" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.000000" EndTime="4.683333" Config="0" Flag0="4" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.333333" EndTime="0.433333" Config="1" Flag0="0" Flag1="128" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.916667" EndTime="0.933333" Config="1" Flag0="0" Flag1="134217728" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.950000" EndTime="16.666668" Config="0" Flag0="8192" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.950000" EndTime="16.666668" Config="0" Flag0="64" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="1.250000" EndTime="5.033333" Config="0" Flag0="10" Flag1="4194304" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="1.750000" EndTime="5.683333" Config="0" Flag0="1" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+  </FlagsTrack>
+</SeqRoot>

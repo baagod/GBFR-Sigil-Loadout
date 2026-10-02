@@ -46,6 +46,9 @@ func main() {
 	editService := &service.EditService{}
 	limitBonusService := &service.LimitBonusService{}
 	skillboardService := &service.SkillboardService{}
+	// 动作表这一页没有防抖：它写的是解包出来的数据文件，保存一次要跑一次 GBFRDataTools，不能像
+	// 编辑列表那样每次按键都往待写里丢（见 service/actionsservice.go）。
+	actionsService := &service.ActionsService{}
 	// 外壳（窗口显隐与托盘）跟载荷数据无关，自成一体（见 service/shellservice.go）。托盘菜单在这里就造：
 	// NewMenu / NewMenuItem 只碰包内一张表、不碰 globalApplication，所以能在 application.New() 之前造；
 	// "退出"那一条随结构体一起给出，exit 不可能为 nil。文案先用英文——前端要等 WebView 起来、读完
@@ -62,6 +65,7 @@ func main() {
 			application.NewService(editService),
 			application.NewService(limitBonusService),
 			application.NewService(skillboardService),
+			application.NewService(actionsService),
 			application.NewService(shellService),
 		},
 		Assets: application.AssetOptions{

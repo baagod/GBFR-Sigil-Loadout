@@ -1,0 +1,5 @@
+<SeqRoot>
+  <FlagsTrack SeqNum="1">
+    <Seq LayerFlag="4294967295" StartTime="0.000000" EndTime="16.666668" Config="0" Flag0="4" Flag1="4" SysFlag="0" FreeArg="0 0 0 0" />
+  </FlagsTrack>
+</SeqRoot>

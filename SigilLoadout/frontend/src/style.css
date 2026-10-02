@@ -172,6 +172,51 @@
 }
 
 /*
+    角色动作页三张表（动作表 / flags / FSM）的边框色：外框与格线**同一支**，颜色只写在这一处。
+
+    用的是主题里的 --input（深色下 #404040），不是新造的颜色 —— Button 的 outline 变体、Input、
+    Checkbox 的边框都是它。选它是因为表内输入框没有底色、格子之间只靠这几条线分，默认那颗
+    --border（10% 白 ≈#222323）在满屏密线里太淡。浅色主题下 --input 与 --border 本来就是同一个值，
+    所以那边等于没变。
+
+    ⚠️ `& *` 是同权重（0,1,0）压住表内所有元素：**表内任何单独的边框色都会被它吃掉**（谁在后谁赢，
+    而这条通常在后）。要给某一格单独上色，得先把它改成更精确的选择器。
+*/
+@utility table-border {
+    border-color: var(--input);
+
+    & * {
+        border-color: var(--input);
+    }
+}
+
+/*
+    格子获得焦点时的那圈线：**从格子的外沿往里画 2px**。
+
+    为什么不直接用 ring：ring 是画在输入框**外面**的（box-shadow），2px 会越出格子 —— 上沿顶进表头、
+    左右顶进邻格；改成 inset 又紧贴格线，2px 环 + 1px 格线连成一条 3px 的带子，看着像加粗。
+
+    这里用一个盖在格子上的伪元素：inset:-1px 让它正好铺满"格子 + 那一圈 1px 格线"，边框朝里画 2px，
+    于是这圈线正好**压住那一格的四条格线**，而且一点都不越界。z-index 高过吸顶表头的 20，免得第一行的
+    焦点框上沿被表头盖掉。
+*/
+@utility cell-focus {
+    position: relative;
+
+    &:focus-within {
+        z-index: 30;
+    }
+
+    &:focus-within::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border: 2px solid var(--ring);
+        pointer-events: none;
+    }
+}
+
+/*
     「专精技能」页的两级吸顶（角色行 + 专精类型名）。
 
     为什么放在这里而不是组件里：这两条要做的事 Tailwind 的 utility 表达不出来 ——

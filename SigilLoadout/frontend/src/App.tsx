@@ -30,9 +30,10 @@ import {ExclusivePanel} from "@/components/ExclusivePanel"
 import {SigilEditorPanel} from "@/components/SigilEditorPanel"
 import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"
 import {SkillboardPanel} from "@/components/SkillboardPanel"
+import {ActionsPanel} from "@/components/ActionsPanel"
 import type {CharaTable} from "@/lib/chara"
 
-type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus" | "skillboard"
+type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus" | "skillboard" | "actions"
 
 /** 外壳唯一的一条失败通道：谁失败都只是把它写进这里，屏幕上只可能显示一条。 */
 type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }
@@ -92,6 +93,30 @@ export default function App() {
 
     // 派生逻辑在 model.ts，可脱离 React 单测。
     const index = useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])
+
+    /*
+        **可玩角色名单，按游戏内部顺序**：专属表（sigils.chara.json）里出现的 PL 码就是这一份，
+        专属 / 角色强化 / 专精技能三页用的都是它。解包目录比它多两个 —— PL0100（主人公的另一个模型）
+        与 PL2000（非玩家版伊德）—— 那两个不该出现在「角色动作」页的下拉里。
+
+        顺序也照它：强化与专精那两页的顺序是**同一个序列再加一个 PL0100**，专属这份正好是去掉它的版本，
+        两者逐项对得上（实测过），所以不必另外维护一份顺序表。
+
+        名单为空（专属表还没读出来）时调用方**不过滤也不排序**：宁可多列几个、顺序先按字母，也不能把
+        下拉整个清空。
+    */
+    const playableChars = useMemo(() => {
+        const seen = new Set<string>()
+        const order: string[] = []
+        for (const entry of exclusiveTable) {
+            const code = entry.player.toUpperCase()
+            if (!seen.has(code)) {
+                seen.add(code)
+                order.push(code)
+            }
+        }
+        return order
+    }, [exclusiveTable])
 
     // 落盘要读"当前"状态，而这个回调刻意不带响应式依赖（闭包里的值会过期），所以从 ref 取。
     const latest = useRef({slots, index, lang, exclusiveState})
@@ -345,6 +370,7 @@ export default function App() {
                             <TabsTrigger value="sigilEditor">{t.tabSigilEditor}</TabsTrigger>
                             <TabsTrigger value="limitBonus">{t.tabLimitBonus}</TabsTrigger>
                             <TabsTrigger value="skillboard">{t.tabSkillboard}</TabsTrigger>
+                            <TabsTrigger value="actions">{t.tabActions}</TabsTrigger>
                         </TabsList>
                         {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的
@@ -437,6 +463,13 @@ export default function App() {
                 {/* keepMounted：理由同上——这一页的编辑状态也活在组件里，落盘要走防抖。 */}
                 <TabsPanel value="skillboard" keepMounted className="min-h-0 flex-1 overflow-auto">
                     <SkillboardPanel lang={lang} charaNames={charaNames} charaTable={charaTable} />
+                </TabsPanel>
+                {/*
+                    keepMounted：这一页的编辑状态也活在组件里（动作表的改动、flags 的行），切走就丢。
+                    这一页自己就是滚动盒（上半区横滚、下半区纵滚），所以外层不再给 overflow-auto。
+                */}
+                <TabsPanel value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
+                    <ActionsPanel t={t} charaNames={charaNames} charaTable={charaTable} playable={playableChars} />
                 </TabsPanel>
             </Tabs>
         </div>

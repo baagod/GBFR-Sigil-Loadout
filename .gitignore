@@ -11,6 +11,7 @@ dist/
 *.pdb
 *.ilk
 *.zip
+/docs/action/
 
 # 构建中间产物：专属表由 gen 的 exclusive 子命令生成，vcxproj 每次编译前重跑它
 GBFR.SigilLoadout.Native/src/exclusive_table.inc
