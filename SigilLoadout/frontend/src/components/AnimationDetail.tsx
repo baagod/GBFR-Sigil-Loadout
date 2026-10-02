@@ -56,7 +56,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [dirty, setDirty] = useState<string[]>([])
     const [fsmNames, setFsmNames] = useState<string[]>([])
     const [fsmName, setFsmName] = useState<string | null>(null)
-    const [fsmFields, setFsmFields] = useState<{key: string; value: string}[]>([])
+    // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
+    const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
     const [opened, setOpened] = useState<string[]>([])
     const [sel, setSel] = useState<{key: string; from: number; to: number} | null>(null)
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
@@ -459,7 +460,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                             {field.key}
                                                         </td>
                                                         <td className="border-b px-2 py-1 align-top break-all">
-                                                            {field.value}
+                                                            {/* FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。 */}
+                                                            {field.value ?? field.original}
                                                         </td>
                                                     </tr>
                                                 ))}

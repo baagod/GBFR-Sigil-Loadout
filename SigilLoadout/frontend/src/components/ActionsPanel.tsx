@@ -324,9 +324,13 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     /**
      * 双击 saveMotIdNN_：把那格的动画号读出来（四位十六进制小写），弹出**动画详情页**——四条轨都在
      * 那一层里看、改、存（flags 也在那边，主面板不再有第二处 flags 表）。
+     *
+     * 格子里没填时**用原值**：这一页现在是"原值灰显为占位符、留空 = 不动"，所以没改过的格子输入框是空的
+     * ——双击它当然也该打开它原本指向的那个动画（原值就在占位符里）。
      */
     const openMotion = (id: string, key: string) => {
-        const value = (draft[id]?.[key] ?? "").trim().toLowerCase()
+        const typed = (draft[id]?.[key] ?? "").trim().toLowerCase()
+        const value = typed !== "" ? typed : (originals[id]?.[key] ?? "").trim().toLowerCase()
         if (!isMotion(value)) {
             setSteps([{ok: false, text: t.badMotion(value)}])
             return
