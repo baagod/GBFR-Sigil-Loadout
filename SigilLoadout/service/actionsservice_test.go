@@ -93,10 +93,138 @@ func sampleFlags(t *testing.T, cfg actionConfig, motion string) {
 	}
 }
 
+// strPtr 造一个"改过的值"：ActionField.Value 是 *string，nil 表示这一格没被编辑过。
+func strPtr(s string) *string { return &s }
+
+/*
+保存**不写源文件**：改动进用户目录的 action_edits.json，原始动作表从此只读。
+
+这是这一页换成"原值 + 改动"模型要保证的第一件事。以前是保存即覆盖源，手滑把一格留空就把原值写没了
+（实测丢过 id 4 的 saveMotId02_/03_：本来 "-"，被写成空串）。
+*/
+func TestSaveActionFieldsNeverWritesTheSource(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	before, err := os.ReadFile(cfg.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := actions[1].Fields
+	for i := range fields {
+		if fields[i].Key == "abilityChargeTime_" {
+			fields[i].Value = strPtr("95")
+		}
+	}
+	if err := service.SaveActionFields("6", fields); err != nil {
+		t.Fatalf("SaveActionFields: %v", err)
+	}
+
+	after, err := os.ReadFile(cfg.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("保存把源文件写了一遍：源必须只读，改动走 " + actionEditsName)
+	}
+	raw, err := os.ReadFile(actionEditsPath())
+	if err != nil {
+		t.Fatalf("改动没落到 %s: %v", actionEditsName, err)
+	}
+	for _, want := range []string{`"field": "abilityChargeTime_"`, `"value": "95"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("%s 里没有 %s:\n%s", actionEditsName, want, raw)
+		}
+	}
+
+	// 部署出去的那份要是**完整成品**：解开 mod 里的 msg 就该看到改动，没改的格子照旧。
+	deployed, err := loadActionTable(filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg"))
+	if err != nil {
+		t.Fatalf("读部署出去的动作表: %v", err)
+	}
+	record := recordByID(deployed, "6")
+	if record == nil {
+		t.Fatal("部署出去的表里没有 id_ = 6")
+	}
+	if got, err := actionFieldValue(record.entry("abilityChargeTime_")); err != nil || got != "95" {
+		t.Fatalf("部署出去的 abilityChargeTime_ = %q（%v），want 95", got, err)
+	}
+	if got, _ := actionFieldValue(record.entry("actionName_")); got != "【アビリティ】アーマー突進＋強Break" {
+		t.Fatalf("没改的格子被动了：actionName_ = %q", got)
+	}
+}
+
+/*
+留空 = 回到原值，**不是**写成空串：改动为 nil 的格子不参与合并。
+
+界面留空就是提交 null；这条保证"没填的格用原值"。
+*/
+func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	actions, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := actions[1].Fields
+	for i := range fields {
+		if fields[i].Key == "abilityChargeTime_" {
+			fields[i].Value = strPtr("95")
+		}
+	}
+	if err := service.SaveActionFields("6", fields); err != nil {
+		t.Fatalf("SaveActionFields: %v", err)
+	}
+
+	actions, err = service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields = actions[1].Fields
+	original := ""
+	for i := range fields {
+		if fields[i].Key == "abilityChargeTime_" {
+			original = fields[i].Original
+			if original == "95" {
+				t.Skip("夹具的原值就是 95，这条测试证明不了什么")
+			}
+			fields[i].Value = nil
+		}
+	}
+	if err := service.SaveActionFields("6", fields); err != nil {
+		t.Fatalf("SaveActionFields（清空）: %v", err)
+	}
+
+	deployed, err := loadActionTable(filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := recordByID(deployed, "6")
+	if record == nil {
+		t.Fatal("部署出去的表里没有 id_ = 6")
+	}
+	got, err := actionFieldValue(record.entry("abilityChargeTime_"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != original {
+		t.Fatalf("清空后部署出去的是 %q，want 原值 %q", got, original)
+	}
+}
+
+// fieldValue 取界面看到的**有效值**：有改动就是改动，没有就是原值（与前端 value ?? original 同义）。
 func fieldValue(action Action, key string) string {
 	for _, field := range action.Fields {
 		if field.Key == key {
-			return field.Value
+			if field.Value != nil {
+				return *field.Value
+			}
+			return field.Original
 		}
 	}
 	return ""
@@ -278,7 +406,7 @@ func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
 	if len(tear.Fields) != 87 {
 		t.Fatalf("id_ = 4 给了 %d 个字段，want 全部 87 个", len(tear.Fields))
 	}
-	if tear.Fields[0].Key != "id_" || tear.Fields[0].Value != "4" {
+	if tear.Fields[0].Key != "id_" || tear.Fields[0].Original != "4" {
 		t.Fatalf("字段没按文件里的顺序给：第一格是 %+v", tear.Fields[0])
 	}
 	if got := fieldValue(tear, "actionName_"); got != "【アビリティ】ツェアライセン" {
@@ -293,9 +421,8 @@ func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
 	if got := fieldValue(power, "supportEffectList_"); got != `["1","4039598841","0.5","1","3","1","1","1"]` {
 		t.Fatalf("supportEffectList_ = %s", got)
 	}
-	// id_ = 4 也挂了同一条支援效果（比 id_ = 6 那份早的改动，测试跟着数据走）。
-	if got := fieldValue(tear, "supportEffectList_"); got != `["1","4039598841","0.5","1","3","1","1","1"]` {
-		t.Fatalf("id_ = 4 的 supportEffectList_ = %s", got)
+	if got := fieldValue(tear, "supportEffectList_"); got != `["0"]` {
+		t.Fatalf("id_ = 4 的 supportEffectList_ = %s，want [\"0\"]", got)
 	}
 	// 空值不归一化：这几格各有各的写法，读回来必须还是它们自己。
 	for key, want := range map[string]string{"saveMotId01_": "3450", "saveMotId02_": "3451", "saveMotId04_": "-", "saveMotId11_": ""} {
@@ -357,7 +484,7 @@ func TestSaveActionFieldsWritesTheEditBack(t *testing.T) {
 	fields := actions[1].Fields
 	for i := range fields {
 		if fields[i].Key == "abilityChargeTime_" {
-			fields[i].Value = "95"
+			fields[i].Value = strPtr("95")
 		}
 	}
 	if err := service.SaveActionFields("6", fields); err != nil {
@@ -394,17 +521,17 @@ func TestSaveActionFieldsRejectsWhatItCannotApply(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := service.SaveActionFields("6", []ActionField{{Key: "nope_", Value: "1"}}); err == nil {
+	if err := service.SaveActionFields("6", []ActionField{{Key: "nope_", Value: strPtr("1")}}); err == nil {
 		t.Fatal("记录里没有的键被收下了")
 	}
-	if err := service.SaveActionFields("99", []ActionField{{Key: "id_", Value: "99"}}); err == nil {
+	if err := service.SaveActionFields("99", []ActionField{{Key: "id_", Value: strPtr("99")}}); err == nil {
 		t.Fatal("记录里没有的 id_ 被收下了")
 	}
-	if err := service.SaveActionFields("  ", []ActionField{{Key: "id_", Value: "1"}}); err == nil {
+	if err := service.SaveActionFields("  ", []ActionField{{Key: "id_", Value: strPtr("1")}}); err == nil {
 		t.Fatal("空的 id_ 被收下了")
 	}
 	// supportEffectList_ 那一格要的是 JSON 字符串数组。
-	if err := service.SaveActionFields("6", []ActionField{{Key: "supportEffectList_", Value: "0"}}); err == nil {
+	if err := service.SaveActionFields("6", []ActionField{{Key: "supportEffectList_", Value: strPtr("0")}}); err == nil {
 		t.Fatal("数组那一格收下了一段不是 JSON 数组的文本")
 	}
 
@@ -736,7 +863,7 @@ func TestLoadFsmFlattensTheMessage(t *testing.T) {
 	}
 	got := make(map[string]string, len(fields))
 	for _, field := range fields {
-		got[field.Key] = field.Value
+		got[field.Key] = field.Original
 	}
 	want := map[string]string{
 		"layerNo":         "3",

@@ -71,9 +71,13 @@ type Action struct {
 
 // ActionField 是记录里的一格。数组类字段（只有 supportEffectList_ 是）编码成 JSON 字符串塞进 Value：
 // 界面拿到的是一段能直接接着编辑的文本，Go 这边不为它另立一个类型。
+//
+// Original 是**随包资产里的原始值**（只读；界面把它当灰色占位符），Value 是玩家的改动，nil = 没改过。
+// 与 skillboard/limitbonus 的 Values []*int 同一套语义：null 不是"空值"，是"这一格没被编辑过"。
 type ActionField struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key      string  `json:"key"`
+	Original string  `json:"original"`
+	Value    *string `json:"value"`
 }
 
 /*
@@ -332,33 +336,62 @@ Fediel 的表里没有 4/6，两边都是正常情况。但一条都对不上就
 */
 func (s *ActionsService) LoadActions() ([]Action, error) {
 	cfg := s.config()
-	root, err := loadActionTable(cfg.Path)
+	original, err := loadActionOriginal(cfg)
 	if err != nil {
 		return nil, err
 	}
+	edits, err := loadActionEdits()
+	if err != nil {
+		return nil, err
+	}
+	changed := mergeActionEdits(edits, charCode(cfg))
 
 	actions := make([]Action, 0, len(cfg.IDs))
 	for _, id := range cfg.IDs {
-		record := recordByID(root, id)
+		record := recordByID(original, id)
 		if record == nil {
 			continue
 		}
 		fields, err := actionFields(record)
 		if err != nil {
-			return nil, fmt.Errorf("动作表 %s 里 id_ = %q 的记录: %w", cfg.Path, id, err)
+			return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", id, err)
+		}
+		// 原值照给，改动叠在上面：界面把 Value 填进输入框、把 Original 当灰色占位符。
+		for i := range fields {
+			if value, ok := changed[id][fields[i].Key]; ok {
+				edited := value
+				fields[i].Value = &edited
+			}
 		}
 		actions = append(actions, Action{ID: id, Fields: fields})
 	}
 	if len(actions) == 0 {
-		return nil, fmt.Errorf("动作表 %s 里 %v 一条都没有", cfg.Path, cfg.IDs)
+		return nil, fmt.Errorf("动作表里 %v 一条都没有", cfg.IDs)
 	}
 	return actions, nil
 }
 
-// SaveActionFields 把界面上的字段写回动作表里 id_ = id 的那条记录，并部署到 Mods。
-//
-// 只认记录里已有的键：多出来的键当场报错（静默丢掉等于界面上说保存成功、游戏里什么都没变）。
-// 传进来的行没提到的字段不动它们。
+/*
+loadActionOriginal 读**原始**动作表：exe 旁 assets\<角色码>_action.msg（随包发布，只读，见 actionedits.go）。
+
+读不到就退回设置里那个解包副本（cfg.Path）——那时候它同样只当只读用：这一页从此不再写源文件。
+*/
+func loadActionOriginal(cfg actionConfig) (*msgValue, error) {
+	path := actionOriginalPath(charCode(cfg))
+	if _, err := os.Stat(path); err != nil {
+		path = cfg.Path
+	}
+	return loadActionTable(path)
+}
+
+/*
+SaveActionFields 记下 id_ = id 这条记录的改动，并部署到 Mods。
+
+**不写源文件**：改动进用户目录的 action_edits.json（原始动作表永远只读），部署时"原始 + 改动"合成
+一份 msgpack 写进 mod —— 所以 mod 里是完整成品，不是补丁。Value 为 nil 的格子 = 回到原值（界面留空即此）。
+
+只认记录里已有的键：多出来的键当场报错（静默丢掉等于界面上说保存成功、游戏里什么都没变）。
+*/
 func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -369,29 +402,73 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 	defer s.mu.Unlock()
 
 	cfg := s.config()
-	root, err := loadActionTable(cfg.Path)
+	original, err := loadActionOriginal(cfg)
 	if err != nil {
 		return err
 	}
-	record := recordByID(root, id)
+	record := recordByID(original, id)
 	if record == nil {
-		return fmt.Errorf("动作表 %s 里没有 id_ = %q 的记录", cfg.Path, id)
+		return fmt.Errorf("动作表里没有 id_ = %q 的记录", id)
 	}
-
 	for _, field := range fields {
-		node := record.entry(field.Key)
-		if node == nil {
+		if record.entry(field.Key) == nil {
 			return fmt.Errorf("id_ = %q 的记录里没有 %s 这一格", id, field.Key)
 		}
-		if err := setActionFieldValue(node, field.Value); err != nil {
-			return fmt.Errorf("id_ = %q 的 %s: %w", id, field.Key, err)
-		}
 	}
 
-	if err := appfiles.WriteAtomic(cfg.Path, encodeMsgpack(root)); err != nil {
+	// 先试合一遍（非法值在这儿报出来），确认没问题再落改动表 —— 否则一个坏值会先被存下来，
+	// 下次打开界面就带着它。合并会改动读进来的那棵树，所以每次合并都现读一份原始表。
+	edits, err := loadActionEdits()
+	if err != nil {
 		return err
 	}
-	return deployFile(cfg.Path, deployActionPath(cfg))
+	char := charCode(cfg)
+	for _, field := range fields {
+		edits = setActionEdit(edits, char, id, field.Key, field.Value)
+	}
+	if _, err := mergedActionTable(cfg, edits); err != nil {
+		return err
+	}
+	if err := saveActionEdits(edits); err != nil {
+		return err
+	}
+	return s.deployActionTable(cfg, edits)
+}
+
+// deployActionTable 把"原始 + 改动"合成一份 msgpack 写进 mod 目录（源文件一个字节都不碰）。
+func (s *ActionsService) deployActionTable(cfg actionConfig, edits []actionEdit) error {
+	body, err := mergedActionTable(cfg, edits)
+	if err != nil {
+		return err
+	}
+	return appfiles.WriteAtomic(deployActionPath(cfg), body)
+}
+
+// mergedActionTable 现读一份**原始**动作表、把改动套上去、编码成 msgpack 字节。
+//
+// 合并是就地改树的，所以它不接受外面传进来的树：自己读一份，用完就扔 —— 调用两次不会互相污染
+// （撤销一格时尤其重要：拿合并过的树再合一次，旧值会留在上面）。
+func mergedActionTable(cfg actionConfig, edits []actionEdit) ([]byte, error) {
+	original, err := loadActionOriginal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	for id, fields := range mergeActionEdits(edits, charCode(cfg)) {
+		record := recordByID(original, id)
+		if record == nil {
+			return nil, fmt.Errorf("改动里有 id_ = %q，但动作表里没有这条记录", id)
+		}
+		for key, value := range fields {
+			node := record.entry(key)
+			if node == nil {
+				return nil, fmt.Errorf("改动里有 id_ = %q 的 %s，但记录里没有这一格", id, key)
+			}
+			if err := setActionFieldValue(node, value); err != nil {
+				return nil, fmt.Errorf("id_ = %q 的 %s: %w", id, key, err)
+			}
+		}
+	}
+	return encodeMsgpack(original), nil
 }
 
 // LoadFlags 读某个 motion 的 flags 轨并解析成行。
@@ -439,7 +516,11 @@ func (s *ActionsService) Deploy() error {
 	defer s.mu.Unlock()
 
 	cfg := s.config()
-	if err := deployFile(cfg.Path, deployActionPath(cfg)); err != nil {
+	edits, err := loadActionEdits()
+	if err != nil {
+		return err
+	}
+	if err := s.deployActionTable(cfg, edits); err != nil {
 		return err
 	}
 
@@ -676,7 +757,7 @@ func actionFields(record *msgValue) ([]ActionField, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", e.key.str, err)
 		}
-		fields = append(fields, ActionField{Key: e.key.str, Value: value})
+		fields = append(fields, ActionField{Key: e.key.str, Original: value})
 	}
 	return fields, nil
 }
@@ -730,11 +811,13 @@ func setActionFieldValue(node *msgValue, value string) error {
 //
 // 同名的兄弟键（根上连着几条 FSMNode 就是）第 2 个起带 #1 / #2 后缀——与参考实现同一套记法，
 // 界面据此仍然能唯一定位一行。空容器也出一行（[] / {}），否则它会从界面上整个消失。
+//
+// 值一律填 Original：FSM 这块**只读**（没有编辑入口），所以 Value 永远是 nil。
 func flattenMsg(v *msgValue, path string, out *[]ActionField) {
 	switch v.format {
 	case msgArray:
 		if len(v.items) == 0 {
-			*out = append(*out, ActionField{Key: path, Value: "[]"})
+			*out = append(*out, ActionField{Key: path, Original: "[]"})
 			return
 		}
 		for i, item := range v.items {
@@ -742,7 +825,7 @@ func flattenMsg(v *msgValue, path string, out *[]ActionField) {
 		}
 	case msgMap:
 		if len(v.entries) == 0 {
-			*out = append(*out, ActionField{Key: path, Value: "{}"})
+			*out = append(*out, ActionField{Key: path, Original: "{}"})
 			return
 		}
 		seen := make(map[string]int, len(v.entries))
@@ -756,7 +839,7 @@ func flattenMsg(v *msgValue, path string, out *[]ActionField) {
 			flattenMsg(e.value, joinPath(path, key), out)
 		}
 	default:
-		*out = append(*out, ActionField{Key: path, Value: v.scalar()})
+		*out = append(*out, ActionField{Key: path, Original: v.scalar()})
 	}
 }
 

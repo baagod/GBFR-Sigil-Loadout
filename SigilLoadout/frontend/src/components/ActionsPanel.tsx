@@ -90,13 +90,15 @@ type Step = {ok: boolean; text: string}
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({value, onCommit, onDoubleClick, mono, slim}: {
+export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeholder}: {
     value: string
     onCommit: (value: string) => void
     onDoubleClick?: () => void
     mono?: boolean
     /** 行高由内容撑的格子（动作表）用这一档；flags 表那种行高固定的不传，直接铺满。 */
     slim?: boolean
+    /** 原值灰显：留空时显示它（动作表的"原值 / 改动"模型，见后端 actionedits.go）。 */
+    placeholder?: string
 }) {
     const [draft, setDraft] = useState(value)
     const [editing, setEditing] = useState(false)
@@ -104,22 +106,27 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim}: {
     if (!editing && draft !== value) setDraft(value)
 
     return (
-        <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onFocus={() => setEditing(true)}
-            onBlur={() => {
-                setEditing(false)
-                if (draft !== value) onCommit(draft)
-            }}
-            onDoubleClick={onDoubleClick}
-            // 值比表头长时把这一列撑开：`w-full` 的输入框对"最大内容宽度"的贡献几乎为 0，
-            // 于是列宽只剩表头文字说了算 —— 429496729 这种长值就被截掉了。
-            // 等宽字体下 ch 正好是"一个字符"，+1 给光标和内边距留位。
-            style={mono ? {minWidth: `${value.length + 1}ch`} : undefined}
-            // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
-            className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
-        />
+        <>
+            <Input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={() => setEditing(true)}
+                onBlur={() => {
+                    setEditing(false)
+                    if (draft !== value) onCommit(draft)
+                }}
+                onDoubleClick={onDoubleClick}
+                placeholder={placeholder}
+                // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
+                className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
+            />
+            {/* 隐形尺子：让这一列按"值有多长"撑开。输入框是 w-full，对**固有宽度**的贡献几乎为 0，
+                于是列宽只剩表头文字说了算 —— 429496729、AB_PL1000_04 这种长值就被截了。
+                h-0 + invisible：不占高度、不显示，但宽度照样参与表格的列宽计算。 */}
+            {mono && (
+                <span className="invisible block h-0 overflow-hidden text-xs whitespace-pre">{draft}</span>
+            )}
+        </>
     )
 }
 
@@ -227,9 +234,14 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     /** 可玩角色名单，**按游戏内部顺序**（App 从专属表推出来）。空数组视为"名单还不知道"，那时不过滤不排序。 */
     playable: string[]
 }) {
-    // 动作表：actions 是"读回来那一份"，draft[id][key] 是界面上的文本（保存总是整条记录交出去）。
-    const [actions, setActions] = useState<{id: string; fields: {key: string; value: string}[]}[]>([])
+    // 动作表：actions 是后端给的那一份（每格带**原值**与**改动**）。draft[id][key] 是玩家改过的文本，
+    // 没改过的格子留空 —— 输入框显示 originals 里的原值当灰色占位符（见后端 actionedits.go 的模型）。
+    const [actions, setActions] = useState<
+        {id: string; fields: {key: string; original: string; value: string | null}[]}[]
+    >([])
     const [draft, setDraft] = useState<Record<string, Record<string, string>>>({})
+    // 每一格的原值（随包资产里那份）：占位符与只读列都用它；改动不在这儿。
+    const [originals, setOriginals] = useState<Record<string, Record<string, string>>>({})
     const [actionsDirty, setActionsDirty] = useState(false)
     // charCode 是当前角色（从动作表路径上取），characters 是下拉的候选（解包目录里有的那些）。
     const [charCode, setCharCode] = useState("")
@@ -280,12 +292,20 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
         const table = (await LoadActions()) ?? []
         setActions(table)
         const map: Record<string, Record<string, string>> = {}
+        const base: Record<string, Record<string, string>> = {}
         for (const action of table) {
             const values: Record<string, string> = {}
-            for (const field of action.fields) values[field.key] = field.value
+            const original: Record<string, string> = {}
+            for (const field of action.fields) {
+                // 草稿只装**玩家改过的**：没改过的留空，于是输入框显示灰色占位符（原值）。
+                values[field.key] = field.value ?? ""
+                original[field.key] = field.original
+            }
             map[action.id] = values
+            base[action.id] = original
         }
         setDraft(map)
+        setOriginals(base)
     }
 
     useEffect(() => {
@@ -362,7 +382,8 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
         for (const action of actions) {
             await SaveActionFields(action.id, action.fields.map((field) => ({
                 key: field.key,
-                value: draft[action.id]?.[field.key] ?? field.value,
+                // 空 = 没填 = 这一格回到原值（null），**不是**写成空串 —— 留空不再等于清空。
+                value: (draft[action.id]?.[field.key] ?? "").trim() === "" ? null : draft[action.id]![field.key],
             })))
             done.push({ok: true, text: t.savedAction(action.id)})
         }
@@ -460,7 +481,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                                 // 底色只有一处来源：表头默认 bg-muted，上面那两类列的**表头**
                                                 // 换成反色（浅底深字），一眼看出双击哪几格能加载 flags。
                                                 key === "id_"
-                                                    ? "left-0 z-20 bg-background"
+                                                    ? "left-0 z-50 bg-background"
                                                     : isHighlightedColumn(key)
                                                       ? "z-10 bg-primary text-primary-foreground"
                                                       : "z-10 bg-muted"
@@ -479,17 +500,18 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                                 key={key}
                                                 className={`${key === "id_" ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus`} ${
                                                     // 表体不给底色：标记只做在表头上（见 isHighlightedColumn）。
-                                                    key === "id_" ? "sticky left-0 z-10 bg-background tabular-nums" : ""
+                                                    key === "id_" ? "sticky left-0 z-40 bg-background tabular-nums" : ""
                                                 }`}
                                             >
                                                 {key === "id_" ? (
-                                                    // id_ 是后端用来找记录的那把钥匙，只读。
-                                                    draft[action.id]?.[key] ?? ""
+                                                    // id_ 是后端用来找记录的那把钥匙，只读，直接显示原值。
+                                                    originals[action.id]?.[key] ?? ""
                                                 ) : (
                                                     <EditableCell
                                                         mono
                                                         slim
                                                         value={draft[action.id]?.[key] ?? ""}
+                                                        placeholder={originals[action.id]?.[key]}
                                                         onCommit={(value) => editField(action.id, key, value)}
                                                         onDoubleClick={
                                                             isHighlightedColumn(key)

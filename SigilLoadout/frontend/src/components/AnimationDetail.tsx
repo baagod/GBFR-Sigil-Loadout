@@ -625,7 +625,7 @@ function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend,
             }}
             className={`${isDragging ? "relative z-10 opacity-50" : ""} ${selected ? "bg-primary/20" : ""}`}
         >
-            <td className="sticky left-0 z-10 w-[68px] border-r border-b bg-background p-0">
+            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-background p-0">
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -684,7 +684,7 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-20 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
+                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
                                 {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
                                     表体里那条分隔竖线到表头就断了。 */}
                                 <div className="flex items-stretch">
@@ -747,7 +747,7 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
             }}
             className={`${isDragging ? "relative z-10 opacity-50" : ""} ${selected ? "bg-primary/20" : ""}`}
         >
-            <td className="sticky left-0 z-10 w-[68px] border-r border-b bg-background p-0">
+            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-background p-0">
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -816,7 +816,7 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-20 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
+                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
                                 {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
