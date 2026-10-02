@@ -287,6 +287,12 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         }
     }
 
+    // 数据没到位之前**整个弹层都不挂载**（而不是挂一个很矮的"读取中…"）：
+    // 那样的话弹层先以很矮的样子出场，数据一到就跳到 700 多高 —— 那一下既像抖动，
+    // 又把它自己的出场动画盖掉了（动画在小盒子上播完了，盒子才变大）。
+    // 读取失败时照常挂载，错误显示在弹层里。
+    if (!loaded && !failure) return null
+
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             {/* 宽度 836。⚠️ 两条都要带变体/正确写法：
@@ -310,12 +316,12 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     约 15px 横向空间、整块内容跟着重排（一出一进就是抖动）。预留之后它出现/消失都不动布局。
                     pr-2 是滚动条与表格之间的 8px，在预留位**内侧**，所以那点间距不受影响。 */}
                 <div className="min-h-0 flex-1 overflow-auto pr-2 scrollbar-gutter-stable">
-                    {!loaded && !failure && <p className="text-xs text-muted-foreground">{t.loading}</p>}
                     {loaded && infos.length === 0 && (
                         <p className="text-xs text-muted-foreground">{t.trackNone}</p>
                     )}
                     {/* multiple：展开状态是**多项**的（一套动画的四条轨常常要一起看）。
-                        整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
+                        整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。
+                        这里**不加自己的动画**：弹层出场时它本来就已在最终形态里，基类那 100ms 管够了。 */}
                     {loaded && (
                     <Accordion multiple value={opened} onValueChange={(value) => setOpened(value as string[])}>
                         {infos.map((info) => {
