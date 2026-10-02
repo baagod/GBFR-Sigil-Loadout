@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"sigilloadout/appfiles"
 )
@@ -547,11 +548,14 @@ type trackWrite struct {
 }
 
 /*
-writeAndDeployTracks 把若干条轨的 XML 写进一个临时目录、逐条转成 BXM、再搬进 mod 目录。
+writeAndDeployTracks 把若干条轨的 XML 写进一个临时目录、**一次**转成 BXM、再搬进 mod 目录。
+
+之前是每个文件起一次 GBFRDataTools（保存三条轨 = 三次进程 + 三次黑框，还慢）：工具其实吃得下整个目录，
+所以现在是"先把这一批的 XML 全写进临时目录 → 一次转完 → 再逐条搬"。
 
 flags 的保存、通用轨的保存、以及 Deploy 里"把这次改过的轨重新搬一遍"都走这里 —— **同一把锁、同一个
 临时目录、同一段转换与部署**（调用方持有 s.mu：GBFRDataTools 同一时刻只能有一个实例）。
-顺序也是稳的：按传进来的先后一条条走完，真出错时日志里看得出停在哪一条。
+搬的顺序仍然按传进来的先后：真出错时日志里看得出停在哪一条。
 */
 func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWrite) error {
 	if len(items) == 0 {
@@ -563,20 +567,43 @@ func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWri
 	}
 	defer os.RemoveAll(dir)
 
+	names := make([]string, 0, len(items))
 	for _, item := range items {
 		base := fmt.Sprintf("%s_%s_%s_seq_edit_%s", charCode(cfg), item.motion, item.sub, item.kind)
-		xmlPath := filepath.Join(dir, base+".xml")
-		bxmPath := filepath.Join(dir, base+".bxm")
-		if err := os.WriteFile(xmlPath, item.raw, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, base+".xml"), item.raw, 0o644); err != nil {
 			return fmt.Errorf("写中转 XML: %w", err)
 		}
-		if err := xmlToBxm(cfg.ToolPath, xmlPath, bxmPath); err != nil {
-			return err
+		names = append(names, base)
+	}
+	if err := xmlToBxmDir(cfg.ToolPath, dir); err != nil {
+		return err
+	}
+	for i, item := range items {
+		bxmPath := filepath.Join(dir, names[i]+".bxm")
+		if _, err := os.Stat(bxmPath); err != nil {
+			return fmt.Errorf("工具没转出 %s: %w", names[i]+".bxm", err)
 		}
 		if err := deployFile(bxmPath, deployTrackPath(cfg, item.motion, item.sub, item.kind)); err != nil {
 			return err
 		}
 		s.markTouched(item.motion, item.sub, item.kind)
+	}
+	return nil
+}
+
+// xmlToBxmDir 让工具把目录里每个 .xml **就地**转成同名 .bxm（一次进程转完一整批）。
+//
+// 只传 -i 不传 -o：目录输入时它就是这么工作的；给它 -o 传目录，它会拿目录当文件去打开、每条都报
+// UnauthorizedAccess（试过 -o 目录、-o 目录加反斜杠两种写法，都不行）。-o 只对单文件输入有效。
+func xmlToBxmDir(toolPath, dir string) error {
+	if _, err := os.Stat(toolPath); err != nil {
+		return fmt.Errorf("转换工具 %s 读不到: %w", toolPath, err)
+	}
+	cmd := exec.Command(toolPath, "xml-to-bxm", "-i", dir)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xml-to-bxm 失败: %w\n%s", err, strings.TrimSpace(string(output)))
 	}
 	return nil
 }
@@ -587,6 +614,9 @@ func xmlToBxm(toolPath, xmlPath, bxmPath string) error {
 		return fmt.Errorf("转换工具 %s 读不到: %w", toolPath, err)
 	}
 	cmd := exec.Command(toolPath, "xml-to-bxm", "-i", xmlPath, "-o", bxmPath)
+	// GBFRDataTools 是控制台程序：从 GUI 里起它，Windows 会弹一个黑框一闪而过。
+	// HideWindow 就是不显示那个窗口（本项目只跑 Windows —— 工具路径、mod 目录都是写死的）。
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	// 它打一屏 banner 和自己那句 "Converted to …"：跑成功就不用看，失败时那几行是唯一能说明原因的东西。
 	output, err := cmd.CombinedOutput()
 	if err != nil {

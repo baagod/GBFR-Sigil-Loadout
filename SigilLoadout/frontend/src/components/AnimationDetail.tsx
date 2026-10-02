@@ -59,7 +59,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [fsmFields, setFsmFields] = useState<{key: string; value: string}[]>([])
     const [opened, setOpened] = useState<string[]>([])
     const [sel, setSel] = useState<{key: string; from: number; to: number} | null>(null)
-    const [clip, setClip] = useState<{key: string; rows: unknown[]} | null>(null)
+    const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [note, setNote] = useState("")
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
@@ -165,6 +165,30 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setSel((prev) => (prev && prev.key === key ? {...prev, to: index} : prev))
     }
 
+    /**
+     * Ctrl+C / Ctrl+V：复制选中行、插入到选中行下面，**能在动画之间用**（剪贴板在模块级）。
+     * 在输入框/文本域里打字时不抢按键：否则框内自己的文本复制粘贴会被吃掉 ✗。
+     * 没有选中行就什么都不做 —— 粘到哪儿必须由人指定，别猜 ✓。
+     */
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+            if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]")) return
+            const key = sel?.key
+            const info = infos.find((one) => trackKey(one) === key)
+            if (!key || !info) return
+            if (event.key === "c") {
+                event.preventDefault()
+                copySelected(key, info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0), info.kind)
+            } else if (event.key === "v") {
+                event.preventDefault()
+                pasteBelow(key, info.kind)
+            }
+        }
+        window.addEventListener("keydown", onKey)
+        return () => window.removeEventListener("keydown", onKey)
+    })
+
     /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     const reorder = (key: string, from: number, to: number) => {
         if (key === flagsKey) setFlags((prev) => arrayMove(prev, from, to))
@@ -198,17 +222,23 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setNote("")
     }
 
-    const copySelected = (key: string, count: number) => {
+    const copySelected = (key: string, count: number, kind: string) => {
         const {from, to} = rangeOf(key, count)
         if (to < from) return
         const rows =
             key === flagsKey ? flags.slice(from, to + 1) : (tables[key]?.rows ?? []).slice(from, to + 1)
-        setClip({key, rows})
+        // 同时写进模块级剪贴板：关掉这个弹层、换一套动画再 Ctrl+V 时，靠它拿到内容。
+        clipboard = {kind, rows}
+        setClip(clipboard)
         setNote(t.copiedRows(rows.length))
     }
 
-    const pasteBelow = (key: string) => {
-        if (!clip || clip.key !== key || clip.rows.length === 0) return
+    const pasteBelow = (key: string, kind: string) => {
+        if (!clip || clip.rows.length === 0) return
+        if (clip.kind !== kind) {
+            setNote(t.pasteKind(clip.kind, kind))
+            return
+        }
         const count = key === flagsKey ? flags.length : (tables[key]?.rows.length ?? 0)
         const at = count === 0 ? 0 : rangeOf(key, count).to + 1
         const copies = clip.rows.length
@@ -220,7 +250,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 const table = prev[key]
                 if (!table) return prev
                 const rows = clip.rows as TrackRow[]
-                const inserted = rows.map((row, i) => ({...row, index: at + i, children: []}))
+                // children 要一起深拷一份：attack 行的 <AilmentNN> 就在里面，
+                // 丢了它等于粘贴出来的行少了东西（而且和源行共用对象，改一个动两个）。
+                const inserted = rows.map((row, i) => ({
+                    ...row,
+                    index: at + i,
+                    children: row.children.map((child) => ({...child, values: {...child.values}})),
+                }))
                 return {...prev, [key]: {...table, rows: [...table.rows.slice(0, at), ...inserted, ...table.rows.slice(at)]}}
             })
         }
@@ -353,11 +389,11 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                             t={t}
                                             className="absolute top-1 right-10 z-10"
                                             canCopy={count > 0}
-                                            canPaste={clip !== null && clip.key === key}
+                                            canPaste={clip !== null && clip.kind === info.kind}
                                             canRemove={sel?.key === key}
                                             onAdd={() => addRow(key)}
-                                            onCopy={() => copySelected(key, count)}
-                                            onPaste={() => pasteBelow(key)}
+                                            onCopy={() => copySelected(key, count, info.kind)}
+                                            onPaste={() => pasteBelow(key, info.kind)}
                                             onRemove={() => removeSelected(key)}
                                         />
                                     </div>
@@ -452,6 +488,14 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
 }
 
 const flagsKey = "0flags"
+
+/**
+ * 剪贴板放在**模块级**，不是弹层的 state：弹层是"一套动画一个" ✗，而要做到
+ * "复制 A 动画的 flags 行、贴到 B 动画的 flags 行" ✓，它就必须活得比弹层久 ✗。
+ * 只存"轨种类 + 行内容"：种类用来拦住把 flags 行贴进 attack 这种荒唐事 ✓
+ * （同一张表里，key 还带着 sub，跨动画不一定对得上，所以判等用 kind ✓）。
+ */
+let clipboard: {kind: string; rows: (FlagRow | TrackRow)[]} | null = null
 
 function trackKey(info: {sub: string; kind: string}): string {
     return info.sub + info.kind
@@ -637,7 +681,7 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 visible 计算成 auto，盒子在纵向也成了滚动容器 —— 表格只要有几像素的四舍五入溢出，
                 就会冒出一条垂直滚动条（实测见过）。高度本来就由内容撑开，hidden 不会裁掉东西。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+                <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
                             <th className="sticky top-0 left-0 z-20 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
@@ -769,7 +813,7 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
         >
             {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+                <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
                             <th className="sticky top-0 left-0 z-20 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">

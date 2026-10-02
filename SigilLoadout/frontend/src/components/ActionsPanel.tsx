@@ -59,9 +59,12 @@ import type {Messages} from "@/lib/messages"
 const ACTION_CELL = "border-r border-b align-middle whitespace-nowrap"
 const ACTION_CELL_PAD = `${ACTION_CELL} px-2 py-1`
 
-// saveMotId* 这几列是"双击它加载那个 motion 的 flags"的入口，**表头**用反色标出来
-// （bg-primary / text-primary-foreground，与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）。
-const isMotionColumn = (key: string) => key.startsWith("saveMotId")
+// 这两类是"改一段动作链"要一起动的格子，**表头**都用反色标出来
+// （bg-primary / text-primary-foreground，与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）：
+//   saveMotId*      —— 双击它加载那个 motion 的 flags
+//   controlTypeHash_ —— 决定"这一串 mot 播几段"（见 docs/action/动作表字段文档.md §5），
+//                       填了 mot 却没改类型 = 那几段根本不会播，所以它必须和 mot 列摆在一个视觉组里。
+const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key === "controlTypeHash_"
 
 // 一格输入框：**没有自己的底色**（连 Input 自带的 dark:bg-input/30 也压掉）——整张表因此是一个平铺的
 // 面，格子由 1px 格线分，而不是每格套一个方框。高度只有一处来源，就是下面 EditableCell 按所在行决定的
@@ -110,6 +113,10 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim}: {
                 if (draft !== value) onCommit(draft)
             }}
             onDoubleClick={onDoubleClick}
+            // 值比表头长时把这一列撑开：`w-full` 的输入框对"最大内容宽度"的贡献几乎为 0，
+            // 于是列宽只剩表头文字说了算 —— 429496729 这种长值就被截掉了。
+            // 等宽字体下 ch 正好是"一个字符"，+1 给光标和内边距留位。
+            style={mono ? {minWidth: `${value.length + 1}ch`} : undefined}
             // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
             className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
         />
@@ -450,11 +457,11 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                             className={`${ACTION_CELL_PAD} sticky top-0 text-left font-medium ${
                                                 // id_ 排在字段顺序最前，钉住它：横向滚到第 80 列时还知道这是哪条记录；
                                                 // 表头纵向也钉住（两轴都钉的那一格要压在别的表头上面）。
-                                                // 底色只有一处来源：表头默认 bg-muted，saveMotId 那几列的**表头**
+                                                // 底色只有一处来源：表头默认 bg-muted，上面那两类列的**表头**
                                                 // 换成反色（浅底深字），一眼看出双击哪几格能加载 flags。
                                                 key === "id_"
                                                     ? "left-0 z-20 bg-background"
-                                                    : isMotionColumn(key)
+                                                    : isHighlightedColumn(key)
                                                       ? "z-10 bg-primary text-primary-foreground"
                                                       : "z-10 bg-muted"
                                             }`}
@@ -471,7 +478,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                             <td
                                                 key={key}
                                                 className={`${key === "id_" ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus`} ${
-                                                    // 表体不给底色：标记只做在表头上（saveMotId 那几列）。
+                                                    // 表体不给底色：标记只做在表头上（见 isHighlightedColumn）。
                                                     key === "id_" ? "sticky left-0 z-10 bg-background tabular-nums" : ""
                                                 }`}
                                             >
@@ -485,7 +492,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                                         value={draft[action.id]?.[key] ?? ""}
                                                         onCommit={(value) => editField(action.id, key, value)}
                                                         onDoubleClick={
-                                                            isMotionColumn(key)
+                                                            isHighlightedColumn(key)
                                                                 ? () => void openMotion(action.id, key)
                                                                 : undefined
                                                         }

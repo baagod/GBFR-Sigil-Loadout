@@ -293,8 +293,9 @@ func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
 	if got := fieldValue(power, "supportEffectList_"); got != `["1","4039598841","0.5","1","3","1","1","1"]` {
 		t.Fatalf("supportEffectList_ = %s", got)
 	}
-	if got := fieldValue(tear, "supportEffectList_"); got != `["0"]` {
-		t.Fatalf("id_ = 4 的 supportEffectList_ = %s，want [\"0\"]", got)
+	// id_ = 4 也挂了同一条支援效果（比 id_ = 6 那份早的改动，测试跟着数据走）。
+	if got := fieldValue(tear, "supportEffectList_"); got != `["1","4039598841","0.5","1","3","1","1","1"]` {
+		t.Fatalf("id_ = 4 的 supportEffectList_ = %s", got)
 	}
 	// 空值不归一化：这几格各有各的写法，读回来必须还是它们自己。
 	for key, want := range map[string]string{"saveMotId01_": "3450", "saveMotId02_": "3451", "saveMotId04_": "-", "saveMotId11_": ""} {

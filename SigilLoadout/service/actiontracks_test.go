@@ -233,3 +233,58 @@ func contains(haystack []string, needle string) bool {
 	}
 	return false
 }
+
+/*
+一次保存要转的轨是**一批一起转**的（工具吃得下整个目录，一个进程搞定），所以这里一次存两条：
+两条的 BXM 都得落进 mod 目录，并且各自与"工具直接转这份 XML"的结果一致。
+批量模式最容易错的就是名字对不上 —— 这个测试盯的就是它。
+*/
+func TestSaveTracksConvertsTheWholeBatchInOneGo(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	if _, err := os.Stat(cfg.ToolPath); err != nil {
+		t.Skipf("这台机器上没有转换工具 %s", cfg.ToolPath)
+	}
+	// 夹具按**目标名字**放：文件名就是轨的身份（角色_动画_子轨_seq_edit_种类），
+	// sampleTrack 是照原名复制的，这里两份的名字与 3400 对不上，所以自己写。
+	kinds := []struct{ kind, fixture string }{
+		{"effect", "pl1000_0b1a_0_seq_edit_effect.xml"},
+		{"speed", "pl1000_0010_0_seq_edit_speed.xml"},
+	}
+	tables := make([]TrackTable, 0, len(kinds))
+	for _, spec := range kinds {
+		raw, err := os.ReadFile(filepath.Join("testdata", spec.fixture))
+		if err != nil {
+			t.Fatalf("读夹具 %s: %v", spec.fixture, err)
+		}
+		name := "pl1000_3400_0_seq_edit_" + spec.kind + ".xml"
+		if err := os.WriteFile(filepath.Join(cfg.FlagsDir, name), raw, 0o644); err != nil {
+			t.Fatalf("放夹具 %s: %v", name, err)
+		}
+		table, err := service.LoadTrack("3400", "0", spec.kind)
+		if err != nil {
+			t.Fatalf("LoadTrack %s: %v", spec.kind, err)
+		}
+		tables = append(tables, *table)
+	}
+
+	if err := service.SaveTracks("3400", tables); err != nil {
+		t.Fatalf("SaveTracks: %v", err)
+	}
+
+	for _, spec := range kinds {
+		source, err := os.ReadFile(filepath.Join(cfg.FlagsDir, "pl1000_3400_0_seq_edit_"+spec.kind+".xml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		deployed, err := os.ReadFile(filepath.Join(modDir, "pl", "pl1000", "pl1000_3400_0_seq_edit_"+spec.kind+".bxm"))
+		if err != nil {
+			t.Fatalf("%s 没部署到 mod 目录: %v", spec.kind, err)
+		}
+		if string(deployed[:3]) != "BXM" {
+			t.Fatalf("%s 部署出去的不是 BXM（头三个字节 % x）", spec.kind, deployed[:3])
+		}
+		if want := convertForTest(t, cfg.ToolPath, source); !bytes.Equal(deployed, want) {
+			t.Fatalf("%s 部署出去的 BXM 与工具直接转源 XML 的结果不是同一份", spec.kind)
+		}
+	}
+}
