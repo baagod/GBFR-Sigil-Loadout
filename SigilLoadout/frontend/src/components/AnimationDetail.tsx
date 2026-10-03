@@ -595,7 +595,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <Plus />
+                        <Plus weight="light" />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.addRow}</TooltipContent>
                 </Tooltip>
