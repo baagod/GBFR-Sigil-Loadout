@@ -23,9 +23,9 @@ import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigi
 import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion"
 import {Button} from "@/components/ui/button"
 // 工具条图标用 Heroicons（项目自用的这五处换库；components/ui/ 里的基础组件仍用 lucide，不动）。
-// 「添加」用 **solid** 那个：outline 的加号只有两笔直线，与复制/插入/删除（都有方框轮廓）相比
-// 墨迹少约 2.7–4 倍，同线宽下看着"虚"；实心版把这处补回来，也就不必去混用线宽。
-import PlusIcon from "@heroicons/react/24/solid/PlusIcon"
+// **四个都用 outline**（统一风格）：Heroicons 的 outline 描边是 1.5，比 lucide 的 2 细，
+// 所以这几个图标整体比换库前轻一档；加号字形天生比复制/插入/删除小（没有方框轮廓）。
+import PlusIcon from "@heroicons/react/24/outline/PlusIcon"
 import Square2StackIcon from "@heroicons/react/24/outline/Square2StackIcon"
 import ClipboardDocumentListIcon from "@heroicons/react/24/outline/ClipboardDocumentListIcon"
 import TrashIcon from "@heroicons/react/24/outline/TrashIcon"
