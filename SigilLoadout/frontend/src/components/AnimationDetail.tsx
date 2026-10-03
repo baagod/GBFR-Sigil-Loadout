@@ -743,7 +743,6 @@ function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend,
                 <td key={column} className="border-r border-b p-0 cell-focus dark:bg-input/30">
                     <EditableCell
                         mono
-                        slim
                         value={row.values[column] ?? ""}
                         onCommit={(value) => onEdit(column, value)}
                     />
@@ -873,7 +872,6 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
                     ) : (
                         <EditableCell
                             mono
-                            slim
                             value={String(row[column.key] ?? "")}
                             onCommit={(value) => onEdit(column.key, value)}
                         />

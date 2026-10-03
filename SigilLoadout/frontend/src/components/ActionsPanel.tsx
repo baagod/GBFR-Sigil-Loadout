@@ -95,9 +95,8 @@ function actionHeaderClass(key: string): string {
 }
 
 // 一格输入框：**没有自己的底色**（连 Input 自带的 dark:bg-input/30 也压掉）——整张表因此是一个平铺的
-// 面，格子由 1px 格线分，而不是每格套一个方框。高度只有一处来源，就是下面 EditableCell 按所在行决定的
-// 那一档：flags 表的行高写死 28px，用 h-full 铺满；动作表的行高由内容撑出来，那一档钉 24px。两者都
-// **填满单元格**，格子里不留缝。
+// 面，格子由 1px 格线分，而不是每格套一个方框。编辑时它**绝对定位**盖在格子上（inset-x-0 top-0 + 固定
+// h-6），所以它的固有宽度不参与列宽计算、也不撑行高（三个表的行高都由别的格子撑着，见 EditableCell）。
 //
 // 焦点那圈线**不在输入框上画**，而是由所在格子画（见 style.css 的 cell-focus）：从格子外沿往里 2px，
 // 压住那四条格线且不越界。输入框这里只负责把 Input 自带的那圈 3px 光晕顶成透明——它画在框外，会越出去。
@@ -124,21 +123,20 @@ const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-s
  * 一个可编辑的格：**平时是文本，点一下才变输入框**，回车或失焦提交。值没变就什么都不做——
  * 免得把"点了一下"记成改动。
  *
- * 高度跟着所在的行走：flags 表的行高是**写死的 28px**，用 h-full 铺满；动作表的行高由内容撑出来，
- * 那里没有可依赖的高度，所以 slim 那一档钉 24px。两者都**填满单元格**，格子里不留缝。
+ * 状态切换**不改变任何几何**：显示态那段文本始终留在流里，编辑时只是变 invisible 并让输入框浮上去。
+ * 行高不由这里决定 —— 动作表是只读格（px-2 py-1 = 24 + 1px 格线 = 25px）撑的，轨表是行号那个
+ * 拖拽握把（24px）撑的，所以输入框脱离文档流也不会让行变矮。
  *
  * 为什么显示态也要有 tabIndex：焦点圈（style.css 的 cell-focus）靠 td 的 :focus-within 画，
  * 键盘 Tab 也要能进到格子里 —— 有焦点才会换成输入框。
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeholder}: {
+export function EditableCell({value, onCommit, onDoubleClick, mono, placeholder}: {
     value: string
     onCommit: (value: string) => void
     onDoubleClick?: () => void
     mono?: boolean
-    /** 行高由内容撑的格子（动作表）用这一档；flags 表那种行高固定的不传，直接铺满。 */
-    slim?: boolean
     /** 原值：留空时显示它（动作表的"原值 / 改动"模型，见后端 actionedits.go）。 */
     placeholder?: string
 }) {
@@ -169,7 +167,30 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
     // 外层上，事件照常冒泡过来。contents 不产生盒子，对布局零影响。
     return (
         <div className="contents" onDoubleClick={onDoubleClick}>
-            {editing ? (
+            {/*
+             * 显示态那段文本**两个状态下都留在流里**——它才是列宽的唯一来源。
+             *
+             * 表格是 auto 布局，而格子里的 `width:100%` 在算固有尺寸时按 auto 处理，所以"谁在流里"
+             * 直接决定列宽：早先让输入框替换掉文本，`<input>` 默认的 `size=20`（约 110px）会把列
+             * **顶宽**（点"结束"列 83px → 111px，其它列被挤窄，看着抖一下）；只给输入框压 `size`
+             * 又反过来让列**缩窄**（该格是本列唯一最宽内容时，列缩到次宽内容，文字被裁）。两边都会
+             * 抖，所以干脆让文本一直在流里：编辑时设成 `invisible`（visibility: hidden 仍占位），
+             * 输入框**绝对定位浮在它上面**（td 有 cell-focus 提供的 position: relative）。
+             * 于是列宽在两个状态下都由同一份文本决定，既不变宽也不变窄。
+             */}
+            <div
+                // 编辑中这层被输入框盖住且不可见，就别再让它进 Tab 序列。
+                tabIndex={editing ? -1 : 0}
+                onClick={() => setEditing(true)}
+                onFocus={() => setEditing(true)}
+                onKeyDown={(e) => onCopy(e, false)}
+                className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
+                    value === "" ? "text-muted-foreground" : ""
+                } ${editing ? "invisible" : ""}`}
+            >
+                {shown}
+            </div>
+            {editing && (
                 <Input
                     // autoFocus：点进来之后光标立刻可打字，不用再点第二下。
                     autoFocus
@@ -198,33 +219,10 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
                         if (input.selectionStart === input.selectionEnd) input.select()
                     }}
                     placeholder={placeholder}
-                    /**
-                     * size={1}：把输入框的**固有宽度**压到最小。
-                     *
-                     * 表格是 auto 布局，格子里的 `width:100%` 在算固有尺寸时按 auto 处理 —— 于是
-                     * `<input>` 默认的 `size=20`（约 110px）会**反过来把列顶宽**：点一下"结束"列，
-                     * 83px → 111px，其它列被挤窄，看着就是抖一下。列宽本该由"最长的那份文本"决定，
-                     * 不该由输入框的默认尺寸决定。压到 1 个字符后，实际宽度仍由 w-full 铺满格子。
-                     *
-                     * 动作表看不出这毛病，只因为它的列表头名很长（autoHomingOffsetDist_ 之类）本来就
-                     * 超过 110px；它那两列窄的（id_ / abilityTag_）是只读的，不走这里。
-                     */
-                    size={1}
-                    // slim 那档钉 24px：动作表的行高由这个输入框撑出来，24 正好和表头一样高。
-                    className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
+                    // absolute inset-x-0 top-0：脱离文档流，于是它的固有宽度不参与列宽计算；
+                    // h-6（24px）仍是钉死的高度，和表头一样高，行高由别的格子撑着（见上面的注释）。
+                    className={`absolute inset-x-0 top-0 ${CELL_INPUT} h-6! ${mono ? "tabular-nums" : ""}`}
                 />
-            ) : (
-                <div
-                    tabIndex={0}
-                    onClick={() => setEditing(true)}
-                    onFocus={() => setEditing(true)}
-                    onKeyDown={(e) => onCopy(e, false)}
-                    className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
-                        value === "" ? "text-muted-foreground" : ""
-                    }`}
-                >
-                    {shown}
-                </div>
             )}
         </div>
     )
@@ -638,7 +636,6 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                                 ) : (
                                                     <EditableCell
                                                         mono
-                                                        slim
                                                         value={draft[action.id]?.[key] ?? ""}
                                                         placeholder={originals[action.id]?.[key]}
                                                         onCommit={(value) => editField(action.id, key, value)}
