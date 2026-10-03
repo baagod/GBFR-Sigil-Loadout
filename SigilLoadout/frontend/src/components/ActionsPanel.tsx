@@ -114,6 +114,31 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
                 if (draft !== value) onCommit(draft)
             }}
             onDoubleClick={onDoubleClick}
+            /**
+             * Ctrl+C：**直接复制整格文本**，不用先划选。
+             *
+             * 有选区时让浏览器自己处理（原生复制选中的那一截）；没选区才接管 —— 否则在没选中内容时
+             * 按 Ctrl+C 什么都不会发生。格子里没填值（显示的是占位符 = 原值）时复制那个原值。
+             */
+            onKeyDown={(e) => {
+                if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return
+                const input = e.currentTarget
+                if (input.selectionStart !== input.selectionEnd) return
+                const text = draft !== "" ? draft : (placeholder ?? "")
+                if (text === "") return
+                e.preventDefault()
+                void navigator.clipboard?.writeText(text).catch(console.error)
+            }}
+            /**
+             * 右键：格子里没有选区时，浏览器的**原生菜单**会把"复制"置灰，而原生菜单的项和禁用态
+             * JS 改不了。唯一不换自绘菜单的办法就是先把整格文本选上 —— 原生"复制"随即恢复可用，
+             * 复制到的也正是整格内容。注意：值本身为空（只显示占位符原值）时这招无效，
+             * 那种情况要"复制"可用只能换成自绘菜单。
+             */
+            onContextMenu={(e) => {
+                const input = e.currentTarget
+                if (input.selectionStart === input.selectionEnd) input.select()
+            }}
             placeholder={placeholder}
             /**
              * 按内容定宽：细节见 style.css 里 cell-fit 的说明（`field-sizing: content`，Chromium 123+，
