@@ -15,6 +15,7 @@
         "@dnd-kit/modifiers": "^9.0.0",
         "@dnd-kit/sortable": "^10.0.0",
         "@fontsource-variable/geist": "^5.3.0",
+        "@heroicons/react": "^2.2.0",
         "@wailsio/runtime": "latest",
         "class-variance-authority": "^0.7.1",
         "cn": "^0.3.0",
