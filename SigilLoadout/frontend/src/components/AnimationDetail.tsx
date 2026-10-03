@@ -381,16 +381,20 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                 <AccordionItem key={key} value={key}>
                                     {/* 标题与那排按钮**包在同一个 sticky 容器里**：只钉标题的话，不透明的标题
                                         会把压在它上面的按钮盖住（上一版就是这么翻车的 ✗）。容器是 sticky，
-                                        本身就是定位元素，所以里面那个 absolute 的按钮组跟着一起钉住。
+                                        本身就是定位元素，所以里面的工具条跟着一起钉住。
+                                        ⚠️ **这层不要改成 flex、触发器不要改内边距**：触发器靠"块级子元素占满整行
+                                        + 基类 py-4"决定行高与箭头的落点，改了这些就等于改了标题和箭头的位置。
+                                        工具条是**绝对定位叠上去**的一层，不参与这行的排版，所以怎么排都不动它俩。
                                         z-[60]：**必须高过表格里所有吸顶格**（表头 "#" 是 50、表体 "#" 是 40、焦点框是 30）。给 30 时表体那格会画到标题行上面（实测把标题整个盖住）。
                                         **这一层不给边框**：分区之间那条分隔线归 AccordionItem 的基类
                                         `not-last:border-b`（官方语义：每个 item 一条下边框，最后一个没有）——
                                         画在 item 的底边上，于是收起时在两个标题之间、展开时在内容**最下面**，
                                         最后一项自然没有。以前这里各画一条、还把基类顶掉，两处就都叠成了 2px。 */}
                                     <div className="sticky top-0 z-[60] bg-popover">
-                                        {/* pt-1 与 pb-4 都写明：基类是 py-4，twMerge 遇到"局部覆盖"会把 py-4
-                                            整条删掉（它没法只删一半），只写 pt-1 的话 pb 也没了。 */}
-                                        <AccordionTrigger className="pt-1 pb-4">
+                                        {/* py-2（8px）：行内上下内间距，替代基类的 py-4（16px）。行内只改这一处，
+                                            标题与箭头照旧由 Accordion 自己的布局决定。
+                                            写 py-2 而不是 pt-2：基类那条是 `py-4` 一对，twMerge 只删得掉整对。 */}
+                                        <AccordionTrigger className="py-2">
                                             <span className="flex w-full items-baseline gap-3">
                                                 <span>{trackLabel(info.kind)}</span>
                                                 <span className="text-xs text-muted-foreground">
@@ -400,19 +404,24 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                 </span>
                                             </span>
                                         </AccordionTrigger>
-                                        <TrackToolbar
-                                            t={t}
-                                            className="absolute top-1 right-10 z-10"
-                                            canCopy={count > 0}
-                                            // 插入只在"这张表里选中了行、且剪贴板是对应轨种类"时可用；
-                                            // 光标不在表格里（没选行）时它是灰的，Ctrl+V 同样要求先选行。
-                                            canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
-                                            canRemove={sel?.key === key}
-                                            onAdd={() => addRow(key)}
-                                            onCopy={() => copySelected(key, count, info.kind)}
-                                            onPaste={() => pasteBelow(key, info.kind)}
-                                            onRemove={() => removeSelected(key)}
-                                        />
+                                        {/* 工具条的容器：绝对定位叠在箭头左边（40px = 箭头 16 + 基类 mr-1.5 + 间隙）。
+                                            top-2 与触发器的 py-2 对应（8px），这样它跟标题、箭头在同一基线上；
+                                            h-4 + items-center 让按钮组的中心与箭头（size-4 = 16px）对齐，
+                                            容器比按钮矮，所以不会把这行撑高。 */}
+                                        <div className="absolute right-10 top-2 flex h-4 items-center">
+                                            <TrackToolbar
+                                                t={t}
+                                                canCopy={count > 0}
+                                                // 插入只在"这张表里选中了行、且剪贴板是对应轨种类"时可用；
+                                                // 光标不在表格里（没选行）时它是灰的，Ctrl+V 同样要求先选行。
+                                                canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
+                                                canRemove={sel?.key === key}
+                                                onAdd={() => addRow(key)}
+                                                onCopy={() => copySelected(key, count, info.kind)}
+                                                onPaste={() => pasteBelow(key, info.kind)}
+                                                onRemove={() => removeSelected(key)}
+                                            />
+                                        </div>
                                     </div>
                                     <AccordionContent className="pb-6">
                                         {info.kind === "flags" ? (
@@ -447,9 +456,10 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                 直接挂在 Trigger 上的话，它的父元素是 Base UI 生成的 Header（只有标题那么高），
                                 一滚就被带走了 —— 表现就是"别的都吸顶、FSM 不吸顶"。
                                 边框同前几个分区：归 AccordionItem 的基类 not-last:border-b；它是**最后一项**，
-                                所以收起展开都不带边框（与官方示例一致）。 */}
+                                所以收起展开都不带边框（与官方示例一致）。
+                                行高、边框、内边距全用 Accordion 的默认值，不再自定义。 */}
                             <div className="sticky top-0 z-[60] bg-popover">
-                                <AccordionTrigger className="pt-1 pb-4">{t.fsmScope}</AccordionTrigger>
+                                <AccordionTrigger className="py-2">{t.fsmScope}</AccordionTrigger>
                             </div>
                             {/* 最后一块**不给下间距**（轨道那块给 24px 是为了跟下一个标题拉开）：它下面
                                 没有标题了，留着就是一段空白 —— 表格底边会跟滚动区底边差出这么一截。 */}
