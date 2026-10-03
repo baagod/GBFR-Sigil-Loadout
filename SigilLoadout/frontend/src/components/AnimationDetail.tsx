@@ -377,11 +377,15 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                             const key = trackKey(info)
                             const count = info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0)
                             // 分区之间的那条线交给 AccordionItem 的基类 `not-last:border-b`：它画在 item
-                            // 的底边上 —— 收起时正好在两个标题之间，展开时在内容**最下面**，最后一项没有。
-                            // （以前用 not-last:border-b-0 把基类顶掉、改在每个标题那层画一条，结果
+                            // 的底边上 —— 收起时正好在两个标题之间（保留），展开时在内容**最下面**（去掉）。
+                            // （以前用 not-last:border-b-0 把基类整个顶掉、改在每个标题那层画一条，结果
                             // 收起时与下一个标题的上边框、展开时与表格容器的上边框各叠一次 = 2px。）
+                            //
+                            // 展开时去掉这条线：展开后表格自带四边边框，再在下面 40px 处画一条等于双线。
+                            // `data-[open]:not-last:border-b-0` 比基类多一个 `[data-open]` 属性选择器，
+                            // 特异度更高所以压得住，不必用 `!`；Base UI 展开时会给 item 挂 data-open。
                             return (
-                                <AccordionItem key={key} value={key}>
+                                <AccordionItem key={key} value={key} className="data-[open]:not-last:border-b-0">
                                     {/* 标题与那排按钮**包在同一个 sticky 容器里**：只钉标题的话，不透明的标题
                                         会把压在它上面的按钮盖住（上一版就是这么翻车的 ✗）。容器是 sticky，
                                         本身就是定位元素，所以里面的工具条跟着一起钉住。
@@ -427,7 +431,11 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                             />
                                         </div>
                                     </div>
-                                    <AccordionContent className="pb-6">
+                                    {/* 展开区的上下内间距 = 表格与展开区的间距：上 4px、下 16px。
+                                        写在**面板**上而不是给表格加 margin —— 面板收起时高度为 0
+                                        且 overflow:hidden，这两段间距跟着一起消失，所以"只有展开时"
+                                        是天然的，不需要额外判断展开状态。 */}
+                                    <AccordionContent className="pt-1 pb-4">
                                         {info.kind === "flags" ? (
                                             <FlagsGrid
                                                 rows={flags}
@@ -465,9 +473,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                             <div className="sticky top-0 z-[60] bg-popover">
                                 <AccordionTrigger className="py-2">{t.fsmScope}</AccordionTrigger>
                             </div>
-                            {/* 最后一块**不给下间距**（轨道那块给 24px 是为了跟下一个标题拉开）：它下面
-                                没有标题了，留着就是一段空白 —— 表格底边会跟滚动区底边差出这么一截。 */}
-                            <AccordionContent className="pb-0">
+                            {/* FSM 这块与轨道分区同一套间距：上 4px；**不给下间距** —— 它下面没有
+                                标题了，留着就是一段空白（滚动区底边会跟内容差出这么一截）。 */}
+                            <AccordionContent className="pt-1 pb-0">
                                 <div className="flex flex-wrap gap-2">
                                     {fsmNames.map((name) => (
                                         <Button
@@ -684,7 +692,7 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
             </div>
             <div
                 ref={gripRef}
-                title={gripLabel}
+                // 只留 aria-label（读屏用），**不给 title** —— title 会弹出原生悬停提示，按需求去掉。
                 aria-label={gripLabel}
                 {...attributes}
                 {...listeners}
@@ -693,7 +701,9 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
                     e.stopPropagation()
                     listeners?.onPointerDown?.(e)
                 }}
-                className={`flex w-8 shrink-0 cursor-grab touch-none items-center justify-center border-l text-base leading-none text-muted-foreground/60 select-none active:cursor-grabbing md:text-sm ${
+                // cursor-default：**要箭头，不要手**（与左边行号那半截一致）。刻意不用 cursor-grab ——
+                // 这一格只是"按住能拖"，按需求统一成普通箭头。
+                className={`flex w-8 shrink-0 cursor-default touch-none items-center justify-center border-l text-base leading-none text-muted-foreground/60 select-none md:text-sm ${
                     dragging ? "opacity-40" : ""
                 }`}
             >
