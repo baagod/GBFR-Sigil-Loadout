@@ -3,12 +3,9 @@ package service
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"sigilloadout/appfiles"
 )
 
 /*
@@ -24,8 +21,8 @@ attack / effect / speed 三种轨：与 flags 同一族（同一套 XML 布局�
 	  </AttackTrack>
 	</SeqRoot>
 
-三条规矩都是为了**没改过的轨能一个字节不差地写回去**（写回 mod 的 BXM 是拿这份 XML 转的，差一个字节
-就是另外一份文件）。下面每条都拿全部 17929 份轨、54777 行实测过：
+三条规矩都是为了**没改过的轨能一个字节不差地写回去**（改动的 XML 是拿这份拼出来的，再编成 BXM 进 mod，
+差一个字节就是另外一份文件）。下面每条都拿全部 17929 份轨、54777 行实测过：
 
   - 列 = 所有 <Seq> 属性的并集，顺序按**首次出现**；每行只写自己有的那些，缺的**不补**。
     （全库 0 份存在"某行属性顺序 ≠ 并集顺序"，所以按并集顺序写出来就是原顺序。）
@@ -43,7 +40,7 @@ type TrackInfo struct {
 	Rows int    `json:"rows"`
 }
 
-// TrackTable 是一条轨的整份内容。Sub/Kind 是它的身份（写回哪个文件要靠它俩），Columns 是表头，
+// TrackTable 是一条轨的整份内容。Sub/Kind 是它的身份（改动表与包内条目名都靠它俩），Columns 是表头，
 // ChildColumns 是子元素（<AilmentNN>）的表头；行里没有的列**没有那个键**（缺的属性不补）。
 type TrackTable struct {
 	Sub          string     `json:"sub"`
@@ -102,8 +99,11 @@ func isTrackKind(kind string) bool {
 	return false
 }
 
-// trackXMLPath 是某条轨的源文件：<角色>_<动画号>_<子轨号>_seq_edit_<种类>.xml —— 解包时已经离线转成
-// XML 躺在那儿，读它不需要任何工具。
+// trackXMLPath 是某条轨在**解包目录**里的落点：<角色>_<动画号>_<子轨号>_seq_edit_<种类>.xml。
+//
+// 它现在有两个用处：一是三个身份（动画号 / 子轨号 / 种类）的校验（它们都会被拼进文件名与包内条目名，
+// 所以每个入口都得先过这一关），二是随包资产里没有这条轨时回头读这里（见 actiontrackedits.go 的
+// trackPrimalXML）。数据的家是随包资产，不是这儿。
 func trackXMLPath(cfg actionConfig, motion, sub, kind string) (string, error) {
 	if !isMotion(motion) {
 		return "", fmt.Errorf("动画号 %q 不是四位十六进制小写（例如 3400）", motion)
@@ -262,6 +262,9 @@ func trackAttr(attrs []xml.Attr, name string) string {
 ListTracks 列出这个动画有的所有轨（界面上的「Attack 3 行」）。行数就是 <Seq> 的条数——不靠数标签，
 是真解析一遍：这几份文件都很小，解析一次的代价换来的是"行数"跟加载出来的表永远一致。
 
+轨有三个来路，并起来（同一个身份去重）：随包那份包、解包目录、以及这个角色的改动表。最后一条是为了
+"改过、但原始里没有这条轨"的情况——少了它，改完一刷新那条轨就从界面上消失了。
+
 没有轨的动画（比如只有动作表里那一行、没有对应轨文件）返回空表，不是错误：那是正常情况。
 */
 func (s *ActionsService) ListTracks(motion string) ([]TrackInfo, error) {
@@ -270,26 +273,47 @@ func (s *ActionsService) ListTracks(motion string) ([]TrackInfo, error) {
 	}
 	cfg := s.config()
 	char := charCode(cfg)
+
+	refs := map[trackRef]bool{}
+	names, err := trackAssetNames()
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range names {
+		if ref, ok := parseTrackAssetName(name, char, motion); ok {
+			refs[ref] = true
+		}
+	}
 	matches, err := filepath.Glob(filepath.Join(cfg.FlagsDir, fmt.Sprintf("%s_%s_*_seq_edit_*.xml", char, motion)))
 	if err != nil {
 		return nil, fmt.Errorf("找轨文件: %w", err)
 	}
-
-	infos := make([]TrackInfo, 0, len(matches))
 	for _, path := range matches {
-		sub, kind, ok := parseTrackName(filepath.Base(path), char, motion)
-		if !ok {
-			continue
+		if sub, kind, ok := parseTrackName(filepath.Base(path), char, motion); ok {
+			refs[trackRef{motion: motion, sub: sub, kind: kind}] = true
 		}
-		raw, err := os.ReadFile(path)
+	}
+	edits, err := loadTrackEdits()
+	if err != nil {
+		return nil, err
+	}
+	for _, edit := range edits {
+		if edit.Char == char && edit.Motion == motion {
+			refs[edit.ref()] = true
+		}
+	}
+
+	infos := make([]TrackInfo, 0, len(refs))
+	for ref := range refs {
+		raw, err := trackSourceXML(cfg, edits, ref.motion, ref.sub, ref.kind)
 		if err != nil {
-			return nil, fmt.Errorf("读轨 %s: %w", path, err)
+			return nil, err
 		}
 		table, err := parseTrackXML(raw)
 		if err != nil {
 			return nil, err
 		}
-		infos = append(infos, TrackInfo{Sub: sub, Kind: kind, Rows: len(table.Rows)})
+		infos = append(infos, TrackInfo{Sub: ref.sub, Kind: ref.kind, Rows: len(table.Rows)})
 	}
 	// 分区顺序固定成 flags / attack / effect / speed，同一分区里按子轨号。
 	sort.Slice(infos, func(i, j int) bool {
@@ -315,16 +339,16 @@ func parseTrackName(base, char, motion string) (sub, kind string, ok bool) {
 	return sub, kind, true
 }
 
-// LoadTrack 读一条轨（通用解析，见文件头）。
+// LoadTrack 读一条轨（通用解析，见文件头）。改过就是这个角色的改动，没改过就是随包的原始数据。
 func (s *ActionsService) LoadTrack(motion, sub, kind string) (*TrackTable, error) {
 	cfg := s.config()
-	path, err := trackXMLPath(cfg, motion, sub, kind)
+	edits, err := loadTrackEdits()
 	if err != nil {
 		return nil, err
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := trackSourceXML(cfg, edits, motion, sub, kind)
 	if err != nil {
-		return nil, fmt.Errorf("读轨 %s: %w", path, err)
+		return nil, err
 	}
 	table, err := parseTrackXML(raw)
 	if err != nil {
@@ -335,30 +359,39 @@ func (s *ActionsService) LoadTrack(motion, sub, kind string) (*TrackTable, error
 }
 
 /*
-SaveTracks 一次把若干条改过的轨写完并部署（界面上详情页那一个「保存」）。
+SaveTracks 一次把若干条改过的轨记下来并部署（界面上详情页那一个「保存」）。
 
-先写回各自源 XML（下一次读到的就是刚存下的），再逐条转 BXM 搬进 mod —— 与 flags 的保存走同一段管线
-（同一把锁、同一个临时目录、同一个部署函数，见 writeAndDeployTracks）。
+**不写源文件**：改动进用户目录的 track_edits.json（原始数据永远只读，见 actiontrackedits.go），
+部署时"改动（没有改动就是原始）→ BXM"写进 mod —— 所以 mod 里是完整成品，不是补丁。
+
+与 flags 的保存走同一段管线（同一把锁、同一个部署函数，见 writeAndDeployTracks）。
 */
 func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cfg := s.config()
+	char := charCode(cfg)
+	edits, err := loadTrackEdits()
+	if err != nil {
+		return err
+	}
 	items := make([]trackWrite, 0, len(tables))
 	for _, table := range tables {
-		path, err := trackXMLPath(cfg, motion, table.Sub, table.Kind)
-		if err != nil {
+		// 身份先校验（它们都会被拼进文件名）：不认的写法不该有机会进改动表。
+		if _, err := trackXMLPath(cfg, motion, table.Sub, table.Kind); err != nil {
 			return err
 		}
 		raw, err := buildTrackXML(&table)
 		if err != nil {
 			return err
 		}
-		if err := appfiles.WriteAtomic(path, raw); err != nil {
-			return err
-		}
+		ref := trackRef{motion: motion, sub: table.Sub, kind: table.Kind}
+		edits = setTrackEdit(edits, char, ref, string(raw))
 		items = append(items, trackWrite{motion: motion, sub: table.Sub, kind: table.Kind, raw: raw})
+	}
+	if err := saveTrackEdits(edits); err != nil {
+		return err
 	}
 	return s.writeAndDeployTracks(cfg, items)
 }

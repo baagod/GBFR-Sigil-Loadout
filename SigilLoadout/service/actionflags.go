@@ -9,8 +9,8 @@ import (
 
 /*
 flags 轨：解包时已经离线转成 XML（就摆在角色自己的解包目录里，见 actionsservice.go 的 defaultFlagsDir），
-所以读是**直接读 XML**，不碰转换工具；只有写回 mod 那一步要 BXM，才需要跑一次 xml-to-bxm（见
-actionsservice.go 的 deployFlags）。
+所以读是**直接读 XML**；写回 mod 那一步要 BXM，由 bxm.go 自己编（不起了任何外部进程，见
+actionsservice.go 的 writeAndDeployTracks）。
 
 XML 的形状（对面那个工具的样子，属性顺序也就是写出时的顺序）：
 

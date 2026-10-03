@@ -60,7 +60,10 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     'limit_bonus.json', 'limit_bonus.zh.json', 'limit_bonus.en.json', 'limit_bonus.ja.json',
     'limit_bonus.ko.json', 'chara.json',
     # 专精技能页那两张：缺了 loadSkillboardTables 直接返错，工具启动即挂。
-    'skillboard.json', 'skillboard.zh.json')
+    'skillboard.json', 'skillboard.zh.json',
+    # 轨的原始数据（17929 份 .bxm，约 8.8 MB）：少了它，除了作者本机（那边有解包目录兜底），
+    # 别人的轨一页会全是空的。
+    'tracks.zip')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }

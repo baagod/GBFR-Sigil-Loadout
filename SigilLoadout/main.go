@@ -46,8 +46,8 @@ func main() {
 	editService := &service.EditService{}
 	limitBonusService := &service.LimitBonusService{}
 	skillboardService := &service.SkillboardService{}
-	// 动作表这一页没有防抖：它写的是解包出来的数据文件，保存一次要跑一次 GBFRDataTools，不能像
-	// 编辑列表那样每次按键都往待写里丢（见 service/actionsservice.go）。
+	// 动作表这一页没有防抖：它写的是解包出来的数据文件，保存是"整份读-改-写"，不能像编辑列表那样
+	// 每次按键都往待写里丢（见 service/actionsservice.go）。
 	actionsService := &service.ActionsService{}
 	// 外壳（窗口显隐与托盘）跟载荷数据无关，自成一体（见 service/shellservice.go）。托盘菜单在这里就造：
 	// NewMenu / NewMenuItem 只碰包内一张表、不碰 globalApplication，所以能在 application.New() 之前造；

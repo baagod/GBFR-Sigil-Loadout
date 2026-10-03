@@ -12,9 +12,9 @@ import (
 /*
 通用轨的**字节级往返**：拿一份真实轨读进来 → 解析 → 拼回去，必须逐字节相同。
 
-为什么较真到一个字节：mod 要的 BXM 是拿这份 XML 转出来的，多一个空格、少一位小数、把属性挪个位置，
-转出来就是另外一份文件（对面那个工具认的是它自己的书写格式）。夹具用仓库里的 testdata，**不取解包目录**
-——那边同时是编辑器的工作副本，界面上保存一次就变了。
+为什么较真到一个字节：mod 要的 BXM 是拿这份 XML 编出来的，多一个空格、少一位小数、把属性挪个位置，
+编出来就是另外一份文件（对面那个工具认的是它自己的书写格式，而我们的编码与它逐字节对齐）。夹具用仓库
+里的 testdata，**不取真实的解包目录**——那是作者手边的一份工作副本。
 
 四种轨都至少一份；attack 另外单挑一份带 16 个 <AilmentNN> 子元素的（通用解析里唯一有嵌套的分支）。
 */
@@ -235,15 +235,12 @@ func contains(haystack []string, needle string) bool {
 }
 
 /*
-一次保存要转的轨是**一批一起转**的（工具吃得下整个目录，一个进程搞定），所以这里一次存两条：
-两条的 BXM 都得落进 mod 目录，并且各自与"工具直接转这份 XML"的结果一致。
-批量模式最容易错的就是名字对不上 —— 这个测试盯的就是它。
+一次保存两条轨：两条的 BXM 都得落进 mod 目录，并且各自与"工具直接转这份 XML"的结果一致。
+批量最容易错的就是名字对不上 —— 这个测试盯的就是它。
 */
 func TestSaveTracksConvertsTheWholeBatchInOneGo(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
-	if _, err := os.Stat(cfg.ToolPath); err != nil {
-		t.Skipf("这台机器上没有转换工具 %s", cfg.ToolPath)
-	}
+	toolForTest(t) // 没有工具就跳过：下面要拿它当尺子
 	// 夹具按**目标名字**放：文件名就是轨的身份（角色_动画_子轨_seq_edit_种类），
 	// sampleTrack 是照原名复制的，这里两份的名字与 3400 对不上，所以自己写。
 	kinds := []struct{ kind, fixture string }{
@@ -283,7 +280,7 @@ func TestSaveTracksConvertsTheWholeBatchInOneGo(t *testing.T) {
 		if string(deployed[:3]) != "BXM" {
 			t.Fatalf("%s 部署出去的不是 BXM（头三个字节 % x）", spec.kind, deployed[:3])
 		}
-		if want := convertForTest(t, cfg.ToolPath, source); !bytes.Equal(deployed, want) {
+		if want := convertForTest(t, source); !bytes.Equal(deployed, want) {
 			t.Fatalf("%s 部署出去的 BXM 与工具直接转源 XML 的结果不是同一份", spec.kind)
 		}
 	}

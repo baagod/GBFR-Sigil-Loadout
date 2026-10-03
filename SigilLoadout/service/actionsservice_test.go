@@ -6,9 +6,11 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -39,6 +41,13 @@ func actionsFixture(t *testing.T) (*ActionsService, actionConfig, string) {
 	previousModDir := actionsModDir
 	actionsModDir = modDir
 	t.Cleanup(func() { actionsModDir = previousModDir })
+
+	// 随包那份轨数据也钉在 fixture 自己的根下（它一开始**不存在**）：测试进程的 exe 是 go test 的临时
+	// 产物，本来就没有 assets\，但显式钉一下才不怕哪天在别处跑时撞上真实安装里的那份包——那会让
+	// "从解包目录兜底"这类测试悄悄变成测别的东西。要测资产这一条来路的自己写一份（writeTrackAsset）。
+	previousTracksAsset := tracksAssetPath
+	tracksAssetPath = filepath.Join(root, "assets", tracksAssetName)
+	t.Cleanup(func() { tracksAssetPath = previousTracksAsset })
 
 	service := &ActionsService{}
 	if err := service.SetPath(actionPath); err != nil {
@@ -75,11 +84,12 @@ func sampleActionTable(t *testing.T, cfg actionConfig) {
 }
 
 /*
-sampleFlags 把某个 motion 的 flags XML 拷进 fixture。
+sampleFlags 把某个 motion 的 flags XML 放进 fixture 的**解包目录**（走的是兜底那条来路）。
 
-样本取自仓库里的 testdata，**不取解包目录**：那边的 XML 同时是编辑器的工作副本——在界面上保存 flags 会
-就地改它。拿它当断言对象，等于把"用户改过什么"当成期望值：这条样本（pl1000_3400）就因为被加了 7 行而
-把 TestLoadFlagsParsesTheTrack 顶红过一次。样本没了是**测试自己的事**，所以这里 Fatal 而不是 Skip。
+样本取自仓库里的 testdata，**不取真实的解包目录**：那是作者手边的一份工作副本。拿它当断言对象，等于把
+"他改过什么"当成期望值：这条样本（pl1000_3400）就因为被加了 7 行而把 TestLoadFlagsParsesTheTrack 顶红过
+一次（那时候保存还会就地改解包目录里的 XML；现在不会了，但这条规矩照旧）。样本没了是**测试自己的事**，
+所以这里 Fatal 而不是 Skip。
 */
 func sampleFlags(t *testing.T, cfg actionConfig, motion string) {
 	t.Helper()
@@ -300,8 +310,8 @@ func TestActionPathsAreSettings(t *testing.T) {
 	if err := jsonv2.Unmarshal(raw, &saved); err != nil {
 		t.Fatalf("actions.json 不是合法 JSON（%v）:\n%s", err, raw)
 	}
-	// 只写被改过的那一栏：没配过的三栏在文件里是空的，读的时候才回默认值。
-	if saved.Path != actionPath || saved.FlagsDir != "" || saved.FsmDir != "" || saved.ToolPath != "" {
+	// 只写被改过的那一栏：没配过的两栏在文件里是空的，读的时候才回默认值。
+	if saved.Path != actionPath || saved.FlagsDir != "" || saved.FsmDir != "" {
 		t.Fatalf("actions.json 里存的是 %+v", saved)
 	}
 
@@ -314,6 +324,37 @@ func TestActionPathsAreSettings(t *testing.T) {
 	}
 	if got := service.Path(); got != actionPath {
 		t.Fatalf("被拒的设置把配好的那份改成了 %q", got)
+	}
+}
+
+/*
+老配置里**多出来的键不能算解析失败**。
+
+用户的 actions.json 里还留着 "toolPath"（那个设置随外部转换工具一起去掉了），而 loadActionConfig 把
+"解析不了"当成"还没配过" —— 一旦哪天觉得不认识的键该报错，用户其余三个路径会跟着一起悄悄回到默认值。
+这条测试钉的是这个依赖（当前是 encoding/json/v2 的默认行为，不是我们额外做了什么）。
+*/
+func TestActionConfigToleratesARemovedSetting(t *testing.T) {
+	hermeticHome(t)
+	path := actionConfigPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`{
+  "path": "C:\\x\\system\\player\\data\\pl2900\\pl2900_action.msg",
+  "flagsDir": "C:\\x\\pl\\pl2900",
+  "fsmDir": "C:\\x\\system\\fsm\\pl2900",
+  "toolPath": "C:\\gone\\GBFRDataTools.exe",
+  "ids": ["4", "6"]
+}`)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := loadActionConfig()
+	if cfg.Path != `C:\x\system\player\data\pl2900\pl2900_action.msg` || cfg.FlagsDir != `C:\x\pl\pl2900` ||
+		cfg.FsmDir != `C:\x\system\fsm\pl2900` || !slices.Equal(cfg.IDs, []string{"4", "6"}) {
+		t.Fatalf("带 toolPath 的旧配置没读全（被整份当成了没配过）: %+v", cfg)
 	}
 }
 
@@ -370,7 +411,6 @@ func TestSetCharacterSwapsAllThreePaths(t *testing.T) {
 		{"动作表", got.Path, filepath.Join(filepath.Dir(filepath.Dir(cfg.Path)), "pl2900", "pl2900_action.msg")},
 		{"flags 目录", got.FlagsDir, filepath.Join(filepath.Dir(cfg.FlagsDir), "pl2900")},
 		{"FSM 目录", got.FsmDir, filepath.Join(filepath.Dir(cfg.FsmDir), "pl2900")},
-		{"转换工具", got.ToolPath, cfg.ToolPath}, // 与角色无关，不许被顺手改掉
 	} {
 		if want.got != want.expect {
 			t.Fatalf("%s 变成了 %q，want %q", want.what, want.got, want.expect)
@@ -691,15 +731,14 @@ func TestEveryFlagsXMLRoundTripsByteForByte(t *testing.T) {
 }
 
 /*
-flags 那边整条链路：读 XML → 原样写回（源文件一个字节不变）→ 部署到 mod 的是工具转出来的 BXM。
-与"直接让工具转没动过的那份 XML"对齐，说明我们拼的 XML 与源文件是等价的。
+flags 那边整条链路（走的是"解包目录兜底"这条来路，因为 fixture 里没有随包资产）：
+读 XML → 保存（**源文件一个字节不变**，改动进 track_edits.json）→ 部署到 mod 的是我们编出来的 BXM。
+与"直接让工具转那份 XML"对齐，说明我们拼的 XML 与它读进来的是等价的。
 */
 func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
 	sampleFlags(t, cfg, "3400")
-	if _, err := os.Stat(cfg.ToolPath); err != nil {
-		t.Skipf("这台机器上没有转换工具 %s", cfg.ToolPath)
-	}
+	toolForTest(t) // 没有工具就跳过：下面要拿它当尺子
 
 	source := filepath.Join(cfg.FlagsDir, "pl1000_3400_0_seq_edit_flags.xml")
 	before, err := os.ReadFile(source)
@@ -720,7 +759,7 @@ func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(before, after) {
-		t.Fatalf("原样写回却改了源 XML（在第 %d 个字节起不一样）", diffBytes(before, after))
+		t.Fatalf("保存动了源 XML（在第 %d 个字节起不一样）：原始数据必须只读", diffBytes(before, after))
 	}
 
 	deployed, err := os.ReadFile(filepath.Join(modDir, "pl", "pl1000", "pl1000_3400_0_seq_edit_flags.bxm"))
@@ -730,26 +769,38 @@ func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 	if string(deployed[:3]) != "BXM" {
 		t.Fatalf("部署出去的不是 BXM（头三个字节 % x）", deployed[:3])
 	}
-	if want := convertForTest(t, cfg.ToolPath, before); !bytes.Equal(deployed, want) {
-		t.Fatal("部署出去的 BXM 与工具直接转源 XML 的结果不是同一份")
+	if want := convertForTest(t, before); !bytes.Equal(deployed, want) {
+		t.Fatal("部署出去的 BXM 与工具直接转那份 XML 的结果不是同一份")
 	}
 
-	// 改一行：源文件与部署出去的那份都要跟着变。
+	// 改一行：改动表与部署出去的那份都要跟着变，而源 XML 仍然一个字节不动。
 	rows[0].Flag0 = "8192"
 	if err := service.SaveFlags("3400", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}
-	changed, err := os.ReadFile(source)
+	untouched, err := os.ReadFile(source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(changed), `Flag0="8192"`) {
-		t.Fatalf("改过的掩码没写回源 XML:\n%s", changed)
+	if !bytes.Equal(before, untouched) {
+		t.Fatal("改一行的保存也动了源 XML：原始数据必须只读")
+	}
+	edited, err := os.ReadFile(trackEditsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(edited), `Flag0=\"8192\"`) {
+		t.Fatalf("改过的掩码没进 %s:\n%s", trackEditsName, edited)
 	}
 }
 
-// convertForTest 让工具把一份 XML 转成 BXM：测试自己的参照物。
-func convertForTest(t *testing.T, toolPath string, xml []byte) []byte {
+/*
+convertForTest 是**测试自己的**参照物：让 GBFRDataTools 把一份 XML 转成 BXM。
+
+它已经不是这个项目的一部分了（部署轨由 bxm.go 自己编解码，一个进程都不起），留着它是为了那条约定还能
+在真实的保存路径上再验一遍："我们写出的字节 == 工具写出的字节"。
+*/
+func convertForTest(t *testing.T, xml []byte) []byte {
 	t.Helper()
 	dir := t.TempDir()
 	in := filepath.Join(dir, "in.xml")
@@ -757,8 +808,11 @@ func convertForTest(t *testing.T, toolPath string, xml []byte) []byte {
 	if err := os.WriteFile(in, xml, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := xmlToBxm(toolPath, in, out); err != nil {
-		t.Fatal(err)
+	cmd := exec.Command(toolForTest(t), "xml-to-bxm", "-i", in, "-o", out)
+	// 控制台程序：从 GUI 里起会弹个黑框一闪而过，测试里一样藏着。
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("xml-to-bxm 失败: %v\n%s", err, strings.TrimSpace(string(output)))
 	}
 	raw, err := os.ReadFile(out)
 	if err != nil {
@@ -767,15 +821,27 @@ func convertForTest(t *testing.T, toolPath string, xml []byte) []byte {
 	return raw
 }
 
+// toolForTest 找 GBFRDataTools.exe：设了 GBFR_DATA_TOOLS 就用它，否则用这台机器解包工作区里那份；
+// 两个都没有就跳过 —— 拿工具当尺子的这几条对照在别的机器上跑不了，那不该算失败。
+func toolForTest(t *testing.T) string {
+	t.Helper()
+	if path := os.Getenv("GBFR_DATA_TOOLS"); path != "" {
+		return path
+	}
+	const devPath = `D:\Games\Relink\gen\GBFRDataTools\GBFRDataTools.exe`
+	if _, err := os.Stat(devPath); err != nil {
+		t.Skipf("没有 GBFRDataTools（设 GBFR_DATA_TOOLS 指过去就能跑这几条对照），跳过")
+	}
+	return devPath
+}
+
 // Deploy：动作表总是搬；flags 轨只搬这次会话改过的 motion（别的 motion 一份都不该出现在 mod 里）。
 func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
 	sampleActionTable(t, cfg)
 	sampleFlags(t, cfg, "3400")
 	sampleFlags(t, cfg, "3451")
-	if _, err := os.Stat(cfg.ToolPath); err != nil {
-		t.Skipf("这台机器上没有转换工具 %s", cfg.ToolPath)
-	}
+	toolForTest(t) // 没有工具就跳过：下面要拿它当尺子
 
 	if err := service.Deploy(); err != nil {
 		t.Fatalf("Deploy: %v", err)

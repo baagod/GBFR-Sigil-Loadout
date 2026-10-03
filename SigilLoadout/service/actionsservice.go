@@ -1,7 +1,10 @@
-// 「角色动作表」这一页的服务：读动作表（msgpack）与某个 motion 的 flags 轨（XML），改完写回源、
-// 部署到 Mods。
+// 「角色动作表」这一页的服务：读动作表（msgpack）与轨（flags / attack / effect / speed），把改动记进
+// 用户目录、部署到 Mods。
 //
-// 游戏本体一个字节都不碰：动的全是 gen\extracted 下的解包副本，产物落到 Reloaded-II 的 mod 目录。
+// 三份数据都是**原始只读 + 改动另存**（见 actionedits.go / actiontrackedits.go）：原始随包发布，
+// 任何一次保存都不碰它；mod 里装的是合成出来的完整成品。
+//
+// 游戏本体一个字节都不碰：原始是 exe 旁 assets\ 里的资产，产物落到 mod 目录 GBFR\data\。
 package service
 
 import (
@@ -11,55 +14,57 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 
 	"sigilloadout/appfiles"
 )
 
 /*
-这一页要动的三份数据，各自的默认位置都在这台机器的解包目录下：
+三个路径设置：它们是**解包目录的兜底来路**，不是数据的家 —— 原始数据随包发布（动作表走
+assets\<角色码>_action.msg，轨走 assets\tracks.zip），只有资产里没有那一条时才回头读这里。
 
 	动作表源：D:\Games\Relink\gen\extracted\system\player\data\pl1000\pl1000_action.msg   （msgpack）
-	flags 源：D:\Games\Relink\gen\extracted\pl\pl1000\                                     （XML）
+	flags 源：D:\Games\Relink\gen\extracted\pl\pl1000\                                     （.bxm 或 .xml）
 	FSM 源  ：D:\Games\Relink\gen\extracted\system\fsm\pl1000\                             （msgpack）
 
-flags 的 XML 是 **转在角色自己那个解包目录里**的（和该角色的 .bxm/.mot 摆在一起），不是单独一个
+解包目录里的轨是**转在角色自己那个目录里**的（和该角色的 .bxm/.mot 摆在一起），不是单独一个
 `pl1000_xml\`；布局与 FSM 一致（都是 <根>\<角色>\）。
 
-三个都是设置项（见 actions.json），下面只是没配过时的默认值；第四个设置是转换工具（只有部署 flags
-轨时用得上）。角色码（pl1000）从**动作表的所在目录**取（<根>\system\player\data\<角色>\），flags 与
-FSM 的文件名都带它——换角色只需换动作表这一个设置。
+角色码（pl1000）从**动作表的所在目录**取（<根>\system\player\data\<角色>\），flags 与 FSM 的文件名
+都带它——换角色只需换动作表这一个设置。FSM 那一块**还没有随包资产**，仍然只从解包目录读。
+
+**这里以前还有第四个设置：XML → BXM 的转换工具（GBFRDataTools.exe）。** BXM 的编解码已经在自己手里
+（bxm.go），那个外部 exe、它的路径、以及那个设置项都不再需要 —— 部署轨时不再起任何进程。
 */
 const (
 	defaultActionTablePath = `D:\Games\Relink\gen\extracted\system\player\data\pl1000\pl1000_action.msg`
 	defaultFlagsDir        = `D:\Games\Relink\gen\extracted\pl\pl1000`
 	defaultFsmDir          = `D:\Games\Relink\gen\extracted\system\fsm\pl1000`
-	defaultActionToolPath  = `D:\Games\Relink\gen\GBFRDataTools\GBFRDataTools.exe`
 )
 
-// actionsModDir 是部署目标：Reloaded-II 那个 mod 的数据目录，产物按游戏原本的布局放进去
-// （<mod>\system\player\data\<角色>\<角色>_action.msg、<mod>\pl\<角色>\<角色>_<motion>_0_seq_edit_flags.bxm）。
-// **写死**，不做成设置项。
+// actionsModDir 是部署目标：**本工具自己**的 mod 数据目录 —— exe 就躺在 mod 根下，产物按游戏原本的
+// 布局放进去（GBFR\data\system\player\data\<角色>\<角色>_action.msg、
+// GBFR\data\pl\<角色>\<角色>_<motion>_<子轨>_seq_edit_<种类>.bxm）。
 //
-// 它是 var 只为一件事：测试要把它指到临时目录——照这个常量写文件等于改用户的 mod。
-var actionsModDir = `C:\Users\baago\Desktop\Reloaded-II\Mods\GBFR.ActionBuffTest\GBFR\data`
+// 以前这里写死的是作者本机那个试验 mod（Mods\GBFR.ActionBuffTest）—— 发布版往**别人的** mod 里写东西，
+// 那份产物就发不出去。现在跟着 exe 走：mod 铺到哪就写哪，换台机器不用改代码。
+//
+// 它是 var 只为一件事：测试要把它指到临时目录——照这个路径写文件等于改用户的 mod。
+var actionsModDir = filepath.Join(appfiles.ExeDir(), "GBFR", "data")
 
 // actionsConfigName 住在用户目录（appfiles.UserDir()），和 loadout.json 挨着：这一页唯一的设置。
 const actionsConfigName = "actions.json"
 
-// actionConfig 是 actions.json 的形状：四个路径 + 一份记录清单。缺哪一栏就用它自己的默认值
+// actionConfig 是 actions.json 的形状：三个路径 + 一份记录清单。缺哪一栏就用它自己的默认值
 // （见 loadActionConfig）——手写一份只写了其中一行的文件是常事。
 type actionConfig struct {
 	Path     string   `json:"path"`
 	FlagsDir string   `json:"flagsDir"`
 	FsmDir   string   `json:"fsmDir"`
-	ToolPath string   `json:"toolPath"`
 	IDs      []string `json:"ids"`
 }
 
@@ -94,12 +99,11 @@ var defaultActionIDs = []string{"4", "6", "954"}
 
 // ActionsService 是这一页的服务。
 //
-// 它比别的 service 多一份锁，护的是两件事：GBFRDataTools 同一时刻只能有一个实例（它读游戏归档会锁
-// 文件），而动作表是**整份读-改-写**（两次并发保存会互相盖掉）。读取不占锁：写入是原子的，读到的
-// 要么是旧的、要么是新的。
+// 它比别的 service 多一份锁，护的是**整份读-改-写**：动作表与轨都是"读一份、改、整份写出去"，
+// 两次并发保存会互相盖掉。读取不占锁：写入是原子的，读到的要么是旧的、要么是新的。
 type ActionsService struct {
 	mu sync.Mutex
-	// touched 是这次会话改过的**轨**：解包目录里几万份轨绝大多数跟这一页无关，部署时不该把没动过的
+	// touched 是这次会话改过的**轨**：随包那份包里 17929 条轨绝大多数跟这一页无关，部署时不该把没动过的
 	// 也搬过去（搬了还会盖掉别处的手工改动）。
 	touched map[trackRef]bool
 }
@@ -120,10 +124,6 @@ func (s *ActionsService) FlagsDir() string { return s.config().FlagsDir }
 // FsmDir 是这个角色的 FSM（.msg）所在目录。
 func (s *ActionsService) FsmDir() string { return s.config().FsmDir }
 
-// ToolPath 是 XML → BXM 的转换工具：整页只有"部署 flags 轨"这一步用得上它（读的是已经转好的 XML，
-// 写回动作表是纯 Go 的事）。
-func (s *ActionsService) ToolPath() string { return s.config().ToolPath }
-
 func (s *ActionsService) SetPath(p string) error {
 	return saveActionPath("动作表", p, func(c *actionConfig, path string) { c.Path = path })
 }
@@ -134,10 +134,6 @@ func (s *ActionsService) SetFlagsDir(dir string) error {
 
 func (s *ActionsService) SetFsmDir(dir string) error {
 	return saveActionPath("FSM 目录", dir, func(c *actionConfig, path string) { c.FsmDir = path })
-}
-
-func (s *ActionsService) SetToolPath(p string) error {
-	return saveActionPath("转换工具", p, func(c *actionConfig, path string) { c.ToolPath = path })
 }
 
 // ActionIDs 是当前那份记录清单，**空格分隔**——界面工具栏上那个输入框拿它回填。
@@ -229,8 +225,8 @@ characterPaths 算出某个角色的三条路径，**三条都存在**才返回�
 	<根>\pl\<码>            ← flags 的 XML 转在角色自己的目录里，和 .bxm 摆在一起
 	<根>\system\fsm\<码>    ← FSM 同样是"一个角色一个目录"
 
-每一栏都是从**当前那一栏**换掉角色码得来的，所以解包根在哪、盘符是什么都不用另配。转换工具与角色无关，
-原样留着。三条一起校验、一起落盘：saveActionPath 那种一条一写的做法会留下半新半旧的配置，面板就指到
+每一栏都是从**当前那一栏**换掉角色码得来的，所以解包根在哪、盘符是什么都不用另配。
+三条一起校验、一起落盘：saveActionPath 那种一条一写的做法会留下半新半旧的配置，面板就指到
 两个角色上去了。
 */
 func characterPaths(cfg actionConfig, code string) (actionConfig, error) {
@@ -238,7 +234,6 @@ func characterPaths(cfg actionConfig, code string) (actionConfig, error) {
 		Path:     filepath.Join(filepath.Dir(filepath.Dir(cfg.Path)), code, code+"_action.msg"),
 		FlagsDir: filepath.Join(filepath.Dir(cfg.FlagsDir), code),
 		FsmDir:   filepath.Join(filepath.Dir(cfg.FsmDir), code),
-		ToolPath: cfg.ToolPath,
 	}
 	for _, one := range []struct{ what, path string }{
 		{"动作表", next.Path},
@@ -252,7 +247,7 @@ func characterPaths(cfg actionConfig, code string) (actionConfig, error) {
 	return next, nil
 }
 
-// config 是当前生效的四个路径与记录清单：设置里空着的那几栏回默认值。
+// config 是当前生效的三个路径与记录清单：设置里空着的那几栏回默认值。
 //
 // **每次现算**（同 editlist.go 的规矩）：它走 appfiles.UserDir()，而测试靠 Setenv 换 LOCALAPPDATA。
 func (s *ActionsService) config() actionConfig {
@@ -266,9 +261,6 @@ func (s *ActionsService) config() actionConfig {
 	if strings.TrimSpace(cfg.FsmDir) == "" {
 		cfg.FsmDir = defaultFsmDir
 	}
-	if strings.TrimSpace(cfg.ToolPath) == "" {
-		cfg.ToolPath = defaultActionToolPath
-	}
 	if len(cfg.IDs) == 0 {
 		cfg.IDs = defaultActionIDs
 	}
@@ -276,7 +268,12 @@ func (s *ActionsService) config() actionConfig {
 }
 
 // loadActionConfig 只读文件。没有文件、读不出来、解析不了，一律当"还没配过"：这一步只是要在界面上
-// 显示四个路径，为它报错只会让那一页打不开（真正读数据时读不到，会在那边报出来）。
+// 显示那几个路径，为它报错只会让那一页打不开（真正读数据时读不到，会在那边报出来）。
+//
+// "解析不了就当没配过"这条规矩之下，**老配置里多出来的键必须被忽略、不能算解析失败**：转换工具那个
+// 设置已经删了，而用户的 actions.json 里还留着 "toolPath"；要是它算失败，其余三个路径会一起回到
+// 默认值。encoding/json/v2 默认就是忽略不认识的键（实测过，不是想当然），
+// TestActionConfigToleratesARemovedSetting 钉着这条依赖。
 func loadActionConfig() actionConfig {
 	raw, err := os.ReadFile(actionConfigPath())
 	if err != nil {
@@ -471,46 +468,51 @@ func mergedActionTable(cfg actionConfig, edits []actionEdit) ([]byte, error) {
 	return encodeMsgpack(original), nil
 }
 
-// LoadFlags 读某个 motion 的 flags 轨并解析成行。
+// LoadFlags 读某个 motion 的 flags 轨并解析成行（改过就是这个角色的改动，没改过就是随包的原始数据）。
 func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
 	cfg := s.config()
-	path, err := trackXMLPath(cfg, motion, flagSub, flagsKind)
+	edits, err := loadTrackEdits()
 	if err != nil {
 		return nil, err
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := trackSourceXML(cfg, edits, motion, flagSub, flagsKind)
 	if err != nil {
-		return nil, fmt.Errorf("读 flags 轨 %s: %w", path, err)
+		return nil, err
 	}
 	return parseFlagsXML(raw)
 }
 
-// SaveFlags 把行写回那个 motion 的 flags 轨，并部署到 Mods。
+// SaveFlags 记下这个 motion 的 flags 轨改动，并部署到 Mods。
 //
-// 源是 XML：先写回源文件（下一次读到的就是刚存下的），再让工具把它转成 BXM（mod 要的是 BXM）。
-// 整页只有写这一步要跑工具，锁护的也正是它——转换与部署那段管线在 writeAndDeployTracks 里，
-// 与通用轨（attack / effect / speed）共用。
+// **不写源文件**：改动进用户目录的 track_edits.json（原始数据永远只读，见 actiontrackedits.go），
+// 部署时"改动 → BXM"写进 mod。写改动与部署共用一把锁——它们是一段"读一份、改、整份写出去"。
 func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cfg := s.config()
-	path, err := trackXMLPath(cfg, motion, flagSub, flagsKind)
-	if err != nil {
+	// 身份先校验（它们都会被拼进文件名）：不认的写法不该有机会进改动表。
+	if _, err := trackXMLPath(cfg, motion, flagSub, flagsKind); err != nil {
 		return err
 	}
 	raw, err := buildFlagsXML(rows)
 	if err != nil {
 		return err
 	}
-	if err := appfiles.WriteAtomic(path, raw); err != nil {
+	edits, err := loadTrackEdits()
+	if err != nil {
+		return err
+	}
+	ref := trackRef{motion: motion, sub: flagSub, kind: flagsKind}
+	edits = setTrackEdit(edits, charCode(cfg), ref, string(raw))
+	if err := saveTrackEdits(edits); err != nil {
 		return err
 	}
 	return s.writeAndDeployTracks(cfg, []trackWrite{{motion: motion, sub: flagSub, kind: flagsKind, raw: raw}})
 }
 
-// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨只搬这次会话改过的（源是 XML，每一条都得让工具
-// 转一次——几万份全转一遍既慢，又会盖掉别处的手工改动）。
+// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨只搬这次会话改过的（随包那份包里有 17929 条轨，
+// 全搬一遍既慢，又会盖掉别处的手工改动）。
 func (s *ActionsService) Deploy() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -539,15 +541,15 @@ func (s *ActionsService) Deploy() error {
 		return refs[i].sub < refs[j].sub
 	})
 
+	trackEdits, err := loadTrackEdits()
+	if err != nil {
+		return err
+	}
 	items := make([]trackWrite, 0, len(refs))
 	for _, ref := range refs {
-		path, err := trackXMLPath(cfg, ref.motion, ref.sub, ref.kind)
+		raw, err := trackSourceXML(cfg, trackEdits, ref.motion, ref.sub, ref.kind)
 		if err != nil {
 			return err
-		}
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("读轨 %s: %w", path, err)
 		}
 		items = append(items, trackWrite{motion: ref.motion, sub: ref.sub, kind: ref.kind, raw: raw})
 	}
@@ -629,93 +631,27 @@ type trackWrite struct {
 }
 
 /*
-writeAndDeployTracks 把若干条轨的 XML 写进一个临时目录、**一次**转成 BXM、再搬进 mod 目录。
+writeAndDeployTracks 把若干条轨的 XML 编成 BXM 再搬进 mod 目录。
 
-之前是每个文件起一次 GBFRDataTools（保存三条轨 = 三次进程 + 三次黑框，还慢）：工具其实吃得下整个目录，
-所以现在是"先把这一批的 XML 全写进临时目录 → 一次转完 → 再逐条搬"。
+以前是"XML 写进临时目录 → 起一次 GBFRDataTools 转成 BXM → 再搬"，现在编解码在自己手里（bxm.go），
+临时目录与那个外部 exe 都省了。**写出的字节与工具逐字节相同**：全库 17929 份对过（bxm_test.go 的
+TestBXMCorpus），保存路径上也还有一条拿工具当尺子的测试（actiontracks_test.go）。
 
-flags 的保存、通用轨的保存、以及 Deploy 里"把这次改过的轨重新搬一遍"都走这里 —— **同一把锁、同一个
-临时目录、同一段转换与部署**（调用方持有 s.mu：GBFRDataTools 同一时刻只能有一个实例）。
-搬的顺序仍然按传进来的先后：真出错时日志里看得出停在哪一条。
+flags 的保存、通用轨的保存、以及 Deploy 里"把这次改过的轨重新搬一遍"都走这里（调用方持有 s.mu）。
+搬的顺序按传进来的先后：真出错时日志里看得出停在哪一条。
 */
 func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWrite) error {
-	if len(items) == 0 {
-		return nil
-	}
-	dir, err := os.MkdirTemp("", "gbfr-tracks-")
-	if err != nil {
-		return fmt.Errorf("建临时目录: %w", err)
-	}
-	defer os.RemoveAll(dir)
-
-	names := make([]string, 0, len(items))
 	for _, item := range items {
-		base := fmt.Sprintf("%s_%s_%s_seq_edit_%s", charCode(cfg), item.motion, item.sub, item.kind)
-		if err := os.WriteFile(filepath.Join(dir, base+".xml"), item.raw, 0o644); err != nil {
-			return fmt.Errorf("写中转 XML: %w", err)
+		body, err := xmlToBXM(item.raw)
+		if err != nil {
+			return fmt.Errorf("把 %s_%s_%s_seq_edit_%s 的 XML 编成 BXM: %w",
+				charCode(cfg), item.motion, item.sub, item.kind, err)
 		}
-		names = append(names, base)
-	}
-	if err := xmlToBxmDir(cfg.ToolPath, dir); err != nil {
-		return err
-	}
-	for i, item := range items {
-		bxmPath := filepath.Join(dir, names[i]+".bxm")
-		if _, err := os.Stat(bxmPath); err != nil {
-			return fmt.Errorf("工具没转出 %s: %w", names[i]+".bxm", err)
-		}
-		if err := deployFile(bxmPath, deployTrackPath(cfg, item.motion, item.sub, item.kind)); err != nil {
-			return err
+		dst := deployTrackPath(cfg, item.motion, item.sub, item.kind)
+		if err := appfiles.WriteAtomic(dst, body); err != nil {
+			return fmt.Errorf("部署到 %s: %w", dst, err)
 		}
 		s.markTouched(item.motion, item.sub, item.kind)
-	}
-	return nil
-}
-
-// xmlToBxmDir 让工具把目录里每个 .xml **就地**转成同名 .bxm（一次进程转完一整批）。
-//
-// 只传 -i 不传 -o：目录输入时它就是这么工作的；给它 -o 传目录，它会拿目录当文件去打开、每条都报
-// UnauthorizedAccess（试过 -o 目录、-o 目录加反斜杠两种写法，都不行）。-o 只对单文件输入有效。
-func xmlToBxmDir(toolPath, dir string) error {
-	if _, err := os.Stat(toolPath); err != nil {
-		return fmt.Errorf("转换工具 %s 读不到: %w", toolPath, err)
-	}
-	cmd := exec.Command(toolPath, "xml-to-bxm", "-i", dir)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("xml-to-bxm 失败: %w\n%s", err, strings.TrimSpace(string(output)))
-	}
-	return nil
-}
-
-// xmlToBxm 跑一次 GBFRDataTools（整页唯一用到它的地方）。
-func xmlToBxm(toolPath, xmlPath, bxmPath string) error {
-	if _, err := os.Stat(toolPath); err != nil {
-		return fmt.Errorf("转换工具 %s 读不到: %w", toolPath, err)
-	}
-	cmd := exec.Command(toolPath, "xml-to-bxm", "-i", xmlPath, "-o", bxmPath)
-	// GBFRDataTools 是控制台程序：从 GUI 里起它，Windows 会弹一个黑框一闪而过。
-	// HideWindow 就是不显示那个窗口（本项目只跑 Windows —— 工具路径、mod 目录都是写死的）。
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	// 它打一屏 banner 和自己那句 "Converted to …"：跑成功就不用看，失败时那几行是唯一能说明原因的东西。
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("xml-to-bxm 失败: %w\n%s", err, strings.TrimSpace(string(output)))
-	}
-	return nil
-}
-
-// deployFile 把一个产物写进 mod 目录（目录不存在就建，见 appfiles.WriteAtomic）。
-//
-// 先整份读进来再原子写下去：跨盘符 rename 不一定成立，而这一份 mod 那边随时可能正在读。
-func deployFile(src, dst string) error {
-	raw, err := os.ReadFile(src)
-	if err != nil {
-		return fmt.Errorf("读 %s: %w", src, err)
-	}
-	if err := appfiles.WriteAtomic(dst, raw); err != nil {
-		return fmt.Errorf("部署到 %s: %w", dst, err)
 	}
 	return nil
 }
