@@ -552,7 +552,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
     onRemove: () => void
 }) {
     return (
-        // secondary：这排按钮贴在标题行右侧，有底色但不跟标题抢注意力。
+        // ghost：这排按钮贴在标题行右侧，本体不画底、只靠悬停那一下给反馈（底色留给标题行自己）。
         // 图标代替文字：文案同时用作 aria-label 与**悬停提示**（用项目现成的 Tooltip 组件，不用原生
         // title —— 那种用户明确不要）。**不给 svg 写 size 类**，尺寸由 Button 的 size 档给
         // （icon-sm = h-8，与原来 size="sm" 同高）。图标取自项目配置的 lucide-react。
@@ -562,7 +562,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <Button size="icon-sm" variant="secondary" aria-label={t.addRow} onClick={onAdd} />
+                            <Button size="icon-sm" variant="ghost" aria-label={t.addRow} onClick={onAdd} />
                         }
                     >
                         <Plus />
@@ -574,7 +574,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                         render={
                             <Button
                                 size="icon-sm"
-                                variant="secondary"
+                                variant="ghost"
                                 aria-label={t.copySelected}
                                 disabled={!canCopy}
                                 onClick={onCopy}
@@ -590,7 +590,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                         render={
                             <Button
                                 size="icon-sm"
-                                variant="secondary"
+                                variant="ghost"
                                 aria-label={t.pasteBelow}
                                 disabled={!canPaste}
                                 onClick={onPaste}
@@ -606,7 +606,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                         render={
                             <Button
                                 size="icon-sm"
-                                variant="secondary"
+                                variant="ghost"
                                 aria-label={t.remove}
                                 disabled={!canRemove}
                                 onClick={onRemove}
