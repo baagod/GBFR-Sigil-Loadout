@@ -73,23 +73,30 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         let alive = true
         void (async () => {
             try {
-                const list = (await ListTracks(motion)) ?? []
+                // 两次往返，不是七次：这几份数据之间**没有依赖**（每条的轨由 ListTracks 给出名字，
+                // 之后各读各的），逐条 await 只是白等一串串行的 IPC。
+                const [tracks, names] = await Promise.all([ListTracks(motion), ListFsm()])
+                const list = tracks ?? []
+                const hasFlags = list.some((info) => info.kind === "flags")
+                const [read, flagRows] = await Promise.all([
+                    Promise.all(
+                        list.filter((info) => info.kind !== "flags")
+                            .map((info) => LoadTrack(motion, info.sub, info.kind)),
+                    ),
+                    hasFlags ? LoadFlags(motion) : Promise.resolve([]),
+                ])
                 const loaded: Record<string, TrackTable> = {}
-                let flagRows: FlagRow[] = []
+                let next = 0
                 for (const info of list) {
-                    if (info.kind === "flags") {
-                        flagRows = (await LoadFlags(motion)) ?? []
-                        continue
-                    }
-                    const table = await LoadTrack(motion, info.sub, info.kind)
+                    if (info.kind === "flags") continue
+                    const table = read[next++]
                     if (table) loaded[trackKey(info)] = table
                 }
-                const names = (await ListFsm()) ?? []
                 if (!alive) return
                 setInfos(list)
                 setTables(loaded)
-                setFlags(flagRows)
-                setFsmNames(names)
+                setFlags(flagRows ?? [])
+                setFsmNames(names ?? [])
                 // 全部默认展开：点进来就是想看它们，不该再点一次（空的分区也展开，展开着才知道它是空的）。
                 setOpened([...list.map(trackKey), "fsm"])
                 // 与 infos 同一次 setState：手风琴第一次渲染时就是"已展开"，不会先收起再展开。
@@ -638,7 +645,8 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
                     onSelect(e.shiftKey)
                 }}
                 onMouseEnter={onExtend}
-                className="w-9 shrink-0 cursor-default px-1.5 text-xs leading-6 tabular-nums select-none"
+                // text-center：与表头那个 `#` 一致（原来只给表头居中了，表体的行号是左对齐的）。
+                className="w-9 shrink-0 cursor-default px-1.5 text-center text-xs leading-6 tabular-nums select-none"
             >
                 {index + 1}
             </div>
@@ -686,7 +694,7 @@ function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend,
             }}
             className={`${isDragging ? "relative z-10 opacity-50" : ""} ${selected ? "bg-primary/20" : ""}`}
         >
-            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-background p-0">
+            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-[#171717] p-0">
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -741,11 +749,17 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 ⚠️ overflow-y 必须**显式**写 hidden：只写 overflow-x-auto 的话，规范会把另一侧的
                 visible 计算成 auto，盒子在纵向也成了滚动容器 —— 表格只要有几像素的四舍五入溢出，
                 就会冒出一条垂直滚动条（实测见过）。高度本来就由内容撑开，hidden 不会裁掉东西。 */}
-            <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+            {/* min-w-full：内容比容器窄时（只有几条轨的动画很常见）补满那截右侧空白；表宽仍由文本撑开，
+                多余的部分按各列固有宽度**等比分摊**（实测表头与表体逐列仍相等）。用 min-w 而不是 w ——
+                attack 三十几列那类表本来就比容器宽，那时 w 会被规范当成"下限"，这里不需要那把力。
+                border-t-0：本容器的上边框与上面分区标题那条 border-b **叠在同一像素上**（实测两者的
+                rect.bottom / rect.top 都是同一个 y），渲染出来就是 2px 的一条粗线；分区标题那条已经
+                画在这一行的位置上了，所以表格这侧不画上边 —— 左右两条竖框照旧与它接上。 */}
+            <div className="overflow-x-auto overflow-y-hidden border border-t-0 table-border">
+                <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-center font-medium">
+                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
                                 {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
                                     表体里那条分隔竖线到表头就断了。 */}
                                 <div className="flex items-stretch">
@@ -756,7 +770,7 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                             {table.columns.map((column) => (
                                 <th
                                     key={column}
-                                    className="sticky top-0 z-10 border-r border-b bg-muted px-2 py-1 text-center font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-[#171717] px-2 py-1 text-center font-medium whitespace-nowrap"
                                 >
                                     {column}
                                 </th>
@@ -808,7 +822,7 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
             }}
             className={`${isDragging ? "relative z-10 opacity-50" : ""} ${selected ? "bg-primary/20" : ""}`}
         >
-            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-background p-0">
+            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-[#171717] p-0">
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -872,12 +886,15 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 if (over && active.id !== over.id) onReorder(Number(active.id), Number(over.id))
             }}
         >
-            {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。 */}
-            <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+            {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。
+                min-w-full 同上：flags 的 9 列通常比容器窄，不补满右边就会空出一截。
+                border-t-0 同上：上边框与分区标题那条 border-b 叠在同一像素上，会渲染成 2px（实测两格
+                的 rect.bottom / rect.top 都是 297.5），所以表格这侧不画上边。 */}
+            <div className="overflow-x-auto overflow-y-hidden border border-t-0 table-border">
+                <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-center font-medium">
+                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
                                 {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
@@ -887,7 +904,7 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                             {columns.map((column) => (
                                 <th
                                     key={column.label}
-                                    className="sticky top-0 z-10 border-r border-b bg-muted px-2 py-1 text-center font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-[#171717] px-2 py-1 text-center font-medium whitespace-nowrap"
                                 >
                                     {column.label}
                                 </th>

@@ -53,6 +53,13 @@ import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
+// 只读列：**不许编辑、直接显示当前值、用带内边距那档格子**。
+//   id_        —— 后端用来找记录的那把钥匙，改了等于换了另一条记录；
+//   abilityTag_ —— 关联技能（`AB_PL1000_04` 这种），是**别的字段/别的系统拿来查表的引用**，
+//                  形如技能名但本质是个键（见 docs/action/动作表字段文档.md §1）。改它不会"改坏"，
+//                  但会悄悄让那一行指向另一个技能，所以只读。
+const isReadOnlyColumn = (key: string) => key === "id_" || key === "abilityTag_"
+
 // 动作表的单元格：字段名比五位数宽，格子按内容撑，整张表横向滚。
 //
 // 两档，**内边距别混在同一格里**：td 这里是普通模板字符串，不过 cn()（只有它带 tailwind-merge），
@@ -67,6 +74,25 @@ const ACTION_CELL_PAD = `${ACTION_CELL} px-2 py-1`
 //   controlTypeHash_ —— 决定"这一串 mot 播几段"（见 docs/action/动作表字段文档.md §5），
 //                       填了 mot 却没改类型 = 那几段根本不会播，所以它必须和 mot 列摆在一个视觉组里。
 const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key === "controlTypeHash_"
+
+/*
+    动作表的表头那一格的类（底色 + 吸顶）。**只有表头**这么上色，表体格子另有各自主色（见下面 td 那段）。
+
+    底色一律 `#171717`（写死，不走 `--muted`：那个还兼着页签栏底座、按钮 hover、combobox tag 等好几处，
+    改它会全站跟着变；而且本应用只有深色一套 —— index.html 上 `dark` 是写死的 —— 为它造一个 token
+    等于造一个永远用不到的浅色变体）：
+      · 普通列    —— `z-10 bg-[#171717]`
+      · `id_`     —— 吸顶（纵向 top-0，横向 left-0）：横向滚到第 80 列时还知道这是哪条记录。
+                      它是两轴都钉的那一格，z-50 要压在别的表头上面；底色仍与其他表头一致。
+      · 反色列    —— `saveMotId*` / `controlTypeHash_` 换成 `bg-primary`（浅底深字），
+                      一眼看出双击哪几格能加载 flags。
+    这几个类**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
+*/
+function actionHeaderClass(key: string): string {
+    if (key === "id_") return "sticky top-0 left-0 z-50 bg-[#171717] text-center font-medium"
+    if (isHighlightedColumn(key)) return "sticky top-0 z-10 bg-primary text-primary-foreground text-center font-medium"
+    return "sticky top-0 z-10 bg-[#171717] text-center font-medium"
+}
 
 // 一格输入框：**没有自己的底色**（连 Input 自带的 dark:bg-input/30 也压掉）——整张表因此是一个平铺的
 // 面，格子由 1px 格线分，而不是每格套一个方框。高度只有一处来源，就是下面 EditableCell 按所在行决定的
@@ -566,20 +592,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                             <thead>
                                 <tr>
                                     {keys.map((key) => (
-                                        <th
-                                            key={key}
-                                            className={`${ACTION_CELL_PAD} sticky top-0 text-center font-medium ${
-                                                // id_ 排在字段顺序最前，钉住它：横向滚到第 80 列时还知道这是哪条记录；
-                                                // 表头纵向也钉住（两轴都钉的那一格要压在别的表头上面）。
-                                                // 底色只有一处来源：表头默认 bg-muted，上面那两类列的**表头**
-                                                // 换成反色（浅底深字），一眼看出双击哪几格能加载 flags。
-                                                key === "id_"
-                                                    ? "left-0 z-50 bg-background"
-                                                    : isHighlightedColumn(key)
-                                                      ? "z-10 bg-primary text-primary-foreground"
-                                                      : "z-10 bg-muted"
-                                            }`}
-                                        >
+                                        <th key={key} className={`${ACTION_CELL_PAD} ${actionHeaderClass(key)}`}>
                                             {key}
                                         </th>
                                     ))}
@@ -591,16 +604,24 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                         {keys.map((key) => (
                                             <td
                                                 key={key}
-                                                className={`${key === "id_" ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus dark:bg-input/30`} ${
+                                                className={`${isReadOnlyColumn(key) ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus dark:bg-input/30`} ${
                                                     // 表体底色 = **基础 Input 的底色**（它自己是 bg-transparent + dark:bg-input/30，
                                                     // 而 CELL_INPUT 又把格子里那个输入框设成透明），所以这层底色只能由 td 出，
-                                                    // 全站表格这才统一。id_ 那列仍是 bg-background（与轨表的 "#" 列一致，
-                                                    // 吸顶列本来也必须不透明）；高亮标记只做在表头上。
-                                                    key === "id_" ? "sticky left-0 z-40 bg-background tabular-nums" : ""
+                                                    // 全站表格这才统一。id_ 与 abilityTag_ 这两列**底色跟 id_ 走**
+                                                    // （bg-background；id_ 那列同时吸顶 —— 横向滚到第 80 列时还认得出这是哪条记录）；
+                                                    // id_ 里是记录号，**居中**（与表头一致）；高亮标记只做在表头上。
+                                                    key === "id_"
+                                                        ? "sticky left-0 z-40 bg-background text-center tabular-nums"
+                                                        : key === "abilityTag_"
+                                                          ? "bg-background tabular-nums"
+                                                          : ""
                                                 }`}
                                             >
-                                                {key === "id_" ? (
-                                                    // id_ 是后端用来找记录的那把钥匙，只读，直接显示原值。
+                                                {isReadOnlyColumn(key) ? (
+                                                    // 只读列一律显示**原值**。
+                                                    // ⚠️ 不能写 `draft[...] ?? originals[...]`：draft 是 loadAll 里按
+                                                    // `field.value ?? ""` 建出来的，**没改过的格子在那里是空字符串、不是
+                                                    // undefined**，`??` 因此永远不回落 —— 这两列会整列显示为空。
                                                     originals[action.id]?.[key] ?? ""
                                                 ) : (
                                                     <EditableCell
