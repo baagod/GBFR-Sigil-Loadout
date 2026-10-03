@@ -96,7 +96,7 @@ func TestListTracksKeepsTracksThatOnlyExistAsAnEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 	ref := trackRef{motion: "3400", sub: flagSub, kind: flagsKind}
-	if err := saveTrackEdits(setTrackEdit(nil, charCode(cfg), ref, string(source))); err != nil {
+	if err := saveTrackEdits(setTrackEdit(nil, charCode(cfg), ref, string(source), nil)); err != nil {
 		t.Fatal(err)
 	}
 

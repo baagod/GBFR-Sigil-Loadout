@@ -532,7 +532,8 @@ func mergedActionTable(cfg actionConfig, edits []actionEdit) ([]byte, error) {
 	return encodeMsgpack(original), nil
 }
 
-// LoadFlags 读某个 motion 的 flags 轨并解析成行（改过就是这个角色的改动，没改过就是随包的原始数据）。
+// LoadFlags 读某个 motion 的 flags 轨并解析成行（改过就是这个角色的改动，没改过就是随包的原始数据）；
+// 被"假删除"的行会从原版插回来（标记 Removed），界面上一直看得见。
 func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
 	cfg := s.config()
 	edits, err := loadTrackEdits()
@@ -540,6 +541,30 @@ func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
 		return nil, err
 	}
 	raw, err := trackSourceXML(cfg, edits, motion, flagSub, flagsKind)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := parseFlagsXML(raw)
+	if err != nil {
+		return nil, err
+	}
+	ref := trackRef{motion: motion, sub: flagSub, kind: flagsKind}
+	marks := marksOf(edits, charCode(cfg), ref, len(rows))
+	// 原版读不到也不该让这一页打不开：那就退回"位置对齐"。
+	if prim, err := s.LoadFlagsOriginal(motion); err == nil {
+		return mergeFlagRows(marks, rows, prim), nil
+	}
+	return mergeFlagRows(marks, rows, nil), nil
+}
+
+// LoadFlagsOriginal 读这个 motion 的 flags 轨**原版**（随包那份，只读），界面拿它当比较基准。
+func (s *ActionsService) LoadFlagsOriginal(motion string) ([]FlagRow, error) {
+	cfg := s.config()
+	xmlPath, err := trackXMLPath(cfg, motion, flagSub, flagsKind)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := trackPrimalXML(cfg, motion, flagSub, flagsKind, xmlPath)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +584,16 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	if _, err := trackXMLPath(cfg, motion, flagSub, flagsKind); err != nil {
 		return err
 	}
-	raw, err := buildFlagsXML(rows)
+	// 行身份跟着改动一起存；被"假删除"的行不进 XML（所以不部署），但身份留着（界面上看得见、能恢复）。
+	marks := make([]rowMark, 0, len(rows))
+	kept := make([]FlagRow, 0, len(rows))
+	for _, row := range rows {
+		marks = append(marks, rowMark{Orig: row.Orig, Removed: row.Removed})
+		if !row.Removed {
+			kept = append(kept, row)
+		}
+	}
+	raw, err := buildFlagsXML(kept)
 	if err != nil {
 		return err
 	}
@@ -568,7 +602,7 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 		return err
 	}
 	ref := trackRef{motion: motion, sub: flagSub, kind: flagsKind}
-	edits = setTrackEdit(edits, charCode(cfg), ref, string(raw))
+	edits = setTrackEdit(edits, charCode(cfg), ref, string(raw), marks)
 	if err := saveTrackEdits(edits); err != nil {
 		return err
 	}

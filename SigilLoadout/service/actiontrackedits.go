@@ -51,6 +51,9 @@ type trackEdit struct {
 	Sub    string `json:"sub"`
 	Kind   string `json:"kind"`
 	XML    string `json:"xml"`
+	// Rows 是**行身份**（界面用，见 actionrowmarks.go）：每行对应原版第几行、是否被"假删除"。
+	// 原版数据永远只读，行身份没地方放，只能跟着改动一起记在这里。
+	Rows []rowMark `json:"rows,omitempty"`
 }
 
 type trackEditsFile struct {
@@ -196,19 +199,20 @@ func trackEditFor(edits []trackEdit, char string, ref trackRef) (string, bool) {
 	return "", false
 }
 
-// setTrackEdit 记下改动（已有就覆盖）。
+// setTrackEdit 记下改动（已有就覆盖），连同这一版的行身份一起存。
 //
 // 每次保存都记一条，**即使这次没真的改**（打开又原样保存）。不做"与原始相同就删掉这条"：那要求保存时
 // 先读一遍原始，于是一个本来不需要读的操作平白多出一条失败路径（解包目录被挪走、资产缺了这一条，就
 // 连保存都做不成）。代价只是改动文件里多一条，且它盖住以后随包原始数据的更新。
-func setTrackEdit(edits []trackEdit, char string, ref trackRef, xml string) []trackEdit {
+func setTrackEdit(edits []trackEdit, char string, ref trackRef, xml string, rows []rowMark) []trackEdit {
 	for i, edit := range edits {
 		if edit.Char == char && edit.ref() == ref {
 			edits[i].XML = xml
+			edits[i].Rows = rows
 			return edits
 		}
 	}
-	return append(edits, trackEdit{Char: char, Motion: ref.motion, Sub: ref.sub, Kind: ref.kind, XML: xml})
+	return append(edits, trackEdit{Char: char, Motion: ref.motion, Sub: ref.sub, Kind: ref.kind, XML: xml, Rows: rows})
 }
 
 /*

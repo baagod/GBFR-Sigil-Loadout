@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import {
     DndContext,
     PointerSensor,
@@ -12,8 +12,10 @@ import {restrictToVerticalAxis} from "@dnd-kit/modifiers"
 import {SortableContext, arrayMove, useSortable, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {
     LoadFlags,
+    LoadFlagsOriginal,
     LoadFsm,
     LoadTrack,
+    LoadTrackOriginal,
     ListFsm,
     ListTracks,
     SaveFlags,
@@ -40,6 +42,47 @@ import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/
 import {EditableCell} from "@/components/ActionsPanel"
 import {FLAG0_NAMES, FLAG1_NAMES, withNewRow} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
+
+/** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
+const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = ["config", "startTime", "endTime", "flag0", "flag1"]
+
+/**
+ * 行身份（后端给的，见 Go 侧 actionrowmarks.go）：
+ * - `orig`：这一行对应**游戏原版**第几行（-1 = 新增 / 粘贴出来的，原版里没有它）；
+ * - `removed`：这一行被**假删除**了（界面上刷成暗红底标记一下，保存时不部署这一行；其余照旧，仍可编辑）。
+ *
+ * 它必须记在行上：改过的原行，光看值已经和新行分不出来了（后端把行身份跟改动一起存进
+ * track_edits.json，重启后照样认得）。编辑会把行换成新对象（`{...row}`），字段自动跟着走过去。
+ */
+type Marked<T> = T & {orig?: number; removed?: boolean}
+
+/** 这一行在原版里有没有对应行（有才是"原行"：删除只做假删除）。 */
+const isOriginal = (row: {orig?: number}) => row.orig !== undefined && row.orig >= 0
+
+/**
+ * 每行与原表**对应那行**的差异列（null = 这一行与原表一致）。
+ *
+ * 配对是**记录下来的**（行上的 `orig`：它对应原版第几行），不是靠值猜 —— 原行只会被"假删除"、
+ * 永远不会真的从表里消失，原版又是只读的，所以拖到哪、前后插了多少行都不影响配对。
+ * 没有编号的行（新增 / 粘贴出来的）本来就不在原版里 → 整行都算改动。
+ */
+function diffRows<T, C extends PropertyKey>(
+    cols: readonly C[],
+    current: (T & {orig?: number})[],
+    original: T[],
+    get: (row: T, col: C) => string,
+): (Set<string> | null)[] {
+    const wholeRow = new Set(cols.map(String))
+    return current.map((row) => {
+        const mate = isOriginal(row) ? original[row.orig as number] : undefined
+        if (!mate) return wholeRow
+        const miss = new Set<string>()
+        for (const col of cols) {
+            if (get(row, col) !== get(mate, col)) miss.add(String(col))
+        }
+        return miss.size > 0 ? miss : null
+    })
+}
 
 /*
 动画详情页：点动作表里的动画号弹出来的那一层。
@@ -80,14 +123,29 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     // "正在拖选"：同步版本（ref），按下与第一次划过同一帧时 state 还没落地。
     const draggingRef = useRef(false)
     /**
-     * 打开这个弹层时那份**原值**，按行对象身份记（WeakMap）。
+     * 打开弹层时那份**原表**（深拷、之后只读）。
      *
-     * 只服务界面：显示态据此把"没动过的格子"显示成灰色原值、"动过的"显示成正常前景色
-     * （与动作表同一套观感）。按**身份**而不是下标记 —— 行重排、增删都不会错位，也不会写进数据
-     * （保存负载里没有它）。编辑会把行换成新对象（`{...row}`），所以 editValue / editFlag 里
-     * 要把原值搬到新对象上；新增 / 粘贴出来的行没有原值 → 一律当成改动。
+     * 灰/亮完全由**值**决定：拿当前每一行去和它比 —— 整行元组串对得上就是"没动过"（整行灰），
+     * 对不上就在原表里找最像的那行，把不同的那几格点亮。因此：
+     * 新增 / 删除 / 插入 / 重排**都不需要任何维护**（比较与顺序无关），也不需要指针或改动表；
+     * "改回原值就退回灰"也是比较的自然结果，不必在离开时判断。
+     * 保存成功后把这份刷成刚写下去的那份（于是全部回到"没动过"）。
      */
-    const origRef = useRef(new WeakMap<object, Record<string, unknown>>())
+    const [baseline, setBaseline] = useState<{tables: Record<string, TrackTable>; flags: FlagRow[]} | null>(null)
+
+    /**
+     * 每个分区里、每行与原表的差异列（下标与当前行一一对应）。
+     * 只在数据变了时重算 —— 与顺序无关，所以增删插入重排之后依然是对的。
+     */
+    const diffs = useMemo(() => {
+        if (!baseline) return null
+        const out: Record<string, (Set<string> | null)[]> = {}
+        for (const [key, table] of Object.entries(tables)) {
+            out[key] = diffRows<TrackRow, string>(table.columns, table.rows, baseline.tables[key]?.rows ?? [], (row, col) => row.values[col] ?? "")
+        }
+        out[flagsKey] = diffRows(FLAG_DIFF_COLS, flags, baseline.flags, (row, col) => String(row[col] ?? ""))
+        return out
+    }, [baseline, tables, flags])
 
     useEffect(() => {
         let alive = true
@@ -98,32 +156,33 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 const [tracks, names] = await Promise.all([ListTracks(motion), ListFsm()])
                 const list = tracks ?? []
                 const hasFlags = list.some((info) => info.kind === "flags")
-                const [read, flagRows] = await Promise.all([
-                    Promise.all(
-                        list.filter((info) => info.kind !== "flags")
-                            .map((info) => LoadTrack(motion, info.sub, info.kind)),
-                    ),
+                // 两批一起发：**当前**（改动合成后的，行上带着后端给的行身份）与**原版**（游戏原版数据，
+                // 只读、永远是比较基准）。见 baseline 的注释。
+                const others = list.filter((info) => info.kind !== "flags")
+                const [read, flagRows, primal, primalFlags] = await Promise.all([
+                    Promise.all(others.map((info) => LoadTrack(motion, info.sub, info.kind))),
                     hasFlags ? LoadFlags(motion) : Promise.resolve([]),
+                    Promise.all(others.map((info) => LoadTrackOriginal(motion, info.sub, info.kind))),
+                    hasFlags ? LoadFlagsOriginal(motion) : Promise.resolve([]),
                 ])
                 const loaded: Record<string, TrackTable> = {}
+                const original: Record<string, TrackTable> = {}
                 let next = 0
                 for (const info of list) {
                     if (info.kind === "flags") continue
-                    const table = read[next++]
-                    if (table) loaded[trackKey(info)] = table
+                    const key = trackKey(info)
+                    if (read[next]) loaded[key] = read[next]
+                    if (primal[next]) original[key] = primal[next]
+                    next++
                 }
                 if (!alive) return
                 setInfos(list)
                 setTables(loaded)
                 setFlags(flagRows ?? [])
                 setFsmNames(names ?? [])
-                // 原值快照（见 origRef 的注释）：通用轨按行的 values 抄一份，flags 是平铺字段，整行抄。
-                const orig = new WeakMap<object, Record<string, unknown>>()
-                for (const table of Object.values(loaded)) {
-                    for (const row of table.rows) orig.set(row, {...row.values})
-                }
-                for (const row of flagRows ?? []) orig.set(row, {...row})
-                origRef.current = orig
+                // 原表 = **游戏原版**（后端从随包 data.zip 里读的，只读）：灰/亮全靠拿当前行和它比。
+                // 它不随保存变化 —— "我一直知道原表的值"就是靠这个。
+                setBaseline({tables: original, flags: primalFlags ?? []})
                 // 全部默认展开：点进来就是想看它们，不该再点一次（空的分区也展开，展开着才知道它是空的）。
                 setOpened([...list.map(trackKey), "fsm"])
                 // 与 infos 同一次 setState：手风琴第一次渲染时就是"已展开"，不会先收起再展开。
@@ -149,48 +208,32 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const markDirty = (key: string) =>
         setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]))
 
-    /**
-     * 改 flags 的一格：只在真变了的时候记改动。
-     * **改回原值就等于没改**：写回原值、不标脏 —— 显示态会退回灰色占位符（与动作表同一套语义）。
-     */
+    /** 改 flags 的一格：只在真变了的时候记改动（"改回原值就退回灰"由与原表的比较自动得出）。 */
     const editFlag = (index: number, key: keyof FlagRow, value: string) => {
-        const row = flags[index]
-        const orig = row ? origRef.current.get(row) : undefined
-        const reverted = orig !== undefined && String(orig[String(key)] ?? "") === value
         setFlags((prev) =>
-            prev.map((r, i) => {
-                if (i !== index || String(r[key]) === value) return r
-                const next = {...r, [key]: value}
+            prev.map((row, i) => {
+                if (i !== index || String(row[key]) === value) return row
+                const next = {...row, [key]: value}
                 // 掩码改了就把含义重算一遍——这两列是给人看的，不该等下次读取才更新。
                 if (key === "flag0") next.flag0Effects = effectsOf(value, 0)
                 if (key === "flag1") next.flag1Effects = effectsOf(value, 1)
-                // 原值跟着新行对象走（WeakMap 按身份记）。updater 里这次写是幂等的，双跑也无害。
-                const o = origRef.current.get(r)
-                if (o) origRef.current.set(next, o)
                 return next
             })
         )
-        if (!reverted) markDirty(flagsKey)
+        markDirty(flagsKey)
     }
 
-    /** 改通用轨的一格。语义同 editFlag：改回原值即撤销，不标脏。 */
+    /** 改通用轨的一格。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
-        const row = tables[key]?.rows[index]
-        const orig = row ? origRef.current.get(row) : undefined
-        const reverted = orig !== undefined && String(orig[column] ?? "") === value
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
-            const rows = table.rows.map((r, i) => {
-                if (i !== index) return r
-                const next = {...r, values: {...r.values, [column]: value}}
-                const o = origRef.current.get(r)
-                if (o) origRef.current.set(next, o)
-                return next
-            })
+            const rows = table.rows.map((row, i) =>
+                i === index ? {...row, values: {...row.values, [column]: value}} : row
+            )
             return {...prev, [key]: {...table, rows}}
         })
-        if (!reverted) markDirty(key)
+        markDirty(key)
     }
 
     // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
@@ -205,6 +248,10 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
      * 顺带记上"正在拖选"，鼠标划过哪一行由 extendTo 接着改 focus（和动作页那张 flags 表同一套手感）。
      */
     const select = (key: string, index: number, shift: boolean) => {
+        // 先把编辑框的焦点收掉：行号那半截的 mousedown 里有 preventDefault（为了拖选时不选中文字），
+        // 浏览器就不会替你转移焦点了 —— 焦点还在输入框里，Del 会被输入框自己吃掉，
+        // 于是"删过一次就再也删不动" ✗。blur 也顺手把没提交的编辑按正常路径提交掉 ✓。
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
         draggingRef.current = true
         setSel((prev) =>
             prev && prev.key === key && shift ? {...prev, to: index} : {key, from: index, to: index}
@@ -219,16 +266,24 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     }
 
     /**
-     * Ctrl+C / Ctrl+V：复制选中行、插入到选中行下面，**能在动画之间用**（剪贴板在模块级）。
-     * 在输入框/文本域里打字时不抢按键：否则框内自己的文本复制粘贴会被吃掉 ✗。
-     * 没有选中行就什么都不做 —— 粘到哪儿必须由人指定，别猜 ✓。
+     * 键盘：Ctrl+C / Ctrl+V 复制插入（能在动画之间用，剪贴板在模块级）；**Del = 删除 / 恢复**选中行
+     * （同一个开关，与标题右侧那个按钮等价，见 removeSelected）。
+     * 在输入框/文本域里打字时不抢按键：否则框内自己的文本复制粘贴、退格都会被吃掉 ✗。
+     * 没有选中行就什么都不做 —— 删哪儿、粘到哪儿都必须由人指定，别猜 ✓。
      */
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+            if (event.altKey) return
             if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]")) return
             const key = sel?.key
             const info = infos.find((one) => trackKey(one) === key)
+            if (event.key === "Delete" && !event.ctrlKey && !event.metaKey) {
+                if (!key || !info) return
+                event.preventDefault()
+                removeSelected(key)
+                return
+            }
+            if (!(event.ctrlKey || event.metaKey)) return
             if (!key || !info) return
             if (event.key === "c") {
                 event.preventDefault()
@@ -265,8 +320,10 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 if (!table) return prev
                 // 新行照抄最后一行的列（空表就只有空值）：这几种轨一行几十个字段，从零填不如改现成的。
                 const last = table.rows[table.rows.length - 1]
+                // orig 必须显式写成 -1：新行是 `{...last}` 抄出来的，不然它会被当成原行去"假删除"、
+                // 也会拿最后一行的原值去比。
                 const row: TrackRow = last
-                    ? {...last, index: table.rows.length, children: []}
+                    ? {...last, index: table.rows.length, children: [], orig: -1, removed: undefined}
                     : ({index: 0, values: {}, children: []} as TrackRow)
                 return {...prev, [key]: {...table, rows: [...table.rows, row]}}
             })
@@ -279,8 +336,11 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         if (to < from) return
         const rows =
             key === flagsKey ? flags.slice(from, to + 1) : (tables[key]?.rows ?? []).slice(from, to + 1)
+        // 假删除掉的行不参与复制（它们不参与部署，复制出去也没有意义）。
+        const kept = rows.filter((row) => !(row as Marked<object>).removed)
+        if (kept.length === 0) return
         // 同时写进模块级剪贴板：关掉这个弹层、换一套动画再 Ctrl+V 时，靠它拿到内容。
-        clipboard = {kind, rows}
+        clipboard = {kind, rows: kept}
         setClip(clipboard)
     }
 
@@ -293,7 +353,12 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         const copies = clip.rows.length
         if (key === flagsKey) {
             const rows = clip.rows as FlagRow[]
-            setFlags((prev) => [...prev.slice(0, at), ...rows.map((r) => ({...r})), ...prev.slice(at)])
+            // 粘贴出来的是**新行**：清掉原表标记（否则它会被当成原行去"假删除"）。
+            setFlags((prev) => [
+                ...prev.slice(0, at),
+                ...rows.map((row) => ({...row, orig: -1, removed: undefined})),
+                ...prev.slice(at),
+            ])
         } else {
             setTables((prev) => {
                 const table = prev[key]
@@ -304,6 +369,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 const inserted = rows.map((row, i) => ({
                     ...row,
                     index: at + i,
+                    // 粘贴出来的是**新行**：原版里没有它（orig = -1）。
+                    orig: -1,
+                    removed: undefined,
                     children: row.children.map((child) => ({...child, values: {...child.values}})),
                 }))
                 return {...prev, [key]: {...table, rows: [...table.rows.slice(0, at), ...inserted, ...table.rows.slice(at)]}}
@@ -313,23 +381,38 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setSel({key, from: at, to: at + copies - 1})
     }
 
-    /** 删掉这个分区里当前选中的那几行（先点行号选好，再按标题右侧的「删除」）。 */
+    /**
+     * 删除 / **恢复**选中的行（标题右侧那个按钮，或按 Del —— 同一个开关）。
+     *
+     * - **原表的行不真删**：标成"已删除"（整行暗红、保存时这一行不部署），界面上一直看得见原值 ✓；
+     * - 选中的原行**全都已经被标记**时，这一次按下去就是**恢复**（清掉标记）✓；
+     * - 新增 / 粘贴出来的行在原版里没有对应行，无处可恢复 → 直接真删 ✓。
+     */
     const removeSelected = (key: string) => {
         if (sel?.key !== key) return
-        const count = key === flagsKey ? flags.length : (tables[key]?.rows.length ?? 0)
-        const {from, to} = rangeOf(key, count)
+        const current = key === flagsKey ? flags : (tables[key]?.rows ?? [])
+        const {from, to} = rangeOf(key, current.length)
         if (to < from) return
-        const gone = (index: number) => index >= from && index <= to
-        if (key === flagsKey) setFlags((prev) => prev.filter((_, i) => !gone(i)))
+        const selected = current.slice(from, to + 1) as Marked<object>[]
+        // 全都是"已删除"的原行 → 这次是恢复；否则是删除（混着选时按删除走：该恢复的保持、该删的删）。
+        const originals = selected.filter((row) => isOriginal(row))
+        const restore = originals.length > 0 && originals.every((row) => row.removed)
+        const kept = <T extends object>(row: T, index: number): T[] => {
+            if (index < from || index > to) return [row]
+            if (!isOriginal(row as Marked<object>)) return [] // 新行：无处可恢复 → 真删
+            return [{...row, removed: !restore} as T]
+        }
+        if (key === flagsKey) setFlags((prev) => prev.flatMap(kept))
         else
             setTables((prev) => {
                 const table = prev[key]
                 if (!table) return prev
-                return {...prev, [key]: {...table, rows: table.rows.filter((_, i) => !gone(i))}}
+                return {...prev, [key]: {...table, rows: table.rows.flatMap(kept)}}
             })
         markDirty(key)
-        // 删完原来的号码全错位了：选中清掉，别让它指着别的行。
-        setSel(null)
+        // 真删会让后面的号码错位（选中得清掉，别让它指着别的行）；只做假删除/恢复时号码不动，
+        // 选中留着 —— 这样连按两下 Del 就能删了又恢复。
+        if (!restore && selected.some((row) => !isOriginal(row))) setSel(null)
     }
 
     const showFsm = async (name: string) => {
@@ -347,6 +430,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setBusy(true)
         setFailure("")
         try {
+            // 整张表原样交给后端（含行身份 `orig` / `removed`）：由它决定"哪些行进 XML"（假删除的不进）、
+            // 并把行身份跟改动一起存进 track_edits.json —— 下次打开照样认得每一行是原版第几行。
             if (dirty.includes(flagsKey)) {
                 await SaveFlags(motion, flags)
             }
@@ -361,14 +446,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             const list = (await ListTracks(motion)) ?? []
             setInfos(list)
             setDirty([])
-            // 原值刷成刚写下去的那份：改过的格子随之回到灰色（此刻没有未保存的差异了），
-            // 与动作表保存后重读 originals 的行为一致。
-            const orig = new WeakMap<object, Record<string, unknown>>()
-            for (const table of Object.values(tables)) {
-                for (const row of table.rows) orig.set(row, {...row.values})
-            }
-            for (const row of flags) orig.set(row, {...row})
-            origRef.current = orig
+            // **原表不换、行不丢**：原表是游戏原版数据（只读），保存不改变它 —— 于是"相对原版改了什么"
+            // 保存后依然看得见，被假删除的行也照样留在界面上（它们本来就不进文件）。只是想看"干净状态"，
+            // 重开一次弹层即可（那时读到的当前表就是刚保存的那份）。
         } catch (e) {
             setFailure(t.saveFailedText(String(e)))
         } finally {
@@ -481,7 +561,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                 rows={flags}
                                                 sel={sel?.key === key ? sel : null}
                                                 t={t}
-                                                origMap={origRef.current}
+                                                diffs={diffs?.[key]}
                                                 onSelect={(index, shift) => select(key, index, shift)}
                                                 onExtend={(index) => extendTo(key, index)}
                                                 onEdit={editFlag}
@@ -492,7 +572,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                 table={tables[key]}
                                                 sel={sel?.key === key ? sel : null}
                                                 t={t}
-                                                origMap={origRef.current}
+                                                diffs={diffs?.[key]}
                                                 onSelect={(index, shift) => select(key, index, shift)}
                                                 onExtend={(index) => extendTo(key, index)}
                                                 onEdit={(index, column, value) => editValue(key, index, column, value)}
@@ -716,7 +796,7 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
         // 边框画在 td 上（不是这个 div）：这样"最后一行的下边框"才归表格管（见 table 上的
         // [&_tr:last-child>*]:border-b-0 —— 不去掉它就会跟容器外框那条挨在一起，看着是 2px）。
         // h-full 让选区底色铺满整格。
-        <div className={`flex h-full items-stretch ${selected ? "bg-primary/20" : ""}`}>
+        <div className={`flex h-full items-stretch ${selected ? "bg-white/12" : ""}`}>
             {/* 两半都写死宽度（36 + 20 = 56 = w-14）：表头与表体的可用宽度本来就不一样，
                 用 flex-1 的话两边会各算各的分割位置，竖线就错开了。 */}
             <div
@@ -756,19 +836,21 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
 }
 
 /** 通用轨的一行。**单独一个组件**，因为 useSortable 是 hook：hook 不能写在 rows.map 的循环里。 */
-function SortableTrackRow({row, index, columns, t, selected, orig, onSelect, onExtend, onEdit}: {
+function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onExtend, onEdit}: {
     row: TrackRow
     index: number
     columns: string[]
     t: Messages
     selected: boolean
-    /** 这一行打开时的原值；没有（新增 / 粘贴出来的行）就当整行都是改动。 */
-    orig?: Record<string, unknown>
+    /** 这一行与原表不同的列；null = 整行与原表一致（整行灰）。 */
+    diff: Set<string> | null
     onSelect: (shift: boolean) => void
     onExtend: () => void
     onEdit: (column: string, value: string) => void
 }) {
     // 排序按**数组下标**认行：位置就是身份，行一挪下标自然跟着变。
+    // 被"假删除"的原行：整行 disabled，只是留在这里让人看见原值。
+    const removed = (row as Marked<TrackRow>).removed === true
     const {attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging} =
         useSortable({id: index})
     return (
@@ -778,9 +860,20 @@ function SortableTrackRow({row, index, columns, t, selected, orig, onSelect, onE
                 transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
                 transition,
             }}
-            className={`${isDragging ? "relative z-10 opacity-50" : ""} ${selected ? "bg-primary/20" : ""}`}
+            className={`${isDragging ? "relative z-10 opacity-50" : ""} ${
+                // 选中那层用**背景图（渐变）**画，而不是背景色：背景色只有一个坑位，会把这行自己的底色
+                // （比如假删除的 #542526）顶掉 → "选中 + 假删除"时半行淡、半行红 ✗。
+                // 画成半透明层就能叠在任意底色之上，行底色是什么都能适配 ✓
+                // 颜色用中性叠加层（10% 白，与 --border 同一个透明度），而不是发白的 primary。
+                // 不用 shadcn 那句 hover:bg-muted/50：它在这张表上几乎看不出 —— docs 里表格坐在
+                // --background(#0a0a0a) 上，这里坐在 --popover(#171717) 上，同一个 50% 只抬升几级。
+                selected ? "bg-linear-to-b from-white/12 to-white/12" : ""
+            } ${
+                // 假删除：整行刷成 #542526（暗红底，一眼看出这行不生效；保存时这一行不部署）。
+                removed ? "bg-[#542526]" : ""
+            }`}
         >
-            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-[#171717] p-0">
+            <td className={`sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -793,32 +886,27 @@ function SortableTrackRow({row, index, columns, t, selected, orig, onSelect, onE
                     onExtend={onExtend}
                 />
             </td>
-            {columns.map((column) => {
-                const cur = row.values[column] ?? ""
-                // 与打开时一字不差 = 没动过 → 显示成灰。值照常传下去（点开即预填，改一位数字很方便）。
-                const unchanged = orig !== undefined && String(orig[column] ?? "") === cur
-                return (
-                    <EditableCell
-                        key={column}
-                        tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
-                        mono
-                        value={cur}
-                        unchanged={unchanged}
-                        onCommit={(value) => onEdit(column, value)}
-                    />
-                )
-            })}
+            {columns.map((column) => (
+                <EditableCell
+                    key={column}
+                    tdClassName={`border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`}
+                    mono
+                    value={row.values[column] ?? ""}
+                    unchanged={!diff || !diff.has(column)}
+                    onCommit={(value) => onEdit(column, value)}
+                />
+            ))}
         </tr>
     )
 }
 
 /** 通用轨的表格：列是后端给的（该轨所有属性的并集，按首次出现排），格子直接改，行拖握把重排。 */
-function TrackGrid({table, sel, t, origMap, onSelect, onExtend, onEdit, onReorder}: {
+function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}: {
     table: TrackTable | undefined
     sel: {from: number; to: number} | null
     t: Messages
-    /** 各行打开时的原值（见 AnimationDetail 里 origRef 的注释）。 */
-    origMap: WeakMap<object, Record<string, unknown>>
+    /** 每行与原表的差异列（下标与行一一对应，见 diffRows）。 */
+    diffs: (Set<string> | null)[] | undefined
     onSelect: (index: number, shift: boolean) => void
     onExtend: (index: number) => void
     onEdit: (index: number, column: string, value: string) => void
@@ -878,7 +966,7 @@ function TrackGrid({table, sel, t, origMap, onSelect, onExtend, onEdit, onReorde
                                     index={index}
                                     columns={table.columns}
                                     t={t}
-                                    orig={origMap.get(row)}
+                                    diff={diffs?.[index] ?? null}
                                     selected={inRange(index)}
                                     onSelect={(shift) => onSelect(index, shift)}
                                     onExtend={() => onExtend(index)}
@@ -894,18 +982,20 @@ function TrackGrid({table, sel, t, origMap, onSelect, onExtend, onEdit, onReorde
 }
 
 /** flags 的一行。同 SortableTrackRow，只是格子按 flags 那几列渲染。 */
-function SortableFlagRow({row, index, columns, t, selected, orig, onSelect, onExtend, onEdit}: {
+function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onExtend, onEdit}: {
     row: FlagRow
     index: number
     columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string}[]
     t: Messages
     selected: boolean
-    /** 这一行打开时的原值；没有（新增 / 粘贴出来的行）就当整行都是改动。 */
-    orig?: Record<string, unknown>
+    /** 这一行与原表不同的列；null = 整行与原表一致（整行灰）。 */
+    diff: Set<string> | null
     onSelect: (shift: boolean) => void
     onExtend: () => void
     onEdit: (key: keyof FlagRow, value: string) => void
 }) {
+    // 被"假删除"的原行：整行 disabled，只是留在这里让人看见原值。
+    const removed = (row as Marked<FlagRow>).removed === true
     const {attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging} =
         useSortable({id: index})
     return (
@@ -915,9 +1005,20 @@ function SortableFlagRow({row, index, columns, t, selected, orig, onSelect, onEx
                 transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
                 transition,
             }}
-            className={`${isDragging ? "relative z-10 opacity-50" : ""} ${selected ? "bg-primary/20" : ""}`}
+            className={`${isDragging ? "relative z-10 opacity-50" : ""} ${
+                // 选中那层用**背景图（渐变）**画，而不是背景色：背景色只有一个坑位，会把这行自己的底色
+                // （比如假删除的 #542526）顶掉 → "选中 + 假删除"时半行淡、半行红 ✗。
+                // 画成半透明层就能叠在任意底色之上，行底色是什么都能适配 ✓
+                // 颜色用中性叠加层（10% 白，与 --border 同一个透明度），而不是发白的 primary。
+                // 不用 shadcn 那句 hover:bg-muted/50：它在这张表上几乎看不出 —— docs 里表格坐在
+                // --background(#0a0a0a) 上，这里坐在 --popover(#171717) 上，同一个 50% 只抬升几级。
+                selected ? "bg-linear-to-b from-white/12 to-white/12" : ""
+            } ${
+                // 假删除：整行刷成 #542526（暗红底，一眼看出这行不生效；保存时这一行不部署）。
+                removed ? "bg-[#542526]" : ""
+            }`}
         >
-            <td className="sticky left-0 z-40 w-[68px] border-r border-b bg-[#171717] p-0">
+            <td className={`sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -930,37 +1031,34 @@ function SortableFlagRow({row, index, columns, t, selected, orig, onSelect, onEx
                     onExtend={onExtend}
                 />
             </td>
-            {columns.map((column) => {
-                // 与打开时一字不差 = 没动过 → 显示成灰。值照常传下去（点开即预填）。
-                // 提示：类型那一列是下拉框、效果那两列是算出来的文字，都不走这里，所以不参与灰/亮。
-                const cur = String(row[column.key] ?? "")
-                const unchanged = orig !== undefined && String(orig[String(column.key)] ?? "") === cur
-                return column.text ? (
-                    <td key={column.label} className="border-r border-b p-0 cell-focus dark:bg-input/30">
+            {columns.map((column) =>
+                column.text ? (
+                    // 假删除的行：文字格也别留那层暗色（dark:bg-input/30），否则整条红带里这几格是暗的。
+                    <td key={column.label} className={`border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`}>
                         <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
                     </td>
                 ) : (
                     <EditableCell
                         key={column.label}
-                        tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
+                        tdClassName={`border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`}
                         mono
-                        value={cur}
-                        unchanged={unchanged}
+                        value={String(row[column.key] ?? "")}
+                        unchanged={!diff || !diff.has(String(column.key))}
                         onCommit={(value) => onEdit(column.key, value)}
                     />
-                )
-            })}
+                ),
+            )}
         </tr>
     )
 }
 
 /** flags 的专用表格：只列有意义的那几列，Flag0/Flag1 后面跟后端算好的中文含义。 */
-function FlagsGrid({rows, sel, t, origMap, onSelect, onExtend, onEdit, onReorder}: {
+function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}: {
     rows: FlagRow[]
     sel: {from: number; to: number} | null
     t: Messages
-    /** 各行打开时的原值（见 AnimationDetail 里 origRef 的注释）。 */
-    origMap: WeakMap<object, Record<string, unknown>>
+    /** 每行与原表的差异列（下标与行一一对应，见 diffRows）。 */
+    diffs: (Set<string> | null)[] | undefined
     onSelect: (index: number, shift: boolean) => void
     onExtend: (index: number) => void
     onEdit: (index: number, key: keyof FlagRow, value: string) => void
@@ -1021,7 +1119,7 @@ function FlagsGrid({rows, sel, t, origMap, onSelect, onExtend, onEdit, onReorder
                                     index={index}
                                     columns={columns}
                                     t={t}
-                                    orig={origMap.get(row)}
+                                    diff={diffs?.[index] ?? null}
                                     selected={inRange(index)}
                                     onSelect={(shift) => onSelect(index, shift)}
                                     onExtend={() => onExtend(index)}

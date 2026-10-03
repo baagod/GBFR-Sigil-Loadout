@@ -52,10 +52,15 @@ type TrackTable struct {
 }
 
 // TrackRow 是一行：Values 是那一行的属性（列名 → 原样的字符串），Children 是它的子元素（多数轨没有）。
+//
+// Orig / Removed 是**界面用的行身份**（见 actionrowmarks.go）：对应原版第几行、是否被"假删除"。
+// 它们只跟着改动存进 track_edits.json，**不进 XML、不进 BXM**（buildTrackXML 只读 Values 与 Children）。
 type TrackRow struct {
 	Index    int               `json:"index"`
 	Values   map[string]string `json:"values"`
 	Children []TrackChild      `json:"children"`
+	Orig     int               `json:"orig"`
+	Removed  bool              `json:"removed"`
 }
 
 // TrackChild 是行里的一个子元素：Tag 是标签名（Ailment00…），Values 同上一层的规矩。
@@ -333,7 +338,8 @@ func parseTrackName(base, char, motion string) (sub, kind string, ok bool) {
 	return sub, kind, true
 }
 
-// LoadTrack 读一条轨（通用解析，见文件头）。改过就是这个角色的改动，没改过就是随包的原始数据。
+// LoadTrack 读一条轨（通用解析，见文件头）。改过就是这个角色的改动，没改过就是随包的原始数据；
+// 被"假删除"的行会从原版插回来（标记 Removed），界面上一直看得见。
 func (s *ActionsService) LoadTrack(motion, sub, kind string) (*TrackTable, error) {
 	cfg := s.config()
 	edits, err := loadTrackEdits()
@@ -341,6 +347,39 @@ func (s *ActionsService) LoadTrack(motion, sub, kind string) (*TrackTable, error
 		return nil, err
 	}
 	raw, err := trackSourceXML(cfg, edits, motion, sub, kind)
+	if err != nil {
+		return nil, err
+	}
+	table, err := parseTrackXML(raw)
+	if err != nil {
+		return nil, err
+	}
+	table.Sub = sub
+	ref := trackRef{motion: motion, sub: sub, kind: kind}
+	marks := marksOf(edits, charCode(cfg), ref, len(table.Rows))
+	// 原版读不到（资产缺这一条）也不该让这一页打不开：那就退回"位置对齐"。
+	if prim, err := s.loadOriginalTable(motion, sub, kind); err == nil {
+		table.Rows = mergeTrackRows(marks, table.Rows, prim.Rows)
+	} else {
+		table.Rows = mergeTrackRows(marks, table.Rows, nil)
+	}
+	return table, nil
+}
+
+// LoadTrackOriginal 读这条轨的**原版**（随包 data.zip 那份，永远只读、与玩家改动无关）：
+// 界面上"这一格相对游戏原版改了什么"就是拿它当基准。
+func (s *ActionsService) LoadTrackOriginal(motion, sub, kind string) (*TrackTable, error) {
+	return s.loadOriginalTable(motion, sub, kind)
+}
+
+// loadOriginalTable 是 LoadTrack / LoadTrackOriginal 共用的那份"读原版并解析"。
+func (s *ActionsService) loadOriginalTable(motion, sub, kind string) (*TrackTable, error) {
+	cfg := s.config()
+	xmlPath, err := trackXMLPath(cfg, motion, sub, kind)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := trackPrimalXML(cfg, motion, sub, kind, xmlPath)
 	if err != nil {
 		return nil, err
 	}
@@ -376,12 +415,24 @@ func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
 		if _, err := trackXMLPath(cfg, motion, table.Sub, table.Kind); err != nil {
 			return err
 		}
-		raw, err := buildTrackXML(&table)
+		// 行身份跟着改动一起存（见 actionrowmarks.go）；被"假删除"的行不进 XML（所以不部署），
+		// 但它们的身份留着 —— 界面上要一直看得见、也随时能恢复。
+		marks := make([]rowMark, 0, len(table.Rows))
+		kept := make([]TrackRow, 0, len(table.Rows))
+		for _, row := range table.Rows {
+			marks = append(marks, rowMark{Orig: row.Orig, Removed: row.Removed})
+			if !row.Removed {
+				kept = append(kept, row)
+			}
+		}
+		plain := table
+		plain.Rows = kept
+		raw, err := buildTrackXML(&plain)
 		if err != nil {
 			return err
 		}
 		ref := trackRef{motion: motion, sub: table.Sub, kind: table.Kind}
-		edits = setTrackEdit(edits, char, ref, string(raw))
+		edits = setTrackEdit(edits, char, ref, string(raw), marks)
 		items = append(items, trackWrite{motion: motion, sub: table.Sub, kind: table.Kind, raw: raw})
 	}
 	if err := saveTrackEdits(edits); err != nil {

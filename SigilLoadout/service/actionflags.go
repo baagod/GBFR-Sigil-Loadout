@@ -29,6 +29,9 @@ XML 的形状（对面那个工具的样子，属性顺序也就是写出时的�
 //
 // Flag0Effects / Flag1Effects 是那两个掩码翻译过来的中文（见 flagEffects），给界面直接显示；
 // 写回时**不看它们**，改掩码要改 Flag0 / Flag1 本身。
+//
+// Orig / Removed 是**界面用的行身份**（见 actionrowmarks.go）：对应原版第几行、是否被"假删除"。
+// 它们只跟着改动存进 track_edits.json，不进 XML。
 type FlagRow struct {
 	Index        int    `json:"index"`
 	Config       string `json:"config"`
@@ -41,6 +44,8 @@ type FlagRow struct {
 	FreeArg      string `json:"freeArg"`
 	Flag0Effects string `json:"flag0Effects"`
 	Flag1Effects string `json:"flag1Effects"`
+	Orig         int    `json:"orig"`
+	Removed      bool   `json:"removed"`
 }
 
 // flag0Names / flag1Names 是位定义表：**下标就是 bit 号**，空串 = 还没弄清含义的那一位（给界面时
