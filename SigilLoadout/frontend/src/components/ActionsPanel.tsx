@@ -79,13 +79,30 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
 // ⚠️ 这一格**不能给自己加边框**：Input 基类自己带 border+border-input，而这一格要的是"没有边框"
 // （格线由格子的 border-r/border-b 提供），所以宽度必须是 0（border-0）。
 const CELL_INPUT =
-    "rounded-none border-0 bg-transparent dark:bg-transparent px-1 py-0 text-xs shadow-none focus-visible:ring-2 focus-visible:ring-transparent"
+    "w-full rounded-none border-0 bg-transparent dark:bg-transparent px-1 py-0 shadow-none focus-visible:ring-2 focus-visible:ring-transparent"
+
+// 显示态那一格的类：平时只渲染**文本**（不是输入框），点一下才换成 Input。
+//
+// 字号必须和输入框**完全一样**：Input 基础类里是 `text-base md:text-sm`（本窗口宽度下 = 14px），
+// 而这里原来写的是 `text-xs`（12px）—— 于是未编辑的格子看着比编辑时小一号，点一下字会"跳大"。
+// 所以这里照抄 Input 的那两个类，而不是自己定一个值。
+//
+// 为什么值得这么折腾：动作表是 **138 行 × 86 列 = 11868 个格子**（CDP 实测整个文档有 13265 个 input），
+// 一万多个输入框常驻，每次布局/动画都要带着它们算 —— 弹窗打开那约 1 秒的主线程阻塞就出在这儿。
+// 顺带一个大红利：**文本自己就把列撑开了**，于是之前那套"canvas 量文本 + 缓存 + 读字体"整个不需要，
+// 全删（那几轮估宽/量宽的弯路就此结束）。
+// 没填值时显示的是原值：用 muted 前景色，和输入框 placeholder 的默认灰一致，观感不变。
+const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-sm whitespace-nowrap"
 
 /**
- * 一个可编辑的格：点一下变输入框，回车或失焦提交。值没变就什么都不做——免得把"点了一下"记成改动。
+ * 一个可编辑的格：**平时是文本，点一下才变输入框**，回车或失焦提交。值没变就什么都不做——
+ * 免得把"点了一下"记成改动。
  *
  * 高度跟着所在的行走：flags 表的行高是**写死的 28px**，用 h-full 铺满；动作表的行高由内容撑出来，
- * 那里没有可依赖的高度，所以 slim 那一档钉 24px（钉住的是输入框，行高自然就是它）。
+ * 那里没有可依赖的高度，所以 slim 那一档钉 24px。两者都**填满单元格**，格子里不留缝。
+ *
+ * 为什么显示态也要有 tabIndex：焦点圈（style.css 的 cell-focus）靠 td 的 :focus-within 画，
+ * 键盘 Tab 也要能进到格子里 —— 有焦点才会换成输入框。
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
@@ -96,7 +113,7 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
     mono?: boolean
     /** 行高由内容撑的格子（动作表）用这一档；flags 表那种行高固定的不传，直接铺满。 */
     slim?: boolean
-    /** 原值灰显：留空时显示它（动作表的"原值 / 改动"模型，见后端 actionedits.go）。 */
+    /** 原值：留空时显示它（动作表的"原值 / 改动"模型，见后端 actionedits.go）。 */
     placeholder?: string
 }) {
     const [draft, setDraft] = useState(value)
@@ -104,53 +121,74 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
     // 没在编辑的格子跟着外部值走：别处保存完、重读回来的新值要上屏。
     if (!editing && draft !== value) setDraft(value)
 
+    /** 这一格显示的那份文本：没填值时就是原值。 */
+    const shown = value !== "" ? value : (placeholder ?? "")
+
+    /**
+     * Ctrl+C：**直接复制整格文本**，不用先划选。有选区时（只在编辑态可能）交给浏览器，
+     * 没选区才接管 —— 否则在没选中内容时按 Ctrl+C 什么都不会发生。
+     */
+    const onCopy = (
+        e: {ctrlKey: boolean; metaKey: boolean; key: string; preventDefault: () => void},
+        hasSelection: boolean,
+    ) => {
+        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return
+        if (hasSelection || shown === "") return
+        e.preventDefault()
+        void navigator.clipboard?.writeText(shown).catch(console.error)
+    }
+
+    // display: contents 的这层**只为接双击**，两个状态都在它里面：第一次点击会把格子换成输入框，
+    // 两次点击因此落在**不同元素**上（div → input），浏览器不一定还认成一次双击 —— 挂在不会更换的
+    // 外层上，事件照常冒泡过来。contents 不产生盒子，对布局零影响。
     return (
-        <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onFocus={() => setEditing(true)}
-            onBlur={() => {
-                setEditing(false)
-                if (draft !== value) onCommit(draft)
-            }}
-            onDoubleClick={onDoubleClick}
-            /**
-             * Ctrl+C：**直接复制整格文本**，不用先划选。
-             *
-             * 有选区时让浏览器自己处理（原生复制选中的那一截）；没选区才接管 —— 否则在没选中内容时
-             * 按 Ctrl+C 什么都不会发生。格子里没填值（显示的是占位符 = 原值）时复制那个原值。
-             */
-            onKeyDown={(e) => {
-                if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return
-                const input = e.currentTarget
-                if (input.selectionStart !== input.selectionEnd) return
-                const text = draft !== "" ? draft : (placeholder ?? "")
-                if (text === "") return
-                e.preventDefault()
-                void navigator.clipboard?.writeText(text).catch(console.error)
-            }}
-            /**
-             * 右键：格子里没有选区时，浏览器的**原生菜单**会把"复制"置灰，而原生菜单的项和禁用态
-             * JS 改不了。唯一不换自绘菜单的办法就是先把整格文本选上 —— 原生"复制"随即恢复可用，
-             * 复制到的也正是整格内容。注意：值本身为空（只显示占位符原值）时这招无效，
-             * 那种情况要"复制"可用只能换成自绘菜单。
-             */
-            onContextMenu={(e) => {
-                const input = e.currentTarget
-                if (input.selectionStart === input.selectionEnd) input.select()
-            }}
-            placeholder={placeholder}
-            /**
-             * 按内容定宽：细节见 style.css 里 cell-fit 的说明（`field-sizing: content`，Chromium 123+，
-             * 本机 WebView2 是 154）。有 placeholder 时 **placeholder 就是内容** —— 动作表里没改过的
-             * 格子显示的正是原值占位符，于是列宽刚好放下它，不再靠"估算字符宽度"那套（已删）。
-             * 非 mono 的格子不需要这个（它们要铺满整格），保留 w-full。
-             */
-            // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
-            className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${
-                mono ? "cell-fit tabular-nums" : "w-full"
-            }`}
-        />
+        <div className="contents" onDoubleClick={onDoubleClick}>
+            {editing ? (
+                <Input
+                    // autoFocus：点进来之后光标立刻可打字，不用再点第二下。
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={() => {
+                        setEditing(false)
+                        if (draft !== value) onCommit(draft)
+                    }}
+                    onKeyDown={(e) => {
+                        // 回车提交：走 blur，保证只有一条提交路径。
+                        if (e.key === "Enter") {
+                            e.currentTarget.blur()
+                            return
+                        }
+                        onCopy(e, e.currentTarget.selectionStart !== e.currentTarget.selectionEnd)
+                    }}
+                    /**
+                     * 右键：格子里没有选区时，浏览器的**原生菜单**会把"复制"置灰，而原生菜单的项和
+                     * 禁用态 JS 改不了。唯一不换自绘菜单的办法就是先把整格文本选上 —— 原生"复制"
+                     * 随即恢复可用。注意：值本身为空（只显示原值）时这招无效，那种情况要"复制"可用
+                     * 只能换成自绘菜单。
+                     */
+                    onContextMenu={(e) => {
+                        const input = e.currentTarget
+                        if (input.selectionStart === input.selectionEnd) input.select()
+                    }}
+                    placeholder={placeholder}
+                    // slim 那档钉 24px：动作表的行高由这个输入框撑出来，24 正好和表头一样高。
+                    className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
+                />
+            ) : (
+                <div
+                    tabIndex={0}
+                    onClick={() => setEditing(true)}
+                    onFocus={() => setEditing(true)}
+                    onKeyDown={(e) => onCopy(e, false)}
+                    className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
+                        value === "" ? "text-muted-foreground" : ""
+                    }`}
+                >
+                    {shown}
+                </div>
+            )}
+        </div>
     )
 }
 

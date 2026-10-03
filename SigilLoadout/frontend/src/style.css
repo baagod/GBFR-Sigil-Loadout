@@ -191,20 +191,6 @@
 }
 
 /*
-    让格子里那个输入框**按内容定宽**（数字串、JSON 串都刚好放下）。
-
-    `field-sizing: content` 是 Chromium 123+ 的原生能力（本机 WebView2 是 154），官方文档明确写着
-    **有 placeholder 时 placeholder 就是内容** —— 正好对上这张表：没改过的格子显示的是原值占位符。
-    此前用"字符数 × 每字符宽度"去估 min-width，估宽了列虚高、估窄了被截断，来回调了三版；
-    现在交给浏览器量，那套估算连同它的系数全部删掉。
-    `min-inline-size` 只做兜底：内容为空、又没有占位符时，别把格子缩成 0。
-*/
-@utility cell-fit {
-    field-sizing: content;
-    min-inline-size: 2ch;
-}
-
-/*
     格子获得焦点时的那圈线：**从格子的外沿往里画 2px**。
 
     为什么不直接用 ring：ring 是画在输入框**外面**的（box-shadow），2px 会越出格子 —— 上沿顶进表头、
