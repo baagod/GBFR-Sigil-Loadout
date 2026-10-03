@@ -140,7 +140,7 @@ const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-s
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono, placeholder}: {
+export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono, placeholder, unchanged}: {
     /** 这个格的 td 类，由调用点给（各表的边框/底色/吸顶不一样）。 */
     tdClassName: string
     value: string
@@ -149,6 +149,14 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
     mono?: boolean
     /** 原值：留空时显示它（动作表的"原值 / 改动"模型，见后端 actionedits.go）。 */
     placeholder?: string
+    /**
+     * 这一格**还等于打开时的原值**（没动过）→ 显示成 muted 灰。
+     *
+     * 动作表用"value 为空 + placeholder"表达同一件事（它的原值在后端那套 override 里）；
+     * 轨表的原值就在自己的数据里，所以直接给个标记，值照常传进来 —— 点开时输入框因此是**预填**的，
+     * 改一位数字很方便。
+     */
+    unchanged?: boolean
 }) {
     const [draft, setDraft] = useState(value)
     const [editing, setEditing] = useState(false)
@@ -191,7 +199,7 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                 onFocus={() => setEditing(true)}
                 onKeyDown={(e) => onCopy(e, false)}
                 className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
-                    value === "" ? "text-muted-foreground" : ""
+                    value === "" || unchanged ? "text-muted-foreground" : ""
                 } ${editing ? "invisible" : ""}`}
             >
                 {shown}

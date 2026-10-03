@@ -79,6 +79,15 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [busy, setBusy] = useState(false)
     // "正在拖选"：同步版本（ref），按下与第一次划过同一帧时 state 还没落地。
     const draggingRef = useRef(false)
+    /**
+     * 打开这个弹层时那份**原值**，按行对象身份记（WeakMap）。
+     *
+     * 只服务界面：显示态据此把"没动过的格子"显示成灰色原值、"动过的"显示成正常前景色
+     * （与动作表同一套观感）。按**身份**而不是下标记 —— 行重排、增删都不会错位，也不会写进数据
+     * （保存负载里没有它）。编辑会把行换成新对象（`{...row}`），所以 editValue / editFlag 里
+     * 要把原值搬到新对象上；新增 / 粘贴出来的行没有原值 → 一律当成改动。
+     */
+    const origRef = useRef(new WeakMap<object, Record<string, unknown>>())
 
     useEffect(() => {
         let alive = true
@@ -108,6 +117,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 setTables(loaded)
                 setFlags(flagRows ?? [])
                 setFsmNames(names ?? [])
+                // 原值快照（见 origRef 的注释）：通用轨按行的 values 抄一份，flags 是平铺字段，整行抄。
+                const orig = new WeakMap<object, Record<string, unknown>>()
+                for (const table of Object.values(loaded)) {
+                    for (const row of table.rows) orig.set(row, {...row.values})
+                }
+                for (const row of flagRows ?? []) orig.set(row, {...row})
+                origRef.current = orig
                 // 全部默认展开：点进来就是想看它们，不该再点一次（空的分区也展开，展开着才知道它是空的）。
                 setOpened([...list.map(trackKey), "fsm"])
                 // 与 infos 同一次 setState：手风琴第一次渲染时就是"已展开"，不会先收起再展开。
@@ -133,32 +149,48 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const markDirty = (key: string) =>
         setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]))
 
-    /** 改 flags 的一格：只在真变了的时候记改动。 */
+    /**
+     * 改 flags 的一格：只在真变了的时候记改动。
+     * **改回原值就等于没改**：写回原值、不标脏 —— 显示态会退回灰色占位符（与动作表同一套语义）。
+     */
     const editFlag = (index: number, key: keyof FlagRow, value: string) => {
+        const row = flags[index]
+        const orig = row ? origRef.current.get(row) : undefined
+        const reverted = orig !== undefined && String(orig[String(key)] ?? "") === value
         setFlags((prev) =>
-            prev.map((row, i) => {
-                if (i !== index || String(row[key]) === value) return row
-                const next = {...row, [key]: value}
+            prev.map((r, i) => {
+                if (i !== index || String(r[key]) === value) return r
+                const next = {...r, [key]: value}
                 // 掩码改了就把含义重算一遍——这两列是给人看的，不该等下次读取才更新。
                 if (key === "flag0") next.flag0Effects = effectsOf(value, 0)
                 if (key === "flag1") next.flag1Effects = effectsOf(value, 1)
+                // 原值跟着新行对象走（WeakMap 按身份记）。updater 里这次写是幂等的，双跑也无害。
+                const o = origRef.current.get(r)
+                if (o) origRef.current.set(next, o)
                 return next
             })
         )
-        markDirty(flagsKey)
+        if (!reverted) markDirty(flagsKey)
     }
 
-    /** 改通用轨的一格。 */
+    /** 改通用轨的一格。语义同 editFlag：改回原值即撤销，不标脏。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
+        const row = tables[key]?.rows[index]
+        const orig = row ? origRef.current.get(row) : undefined
+        const reverted = orig !== undefined && String(orig[column] ?? "") === value
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
-            const rows = table.rows.map((row, i) =>
-                i === index ? {...row, values: {...row.values, [column]: value}} : row
-            )
+            const rows = table.rows.map((r, i) => {
+                if (i !== index) return r
+                const next = {...r, values: {...r.values, [column]: value}}
+                const o = origRef.current.get(r)
+                if (o) origRef.current.set(next, o)
+                return next
+            })
             return {...prev, [key]: {...table, rows}}
         })
-        markDirty(key)
+        if (!reverted) markDirty(key)
     }
 
     // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
@@ -329,6 +361,14 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             const list = (await ListTracks(motion)) ?? []
             setInfos(list)
             setDirty([])
+            // 原值刷成刚写下去的那份：改过的格子随之回到灰色（此刻没有未保存的差异了），
+            // 与动作表保存后重读 originals 的行为一致。
+            const orig = new WeakMap<object, Record<string, unknown>>()
+            for (const table of Object.values(tables)) {
+                for (const row of table.rows) orig.set(row, {...row.values})
+            }
+            for (const row of flags) orig.set(row, {...row})
+            origRef.current = orig
         } catch (e) {
             setFailure(t.saveFailedText(String(e)))
         } finally {
@@ -441,6 +481,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                 rows={flags}
                                                 sel={sel?.key === key ? sel : null}
                                                 t={t}
+                                                origMap={origRef.current}
                                                 onSelect={(index, shift) => select(key, index, shift)}
                                                 onExtend={(index) => extendTo(key, index)}
                                                 onEdit={editFlag}
@@ -451,6 +492,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                 table={tables[key]}
                                                 sel={sel?.key === key ? sel : null}
                                                 t={t}
+                                                origMap={origRef.current}
                                                 onSelect={(index, shift) => select(key, index, shift)}
                                                 onExtend={(index) => extendTo(key, index)}
                                                 onEdit={(index, column, value) => editValue(key, index, column, value)}
@@ -714,12 +756,14 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
 }
 
 /** 通用轨的一行。**单独一个组件**，因为 useSortable 是 hook：hook 不能写在 rows.map 的循环里。 */
-function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend, onEdit}: {
+function SortableTrackRow({row, index, columns, t, selected, orig, onSelect, onExtend, onEdit}: {
     row: TrackRow
     index: number
     columns: string[]
     t: Messages
     selected: boolean
+    /** 这一行打开时的原值；没有（新增 / 粘贴出来的行）就当整行都是改动。 */
+    orig?: Record<string, unknown>
     onSelect: (shift: boolean) => void
     onExtend: () => void
     onEdit: (column: string, value: string) => void
@@ -749,24 +793,32 @@ function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend,
                     onExtend={onExtend}
                 />
             </td>
-            {columns.map((column) => (
-                <EditableCell
-                    key={column}
-                    tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
-                    mono
-                    value={row.values[column] ?? ""}
-                    onCommit={(value) => onEdit(column, value)}
-                />
-            ))}
+            {columns.map((column) => {
+                const cur = row.values[column] ?? ""
+                // 与打开时一字不差 = 没动过 → 显示成灰。值照常传下去（点开即预填，改一位数字很方便）。
+                const unchanged = orig !== undefined && String(orig[column] ?? "") === cur
+                return (
+                    <EditableCell
+                        key={column}
+                        tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
+                        mono
+                        value={cur}
+                        unchanged={unchanged}
+                        onCommit={(value) => onEdit(column, value)}
+                    />
+                )
+            })}
         </tr>
     )
 }
 
 /** 通用轨的表格：列是后端给的（该轨所有属性的并集，按首次出现排），格子直接改，行拖握把重排。 */
-function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
+function TrackGrid({table, sel, t, origMap, onSelect, onExtend, onEdit, onReorder}: {
     table: TrackTable | undefined
     sel: {from: number; to: number} | null
     t: Messages
+    /** 各行打开时的原值（见 AnimationDetail 里 origRef 的注释）。 */
+    origMap: WeakMap<object, Record<string, unknown>>
     onSelect: (index: number, shift: boolean) => void
     onExtend: (index: number) => void
     onEdit: (index: number, column: string, value: string) => void
@@ -826,6 +878,7 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                                     index={index}
                                     columns={table.columns}
                                     t={t}
+                                    orig={origMap.get(row)}
                                     selected={inRange(index)}
                                     onSelect={(shift) => onSelect(index, shift)}
                                     onExtend={() => onExtend(index)}
@@ -841,12 +894,14 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
 }
 
 /** flags 的一行。同 SortableTrackRow，只是格子按 flags 那几列渲染。 */
-function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, onEdit}: {
+function SortableFlagRow({row, index, columns, t, selected, orig, onSelect, onExtend, onEdit}: {
     row: FlagRow
     index: number
     columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string}[]
     t: Messages
     selected: boolean
+    /** 这一行打开时的原值；没有（新增 / 粘贴出来的行）就当整行都是改动。 */
+    orig?: Record<string, unknown>
     onSelect: (shift: boolean) => void
     onExtend: () => void
     onEdit: (key: keyof FlagRow, value: string) => void
@@ -875,8 +930,12 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
                     onExtend={onExtend}
                 />
             </td>
-            {columns.map((column) =>
-                column.text ? (
+            {columns.map((column) => {
+                // 与打开时一字不差 = 没动过 → 显示成灰。值照常传下去（点开即预填）。
+                // 提示：类型那一列是下拉框、效果那两列是算出来的文字，都不走这里，所以不参与灰/亮。
+                const cur = String(row[column.key] ?? "")
+                const unchanged = orig !== undefined && String(orig[String(column.key)] ?? "") === cur
+                return column.text ? (
                     <td key={column.label} className="border-r border-b p-0 cell-focus dark:bg-input/30">
                         <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
                     </td>
@@ -885,20 +944,23 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
                         key={column.label}
                         tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
                         mono
-                        value={String(row[column.key] ?? "")}
+                        value={cur}
+                        unchanged={unchanged}
                         onCommit={(value) => onEdit(column.key, value)}
                     />
-                ),
-            )}
+                )
+            })}
         </tr>
     )
 }
 
 /** flags 的专用表格：只列有意义的那几列，Flag0/Flag1 后面跟后端算好的中文含义。 */
-function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
+function FlagsGrid({rows, sel, t, origMap, onSelect, onExtend, onEdit, onReorder}: {
     rows: FlagRow[]
     sel: {from: number; to: number} | null
     t: Messages
+    /** 各行打开时的原值（见 AnimationDetail 里 origRef 的注释）。 */
+    origMap: WeakMap<object, Record<string, unknown>>
     onSelect: (index: number, shift: boolean) => void
     onExtend: (index: number) => void
     onEdit: (index: number, key: keyof FlagRow, value: string) => void
@@ -959,6 +1021,7 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                                     index={index}
                                     columns={columns}
                                     t={t}
+                                    orig={origMap.get(row)}
                                     selected={inRange(index)}
                                     onSelect={(shift) => onSelect(index, shift)}
                                     onExtend={() => onExtend(index)}
