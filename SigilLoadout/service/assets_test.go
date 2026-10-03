@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 只有 pl1000 那一份的时候，作者本机看不出毛病（读不到就退回解包目录），别人装上去才是"除炎帝之外每个
 角色都读不到动作表"。
 
-门槛是 GBFR_EXTRACTED（gen 的 actions 子命令就是从那里拷的）：
+门槛是 GBFR_EXTRACTED（生成器那个子命令的 -data 下面的 extracted）：
 
 	$env:GBFR_EXTRACTED = 'D:\Games\Relink\gen\extracted'
 	go test ./service -run TestPackagedActionTables -count=1 -v
@@ -51,30 +51,30 @@ func TestPackagedActionTablesCoverEveryCharacter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	entries := readDataAsset(t)
 
 	var failures []string
 	for _, path := range source {
-		name := filepath.Base(path)
+		char := filepath.Base(filepath.Dir(path))
 		want, err := os.ReadFile(path)
 		if err != nil {
 			failures = append(failures, err.Error())
 			continue
 		}
-		// 名字就是工具那边找的写法（assets\<角色码>_action.msg），内容要与解包目录那份逐字节相同。
-		deployed := filepath.Join("..", assetsDir, name)
-		got, err := os.ReadFile(deployed)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: 随包里没有（%v）", name, err))
+		// 条目名就是部署路径（actionEntry），内容要与解包目录那份逐字节相同。
+		got, ok := entries[actionEntry(char)]
+		if !ok {
+			failures = append(failures, fmt.Sprintf("%s: 容器里没有 %s", filepath.Base(path), actionEntry(char)))
 			continue
 		}
 		if !bytes.Equal(got, want) {
 			failures = append(failures, fmt.Sprintf(
-				"%s: 与解包目录那份不是同一份字节（%d vs %d）", name, len(got), len(want)))
+				"%s: 与解包目录那份不是同一份字节（%d vs %d）", filepath.Base(path), len(got), len(want)))
 			continue
 		}
 		// 而且真的解得开：它是 msgpack，坏一个字节界面上就是"这个角色读不出来"。
-		if _, err := loadActionTable(deployed); err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
+		if _, err := parseActionTable(got, actionEntry(char)); err != nil {
+			failures = append(failures, err.Error())
 		}
 	}
 	for _, failure := range failures {
@@ -83,5 +83,5 @@ func TestPackagedActionTablesCoverEveryCharacter(t *testing.T) {
 	if len(source) == 0 {
 		t.Fatalf("%s 下面一份动作表都没有，这条测试等于没跑", extracted)
 	}
-	t.Logf("随包动作表 %d 份：名字与解包目录一一对应、逐份字节相同、都解得开", len(source))
+	t.Logf("随包动作表 %d 份：条目名与解包目录一一对应、逐份字节相同、都解得开", len(source))
 }

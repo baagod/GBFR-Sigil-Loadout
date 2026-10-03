@@ -24,18 +24,19 @@ import (
 )
 
 /*
-三个路径设置：它们是**解包目录的兜底来路**，不是数据的家 —— 原始数据随包发布（动作表走
-assets\<角色码>_action.msg，轨走 assets\tracks.zip），只有资产里没有那一条时才回头读这里。
+三个路径设置：它们是**解包目录的兜底来路**，不是数据的家 —— 轨、动作表、FSM 三类原始数据都在随包容器
+assets\data.zip 里（条目名就是部署路径，见 actiontrackedits.go 的 dataAssetName），只有容器里没有那一条
+时才回头读这里。
 
-	动作表源：D:\Games\Relink\gen\extracted\system\player\data\pl1000\pl1000_action.msg   （msgpack）
-	flags 源：D:\Games\Relink\gen\extracted\pl\pl1000\                                     （.bxm 或 .xml）
-	FSM 源  ：D:\Games\Relink\gen\extracted\system\fsm\pl1000\                             （msgpack）
+	动作表：D:\Games\Relink\gen\extracted\system\player\data\pl1000\pl1000_action.msg   （msgpack）
+	轨    ：D:\Games\Relink\gen\extracted\pl\pl1000\                                     （.bxm 或 .xml）
+	FSM   ：D:\Games\Relink\gen\extracted\system\fsm\pl1000\                             （msgpack）
 
 解包目录里的轨是**转在角色自己那个目录里**的（和该角色的 .bxm/.mot 摆在一起），不是单独一个
 `pl1000_xml\`；布局与 FSM 一致（都是 <根>\<角色>\）。
 
-角色码（pl1000）从**动作表的所在目录**取（<根>\system\player\data\<角色>\），flags 与 FSM 的文件名
-都带它——换角色只需换动作表这一个设置。FSM 那一块**还没有随包资产**，仍然只从解包目录读。
+角色码（pl1000）从**动作表的所在目录**取（<根>\system\player\data\<角色>\），三条路径的文件名都带它
+——换角色只需换动作表这一个设置。容器在的时候，"能切到哪些角色"也由容器说了算（ListCharacters）。
 
 **这里以前还有第四个设置：XML → BXM 的转换工具（GBFRDataTools.exe）。** BXM 的编解码已经在自己手里
 （bxm.go），那个外部 exe、它的路径、以及那个设置项都不再需要 —— 部署轨时不再起任何进程。
@@ -182,6 +183,12 @@ ListCharacters 列出**三个数据源都解出来了**的角色码（pl1000 / p
 */
 func (s *ActionsService) ListCharacters() ([]string, error) {
 	cfg := s.config()
+	if codes, present, err := actionTableCodes(); err != nil {
+		return nil, err
+	} else if present {
+		return codes, nil
+	}
+
 	root := filepath.Dir(filepath.Dir(cfg.Path))
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -217,12 +224,15 @@ func (s *ActionsService) SetCharacter(code string) error {
 }
 
 /*
-characterPaths 算出某个角色的三条路径，**三条都存在**才返回。
+characterPaths 算出某个角色的三条路径。
+
+**容器里有这个角色就够了**（发布版就是这一条路：轨、动作表、FSM 都在 data.zip 里，盘上什么都没有）。
+容器里没有才退回"三条路径都要在"的老校验——那是开发机上解包目录还在的时候。
 
 布局是游戏自己的那一套（与 deployActionPath 里写死的一致）：
 
 	<根>\system\player\data\<码>\<码>_action.msg
-	<根>\pl\<码>            ← flags 的 XML 转在角色自己的目录里，和 .bxm 摆在一起
+	<根>\pl\<码>            ← 轨
 	<根>\system\fsm\<码>    ← FSM 同样是"一个角色一个目录"
 
 每一栏都是从**当前那一栏**换掉角色码得来的，所以解包根在哪、盘符是什么都不用另配。
@@ -235,6 +245,15 @@ func characterPaths(cfg actionConfig, code string) (actionConfig, error) {
 		FlagsDir: filepath.Join(filepath.Dir(cfg.FlagsDir), code),
 		FsmDir:   filepath.Join(filepath.Dir(cfg.FsmDir), code),
 	}
+	if _, present, err := actionTableCodes(); err != nil {
+		return actionConfig{}, err
+	} else if present {
+		if hasActionTable(code) {
+			return next, nil
+		}
+		return actionConfig{}, fmt.Errorf("随包数据里没有角色 %s", code)
+	}
+
 	for _, one := range []struct{ what, path string }{
 		{"动作表", next.Path},
 		{"flags 目录", next.FlagsDir},
@@ -369,16 +388,21 @@ func (s *ActionsService) LoadActions() ([]Action, error) {
 }
 
 /*
-loadActionOriginal 读**原始**动作表：exe 旁 assets\<角色码>_action.msg（随包发布，只读，见 actionedits.go）。
+loadActionOriginal 读**原始**动作表：随包容器 data.zip 里那条 system/player/data/<角色码>/<角色码>_action.msg
+（只读，见 actionedits.go / actiontrackedits.go）。
 
-读不到就退回设置里那个解包副本（cfg.Path）——那时候它同样只当只读用：这一页从此不再写源文件。
+容器里没有这个角色就退回设置里那个解包副本（cfg.Path）——那时候它同样只当只读用：这一页从不写源文件。
 */
 func loadActionOriginal(cfg actionConfig) (*msgValue, error) {
-	path := actionOriginalPath(charCode(cfg))
-	if _, err := os.Stat(path); err != nil {
-		path = cfg.Path
+	char := charCode(cfg)
+	raw, found, err := readOriginal(actionEntry(char))
+	if err != nil {
+		return nil, err
 	}
-	return loadActionTable(path)
+	if !found {
+		return loadActionTable(cfg.Path)
+	}
+	return parseActionTable(raw, actionEntry(char))
 }
 
 /*
@@ -556,22 +580,25 @@ func (s *ActionsService) Deploy() error {
 	return s.writeAndDeployTracks(cfg, items)
 }
 
-// ListFsm 列出这个角色的 FSM 名：**扫目录**得来（<角色>_<名>_fsm_ingame.msg），不写死清单——
-// 换一个角色、或者解包出新文件，这里跟着变。
+/*
+ListFsm 列出这个角色的 FSM 名（<角色>_<名>_fsm_ingame.msg）：**列出来**的，不写死清单——换一个角色、
+或者解包出新文件，这里跟着变。
+
+文件清单从随包容器来（发布版的唯一来路）；容器里没有这个角色（开发机上没打资产）就退回解包目录
+cfg.FsmDir。两条来路只差"文件名从哪儿来"，筛名字那一段是同一份。
+*/
 func (s *ActionsService) ListFsm() ([]string, error) {
 	cfg := s.config()
-	entries, err := os.ReadDir(cfg.FsmDir)
+	char := charCode(cfg)
+	files, err := fsmFileNames(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("读 FSM 目录 %s: %w", cfg.FsmDir, err)
+		return nil, err
 	}
 
-	prefix, suffix := charCode(cfg)+"_", "_fsm_ingame.msg"
+	prefix, suffix := char+"_", "_fsm_ingame.msg"
 	names := []string{} // 空目录给 []，不给 null
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name, ok := strings.CutPrefix(entry.Name(), prefix)
+	for _, file := range files {
+		name, ok := strings.CutPrefix(file, prefix)
 		if !ok {
 			continue
 		}
@@ -584,20 +611,51 @@ func (s *ActionsService) ListFsm() ([]string, error) {
 	return names, nil
 }
 
-// LoadFsm 读一个 FSM 的 .msg，把嵌套结构拍平成 key.path = 值 的行：够在界面上一行一格地看就行。
-func (s *ActionsService) LoadFsm(name string) ([]ActionField, error) {
-	cfg := s.config()
-	path, err := fsmPath(cfg, name)
+// fsmFileNames 是这个角色的 FSM 文件名清单。容器在就用容器的，容器不在才读解包目录。
+func fsmFileNames(cfg actionConfig) ([]string, error) {
+	names, present, err := dataEntryNames("system/fsm/" + charCode(cfg) + "/")
 	if err != nil {
 		return nil, err
 	}
-	raw, err := os.ReadFile(path)
+	if present {
+		return names, nil
+	}
+
+	entries, err := os.ReadDir(cfg.FsmDir)
 	if err != nil {
-		return nil, fmt.Errorf("读 FSM %s: %w", path, err)
+		return nil, fmt.Errorf("读 FSM 目录 %s: %w", cfg.FsmDir, err)
+	}
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+	return files, nil
+}
+
+// LoadFsm 读一个 FSM 的 .msg，把嵌套结构拍平成 key.path = 值 的行：够在界面上一行一格地看就行。
+func (s *ActionsService) LoadFsm(name string) ([]ActionField, error) {
+	cfg := s.config()
+	path, err := fsmPath(cfg, name) // 名字由界面给，先当校验过一遍（它要拼进路径与条目名）
+	if err != nil {
+		return nil, err
+	}
+	char := charCode(cfg)
+	entry := fsmEntry(char, name)
+
+	raw, found, err := readOriginal(entry)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		if raw, err = os.ReadFile(path); err != nil {
+			return nil, fmt.Errorf("读 FSM %s: %w", path, err)
+		}
 	}
 	root, err := decodeMsgpack(raw)
 	if err != nil {
-		return nil, fmt.Errorf("解析 FSM %s: %w", path, err)
+		return nil, fmt.Errorf("解析 FSM %s: %w", entry, err)
 	}
 
 	fields := []ActionField{}
@@ -656,20 +714,26 @@ func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWri
 	return nil
 }
 
-// loadActionTable 读整份动作表。它按**有序的 entries** 解，根上那 35 个同名的 ActionInfo 一个不少。
+// parseActionTable 解一份动作表。它按**有序的 entries** 解，根上那 35 个同名的 ActionInfo 一个不少。
+// what 只进错误消息（原始数据可能来自容器，没有文件路径可报）。
+func parseActionTable(raw []byte, what string) (*msgValue, error) {
+	root, err := decodeMsgpack(raw)
+	if err != nil {
+		return nil, fmt.Errorf("解析动作表 %s: %w", what, err)
+	}
+	if root.format != msgMap {
+		return nil, fmt.Errorf("动作表 %s 的根不是映射", what)
+	}
+	return root, nil
+}
+
+// loadActionTable 从磁盘上读整份动作表（容器里没有这个角色时的兜底来路）。
 func loadActionTable(path string) (*msgValue, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("读动作表 %s: %w", path, err)
 	}
-	root, err := decodeMsgpack(raw)
-	if err != nil {
-		return nil, fmt.Errorf("解析动作表 %s: %w", path, err)
-	}
-	if root.format != msgMap {
-		return nil, fmt.Errorf("动作表 %s 的根不是映射", path)
-	}
-	return root, nil
+	return parseActionTable(raw, path)
 }
 
 // recordByID 按记录自己的 id_ 找（不按下标：id_ 和顺序不是一回事）。

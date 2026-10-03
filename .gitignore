@@ -11,9 +11,10 @@ dist/
 *.pdb
 *.ilk
 *.zip
-# 但随包资产 tracks.zip 是**要入库**的：发布版靠它自带全部原始轨（17929 份 .bxm，由 gen 的
-# tracks 子命令产出）。少了它，别人装上去轨一页全是空的——而作者本机有解包目录兜底，看不出来。
-!SigilLoadout/assets/tracks.zip
+# 但随包原始数据 data.zip 是**要入库**的：发布版靠它自带全部轨与动作表（17929 条轨 + 36 份动作表，
+# 条目名就是部署路径，由 gen 的 data 子命令产出）。少了它，别人装上去每个角色的轨与动作表都读不到
+# ——而作者本机有解包目录兜底，看不出来。
+!SigilLoadout/assets/data.zip
 /docs/action/
 
 # 构建中间产物：专属表由 gen 的 exclusive 子命令生成，vcxproj 每次编译前重跑它

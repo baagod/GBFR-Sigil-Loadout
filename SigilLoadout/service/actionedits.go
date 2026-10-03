@@ -44,10 +44,9 @@ func actionEditsPath() string {
 	return filepath.Join(appfiles.UserDir(), actionEditsName)
 }
 
-// actionOriginalPath 是随包资产里的原始动作表：exe 旁 assets\<角色码>_action.msg。
-// 源码树里是 SigilLoadout\assets\，打包后是 mod 目录下的 assets\ —— 同一个布局（见 assets.go）。
-func actionOriginalPath(char string) string {
-	return filepath.Join(appfiles.ExeDir(), assetsDir, char+"_action.msg")
+// actionEntry 是原始动作表在随包容器里的条目名 —— 与 deployActionPath 拼出来的部署路径**逐字相同**。
+func actionEntry(char string) string {
+	return "system/player/data/" + char + "/" + char + "_action.msg"
 }
 
 // loadActionEdits 读改动表。文件不存在 = 一处都没改过，不是错误。

@@ -45,9 +45,13 @@ func actionsFixture(t *testing.T) (*ActionsService, actionConfig, string) {
 	// 随包那份轨数据也钉在 fixture 自己的根下（它一开始**不存在**）：测试进程的 exe 是 go test 的临时
 	// 产物，本来就没有 assets\，但显式钉一下才不怕哪天在别处跑时撞上真实安装里的那份包——那会让
 	// "从解包目录兜底"这类测试悄悄变成测别的东西。要测资产这一条来路的自己写一份（writeTrackAsset）。
-	previousTracksAsset := tracksAssetPath
-	tracksAssetPath = filepath.Join(root, "assets", tracksAssetName)
-	t.Cleanup(func() { tracksAssetPath = previousTracksAsset })
+	previousTracksAsset := dataAssetPath
+	dataAssetPath = filepath.Join(root, "assets", dataAssetName)
+	t.Cleanup(func() {
+		// 先放掉那份包的句柄再还原路径：测试搭的那份包在 t.TempDir() 里，句柄还开着 Windows 就删不掉。
+		closeDataAsset()
+		dataAssetPath = previousTracksAsset
+	})
 
 	service := &ActionsService{}
 	if err := service.SetPath(actionPath); err != nil {

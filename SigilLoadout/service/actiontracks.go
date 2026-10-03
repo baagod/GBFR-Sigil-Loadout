@@ -275,14 +275,8 @@ func (s *ActionsService) ListTracks(motion string) ([]TrackInfo, error) {
 	char := charCode(cfg)
 
 	refs := map[trackRef]bool{}
-	names, err := trackAssetNames()
-	if err != nil {
+	if err := trackAssetRefs(char, motion, refs); err != nil {
 		return nil, err
-	}
-	for _, name := range names {
-		if ref, ok := parseTrackAssetName(name, char, motion); ok {
-			refs[ref] = true
-		}
 	}
 	matches, err := filepath.Glob(filepath.Join(cfg.FlagsDir, fmt.Sprintf("%s_%s_*_seq_edit_*.xml", char, motion)))
 	if err != nil {
