@@ -26,10 +26,12 @@ import {Button} from "@/components/ui/button"
 // 以及 DisclosureChevron / SkillPicker / SigilEditorPanel 这些自带图标的组件）一律保持 lucide。
 // 四个都用默认的 regular 字重；Phosphor 每个图标有 thin/light/regular/bold/fill/duotone 六档，
 // 将来若某个图标显得偏轻，改 `weight` 就行，不必换库或混用线宽。
+// 复制/删除取的是 **Simple** 变体（只有"两张纸/一个桶"的主体轮廓，没有内侧的复制线、桶盖提手
+// 那些细节）—— 16px 下细节会糊成一团，Simple 在这么小的尺寸里更清楚。
 import {Plus} from "@phosphor-icons/react/Plus"
-import {Copy} from "@phosphor-icons/react/Copy"
+import {CopySimple} from "@phosphor-icons/react/CopySimple"
 import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
-import {Trash} from "@phosphor-icons/react/Trash"
+import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {EditableCell} from "@/components/ActionsPanel"
@@ -610,7 +612,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <Copy />
+                        <CopySimple />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.copySelected}</TooltipContent>
                 </Tooltip>
@@ -644,7 +646,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <Trash />
+                        <TrashSimple />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.remove}</TooltipContent>
                 </Tooltip>
