@@ -49,7 +49,9 @@ const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = ["config", "startTime", "endT
 /**
  * 行身份（后端给的，见 Go 侧 actionrowmarks.go）：
  * - `orig`：这一行对应**游戏原版**第几行（-1 = 新增 / 粘贴出来的，原版里没有它）；
- * - `removed`：这一行被**假删除**了（界面上刷成暗红底标记一下，保存时不部署这一行；其余照旧，仍可编辑）。
+ * - `removed`：这一行被**假删除**了（界面上刷成暗红底标记一下，保存时不写进游戏文件）。
+ *   它**照样可以编辑**，而且改动不会丢：后端把那行的**当前值**一起存进行身份里（见 Go 侧
+ *   actionrowmarks.go 的 Track / Flag），重开时原样回来。删除也不是实时写回：一切都等到按「保存」。
  *
  * 它必须记在行上：改过的原行，光看值已经和新行分不出来了（后端把行身份跟改动一起存进
  * track_edits.json，重启后照样认得）。编辑会把行换成新对象（`{...row}`），字段自动跟着走过去。
@@ -229,6 +231,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             const table = prev[key]
             if (!table) return prev
             const rows = table.rows.map((row, i) =>
+                // 删除态的行照样能改：改动由后端存进行身份，重开原样回来（写回仍只在按「保存」时）。
                 i === index ? {...row, values: {...row.values, [column]: value}} : row
             )
             return {...prev, [key]: {...table, rows}}
@@ -324,7 +327,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 // 也会拿最后一行的原值去比。
                 const row: TrackRow = last
                     ? {...last, index: table.rows.length, children: [], orig: -1, removed: undefined}
-                    : ({index: 0, values: {}, children: []} as TrackRow)
+                    // 空轨兜底那一行也必须显式写 -1：Go 那边 orig 是 int，缺字段会解成 0 = "原版第 0 行" ✗。
+                    : ({index: 0, values: {}, children: [], orig: -1, removed: undefined} as TrackRow)
                 return {...prev, [key]: {...table, rows: [...table.rows, row]}}
             })
         }
@@ -849,7 +853,7 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
     onEdit: (column: string, value: string) => void
 }) {
     // 排序按**数组下标**认行：位置就是身份，行一挪下标自然跟着变。
-    // 被"假删除"的原行：整行 disabled，只是留在这里让人看见原值。
+    // 被"假删除"的原行：暗红底标记一下；值照旧可编辑，改动由后端存进行身份保住（仍是删除态时不写进游戏）。
     const removed = (row as Marked<TrackRow>).removed === true
     const {attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging} =
         useSortable({id: index})
@@ -994,7 +998,7 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
     onExtend: () => void
     onEdit: (key: keyof FlagRow, value: string) => void
 }) {
-    // 被"假删除"的原行：整行 disabled，只是留在这里让人看见原值。
+    // 被"假删除"的原行：暗红底标记一下；值照旧可编辑，改动由后端存进行身份保住（仍是删除态时不写进游戏）。
     const removed = (row as Marked<FlagRow>).removed === true
     const {attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging} =
         useSortable({id: index})
@@ -1155,5 +1159,8 @@ function blankFlag(rows: FlagRow[]): FlagRow {
         freeArg: "0 0 0 0",
         flag0Effects: "",
         flag1Effects: "",
+        // 新行必须显式写 -1：Go 那边 orig 是 int，缺字段会被解成 0 = "原版第 0 行" ✗。
+        orig: -1,
+        removed: undefined,
     } as FlagRow
 }

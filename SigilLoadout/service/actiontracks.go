@@ -420,7 +420,13 @@ func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
 		marks := make([]rowMark, 0, len(table.Rows))
 		kept := make([]TrackRow, 0, len(table.Rows))
 		for _, row := range table.Rows {
-			marks = append(marks, rowMark{Orig: row.Orig, Removed: row.Removed})
+			mark := rowMark{Orig: row.Orig, Removed: row.Removed}
+			if row.Removed {
+				// 假删除的行不进 XML，所以它的**当前值**只能存在这里 —— 重开时要原样回来。
+				self := row
+				mark.Track = &self
+			}
+			marks = append(marks, mark)
 			if !row.Removed {
 				kept = append(kept, row)
 			}
