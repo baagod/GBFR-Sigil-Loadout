@@ -373,18 +373,21 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         {infos.map((info) => {
                             const key = trackKey(info)
                             const count = info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0)
-                            // not-last:border-b-0：基类给每个非最后分区加了下边框（也就是"下一个标题上面
-                            // 那条线"）。要关掉必须写**同变体**的类 —— 无变体的 border-b-0 跟
-                            // not-last:border-b 不算同一冲突组，顶不掉。
+                            // 分区之间的那条线交给 AccordionItem 的基类 `not-last:border-b`：它画在 item
+                            // 的底边上 —— 收起时正好在两个标题之间，展开时在内容**最下面**，最后一项没有。
+                            // （以前用 not-last:border-b-0 把基类顶掉、改在每个标题那层画一条，结果
+                            // 收起时与下一个标题的上边框、展开时与表格容器的上边框各叠一次 = 2px。）
                             return (
-                                <AccordionItem key={key} value={key} className="not-last:border-b-0">
+                                <AccordionItem key={key} value={key}>
                                     {/* 标题与那排按钮**包在同一个 sticky 容器里**：只钉标题的话，不透明的标题
                                         会把压在它上面的按钮盖住（上一版就是这么翻车的 ✗）。容器是 sticky，
                                         本身就是定位元素，所以里面那个 absolute 的按钮组跟着一起钉住。
                                         z-[60]：**必须高过表格里所有吸顶格**（表头 "#" 是 50、表体 "#" 是 40、焦点框是 30）。给 30 时表体那格会画到标题行上面（实测把标题整个盖住）。
-                                        border-b：这一行原来没有下边框，而表格的表头紧贴在它下面，于是"标题行 / 表头 / 第一行"
-                                        之间的分界线整体看着是缺的。加在这里也保证横向滚、纵向滚时这条线始终在最上面。 */}
-                                    <div className="sticky top-0 z-[60] border-b bg-popover">
+                                        **这一层不给边框**：分区之间那条分隔线归 AccordionItem 的基类
+                                        `not-last:border-b`（官方语义：每个 item 一条下边框，最后一个没有）——
+                                        画在 item 的底边上，于是收起时在两个标题之间、展开时在内容**最下面**，
+                                        最后一项自然没有。以前这里各画一条、还把基类顶掉，两处就都叠成了 2px。 */}
+                                    <div className="sticky top-0 z-[60] bg-popover">
                                         {/* pt-1 与 pb-4 都写明：基类是 py-4，twMerge 遇到"局部覆盖"会把 py-4
                                             整条删掉（它没法只删一半），只写 pt-1 的话 pb 也没了。 */}
                                         <AccordionTrigger className="pt-1 pb-4">
@@ -439,12 +442,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         })}
 
                         {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。 */}
-                        <AccordionItem value="fsm" className="not-last:border-b-0">
+                        <AccordionItem value="fsm">
                             {/* FSM 这块没有按钮组，但**外面这层 div 不能省**：sticky 只能在父元素范围内吸顶，
                                 直接挂在 Trigger 上的话，它的父元素是 Base UI 生成的 Header（只有标题那么高），
                                 一滚就被带走了 —— 表现就是"别的都吸顶、FSM 不吸顶"。
-                                border-b 同前面几个分区：分区标题行统一带一条下边框。 */}
-                            <div className="sticky top-0 z-[60] border-b bg-popover">
+                                边框同前几个分区：归 AccordionItem 的基类 not-last:border-b；它是**最后一项**，
+                                所以收起展开都不带边框（与官方示例一致）。 */}
+                            <div className="sticky top-0 z-[60] bg-popover">
                                 <AccordionTrigger className="pt-1 pb-4">{t.fsmScope}</AccordionTrigger>
                             </div>
                             {/* 最后一块**不给下间距**（轨道那块给 24px 是为了跟下一个标题拉开）：它下面
@@ -752,10 +756,9 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
             {/* min-w-full：内容比容器窄时（只有几条轨的动画很常见）补满那截右侧空白；表宽仍由文本撑开，
                 多余的部分按各列固有宽度**等比分摊**（实测表头与表体逐列仍相等）。用 min-w 而不是 w ——
                 attack 三十几列那类表本来就比容器宽，那时 w 会被规范当成"下限"，这里不需要那把力。
-                border-t-0：本容器的上边框与上面分区标题那条 border-b **叠在同一像素上**（实测两者的
-                rect.bottom / rect.top 都是同一个 y），渲染出来就是 2px 的一条粗线；分区标题那条已经
-                画在这一行的位置上了，所以表格这侧不画上边 —— 左右两条竖框照旧与它接上。 */}
-            <div className="overflow-x-auto overflow-y-hidden border border-t-0 table-border">
+                上边框由分区标题那条改到 AccordionItem 的基类之后，这里可以照常画：它在展开时不会与
+                任何东西叠（标题那层不再有边框），收起时表格根本不挂载。 */}
+            <div className="overflow-x-auto overflow-y-hidden border table-border">
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
@@ -887,10 +890,8 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
             }}
         >
             {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。
-                min-w-full 同上：flags 的 9 列通常比容器窄，不补满右边就会空出一截。
-                border-t-0 同上：上边框与分区标题那条 border-b 叠在同一像素上，会渲染成 2px（实测两格
-                的 rect.bottom / rect.top 都是 297.5），所以表格这侧不画上边。 */}
-            <div className="overflow-x-auto overflow-y-hidden border border-t-0 table-border">
+                min-w-full 同上：flags 的 9 列通常比容器窄，不补满右边就会空出一截。 */}
+            <div className="overflow-x-auto overflow-y-hidden border table-border">
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
