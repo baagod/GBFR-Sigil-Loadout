@@ -206,7 +206,7 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                 弹层里**没有搜索框**，因此也不需要 filter；样式照 SkillPicker 那套：outline 按钮 + 名在左箭头在右。 */}
             <ComboboxTrigger
                 render={
-                    <Button variant="outline" disabled={disabled} className="w-56 justify-between font-normal">
+                    <Button variant="outline" disabled={disabled} className="w-56 justify-between font-medium">
                         <span className="truncate" style={{color: colors[value.toUpperCase()]?.color}}>
                             {selected.label}
                         </span>
@@ -219,7 +219,9 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                 {/* 官方列表的高度是 CSS 定的（252px，约 8 行），Base UI 也没有"显示条数"这类属性，
                     所以要让 15 行（15 × 32px + 内边距 8px = 488px）露出来，只能在这里给一个高度；
                     后半句保留官方那套"不超过窗口可用高度"的钳制。 */}
-                <ComboboxList className="max-h-[min(30.5rem,calc(var(--available-height)-2.25rem))]">
+                {/* 字重 500：列表项本身没设字重（text-sm 而已），写在 List 上会继承给每一项。
+                    只这一个 combo 这样，SkillPicker 那个不动。 */}
+                <ComboboxList className="max-h-[min(30.5rem,calc(var(--available-height)-2.25rem))] font-medium">
                     {(item) => (
                         <ComboboxItem key={item.value} value={item}>
                             {renderCode(item.value)}
