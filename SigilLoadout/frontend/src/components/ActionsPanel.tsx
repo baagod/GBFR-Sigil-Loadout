@@ -228,7 +228,12 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                     // inset-0 + h-auto：脱离文档流（固有宽度不参与列宽计算），并向四边拉伸铺满格子。
                     // h-auto! 必须写 —— Input 基类自带 h-9（36px），四边都定位时 height 不是 auto 就会
                     // 忽略 bottom、按 36px 渲染。拉伸后高度自然跟随单元格，不必写死 24px。
-                    className={`absolute inset-0 h-auto! ${CELL_INPUT} ${mono ? "tabular-nums" : ""}`}
+                    //
+                    // pr-0（放在 CELL_INPUT 之后，让 twMerge 的后者胜出）：**给行尾光标让出 4px**。
+                    // 列宽是由显示态文本撑出来的，内容区正好等于文本宽度（实测 clientWidth == scrollWidth），
+                    // 于是"该列最长的那串文本"一旦进入编辑态，光标就落在最后一个字符的边界上、看着像卡在
+                    // 数字里。左侧内边距保持 4px 不动 —— 文字起点与显示态仍然对得齐，只是行尾多出余量。
+                    className={`absolute inset-0 h-auto! ${CELL_INPUT} pr-0 ${mono ? "tabular-nums" : ""}`}
                 />
             )}
         </td>
