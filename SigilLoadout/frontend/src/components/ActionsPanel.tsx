@@ -198,6 +198,18 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
                         if (input.selectionStart === input.selectionEnd) input.select()
                     }}
                     placeholder={placeholder}
+                    /**
+                     * size={1}：把输入框的**固有宽度**压到最小。
+                     *
+                     * 表格是 auto 布局，格子里的 `width:100%` 在算固有尺寸时按 auto 处理 —— 于是
+                     * `<input>` 默认的 `size=20`（约 110px）会**反过来把列顶宽**：点一下"结束"列，
+                     * 83px → 111px，其它列被挤窄，看着就是抖一下。列宽本该由"最长的那份文本"决定，
+                     * 不该由输入框的默认尺寸决定。压到 1 个字符后，实际宽度仍由 w-full 铺满格子。
+                     *
+                     * 动作表看不出这毛病，只因为它的列表头名很长（autoHomingOffsetDist_ 之类）本来就
+                     * 超过 110px；它那两列窄的（id_ / abilityTag_）是只读的，不走这里。
+                     */
+                    size={1}
                     // slim 那档钉 24px：动作表的行高由这个输入框撑出来，24 正好和表头一样高。
                     className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
                 />
