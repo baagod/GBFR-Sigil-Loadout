@@ -63,7 +63,18 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     'skillboard.json', 'skillboard.zh.json',
     # 轨的原始数据（17929 份 .bxm，约 8.8 MB）：少了它，除了作者本机（那边有解包目录兜底），
     # 别人的轨一页会全是空的。
-    'tracks.zip')
+    'tracks.zip',
+    # 动作表：一个角色一份（gen 的 actions 子命令产出，散着放，见那边的注释）。这一批名字就是
+    # "解包目录里有哪些角色"，换游戏版本时会增减 —— 缺哪个这里就报哪个，照报出来的名字补。
+    'em1900_action.msg', 'em7000_action.msg', 'np0000_action.msg', 'np0300_action.msg',
+    'np1800_action.msg', 'pl0000_action.msg', 'pl0100_action.msg', 'pl0200_action.msg',
+    'pl0300_action.msg', 'pl0400_action.msg', 'pl0500_action.msg', 'pl0600_action.msg',
+    'pl0700_action.msg', 'pl0800_action.msg', 'pl0900_action.msg', 'pl1000_action.msg',
+    'pl1100_action.msg', 'pl1200_action.msg', 'pl1300_action.msg', 'pl1400_action.msg',
+    'pl1500_action.msg', 'pl1600_action.msg', 'pl1700_action.msg', 'pl1800_action.msg',
+    'pl1900_action.msg', 'pl2000_action.msg', 'pl2100_action.msg', 'pl2200_action.msg',
+    'pl2300_action.msg', 'pl2400_action.msg', 'pl2500_action.msg', 'pl2600_action.msg',
+    'pl2700_action.msg', 'pl2800_action.msg', 'pl2900_action.msg', 'plffff_action.msg')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }

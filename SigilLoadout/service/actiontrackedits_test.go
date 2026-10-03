@@ -124,18 +124,18 @@ func TestTrackWithoutAnyOriginalSaysSo(t *testing.T) {
 看不出来。所以这里对着**打包来源**逐条走：名字要认得出来、字节要与源文件一模一样（那一步就是拷，差一个
 字节就是拷错了东西）、条数要一份不差。
 
-门槛是 GBFR_TRACK_EXTRACTED（生成器那个子命令的 -data 下面的 extracted）：
+门槛是 GBFR_EXTRACTED（生成器那个子命令的 -data 下面的 extracted）：
 
-	$env:GBFR_TRACK_EXTRACTED = 'D:\Games\Relink\gen\extracted'
+	$env:GBFR_EXTRACTED = 'D:\Games\Relink\gen\extracted'
 	go test ./service -run TestPackagedTrackAsset -count=1 -v
 
 **不拿 GBFR_TRACK_CORPUS 那棵树当基准**：那棵树是从作者手边的工作副本 .xml 生成的，而他手上那份
 pl2900_31a2 是被改过的（11 行），随包里装的却是游戏原始（7 行）—— 两者本来就该不同。
 */
 func TestPackagedTrackAssetCoversTheWholeCorpus(t *testing.T) {
-	extracted := os.Getenv("GBFR_TRACK_EXTRACTED")
+	extracted := os.Getenv("GBFR_EXTRACTED")
 	if extracted == "" {
-		t.Skip("没有设 GBFR_TRACK_EXTRACTED，跳过随包轨数据的验收")
+		t.Skip("没有设 GBFR_EXTRACTED，跳过随包轨数据的验收")
 	}
 	// 测试的工作目录是 SigilLoadout\service\，随包资产在 SigilLoadout\assets\。
 	const assetPath = "../assets/tracks.zip"
