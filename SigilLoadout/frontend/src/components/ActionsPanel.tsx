@@ -47,8 +47,7 @@ import {
 } from "@/components/ui/combobox"
 import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
-import ChevronDownIcon from "@heroicons/react/24/outline/ChevronDownIcon"
-import MagnifyingGlassIcon from "@heroicons/react/24/outline/MagnifyingGlassIcon"
+import {ChevronDown, Search} from "lucide-react"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
@@ -290,7 +289,7 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                         <span className="truncate" style={{color: colors[value.toUpperCase()]?.color}}>
                             {selected.label}
                         </span>
-                        <ChevronDownIcon className="size-4 text-muted-foreground" />
+                        <ChevronDown className="size-4 text-muted-foreground" />
                     </Button>
                 }
             />
@@ -562,7 +561,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                             placeholder={t.idsHint}
                         />
                         <InputGroupAddon>
-                            <MagnifyingGlassIcon />
+                            <Search />
                         </InputGroupAddon>
                     </InputGroup>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，

@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import XMarkIcon from "@heroicons/react/24/outline/XMarkIcon";
+import { X } from "lucide-react";
 
 import { LoadEdits, SaveEdits, SkillMap, SkillTable } from "../../bindings/sigilloadout/service/editservice";
 import {
@@ -359,7 +359,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                                         searchBox.current?.focus();
                                     }}
                                 >
-                                    <XMarkIcon />
+                                    <X />
                                 </InputGroupButton>
                             </InputGroupAddon>
                         )}

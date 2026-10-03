@@ -22,13 +22,14 @@ import {
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion"
 import {Button} from "@/components/ui/button"
-// 工具条图标用 Heroicons（项目自用的这五处换库；components/ui/ 里的基础组件仍用 lucide，不动）。
-// **四个都用 outline**（统一风格）：Heroicons 的 outline 描边是 1.5，比 lucide 的 2 细，
-// 所以这几个图标整体比换库前轻一档；加号字形天生比复制/插入/删除小（没有方框轮廓）。
-import PlusIcon from "@heroicons/react/24/outline/PlusIcon"
-import Square2StackIcon from "@heroicons/react/24/outline/Square2StackIcon"
-import ClipboardDocumentListIcon from "@heroicons/react/24/outline/ClipboardDocumentListIcon"
-import TrashIcon from "@heroicons/react/24/outline/TrashIcon"
+// 这一排四个图标用 Phosphor —— **全仓只有这一处换库**，其余（含 components/ui/ 的基础组件、
+// 以及 DisclosureChevron / SkillPicker / SigilEditorPanel 这些自带图标的组件）一律保持 lucide。
+// 四个都用默认的 regular 字重；Phosphor 每个图标有 thin/light/regular/bold/fill/duotone 六档，
+// 将来若某个图标显得偏轻，改 `weight` 就行，不必换库或混用线宽。
+import {Plus} from "@phosphor-icons/react/Plus"
+import {Copy} from "@phosphor-icons/react/Copy"
+import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
+import {Trash} from "@phosphor-icons/react/Trash"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {EditableCell} from "@/components/ActionsPanel"
@@ -592,7 +593,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <PlusIcon />
+                        <Plus />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.addRow}</TooltipContent>
                 </Tooltip>
@@ -609,7 +610,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <Square2StackIcon />
+                        <Copy />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.copySelected}</TooltipContent>
                 </Tooltip>
@@ -626,7 +627,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <ClipboardDocumentListIcon />
+                        <ClipboardText />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.pasteBelow}</TooltipContent>
                 </Tooltip>
@@ -643,7 +644,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <TrashIcon />
+                        <Trash />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.remove}</TooltipContent>
                 </Tooltip>

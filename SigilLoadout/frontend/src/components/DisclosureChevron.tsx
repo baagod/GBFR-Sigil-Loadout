@@ -1,5 +1,4 @@
-import ChevronDownIcon from "@heroicons/react/24/outline/ChevronDownIcon"
-import ChevronRightIcon from "@heroicons/react/24/outline/ChevronRightIcon"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "cn"
 
 /**
@@ -17,7 +16,7 @@ export function DisclosureChevron({ open, className }: { open: boolean; classNam
             aria-hidden
             className={cn("grid size-7 shrink-0 place-content-center text-muted-foreground", className)}
         >
-            {open ? <ChevronDownIcon className="size-4" /> : <ChevronRightIcon className="size-4" />}
+            {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         </span>
     )
 }

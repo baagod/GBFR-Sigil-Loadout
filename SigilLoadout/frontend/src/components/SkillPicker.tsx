@@ -10,7 +10,7 @@ import {
     ComboboxTrigger,
     ComboboxValue,
 } from "@/components/ui/combobox"
-import ChevronDownIcon from "@heroicons/react/24/outline/ChevronDownIcon"
+import { ChevronDown } from "lucide-react"
 
 interface SkillItem {
     value: string
@@ -92,7 +92,7 @@ export function SkillPicker({
                         }
                     >
                         <ComboboxValue />
-                        <ChevronDownIcon className="size-4 text-muted-foreground" />
+                        <ChevronDown className="size-4 text-muted-foreground" />
                     </Button>
                 }
             />
