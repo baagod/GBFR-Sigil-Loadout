@@ -79,7 +79,7 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
 // ⚠️ 这一格**不能给自己加边框**：Input 基类自己带 border+border-input，而这一格要的是"没有边框"
 // （格线由格子的 border-r/border-b 提供），所以宽度必须是 0（border-0）。
 const CELL_INPUT =
-    "w-full rounded-none border-0 bg-transparent dark:bg-transparent px-1 py-0 text-xs shadow-none focus-visible:ring-2 focus-visible:ring-transparent"
+    "rounded-none border-0 bg-transparent dark:bg-transparent px-1 py-0 text-xs shadow-none focus-visible:ring-2 focus-visible:ring-transparent"
 
 /**
  * 一个可编辑的格：点一下变输入框，回车或失焦提交。值没变就什么都不做——免得把"点了一下"记成改动。
@@ -116,25 +116,15 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
             onDoubleClick={onDoubleClick}
             placeholder={placeholder}
             /**
-             * 值比表头长时把**这一列**撑开。
-             *
-             * 输入框是 w-full，对固有宽度的贡献几乎为 0，于是列宽只剩表头文字说了算 ——
-             * `4294967295`、`AB_PL1000_04` 这类长值就被输入框自己截掉了。
-             * `min-width` 会进入单元格的**最小内容宽度**，表格因此一定把这列撑到够宽（这条是可靠的，
-             * 试过"隐形尺子"那套固有尺寸的写法，在 auto 布局里并不生效，已删）。等宽数字下 ch 正好一格。
+             * 按内容定宽：细节见 style.css 里 cell-fit 的说明（`field-sizing: content`，Chromium 123+，
+             * 本机 WebView2 是 154）。有 placeholder 时 **placeholder 就是内容** —— 动作表里没改过的
+             * 格子显示的正是原值占位符，于是列宽刚好放下它，不再靠"估算字符宽度"那套（已删）。
+             * 非 mono 的格子不需要这个（它们要铺满整格），保留 w-full。
              */
-            style={
-                mono
-                    ? {
-                          // 值与原值**哪个长算哪个**：动作表里没改过的格子显示的是占位符（原值），
-                          // 只按 value 算长度的话全是空的，列宽就只剩表头文字 —— 与 flags 表不一致。
-                          minWidth: `${Math.max(value.length, placeholder?.length ?? 0) + 1}ch`,
-                      }
-                    : undefined
-            }
             // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
-            // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
-            className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
+            className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${
+                mono ? "cell-fit tabular-nums" : "w-full"
+            }`}
         />
     )
 }
