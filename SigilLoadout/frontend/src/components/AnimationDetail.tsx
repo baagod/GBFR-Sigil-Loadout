@@ -22,6 +22,8 @@ import {
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion"
 import {Button} from "@/components/ui/button"
+import {ClipboardPaste, Copy, Plus, Trash2} from "lucide-react"
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {EditableCell} from "@/components/ActionsPanel"
 import {FLAG0_NAMES, FLAG1_NAMES, withNewRow} from "@/lib/actionflags"
@@ -372,8 +374,10 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                     {/* 标题与那排按钮**包在同一个 sticky 容器里**：只钉标题的话，不透明的标题
                                         会把压在它上面的按钮盖住（上一版就是这么翻车的 ✗）。容器是 sticky，
                                         本身就是定位元素，所以里面那个 absolute 的按钮组跟着一起钉住。
-                                        z-[60]：**必须高过表格里所有吸顶格**（表头 "#" 是 50、表体 "#" 是 40、焦点框是 30）。给 30 时表体那格会画到标题行上面（实测把标题整个盖住）。 */}
-                                    <div className="sticky top-0 z-[60] bg-popover">
+                                        z-[60]：**必须高过表格里所有吸顶格**（表头 "#" 是 50、表体 "#" 是 40、焦点框是 30）。给 30 时表体那格会画到标题行上面（实测把标题整个盖住）。
+                                        border-b：这一行原来没有下边框，而表格的表头紧贴在它下面，于是"标题行 / 表头 / 第一行"
+                                        之间的分界线整体看着是缺的。加在这里也保证横向滚、纵向滚时这条线始终在最上面。 */}
+                                    <div className="sticky top-0 z-[60] border-b bg-popover">
                                         {/* pt-1 与 pb-4 都写明：基类是 py-4，twMerge 遇到"局部覆盖"会把 py-4
                                             整条删掉（它没法只删一半），只写 pt-1 的话 pb 也没了。 */}
                                         <AccordionTrigger className="pt-1 pb-4">
@@ -431,8 +435,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         <AccordionItem value="fsm" className="not-last:border-b-0">
                             {/* FSM 这块没有按钮组，但**外面这层 div 不能省**：sticky 只能在父元素范围内吸顶，
                                 直接挂在 Trigger 上的话，它的父元素是 Base UI 生成的 Header（只有标题那么高），
-                                一滚就被带走了 —— 表现就是"别的都吸顶、FSM 不吸顶"。 */}
-                            <div className="sticky top-0 z-[60] bg-popover">
+                                一滚就被带走了 —— 表现就是"别的都吸顶、FSM 不吸顶"。
+                                border-b 同前面几个分区：分区标题行统一带一条下边框。 */}
+                            <div className="sticky top-0 z-[60] border-b bg-popover">
                                 <AccordionTrigger className="pt-1 pb-4">{t.fsmScope}</AccordionTrigger>
                             </div>
                             {/* 最后一块**不给下间距**（轨道那块给 24px 是为了跟下一个标题拉开）：它下面
@@ -537,20 +542,72 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
 }) {
     return (
         // secondary：这排按钮贴在标题行右侧，有底色但不跟标题抢注意力。
-        <div className={`flex items-center gap-2 ${className ?? ""}`}>
-            <Button size="sm" variant="secondary" onClick={onAdd}>
-                {t.addRow}
-            </Button>
-            <Button size="sm" variant="secondary" disabled={!canCopy} onClick={onCopy}>
-                {t.copySelected}
-            </Button>
-            <Button size="sm" variant="secondary" disabled={!canPaste} onClick={onPaste}>
-                {t.pasteBelow}
-            </Button>
-            <Button size="sm" variant="secondary" disabled={!canRemove} onClick={onRemove}>
-                {t.remove}
-            </Button>
-        </div>
+        // 图标代替文字：文案同时用作 aria-label 与**悬停提示**（用项目现成的 Tooltip 组件，不用原生
+        // title —— 那种用户明确不要）。**不给 svg 写 size 类**，尺寸由 Button 的 size 档给
+        // （icon-sm = h-8，与原来 size="sm" 同高）。图标取自项目配置的 lucide-react。
+        // 按钮禁用时 Tooltip 也一起 disabled（SkillRow 的惯例）：禁用的按钮收不到指针事件。
+        <TooltipProvider>
+            <div className={`flex items-center gap-2 ${className ?? ""}`}>
+                <Tooltip>
+                    <TooltipTrigger
+                        render={
+                            <Button size="icon-sm" variant="secondary" aria-label={t.addRow} onClick={onAdd} />
+                        }
+                    >
+                        <Plus />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.addRow}</TooltipContent>
+                </Tooltip>
+                <Tooltip disabled={!canCopy}>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                size="icon-sm"
+                                variant="secondary"
+                                aria-label={t.copySelected}
+                                disabled={!canCopy}
+                                onClick={onCopy}
+                            />
+                        }
+                    >
+                        <Copy />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.copySelected}</TooltipContent>
+                </Tooltip>
+                <Tooltip disabled={!canPaste}>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                size="icon-sm"
+                                variant="secondary"
+                                aria-label={t.pasteBelow}
+                                disabled={!canPaste}
+                                onClick={onPaste}
+                            />
+                        }
+                    >
+                        <ClipboardPaste />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.pasteBelow}</TooltipContent>
+                </Tooltip>
+                <Tooltip disabled={!canRemove}>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                size="icon-sm"
+                                variant="secondary"
+                                aria-label={t.remove}
+                                disabled={!canRemove}
+                                onClick={onRemove}
+                            />
+                        }
+                    >
+                        <Trash2 />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.remove}</TooltipContent>
+                </Tooltip>
+            </div>
+        </TooltipProvider>
     )
 }
 
@@ -643,7 +700,7 @@ function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend,
                 />
             </td>
             {columns.map((column) => (
-                <td key={column} className="border-r border-b p-0 cell-focus">
+                <td key={column} className="border-r border-b p-0 cell-focus dark:bg-input/30">
                     <EditableCell
                         mono
                         slim
@@ -685,10 +742,10 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 visible 计算成 auto，盒子在纵向也成了滚动容器 —— 表格只要有几像素的四舍五入溢出，
                 就会冒出一条垂直滚动条（实测见过）。高度本来就由内容撑开，hidden 不会裁掉东西。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+                <table className="border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
+                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-center font-medium">
                                 {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
                                     表体里那条分隔竖线到表头就断了。 */}
                                 <div className="flex items-stretch">
@@ -765,7 +822,7 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
                 />
             </td>
             {columns.map((column) => (
-                <td key={column.label} className="border-r border-b p-0 cell-focus">
+                <td key={column.label} className="border-r border-b p-0 cell-focus dark:bg-input/30">
                     {column.text ? (
                         <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
                     ) : (
@@ -817,10 +874,10 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
         >
             {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+                <table className="border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
+                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-center font-medium">
                                 {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>

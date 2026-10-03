@@ -123,7 +123,16 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, slim, placeh
              * `min-width` 会进入单元格的**最小内容宽度**，表格因此一定把这列撑到够宽（这条是可靠的，
              * 试过"隐形尺子"那套固有尺寸的写法，在 auto 布局里并不生效，已删）。等宽数字下 ch 正好一格。
              */
-            style={mono ? {minWidth: `${value.length + 1}ch`} : undefined}
+            style={
+                mono
+                    ? {
+                          // 值与原值**哪个长算哪个**：动作表里没改过的格子显示的是占位符（原值），
+                          // 只按 value 算长度的话全是空的，列宽就只剩表头文字 —— 与 flags 表不一致。
+                          minWidth: `${Math.max(value.length, placeholder?.length ?? 0) + 1}ch`,
+                      }
+                    : undefined
+            }
+            // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
             // slim 那档钉 24px：动作表的行高由输入框撑出来，24 正好和表头一样高。
             className={`${CELL_INPUT} ${slim ? "h-6!" : "h-full!"} ${mono ? "tabular-nums" : ""}`}
         />
@@ -504,7 +513,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                     {keys.map((key) => (
                                         <th
                                             key={key}
-                                            className={`${ACTION_CELL_PAD} sticky top-0 text-left font-medium ${
+                                            className={`${ACTION_CELL_PAD} sticky top-0 text-center font-medium ${
                                                 // id_ 排在字段顺序最前，钉住它：横向滚到第 80 列时还知道这是哪条记录；
                                                 // 表头纵向也钉住（两轴都钉的那一格要压在别的表头上面）。
                                                 // 底色只有一处来源：表头默认 bg-muted，上面那两类列的**表头**
@@ -527,8 +536,11 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                         {keys.map((key) => (
                                             <td
                                                 key={key}
-                                                className={`${key === "id_" ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus`} ${
-                                                    // 表体不给底色：标记只做在表头上（见 isHighlightedColumn）。
+                                                className={`${key === "id_" ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus dark:bg-input/30`} ${
+                                                    // 表体底色 = **基础 Input 的底色**（它自己是 bg-transparent + dark:bg-input/30，
+                                                    // 而 CELL_INPUT 又把格子里那个输入框设成透明），所以这层底色只能由 td 出，
+                                                    // 全站表格这才统一。id_ 那列仍是 bg-background（与轨表的 "#" 列一致，
+                                                    // 吸顶列本来也必须不透明）；高亮标记只做在表头上。
                                                     key === "id_" ? "sticky left-0 z-40 bg-background tabular-nums" : ""
                                                 }`}
                                             >
