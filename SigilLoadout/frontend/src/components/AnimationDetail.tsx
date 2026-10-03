@@ -693,7 +693,7 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
                     e.stopPropagation()
                     listeners?.onPointerDown?.(e)
                 }}
-                className={`flex w-8 shrink-0 cursor-grab touch-none items-center justify-center border-l text-[10px] leading-none text-muted-foreground/60 select-none active:cursor-grabbing ${
+                className={`flex w-8 shrink-0 cursor-grab touch-none items-center justify-center border-l text-base leading-none text-muted-foreground/60 select-none active:cursor-grabbing md:text-sm ${
                     dragging ? "opacity-40" : ""
                 }`}
             >
