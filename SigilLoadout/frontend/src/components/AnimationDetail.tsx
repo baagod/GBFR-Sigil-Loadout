@@ -24,8 +24,11 @@ import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/co
 import {Button} from "@/components/ui/button"
 // 这一排四个图标用 Phosphor —— **全仓只有这一处换库**，其余（含 components/ui/ 的基础组件、
 // 以及 DisclosureChevron / SkillPicker / SigilEditorPanel 这些自带图标的组件）一律保持 lucide。
-// 四个都用默认的 regular 字重；Phosphor 每个图标有 thin/light/regular/bold/fill/duotone 六档，
-// 将来若某个图标显得偏轻，改 `weight` 就行，不必换库或混用线宽。
+// 四个都用 regular，只有加号用 **bold**：
+// Phosphor 是 256 栅格、缩到 16px 时缩放因子 0.0625，regular 的加号笔画只有 1px 宽、
+// 又正好落在半像素边界上（x=7.5px），于是被抗锯齿对半摊开 —— 峰值不透明度只有 192、
+// 亮像素 256 个，所以看着"发灰"（实测）。bold 笔画 12 单位 = 0.75px 以上，能跨满一个像素列，
+// 峰值到 240（复制是 250），浓度就对上了；而 0.75px 仍远细于复制/插入/删除的 2px，不会显得更粗。
 // 复制/删除取的是 **Simple** 变体（只有"两张纸/一个桶"的主体轮廓，没有内侧的复制线、桶盖提手
 // 那些细节）—— 16px 下细节会糊成一团，Simple 在这么小的尺寸里更清楚。
 import {Plus} from "@phosphor-icons/react/Plus"
@@ -595,7 +598,7 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                             />
                         }
                     >
-                        <Plus weight="light" />
+                        <Plus weight="bold" />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.addRow}</TooltipContent>
                 </Tooltip>
