@@ -69,8 +69,6 @@ const zh = {
     fsmList: "FSM：",
     // 动画详情页
     trackNone: "这个动画没有轨文件",
-    trackRows: (n: number) => `${n} 行`,
-    savedTracks: (n: number) => `已保存 ${n} 条轨`,
     fsmScope: "FSM（本角色可用，与当前动画无关）",
     badMotion: (motion: string) => `motion 要是四位十六进制小写（例如 3400），这里是「${motion}」`,
     saveFailedText: (detail: string) => `保存失败：${detail}`,
@@ -82,14 +80,10 @@ const zh = {
     colFlag0Effects: "Flag0效果",
     colFlag1: "Flag1",
     colFlag1Effects: "Flag1效果",
-    /** 行号那一列右半截的握把（拖着重排），以及复制/插入那两枚按钮与之后那行小字。 */
+    /** 行号那一列右半截的握把（拖着重排），以及复制/插入那两枚按钮。 */
     dragRow: "拖这里移动这一行",
     copySelected: "复制",
     pasteBelow: "插入",
-    copiedRows: (count: number) => `已复制 ${count} 行`,
-    pastedRows: (count: number) => `已插入 ${count} 行`,
-    /** 剪贴板是按"轨种类"存的：flags 的行贴不进 attack，说清楚是哪种 */
-    pasteKind: (from: string, to: string) => `剪贴板里是 ${from} 行，贴不进 ${to}`,
 };
 
 export type Messages = typeof zh;
@@ -146,8 +140,6 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "Save",
         fsmList: "FSM:",
         trackNone: "No track files for this animation",
-        trackRows: (n: number) => `${n} rows`,
-        savedTracks: (n: number) => `${n} tracks saved`,
         fsmScope: "FSM (available to this character, unrelated to this animation)",
         badMotion: (motion: string) => `A motion is four lowercase hex digits (e.g. 3400); this is "${motion}"`,
         saveFailedText: (detail: string) => `Could not save: ${detail}`,
@@ -162,9 +154,6 @@ export const messages: Record<Lang, Messages> = {
         dragRow: "Drag here to move this row",
         copySelected: "Copy",
         pasteBelow: "Insert",
-        copiedRows: (count: number) => (count === 1 ? "Copied 1 row" : `Copied ${count} rows`),
-        pastedRows: (count: number) => (count === 1 ? "Inserted 1 row" : `Inserted ${count} rows`),
-        pasteKind: (from: string, to: string) => `The clipboard holds ${from} rows; cannot paste into ${to}`,
     },
     ja: {
         tabGeneral: "汎用装備構成",
@@ -214,8 +203,6 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "保存",
         fsmList: "FSM：",
         trackNone: "このアニメには軌ファイルがありません",
-        trackRows: (n: number) => `${n} 行`,
-        savedTracks: (n: number) => `${n} 本の軌を保存しました`,
         fsmScope: "FSM（このキャラで使用可・このアニメとは無関係）",
         badMotion: (motion: string) => `モーションは 4 桁の 16 進小文字（例 3400）です。ここは「${motion}」`,
         saveFailedText: (detail: string) => `保存に失敗しました：${detail}`,
@@ -230,9 +217,6 @@ export const messages: Record<Lang, Messages> = {
         dragRow: "ここをドラッグしてこの行を移動",
         copySelected: "コピー",
         pasteBelow: "挿入",
-        copiedRows: (count: number) => `${count} 行をコピーしました`,
-        pastedRows: (count: number) => `${count} 行を挿入しました`,
-        pasteKind: (from: string, to: string) => `クリップボードは ${from} 行です。${to} には貼れません`,
     },
     ko: {
         tabGeneral: "일반 장비 구성",
@@ -282,8 +266,6 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "저장",
         fsmList: "FSM:",
         trackNone: "이 애니메이션에는 트랙 파일이 없습니다",
-        trackRows: (n: number) => `${n}행`,
-        savedTracks: (n: number) => `${n}개 트랙 저장됨`,
         fsmScope: "FSM(이 캐릭터 사용 가능, 이 애니메이션과 무관)",
         badMotion: (motion: string) => `모션은 4자리 16진수 소문자(예 3400)입니다. 여기는 "${motion}"`,
         saveFailedText: (detail: string) => `저장에 실패했습니다: ${detail}`,
@@ -298,8 +280,5 @@ export const messages: Record<Lang, Messages> = {
         dragRow: "여기를 끌어서 이 행을 이동",
         copySelected: "복사",
         pasteBelow: "삽입",
-        copiedRows: (count: number) => `${count}개 행을 복사했습니다`,
-        pastedRows: (count: number) => `${count}개 행을 삽입했습니다`,
-        pasteKind: (from: string, to: string) => `클립보드는 ${from} 행입니다. ${to}에는 붙여넣을 수 없습니다`,
     },
 };

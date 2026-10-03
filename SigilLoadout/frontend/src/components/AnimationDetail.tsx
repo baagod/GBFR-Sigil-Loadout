@@ -75,7 +75,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [opened, setOpened] = useState<string[]>([])
     const [sel, setSel] = useState<{key: string; from: number; to: number} | null>(null)
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
-    const [note, setNote] = useState("")
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
     // "正在拖选"：同步版本（ref），按下与第一次划过同一帧时 state 还没落地。
@@ -241,7 +240,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             })
         }
         markDirty(key)
-        setNote("")
     }
 
     const copySelected = (key: string, count: number, kind: string) => {
@@ -252,15 +250,12 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         // 同时写进模块级剪贴板：关掉这个弹层、换一套动画再 Ctrl+V 时，靠它拿到内容。
         clipboard = {kind, rows}
         setClip(clipboard)
-        setNote(t.copiedRows(rows.length))
     }
 
     const pasteBelow = (key: string, kind: string) => {
         if (!clip || clip.rows.length === 0) return
-        if (clip.kind !== kind) {
-            setNote(t.pasteKind(clip.kind, kind))
-            return
-        }
+        // 分区之间不能混插：行里有哪些列不一样，混着插会丢字段。所以种类不匹配时**什么都不做**。
+        if (clip.kind !== kind) return
         const count = key === flagsKey ? flags.length : (tables[key]?.rows.length ?? 0)
         const at = count === 0 ? 0 : rangeOf(key, count).to + 1
         const copies = clip.rows.length
@@ -284,7 +279,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         }
         markDirty(key)
         setSel({key, from: at, to: at + copies - 1})
-        setNote(t.pastedRows(copies))
     }
 
     /** 删掉这个分区里当前选中的那几行（先点行号选好，再按标题右侧的「删除」）。 */
@@ -304,7 +298,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         markDirty(key)
         // 删完原来的号码全错位了：选中清掉，别让它指着别的行。
         setSel(null)
-        setNote("")
     }
 
     const showFsm = async (name: string) => {
@@ -321,7 +314,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         if (busy) return
         setBusy(true)
         setFailure("")
-        setNote("")
         try {
             if (dirty.includes(flagsKey)) {
                 await SaveFlags(motion, flags)
@@ -337,7 +329,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             const list = (await ListTracks(motion)) ?? []
             setInfos(list)
             setDirty([])
-            setNote(t.savedTracks(dirty.length))
         } catch (e) {
             setFailure(t.saveFailedText(String(e)))
         } finally {
@@ -407,12 +398,14 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                             标题与箭头照旧由 Accordion 自己的布局决定。
                                             写 py-2 而不是 pt-2：基类那条是 `py-4` 一对，twMerge 只删得掉整对。 */}
                                         <AccordionTrigger className="py-2">
-                                            <span className="flex w-full items-baseline gap-3">
+                                            {/* gap-1.5（6px）：标题与子轨号之间就这一点距离 —— 紧凑成 "<标题> #N"。
+                                                以前是「N 行 · #N」，行数已去掉、`·` 分隔符也一并不要了。 */}
+                                            <span className="flex w-full items-baseline gap-1.5">
                                                 <span>{trackLabel(info.kind)}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {t.trackRows(count)}
-                                                    {info.sub !== "0" && ` · #${info.sub}`}
-                                                </span>
+                                                {/* 子轨号：区分同一动画的多条同类轨（sub 为 0 时不显示）。 */}
+                                                {info.sub !== "0" && (
+                                                    <span className="text-xs text-muted-foreground">{`#${info.sub}`}</span>
+                                                )}
                                             </span>
                                         </AccordionTrigger>
                                         {/* 工具条的容器：绝对定位叠在箭头左边（40px = 箭头 16 + 基类 mr-1.5 + 间隙）。
@@ -514,9 +507,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     )}
                 </div>
 
-                {/* 保存结果放在按钮上面那一行；下面这排用官方的 DialogFooter（右对齐、自带间隔与换行）。
-                    顺序照官方示例：取消在左、主操作在右。保存**一直可点**——没改动时点了也只是读一遍再报一句。 */}
-                {note && <p className="text-xs text-muted-foreground">{note}</p>}
+                {/* 按钮那排用官方的 DialogFooter（右对齐、自带间隔与换行）。
+                    顺序照官方示例：取消在左、主操作在右。保存**一直可点**——没改动时点了也只是读一遍。 */}
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>
                         {t.cancel}
