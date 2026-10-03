@@ -400,7 +400,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                                 <span className="text-xs text-muted-foreground">
                                                     {t.trackRows(count)}
                                                     {info.sub !== "0" && ` · #${info.sub}`}
-                                                    {dirty.includes(key) && " · *"}
                                                 </span>
                                             </span>
                                         </AccordionTrigger>
