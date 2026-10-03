@@ -117,22 +117,32 @@ const CELL_INPUT =
 // 顺带一个大红利：**文本自己就把列撑开了**，于是之前那套"canvas 量文本 + 缓存 + 读字体"整个不需要，
 // 全删（那几轮估宽/量宽的弯路就此结束）。
 // 没填值时显示的是原值：用 muted 前景色，和输入框 placeholder 的默认灰一致，观感不变。
+//
+// 高度**不用管**：它只有行盒那么高（20px），比 24px 的单元格内容区矮，而 td 的 `align-middle`
+// 正好把它居中——文字位置因此是对的。点击区不靠它，靠整个 td（见 EditableCell），所以不必给它
+// 写死高度：单元格行高将来变了也不会留出点不到的死区。
 const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-sm whitespace-nowrap"
 
 /**
  * 一个可编辑的格：**平时是文本，点一下才变输入框**，回车或失焦提交。值没变就什么都不做——
  * 免得把"点了一下"记成改动。
  *
- * 状态切换**不改变任何几何**：显示态那段文本始终留在流里，编辑时只是变 invisible 并让输入框浮上去。
- * 行高不由这里决定 —— 动作表是只读格（px-2 py-1 = 24 + 1px 格线 = 25px）撑的，轨表是行号那个
- * 拖拽握把（24px）撑的，所以输入框脱离文档流也不会让行变矮。
+ * **它自己渲染那个 `<td>`**，点击区就是整个单元格：文本层只有行盒那么高（20px），贴在格子上下边缘
+ * 的那两三像素点不到它 —— 挂在 td 上才不会留死区（命中测试实测过）。顺带这样也少一层
+ * `display:contents` 包装（原来那层只为在 div↔input 切换时兜住双击）。
+ *
+ * 状态切换**不改变任何几何**：显示态那段文本始终留在流里（编辑时只是 invisible），列宽两个状态下
+ * 都由同一份文本决定；输入框绝对定位铺满格子、高度 auto 跟随单元格。行高也不由这里决定 ——
+ * 动作表是只读格（px-2 py-1）撑的，轨表是行号那个拖拽握把撑的。
  *
  * 为什么显示态也要有 tabIndex：焦点圈（style.css 的 cell-focus）靠 td 的 :focus-within 画，
  * 键盘 Tab 也要能进到格子里 —— 有焦点才会换成输入框。
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({value, onCommit, onDoubleClick, mono, placeholder}: {
+export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono, placeholder}: {
+    /** 这个格的 td 类，由调用点给（各表的边框/底色/吸顶不一样）。 */
+    tdClassName: string
     value: string
     onCommit: (value: string) => void
     onDoubleClick?: () => void
@@ -162,11 +172,9 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, placeholder}
         void navigator.clipboard?.writeText(shown).catch(console.error)
     }
 
-    // display: contents 的这层**只为接双击**，两个状态都在它里面：第一次点击会把格子换成输入框，
-    // 两次点击因此落在**不同元素**上（div → input），浏览器不一定还认成一次双击 —— 挂在不会更换的
-    // 外层上，事件照常冒泡过来。contents 不产生盒子，对布局零影响。
+    // 双击挂在 td 上：它两个状态下都不换（早先是挂在 display:contents 那层上兜住 div↔input 的切换）。
     return (
-        <div className="contents" onDoubleClick={onDoubleClick}>
+        <td className={tdClassName} onClick={() => setEditing(true)} onDoubleClick={onDoubleClick}>
             {/*
              * 显示态那段文本**两个状态下都留在流里**——它才是列宽的唯一来源。
              *
@@ -175,13 +183,11 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, placeholder}
              * **顶宽**（点"结束"列 83px → 111px，其它列被挤窄，看着抖一下）；只给输入框压 `size`
              * 又反过来让列**缩窄**（该格是本列唯一最宽内容时，列缩到次宽内容，文字被裁）。两边都会
              * 抖，所以干脆让文本一直在流里：编辑时设成 `invisible`（visibility: hidden 仍占位），
-             * 输入框**绝对定位浮在它上面**（td 有 cell-focus 提供的 position: relative）。
-             * 于是列宽在两个状态下都由同一份文本决定，既不变宽也不变窄。
+             * 输入框**绝对定位浮在它上面**。
              */}
             <div
                 // 编辑中这层被输入框盖住且不可见，就别再让它进 Tab 序列。
                 tabIndex={editing ? -1 : 0}
-                onClick={() => setEditing(true)}
                 onFocus={() => setEditing(true)}
                 onKeyDown={(e) => onCopy(e, false)}
                 className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
@@ -219,12 +225,13 @@ export function EditableCell({value, onCommit, onDoubleClick, mono, placeholder}
                         if (input.selectionStart === input.selectionEnd) input.select()
                     }}
                     placeholder={placeholder}
-                    // absolute inset-x-0 top-0：脱离文档流，于是它的固有宽度不参与列宽计算；
-                    // h-6（24px）仍是钉死的高度，和表头一样高，行高由别的格子撑着（见上面的注释）。
-                    className={`absolute inset-x-0 top-0 ${CELL_INPUT} h-6! ${mono ? "tabular-nums" : ""}`}
+                    // inset-0 + h-auto：脱离文档流（固有宽度不参与列宽计算），并向四边拉伸铺满格子。
+                    // h-auto! 必须写 —— Input 基类自带 h-9（36px），四边都定位时 height 不是 auto 就会
+                    // 忽略 bottom、按 36px 渲染。拉伸后高度自然跟随单元格，不必写死 24px。
+                    className={`absolute inset-0 h-auto! ${CELL_INPUT} ${mono ? "tabular-nums" : ""}`}
                 />
             )}
-        </div>
+        </td>
     )
 }
 
@@ -611,43 +618,45 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                             <tbody>
                                 {actions.map((action) => (
                                     <tr key={action.id}>
-                                        {keys.map((key) => (
-                                            <td
-                                                key={key}
-                                                className={`${isReadOnlyColumn(key) ? ACTION_CELL_PAD : `${ACTION_CELL} p-0 cell-focus dark:bg-input/30`} ${
-                                                    // 表体底色 = **基础 Input 的底色**（它自己是 bg-transparent + dark:bg-input/30，
-                                                    // 而 CELL_INPUT 又把格子里那个输入框设成透明），所以这层底色只能由 td 出，
-                                                    // 全站表格这才统一。id_ 与 abilityTag_ 这两列**底色跟 id_ 走**
-                                                    // （bg-background；id_ 那列同时吸顶 —— 横向滚到第 80 列时还认得出这是哪条记录）；
-                                                    // id_ 里是记录号，**居中**（与表头一致）；高亮标记只做在表头上。
-                                                    key === "id_"
-                                                        ? "sticky left-0 z-40 bg-background text-center tabular-nums"
-                                                        : key === "abilityTag_"
-                                                          ? "bg-background tabular-nums"
-                                                          : ""
-                                                }`}
-                                            >
-                                                {isReadOnlyColumn(key) ? (
-                                                    // 只读列一律显示**原值**。
-                                                    // ⚠️ 不能写 `draft[...] ?? originals[...]`：draft 是 loadAll 里按
-                                                    // `field.value ?? ""` 建出来的，**没改过的格子在那里是空字符串、不是
-                                                    // undefined**，`??` 因此永远不回落 —— 这两列会整列显示为空。
-                                                    originals[action.id]?.[key] ?? ""
-                                                ) : (
-                                                    <EditableCell
-                                                        mono
-                                                        value={draft[action.id]?.[key] ?? ""}
-                                                        placeholder={originals[action.id]?.[key]}
-                                                        onCommit={(value) => editField(action.id, key, value)}
-                                                        onDoubleClick={
-                                                            isHighlightedColumn(key)
-                                                                ? () => void openMotion(action.id, key)
-                                                                : undefined
-                                                        }
-                                                    />
-                                                )}
-                                            </td>
-                                        ))}
+                                        {keys.map((key) =>
+                                            isReadOnlyColumn(key) ? (
+                                                <td
+                                                    key={key}
+                                                    className={`${ACTION_CELL_PAD} ${
+                                                        // 表体底色 = **基础 Input 的底色**（它自己是 bg-transparent + dark:bg-input/30，
+                                                        // 而 CELL_INPUT 又把格子里那个输入框设成透明），所以这层底色只能由 td 出，
+                                                        // 全站表格这才统一。id_ 与 abilityTag_ 这两列**底色跟 id_ 走**
+                                                        // （bg-background；id_ 那列同时吸顶 —— 横向滚到第 80 列时还认得出这是哪条记录）；
+                                                        // id_ 里是记录号，**居中**（与表头一致）；高亮标记只做在表头上。
+                                                        key === "id_"
+                                                            ? "sticky left-0 z-40 bg-background text-center tabular-nums"
+                                                            : key === "abilityTag_"
+                                                              ? "bg-background tabular-nums"
+                                                              : ""
+                                                    }`}
+                                                >
+                                                    {/* 只读列一律显示**原值**。
+                                                        ⚠️ 不能写 `draft[...] ?? originals[...]`：draft 是 loadAll 里按
+                                                        `field.value ?? ""` 建出来的，**没改过的格子在那里是空字符串、不是
+                                                        undefined**，`??` 因此永远不回落 —— 这两列会整列显示为空。 */}
+                                                    {originals[action.id]?.[key] ?? ""}
+                                                </td>
+                                            ) : (
+                                                <EditableCell
+                                                    key={key}
+                                                    tdClassName={`${ACTION_CELL} p-0 cell-focus dark:bg-input/30`}
+                                                    mono
+                                                    value={draft[action.id]?.[key] ?? ""}
+                                                    placeholder={originals[action.id]?.[key]}
+                                                    onCommit={(value) => editField(action.id, key, value)}
+                                                    onDoubleClick={
+                                                        isHighlightedColumn(key)
+                                                            ? () => void openMotion(action.id, key)
+                                                            : undefined
+                                                    }
+                                                />
+                                            ),
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>

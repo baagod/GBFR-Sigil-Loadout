@@ -740,13 +740,13 @@ function SortableTrackRow({row, index, columns, t, selected, onSelect, onExtend,
                 />
             </td>
             {columns.map((column) => (
-                <td key={column} className="border-r border-b p-0 cell-focus dark:bg-input/30">
-                    <EditableCell
-                        mono
-                        value={row.values[column] ?? ""}
-                        onCommit={(value) => onEdit(column, value)}
-                    />
-                </td>
+                <EditableCell
+                    key={column}
+                    tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
+                    mono
+                    value={row.values[column] ?? ""}
+                    onCommit={(value) => onEdit(column, value)}
+                />
             ))}
         </tr>
     )
@@ -865,19 +865,21 @@ function SortableFlagRow({row, index, columns, t, selected, onSelect, onExtend, 
                     onExtend={onExtend}
                 />
             </td>
-            {columns.map((column) => (
-                <td key={column.label} className="border-r border-b p-0 cell-focus dark:bg-input/30">
-                    {column.text ? (
+            {columns.map((column) =>
+                column.text ? (
+                    <td key={column.label} className="border-r border-b p-0 cell-focus dark:bg-input/30">
                         <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
-                    ) : (
-                        <EditableCell
-                            mono
-                            value={String(row[column.key] ?? "")}
-                            onCommit={(value) => onEdit(column.key, value)}
-                        />
-                    )}
-                </td>
-            ))}
+                    </td>
+                ) : (
+                    <EditableCell
+                        key={column.label}
+                        tdClassName="border-r border-b p-0 cell-focus dark:bg-input/30"
+                        mono
+                        value={String(row[column.key] ?? "")}
+                        onCommit={(value) => onEdit(column.key, value)}
+                    />
+                ),
+            )}
         </tr>
     )
 }
