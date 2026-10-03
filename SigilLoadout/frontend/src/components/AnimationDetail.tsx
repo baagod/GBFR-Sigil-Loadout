@@ -372,8 +372,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                     {/* 标题与那排按钮**包在同一个 sticky 容器里**：只钉标题的话，不透明的标题
                                         会把压在它上面的按钮盖住（上一版就是这么翻车的 ✗）。容器是 sticky，
                                         本身就是定位元素，所以里面那个 absolute 的按钮组跟着一起钉住。
-                                        z-30 高过表格自己的吸顶表头（z-20 / z-10）。 */}
-                                    <div className="sticky top-0 z-30 bg-popover">
+                                        z-[60]：**必须高过表格里所有吸顶格**（表头 "#" 是 50、表体 "#" 是 40、焦点框是 30）。给 30 时表体那格会画到标题行上面（实测把标题整个盖住）。 */}
+                                    <div className="sticky top-0 z-[60] bg-popover">
                                         {/* pt-1 与 pb-4 都写明：基类是 py-4，twMerge 遇到"局部覆盖"会把 py-4
                                             整条删掉（它没法只删一半），只写 pt-1 的话 pb 也没了。 */}
                                         <AccordionTrigger className="pt-1 pb-4">
@@ -390,7 +390,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                             t={t}
                                             className="absolute top-1 right-10 z-10"
                                             canCopy={count > 0}
-                                            canPaste={clip !== null && clip.kind === info.kind}
+                                            // 插入只在"这张表里选中了行、且剪贴板是对应轨种类"时可用；
+                                            // 光标不在表格里（没选行）时它是灰的，Ctrl+V 同样要求先选行。
+                                            canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
                                             canRemove={sel?.key === key}
                                             onAdd={() => addRow(key)}
                                             onCopy={() => copySelected(key, count, info.kind)}
@@ -430,7 +432,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                             {/* FSM 这块没有按钮组，但**外面这层 div 不能省**：sticky 只能在父元素范围内吸顶，
                                 直接挂在 Trigger 上的话，它的父元素是 Base UI 生成的 Header（只有标题那么高），
                                 一滚就被带走了 —— 表现就是"别的都吸顶、FSM 不吸顶"。 */}
-                            <div className="sticky top-0 z-30 bg-popover">
+                            <div className="sticky top-0 z-[60] bg-popover">
                                 <AccordionTrigger className="pt-1 pb-4">{t.fsmScope}</AccordionTrigger>
                             </div>
                             {/* 最后一块**不给下间距**（轨道那块给 24px 是为了跟下一个标题拉开）：它下面
@@ -683,7 +685,7 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                 visible 计算成 auto，盒子在纵向也成了滚动容器 —— 表格只要有几像素的四舍五入溢出，
                 就会冒出一条垂直滚动条（实测见过）。高度本来就由内容撑开，hidden 不会裁掉东西。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+                <table className="border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
                             <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
@@ -697,7 +699,7 @@ function TrackGrid({table, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                             {table.columns.map((column) => (
                                 <th
                                     key={column}
-                                    className="sticky top-0 z-10 border-r border-b bg-muted px-2 py-1 text-left font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-muted px-2 py-1 text-center font-medium whitespace-nowrap"
                                 >
                                     {column}
                                 </th>
@@ -815,7 +817,7 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
         >
             {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
-                <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
+                <table className="border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
                             <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-muted p-0 text-left font-medium">
@@ -828,7 +830,7 @@ function FlagsGrid({rows, sel, t, onSelect, onExtend, onEdit, onReorder}: {
                             {columns.map((column) => (
                                 <th
                                     key={column.label}
-                                    className="sticky top-0 z-10 border-r border-b bg-muted px-2 py-1 text-left font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-muted px-2 py-1 text-center font-medium whitespace-nowrap"
                                 >
                                     {column.label}
                                 </th>

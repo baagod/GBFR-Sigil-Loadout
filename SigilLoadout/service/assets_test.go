@@ -32,6 +32,48 @@ func TestMain(m *testing.M) {
 }
 
 /*
+每张动作表的两条不变式。界面拿 id 索引一行的值（draft[action.id]），破了这两条就会"少几条"或者"两条
+互相盖"——而这两种毛病都只在具体某个角色上才看得见，所以这里对**每一张表**都跑：
+
+  - 每个记录都有 id_（没有的记录进不了"全部记录"那个列表）；
+  - id_ 不重复（重复的会被 tableIDs 去掉一个）。
+
+它读的是解包目录那批（与随包容器同源；容器那份另有 TestPackagedActionTablesCoverEveryCharacter 逐份比
+字节）。门槛 GBFR_EXTRACTED。
+*/
+func TestEveryRecordHasAUniqueID(t *testing.T) {
+	extracted := os.Getenv("GBFR_EXTRACTED")
+	if extracted == "" {
+		t.Skip("没有设 GBFR_EXTRACTED，跳过动作表不变式的验收")
+	}
+	paths, err := filepath.Glob(filepath.Join(extracted, "system", "player", "data", "*", "*_action.msg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := 0
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		root, err := parseActionTable(raw, path)
+		if err != nil {
+			t.Errorf("%s: %v", filepath.Base(path), err)
+			continue
+		}
+		records += len(root.entries)
+		if ids := tableIDs(root); len(ids) != len(root.entries) {
+			t.Errorf("%s：根上有 %d 条记录，却只认出 %d 个 id（有记录缺 id_，或者 id 重复被去掉了）",
+				filepath.Base(path), len(root.entries), len(ids))
+		}
+	}
+	if len(paths) == 0 {
+		t.Fatalf("%s 下面一份动作表都没有", extracted)
+	}
+	t.Logf("%d 张表 / 共 %d 条记录：每条都有 id_、且不重复", len(paths), records)
+}
+
+/*
 随包动作表也要一份不差：它是这一页"原始只读"的那一半，界面上换个角色就要读它。
 
 只有 pl1000 那一份的时候，作者本机看不出毛病（读不到就退回解包目录），别人装上去才是"除炎帝之外每个

@@ -111,6 +111,26 @@ func sampleFlags(t *testing.T, cfg actionConfig, motion string) {
 func strPtr(s string) *string { return &s }
 
 /*
+清单上的记录一条都对不上**不是错误**：那份清单是跨角色共用的（pl1000 的表里没有 954 很正常）。
+LoadActions 返回空列表，界面在表格位置提示"没有这些记录"，而不是弹一句"读取失败：…一条都没有"。
+*/
+func TestLoadActionsReturnsEmptyInsteadOfErroringWhenNoIDMatches(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	if err := service.SetActionIDs("950 951"); err != nil {
+		t.Fatalf("SetActionIDs: %v", err)
+	}
+	actions, err := service.LoadActions()
+	if err != nil {
+		t.Fatalf("一条都对不上不该报错: %v", err)
+	}
+	if len(actions) != 0 {
+		t.Fatalf("拿到 %d 条记录，want 0", len(actions))
+	}
+}
+
+/*
 保存**不写源文件**：改动进用户目录的 action_edits.json，原始动作表从此只读。
 
 这是这一页换成"原值 + 改动"模型要保证的第一件事。以前是保存即覆盖源，手滑把一格留空就把原值写没了
@@ -269,15 +289,110 @@ func TestActionIDsAreASetting(t *testing.T) {
 		t.Fatalf("逗号没被当成分隔符：%q", got)
 	}
 
-	// 空清单拒绝，而且不能把已经配好的那份改坏。
+	// 空清单是**合法值**：意思是"这条表里全部记录"（界面上把搜索框清空就是这个意思）。写下去必须是
+	// `[]` 而不是 `null` —— 后者会被当成"没配过"，下一次读又回落到默认清单，表现就是"清空了又跳回来"。
 	for _, empty := range []string{"", "   ", " , "} {
-		if err := service.SetActionIDs(empty); err == nil {
-			t.Fatalf("空清单 %q 被收下了", empty)
+		if err := service.SetActionIDs(empty); err != nil {
+			t.Fatalf("空清单 %q 该被收下（= 全部记录）: %v", empty, err)
+		}
+		if got := service.ActionIDs(); got != "" {
+			t.Fatalf("空清单 %q 存成了 %q，want 空", empty, got)
+		}
+		if saved := loadActionConfig(); saved.IDs == nil {
+			t.Fatalf("空清单 %q 写成了 null：那会被当成「没配过」而回落到默认清单", empty)
 		}
 	}
-	if got := service.ActionIDs(); got != "4 6 954" {
-		t.Fatalf("被拒之后清单变成了 %q", got)
+}
+
+/*
+`ids` 那一栏的**缺省 vs 空**是两件事，靠 actionConfig 上的 omitzero 分开：
+
+  - 没配过（这一栏根本没写）→ 回落默认清单 4 6 954；
+  - 配成空（JSON 里的 `[]`）→ 这条表里全部记录。
+
+它很容易在不知不觉中坏掉：SetPath / SetFlagsDir / SetFsmDir 也会写这份配置，而它们手里的 IDs 是 nil
+—— tag 上少了 omitzero，nil 就会被写成 `[]`，于是"顺手改一下路径"就把"没配过"变成了"全部记录"。
+（这正是 TestSaveActionFieldsWritesTheEditBack 变红的原因：它按默认清单取 actions[1]，却拿到了全部记录里
+的第 2 条。）
+*/
+func TestUnsetIDListFallsBackToTheDefaultAndAnEmptyOneDoesNot(t *testing.T) {
+	hermeticHome(t)
+	service := &ActionsService{}
+
+	// 只改路径：IDs 从没被配过，写出来的文件里不该有 ids 这一栏。
+	dir := t.TempDir()
+	actionPath := filepath.Join(dir, "pl1000_action.msg")
+	writeFile(t, actionPath, "")
+	if err := service.SetPath(actionPath); err != nil {
+		t.Fatalf("SetPath: %v", err)
 	}
+	raw, err := os.ReadFile(actionConfigPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), `"ids"`) {
+		t.Fatalf("没配过的清单被写进了文件（那会被读成「配成空」= 全部记录）：\n%s", raw)
+	}
+	if got := service.ActionIDs(); got != "4 6 954" {
+		t.Fatalf("没配过时 ActionIDs() = %q，want 默认的 \"4 6 954\"", got)
+	}
+
+	// 配成空：这一栏必须在，而且是 []。
+	if err := service.SetActionIDs(""); err != nil {
+		t.Fatalf("SetActionIDs(\"\"): %v", err)
+	}
+	raw, err = os.ReadFile(actionConfigPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"ids"`) {
+		t.Fatalf("空清单没被写进文件：\n%s", raw)
+	}
+	if got := service.ActionIDs(); got != "" {
+		t.Fatalf("空清单读回来是 %q，want 空（= 全部记录）", got)
+	}
+}
+
+/*
+空清单 = **全部记录**，而且它必须**活过一次换角色**。
+
+这条 bug 有两半，都在这里钉住：
+
+  - 界面对空值提前 return → 清空从来没提交过（那一半在 ActionsPanel.tsx 里）；
+  - characterPaths 造新配置时没带 IDs → 换一次角色就把清单写没了（回落到默认的 4 6 954），而界面换完
+    角色会重读清单回填 —— 表现正是"清空的搜索框又跳出旧值"。
+*/
+func TestEmptyIDListIsEveryRecordAndSurvivesACharacterSwitch(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+	addCharacter(t, cfg, "pl2900")
+
+	if err := service.SetActionIDs(""); err != nil {
+		t.Fatalf("SetActionIDs(\"\"): %v", err)
+	}
+	all, err := service.LoadActions()
+	if err != nil {
+		t.Fatalf("LoadActions: %v", err)
+	}
+	if len(all) < 2 {
+		t.Fatalf("空清单只列出 %d 条记录", len(all))
+	}
+	// 界面拿 id 索引一行的值（draft[action.id]）：同一个 id 出现两次会互相盖。
+	seen := make(map[string]bool, len(all))
+	for _, action := range all {
+		if seen[action.ID] {
+			t.Fatalf("记录 id_ = %q 出现了两次", action.ID)
+		}
+		seen[action.ID] = true
+	}
+
+	if err := service.SetCharacter("pl2900"); err != nil {
+		t.Fatalf("SetCharacter: %v", err)
+	}
+	if got := service.ActionIDs(); got != "" {
+		t.Fatalf("换角色之后清单变成了 %q，want 还是空（= 全部）", got)
+	}
+	t.Logf("空清单 = 这张表的全部 %d 条记录", len(all))
 }
 
 /*

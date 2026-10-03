@@ -62,11 +62,15 @@ const actionsConfigName = "actions.json"
 
 // actionConfig 是 actions.json 的形状：三个路径 + 一份记录清单。缺哪一栏就用它自己的默认值
 // （见 loadActionConfig）——手写一份只写了其中一行的文件是常事。
+//
+// `ids` 上的 omitzero 是**语义的一部分**，不是省字节：nil（没配过）这一栏会被整个省掉，空清单则写成
+// `[]`。两者的意思不同——前者回落到 defaultActionIDs，后者是"这条表里全部记录"（把搜索框清空）。
+// 少了它，nil 会被写成 `[]`，于是"没配过"和"配成空"再也分不出来。
 type actionConfig struct {
 	Path     string   `json:"path"`
 	FlagsDir string   `json:"flagsDir"`
 	FsmDir   string   `json:"fsmDir"`
-	IDs      []string `json:"ids"`
+	IDs      []string `json:"ids,omitzero"`
 }
 
 // Action 是动作表里的一条记录。Fields 是它**全部字段，按文件里的顺序**（id_ 排在最前面）。
@@ -148,11 +152,15 @@ SetActionIDs 换这份记录清单。
 分隔符是**空白**（空格 / Tab / 换行都算），逗号也一并当分隔符收下——手从别处粘一段 "4,6,954" 进来是常事，
 为这个报错不值。清单里允许出现这张表没有的 id：这份清单是跨角色共用的（见 defaultActionIDs），
 "这条不在当前表里"由 LoadActions 跳过。
+
+**空清单是合法值**，意思是"这条表里全部记录"（界面上把搜索框清空就是这个意思）。它必须与"没配过"
+区分开：写下去的是**非 nil 的空切片**（JSON 里的 `[]`），而没配过是 nil（JSON 里的 `null` 或键不存在）
+—— config() 只给后者回默认值。
 */
 func (s *ActionsService) SetActionIDs(text string) error {
 	ids := strings.Fields(strings.ReplaceAll(text, ",", " "))
-	if len(ids) == 0 {
-		return errors.New("记录清单不能是空的")
+	if ids == nil {
+		ids = []string{}
 	}
 	cfg := loadActionConfig()
 	cfg.IDs = ids
@@ -244,6 +252,9 @@ func characterPaths(cfg actionConfig, code string) (actionConfig, error) {
 		Path:     filepath.Join(filepath.Dir(filepath.Dir(cfg.Path)), code, code+"_action.msg"),
 		FlagsDir: filepath.Join(filepath.Dir(cfg.FlagsDir), code),
 		FsmDir:   filepath.Join(filepath.Dir(cfg.FsmDir), code),
+		// 记录清单跟着走：它**跨角色共用**（见 defaultActionIDs）。漏掉它就等于"换一次角色把清单重置回
+		// 默认的 4 6 954"，而界面换完角色会重读清单回填 —— 表现正是"清空的搜索框又跳出旧值"。
+		IDs: cfg.IDs,
 	}
 	if _, present, err := actionTableCodes(); err != nil {
 		return actionConfig{}, err
@@ -280,7 +291,10 @@ func (s *ActionsService) config() actionConfig {
 	if strings.TrimSpace(cfg.FsmDir) == "" {
 		cfg.FsmDir = defaultFsmDir
 	}
-	if len(cfg.IDs) == 0 {
+	// **只在没配过时**回默认清单：配过的空清单（JSON 里的 `[]`）是"全部记录"，是一个有效的选择，
+	// 拿默认清单盖掉它就等于"清空搜索框之后又自己填回来了"。两种状态靠 actionConfig 上那个 omitzero
+	// 区分（nil = 这一栏根本没写 = 没配过）。
+	if cfg.IDs == nil {
 		cfg.IDs = defaultActionIDs
 	}
 	return cfg
@@ -344,11 +358,12 @@ func deployActionPath(cfg actionConfig) string {
 }
 
 /*
-LoadActions 读动作表，给出当前那份记录清单里**这张表真的有**的那几条。**按 id_ 找，不按下标。**
+LoadActions 读动作表，给出要显示的那几条记录。**按 id_ 找，不按下标。**
 
-查不到的 id 跳过而不是报错：那份清单是跨角色共用的（见 defaultActionIDs），炎帝的表里没有 954、
-Fediel 的表里没有 4/6，两边都是正常情况。但一条都对不上就说明清单和这张表不是一套，那时不能装作没事
-——把清单原样报出来，用户照着改工具栏那个输入框就行。
+清单**空** = 全部：表里有几条就列几条，顺序照文件里的顺序（界面上的清空搜索框就是这个意思）。
+
+清单非空时，表里没有的 id 跳过而不是报错：那份清单是跨角色共用的（见 defaultActionIDs），炎帝的表里
+没有 954 很正常。一条都对不上也不是错误，界面在表格位置提示。
 */
 func (s *ActionsService) LoadActions() ([]Action, error) {
 	cfg := s.config()
@@ -362,8 +377,13 @@ func (s *ActionsService) LoadActions() ([]Action, error) {
 	}
 	changed := mergeActionEdits(edits, charCode(cfg))
 
-	actions := make([]Action, 0, len(cfg.IDs))
-	for _, id := range cfg.IDs {
+	ids := cfg.IDs
+	if len(ids) == 0 {
+		ids = tableIDs(original)
+	}
+
+	actions := make([]Action, 0, len(ids))
+	for _, id := range ids {
 		record := recordByID(original, id)
 		if record == nil {
 			continue
@@ -381,10 +401,30 @@ func (s *ActionsService) LoadActions() ([]Action, error) {
 		}
 		actions = append(actions, Action{ID: id, Fields: fields})
 	}
-	if len(actions) == 0 {
-		return nil, fmt.Errorf("动作表里 %v 一条都没有", cfg.IDs)
-	}
 	return actions, nil
+}
+
+/*
+tableIDs 是这张表里**全部**记录的 id_，按文件里的顺序。
+
+同一个 id_ 出现两次时只留第一次：界面拿 id 索引一行的值（draft[action.id]），重复的会互相盖，看着就是
+"表里少了一半"。实测 pl1000 那张表 35 条记录、id 一个不重复（TestLoadActionsWithAnEmptyList... 钉着）。
+*/
+func tableIDs(root *msgValue) []string {
+	ids := make([]string, 0, len(root.entries))
+	seen := make(map[string]bool, len(root.entries))
+	for _, entry := range root.entries {
+		if entry.value.format != msgMap {
+			continue
+		}
+		field := entry.value.entry("id_")
+		if field == nil || seen[field.str] {
+			continue
+		}
+		seen[field.str] = true
+		ids = append(ids, field.str)
+	}
+	return ids
 }
 
 /*

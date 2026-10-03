@@ -3,12 +3,32 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"sigilloadout/service"
 	"sigilloadout/window"
 )
+
+/*
+debugBrowserArgs 是给 WebView2 的额外启动参数：**只在设了 GBFR_WEBVIEW_DEBUG_PORT 时**开一个 CDP 端口。
+
+为什么要它：页面测试要走 agent-browser（见 AGENTS.md），而它靠 CDP 连进来。WebView2 默认不开这个端口，
+而 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 那个环境变量会被 Wails 自己传的参数盖掉（实测连不上），所以只能
+从代码里给。不设这个环境变量时返回 nil，发布版行为一点不变。
+
+	$env:GBFR_WEBVIEW_DEBUG_PORT = '9222'; .\SigilLoadout.exe
+	agent-browser connect 9222
+*/
+func debugBrowserArgs() []string {
+	port := strings.TrimSpace(os.Getenv("GBFR_WEBVIEW_DEBUG_PORT"))
+	if port == "" {
+		return nil
+	}
+	return []string{"--remote-debugging-port=" + port}
+}
 
 //go:embed all:frontend/dist
 var assets embed.FS
@@ -73,6 +93,9 @@ func main() {
 		},
 		Windows: application.WindowsOptions{
 			DisableQuitOnLastWindowClosed: true,
+			// 调试端口（见 debugBrowserArgs）：不设环境变量就是 nil。这一项是**全局**的 ——
+			// WebView2 只认一个浏览器环境，所有窗口共用。
+			AdditionalBrowserArgs: debugBrowserArgs(),
 			// X 按钮 = 假隐藏到托盘（WebView 保持活着，之后再显出来不会白闪）。这一版 Wails 没有暴露
 			// WebviewWindow 的 HWND 取用口，所以每条消息兼作一条针对该窗口的命令。
 			// 窗口还没建好时这个闭包也可能被调用（win 还是 nil），HandleMsg 里那道 nil 门照旧 fail closed。
