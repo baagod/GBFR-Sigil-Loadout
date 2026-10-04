@@ -210,30 +210,36 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const markDirty = (key: string) =>
         setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]))
 
-    /** 改 flags 的一格：只在真变了的时候记改动（"改回原值就退回灰"由与原表的比较自动得出）。 */
+    /**
+     * 改 flags 的一格：只在真变了的时候记改动。"改回原值就退回灰"由与原表的比较自动得出；
+     * **清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值，而不是一个空串。
+     */
     const editFlag = (index: number, key: keyof FlagRow, value: string) => {
+        const row = flags[index] as Marked<FlagRow> | undefined
+        const orig = row && isOriginal(row) ? baseline?.flags[row.orig as number] : undefined
+        const next = value === "" && orig ? String(orig[key] ?? "") : value
         setFlags((prev) =>
-            prev.map((row, i) => {
-                if (i !== index || String(row[key]) === value) return row
-                const next = {...row, [key]: value}
+            prev.map((r, i) => {
+                if (i !== index || String(r[key]) === next) return r
+                const changed = {...r, [key]: next}
                 // 掩码改了就把含义重算一遍——这两列是给人看的，不该等下次读取才更新。
-                if (key === "flag0") next.flag0Effects = effectsOf(value, 0)
-                if (key === "flag1") next.flag1Effects = effectsOf(value, 1)
-                return next
+                if (key === "flag0") changed.flag0Effects = effectsOf(next, 0)
+                if (key === "flag1") changed.flag1Effects = effectsOf(next, 1)
+                return changed
             })
         )
         markDirty(flagsKey)
     }
 
-    /** 改通用轨的一格。 */
+    /** 改通用轨的一格。清空同样 = 回到原值（见 editFlag）；删除态的行照样能改。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
+        const row = tables[key]?.rows[index] as Marked<TrackRow> | undefined
+        const orig = row && isOriginal(row) ? baseline?.tables[key]?.rows[row.orig as number] : undefined
+        const next = value === "" && orig ? (orig.values[column] ?? "") : value
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
-            const rows = table.rows.map((row, i) =>
-                // 删除态的行照样能改：改动由后端存进行身份，重开原样回来（写回仍只在按「保存」时）。
-                i === index ? {...row, values: {...row.values, [column]: value}} : row
-            )
+            const rows = table.rows.map((r, i) => (i === index ? {...r, values: {...r.values, [column]: next}} : r))
             return {...prev, [key]: {...table, rows}}
         })
         markDirty(key)
