@@ -108,9 +108,6 @@ var defaultActionIDs = []string{"4", "6", "954"}
 // 两次并发保存会互相盖掉。读取不占锁：写入是原子的，读到的要么是旧的、要么是新的。
 type ActionsService struct {
 	mu sync.Mutex
-	// touched 是这次会话改过的**轨**：随包那份包里 17929 条轨绝大多数跟这一页无关，部署时不该把没动过的
-	// 也搬过去（搬了还会盖掉别处的手工改动）。
-	touched map[trackRef]bool
 }
 
 // trackRef 是一条轨的身份：同一个动画可能有好几条轨（子轨号不同、种类不同），改了一条只该重搬那一条。
@@ -615,8 +612,14 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	return s.writeAndDeployTracks(cfg, []trackWrite{{motion: motion, sub: flagSub, kind: flagsKind, raw: raw}})
 }
 
-// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨只搬这次会话改过的（随包那份包里有 17929 条轨，
-// 全搬一遍既慢，又会盖掉别处的手工改动）。
+// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨搬 **UserDir 改动表里记着的那些**（限当前角色）。
+//
+// 为什么不是"只搬本次会话改过的"：mod 目录每次更新都会被整个换掉 —— tools/deploy.ps1 先删掉整个目录再
+// 解压，而构建产物的 zip 里不含 GBFR\data。于是上次会话保存出来的部署文件会消失；若只搬本次会话碰过的，
+// 那些改动就再也回不来（除非用户重新编辑一次）。改动表里本来就只有"编辑过的那些轨"（不是包里那 17929 条），
+// 整份补一遍的成本很小。
+//
+// 按当前角色过滤：部署路径是用 charCode(cfg) 拼的，别的角色的轨写下去会错位。
 func (s *ActionsService) Deploy() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -630,9 +633,21 @@ func (s *ActionsService) Deploy() error {
 		return err
 	}
 
-	refs := make([]trackRef, 0, len(s.touched))
-	for ref := range s.touched {
-		refs = append(refs, ref)
+	trackEdits, err := loadTrackEdits()
+	if err != nil {
+		return err
+	}
+	char := charCode(cfg)
+	refs := make([]trackRef, 0, len(trackEdits))
+	seen := make(map[trackRef]bool, len(trackEdits))
+	for _, edit := range trackEdits {
+		if edit.Char != char {
+			continue
+		}
+		if ref := edit.ref(); !seen[ref] {
+			seen[ref] = true
+			refs = append(refs, ref)
+		}
 	}
 	// 顺序稳一点：真出错时日志里才看得出进行到哪一条。
 	sort.Slice(refs, func(i, j int) bool {
@@ -645,10 +660,6 @@ func (s *ActionsService) Deploy() error {
 		return refs[i].sub < refs[j].sub
 	})
 
-	trackEdits, err := loadTrackEdits()
-	if err != nil {
-		return err
-	}
 	items := make([]trackWrite, 0, len(refs))
 	for _, ref := range refs {
 		raw, err := trackSourceXML(cfg, trackEdits, ref.motion, ref.sub, ref.kind)
@@ -752,14 +763,6 @@ func fsmPath(cfg actionConfig, name string) (string, error) {
 	return filepath.Join(cfg.FsmDir, char+"_"+name+"_fsm_ingame.msg"), nil
 }
 
-// markTouched 记下这条轨被改过（零值可用的 service 也能用：第一次写的时候才建 map）。
-func (s *ActionsService) markTouched(motion, sub, kind string) {
-	if s.touched == nil {
-		s.touched = map[trackRef]bool{}
-	}
-	s.touched[trackRef{motion: motion, sub: sub, kind: kind}] = true
-}
-
 // trackWrite 是一条要写出去的轨：身份 + 已经拼好的 XML 字节。
 type trackWrite struct {
 	motion string
@@ -775,7 +778,7 @@ writeAndDeployTracks 把若干条轨的 XML 编成 BXM 再搬进 mod 目录。
 临时目录与那个外部 exe 都省了。**写出的字节与工具逐字节相同**：全库 17929 份对过（bxm_test.go 的
 TestBXMCorpus），保存路径上也还有一条拿工具当尺子的测试（actiontracks_test.go）。
 
-flags 的保存、通用轨的保存、以及 Deploy 里"把这次改过的轨重新搬一遍"都走这里（调用方持有 s.mu）。
+flags 的保存、通用轨的保存、以及 Deploy 里"把改动表里记着的轨搬一遍"都走这里（调用方持有 s.mu）。
 搬的顺序按传进来的先后：真出错时日志里看得出停在哪一条。
 */
 func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWrite) error {
@@ -789,7 +792,6 @@ func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWri
 		if err := appfiles.WriteAtomic(dst, body); err != nil {
 			return fmt.Errorf("部署到 %s: %w", dst, err)
 		}
-		s.markTouched(item.motion, item.sub, item.kind)
 	}
 	return nil
 }

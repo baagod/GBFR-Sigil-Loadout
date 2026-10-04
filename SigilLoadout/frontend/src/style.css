@@ -218,6 +218,20 @@
         border: 2px solid var(--ring);
         pointer-events: none;
     }
+
+    /*
+        ⚠️ 最后一列 / 最后一行**没有那两条边框**（见表格的 `[&_tr>*:last-child]:border-r-0`、
+        `[&_tr:last-child>*]:border-b-0`），而上面的 inset:-1px 是按"格子 + 那圈格线"算的 ——
+        没有格线时它就越过表格边缘 1px：**点一下最后一列，容器会平白冒出一条横向滚动条**。
+        这两条把环压回格子内（右/下各收 1px，其余三边照旧）。
+    */
+    &:last-child:focus-within::after {
+        right: 0;
+    }
+
+    tr:last-child > &:focus-within::after {
+        bottom: 0;
+    }
 }
 
 /*

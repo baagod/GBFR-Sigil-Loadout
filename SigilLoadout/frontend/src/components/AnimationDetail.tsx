@@ -44,7 +44,16 @@ import {FLAG0_NAMES, FLAG1_NAMES, withNewRow} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
-const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = ["config", "startTime", "endTime", "flag0", "flag1"]
+const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = [
+    "config",
+    "startTime",
+    "endTime",
+    "layerFlag",
+    "flag0",
+    "flag1",
+    "sysFlag",
+    "freeArg",
+]
 
 /**
  * 行身份（后端给的，见 Go 侧 actionrowmarks.go）：
@@ -1081,10 +1090,14 @@ function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}:
         {label: t.colStart, key: "startTime"},
         {label: t.colEnd, key: "endTime"},
         {label: t.colFrame, key: "endTime", text: frameOf},
+        // 这三个本来就是 XML 的字段，只是原先没上屏 —— 不上屏就等于改不了（写回时只原样往返）。
+        {label: t.colLayerFlag, key: "layerFlag"},
         {label: t.colFlag0, key: "flag0"},
         {label: t.colFlag0Effects, key: "flag0Effects", text: (row) => row.flag0Effects},
         {label: t.colFlag1, key: "flag1"},
         {label: t.colFlag1Effects, key: "flag1Effects", text: (row) => row.flag1Effects},
+        {label: t.colSysFlag, key: "sysFlag"},
+        {label: t.colFreeArg, key: "freeArg"},
     ]
     const inRange = (index: number) =>
         sel !== null && index >= Math.min(sel.from, sel.to) && index <= Math.max(sel.from, sel.to)
