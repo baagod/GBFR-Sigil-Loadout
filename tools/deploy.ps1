@@ -60,8 +60,31 @@ if (Test-Path -LiteralPath $modDir) {
     }
 }
 
-Remove-Item -LiteralPath $modDir -Recurse -Force -ErrorAction SilentlyContinue
-Expand-Archive -LiteralPath $zip.FullName -DestinationPath $Target -Force
+# 4b. 删旧之前，先把"可视工具部署出来的数据"（GBFR\data）挪出去。
+#
+#     它是工具按你的改动生成的，构建产物的 zip 里**没有**它 —— 不挪就会被下一行连着一起删掉。
+#     改动本身存在 UserDir 的改动表里、不会丢，但游戏要等你再按一次「保存」才会重新看到它们。
+#     仍然整个删除（而不是"不删目录直接解压"）：那样会留下上一次构建里、这一次已经删掉的文件 ——
+#     按角色的 assets\*_action.msg 被换成 data.zip 时就是这样，旧文件不该留着。
+$dataDir = Join-Path $modDir 'GBFR\data'
+$stash = $null
+if (Test-Path -LiteralPath $dataDir) {
+    $stash = Join-Path $env:TEMP ("gbfr-sigilloadout-data-" + [guid]::NewGuid().ToString('N'))
+    Move-Item -LiteralPath $dataDir -Destination $stash -Force
+}
+
+# try/finally：解压失败也要把数据放回去 —— 宁可"数据在、程序是旧的"，也不要数据卡在临时目录里断链。
+try {
+    Remove-Item -LiteralPath $modDir -Recurse -Force -ErrorAction SilentlyContinue
+    Expand-Archive -LiteralPath $zip.FullName -DestinationPath $Target -Force
+}
+finally {
+    if ($stash) {
+        New-Item -ItemType Directory -Path (Split-Path -LiteralPath $dataDir) -Force | Out-Null
+        Move-Item -LiteralPath $stash -Destination $dataDir -Force
+        Write-Host "Kept the tool's deployed data (GBFR\data) across the update."
+    }
+}
 
 # 5. 第一次启动没活下来，多半是残留实例还占着 mutex：全停掉再来一次。
 if (-not (Start-SigilLoadout)) {

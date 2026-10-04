@@ -87,6 +87,7 @@ const zh = {
     /** 行号那一列右半截的握把（拖着重排），以及复制/插入那两枚按钮。 */
     dragRow: "拖这里移动这一行",
     copySelected: "复制",
+    cutSelected: "剪切",
     pasteBelow: "插入",
 };
 
@@ -160,6 +161,7 @@ export const messages: Record<Lang, Messages> = {
         colFlag1Effects: "Flag1 Effects",
         dragRow: "Drag here to move this row",
         copySelected: "Copy",
+    cutSelected: "Cut",
         pasteBelow: "Insert",
     },
     ja: {
@@ -226,6 +228,7 @@ export const messages: Record<Lang, Messages> = {
         colFlag1Effects: "Flag1 効果",
         dragRow: "ここをドラッグしてこの行を移動",
         copySelected: "コピー",
+    cutSelected: "切り取り",
         pasteBelow: "挿入",
     },
     ko: {
@@ -292,6 +295,7 @@ export const messages: Record<Lang, Messages> = {
         colFlag1Effects: "Flag1 효과",
         dragRow: "여기를 끌어서 이 행을 이동",
         copySelected: "복사",
+    cutSelected: "잘라내기",
         pasteBelow: "삽입",
     },
 };

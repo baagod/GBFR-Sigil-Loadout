@@ -35,6 +35,7 @@ import {Button} from "@/components/ui/button"
 // 那些细节）—— 16px 下细节会糊成一团，Simple 在这么小的尺寸里更清楚。
 import {Plus} from "@phosphor-icons/react/Plus"
 import {CopySimple} from "@phosphor-icons/react/CopySimple"
+import {Scissors} from "@phosphor-icons/react/Scissors"
 import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
 import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
@@ -306,6 +307,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             if (event.key === "c") {
                 event.preventDefault()
                 copySelected(key, info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0), info.kind)
+            } else if (event.key === "x") {
+                event.preventDefault()
+                cutSelected(key, info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0), info.kind)
             } else if (event.key === "v") {
                 event.preventDefault()
                 pasteBelow(key, info.kind)
@@ -361,6 +365,16 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         // 同时写进模块级剪贴板：关掉这个弹层、换一套动画再 Ctrl+V 时，靠它拿到内容。
         clipboard = {kind, rows: kept}
         setClip(clipboard)
+    }
+
+    /**
+     * 剪切 = **复制 + 删除**（按钮或 Ctrl+X）：先按复制那条路把选中行放进剪贴板，再走删除那条路。
+     * 所以"剪到原行"只是标红（`removeSelected` 只对非原行真删）—— 原行始终留在表里，
+     * 贴回来、或者再按一次 Del 恢复都成立 ✓
+     */
+    const cutSelected = (key: string, count: number, kind: string) => {
+        copySelected(key, count, kind)
+        removeSelected(key)
     }
 
     const pasteBelow = (key: string, kind: string) => {
@@ -559,12 +573,15 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                             <TrackToolbar
                                                 t={t}
                                                 canCopy={count > 0}
+                                                canCut={sel?.key === key}
                                                 // 插入只在"这张表里选中了行、且剪贴板是对应轨种类"时可用；
                                                 // 光标不在表格里（没选行）时它是灰的，Ctrl+V 同样要求先选行。
                                                 canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
                                                 canRemove={sel?.key === key}
                                                 onAdd={() => addRow(key)}
                                                 onCopy={() => copySelected(key, count, info.kind)}
+                                                // 剪切 = 复制 + 删除；原行只会标红（见 removeSelected），贴回来还在 ✓
+                                                onCut={() => cutSelected(key, count, info.kind)}
                                                 onPaste={() => pasteBelow(key, info.kind)}
                                                 onRemove={() => removeSelected(key)}
                                             />
@@ -702,14 +719,16 @@ function effectsOf(mask: string, which: 0 | 1): string {
 }
 
 /** 一条轨那排按钮：压在标题行右侧，谁被选中就删谁。 */
-function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy, onPaste, onRemove}: {
+function TrackToolbar({t, className, canCopy, canCut, canPaste, canRemove, onAdd, onCopy, onCut, onPaste, onRemove}: {
     t: Messages
     className?: string
     canCopy: boolean
+    canCut: boolean
     canPaste: boolean
     canRemove: boolean
     onAdd: () => void
     onCopy: () => void
+    onCut: () => void
     onPaste: () => void
     onRemove: () => void
 }) {
@@ -776,6 +795,23 @@ function TrackToolbar({t, className, canCopy, canPaste, canRemove, onAdd, onCopy
                         <ClipboardText />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.pasteBelow}</TooltipContent>
+                </Tooltip>
+                <Tooltip disabled={!canCut}>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                className="hover:bg-[#262626]!"
+                                aria-label={t.cutSelected}
+                                disabled={!canCut}
+                                onClick={onCut}
+                            />
+                        }
+                    >
+                        <Scissors />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.cutSelected}</TooltipContent>
                 </Tooltip>
                 <Tooltip disabled={!canRemove}>
                     <TooltipTrigger
