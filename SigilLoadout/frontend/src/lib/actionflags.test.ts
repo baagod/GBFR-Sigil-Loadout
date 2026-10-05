@@ -7,16 +7,59 @@ import { describe, expect, it } from "vitest"
 
 import {
     FLAG0_NAMES,
+    FLAG0_VALUES,
     FLAG1_NAMES,
+    FLAG1_VALUES,
     charCodeOf,
     collectRows,
     flagEffects,
+    flagValueOptions,
     isMotion,
     rangeOf,
     totalDuration,
     totalFrames,
     withNewRow,
 } from "@/lib/actionflags"
+
+describe("flag 取值下拉", () => {
+    it("取值清单是数据快照：Flag0 91 个 / Flag1 33 个", () => {
+        // 这份清单是从 assets/data.zip 的 8341 份 flags 轨扫出来的，数量对不上说明是另一批数据。
+        expect(FLAG0_VALUES.length).toBe(91)
+        expect(FLAG1_VALUES.length).toBe(33)
+        // 出现最多的那个组合与"一个字面值编码 5 个效果"这件事，一起钉住。
+        expect(FLAG0_VALUES).toContain(8207)
+        expect(flagEffects("8207", FLAG0_NAMES).split(" + ").length).toBe(5)
+    })
+
+    it("单个位排在组合值前面，各自按数值升序", () => {
+        const options = flagValueOptions("0", FLAG0_VALUES, FLAG0_NAMES)
+        // 数据里是 91 个取值，再加上位定义表里有名字、但数据里没出现的两个单个位（bit19 / bit24）。
+        expect(options.length).toBe(93)
+        expect(options).toContain("524288") // bit19 = 命中后触发branchAtkHit
+        expect(options).toContain("16777216") // bit24 = 允许X输入
+        // 2147483648 是 bit31（名字表只到 bit30，所以它没有名字）—— 它仍属"单个位"那一组，
+        // 组合值 8207 必须排在它后面。
+        expect(options.indexOf("2147483648")).toBeGreaterThan(-1)
+        expect(options.indexOf("8207")).toBeGreaterThan(options.indexOf("2147483648"))
+        // 数字是升序的（前 3 项）。
+        expect(options.slice(0, 3)).toEqual(["0", "1", "2"])
+    })
+
+    it("当前值不在清单里也补进去（手改过的、或游戏更新带来的）", () => {
+        const options = flagValueOptions("12345", [0, 4], FLAG0_NAMES)
+        expect(options).toContain("12345")
+        // 12345 = bit0+bit3+bit12+bit13，算组合，排在所有单个位之后。
+        expect(options.indexOf("12345")).toBeGreaterThan(options.indexOf("2147483648"))
+    })
+
+    it(">2³¹ 的掩码不被位运算弄错", () => {
+        // 数据里真有 2147483648；拿 JS 位运算判位数会把它翻成负数（所以 bitCount 是逐位除下来的）。
+        const options = flagValueOptions("2147483648", FLAG0_VALUES, FLAG0_NAMES)
+        // 判成"单个位"（排在组合 8207 之前）而不是"组合"或"没有位"。
+        expect(options.indexOf("2147483648")).toBeGreaterThan(-1)
+        expect(options.indexOf("2147483648")).toBeLessThan(options.indexOf("8207"))
+    })
+})
 
 describe("掩码翻译", () => {
     it("置起来的位按 bit 号从小到大用 + 连起来", () => {

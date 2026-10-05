@@ -49,6 +49,7 @@ import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
 import {AnimationDetail} from "@/components/AnimationDetail"
+import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
@@ -368,6 +369,11 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
 
     // 动画详情页显示的是哪个动画号（null = 关着）。
     const [detail, setDetail] = useState<string | null>(null)
+    // 下方那块地方归谁：顶栏那个开关按钮在「通用轨」与「动作表」之间切（**默认通用轨**，
+    // 切一下才到动作表）。
+    // 两块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
+    // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
+    const [section, setSection] = useState<"general" | "actions">("general")
 
     const [busy, setBusy] = useState(false)
 
@@ -594,6 +600,17 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                             <Search />
                         </InputGroupAddon>
                     </InputGroup>
+                    {/* 通用轨 / 动作表 的开关。按钮上写的是**点一下会去的那一块**（目标），不是当前看着的
+                        那一块 —— 所以看着动作表时它写「通用轨」，反之亦然。
+                        **不给任何自定义类**：就用 Button 的 outline 变体原样（字号/字重/字色/底色都由它定），
+                        放在搜索框右边、保存按钮左边（保存带 ml-auto，仍然顶到最右）。
+                        默认停在「通用轨」（section 初值 general）。 */}
+                    <Button
+                        variant="outline"
+                        onClick={() => setSection((prev) => (prev === "actions" ? "general" : "actions"))}
+                    >
+                        {section === "actions" ? t.generalTracks : t.actionsSection}
+                    </Button>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
                         现在只留这一个）。ml-auto 顶到这一行最右。
                         这里**不再有任何状态行**：成功/失败都不在界面上报（失败只写 console.error）。 */}
@@ -601,8 +618,27 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         {t.saveAndDeploy}
                     </Button>
                 </div>
-                {/* 表头与两条记录是同一次读取给的（keys 与 actions 一起落地），所以这两个判据是一件事。 */}
-                {actions.length === 0 ? (
+                {/* 下方那块地方：两块由顶栏那个开关切换 —— 不再用手风琴，也不再有那两行标题。
+                    两块都留在 DOM 里，没在看的那块压成 h-0 + overflow-hidden（与原来 keepMounted 一个效果）：
+                    切回来时 ids 输入框的内容与滚动位置都还在。
+                    ⚠️ 压成 h-0 的那块**仍占一个 flex gap**（外层是 gap-4），所以要 -mt-4 把这 16px 抵掉，
+                    否则顶栏与表格之间会多出一段空白。两块都写：谁在下面时它都是那一侧的邻居。
+                    「通用轨」= 有轨、但动作表里任何记录的 saveMotId01_~12_ 都没提到的号（见后端
+                    ListHiddenMotions）；在清单里点一行就弹出那个号的轨表。 */}
+                <div
+                    className={`flex min-h-0 flex-col ${
+                        section === "general" ? "flex-1" : "h-0 overflow-hidden -mt-4"
+                    }`}
+                >
+                    <HiddenMotionList t={t} charCode={charCode} onOpen={(motion) => setDetail(motion)} />
+                </div>
+                <div
+                    className={`flex min-h-0 flex-col ${
+                        section === "actions" ? "flex-1" : "h-0 overflow-hidden -mt-4"
+                    }`}
+                >
+                            {/* 表头与两条记录是同一次读取给的（keys 与 actions 一起落地），所以这两个判据是一件事。 */}
+                            {actions.length === 0 ? (
                     // 清单上的记录这张表里一条都没有：不是错误，是 ids 与表不匹配（见后端 LoadActions）。
                     // 就地显示、不居中也不撑高：一行 14px 的灰字。
                     <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
@@ -676,6 +712,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         </table>
                     </div>
                 )}
+                </div>
             </div>
 
             {/* 动画详情页：点动画号弹出来的那一层（四条轨 + FSM）。 */}

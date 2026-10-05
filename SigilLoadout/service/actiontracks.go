@@ -1,11 +1,14 @@
 package service
 
 import (
+	"crypto/sha256"
 	"encoding/xml"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
 
 /*
@@ -261,6 +264,329 @@ func trackAttr(attrs []xml.Attr, name string) string {
 		}
 	}
 	return ""
+}
+
+/*
+HiddenMotion 是一条**隐藏 mot**：这个角色有它的轨文件，但动作表里没有任何记录的 saveMotId01_~12_
+提到它。
+
+界面上的「通用轨」按钮列的就是这批号：动作表里翻不到（引擎从别的 motion 内部链过去，或按通用语义
+取用），但它们确实会被播到 —— 实测炎帝的 3123 放大后游戏里肉眼可见。名称一栏留空：隐藏 mot 没有
+动作记录，也就没有 actionName_ 可给。
+
+**一条都不筛**：查过动作表、FSM、角色参数、预设、`.mot` 本体与 exe 之后可以确定，**跳转关系不在任何
+可读数据里**（引擎自己拼文件名），所以"全角色共享的基础动作"（跳跃、受击、倒地）和"这个角色的隐藏
+技能段"在数据侧分不开。既然分不开，就别筛 —— 筛掉的那些里可能正有真会播的号。改用的办法是**组织**：
+分组（Group）决定默认展开哪一组，标记（RefByOtherChars / DuplicateOf）把能拿到的线索摆在行上。
+*/
+type HiddenMotion struct {
+	Motion string `json:"motion"`
+	Name   string `json:"name"`
+	// Group 是分组，取值见 group* 常量（互斥且全覆盖）。
+	Group string `json:"group"`
+	// RefByOtherChars 是**别的角色**的动作表点到这个号的次数（按角色码排序）。空 = 没有别人用。
+	RefByOtherChars []HiddenMotionRef `json:"refByOtherChars"`
+	// DuplicateOf 是同角色内、轨内容与本号相同的另一个号（取相同的轨最多的那个；没有就是空串）。
+	DuplicateOf string `json:"duplicateOf"`
+	// DuplicateReferenced 说 DuplicateOf 那个号**被动作表引用**没有 —— 那才是"疑似废轨"的强信号：
+	// 实测 3116 的 flags/effect 与 3106 逐字节相同，而 3106 被引用，放大 3116 游戏里毫无反应。
+	DuplicateReferenced bool `json:"duplicateReferenced"`
+}
+
+// HiddenMotionRef 是"别的角色引用了这个号"的一条：角色码 + 次数。
+type HiddenMotionRef struct {
+	Char  string `json:"char"`
+	Count int    `json:"count"`
+}
+
+// 分组取值：按"有没有 attack 轨"把每个号恰好归入一组（只有两组）。
+const (
+	groupSkill = "skill" // 有 attack：技能 / 攻击动作
+	groupOther = "other" // 其余
+)
+
+/*
+ListHiddenMotions 列出当前角色的隐藏 mot（按号排序，**不做筛选**）。
+
+口径：
+  - 来源是**轨文件**（cfg.FlagsDir 下 <角色>_<motion>_<子轨>_seq_edit_<种类>.xml），只算 sub = 0 ——
+    非 0 的子轨跟主轨是同一个 motion，全算上只会在清单里把同一个号列好几次；
+  - 被动作表 saveMotId01_~12_ 引用过的一律排除：原始表里的值和玩家改动后的值都算引用（改动可能把
+    某条记录指到别处，那时候原号就真的没人用了）；
+  - 其余**全部列出**（炎帝 186 条、娜露梅 355 条），每条带分组与两条标记。分组和标记只回答"先看哪
+    几条"，不代表结论 —— 到底会不会被播，目前只有游戏内实测能定。
+*/
+func (s *ActionsService) ListHiddenMotions() ([]HiddenMotion, error) {
+	cfg := s.config()
+	char := charCode(cfg)
+
+	referenced, err := referencedMotions(cfg, char)
+	if err != nil {
+		return nil, err
+	}
+
+	matches, err := filepath.Glob(filepath.Join(cfg.FlagsDir, char+"_*_seq_edit_*.xml"))
+	if err != nil {
+		return nil, fmt.Errorf("找轨文件: %w", err)
+	}
+	// kinds 是清单本身（号 → 有哪些轨）；hashes 只为判"内容逐字节相同"服务，顺路一起读。
+	kinds := map[string]map[string]bool{}
+	hashes := map[string]map[string]string{}
+	for _, path := range matches {
+		motion, sub, kind, ok := splitTrackName(filepath.Base(path), char)
+		if !ok || sub != "0" {
+			continue
+		}
+		if kinds[motion] == nil {
+			kinds[motion] = map[string]bool{}
+			hashes[motion] = map[string]string{}
+		}
+		kinds[motion][kind] = true
+		// 指纹读不出来就不参与比较：少一条标记，不影响清单。
+		if sum, err := fileContentSum(path); err == nil {
+			hashes[motion][kind] = sum
+		}
+	}
+
+	refs, err := otherCharMotionRefs()
+	if err != nil {
+		return nil, err
+	}
+
+	motions := pickHiddenMotions(kinds, referenced)
+	out := make([]HiddenMotion, 0, len(motions))
+	for _, motion := range motions {
+		item := HiddenMotion{Motion: motion, Group: hiddenGroup(kinds[motion])}
+		for _, code := range sortedKeys(refs[motion]) {
+			// 自己不算"别的角色"：这一栏问的是"还有谁在用这个号"。
+			if code == char {
+				continue
+			}
+			item.RefByOtherChars = append(item.RefByOtherChars, HiddenMotionRef{Char: code, Count: refs[motion][code]})
+		}
+		item.DuplicateOf, item.DuplicateReferenced = duplicateOf(motion, hashes, referenced)
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+/*
+pickHiddenMotions 从"号 → 有哪些种类的轨"里取出**全部**隐藏号（排掉被动作表引用的），按号排序。
+
+不筛的理由见 HiddenMotion 的注释：数据侧分不出"全角色共享的基础动作"和"隐藏技能段"，筛了就会把
+真会播的号一起筛掉（炎帝的 3123 就是这么一类）。
+*/
+func pickHiddenMotions(kinds map[string]map[string]bool, referenced map[string]bool) []string {
+	motions := make([]string, 0, len(kinds))
+	for motion := range kinds {
+		if referenced[motion] {
+			continue
+		}
+		motions = append(motions, motion)
+	}
+	sort.Strings(motions)
+	return motions
+}
+
+// hiddenGroup 按"有没有 attack 轨"把号归入一组（互斥且全覆盖，取值见 group* 常量）。
+func hiddenGroup(have map[string]bool) string {
+	if have["attack"] {
+		return groupSkill
+	}
+	return groupOther
+}
+
+/*
+duplicateOf 在同角色内找"轨内容与本号逐字节相同"的另一个号：取相同的轨**最多**的那个（并列取号小的），
+并回答那个号**被动作表引用**没有 —— 被引用的那个才是正主，本号就是没人播的重复轨。
+
+实测：3116 的 flags/effect 与 3106（被引用）完全相同，把 3116 放大后游戏里毫无反应。没有内容相同的
+对象时返回空串。
+*/
+func duplicateOf(motion string, hashes map[string]map[string]string, referenced map[string]bool) (string, bool) {
+	self := hashes[motion]
+	best, bestShared := "", 0
+	for other, otherKinds := range hashes {
+		if other == motion {
+			continue
+		}
+		shared := 0
+		for kind, sum := range self {
+			if sum != "" && otherKinds[kind] == sum {
+				shared++
+			}
+		}
+		if shared == 0 {
+			continue
+		}
+		if shared > bestShared || (shared == bestShared && (best == "" || other < best)) {
+			best, bestShared = other, shared
+		}
+	}
+	if best == "" {
+		return "", false
+	}
+	return best, referenced[best]
+}
+
+/*
+otherCharMotionRefs 是"别的角色点了哪些号"的索引：号 → 角色码 → 次数。
+
+要遍历容器里每个角色的动作表（32 次 msgpack 解码，不便宜），所以**只建一次、进程内缓存**：随包动作表
+是只读的，进程内缓存安全；玩家改动（action_edits.json）在运行期间才会变，最坏情况是标记晚一次刷新
+—— 比每开一次弹窗都解 32 张表划算得多。
+*/
+var otherCharRefs struct {
+	once sync.Once
+	refs map[string]map[string]int
+	err  error
+}
+
+func otherCharMotionRefs() (map[string]map[string]int, error) {
+	otherCharRefs.once.Do(func() {
+		otherCharRefs.refs, otherCharRefs.err = buildOtherCharMotionRefs()
+	})
+	return otherCharRefs.refs, otherCharRefs.err
+}
+
+func buildOtherCharMotionRefs() (map[string]map[string]int, error) {
+	codes, present, err := actionTableCodes()
+	if err != nil {
+		return nil, err
+	}
+	if !present {
+		// 容器不在（开发机上跑老解包目录）：没有跨角色索引，标记就都空着，清单照常出。
+		return map[string]map[string]int{}, nil
+	}
+	edits, err := loadActionEdits()
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]map[string]int{}
+	for _, code := range codes {
+		raw, found, err := readOriginal(actionEntry(code))
+		if err != nil || !found {
+			continue // 单张表读不出来不该让整份索引失败
+		}
+		root, err := parseActionTable(raw, actionEntry(code))
+		if err != nil {
+			continue
+		}
+		merged := mergeActionEdits(edits, code)
+		for _, id := range tableIDs(root) {
+			record := recordByID(root, id)
+			if record == nil {
+				continue
+			}
+			fields, err := actionFields(record)
+			if err != nil {
+				continue
+			}
+			for _, field := range fields {
+				if !strings.HasPrefix(field.Key, "saveMotId") {
+					continue
+				}
+				// 取值口径与 referencedMotions 一致：改动表里有就按改动算（那条记录已经指到别处了）。
+				value := field.Original
+				if replaced, ok := merged[id][field.Key]; ok {
+					value = replaced
+				}
+				if value == "" {
+					continue
+				}
+				if out[value] == nil {
+					out[value] = map[string]int{}
+				}
+				out[value][code]++
+			}
+		}
+	}
+	return out, nil
+}
+
+// sortedKeys 把"角色码 → 次数"按角色码排序取值，界面上的标记顺序才稳定。
+func sortedKeys(counts map[string]int) []string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// fileContentSum 是文件内容的指纹，判"逐字节相同"用。
+func fileContentSum(path string) (string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(raw)), nil
+}
+
+/*
+referencedMotions 是动作表里被 saveMotId01_~12_ 点过名的动画号集合：原始表与这个角色的改动表并起来算。
+*/
+func referencedMotions(cfg actionConfig, char string) (map[string]bool, error) {
+	original, err := loadActionOriginal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, id := range tableIDs(original) {
+		record := recordByID(original, id)
+		if record == nil {
+			continue
+		}
+		fields, err := actionFields(record)
+		if err != nil {
+			return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", id, err)
+		}
+		for _, field := range fields {
+			if !strings.HasPrefix(field.Key, "saveMotId") {
+				continue
+			}
+			out[field.Original] = true
+			if field.Value != nil {
+				out[*field.Value] = true
+			}
+		}
+	}
+	edits, err := loadActionEdits()
+	if err != nil {
+		return nil, err
+	}
+	for _, fields := range mergeActionEdits(edits, char) {
+		for key, value := range fields {
+			if strings.HasPrefix(key, "saveMotId") {
+				out[value] = true
+			}
+		}
+	}
+	return out, nil
+}
+
+/*
+splitTrackName 从 <角色>_<motion>_<子轨>_seq_edit_<种类>.xml 里反推号与子轨号。
+
+与 parseTrackName 的差别只有一处：那个要**先知道 motion**（界面是从某条记录点进来的），这个是从文件名
+反推 —— 列隐藏 mot 时手里只有一堆文件，事先并不知道有哪些号。
+*/
+func splitTrackName(base, char string) (motion, sub, kind string, ok bool) {
+	if !strings.HasPrefix(base, char+"_") {
+		return "", "", "", false
+	}
+	rest := strings.TrimSuffix(strings.TrimPrefix(base, char+"_"), ".xml")
+	var head string
+	var found bool
+	head, kind, found = strings.Cut(rest, "_seq_edit_")
+	if !found || !isTrackKind(kind) {
+		return "", "", "", false
+	}
+	motion, sub, found = strings.Cut(head, "_")
+	if !found || !isMotion(motion) || !isSubTrack(sub) {
+		return "", "", "", false
+	}
+	return motion, sub, kind, true
 }
 
 /*

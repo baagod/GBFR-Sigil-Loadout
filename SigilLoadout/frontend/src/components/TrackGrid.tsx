@@ -26,7 +26,9 @@ import {Scissors} from "@phosphor-icons/react/Scissors"
 import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
 import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
+import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {EditableCell} from "@/components/ActionsPanel"
+import {FLAG0_NAMES, FLAG0_VALUES, FLAG1_NAMES, FLAG1_VALUES, flagEffects, flagValueOptions} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -359,11 +361,87 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
     )
 }
 
+/**
+ * Flag0 / Flag1 那一格：只读两行（数值 / 含义），点开是一个**选值**的下拉。
+ *
+ * 为什么不是输入框：掩码是让人挑的，不是让人敲的 —— 一个格子里可能置着好几个位
+ * （游戏数据里出现最多的 8207 = 5 个效果同时生效），敲数字既看不出含义，
+ * 也容易敲出游戏里根本没出现过的组合。下拉列的是**值**（单个位在前、组合在后，见
+ * flagValueOptions），选中就把那个字面值写进格子；含义是 flagEffects() 现算的，不落盘。
+ *
+ * 行高：两行 13px + 11px = 24px，与行号握把撑出来的那 24px 一样高，所以整张表的行高不变。
+ */
+function FlagPickerCell({value, meaningOf, unchanged, options, searchPlaceholder, tdClassName, onCommit}: {
+    value: string
+    /** 把一个取值翻成含义（0 显示成"无"）—— 列表每一项与格子里那行灰字都走它。 */
+    meaningOf: (raw: string) => string
+    unchanged: boolean
+    options: string[]
+    searchPlaceholder: string
+    tdClassName: string
+    onCommit: (value: string) => void
+}) {
+    return (
+        <td className={tdClassName}>
+            <Combobox
+                items={options}
+                // 空白值（数据里真有 Flag1 为空的轨）不在 options 里，给 null 免得回填不上。
+                value={options.includes(value) ? value : null}
+                autoHighlight
+                // 搜索按**含义**匹配（"闪避"、"重力"）：按数字搜没意义，而含义才是人记得住的东西。
+                itemToStringLabel={(option: string) => meaningOf(option)}
+                onValueChange={(next) => {
+                    if (next !== null && next !== value) onCommit(next)
+                }}
+            >
+                {/* 整格都是触发器：点一下展开、再点一下收起，由官方触发器自己管
+                    （与"角色动作"页那个"选择角色"combo 同一套，不需要我们翻 open 状态）。 */}
+                <ComboboxTrigger
+                    render={
+                        <button type="button" className="block w-full cursor-default px-1 py-0 text-left text-xs">
+                            <span
+                                className={`block leading-[13px] whitespace-nowrap ${
+                                    unchanged ? "text-muted-foreground" : ""
+                                }`}
+                            >
+                                {value}
+                            </span>
+                            {/* 含义行截断：位组合出来的含义能长到四十多个字符（8207 是 5 个效果），
+                                不截的话那一列会被撑到几百像素、把后面几列挤出屏幕。完整含义在弹层里看。 */}
+                            <span className="block max-w-[10rem] truncate text-[10px] leading-[11px] text-muted-foreground/70">
+                                {meaningOf(value)}
+                            </span>
+                        </button>
+                    }
+                />
+                {/* min-w：官方弹层宽度是跟着**锚点**（这一格）走的，而 flag 那一格只有几十像素宽，
+                    照原样弹出来放不下"允许走路取消 + 允许连段至下一动作 …"这种多效果含义。 */}
+                <ComboboxContent className="min-w-[22rem]">
+                    <ComboboxInput showTrigger={false} placeholder={searchPlaceholder}/>
+                    <ComboboxList className="max-h-[264px]">
+                        {(option: string) => (
+                            <ComboboxItem key={option} value={option}>
+                                {/* 列表项本身是 flex（右边还有对勾的位置），所以两行得自己包一层竖排。 */}
+                                <span className="flex flex-col">
+                                    <span className="leading-4">{option}</span>
+                                    <span className="text-xs leading-4 text-muted-foreground">
+                                        {meaningOf(option)}
+                                    </span>
+                                </span>
+                            </ComboboxItem>
+                        )}
+                    </ComboboxList>
+                </ComboboxContent>
+            </Combobox>
+        </td>
+    )
+}
+
 /** flags 的一行。同 SortableTrackRow，只是格子按 flags 那几列渲染。 */
 function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onExtend, onEdit}: {
     row: FlagRow
     index: number
-    columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string}[]
+    columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"}[]
     t: Messages
     selected: boolean
     /** 这一行与原表不同的列；null = 整行与原表一致（整行灰）。 */
@@ -409,28 +487,53 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                     onExtend={onExtend}
                 />
             </td>
-            {columns.map((column) =>
-                column.text ? (
-                    // 假删除的行：文字格也别留那层暗色（dark:bg-input/30），否则整条红带里这几格是暗的。
-                    <td key={column.label} className={`border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`}>
-                        <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
-                    </td>
-                ) : (
+            {columns.map((column) => {
+                // 假删除的行：这几格也别留那层暗色（dark:bg-input/30），否则整条红带里是暗的。
+                const tdClassName = `border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`
+                if (column.picker) {
+                    const names = column.picker === "flag0" ? FLAG0_NAMES : FLAG1_NAMES
+                    const values = column.picker === "flag0" ? FLAG0_VALUES : FLAG1_VALUES
+                    const raw = String(row[column.key] ?? "")
+                    return (
+                        <FlagPickerCell
+                            key={column.label}
+                            value={raw}
+                            meaningOf={(value) => {
+                                const parsed = Number.parseInt(value.trim(), 10)
+                                if (!Number.isFinite(parsed)) return ""
+                                return parsed === 0 ? t.flagNone : flagEffects(value, names)
+                            }}
+                            unchanged={!diff || !diff.has(String(column.key))}
+                            options={flagValueOptions(raw, values, names)}
+                            searchPlaceholder={t.flagSearch}
+                            tdClassName={tdClassName}
+                            onCommit={(value) => onEdit(column.key, value)}
+                        />
+                    )
+                }
+                if (column.text) {
+                    return (
+                        <td key={column.label} className={tdClassName}>
+                            <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
+                        </td>
+                    )
+                }
+                return (
                     <EditableCell
                         key={column.label}
-                        tdClassName={`border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`}
+                        tdClassName={tdClassName}
                         mono
                         value={String(row[column.key] ?? "")}
                         unchanged={!diff || !diff.has(String(column.key))}
                         onCommit={(value) => onEdit(column.key, value)}
                     />
-                ),
-            )}
+                )
+            })}
         </tr>
     )
 }
 
-/** flags 的专用表格：只列有意义的那几列，Flag0/Flag1 后面跟后端算好的中文含义。 */
+/** flags 的专用表格：只列有意义的那几列；Flag0 / Flag1 是**选值格**（数值 + 含义同一格，点开选值）。 */
 export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}: {
     rows: FlagRow[]
     sel: {from: number; to: number} | null
@@ -444,17 +547,17 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
 }) {
     const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
     // 类型与帧是给人看的：类型是 1/0 翻成"触发/持续"，帧由结束时间算出来，都不直接改。
-    const columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string}[] = [
+    // Flag0 / Flag1 是选值格：值本身可能编码好几个效果，所以含义就跟在同一个格子里，
+    // 不再单开"Flag0效果 / Flag1效果"两列（那两列本来也不参与原值比较）。
+    const columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"}[] = [
         {label: t.colConfig, key: "config", text: (row) => (row.config === "1" ? t.configTrigger : t.configContinuous)},
         {label: t.colStart, key: "startTime"},
         {label: t.colEnd, key: "endTime"},
         {label: t.colFrame, key: "endTime", text: frameOf},
         // 这三个本来就是 XML 的字段，只是原先没上屏 —— 不上屏就等于改不了（写回时只原样往返）。
         {label: t.colLayerFlag, key: "layerFlag"},
-        {label: t.colFlag0, key: "flag0"},
-        {label: t.colFlag0Effects, key: "flag0Effects", text: (row) => row.flag0Effects},
-        {label: t.colFlag1, key: "flag1"},
-        {label: t.colFlag1Effects, key: "flag1Effects", text: (row) => row.flag1Effects},
+        {label: t.colFlag0, key: "flag0", picker: "flag0"},
+        {label: t.colFlag1, key: "flag1", picker: "flag1"},
         {label: t.colSysFlag, key: "sysFlag"},
         {label: t.colFreeArg, key: "freeArg"},
     ]
@@ -469,8 +572,8 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                 if (over && active.id !== over.id) onReorder(Number(active.id), Number(over.id))
             }}
         >
-            {/* 同上：横向能滑（flags 十一列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。
-                min-w-full 同上：flags 的 9 列通常比容器窄，不补满右边就会空出一截。 */}
+            {/* 同上：横向能滑（flags 九列在 860 宽里也放不下），纵向显式 hidden，免得冒出垂直滚动条。
+                min-w-full 同上：flags 的这几列通常比容器窄，不补满右边就会空出一截。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>

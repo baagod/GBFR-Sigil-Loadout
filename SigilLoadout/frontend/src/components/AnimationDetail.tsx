@@ -12,12 +12,11 @@ import {
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
-import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion"
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid, TrackToolbar, type Marked} from "@/components/TrackGrid"
-import {FLAG0_NAMES, FLAG1_NAMES, withNewRow} from "@/lib/actionflags"
+import {withNewRow} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
@@ -75,13 +74,23 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
 选中：点行号选一行、按着 Shift 点选一段（**一次只认一个分区**，切到别的分区就等于换了个选区）。
 复制/插入按分区隔离——复制的是 attack 的行，就只能插回 attack（行里有哪些列不一样，混着插会丢字段）。
 */
-export function AnimationDetail({motion, charCode, t, onClose}: {
+/**
+ * 动画详情页。
+ *
+ * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「通用轨」的清单里点一个号。
+ * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨 + FSM。
+ */
+export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     motion: string
     charCode: string
     t: Messages
     onClose: () => void
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])
+    // 当前真正载入的动画号：进来那一个（保留成 state 是为了载入与改动都按同一个名字办事）。
+    const [active, setActive] = useState(initialMotion)
+    // 下面这一整段（到渲染前）都按"当前动画号"办事：把 prop 收进这个名字，改动面最小。
+    const motion = active
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。
     const [loaded, setLoaded] = useState(false)
     const [flags, setFlags] = useState<FlagRow[]>([])
@@ -91,7 +100,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [fsmName, setFsmName] = useState<string | null>(null)
     // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
     const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
-    const [opened, setOpened] = useState<string[]>([])
     const [sel, setSel] = useState<{key: string; from: number; to: number} | null>(null)
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [failure, setFailure] = useState("")
@@ -124,6 +132,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     }, [baseline, tables, flags])
 
     useEffect(() => {
+        // 隐藏 mot 模式：一行都还没展开时没有动画号可载 —— 清单本身不需要这份数据。
+        if (!motion) return
+        // 换号（隐藏 mot 里展开另一行）等于换一份数据：先清掉上一号的草稿与选中，
+        // 否则它们会跟着新号一起被交出去（保存时写错号）。
+        setLoaded(false)
+        setDirty([])
+        setSel(null)
         let alive = true
         void (async () => {
             try {
@@ -159,9 +174,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 // 原表 = **游戏原版**（后端从随包 data.zip 里读的，只读）：灰/亮全靠拿当前行和它比。
                 // 它不随保存变化 —— "我一直知道原表的值"就是靠这个。
                 setBaseline({tables: original, flags: primalFlags ?? []})
-                // 全部默认展开：点进来就是想看它们，不该再点一次（空的分区也展开，展开着才知道它是空的）。
-                setOpened([...list.map(trackKey), "fsm"])
-                // 与 infos 同一次 setState：手风琴第一次渲染时就是"已展开"，不会先收起再展开。
+                // 分区现在常开（不再用手风琴包），"默认展开"这件事已经不存在了。
                 setLoaded(true)
             } catch (e) {
                 if (alive) setFailure(String(e))
@@ -195,11 +208,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setFlags((prev) =>
             prev.map((r, i) => {
                 if (i !== index || String(r[key]) === next) return r
-                const changed = {...r, [key]: next}
-                // 掩码改了就把含义重算一遍——这两列是给人看的，不该等下次读取才更新。
-                if (key === "flag0") changed.flag0Effects = effectsOf(next, 0)
-                if (key === "flag1") changed.flag1Effects = effectsOf(next, 1)
-                return changed
+                // 含义不再写回行里：Flag0 / Flag1 那两格是按当前值现算的（见 TrackGrid 的 FlagPickerCell），
+                // 后端读出来的 flag0Effects / flag1Effects 界面已经不显示了。
+                return {...r, [key]: next}
             })
         )
         markDirty(flagsKey)
@@ -459,6 +470,115 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     // 读取失败时照常挂载，错误显示在弹层里。
     if (!loaded && !failure) return null
 
+    /*
+    三条轨（flags / effect / attack …）+ FSM：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
+    */
+    const sections = (
+        <>
+        {infos.map((info) => {
+            const key = trackKey(info)
+            const count = info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0)
+            return (
+                <div key={key} className="not-last:border-b">
+                    {/* 标题与工具条包在**同一个 sticky 容器**里：工具条是绝对定位叠上去的，不参与这行排版，
+                        所以只钉标题会把按钮留在地上。z-[60] **必须高过表格里所有吸顶格**（表头 "#" 是 50、
+                        表体 "#" 是 40、焦点框是 30）—— 给 30 时表体会画到标题上面（实测把标题整个盖住）。 */}
+                    <div className="sticky top-0 z-[60] bg-popover">
+                        <div className="flex w-full items-start py-2 text-left text-sm font-medium">
+                            <span className="flex w-full items-baseline gap-1.5">
+                                <span>{trackLabel(info.kind)}</span>
+                                {info.sub !== "0" && (
+                                    <span className="text-xs text-muted-foreground">{`#${info.sub}`}</span>
+                                )}
+                            </span>
+                        </div>
+                        <div className="absolute right-10 top-2 flex h-4 items-center">
+                            <TrackToolbar
+                                t={t}
+                                canCopy={count > 0}
+                                canCut={sel?.key === key}
+                                canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
+                                canRemove={sel?.key === key}
+                                onAdd={() => addRow(key)}
+                                onCopy={() => copySelected(key, count, info.kind)}
+                                onCut={() => cutSelected(key, count, info.kind)}
+                                onPaste={() => pasteBelow(key, info.kind)}
+                                onRemove={() => removeSelected(key)}
+                            />
+                        </div>
+                    </div>
+                    <div className="pt-1 pb-4">
+                        {info.kind === "flags" ? (
+                            <FlagsGrid
+                                rows={flags}
+                                sel={sel?.key === key ? sel : null}
+                                t={t}
+                                diffs={diffs?.[key]}
+                                onSelect={(index, shift) => select(key, index, shift)}
+                                onExtend={(index) => extendTo(key, index)}
+                                onEdit={editFlag}
+                                onReorder={(from, to) => reorder(key, from, to)}
+                            />
+                        ) : (
+                            <TrackGrid
+                                table={tables[key]}
+                                sel={sel?.key === key ? sel : null}
+                                t={t}
+                                diffs={diffs?.[key]}
+                                onSelect={(index, shift) => select(key, index, shift)}
+                                onExtend={(index) => extendTo(key, index)}
+                                onEdit={(index, column, value) => editValue(key, index, column, value)}
+                                onReorder={(from, to) => reorder(key, from, to)}
+                            />
+                        )}
+                    </div>
+                </div>
+            )
+        })}
+
+        {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。 */}
+        <div className="not-last:border-b">
+            {/* FSM 这块没有按钮组，但**外面这层 div 不能省**：sticky 只能在父元素范围内吸顶。 */}
+            <div className="sticky top-0 z-[60] bg-popover">
+                <div className="flex w-full items-start py-2 text-sm font-medium">{t.fsmScope}</div>
+            </div>
+            <div className="pt-1 pb-0">
+                <div className="flex flex-wrap gap-2">
+                    {fsmNames.map((name) => (
+                        <Button
+                            key={name}
+                            size="sm"
+                            variant={name === fsmName ? "default" : "outline"}
+                            onClick={() => void showFsm(name)}
+                        >
+                            {name}
+                        </Button>
+                    ))}
+                </div>
+                {fsmFields.length > 0 && (
+                    <div className="mt-2 overflow-x-auto overflow-y-hidden border table-border">
+                        <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0">
+                            <tbody>
+                                {fsmFields.map((field, i) => (
+                                    <tr key={i}>
+                                        <td className="w-2/5 border-r border-b px-2 py-1 align-top break-all">
+                                            {field.key}
+                                        </td>
+                                        <td className="border-b px-2 py-1 align-top break-all">
+                                            {/* FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。 */}
+                                            {field.value ?? field.original}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+        </>
+    )
+
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             {/* 宽度 836。⚠️ 两条都要带变体/正确写法：
@@ -472,7 +592,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 <DialogHeader>
                     {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
                     <DialogTitle className="text-base font-medium">
-                        {charCode}_{motion}
+                        {`${charCode}_${motion}`}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -485,156 +605,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     {loaded && infos.length === 0 && (
                         <p className="text-xs text-muted-foreground">{t.trackNone}</p>
                     )}
-                    {/* multiple：展开状态是**多项**的（一套动画的四条轨常常要一起看）。
-                        整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。
-                        这里**不加自己的动画**：弹层出场时它本来就已在最终形态里，基类那 100ms 管够了。 */}
-                    {loaded && (
-                    <Accordion multiple value={opened} onValueChange={(value) => setOpened(value as string[])}>
-                        {infos.map((info) => {
-                            const key = trackKey(info)
-                            const count = info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0)
-                            // 分区之间的那条线交给 AccordionItem 的基类 `not-last:border-b`：它画在 item
-                            // 的底边上 —— 收起时正好在两个标题之间（保留），展开时在内容**最下面**（去掉）。
-                            // （以前用 not-last:border-b-0 把基类整个顶掉、改在每个标题那层画一条，结果
-                            // 收起时与下一个标题的上边框、展开时与表格容器的上边框各叠一次 = 2px。）
-                            //
-                            // 展开时去掉这条线：展开后表格自带四边边框，再在下面 40px 处画一条等于双线。
-                            // `data-[open]:not-last:border-b-0` 比基类多一个 `[data-open]` 属性选择器，
-                            // 特异度更高所以压得住，不必用 `!`；Base UI 展开时会给 item 挂 data-open。
-                            return (
-                                <AccordionItem key={key} value={key} className="data-[open]:not-last:border-b-0">
-                                    {/* 标题与那排按钮**包在同一个 sticky 容器里**：只钉标题的话，不透明的标题
-                                        会把压在它上面的按钮盖住（上一版就是这么翻车的 ✗）。容器是 sticky，
-                                        本身就是定位元素，所以里面的工具条跟着一起钉住。
-                                        ⚠️ **这层不要改成 flex、触发器不要改内边距**：触发器靠"块级子元素占满整行
-                                        + 基类 py-4"决定行高与箭头的落点，改了这些就等于改了标题和箭头的位置。
-                                        工具条是**绝对定位叠上去**的一层，不参与这行的排版，所以怎么排都不动它俩。
-                                        z-[60]：**必须高过表格里所有吸顶格**（表头 "#" 是 50、表体 "#" 是 40、焦点框是 30）。给 30 时表体那格会画到标题行上面（实测把标题整个盖住）。
-                                        **这一层不给边框**：分区之间那条分隔线归 AccordionItem 的基类
-                                        `not-last:border-b`（官方语义：每个 item 一条下边框，最后一个没有）——
-                                        画在 item 的底边上，于是收起时在两个标题之间、展开时在内容**最下面**，
-                                        最后一项自然没有。以前这里各画一条、还把基类顶掉，两处就都叠成了 2px。 */}
-                                    <div className="sticky top-0 z-[60] bg-popover">
-                                        {/* py-2（8px）：行内上下内间距，替代基类的 py-4（16px）。行内只改这一处，
-                                            标题与箭头照旧由 Accordion 自己的布局决定。
-                                            写 py-2 而不是 pt-2：基类那条是 `py-4` 一对，twMerge 只删得掉整对。 */}
-                                        <AccordionTrigger className="py-2">
-                                            {/* gap-1.5（6px）：标题与子轨号之间就这一点距离 —— 紧凑成 "<标题> #N"。
-                                                以前是「N 行 · #N」，行数已去掉、`·` 分隔符也一并不要了。 */}
-                                            <span className="flex w-full items-baseline gap-1.5">
-                                                <span>{trackLabel(info.kind)}</span>
-                                                {/* 子轨号：区分同一动画的多条同类轨（sub 为 0 时不显示）。 */}
-                                                {info.sub !== "0" && (
-                                                    <span className="text-xs text-muted-foreground">{`#${info.sub}`}</span>
-                                                )}
-                                            </span>
-                                        </AccordionTrigger>
-                                        {/* 工具条的容器：绝对定位叠在箭头左边（40px = 箭头 16 + 基类 mr-1.5 + 间隙）。
-                                            top-2 与触发器的 py-2 对应（8px），这样它跟标题、箭头在同一基线上；
-                                            h-4 + items-center 让按钮组的中心与箭头（size-4 = 16px）对齐，
-                                            容器比按钮矮，所以不会把这行撑高。 */}
-                                        <div className="absolute right-10 top-2 flex h-4 items-center">
-                                            <TrackToolbar
-                                                t={t}
-                                                canCopy={count > 0}
-                                                canCut={sel?.key === key}
-                                                // 插入只在"这张表里选中了行、且剪贴板是对应轨种类"时可用；
-                                                // 光标不在表格里（没选行）时它是灰的，Ctrl+V 同样要求先选行。
-                                                canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
-                                                canRemove={sel?.key === key}
-                                                onAdd={() => addRow(key)}
-                                                onCopy={() => copySelected(key, count, info.kind)}
-                                                // 剪切 = 复制 + 删除；原行只会标红（见 removeSelected），贴回来还在 ✓
-                                                onCut={() => cutSelected(key, count, info.kind)}
-                                                onPaste={() => pasteBelow(key, info.kind)}
-                                                onRemove={() => removeSelected(key)}
-                                            />
-                                        </div>
-                                    </div>
-                                    {/* 展开区的上下内间距 = 表格与展开区的间距：上 4px、下 16px。
-                                        写在**面板**上而不是给表格加 margin —— 面板收起时高度为 0
-                                        且 overflow:hidden，这两段间距跟着一起消失，所以"只有展开时"
-                                        是天然的，不需要额外判断展开状态。 */}
-                                    <AccordionContent className="pt-1 pb-4">
-                                        {info.kind === "flags" ? (
-                                            <FlagsGrid
-                                                rows={flags}
-                                                sel={sel?.key === key ? sel : null}
-                                                t={t}
-                                                diffs={diffs?.[key]}
-                                                onSelect={(index, shift) => select(key, index, shift)}
-                                                onExtend={(index) => extendTo(key, index)}
-                                                onEdit={editFlag}
-                                                onReorder={(from, to) => reorder(key, from, to)}
-                                            />
-                                        ) : (
-                                            <TrackGrid
-                                                table={tables[key]}
-                                                sel={sel?.key === key ? sel : null}
-                                                t={t}
-                                                diffs={diffs?.[key]}
-                                                onSelect={(index, shift) => select(key, index, shift)}
-                                                onExtend={(index) => extendTo(key, index)}
-                                                onEdit={(index, column, value) => editValue(key, index, column, value)}
-                                                onReorder={(from, to) => reorder(key, from, to)}
-                                            />
-                                        )}
-                                    </AccordionContent>
-                                </AccordionItem>
-                            )
-                        })}
-
-                        {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。 */}
-                        <AccordionItem value="fsm">
-                            {/* FSM 这块没有按钮组，但**外面这层 div 不能省**：sticky 只能在父元素范围内吸顶，
-                                直接挂在 Trigger 上的话，它的父元素是 Base UI 生成的 Header（只有标题那么高），
-                                一滚就被带走了 —— 表现就是"别的都吸顶、FSM 不吸顶"。
-                                边框同前几个分区：归 AccordionItem 的基类 not-last:border-b；它是**最后一项**，
-                                所以收起展开都不带边框（与官方示例一致）。
-                                行高、边框、内边距全用 Accordion 的默认值，不再自定义。 */}
-                            <div className="sticky top-0 z-[60] bg-popover">
-                                <AccordionTrigger className="py-2">{t.fsmScope}</AccordionTrigger>
-                            </div>
-                            {/* FSM 这块与轨道分区同一套间距：上 4px；**不给下间距** —— 它下面没有
-                                标题了，留着就是一段空白（滚动区底边会跟内容差出这么一截）。 */}
-                            <AccordionContent className="pt-1 pb-0">
-                                <div className="flex flex-wrap gap-2">
-                                    {fsmNames.map((name) => (
-                                        <Button
-                                            key={name}
-                                            size="sm"
-                                            variant={name === fsmName ? "default" : "outline"}
-                                            onClick={() => void showFsm(name)}
-                                        >
-                                            {name}
-                                        </Button>
-                                    ))}
-                                </div>
-                                {fsmFields.length > 0 && (
-                                    // 跟上面几张表同一套规矩：横向可滑、纵向显式 hidden（不出纵向滚动条，
-                                    // 滚动交给弹层），最后一行的下边框去掉（否则跟外框那条叠成 2px）。
-                                    <div className="mt-2 overflow-x-auto overflow-y-hidden border table-border">
-                                        <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0">
-                                            <tbody>
-                                                {fsmFields.map((field, i) => (
-                                                    <tr key={i}>
-                                                        <td className="w-2/5 border-r border-b px-2 py-1 align-top break-all">
-                                                            {field.key}
-                                                        </td>
-                                                        <td className="border-b px-2 py-1 align-top break-all">
-                                                            {/* FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。 */}
-                                                            {field.value ?? field.original}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                    )}
+                    {/* 三条轨（flags/effect/attack…）+ FSM：常开、直接铺开，右侧没有折叠箭头。
+                        整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
+                    {loaded && sections}
                 </div>
 
                 {/* 按钮那排用官方的 DialogFooter（右对齐、自带间隔与换行）。
@@ -668,20 +641,6 @@ function trackKey(info: {sub: string; kind: string}): string {
 function trackLabel(kind: string): string {
     return kind.charAt(0).toUpperCase() + kind.slice(1)
 }
-
-/** 掩码翻含义：翻不出来就空着（那两列是给人看的，值本身照原样留着）。 */
-function effectsOf(mask: string, which: 0 | 1): string {
-    const bits = Number(mask.trim())
-    if (!Number.isFinite(bits)) return ""
-    const names = which === 0 ? FLAG0_NAMES : FLAG1_NAMES
-    const out: string[] = []
-    for (let bit = 0; bit < 32; bit++) {
-        if ((bits & (1 << bit)) === 0) continue
-        out.push(names[bit] || `未知bit${bit}`)
-    }
-    return out.join(" + ")
-}
-
 
 /** 新 flags 行的默认值：跟前一行同一段时间（用完自己改），掩码与其余字段清零。 */
 function blankFlag(rows: FlagRow[]): FlagRow {

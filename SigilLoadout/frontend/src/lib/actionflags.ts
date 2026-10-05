@@ -6,8 +6,9 @@
     buildFlagsXML），所以界面上直接渲染数组下标就够，重排 / 插入之后什么都不用重编号。
 
     位定义表是后端 actionflags.go 里那两张的**逐字副本**（下标即 bit 号，空串 = 还没弄清含义的那一位），
-    一个字都不能漏：前端只在一个地方用它——改了 Flag0 / Flag1 之后当场把那两格的含义重算出来。
-    后端已经翻好的 flag0Effects / flag1Effects 一律直接显示，不复算。
+    一个字都不能漏：前端拿它把掩码翻成中文——下拉里的每一项、格子里那行灰字，都是 flagEffects() 现算的。
+    后端读出来的 flag0Effects / flag1Effects 现在**不再显示**（那两栏已经并进 Flag0 / Flag1 的选值格子），
+    字段还在模型里，只是界面不再用它。
 */
 export const FLAG0_NAMES = [
     "允许走路取消",
@@ -180,4 +181,62 @@ export function collectRows<T>(rows: T[], range: RowRange): T[] {
     const picked: T[] = []
     for (let index = start; index <= end; index++) picked.push(cloneRow(rows[index]))
     return picked
+}
+
+/*
+    Flag0 / Flag1 下拉里能选的值 = **游戏数据里真实出现过的那些取值**。
+
+    为什么不是"枚举所有组合"：掩码 32 位，组合有 2³² 个，而游戏自己只用了其中一小把 ——
+    实测 8341 份 *flags.bxm 里 Flag0 只出现 91 个取值、Flag1 只出现 33 个，且其中
+    Flag0 有 64 个是**多位组合**（出现最多的 8207 = 允许走路取消 + 允许连段至下一动作 +
+    允许闪避 + 允许跳跃取消 + 允许释放技能，一个字面值编码 5 个效果）。
+
+    这不是第二个"真相源"（位定义表才是逻辑，这两张只是**取值清单**）：游戏更新后冒出没见过的
+    组合也不会坏 —— flagValueOptions() 永远把当前值补进列表里，那一格照样能看能改。
+    重新生成：扫 assets/data.zip 里名字以 flags.bxm 结尾的条目（内容是明文串起来的 BXM），
+    对每份正则抠 Flag0 / Flag1 的取值去重即可。
+*/
+export const FLAG0_VALUES = [
+    0, 1, 2, 4, 6, 8, 10, 11, 14, 15, 16, 20, 32, 64, 72, 128, 256, 260, 512, 2048, 2052, 2064, 2068,
+    4110, 4111, 4366, 4367, 8192, 8194, 8196, 8198, 8200, 8202, 8203, 8204, 8205, 8206, 8207, 8212, 8260,
+    8462, 12290, 12292, 12294, 12302, 12303, 16384, 16388, 32768, 34820, 65536, 65540, 131072, 262144,
+    262176, 524292, 1048576, 1048608, 2097152, 2097168, 2105358, 4194304, 4194336, 4194816, 4196352,
+    4206598, 4456448, 16785416, 16785420, 33554432, 33554436, 67108864, 67108868, 67117060, 67117076,
+    67373056, 134217728, 134217732, 134219776, 134225924, 134283268, 167772164, 536870912, 536870916,
+    536870928, 536872960, 536879108, 570425348, 1073741824, 1073741856, 2147483648,
+] as const
+
+export const FLAG1_VALUES = [
+    0, 1, 2, 4, 16, 32, 64, 128, 132, 144, 256, 512, 513, 1024, 1026, 8192, 131072, 262144, 524288,
+    1048576, 4194304, 4194560, 4194816, 4195328, 4227072, 4325376, 8388608, 16777216, 17825792, 67108864,
+    134217728, 268435456, 536870912,
+] as const
+
+/** 置起来的位数。**不用位运算**：掩码里真有 >2³¹ 的值，JS 位运算会翻符号（见 flagEffects）。 */
+const bitCount = (mask: number): number => {
+    let count = 0
+    for (let bit = 0; bit < 32; bit++) if (Math.floor(mask / 2 ** bit) % 2 === 1) count++
+    return count
+}
+
+/**
+ * 下拉里的可选项（**字符串**，combobox 直接按它比对与回填）。
+ *
+ * - 数据里出现过的取值 ∪ 位定义表里有含义的那些单个位（有位有名字但数据里还没出现的，
+ *   也让人选得到）；
+ * - **当前值一定在列表里**：手改过的、或游戏更新带来的没见过的值补进去兜底 ——
+ *   否则一展开就没有可选项，那一格看着像坏了；
+ * - 单个位排前面、组合值排后面，各自按数值升序："只置这一位"不该在几十个组合里翻。
+ */
+export function flagValueOptions(current: string, values: readonly number[], names: readonly string[]): string[] {
+    const all = new Set<number>(values)
+    names.forEach((name, bit) => {
+        if (name !== "") all.add(2 ** bit)
+    })
+    const parsed = Number.parseInt(current.trim(), 10)
+    if (Number.isFinite(parsed) && parsed >= 0) all.add(parsed)
+    const sorted = [...all].sort((a, b) => a - b)
+    const single = sorted.filter((value) => bitCount(value) <= 1)
+    const combo = sorted.filter((value) => bitCount(value) > 1)
+    return [...single, ...combo].map(String)
 }
