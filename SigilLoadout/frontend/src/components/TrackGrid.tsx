@@ -511,7 +511,10 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
     )
     // outline-none：焦点圈由表格那条 row-focus（整行一条 ring 色线）负责，格子上不再画一圈。
     // select-text：这一格的静态文字**可以被鼠标拖选**（用户要求；见下面 div 那条注释）。
-    const buttonClass = "block w-full cursor-default px-1 py-0.5 text-left text-base tabular-nums outline-none select-text md:text-sm"
+    // ⚠️ 这里**不写 tabular-nums**：那是给**数值槽**（w-21 那两个 span/input）用的，写在外层会连含义
+    // 文本一起变成等宽数字 —— "bit15" 里的 15 一宽，静止态就比编辑态/下拉项宽 2px（用户看到的"点击后
+    // 描述文本收紧"）。数值槽自己带着这个类，对齐不受影响。
+    const buttonClass = "block w-full cursor-default px-1 py-0.5 text-left text-base outline-none select-text md:text-sm"
     /** 进编辑态（挂输入框）并挂出下拉：点这一格、或键盘 Enter/Space 都走它。 */
     const openEditor = () => {
         setQuery(null) // 还没打字：输入框显示这一格的值本身，列表不过滤
@@ -672,7 +675,9 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                                 // 上下对照着看时，两处的数值与含义在同一条竖线上。
                                 // 字号**不缩**（与单元格同为 14px）；紧凑靠内边距：基类 py-1.5 → py-[4px]
                                 // （上下各 4px：32px → 28px）。组件没有 size 属性，只能这样在调用点压。
-                                <ComboboxItem key={option} value={option} className="py-[4px]">
+                                // pl-1：基类是 pl-2（8px），而单元格那层是 px-1（4px）—— 不对齐的话列表里的
+                                // 数值/含义会比格子里多缩进 4px（用户一眼看出"点击后描述文本缩进" ✗）。
+                                <ComboboxItem key={option} value={option} className="py-[4px] pl-1">
                                     <span className="flex items-baseline gap-2">
                                         <span className="w-21 shrink-0 text-left tabular-nums">{option}</span>
                                         <span className="whitespace-nowrap text-muted-foreground">{meaningOf(option)}</span>
