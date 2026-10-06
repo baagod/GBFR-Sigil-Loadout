@@ -256,7 +256,9 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
                 removed ? "bg-[#542526]" : ""
             }`}
         >
-            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
+            {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的 bg-background
+                —— 见下面 EditableCell 那条"可编辑格 #1a1a1a"。原来是写死的 bg-[#171717]，那是当时的弹窗底色。 */}
+            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-background"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -272,7 +274,9 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
             {columns.map((column) => (
                 <EditableCell
                     key={column}
-                    tdClassName={`border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`}
+                    // 可编辑的格：底色**写死 #1a1a1a**（原来是 dark:bg-input/30 —— #404040 的 30% 透明，
+                    // 叠在什么底色上就跟着漂；弹窗底色一改成默认那个 #0a0a0a 就不再是同一个颜色了）。
+                    tdClassName={`border-r border-b p-0 cell-focus ${removed ? "" : "bg-[#1a1a1a]"}`}
                     mono
                     value={row.values[column] ?? ""}
                     unchanged={!diff || !diff.has(column)}
@@ -322,7 +326,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
+                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium">
                                 {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
                                     表体里那条分隔竖线到表头就断了。 */}
                                 <div className="flex items-stretch">
@@ -333,7 +337,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                             {table.columns.map((column) => (
                                 <th
                                     key={column}
-                                    className="sticky top-0 z-10 border-r border-b bg-[#171717] px-2 py-1 text-center font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap"
                                 >
                                     {column}
                                 </th>
@@ -674,7 +678,9 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                 removed ? "bg-[#542526]" : ""
             }`}
         >
-            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
+            {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的 bg-background
+                —— 见下面那句"可编辑格 #1a1a1a"。原来是写死的 bg-[#171717]，那是当时的弹窗底色。 */}
+            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-background"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -688,8 +694,10 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                 />
             </td>
             {columns.map((column) => {
-                // 假删除的行：这几格也别留那层暗色（dark:bg-input/30），否则整条红带里是暗的。
-                const tdClassName = `border-r border-b p-0 cell-focus ${removed ? "" : "dark:bg-input/30"}`
+                // 假删除的行：这几格也别留那层暗色（现在写死的那个 #1a1a1a），否则整条红带里是暗的。
+                // 可编辑的格底色**写死 #1a1a1a**（原来是 dark:bg-input/30 —— #404040 的 30% 透明，
+                // 叠在什么底色上就跟着漂；弹窗底色一改成默认那个 #0a0a0a 就不再是同一个颜色了）。
+                const tdClassName = `border-r border-b p-0 cell-focus ${removed ? "" : "bg-[#1a1a1a]"}`
                 if (column.picker) {
                     const names = column.picker === "flag0" ? FLAG0_NAMES : FLAG1_NAMES
                     const values = column.picker === "flag0" ? FLAG0_VALUES : FLAG1_VALUES
@@ -777,7 +785,7 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
+                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium">
                                 {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
@@ -787,7 +795,7 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                             {columns.map((column) => (
                                 <th
                                     key={column.label}
-                                    className="sticky top-0 z-10 border-r border-b bg-[#171717] px-2 py-1 text-center font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap"
                                 >
                                     {column.label}
                                 </th>

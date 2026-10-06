@@ -48,7 +48,12 @@ import {
 import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
-import {CloseMotionWindow, OpenMotionWindow} from "../../bindings/sigilloadout/service/shellservice"
+import {
+    CloseMotionWindow,
+    OpenGlobalParamWindow,
+    OpenMotionWindow,
+} from "../../bindings/sigilloadout/service/shellservice"
+import {GlobalParamList} from "@/components/GlobalParamList"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
@@ -79,10 +84,10 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
 /*
     动作表的表头那一格的类（底色 + 吸顶）。**只有表头**这么上色，表体格子另有各自主色（见下面 td 那段）。
 
-    底色一律 `#171717`（写死，不走 `--muted`：那个还兼着页签栏底座、按钮 hover、combobox tag 等好几处，
+    底色一律 `#1f1f1f`（写死，不走 `--muted`：那个还兼着页签栏底座、按钮 hover、combobox tag 等好几处，
     改它会全站跟着变；而且本应用只有深色一套 —— index.html 上 `dark` 是写死的 —— 为它造一个 token
-    等于造一个永远用不到的浅色变体）：
-      · 普通列    —— `z-10 bg-[#171717]`
+    等于造一个永远用不到的浅色变体）。它比表体的可编辑格（#1a1a1a）亮一点点，表头才分得出来。
+      · 普通列    —— `z-10 bg-[#1f1f1f]`
       · `id_`     —— 吸顶（纵向 top-0，横向 left-0）：横向滚到第 80 列时还知道这是哪条记录。
                       它是两轴都钉的那一格，z-50 要压在别的表头上面；底色仍与其他表头一致。
       · 反色列    —— `saveMotId*` / `controlTypeHash_` 换成 `bg-primary`（浅底深字），
@@ -90,9 +95,9 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
     这几个类**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
 */
 function actionHeaderClass(key: string): string {
-    if (key === "id_") return "sticky top-0 left-0 z-50 bg-[#171717] text-center font-medium"
+    if (key === "id_") return "sticky top-0 left-0 z-50 bg-[#1f1f1f] text-center font-medium"
     if (isHighlightedColumn(key)) return "sticky top-0 z-10 bg-primary text-primary-foreground text-center font-medium"
-    return "sticky top-0 z-10 bg-[#171717] text-center font-medium"
+    return "sticky top-0 z-10 bg-[#1f1f1f] text-center font-medium"
 }
 
 // 一格输入框：**没有自己的底色**（连 Input 自带的 dark:bg-input/30 也压掉）——整张表因此是一个平铺的
@@ -444,10 +449,12 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     const [idsApplied, setIdsApplied] = useState("")
 
     // 下方那块地方归谁：顶栏那个开关按钮在「通用轨」与「动作表」之间切（**默认通用轨**，
-    // 切一下才到动作表）。
-    // 两块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
+    // 切一下才到动作表）；旁边那个「全局参数」按钮是**临时**换到第三块地方。
+    // 三块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
     // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
-    const [section, setSection] = useState<"general" | "actions">("general")
+    const [section, setSection] = useState<"general" | "actions" | "globals">("general")
+    // 进「全局参数」之前在看哪一块：再点一次那个按钮要**回到原来那一块**（不是回到某个固定的页签）。
+    const [beforeGlobals, setBeforeGlobals] = useState<"general" | "actions">("general")
 
     const [busy, setBusy] = useState(false)
 
@@ -629,6 +636,21 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
         setBusy(false)
     }
 
+    /**
+     * 「全局参数」按钮：点一下把下方那块地方换成那十几张表的清单，再点一下**回到进去之前看的那一块**。
+     *
+     * 清单是**临时的第三块地方**，不是第四个页签：这些表不分角色（路径里没有角色码），做成页签就等于把它
+     * 和"当前角色"摆在同一层，看着像跟着角色走的东西。
+     */
+    const toggleGlobals = () => {
+        if (section === "globals") {
+            setSection(beforeGlobals)
+            return
+        }
+        setBeforeGlobals(section)
+        setSection("globals")
+    }
+
     return (
         <div className="flex h-full min-h-0 flex-col">
             {/*
@@ -682,7 +704,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                     {/* 通用轨 / 动作表 的开关。按钮上写的是**点一下会去的那一块**（目标），不是当前看着的
                         那一块 —— 所以看着动作表时它写「通用轨」，反之亦然。
                         **不给任何自定义类**：就用 Button 的 outline 变体原样（字号/字重/字色/底色都由它定），
-                        放在搜索框右边、保存按钮左边（保存带 ml-auto，仍然顶到最右）。
+                        留在左边这一组（`ml-auto` 在「全局参数」上，右边那一组才被顶到最右）。
                         默认停在「通用轨」（section 初值 general）。 */}
                     <Button
                         variant="outline"
@@ -690,18 +712,26 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                     >
                         {section === "actions" ? t.generalTracks : t.actionsSection}
                     </Button>
+                    {/* 「全局参数」：解包目录 system\player\ 下那十几张**不分角色**的表。
+                        点一下把下方那块地方换成表名清单，再点一下回原来那一块。
+                        它和保存是**右边那一组**（用户要求：紧挨保存），`ml-auto` 因此挂在这里 —— 顶到最右的是
+                        这一组，不是保存自己。**不给任何自定义类**：与旁边那个开关同一个 outline 长相。 */}
+                    <Button className="ml-auto" variant="outline" onClick={toggleGlobals}>
+                        {t.globalParams}
+                    </Button>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
-                        现在只留这一个）。ml-auto 顶到这一行最右。
+                        现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
+                        松紧不一，英文 Save 那档就白留一截）。
                         这里**不再有任何状态行**：成功/失败都不在界面上报（失败只写 console.error）。 */}
-                    <Button className="ml-auto w-16" disabled={busy} onClick={() => void handleSaveAndDeploy()}>
+                    <Button disabled={busy} onClick={() => void handleSaveAndDeploy()}>
                         {t.saveAndDeploy}
                     </Button>
                 </div>
-                {/* 下方那块地方：两块由顶栏那个开关切换 —— 不再用手风琴，也不再有那两行标题。
-                    两块都留在 DOM 里，没在看的那块压成 h-0 + overflow-hidden（与原来 keepMounted 一个效果）：
+                {/* 下方那块地方：三块由顶栏那两个按钮切换 —— 不再用手风琴，也不再有那两行标题。
+                    三块都留在 DOM 里，没在看的那块压成 h-0 + overflow-hidden（与原来 keepMounted 一个效果）：
                     切回来时 ids 输入框的内容与滚动位置都还在。
                     ⚠️ 压成 h-0 的那块**仍占一个 flex gap**（外层是 gap-4），所以要 -mt-4 把这 16px 抵掉，
-                    否则顶栏与表格之间会多出一段空白。两块都写：谁在下面时它都是那一侧的邻居。
+                    否则顶栏与表格之间会多出一段空白。三块都写：谁在下面时它都是那一侧的邻居。
                     「通用轨」= 有轨、但动作表里任何记录的 saveMotId01_~12_ 都没提到的号（见后端
                     ListHiddenMotions）；在清单里点一行就弹出那个号的轨表。 */}
                 <div
@@ -751,10 +781,11 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                                 <td
                                                     key={key}
                                                     className={`${ACTION_CELL_PAD} ${
-                                                        // 表体底色 = **基础 Input 的底色**（它自己是 bg-transparent + dark:bg-input/30，
-                                                        // 而 CELL_INPUT 又把格子里那个输入框设成透明），所以这层底色只能由 td 出，
-                                                        // 全站表格这才统一。id_ 与 abilityTag_ 这两列**底色跟 id_ 走**
-                                                        // （bg-background；id_ 那列同时吸顶 —— 横向滚到第 80 列时还认得出这是哪条记录）；
+                                                        // 只读列的底色 = **默认底色**（--background #0a0a0a），也就是"不上色"
+                                                        // —— 全站那条规矩：可编辑的格 #1a1a1a，不可编辑的格透明
+                                                        // （用户要求，见 EditableCell 那个调用点）。
+                                                        // id_ 那列同时吸顶，所以它必须**不透明**才遮得住滚过来的列；
+                                                        // 取默认底色 = 与"透明"同一个观感，功能上也成立。
                                                         // id_ 里是记录号，**居中**（与表头一致）；高亮标记只做在表头上。
                                                         key === "id_"
                                                             ? "sticky left-0 z-40 bg-background text-center tabular-nums"
@@ -772,7 +803,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                             ) : (
                                                 <EditableCell
                                                     key={key}
-                                                    tdClassName={`${ACTION_CELL} p-0 cell-focus dark:bg-input/30`}
+                                                    tdClassName={`${ACTION_CELL} p-0 cell-focus bg-[#1a1a1a]`}
                                                     mono
                                                     value={draft[action.id]?.[key] ?? ""}
                                                     placeholder={originals[action.id]?.[key]}
@@ -792,9 +823,20 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                     </div>
                 )}
                 </div>
+                {/* 「全局参数」清单：解包目录 system\player\ 下那十几张不分角色的表。
+                    点一行开的是一扇**独立窗口**（同一套做法见 gpwindow.go / GlobalParamWindow.tsx），
+                    所以在下面这块地方只是一个名单。 */}
+                <div
+                    className={`flex min-h-0 flex-col ${
+                        section === "globals" ? "flex-1" : "h-0 overflow-hidden -mt-4"
+                    }`}
+                >
+                    <GlobalParamList onOpen={(table) => void OpenGlobalParamWindow(table)} />
+                </div>
             </div>
 
-            {/* 动画详情不再在这里弹层：它是一扇**独立窗口**（Go 侧开，见 motwindow.go / MotionWindow.tsx）。 */}
+            {/* 动画详情不再在这里弹层：它是一扇**独立窗口**（Go 侧开，见 motwindow.go / MotionWindow.tsx）；
+                全局参数那张表同理（gpwindow.go）。 */}
         </div>
     )
 }

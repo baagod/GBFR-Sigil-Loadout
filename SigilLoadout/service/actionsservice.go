@@ -612,7 +612,8 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	return s.writeAndDeployTracks(cfg, []trackWrite{{motion: motion, sub: flagSub, kind: flagsKind, raw: raw}})
 }
 
-// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨搬 **UserDir 改动表里记着的那些**（限当前角色）。
+// Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨搬 **UserDir 改动表里记着的那些**（限当前角色）；
+// 全局参数同样搬改动表里记着的那些，但**不按角色过滤**（那十几张表不分角色，见 globalparams.go）。
 //
 // 为什么不是"只搬本次会话改过的"：mod 目录每次更新都会被整个换掉 —— tools/deploy.ps1 先删掉整个目录再
 // 解压，而构建产物的 zip 里不含 GBFR\data。于是上次会话保存出来的部署文件会消失；若只搬本次会话碰过的，
@@ -668,7 +669,23 @@ func (s *ActionsService) Deploy() error {
 		}
 		items = append(items, trackWrite{motion: ref.motion, sub: ref.sub, kind: ref.kind, raw: raw})
 	}
-	return s.writeAndDeployTracks(cfg, items)
+	if err := s.writeAndDeployTracks(cfg, items); err != nil {
+		return err
+	}
+
+	// 全局参数（system\player\*.msg）走**另一条独立的路**：不按当前角色过滤 —— 这十几张表本来就不分
+	// 角色（见 globalparams.go）。改动表里记着的每一张都重搬一遍，理由与上面那批轨相同：mod 目录每次
+	// 更新都会被整个换掉，只搬"本次会话碰过的"会让上次保存出来的那些再也回不来。
+	globalEdits, err := loadGlobalParamEdits()
+	if err != nil {
+		return err
+	}
+	for _, table := range globalParamTables(globalEdits) {
+		if err := deployGlobalParam(cfg, table, globalEdits); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 /*

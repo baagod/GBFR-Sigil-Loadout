@@ -120,8 +120,19 @@ func nextForegroundWindow(hwnd uintptr) uintptr {
 	return 0
 }
 
-// findToolWindow 没找到时返回 0。
+// findToolWindow 找**主窗口**，没找到时返回 0。
+//
+// 分两步，顺序不能反：先用手柄，只有还没记下来时才回落到按标题找。
+//
+// 为什么要这样：FindWindowW 是按标题精确匹配的，而工具窗口（动画详情 / 全局参数）现在与主窗口**同名**
+// （用户要求标题栏只写 GBFR Sigil Loadout）。同名之后标题再也认不出哪扇是主窗口，拿错的后果很具体：
+// 主窗口里按 Esc / 点 X → HideToTray → 把**工具窗口**假隐藏成 alpha 0 的隐形窗，主窗口还杵在那儿 ✗；
+// 托盘点一下也可能激活工具窗口。主窗口句柄在启动时就记下来了（WatchMainWindow），之后一直用它，
+// 因此这条回落只在启动最初那一小段里跑到 —— 那时一扇工具窗口都还没开出来，标题仍然是唯一的 ✓。
 func findToolWindow() uintptr {
+	if hwnd := mainHwnd.Load(); hwnd != 0 {
+		return hwnd
+	}
 	title, _ := syscall.UTF16PtrFromString(Title)
 	hwnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(title)))
 	return hwnd

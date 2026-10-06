@@ -69,6 +69,8 @@ const zh = {
     generalTracks: "通用轨",
     /** 手风琴第二个条目的标题：下面那块地方放动作表。 */
     actionsSection: "动作表",
+    /** 工具栏上那个切换按钮：「全局参数」那张 16 张表的清单（system\player\*.msg，不分角色）。 */
+    globalParams: "全局参数",
     /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨的那组。 */
     hmRangeSkill: "技能",
     /** 暂不使用：「他角色引用」筛选与行内标记已移除；后端字段仍在，留着以后用。 */
@@ -161,6 +163,7 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "Save",
         generalTracks: "General tracks",
         actionsSection: "Action table",
+        globalParams: "Global Params",
         hmRangeSkill: "Skills",
         hmRangeReferenced: "Used by others",
         hmGroupOther: "Other",
@@ -236,6 +239,7 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "保存",
         generalTracks: "汎用トラック",
         actionsSection: "アクション表",
+        globalParams: "全体パラメータ",
         hmRangeSkill: "スキル",
         hmRangeReferenced: "他キャラ参照",
         hmGroupOther: "その他",
@@ -311,6 +315,7 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "저장",
         generalTracks: "범용 트랙",
         actionsSection: "액션 표",
+        globalParams: "전역 파라미터",
         hmRangeSkill: "스킬",
         hmRangeReferenced: "타 캐릭터 참조",
         hmGroupOther: "기타",

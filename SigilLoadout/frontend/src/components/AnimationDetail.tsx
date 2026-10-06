@@ -13,7 +13,7 @@ import {
 } from "../../bindings/sigilloadout/service/actionsservice"
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid, TrackToolbar, type Marked} from "@/components/TrackGrid"
 import {withNewRow} from "@/lib/actionflags"
@@ -493,7 +493,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
                         所以只钉标题会把按钮留在地上。z-[60] **必须高过表格里所有吸顶格**（表头 "#" 是 50、
                         表体 "#" 是 40、焦点框是 30）—— 给 30 时表体会画到标题上面（实测把标题整个盖住）。
                         ⚠️ 分区之间**不画分隔线**（原来这里是 `not-last:border-b`）：用户要求全去掉。 */}
-                    <div className="sticky top-0 z-[60] bg-popover">
+                    <div className="sticky top-0 z-[60] bg-background">
                         <div className="flex w-full items-start py-2 text-left text-sm font-medium">
                             <span className="flex w-full items-baseline gap-1.5">
                                 <span>{trackLabel(info.kind)}</span>
@@ -553,7 +553,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
 
         {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。
             标题与内容**不包一层 div**（同上面几条轨）：包起来 sticky 就只能在那一块里吸顶、离场时露半截。 */}
-        <div className="sticky top-0 z-[60] bg-popover">
+        <div className="sticky top-0 z-[60] bg-background">
                 <div className="flex w-full items-start py-2 text-sm font-medium">{t.fsmScope}</div>
             </div>
             <div className="pt-1 pb-0">
@@ -570,15 +570,27 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
                     ))}
                 </div>
                 {fsmFields.length > 0 && (
-                    <div className="mt-2 overflow-x-auto overflow-y-hidden border table-border">
-                        <table className="w-full border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0">
+                    <div className="mt-2 overflow-x-auto overflow-y-hidden">
+                        {/* 表**不套外框**，只剩下每一行下面那条线（用户要求，全局参数表同样）：
+                            外框与竖线都去掉；`[&_tr:last-child>*]:border-b-0` 随之去掉 —— 框没了，
+                            最后一行那条线就是表的收尾。格线颜色仍走全站那一个来路（table-border）。
+                            字段名**不换行**（用户要求）：整串显示，装不下就由外面那个 overflow-x-auto 横向滚。
+                            值那一格给 `w-full`，让它吃掉剩下的宽度（左边那列因此正好等于最长那个字段名）。 */}
+                        <table className="w-full table-border border-separate border-spacing-0 text-xs">
                             <tbody>
                                 {fsmFields.map((field, i) => (
                                     <tr key={i}>
-                                        <td className="w-2/5 border-r border-b px-2 py-1 align-top break-all">
+                                        <td className="border-b px-2 py-1 whitespace-nowrap">
                                             {field.key}
                                         </td>
-                                        <td className="border-b px-2 py-1 align-top break-all">
+                                        {/* 值这一格的字号与全局参数表那格的**一模一样**（用户要求）：那边是
+                                            EditableCell 的显示层，字号类就是 `text-base md:text-sm` ——
+                                            本窗口宽度下 = 14px，所以这里抄同一对（不写死 text-sm，两处才不会漂）。
+                                            `/4` 是**行高 1rem**：text-sm 默认给 1.25rem，比字段名那格
+                                            （text-xs，1rem）高 4px —— 值非空的行会被它撑成 29px，空格子仍是
+                                            25px，同一张表里就出现两种行高 ✗。压回 1rem 两格一样高，行高恒为 25px。
+                                            字段名那格仍是表上那个 text-xs（12px）：值和名字差一档，与全局参数表一致。 */}
+                                        <td className="w-full border-b px-2 py-1 align-top break-all text-base/4 md:text-sm/4">
                                             {/* FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。 */}
                                             {field.value ?? field.original}
                                         </td>
@@ -595,7 +607,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
     /** 标题那一行：弹层与独立窗口共用。 */
     const title = `${charCode}_${motion}`
 
-    /* 失败条 + 滚动区 + 按钮排：弹层与独立窗口共用同一份（只有外壳不同，见 inWindow）。 */
+    /** 保存并部署：一直可点——没改动时点了也只是读一遍。 */
+    const saveButton = <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
+
+    /* 失败条 + 滚动区：弹层与独立窗口共用。
+       按钮排**不共用**：用户把保存挪到了标题右边，独立窗口里也没有"取消"了（退出靠 Esc / 窗口的 X）。 */
     const body = (
         <>
             {failure && <p className="text-xs text-destructive">{failure}</p>}
@@ -611,15 +627,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
                     整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
                 {loaded && sections}
             </div>
-
-            {/* 按钮排：取消在左、主操作在右（照官方示例）。保存**一直可点**——没改动时点了也只是读一遍。
-                独立窗口里不能用 DialogFooter（它内部那条可选的 Close 会依赖 Dialog 上下文），这里自己排。 */}
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button variant="outline" onClick={onClose}>
-                    {t.cancel}
-                </Button>
-                <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
-            </div>
         </>
     )
 
@@ -627,11 +634,20 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
         独立窗口模式：整扇窗口都是它，没有弹层外壳。尺寸由**窗口自己**定（motwindow.go：客户区 1080×800），
         所以这里只是铺满 + 内边距与弹层一致（p-6 / gap-6）。标题用 <h2>：DialogTitle 走 Base UI 的
         Dialog 上下文，离开 <Dialog> 会报错 ✗。
+
+        按钮：**保存挪到标题右侧、没有取消**（用户要求）—— 标题那一行两端对齐，底下不再有按钮排。
+        关这扇窗口靠 Esc 或窗口的 X（见 MotionWindow.tsx）。
+
+        标题下面那条线（用户要求）把标题与表格分开，用的是全站默认的 --border —— 与主窗口页签下那条
+        同一个色（表格自己那些行线走 --input，比它亮一档）。两扇弹窗同一套，见 GlobalParamWindow.tsx。
     */
     if (inWindow) {
         return (
-            <div className="flex h-screen flex-col gap-6 bg-popover p-6 text-sm text-popover-foreground">
-                <h2 className="font-heading text-base leading-none font-medium">{title}</h2>
+            <div className="flex h-screen flex-col gap-6 p-6 text-sm">
+                <div className="flex items-center justify-between gap-4 border-b pb-4">
+                    <h2 className="font-heading text-base leading-none font-medium">{title}</h2>
+                    {saveButton}
+                </div>
                 {body}
             </div>
         )
@@ -664,6 +680,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
                     <DialogTitle className="text-base font-medium">{title}</DialogTitle>
                 </DialogHeader>
                 {body}
+                {/* 弹层这条路（现在只有"渲染成弹层"时才会走到）保留按钮排：取消在左、主操作在右。
+                    独立窗口里没有它 —— 那边保存挂在标题右侧、退出用 Esc（见上）。 */}
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>
+                        {t.cancel}
+                    </Button>
+                    {saveButton}
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     )

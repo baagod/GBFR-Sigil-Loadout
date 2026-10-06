@@ -225,11 +225,12 @@ func readZipEntry(entry *zip.File) ([]byte, error) {
 容器里的条目名必须与**部署路径**逐字相同 —— 这是这个方案的全部要点（读的就是要写的那一份）。
 
 它一旦歪了，两个方向会同时错：读的时候找不到原始数据（作者本机有解包目录兜底，看不出来），写的时候落点
-也跟着不对。所以这里**逐条**拿容器里的名字去比 deployTrackPath / deployActionPath 拼出来的路径。
+也跟着不对。所以这里**逐条**拿容器里的名字去比 deployTrackPath / deployActionPath / deployGlobalParamPath
+拼出来的路径。
 */
 func TestDataAssetEntriesAreTheDeployPaths(t *testing.T) {
 	entries := readDataAsset(t)
-	tracks, tables, fsms := 0, 0, 0
+	tracks, tables, fsms, globals := 0, 0, 0, 0
 	var failures []string
 	for entry := range entries {
 		slash := filepath.ToSlash(entry)
@@ -269,6 +270,16 @@ func TestDataAssetEntriesAreTheDeployPaths(t *testing.T) {
 			if got := relToMod(deployActionPath(configFor(char))); got != slash {
 				failures = append(failures, fmt.Sprintf("%s: deployActionPath 拼出来是 %s", slash, got))
 			}
+		case len(parts) == 3 && parts[0] == "system" && parts[1] == "player":
+			// 全局参数：**平铺**在 player\ 下（没有角色那一段 —— 它们本来就不分角色）。
+			globals++
+			if got := globalParamEntry(parts[2]); got != slash {
+				failures = append(failures, fmt.Sprintf("%s: globalParamEntry 拼出来是 %s", slash, got))
+				continue
+			}
+			if got := relToMod(deployGlobalParamPath(parts[2])); got != slash {
+				failures = append(failures, fmt.Sprintf("%s: deployGlobalParamPath 拼出来是 %s", slash, got))
+			}
 		case len(parts) == 4 && parts[0] == "system" && parts[1] == "fsm":
 			// FSM 没有部署路径（这一页只读），所以这里只对"读的时候按什么名字找"。
 			char, file := parts[2], parts[3]
@@ -284,10 +295,11 @@ func TestDataAssetEntriesAreTheDeployPaths(t *testing.T) {
 	for _, failure := range failures {
 		t.Error(failure)
 	}
-	if tracks == 0 || tables == 0 || fsms == 0 {
-		t.Fatalf("容器里轨 %d 条、动作表 %d 份、FSM %d 份，三类都该有", tracks, tables, fsms)
+	if tracks == 0 || tables == 0 || fsms == 0 || globals == 0 {
+		t.Fatalf("容器里轨 %d 条、动作表 %d 份、FSM %d 份、全局参数 %d 份，四类都该有", tracks, tables, fsms, globals)
 	}
-	t.Logf("容器里 %d 条轨 + %d 份动作表（条目名与部署路径逐条相同）+ %d 份 FSM（条目名与读取路径相同）", tracks, tables, fsms)
+	t.Logf("容器里 %d 条轨 + %d 份动作表 + %d 份全局参数（条目名与部署路径逐条相同）+ %d 份 FSM（条目名与读取路径相同）",
+		tracks, tables, globals, fsms)
 }
 
 // configFor 造一份"角色码是这个"的最小配置（charCode 只看动作表所在目录的名字）。

@@ -116,8 +116,11 @@ func main() {
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
-	// 动画详情那扇独立窗口（mot）：开/关注入给外壳服务，前端就能开它（见 motwindow.go 与 shellservice.go）。
-	shellService.BindMotionWindow(openMotionWindow, closeMotionWindow)
+	// 动画详情那扇独立窗口（mot）与「全局参数」那张表的窗口：开/显示/关注入给外壳服务，前端就能用它们
+	// （见 motwindow.go / gpwindow.go 与 shellservice.go）。两个各自单例。
+	// show 单独一条：两扇窗口都是 Hidden 建的，要等前端画完第一帧再显示（否则先闪一个空框）。
+	shellService.BindMotionWindow(openMotionWindow, showMotionWindow, closeMotionWindow)
+	shellService.BindGlobalParamWindow(openGlobalParamWindow, showGlobalParamWindow, closeGlobalParamWindow)
 	// 主窗口句柄交给后台去记：全局的 WndProc 拦截器靠它把 mot 窗口的消息挡在状态机之外
 	// （见 window/win32.go 的 isMainWindow）。这里不能同步取 —— 这一刻原生窗口还没落地，取到的是 0，
 	// 而 0 会让拦截器放行一切，mot 窗口的 WM_CLOSE 就会被当成主窗口的命令拿去假隐藏 ✗。

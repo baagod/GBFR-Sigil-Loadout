@@ -35,8 +35,9 @@ const trackEditsName = "track_edits.json"
 dataAssetName 是随包的**全部原始数据**（exe 旁 assets\data.zip）。
 
 条目名就是**部署路径**：容器里的 `pl/pl1000/x.bxm` 部署到 `<mod>\GBFR\data\pl\pl1000\x.bxm`，
-`system/player/data/pl1000/pl1000_action.msg` 部署到 `<mod>\GBFR\data\system\player\data\...`。
-所以读的一方不需要第二套命名：**要读的就是要写的那一份**（deployTrackPath / deployActionPath）。
+`system/player/data/pl1000/pl1000_action.msg` 部署到 `<mod>\GBFR\data\system\player\data\...`，
+`system/player/guardparam.msg` 部署到 `<mod>\GBFR\data\system\player\...`。所以读的一方不需要第二套命名：
+**要读的就是要写的那一份**（deployTrackPath / deployActionPath / deployGlobalParamPath）。
 
 打成容器而不是散着放，是因为 C# 那边的 assets 拷贝规则只认 `assets\*` 那一层、不递归；而散着放
 （17929 个文件）实测复制一遍 57.6 秒、git 入库 24.9 秒，`.git` 体积却与一个包一模一样。容器里

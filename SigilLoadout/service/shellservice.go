@@ -12,7 +12,12 @@ type ShellService struct {
 	// 动画详情那扇**独立窗口**的开/关由 main 注入：窗口是应用级的东西（app.Window.NewWithOptions），
 	// service 包拿不到 app，而反向 import main 不成（循环）。注入之后这里只是两行转调。
 	openMotion  func(motion, charCode string) error
+	showMotion  func()
 	closeMotion func()
+	// 「全局参数」那张表的窗口同一条路（另一个单例，见 main 的 gpwindow.go）。
+	openGlobalParam  func(table string) error
+	showGlobalParam  func()
+	closeGlobalParam func()
 }
 
 // NewShellService 接住托盘菜单里那条"退出"：菜单由 main 造（NewMenu 不碰 globalApplication，
@@ -21,9 +26,13 @@ func NewShellService(exit *application.MenuItem) *ShellService {
 	return &ShellService{exit: exit}
 }
 
-// BindMotionWindow 由 main 注入 mot 窗口的开/关（见 motwindow.go）。不注入时两个方法都是空转。
-func (s *ShellService) BindMotionWindow(open func(motion, charCode string) error, close func()) {
+// BindMotionWindow 由 main 注入 mot 窗口的开/显示/关（见 motwindow.go）。不注入时三个方法都是空转。
+//
+// show 是分开的一条：那扇窗口是 Hidden 建出来的，要等**前端画完第一帧**再显示（见 motwindow.go），
+// 否则屏幕上会先闪一个空框。
+func (s *ShellService) BindMotionWindow(open func(motion, charCode string) error, show func(), close func()) {
 	s.openMotion = open
+	s.showMotion = show
 	s.closeMotion = close
 }
 
@@ -36,10 +45,47 @@ func (s *ShellService) OpenMotionWindow(motion, charCode string) error {
 	return s.openMotion(motion, charCode)
 }
 
+// ShowMotionWindow 由 mot 窗口自己在画完第一帧后调用（见 MotionWindow.tsx）。
+func (s *ShellService) ShowMotionWindow() {
+	if s.showMotion != nil {
+		s.showMotion()
+	}
+}
+
 // CloseMotionWindow 由 mot 窗口里那排按钮调用（取消）。
 func (s *ShellService) CloseMotionWindow() {
 	if s.closeMotion != nil {
 		s.closeMotion()
+	}
+}
+
+// BindGlobalParamWindow 由 main 注入「全局参数」窗口的开/显示/关（见 gpwindow.go）。
+func (s *ShellService) BindGlobalParamWindow(open func(table string) error, show func(), close func()) {
+	s.openGlobalParam = open
+	s.showGlobalParam = show
+	s.closeGlobalParam = close
+}
+
+// OpenGlobalParamWindow 由前端在"点全局参数清单里的一行"时调用。
+// 单例：已经开着一扇就换内容并前置，不新建（这条限制在 main 那边的 openGlobalParamWindow 里）。
+func (s *ShellService) OpenGlobalParamWindow(table string) error {
+	if s.openGlobalParam == nil {
+		return nil
+	}
+	return s.openGlobalParam(table)
+}
+
+// ShowGlobalParamWindow 由全局参数窗口自己在画完第一帧后调用（见 GlobalParamWindow.tsx）。
+func (s *ShellService) ShowGlobalParamWindow() {
+	if s.showGlobalParam != nil {
+		s.showGlobalParam()
+	}
+}
+
+// CloseGlobalParamWindow 由全局参数窗口里那记 Esc 调用。
+func (s *ShellService) CloseGlobalParamWindow() {
+	if s.closeGlobalParam != nil {
+		s.closeGlobalParam()
 	}
 }
 

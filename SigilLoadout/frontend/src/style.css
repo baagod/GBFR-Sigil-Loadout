@@ -276,6 +276,35 @@
 }
 
 /*
+    「全局参数」表：一行里任意一格拿到焦点时，**整行**的下沿画一条 2px 的线（颜色 = 输入框聚焦时那个
+    `--ring`，见 ui/input.tsx 的 focus-visible:border-ring）。
+
+    为什么用伪元素而不是 `border-b-2`：**border 参与布局** —— 焦点一来那一行会高 1px，它下面每一行都跟着
+    跳一下，失焦再跳回来（那张表一千多行，点一格整片都在动）。伪元素绝对定位，只画不改布局。
+    为什么挂在 `<tr>` 上：那一行有**两格**（字段名 / 值），要一起变色才叫"覆盖这一行"；只有值那格能拿到
+    焦点，所以用行的 :focus-within 当触发点，两格各画自己那半截。
+
+    `bottom: -1px` 是**盖住格子自己那条 1px 下框线**（--input）用的：定位的包含块是内边距盒，`bottom: 0`
+    落在框线**上面**，会留下"亮线 + 暗线"两条；往下一像素正好压住它，于是整条就是纯 2px。
+    两格相接处没有缝：border-spacing 是 0，各画各的整宽。
+*/
+@utility row-focus {
+    &:focus-within > td {
+        position: relative;
+
+        &::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            bottom: -1px;
+            left: 0;
+            height: 2px;
+            background: var(--ring);
+        }
+    }
+}
+
+/*
     「专精技能」页的两级吸顶（角色行 + 专精类型名）。
 
     为什么放在这里而不是组件里：这两条要做的事 Tailwind 的 utility 表达不出来 ——

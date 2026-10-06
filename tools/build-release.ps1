@@ -61,8 +61,8 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     'limit_bonus.ko.json', 'chara.json',
     # 专精技能页那两张：缺了 loadSkillboardTables 直接返错，工具启动即挂。
     'skillboard.json', 'skillboard.zh.json',
-    # 全部原始数据（17929 份轨 + 36 份动作表，条目名就是部署路径）：少了它，除了作者本机
-    # （那边有解包目录兜底），别人装上去每个角色的轨与动作表都读不到。
+    # 全部原始数据（17929 份轨 + 36 份动作表 + 16 份全局参数，条目名就是部署路径）：少了它，除了作者本机
+    # （那边有解包目录兜底），别人装上去每个角色的轨与动作表都读不到，全局参数那一页也空着。
     'data.zip')
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name

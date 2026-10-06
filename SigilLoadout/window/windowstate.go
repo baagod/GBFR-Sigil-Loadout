@@ -122,9 +122,23 @@ func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _
 	if w == nil {
 		return 0, false
 	}
-	// 拦截器是全局的：mot 窗口（动画详情那扇独立的窗口）的消息也会走到这里。它**不归这套状态机管** ——
-	// 放它进来点 X 会被假隐藏（关不掉），还会把 toolHidden 立起来，主窗口的热键与托盘跟着乱 ✗。
+	// 拦截器是全局的：工具窗口（动画详情 / 全局参数）的消息也会走到这里，而它们**不归下面那套状态机管**
+	// —— 放它们进来点 X 会被假隐藏（关不掉），还会把 toolHidden 立起来，主窗口的热键与托盘跟着乱 ✗。
+	//
+	// 但工具窗口与主窗口**同名**（用户要求标题只写 GBFR Sigil Loadout），于是外面那两处"按标题找主窗口"
+	// 随时可能挑到工具窗口：mod 侧的 F1（Hotkey.cs 的 FindWindow）与"第二个实例"（startup.go）。它们挑
+	// 哪一扇不由我们决定，所以在**收的这一头**兜住 —— 下面这两条本来就是发给"工具"的命令，落到哪扇窗口
+	// 上都该由主窗口执行：
+	//   wmToggle   —— 游戏内 F1 的开关（转给主窗口，效果与直接打到主窗口一模一样）
+	//   wmActivate —— 托盘 / 第二个实例的"拿出来"
+	// ⚠️ 只转这两条。WM_CLOSE（点 X）与 WM_SYSCOMMAND 是**逐窗口**的语义：工具窗口的 X 就是关它自己，
+	// 转给主窗口会变成"主窗口收进托盘、工具窗口关不掉" ✗。
 	if !isMainWindow(hwnd) {
+		if msg == wmToggle || msg == wmActivate {
+			if main := mainHwnd.Load(); main != 0 && main != hwnd {
+				procPostMessageW.Call(main, uintptr(msg), 0, 0)
+			}
+		}
 		return 0, false
 	}
 	switch msg {
