@@ -13,6 +13,7 @@ import {SortableContext, useSortable, verticalListSortingStrategy} from "@dnd-ki
 import type {FlagRow, TrackRow, TrackTable} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
 import {EditableCell} from "@/components/EditableCell"
+import {TrackTableHead} from "@/components/TrackTable"
 import {FLAG0_NAMES, FLAG1_NAMES} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
@@ -159,34 +160,6 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
                 />
             ))}
         </tr>
-    )
-}
-
-/**
- * 两张轨表共用的表头：`#`/握把那格 + 各列。`labels` 就是列名（两张表都是拿列名当 key —— 同表内唯一）。
- *
- * `#` 那格分成两半（行号 + 握把那半截的占位）：不这么画，表体里那条分隔竖线到表头就断了。
- */
-function TrackTableHead({labels}: {labels: string[]}) {
-    return (
-        <thead>
-            <tr>
-                <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium text-base md:text-sm">
-                    <div className="flex items-stretch">
-                        <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
-                        <div className="w-8 shrink-0 leading-6" />
-                    </div>
-                </th>
-                {labels.map((label) => (
-                    <th
-                        key={label}
-                        className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap text-base md:text-sm"
-                    >
-                        {label}
-                    </th>
-                ))}
-            </tr>
-        </thead>
     )
 }
 
