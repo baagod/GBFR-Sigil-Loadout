@@ -191,7 +191,9 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
                 }}
                 onMouseEnter={onExtend}
                 // text-center：与表头那个 `#` 一致（原来只给表头居中了，表体的行号是左对齐的）。
-                className="w-9 shrink-0 cursor-default px-1.5 text-center text-xs leading-6 tabular-nums select-none"
+                // 字号与表头/邻格一致（text-base md:text-sm = 本窗口下 14px）；leading-6 保留 —— 这半截
+                // 的高度是行高的来源之一，字号跟上时行高不能跟着变。
+                className="w-9 shrink-0 cursor-default px-1.5 text-center text-base leading-6 tabular-nums select-none md:text-sm"
             >
                 {index + 1}
             </div>
@@ -327,7 +329,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium">
+                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium text-base md:text-sm">
                                 {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
                                     表体里那条分隔竖线到表头就断了。 */}
                                 <div className="flex items-stretch">
@@ -338,7 +340,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                             {table.columns.map((column) => (
                                 <th
                                     key={column}
-                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap text-base md:text-sm"
                                 >
                                     {column}
                                 </th>
@@ -772,7 +774,9 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                 if (column.text) {
                     return (
                         <td key={column.label} className={tdClassName}>
-                            <div className="px-1 py-0.5 text-xs whitespace-nowrap">{column.text(row)}</div>
+                            {/* 只读文本列（不走 EditableCell，所以得自己带上字号）：与可编辑格同为
+                                `text-base md:text-sm`（本窗口下 14px）—— 光靠表格那层 text-xs 会小一档 ✗。 */}
+                            <div className="px-1 py-0.5 text-base whitespace-nowrap md:text-sm">{column.text(row)}</div>
                         </td>
                     )
                 }
@@ -836,7 +840,7 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium">
+                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium text-base md:text-sm">
                                 {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
@@ -846,7 +850,7 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                             {columns.map((column) => (
                                 <th
                                     key={column.label}
-                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap"
+                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap text-base md:text-sm"
                                 >
                                     {column.label}
                                 </th>

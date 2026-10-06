@@ -13,7 +13,7 @@ import {
 } from "../../bindings/sigilloadout/service/actionsservice"
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
-import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid, TrackToolbar, type Marked} from "@/components/TrackGrid"
 import {withNewRow} from "@/lib/actionflags"
@@ -570,11 +570,12 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 {fsmFields.length > 0 && (
                     <div className="mt-2 overflow-x-auto overflow-y-hidden">
                         {/* 表**不套外框**，只剩下每一行下面那条线（用户要求，全局参数表同样）：
-                            外框与竖线都去掉；`[&_tr:last-child>*]:border-b-0` 随之去掉 —— 框没了，
-                            最后一行那条线就是表的收尾。格线颜色仍走全站那一个来路（table-border）。
+                            外框与竖线都去掉；`[&_tr:last-child>*]:border-b-0` 把**最后一行的下边框也去掉**
+                            （用户要求）—— 表到那里就结束了，留着那条线等于给表画了一条多余的收尾线。
+                            格线颜色仍走全站那一个来路（table-border）。
                             字段名**不换行**（用户要求）：整串显示，装不下就由外面那个 overflow-x-auto 横向滚。
                             值那一格给 `w-full`，让它吃掉剩下的宽度（左边那列因此正好等于最长那个字段名）。 */}
-                        <table className="w-full table-border border-separate border-spacing-0 text-xs">
+                        <table className="w-full table-border border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0">
                             <tbody>
                                 {fsmFields.map((field, i) => (
                                     <tr key={i}>
@@ -631,11 +632,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     /*
         主窗口里的模态弹层（由 ActionsPanel 在点动画号时挂上）。尺寸见下面 DialogContent 那段注释。
 
-        按钮：**保存挪到标题右侧、没有取消**（用户要求）—— 标题那一行两端对齐，底下不再有按钮排。
-        关这层靠 Esc、右上角的 X，或标题栏那条（Dialog 自己的行为）。
-
-        标题下面那条线（用户要求）把标题与表格分开，用的是全站默认的 --border —— 与主窗口页签下那条
-        同一个色（表格自己那些行线走 --input，比它亮一档）。两扇弹窗同一套，见 GlobalParamPanel.tsx。
+        标题那一行同时是**按钮行**（用户要求：取消与保存都挪到上面）—— 左标题、右按钮，底下不再有按钮排。
+        关这层靠 Esc 或那两个按钮（DialogContent 没开自己的 X）。
+        行下面那条线（用户要求）把标题与表格分开，用的是全站默认的 --border —— 与主窗口页签下那条
+        同一个色（表格自己那些行线走 --input，比它亮一档）。
     */
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
@@ -658,19 +658,21 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 initialFocus={() => false}
                 className="flex h-[min(800px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col sm:max-w-none"
             >
-                <DialogHeader>
-                    {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
-                    <DialogTitle className="text-base font-medium">{title}</DialogTitle>
+                {/* 标题行 = 按钮行：左标题、右「取消 / 保存」，`border-b pb-4` 就是标题下面那条线。
+                    行内用 flex 两端对齐（DialogHeader 自己是 flex-col，所以里面再包一层 flex-row）。 */}
+                <DialogHeader className="border-b pb-4">
+                    <div className="flex items-center justify-between gap-4">
+                        {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
+                        <DialogTitle className="text-base font-medium">{title}</DialogTitle>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={onClose}>
+                                {t.cancel}
+                            </Button>
+                            {saveButton}
+                        </div>
+                    </div>
                 </DialogHeader>
                 {body}
-                {/* 弹层这条路（现在只有"渲染成弹层"时才会走到）保留按钮排：取消在左、主操作在右。
-                    独立窗口里没有它 —— 那边保存挂在标题右侧、退出用 Esc（见上）。 */}
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        {t.cancel}
-                    </Button>
-                    {saveButton}
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     )
