@@ -43,7 +43,7 @@ import (
 // 文件头第 1 条（win32.go 的 findToolWindow、windowstate.go 的 HandleMsg）。主标题本身是跨层协议常量
 // （sharedconstants_test.go 与 mod 侧对拍），别动它。
 //
-// 定义在这里是因为这是第一扇工具窗口；gpwindow.go 直接用同一个（同一个包）。
+// 定义在这里是因为这是本项目**唯一**一扇工具窗口。
 const toolWindowTitle = window.Title
 
 // motWin 是唯一那扇 mot 窗口（nil = 没开）。
@@ -74,14 +74,21 @@ func openMotionWindow(motion, charCode string) error {
 	q.Set("view", "mot")
 	q.Set("motion", motion)
 	q.Set("char", charCode)
+	// 目标客户区 1080×800。与主窗口同一套换算（见 main.go）：Wails 的尺寸是整扇窗口外框的 DIP，
+	// 内容区要再加 16（左右边框）/ 39（标题栏）。
+	const motW, motH = 1080 + 16, 800 + 39
+	motX, motY := centeredToolPos(motW, motH)
 	w := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: toolWindowTitle,
-		// 目标客户区 1080×800。与主窗口同一套换算（见 main.go）：Wails 的尺寸是整扇窗口外框的 DIP，
-		// 内容区要再加 16（左右边框）/ 39（标题栏）。
-		Width:  1080 + 16,
-		Height: 800 + 39,
-		// ⚠️ **先建出来但不显示** —— 理由与 gpwindow.go 那扇完全一样（默认那条路是"文档加载完成"就显示，
-		// 那一刻 React 还没提交第一帧，屏幕上先是一个空框）。由前端画完第一帧之后调 showMotionWindow()。
+		Width: motW,
+		Height: motH,
+		// 建窗就把最终坐标交出去（详见 centeredToolPos 的注释）：不给的话 Wails 先按系统默认位置建、
+		// 94ms 后再 center() 挪过去，那一步"挪"就是用户看到的那一帧。
+		InitialPosition: application.WindowXY,
+		X:               motX,
+		Y:               motY,
+		// ⚠️ **先建出来但不显示**：Wails 默认那条路是"文档加载完成"就 Show，而那一刻 React 还没提交
+		// 第一帧 —— 屏幕上先是一个空框。由前端画完第一帧之后调 showMotionWindow() 才显示。
 		Hidden:           true,
 		MinWidth:         640 + 16,
 		MinHeight:        400 + 39,
@@ -90,8 +97,8 @@ func openMotionWindow(motion, charCode string) error {
 	})
 	motWin = w
 	motWinMu.Unlock()
-	// 兜底：前端要是压根没起来，谁都不会叫那一声 —— 3 秒后无条件显示（见 gpwindow.go 同一处）。
-	time.AfterFunc(3*time.Second, showMotionWindow)
+	// 兜底：前端要是压根没起来，谁都不会叫那一声 —— 0.6 秒后无条件显示（用户要求不要"等 3 秒才弹"）。
+	time.AfterFunc(600*time.Millisecond, showMotionWindow)
 	// 关掉（点 X，或窗口里按"取消"）之后清指针，下一扇才开得出来。
 	// 两个事件都收：Close()/原生关闭发的是 Common.WindowClosing，Windows 平台自己那记是
 	// Windows.WindowClosing（见 events/defaults.go 的映射），漏一个就会出现"指针没清、下次开不出来"✗。
@@ -109,15 +116,13 @@ func openMotionWindow(motion, charCode string) error {
 }
 
 // showMotionWindow 由前端在**画完第一帧之后**调（见 MotionWindow.tsx）：这扇窗口是 Hidden 建出来的，
-// 等这一声才 Show —— 理由与 gpwindow.go 的 showGlobalParamWindow 完全一样。
+// 等这一声才显示 —— 真正的显示动作在 showToolWindow（toolwindow.go，两段式：先整窗透明地映射、
+// 等 WebView2 控制器可见再置回不透明，为的是不出现"先看到一个空壳"那一帧）。
 func showMotionWindow() {
 	motWinMu.Lock()
 	w := motWin
 	motWinMu.Unlock()
-	if w == nil {
-		return
-	}
-	application.InvokeSync(func() { w.Show() })
+	showToolWindow(w)
 }
 
 // closeMotionWindow 由窗口里那排按钮调用（取消）。窗口自己的 X 不走这里。

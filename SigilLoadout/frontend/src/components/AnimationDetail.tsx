@@ -639,7 +639,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
         关这扇窗口靠 Esc 或窗口的 X（见 MotionWindow.tsx）。
 
         标题下面那条线（用户要求）把标题与表格分开，用的是全站默认的 --border —— 与主窗口页签下那条
-        同一个色（表格自己那些行线走 --input，比它亮一档）。两扇弹窗同一套，见 GlobalParamWindow.tsx。
+        同一个色（表格自己那些行线走 --input，比它亮一档）。两扇弹窗同一套，见 GlobalParamPanel.tsx。
     */
     if (inWindow) {
         return (

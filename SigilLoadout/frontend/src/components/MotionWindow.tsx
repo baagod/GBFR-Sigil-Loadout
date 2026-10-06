@@ -73,21 +73,36 @@ export function MotionWindow({motion, charCode}: {motion: string; charCode: stri
     }, [])
 
     /*
-        **画完第一帧之后**才让 Go 把这扇窗口显示出来（理由与 GlobalParamWindow.tsx 那一处完全一样）：
-        Go 那边是 Hidden 建的，等这一声，窗口出现时里面已经有内容，不会先闪一个空框。
-        挂在 `t` 上：它一到，标题 + 分隔线就都在了，第一帧已经有内容。
+        **画完第一帧之后**才让 Go 把这扇窗口显示出来：Go 那边是 Hidden 建的（Wails 默认那条路是
+        "文档加载完成"就 Show，而那一刻 React 还没提交第一帧 → 屏幕上先是一个空框），等这一声，
+        窗口出现时里面已经有内容。挂在 `t` 上：它一到，标题 + 分隔线就都在了，第一帧已经有内容。
     */
     useEffect(() => {
-        if (t) void ShowMotionWindow()
+        if (!t) return
+        // 等这一帧真的画到屏幕上（连等三帧 rAF）再让 Go 显示窗口：`t` 到齐只是 React 提交了，
+        // 合成器还要一两帧才把它送上屏幕。
+        let id1 = 0
+        let id2 = 0
+        let id3 = 0
+        id1 = requestAnimationFrame(() => {
+            id2 = requestAnimationFrame(() => {
+                id3 = requestAnimationFrame(() => void ShowMotionWindow())
+            })
+        })
+        return () => {
+            cancelAnimationFrame(id1)
+            cancelAnimationFrame(id2)
+            cancelAnimationFrame(id3)
+        }
     }, [t])
 
     /*
         语言没定下来之前**也先把标题画出来**。
 
         为什么不能空着：这扇窗口是"文档加载完成"那一刻就被 Wails 显示出来的，而那时 React 还没提交第一帧
-        ——全空白的话屏幕上就是**一个空框闪一下**（用户实测，见 GlobalParamWindow.tsx 同一处，那边量到
-        空窗有 151ms）。标题 `pl1000_3440` 只由 URL 上那两个参数拼出来，不需要任何后端往返，所以第一帧
-        就能有内容。底下那一行线是标题与内容的分隔线（用户要求），与内容到位后那一版长得完全一样。
+        ——全空白的话屏幕上就是**一个空框闪一下**（实测那一段有 151ms）。标题 `pl1000_3440` 只由 URL 上
+        那两个参数拼出来，不需要任何后端往返，所以第一帧就能有内容。底下那一行线是标题与内容的分隔线
+        （用户要求），与内容到位后那一版长得完全一样。
     */
     if (!t) {
         return (

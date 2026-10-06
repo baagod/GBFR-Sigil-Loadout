@@ -14,10 +14,6 @@ type ShellService struct {
 	openMotion  func(motion, charCode string) error
 	showMotion  func()
 	closeMotion func()
-	// 「全局参数」那张表的窗口同一条路（另一个单例，见 main 的 gpwindow.go）。
-	openGlobalParam  func(table string) error
-	showGlobalParam  func()
-	closeGlobalParam func()
 }
 
 // NewShellService 接住托盘菜单里那条"退出"：菜单由 main 造（NewMenu 不碰 globalApplication，
@@ -56,36 +52,6 @@ func (s *ShellService) ShowMotionWindow() {
 func (s *ShellService) CloseMotionWindow() {
 	if s.closeMotion != nil {
 		s.closeMotion()
-	}
-}
-
-// BindGlobalParamWindow 由 main 注入「全局参数」窗口的开/显示/关（见 gpwindow.go）。
-func (s *ShellService) BindGlobalParamWindow(open func(table string) error, show func(), close func()) {
-	s.openGlobalParam = open
-	s.showGlobalParam = show
-	s.closeGlobalParam = close
-}
-
-// OpenGlobalParamWindow 由前端在"点全局参数清单里的一行"时调用。
-// 单例：已经开着一扇就换内容并前置，不新建（这条限制在 main 那边的 openGlobalParamWindow 里）。
-func (s *ShellService) OpenGlobalParamWindow(table string) error {
-	if s.openGlobalParam == nil {
-		return nil
-	}
-	return s.openGlobalParam(table)
-}
-
-// ShowGlobalParamWindow 由全局参数窗口自己在画完第一帧后调用（见 GlobalParamWindow.tsx）。
-func (s *ShellService) ShowGlobalParamWindow() {
-	if s.showGlobalParam != nil {
-		s.showGlobalParam()
-	}
-}
-
-// CloseGlobalParamWindow 由全局参数窗口里那记 Esc 调用。
-func (s *ShellService) CloseGlobalParamWindow() {
-	if s.closeGlobalParam != nil {
-		s.closeGlobalParam()
 	}
 }
 

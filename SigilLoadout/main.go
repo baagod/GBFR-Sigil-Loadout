@@ -108,19 +108,18 @@ func main() {
 	win = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: window.Title,
 		// Wails v3 的尺寸是整扇窗口外框（含标题栏）的 DIP：内容再加 16（左右边框）才是外框。
-		Width:            900 + 16,
+		Width:            924 + 16,
 		Height:           800 + 39,
-		MinWidth:         900 + 16,
+		MinWidth:         924 + 16,
 		MinHeight:        800 + 39,
 		URL:              "/",
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
-	// 动画详情那扇独立窗口（mot）与「全局参数」那张表的窗口：开/显示/关注入给外壳服务，前端就能用它们
-	// （见 motwindow.go / gpwindow.go 与 shellservice.go）。两个各自单例。
-	// show 单独一条：两扇窗口都是 Hidden 建的，要等前端画完第一帧再显示（否则先闪一个空框）。
+	// 动画详情那扇独立窗口（mot）：开/显示/关注入给外壳服务，前端就能用它们（见 motwindow.go 与
+	// shellservice.go）。单例。show 单独一条：那扇窗口是 Hidden 建的，要等前端画完第一帧再显示。
+	// （「全局参数」那张表不再是独立窗口：它在主窗口里用一个 dialog 显示，见 GlobalParamPanel.tsx。）
 	shellService.BindMotionWindow(openMotionWindow, showMotionWindow, closeMotionWindow)
-	shellService.BindGlobalParamWindow(openGlobalParamWindow, showGlobalParamWindow, closeGlobalParamWindow)
 	// 主窗口句柄交给后台去记：全局的 WndProc 拦截器靠它把 mot 窗口的消息挡在状态机之外
 	// （见 window/win32.go 的 isMainWindow）。这里不能同步取 —— 这一刻原生窗口还没落地，取到的是 0，
 	// 而 0 会让拦截器放行一切，mot 窗口的 WM_CLOSE 就会被当成主窗口的命令拿去假隐藏 ✗。

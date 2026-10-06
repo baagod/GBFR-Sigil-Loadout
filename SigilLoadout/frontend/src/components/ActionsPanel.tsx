@@ -50,10 +50,10 @@ import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/inpu
 import {ChevronDown, Search} from "lucide-react"
 import {
     CloseMotionWindow,
-    OpenGlobalParamWindow,
     OpenMotionWindow,
 } from "../../bindings/sigilloadout/service/shellservice"
 import {GlobalParamList} from "@/components/GlobalParamList"
+import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
@@ -455,6 +455,16 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     const [section, setSection] = useState<"general" | "actions" | "globals">("general")
     // 进「全局参数」之前在看哪一块：再点一次那个按钮要**回到原来那一块**（不是回到某个固定的页签）。
     const [beforeGlobals, setBeforeGlobals] = useState<"general" | "actions">("general")
+    // 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
+    //
+    // ⚠️ 这块以前是"开一扇独立窗口"，后来是"弹一个 dialog"，现在**两者都不要**（用户要求）：直接就是
+    // 页面上的一栏。独立窗口的问题是"第二扇窗口的第一帧永远是它自己的底色"（用户实测的黑框），
+    // dialog 则是多余的一层。
+    const [gpTable, setGpTable] = useState("")
+    // 这张表有没有没保存的改动 + 它的"保存"动作：保存按钮在页面工具条上（用户要求：面板里不要保存），
+    // 所以由面板把这两样交给这里，`handleSaveAndDeploy` 一起保存。
+    const [gpDirty, setGpDirty] = useState(false)
+    const gpSaveRef = useRef<(() => Promise<void>) | null>(null)
 
     const [busy, setBusy] = useState(false)
 
@@ -618,7 +628,8 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     }
 
     /**
-     * 保存即部署：动作表有改动才保存，最后一律部署一次（轨的保存在详情页那一层里各自做）。
+     * 保存即部署：动作表有改动才保存；「全局参数」那张表同理（它的保存按钮就在这里，用户要求合并）；
+     * 最后一律部署一次（轨的保存在详情页那一层里各自做）。
      *
      * **界面上不报结果**：这一排不要提示（用户明确要求）。失败写 console.error，要查就看 DevTools。
      */
@@ -628,6 +639,9 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
             if (actionsDirty) {
                 await saveActions()
                 setActionsDirty(false)
+            }
+            if (gpDirty) {
+                await gpSaveRef.current?.()
             }
             await Deploy()
         } catch (e) {
@@ -823,20 +837,36 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                     </div>
                 )}
                 </div>
-                {/* 「全局参数」清单：解包目录 system\player\ 下那十几张不分角色的表。
-                    点一行开的是一扇**独立窗口**（同一套做法见 gpwindow.go / GlobalParamWindow.tsx），
-                    所以在下面这块地方只是一个名单。 */}
+                {/* 「全局参数」：解包目录 system\player\ 下那十几张不分角色的表。
+                    整块是**左右两栏**（不再弹任何东西）：左栏是那张清单（条目长相照 combobox 的条目，
+                    见 GlobalParamList），右栏是选中的那张表。点左栏哪张，右栏就换哪张。 */}
                 <div
-                    className={`flex min-h-0 flex-col ${
+                    className={`flex min-h-0 gap-4 ${
                         section === "globals" ? "flex-1" : "h-0 overflow-hidden -mt-4"
                     }`}
                 >
-                    <GlobalParamList onOpen={(table) => void OpenGlobalParamWindow(table)} />
+                    <GlobalParamList
+                        selected={gpTable}
+                        onOpen={setGpTable}
+                        onLoaded={(tables) => setGpTable((cur) => cur || tables[0] || "")}
+                        // w-max：左栏**按最长的名字自适应宽度**；pr-5：右侧那条竖线离条目底色**拉开 20px**
+                        // （用户要求）。条目自己是 w-full，于是底色右边缘正好落在竖线左边 20px 处。
+                        className="w-max shrink-0 border-r pr-5"
+                    />
+                    {gpTable !== "" && (
+                        <GlobalParamPanel
+                            key={gpTable}
+                            table={gpTable}
+                            onDirtyChange={setGpDirty}
+                            onSaveReady={(save) => {
+                                gpSaveRef.current = save
+                            }}
+                        />
+                    )}
                 </div>
             </div>
 
-            {/* 动画详情不再在这里弹层：它是一扇**独立窗口**（Go 侧开，见 motwindow.go / MotionWindow.tsx）；
-                全局参数那张表同理（gpwindow.go）。 */}
+            {/* 动画详情仍是一扇**独立窗口**（Go 侧开，见 motwindow.go / MotionWindow.tsx）。 */}
         </div>
     )
 }
