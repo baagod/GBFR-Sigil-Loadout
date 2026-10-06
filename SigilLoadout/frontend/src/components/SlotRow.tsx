@@ -44,7 +44,29 @@ function LevelInput({
     )
 
     return (
-        <InputGroup ref={groupRef} className="h-8 w-20 shrink-0">
+        /*
+            版式（用户给的图）：`[    20    /    30    ]`
+              · 数字在各自那半边里**居中**；
+              · "/" 在**整框正中**；
+              · 而且**与框的宽度无关** —— 框宽多少都成立。
+
+            ⚠️ 所以**不能用 flex + 定宽中格**（那是把宽度当常数调出来的：换个宽度就偏 ✗），
+            用**三列网格**把这件事变成结构：`grid-cols-[1fr_auto_1fr]` ——
+            两侧 `1fr` 恒等宽、中列 `auto` 只占斜杠自己的宽，于是斜杠的格心**永远**是整框的中线，
+            两边数字也**永远**在各自半边里居中 ✓（下面实测：80px 与 120px 两种宽度斜杠格心都落在框心）。
+
+            几条必须带上的：
+              · InputGroup 默认是 flex，这里要 `grid` 覆盖它（twMerge 同组，调用点胜出）；
+              · `align="inline-end"` 不能省：InputGroupAddon 默认 **inline-start**（order-first），
+                省掉斜杠会跑到最左边 ✗（用户报的"斜杠跑到前面去了"）；两个 addon 都是 order-last，
+                网格自动放置按 order 后的文档序落进第 2、3 列 ✓；
+              · `pr-0`（两处）+ 输入框 `px-0!`：抵掉 addon 自带的 `pr-2` 和 InputGroup 那条
+                "有 inline-end 就给 input 加 pr-1.5" 的规则（后者特异性更高，所以要 `!`）。
+        */
+        <InputGroup
+            ref={groupRef}
+            className="grid h-8 w-20 shrink-0 grid-cols-[1fr_auto_1fr] items-center"
+        >
             <InputGroupInput
                 ref={inputRef}
                 type="number"
@@ -61,10 +83,18 @@ function LevelInput({
                     onLevel(n)
                     if (e.target.value !== String(n)) e.target.value = String(n)
                 }}
-                className="h-8 py-0 pb-px text-center leading-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="h-8 w-full min-w-0 px-0! py-0 pb-px text-center leading-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
-            <InputGroupAddon className="text-[#a0a0a0] tabular-nums">
-                / {max}
+            {/* 中列（auto）：只占斜杠自己的宽 —— 两侧 1fr 恒等宽，所以它的格心就是整框的中线 ✓ */}
+            <InputGroupAddon align="inline-end" className="justify-center pr-0">
+                /
+            </InputGroupAddon>
+            {/* 右列（1fr）：与左列等宽，内容居中 ✓ */}
+            <InputGroupAddon
+                align="inline-end"
+                className="min-w-0 justify-center pr-0 text-[#a0a0a0] tabular-nums"
+            >
+                {max}
             </InputGroupAddon>
         </InputGroup>
     )
