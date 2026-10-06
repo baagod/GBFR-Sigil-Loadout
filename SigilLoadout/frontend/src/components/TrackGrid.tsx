@@ -399,8 +399,44 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
      */
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState("")
+    /**
+     * 本格在不在**输入态**（= 挂着输入框）。
+     *
+     * ⚠️ 它和 `open`（列表弹层）**不是一回事**：Esc 只收列表、**不退出编辑**（用户拍的：默认 combobox
+     * 就是这个样子 —— 列表收起来，光标还在框里，接着打字 / 再点一下都还在这一格）。
+     * 所以「进编辑态」是一件事（点这一格），「退编辑态」是另一件事（点到本格与弹层以外的地方）。
+     */
+    const [editing, setEditing] = useState(false)
+    /**
+     * 弹层收尾时要不要把焦点**抓回本格**。
+     *
+     * ⚠️ 用户点到**别处**（别的格子、列表外的任何地方）时必须关掉：那一记点击会同时关掉本格的弹层，
+     * 组件随即让 `finalFocus` 决定焦点去哪 —— 此刻本格的输入框已经卸了，于是回退到静态按钮，
+     * 把焦点从**用户刚点开的那一格**抢回来 ✗（实测：A 格列表开着时点 B 格，B 格的输入框拿不到焦点）。
+     */
+    const focusBackRef = useRef(true)
     const cellRef = useRef<HTMLTableCellElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
+    /**
+     * 点到本格与弹层**以外**的地方 = 退编辑态（回到静态文本）。
+     *
+     * 弹层自己也有一条 outside-press，但它只在弹层开着时存在；列表已经被 Esc 收起来的时候，
+     * 靠这一条才回得去（否则点别的格子会两格同时停在输入态 ✗）。
+     */
+    useEffect(() => {
+        if (!editing) return
+        const onDown = (e: PointerEvent) => {
+            const target = e.target as HTMLElement | null
+            if (cellRef.current?.contains(target)) return
+            // 点列表项算"还在这一格里"：那次收尾交给组件自己（选中值 / 关列表）。
+            if (target?.closest?.('[data-slot="combobox-content"]')) return
+            focusBackRef.current = false // 用户已经挪到别处：收尾时别把焦点抢回来 ✗
+            setEditing(false)
+            setQuery("")
+        }
+        document.addEventListener("pointerdown", onDown, true)
+        return () => document.removeEventListener("pointerdown", onDown, true)
+    }, [editing])
     /**
      * 打开后把焦点**从列表项抢回输入框**。
      *
@@ -456,6 +492,23 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                     onInputValueChange={setQuery}
                     open={open}
                     // ⚠️ 也别加 autoHighlight：它会把**第一项**高亮并滚到顶部 ✗。
+                    // ⚠️ 在**本格**上再点一下（输入框、右边的含义、格的空白处）不该收起列表：弹层挂在
+                    // body 上，我们自己的这个 input 在组件眼里是"外面"的（只有它自己的 Input / Trigger
+                    // 才被记成参考元素），于是那一下被当成 outside-press 把列表关了 ✗（用户报的"输入状态
+                    // 下再点输入框，列表收起"）。用它自己的取消口子驳回**这一记**：`details.cancel()` 之后
+                    // store 根本不改状态（见 popupStoreUtils 的 applyPopupOpenChange）；点在别的格子或
+                    // 别处照常关 ✓。
+                    onOpenChange={(next, details) => {
+                        if (
+                            !next &&
+                            details.reason === "outside-press" &&
+                            cellRef.current?.contains(details.event.target as Node | null)
+                        ) {
+                            details.cancel()
+                            return
+                        }
+                        setOpen(next)
+                    }}
                     // ⚠️ 这里返回**数值**（不是含义）：输入框显示的正是它 —— 于是点开前后单元格文本完全一致
                     //（`32` 在输入框里、`允许转身` 在右侧 addon 里，位置与显示态一模一样）。代价：下拉的
                     // 过滤按数值匹配（按含义搜就得让输入框显示含义，那样一点开文本就变了 ✗）。
@@ -465,8 +518,8 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                         if (next === null) return
                         if (next !== value) onCommit(next)
                         setOpen(false)
+                        setEditing(false) // 选完就收工：回到静态文本（与 Esc 只收列表不同）
                     }}
-                    onOpenChange={setOpen}
                 >
                     {/* 单元格自己就是一个 **InputGroup**（官方 Combobox 的用法）：里面那个 input 是数值，
                         含义作为 inline-end addon 跟在后面 —— 就是官方示例里 `12 results` 那个位置。
@@ -483,23 +536,49 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                           · 颜色**不能挂 `focus:`** —— 弹层一开组件的列表导航会把焦点抢到列表项上 ✗，
                             输入框于是拿不到 focus 那个样式（"没变白" ✗）→ 它在编辑态恒为默认白字 ✓
                           · 同理 `autoFocus` 会被抢走（"输入状态不在" ✗）→ 用上面那个 effect 抢回来 ✓ */}
-                    {open ? (
+                    {editing ? (
                     <span className="flex items-baseline gap-2 px-1 py-0.5 text-base md:text-sm">
                         <input
                             ref={inputRef}
+                            // "这一格自己管 Esc"：外壳那记"Esc 收进托盘"因此让路（见 App.tsx）——
+                            // 列表被 Esc 收起来之后 `data-picker-open` 就没了，那时全靠这个标记挡住外壳。
+                            data-esc-own=""
                             // 值只放**占位符**、不放进 value：于是既没有"一进来就被全选"✗，第一下打字也不会接在数值后面 ✓
                             // 占位符用**前景色** —— 看着就是"这一格的值"，不是灰提示 ✓
                             value={query}
                             placeholder={value}
-                            onChange={(e) => setQuery(e.target.value)}
+                            // 打字即重新展开列表（列表可能是被 Esc 收起来的，接着打字要能继续搜）。
+                            onChange={(e) => {
+                                setQuery(e.target.value)
+                                setOpen(true)
+                            }}
                             onKeyDown={(e) => {
                                 if (e.key !== "Escape") return
-                                // ⚠️ 必须**拦住**这一记 Esc，别让它继续冒泡：动画详情弹窗（Base UI Dialog）
-                                // 在 document 上也听着 Esc，不拦就会连弹窗一起关掉（用户实测：一格 Esc 关两层）。
-                                // 我们这套没用组件的 Input/Trigger，弹层也就不认这是"自己人"的 Esc，
-                                // 只能在这里明说：这一记归本格。
+                                // Esc 是**两级**的（用户拍的：与默认 combobox 的手感一致）：
+                                //   ①列表开着 → 只收列表，**不退出编辑**（光标留在框里，接着打字列表又回来）
+                                //   ②列表已经收着 → 再按才**退出编辑**（回静态文本）
+                                // ⚠️ 必须**拦住冒泡**：弹层自己的 dismiss 和详情弹窗（Base UI Dialog）都在
+                                // document 上听 Esc —— 不拦，弹层会把它当"关列表"、弹窗会连自己一起关
+                                //（用户实测：一格 Esc 关两层）。我们这套没用组件的 Input/Trigger，
+                                // 弹层也就不认这是"自己人"的 Esc，只能在这里明说：这一记归本格。
                                 e.stopPropagation()
-                                setOpen(false)
+                                if (open) {
+                                    setOpen(false)
+                                    return
+                                }
+                                setEditing(false)
+                                setQuery("")
+                                // 这一下没有弹层收尾，组件的 finalFocus 不会被调用 → 焦点自己交给静态按钮
+                                // （不然它会掉到弹窗容器上，焦点环和 Tab 顺序都断在这一格 ✗）。
+                                // 用**双 rAF**：输入框卸载那一帧，Base UI 的焦点管理会把焦点收进弹窗容器
+                                // （实测），得等它跑完再抢回来；用户要是已经点到别处就不抢 ✓（这个 effect
+                                // 之外没有人再动焦点）。
+                                requestAnimationFrame(() => {
+                                    requestAnimationFrame(() => {
+                                        if (cellRef.current?.contains(document.activeElement)) return
+                                        btnRef.current?.focus()
+                                    })
+                                })
                             }}
                             className="w-21 shrink-0 bg-transparent p-0 text-left text-base tabular-nums outline-none placeholder:text-foreground md:text-sm"
                         />
@@ -509,7 +588,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                     ) : (
                 /* 静止态：与 `EditableCell` 一样的**静态文本**（数值占 84px 槽 + 2 空格 + 含义灰）✓
                    点一下才进编辑态 —— 不常驻输入框/按钮（格子很多，常驻输入框会重 ✗） */
-                <button ref={btnRef} type="button" className={buttonClass} onClick={() => { setQuery(""); setOpen(true) }}>
+                <button ref={btnRef} type="button" className={buttonClass} onClick={() => { setQuery(""); focusBackRef.current = true; setEditing(true); setOpen(true) }}>
                     {lines}
                 </button>
             )}
@@ -518,10 +597,18 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                     {/* finalFocus：关闭时焦点**回这一格**。这是组件自己的 API（`ComboboxPopup.finalFocus` ✓）。
                         ⚠️ 不配它，组件会按默认规则"把焦点还给触发器" —— 可我们这套**没有它的触发器** ✗
                         （弹层由我们自己那格文本按钮打开），于是它退而求其次 focus 文档里第一个可聚焦元素，
-                        有时就落到分区工具条的"添加"上 ✗（用户截图里那个 tooltip）。 */}
+                        有时就落到分区工具条的"添加"上 ✗（用户截图里那个 tooltip）。
+                        列表被 Esc 收起来时**还在输入态**：那时焦点要回输入框（光标留在原地 ✓），
+                        选中一项收尾时才回静态按钮（那一刻输入框已经卸了，inputRef 是 null）。
+                        ⚠️ 用户点到别处（`focusBackRef` 已关）返回 **false** = "别动焦点"：返回 null 不行 ——
+                        Base UI 把 null 当"按默认规则还焦点"（FloatingFocusManager 469-484 行），
+                        那会去 focus 本格，把刚点开的那一格顶掉 ✗。
+                        （这里的 closeType 分不出"选中 / 点到别处"，所以自己记 `focusBackRef`。） */}
                     <ComboboxContent
                         anchor={cellRef}
-                        finalFocus={() => btnRef.current ?? null}
+                        finalFocus={() =>
+                            focusBackRef.current ? (inputRef.current ?? btnRef.current ?? false) : false
+                        }
                         className="w-max min-w-[22rem] max-w-[44rem]">
                         {/* max-h：每项 26px（字号 14px 不缩，上下内边距各 3px：20 + 3×2；基类 py-1.5 = 6px，
                             一路减到 py-[3px]），18rem = 288px 因此能放下 11 行（用户要求至少 10 行 ✓）。 */}
