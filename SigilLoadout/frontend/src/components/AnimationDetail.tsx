@@ -1,6 +1,7 @@
 import {Fragment, useEffect, useMemo, useRef, useState} from "react"
 import {arrayMove} from "@dnd-kit/sortable"
 import {
+    DeployMissingTracks,
     LoadFlags,
     LoadFlagsOriginal,
     LoadFsm,
@@ -450,6 +451,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             if (changed.length > 0) {
                 await SaveTracks(motion, changed)
             }
+            // 改动表里记着、mod 目录里却没有的轨：补一次。mod 目录会被整个换掉（deploy.ps1 / 重装），
+            // 而账本不会 —— 上面两句只在"这次改过"时才写，于是那种缺文件的轨点保存什么都不发生 ✗。
+            // **只补缺的那些**，不把这一层里其它轨重写一遍（那件事归页面那个「保存」）。
+            await DeployMissingTracks(motion)
             // 写完重读一遍：写回的字节与内存里的是同一份，但"读回来"才是真的落地了。
             const list = (await ListTracks(motion)) ?? []
             setInfos(list)

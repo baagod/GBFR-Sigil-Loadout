@@ -638,38 +638,7 @@ func (s *ActionsService) Deploy() error {
 	if err != nil {
 		return err
 	}
-	char := charCode(cfg)
-	refs := make([]trackRef, 0, len(trackEdits))
-	seen := make(map[trackRef]bool, len(trackEdits))
-	for _, edit := range trackEdits {
-		if edit.Char != char {
-			continue
-		}
-		if ref := edit.ref(); !seen[ref] {
-			seen[ref] = true
-			refs = append(refs, ref)
-		}
-	}
-	// 顺序稳一点：真出错时日志里才看得出进行到哪一条。
-	sort.Slice(refs, func(i, j int) bool {
-		if refs[i].motion != refs[j].motion {
-			return refs[i].motion < refs[j].motion
-		}
-		if refs[i].kind != refs[j].kind {
-			return refs[i].kind < refs[j].kind
-		}
-		return refs[i].sub < refs[j].sub
-	})
-
-	items := make([]trackWrite, 0, len(refs))
-	for _, ref := range refs {
-		raw, err := trackSourceXML(cfg, trackEdits, ref.motion, ref.sub, ref.kind)
-		if err != nil {
-			return err
-		}
-		items = append(items, trackWrite{motion: ref.motion, sub: ref.sub, kind: ref.kind, raw: raw})
-	}
-	if err := s.writeAndDeployTracks(cfg, items); err != nil {
+	if err := s.deployRefs(cfg, trackEdits, trackRefsOf(trackEdits, charCode(cfg), ""), false); err != nil {
 		return err
 	}
 
@@ -686,6 +655,90 @@ func (s *ActionsService) Deploy() error {
 		}
 	}
 	return nil
+}
+
+// trackRefsOf 是改动表里属于某个角色的轨（去重）。motion 非空时只收这一个动画的。
+//
+// 顺序稳一点（motion / kind / sub）：真出错时日志里才看得出进行到哪一条。
+func trackRefsOf(edits []trackEdit, char, motion string) []trackRef {
+	refs := make([]trackRef, 0, len(edits))
+	seen := make(map[trackRef]bool, len(edits))
+	for _, edit := range edits {
+		if edit.Char != char {
+			continue
+		}
+		ref := edit.ref()
+		if motion != "" && ref.motion != motion {
+			continue
+		}
+		if seen[ref] {
+			continue
+		}
+		seen[ref] = true
+		refs = append(refs, ref)
+	}
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].motion != refs[j].motion {
+			return refs[i].motion < refs[j].motion
+		}
+		if refs[i].kind != refs[j].kind {
+			return refs[i].kind < refs[j].kind
+		}
+		return refs[i].sub < refs[j].sub
+	})
+	return refs
+}
+
+/*
+deployRefs 把这几条轨按改动合成 XML、编成 BXM 搬进 mod（调用方持有 s.mu）。
+
+onlyMissing = 只搬 mod 目录里**还没有文件**的那些（详情页点保存时的补部署，见 DeployMissingTracks）；
+false = 全搬 —— Deploy 那条路要的是"账本重新投影一遍"，文件已经在也得重写（资产换过时内容会变）。
+*/
+func (s *ActionsService) deployRefs(cfg actionConfig, edits []trackEdit, refs []trackRef, onlyMissing bool) error {
+	items := make([]trackWrite, 0, len(refs))
+	for _, ref := range refs {
+		if onlyMissing {
+			dst := deployTrackPath(cfg, ref.motion, ref.sub, ref.kind)
+			if _, err := os.Stat(dst); err == nil {
+				continue
+			} else if !os.IsNotExist(err) {
+				return fmt.Errorf("看 %s 在不在: %w", dst, err)
+			}
+		}
+		raw, err := trackSourceXML(cfg, edits, ref.motion, ref.sub, ref.kind)
+		if err != nil {
+			return err
+		}
+		items = append(items, trackWrite{motion: ref.motion, sub: ref.sub, kind: ref.kind, raw: raw})
+	}
+	return s.writeAndDeployTracks(cfg, items)
+}
+
+/*
+DeployMissingTracks 补部署：这个动画里"改动表记着、mod 目录里却还没有文件"的轨，重新合成一份写进去。
+
+为什么需要它：改动表是账本，mod 里的文件是账本的投影，而投影会整份消失（mod 目录被换掉）或写失败一次
+——那时账本还在、界面上也读得到内容，唯独游戏看不到。详情页那个「保存」原先**只在这次改过时才碰后端**，
+于是这种情况点保存什么都不写 ✗（见 AnimationDetail 的 save）。
+
+判据就是改动表里有没有这条 ref（= 有没有被改动过的值）：不去比内容是否真的与原版不同——那是另一件事，
+且要多做一次原版解码。**只碰缺的那些**：文件已经在的原样不动，所以连着点保存是空操作，也不会把弹窗里
+其它轨顺手重写一遍。
+*/
+func (s *ActionsService) DeployMissingTracks(motion string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cfg := s.config()
+	if !isMotion(motion) {
+		return fmt.Errorf("motion 号 %q 不合法", motion)
+	}
+	edits, err := loadTrackEdits()
+	if err != nil {
+		return err
+	}
+	return s.deployRefs(cfg, edits, trackRefsOf(edits, charCode(cfg), motion), true)
 }
 
 /*

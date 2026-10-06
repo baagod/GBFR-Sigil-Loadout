@@ -561,3 +561,70 @@ func BenchmarkReadTrackFromTheAsset(b *testing.B) {
 		}
 	})
 }
+
+/*
+详情页的「保存」得能补账：改动表里记着、mod 目录里却没有文件的轨，重新部署一次。
+
+现场是怎么来的：mod 目录会被整个换掉（deploy.ps1 / 重装），而工具生成的那些文件不在安装包里——账本
+（track_edits.json）还在，文件没了。原先详情页只在"这次改过"时才碰后端，于是这种情况点保存什么都不写 ✗。
+
+只补缺的那些：文件已经在的轨必须一个字节都不动，别的动画的轨更不许碰。
+*/
+func TestDeployMissingTracksFillsOnlyWhatIsGone(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	char := charCode(cfg)
+	testdata := func(name string) string {
+		raw, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	// 改动表里三条轨：3400 的 flags 与 attack，外加**别的动画** 0b11 的 attack。
+	edits := setTrackEdit(nil, char, trackRef{motion: "3400", sub: flagSub, kind: flagsKind},
+		testdata("pl1000_3400_0_seq_edit_flags.xml"), nil)
+	edits = setTrackEdit(edits, char, trackRef{motion: "3400", sub: "0", kind: "attack"},
+		testdata("pl1000_0b11_0_seq_edit_attack.xml"), nil)
+	edits = setTrackEdit(edits, char, trackRef{motion: "0b11", sub: "0", kind: "attack"},
+		testdata("pl1000_0b11_0_seq_edit_attack.xml"), nil)
+	if err := saveTrackEdits(edits); err != nil {
+		t.Fatal(err)
+	}
+
+	// mod 目录里**已经**有 3400 的 flags（内容故意不是 BXM，好看出有没有被重写）。
+	kept := deployTrackPath(cfg, "3400", flagSub, flagsKind)
+	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(kept, []byte("already deployed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.DeployMissingTracks("3400"); err != nil {
+		t.Fatalf("DeployMissingTracks: %v", err)
+	}
+
+	// 1. 缺的那一条补出来了（内容真是一份 BXM）。
+	if _, err := decodeBXM(readDeployedTrack(t, modDir, "pl1000_3400_0_seq_edit_attack.bxm")); err != nil {
+		t.Fatalf("补出来的 BXM 解不开: %v", err)
+	}
+	// 2. 已经在的那份一个字节都没动。
+	if raw, err := os.ReadFile(kept); err != nil {
+		t.Fatal(err)
+	} else if string(raw) != "already deployed" {
+		t.Fatalf("文件已经在，却把它重写了：%q", raw)
+	}
+	// 3. 别的动画不碰。
+	if _, err := os.Stat(deployTrackPath(cfg, "0b11", "0", "attack")); !os.IsNotExist(err) {
+		t.Fatalf("补 3400 的时候把 0b11 也部署了（err=%v）", err)
+	}
+}
+
+// 动画号不合法时说清楚（它会被拼进文件名）。
+func TestDeployMissingTracksRejectsABadMotion(t *testing.T) {
+	service, _, _ := actionsFixture(t)
+	if err := service.DeployMissingTracks("34"); err == nil {
+		t.Fatal("动画号 34 不合法，却补成功了")
+	}
+}
