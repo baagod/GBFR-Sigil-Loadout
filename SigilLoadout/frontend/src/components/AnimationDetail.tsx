@@ -488,7 +488,9 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                         所以只钉标题会把按钮留在地上。z-[60] **必须高过表格里所有吸顶格**（表头 "#" 是 50、
                         表体 "#" 是 40、焦点框是 30）—— 给 30 时表体会画到标题上面（实测把标题整个盖住）。
                         ⚠️ 分区之间**不画分隔线**（原来这里是 `not-last:border-b`）：用户要求全去掉。 */}
-                    <div className="sticky top-0 z-[60] bg-background">
+                    {/* 吸顶的轨标题：底色用 **bg-popover**（= 弹层自己的 #171717），不是 bg-background
+                        (#0a0a0a) —— 后者会在 dialog 里显出一条比周围更深的色带（用户要求移除 #0a0a0a）。 */}
+                    <div className="sticky top-0 z-[60] bg-popover">
                         <div className="flex w-full items-start py-2 text-left text-sm font-medium">
                             <span className="flex w-full items-baseline gap-1.5">
                                 <span>{trackLabel(info.kind)}</span>
@@ -548,7 +550,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
         {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。
             标题与内容**不包一层 div**（同上面几条轨）：包起来 sticky 就只能在那一块里吸顶、离场时露半截。 */}
-        <div className="sticky top-0 z-[60] bg-background">
+        {/* 吸顶的 FSM 标题：底色同上面几条轨，走 bg-popover（弹层自己的底色），不铺 #0a0a0a。 */}
+        <div className="sticky top-0 z-[60] bg-popover">
                 <div className="flex w-full items-start py-2 text-sm font-medium">{t.fsmScope}</div>
             </div>
             <div className="pt-1 pb-0">

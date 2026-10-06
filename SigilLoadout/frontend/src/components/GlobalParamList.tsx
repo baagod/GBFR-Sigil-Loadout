@@ -76,8 +76,10 @@ export function GlobalParamList({onOpen, selected, onLoaded, className}: {
                             (selected === table ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
                         }
                     >
-                        {/* 后缀 .msg 只是文件格式，对用户没意义（用户要求去掉）；传出去的仍是完整文件名。 */}
-                        {table.replace(/\.msg$/, "")}
+                        {/* 后缀只是文件格式与命名习惯，对用户没意义（用户要求去掉）：
+                            `.msg` 是格式，`param` / `parameter` 是这批表共有的尾巴（`guardparam` → `guard`、
+                            `playerlinkattackvoiceparameter` → `playerlinkattackvoice`）。传出去的仍是完整文件名。 */}
+                        {table.replace(/\.msg$/, "").replace(/param(eter)?$/, "")}
                     </div>
                 ))}
             </div>

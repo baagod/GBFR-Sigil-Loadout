@@ -256,9 +256,10 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
                 removed ? "bg-[#542526]" : ""
             }`}
         >
-            {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的 bg-background
-                —— 见下面 EditableCell 那条"可编辑格 #1a1a1a"。原来是写死的 bg-[#171717]，那是当时的弹窗底色。 */}
-            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-background"}`}>
+            {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的。
+                用 **bg-popover**（= 弹层自己的底色 #171717），不是 bg-background(#0a0a0a) —— 后者会让
+                这一列在 dialog 里显出一条比周围更深的色带（用户要求移除）。 */}
+            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-popover"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -615,19 +616,23 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                         （这里的 closeType 分不出"选中 / 点到别处"，所以自己记 `focusBackRef`。） */}
                     <ComboboxContent
                         anchor={cellRef}
+                        // sideOffset 默认是 6：弹层与锚点那一格之间会空出 6px。用户要求**留 3px**
+                        // （弹层上沿落在这一格下边框下面 3px 处，比默认更贴，但不完全贴死）。
+                        sideOffset={3}
                         finalFocus={() =>
                             focusBackRef.current ? (inputRef.current ?? btnRef.current ?? false) : false
                         }
                         className="w-max min-w-[22rem] max-w-[44rem]">
-                        {/* max-h：每项 26px（字号 14px 不缩，上下内边距各 3px：20 + 3×2；基类 py-1.5 = 6px，
-                            一路减到 py-[3px]），18rem = 288px 因此能放下 11 行（用户要求至少 10 行 ✓）。 */}
+                        {/* max-h：每项 28px（字号 14px 不缩，上下内边距各 4px：20 + 4×2；基类 py-1.5 = 6px，
+                            一路减到 py-[4px]，用户要求再各加 1px），18rem = 288px 因此能放下 10 行
+                            （用户要求至少 10 行 ✓）。 */}
                         <ComboboxList className="max-h-[18rem]">
                             {(option: string) => (
                                 // 一项**一行**，与单元格同一套排法（数值定宽槽 + 2 空格 + 含义灰）——
                                 // 上下对照着看时，两处的数值与含义在同一条竖线上。
-                                // 字号**不缩**（与单元格同为 14px）；紧凑靠内边距：基类 py-1.5 → py-[3px]
-                                // （上下各减 3px：32px → 26px）。组件没有 size 属性，只能这样在调用点压。
-                                <ComboboxItem key={option} value={option} className="py-[3px]">
+                                // 字号**不缩**（与单元格同为 14px）；紧凑靠内边距：基类 py-1.5 → py-[4px]
+                                // （上下各 4px：32px → 28px）。组件没有 size 属性，只能这样在调用点压。
+                                <ComboboxItem key={option} value={option} className="py-[4px]">
                                     <span className="flex items-baseline gap-2">
                                         <span className="w-21 shrink-0 text-left tabular-nums">{option}</span>
                                         <span className="whitespace-nowrap text-muted-foreground">{meaningOf(option)}</span>
@@ -678,9 +683,10 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                 removed ? "bg-[#542526]" : ""
             }`}
         >
-            {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的 bg-background
-                —— 见下面那句"可编辑格 #1a1a1a"。原来是写死的 bg-[#171717]，那是当时的弹窗底色。 */}
-            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-background"}`}>
+            {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的。
+                用 **bg-popover**（= 弹层自己的底色 #171717），不是 bg-background(#0a0a0a) —— 后者会让
+                这一列在 dialog 里显出一条比周围更深的色带（用户要求移除）。 */}
+            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-popover"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
