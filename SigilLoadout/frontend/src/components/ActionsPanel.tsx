@@ -122,7 +122,12 @@ const CELL_INPUT =
 // 高度**不用管**：它只有行盒那么高（20px），比 24px 的单元格内容区矮，而 td 的 `align-middle`
 // 正好把它居中——文字位置因此是对的。点击区不靠它，靠整个 td（见 EditableCell），所以不必给它
 // 写死高度：单元格行高将来变了也不会留出点不到的死区。
-const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-sm whitespace-nowrap"
+//
+// `outline-none` 不是随手加的：这一层是**可聚焦**的（tabIndex，见下面的 onFocus），而焦点环由所在的
+// `td` 画（style.css 的 cell-focus，`inset:-1px` 那圈）。Esc 退出编辑后焦点正好停在**这一层**上，
+// 浏览器那圈默认 outline（1px auto）就会额外画一遍，看着像格子里多了一层内边框 ✗（用户实测：
+// Flag0/1 没有、别的格子有）。压掉它，环仍然由 td 画 ✓。
+const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-sm whitespace-nowrap outline-none"
 
 /**
  * 一个可编辑的格：**平时是文本，点一下才变输入框**，回车或失焦提交。值没变就什么都不做——
@@ -161,6 +166,20 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
 }) {
     const [draft, setDraft] = useState(value)
     const [editing, setEditing] = useState(false)
+    /** 显示态那层文本（焦点环由 td 的 `:focus-within` 画，见 style.css 的 cell-focus）。 */
+    const textRef = useRef<HTMLDivElement>(null)
+    /**
+     * 程序化把焦点还给文本层时，别在 onFocus 里**又弹回编辑态**。
+     *
+     * 文本层的 onFocus 是"点一下 / Tab 进来就编辑"，而 Esc 退出编辑恰恰要把焦点放回它
+     * —— 没有这个开关就会自己把自己弹回去 ✗。
+     */
+    const skipFocusRef = useRef(false)
+    /**
+     * Esc 那条路自己收尾时用：紧接着 input 会失焦，**那一次 blur 不许提交**（Esc = 放弃草稿）。
+     * （Enter 走的还是 blur 那条唯一提交路径，只是不经这里。）
+     */
+    const skipCommitRef = useRef(false)
     /**
      * **进编辑态那一刻的值**：清空输入框时拿它当占位符。
      *
@@ -201,17 +220,29 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
              * 直接决定列宽：早先让输入框替换掉文本，`<input>` 默认的 `size=20`（约 110px）会把列
              * **顶宽**（点"结束"列 83px → 111px，其它列被挤窄，看着抖一下）；只给输入框压 `size`
              * 又反过来让列**缩窄**（该格是本列唯一最宽内容时，列缩到次宽内容，文字被裁）。两边都会
-             * 抖，所以干脆让文本一直在流里：编辑时设成 `invisible`（visibility: hidden 仍占位），
+             * 抖，所以干脆让文本一直在流里：编辑时设成 `opacity-0`（仍占位、且**仍可聚焦** —— 这一点是
+             * Esc 退编辑要用的，见下面；`invisible` 的 visibility:hidden 是不可聚焦的 ✗），
              * 输入框**绝对定位浮在它上面**。
              */}
             <div
+                ref={textRef}
                 // 编辑中这层被输入框盖住且不可见，就别再让它进 Tab 序列。
                 tabIndex={editing ? -1 : 0}
-                onFocus={() => { beforeEdit.current = value; setEditing(true) }}
+                // 不可见时别把同一份文本再塞进无障碍树（编辑态该读的是那个输入框）。
+                aria-hidden={editing || undefined}
+                onFocus={() => {
+                    // Esc 刚把焦点还回来：这一次不算"用户要编辑"。
+                    if (skipFocusRef.current) {
+                        skipFocusRef.current = false
+                        return
+                    }
+                    beforeEdit.current = value
+                    setEditing(true)
+                }}
                 onKeyDown={(e) => onCopy(e, false)}
                 className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
                     value === "" || unchanged ? "text-muted-foreground" : ""
-                } ${editing ? "invisible" : ""}`}
+                } ${editing ? "opacity-0" : ""}`}
             >
                 {shown}
             </div>
@@ -219,16 +250,49 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                 <Input
                     // autoFocus：点进来之后光标立刻可打字，不用再点第二下。
                     autoFocus
+                    // "这一格自己管 Esc"：外壳那记"Esc 收进托盘"因此让路（见 App.tsx）——
+                    // 动作表在主窗口里、轨表在详情弹窗里，两处都要靠这个标记。
+                    data-esc-own=""
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onBlur={() => {
                         setEditing(false)
+                        // Esc 那条路已经自己收过尾（焦点交给文本层、草稿丢掉）→ 这一次 blur 不提交。
+                        if (skipCommitRef.current) {
+                            skipCommitRef.current = false
+                            return
+                        }
                         if (draft !== value) onCommit(draft)
                     }}
                     onKeyDown={(e) => {
-                        // 回车提交：走 blur，保证只有一条提交路径。
+                        // 回车提交：焦点先交给本格文本层（它会触发上面那个 onBlur），
+                        // 于是**提交仍然只有 blur 那一条路** ✓，而焦点一刻都没离开这一格 →
+                        // 焦点环不闪（与 Esc 同一条收尾，只是这里要提交）。
                         if (e.key === "Enter") {
-                            e.currentTarget.blur()
+                            skipFocusRef.current = true
+                            textRef.current?.focus({preventScroll: true})
+                            return
+                        }
+                        /*
+                            Esc：**只退出编辑**（草稿丢掉 = 放弃这次改动），不提交、不关弹窗、不收窗口。
+                            ⚠️ 必须拦住冒泡：详情弹窗（Base UI Dialog）在 document 和自己的元素上都听
+                            Esc，不拦就会连弹窗一起关掉（用户实测：一格 Esc 关两层）；
+                            主窗口那记"Esc 收托盘"则靠 `data-esc-own`（它在**捕获阶段**跑，拦不住）。
+
+                            焦点**先**交给本格的文本层，再退编辑：焦点一刻都没离开这一格，
+                            `td` 的 `:focus-within` 因此不会闪 —— 焦点环**始终在**（用户要求：
+                            点进来有环、退出编辑后环还在，直到点到别的格子）。
+                            早先是"先退编辑、再双 rAF 把焦点抢回来"，那两帧里环会消失又出现 ✗（看着抖一下）。
+                            `preventScroll`：focus 顺手把表格滚一格也是一抖。
+                        */
+                        if (e.key === "Escape") {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            skipFocusRef.current = true // 这一次 focus 不算"用户要编辑"
+                            skipCommitRef.current = true // 紧接着的 blur 不提交（草稿要丢掉）
+                            textRef.current?.focus({preventScroll: true})
+                            setDraft(value) // 放弃草稿：下一次进编辑态是干净的原值
+                            setEditing(false)
                             return
                         }
                         onCopy(e, e.currentTarget.selectionStart !== e.currentTarget.selectionEnd)
