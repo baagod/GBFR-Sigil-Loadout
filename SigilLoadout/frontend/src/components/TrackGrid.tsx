@@ -697,7 +697,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
 function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onExtend, onEdit}: {
     row: FlagRow
     index: number
-    columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"}[]
+    columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"; align?: "center"}[]
     t: Messages
     selected: boolean
     /** 这一行与原表不同的列；null = 整行与原表一致（整行灰）。 */
@@ -775,8 +775,9 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                     return (
                         <td key={column.label} className={tdClassName}>
                             {/* 只读文本列（不走 EditableCell，所以得自己带上字号）：与可编辑格同为
-                                `text-base md:text-sm`（本窗口下 14px）—— 光靠表格那层 text-xs 会小一档 ✗。 */}
-                            <div className="px-1 py-0.5 text-base whitespace-nowrap md:text-sm">{column.text(row)}</div>
+                                `text-base md:text-sm`（本窗口下 14px）—— 光靠表格那层 text-xs 会小一档 ✗。
+                                `align: "center"` 的列（类型）跟表头一样居中。 */}
+                            <div className={"px-1 py-0.5 text-base whitespace-nowrap md:text-sm" + (column.align === "center" ? " text-center" : "")}>{column.text(row)}</div>
                         </td>
                     )
                 }
@@ -808,11 +809,15 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
     onReorder: (from: number, to: number) => void
 }) {
     const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
-    // 类型与帧是给人看的：类型是 1/0 翻成"触发/持续"，帧由结束时间算出来，都不直接改。
+    // 类型与帧是给人看的：类型按**文档定义**翻 `Config`（`1` = 触发 / `0` = 持续，
+    // 见 docs/action/Flags轨位定义与FSM接口.md:28），帧由结束时间算出来，都不直接改。
+    // ⚠️ 别把 Config 当位域：文档明确写的是 0/1，而数据里还有 `32769` 这种**意外值**
+    //（docs/action/角色动作探索汇总.md:151 记着它，:248 写着"含义未知"）—— 所以除了 0/1，
+    // 一律**把原值显示出来**（一眼看出是怪值），既不猜"触发"也不猜"持续"。
     // Flag0 / Flag1 是选值格：值本身可能编码好几个效果，所以含义就跟在同一个格子里，
     // 不再单开"Flag0效果 / Flag1效果"两列（那两列本来也不参与原值比较）。
-    const columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"}[] = [
-        {label: t.colConfig, key: "config", text: (row) => (row.config === "1" ? t.configTrigger : t.configContinuous)},
+    const columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"; align?: "center"}[] = [
+        {label: t.colConfig, key: "config", align: "center", text: (row) => (row.config === "1" ? t.configTrigger : row.config === "0" ? t.configContinuous : row.config)},
         {label: t.colStart, key: "startTime"},
         {label: t.colEnd, key: "endTime"},
         {label: t.colFrame, key: "endTime", text: frameOf},
