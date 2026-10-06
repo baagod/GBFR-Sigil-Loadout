@@ -99,7 +99,7 @@ const zh = {
     /** 掩码一位都没置（值 0）时，含义那一行显示什么。 */
     flagNone: "无",
     /** flag 下拉里搜索框的占位符：按**含义**搜（"闪避"、"重力"），不是按数字。 */
-    flagSearch: "搜索含义…",
+    flagSearch: "搜索",
     /** 行号那一列右半截的握把（拖着重排），以及复制/插入那两枚按钮。 */
     dragRow: "拖这里移动这一行",
     copySelected: "复制",
@@ -182,7 +182,7 @@ export const messages: Record<Lang, Messages> = {
         colFlag0: "Flag0",
         colFlag1: "Flag1",
         flagNone: "None",
-        flagSearch: "Search meaning…",
+        flagSearch: "Search",
         dragRow: "Drag here to move this row",
         copySelected: "Copy",
     cutSelected: "Cut",
@@ -257,7 +257,7 @@ export const messages: Record<Lang, Messages> = {
         colFlag0: "Flag0",
         colFlag1: "Flag1",
         flagNone: "なし",
-        flagSearch: "意味で検索…",
+        flagSearch: "検索",
         dragRow: "ここをドラッグしてこの行を移動",
         copySelected: "コピー",
     cutSelected: "切り取り",
@@ -332,7 +332,7 @@ export const messages: Record<Lang, Messages> = {
         colFlag0: "Flag0",
         colFlag1: "Flag1",
         flagNone: "없음",
-        flagSearch: "의미 검색…",
+        flagSearch: "검색",
         dragRow: "여기를 끌어서 이 행을 이동",
         copySelected: "복사",
     cutSelected: "잘라내기",

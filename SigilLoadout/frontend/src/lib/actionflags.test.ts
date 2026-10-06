@@ -28,15 +28,15 @@ describe("flag 取值下拉", () => {
         expect(FLAG1_VALUES.length).toBe(33)
         // 出现最多的那个组合与"一个字面值编码 5 个效果"这件事，一起钉住。
         expect(FLAG0_VALUES).toContain(8207)
-        expect(flagEffects("8207", FLAG0_NAMES).split(" + ").length).toBe(5)
+        expect(flagEffects("8207", FLAG0_NAMES).split(" | ").length).toBe(5)
     })
 
     it("单个位排在组合值前面，各自按数值升序", () => {
         const options = flagValueOptions("0", FLAG0_VALUES, FLAG0_NAMES)
         // 数据里是 91 个取值，再加上位定义表里有名字、但数据里没出现的两个单个位（bit19 / bit24）。
         expect(options.length).toBe(93)
-        expect(options).toContain("524288") // bit19 = 命中后触发branchAtkHit
-        expect(options).toContain("16777216") // bit24 = 允许X输入
+        expect(options).toContain("524288") // bit19 = 命中后触发 branchAtkHit
+        expect(options).toContain("16777216") // bit24 = 允许 X 输入
         // 2147483648 是 bit31（名字表只到 bit30，所以它没有名字）—— 它仍属"单个位"那一组，
         // 组合值 8207 必须排在它后面。
         expect(options.indexOf("2147483648")).toBeGreaterThan(-1)
@@ -62,18 +62,18 @@ describe("flag 取值下拉", () => {
 })
 
 describe("掩码翻译", () => {
-    it("置起来的位按 bit 号从小到大用 + 连起来", () => {
-        expect(flagEffects("10", FLAG0_NAMES)).toBe("允许连段至下一动作 + 允许跳跃取消")
-        expect(flagEffects("1", FLAG0_NAMES)).toBe("允许走路取消")
+    it("置起来的位按 bit 号从小到大用 | 连起来（两边各一个空格）", () => {
+        expect(flagEffects("10", FLAG0_NAMES)).toBe("允许连接动画 | 允许跳跃取消")
+        expect(flagEffects("1", FLAG0_NAMES)).toBe("允许移动取消")
         expect(flagEffects("4194304", FLAG1_NAMES)).toBe("允许格挡")
     })
 
-    it("没弄清含义的那一位写成 未知bitN，不藏起来", () => {
-        expect(flagEffects("16", FLAG0_NAMES)).toBe("未知bit4")
-        expect(flagEffects("256", FLAG1_NAMES)).toBe("未知bit8")
-        expect(flagEffects("134217728", FLAG1_NAMES)).toBe("未知bit27")
+    it("没弄清含义的那一位写成 bitN，不藏起来", () => {
+        expect(flagEffects("16", FLAG0_NAMES)).toBe("bit4")
+        expect(flagEffects("256", FLAG1_NAMES)).toBe("bit8")
+        expect(flagEffects("134217728", FLAG1_NAMES)).toBe("bit27")
         // bit27 在 Flag0 那张表里是有名字的（后端的 flag0Names[27] 就是这一条）。
-        expect(flagEffects("134217728", FLAG0_NAMES)).toBe("霸体·击退抗性")
+        expect(flagEffects("134217728", FLAG0_NAMES)).toBe("霸体")
     })
 
     it("没有位 / 不是数的写法都给空串", () => {
@@ -87,10 +87,14 @@ describe("掩码翻译", () => {
     it("两张表都是 32 位：位的下标就是表里的行号", () => {
         // 1 << 31 在 JS 位运算里会翻符号，所以这里必须按 32 位无符号比。
         expect(FLAG0_NAMES[11]).toBe("无敌帧")
+        expect(FLAG0_NAMES).toHaveLength(32) // 表必须是 32 条：少一条就会让那一位的描述变成空串
+        expect(FLAG1_NAMES).toHaveLength(32)
         expect(FLAG0_NAMES[30]).toBe("关闭后续攻击窗口")
         expect(FLAG1_NAMES[23]).toBe("格挡·招架判定帧")
-        expect(flagEffects("4294967295", FLAG0_NAMES).match(/未知bit/g)).toHaveLength(32 - 17)
-        expect(flagEffects("4294967295", FLAG1_NAMES).split(" + ")[31]).toBe("未知bit31")
+        // 全置起来时：16 条有名字、其余 16 条兜底成 bitN（bit31 那次就是因为表少一条而丢了描述）。
+        expect(flagEffects("4294967295", FLAG0_NAMES).match(/bit\d+/g)).toHaveLength(32 - 16)
+        expect(flagEffects("2147483648", FLAG0_NAMES)).toBe("bit31")
+        expect(flagEffects("4294967295", FLAG1_NAMES).split(" | ")[31]).toBe("bit31")
     })
 })
 

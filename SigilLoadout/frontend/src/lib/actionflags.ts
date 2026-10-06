@@ -11,13 +11,13 @@
     字段还在模型里，只是界面不再用它。
 */
 export const FLAG0_NAMES = [
-    "允许走路取消",
-    "允许连段至下一动作",
+    "允许移动取消",
+    "允许连接动画",
     "允许闪避",
     "允许跳跃取消",
     "",
-    "允许追加攻击命中",
-    "允许Y输入",
+    "允许攻击命中",
+    "允许 Y 输入",
     "",
     "",
     "",
@@ -27,21 +27,27 @@ export const FLAG0_NAMES = [
     "允许释放技能",
     "",
     "",
-    "重新启用重力",
+    "重启重力",
     "降低重力",
     "",
-    "命中后触发branchAtkHit",
+    "命中后触发 branchAtkHit",
     "",
     "",
     "拔出武器",
     "",
-    "允许X输入",
+    "允许 X 输入",
     "",
     "",
-    "霸体·击退抗性",
+    "霸体",
     "",
     "允许转身",
     "关闭后续攻击窗口",
+    /*
+        ⚠️ bit31 这一格**不能省**：掩码是 32 位，表少一条（原来只有 0..30）时 names[31] 是 undefined，
+        再被 Array.join 悄悄转成空串 —— 于是一格的值是 2147483648 时**描述整个是空的** ✗（踩过）。
+        Flag1 那张表本来就是 32 条，所以只有 Flag0 有这个毛病。
+    */
+    "",
 ] as const
 
 export const FLAG1_NAMES = [
@@ -80,7 +86,7 @@ export const FLAG1_NAMES = [
 ] as const
 
 /*
-    把掩码翻成含义：置起来的位按 bit 号从小到大用 " + " 连，一位都没有就是空串。
+    把掩码翻成含义：置起来的位按 bit 号从小到大用 " | " 连，一位都没有就是空串。
     认不出来的写法（这几格是文本框）当 0 处理——与后端 flagEffects 一样的规矩。
 */
 export function flagEffects(mask: string, names: readonly string[]): string {
@@ -90,9 +96,10 @@ export function flagEffects(mask: string, names: readonly string[]): string {
     for (let bit = 0; bit < names.length; bit++) {
         // 掩码是 32 位无符号，逐位比较而不是 parseInt 之后按位与：>2^31 的值在 JS 位运算里会翻符号。
         if (Math.floor(bits / 2 ** bit) % 2 === 0) continue
-        meanings.push(names[bit] === "" ? `未知bit${bit}` : names[bit])
+        const name = names[bit] ?? "" // 表万一短一条也别变成空描述：兜底成 bitN
+        meanings.push(name === "" ? `bit${bit}` : name)
     }
-    return meanings.join(" + ")
+    return meanings.join(" | ")
 }
 
 /** motion 的写法：**四位十六进制小写**（与后端 isMotion 同一套判据，值是拼进文件名的）。 */
@@ -188,8 +195,8 @@ export function collectRows<T>(rows: T[], range: RowRange): T[] {
 
     为什么不是"枚举所有组合"：掩码 32 位，组合有 2³² 个，而游戏自己只用了其中一小把 ——
     实测 8341 份 *flags.bxm 里 Flag0 只出现 91 个取值、Flag1 只出现 33 个，且其中
-    Flag0 有 64 个是**多位组合**（出现最多的 8207 = 允许走路取消 + 允许连段至下一动作 +
-    允许闪避 + 允许跳跃取消 + 允许释放技能，一个字面值编码 5 个效果）。
+    Flag0 有 64 个是**多位组合**（出现最多的 8207 = 允许移动取消 | 允许连接动画 |
+    允许闪避 | 允许跳跃取消 | 允许释放技能，一个字面值编码 5 个效果）。
 
     这不是第二个"真相源"（位定义表才是逻辑，这两张只是**取值清单**）：游戏更新后冒出没见过的
     组合也不会坏 —— flagValueOptions() 永远把当前值补进列表里，那一格照样能看能改。

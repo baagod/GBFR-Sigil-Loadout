@@ -1,3 +1,5 @@
+import {useEffect, useRef, useState} from "react"
+import {cn} from "cn"
 import {
     DndContext,
     PointerSensor,
@@ -26,7 +28,7 @@ import {Scissors} from "@phosphor-icons/react/Scissors"
 import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
 import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
-import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
+import {Combobox, ComboboxContent, ComboboxItem, ComboboxList} from "@/components/ui/combobox"
 import {EditableCell} from "@/components/ActionsPanel"
 import {FLAG0_NAMES, FLAG0_VALUES, FLAG1_NAMES, FLAG1_VALUES, flagEffects, flagValueOptions} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
@@ -205,7 +207,7 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
                 }}
                 // cursor-default：**要箭头，不要手**（与左边行号那半截一致）。刻意不用 cursor-grab ——
                 // 这一格只是"按住能拖"，按需求统一成普通箭头。
-                className={`flex w-8 shrink-0 cursor-default touch-none items-center justify-center border-l text-base leading-none text-muted-foreground/60 select-none md:text-sm ${
+                className={`flex w-8 shrink-0 cursor-default touch-none items-center justify-center text-base leading-none text-muted-foreground/60 select-none md:text-sm ${
                     dragging ? "opacity-40" : ""
                 }`}
             >
@@ -253,7 +255,7 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
                 removed ? "bg-[#542526]" : ""
             }`}
         >
-            <td className={`sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
+            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -319,12 +321,12 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
+                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
                                 {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
                                     表体里那条分隔竖线到表头就断了。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
-                                    <div className="w-8 shrink-0 border-l leading-6" />
+                                    <div className="w-8 shrink-0 leading-6" />
                                 </div>
                             </th>
                             {table.columns.map((column) => (
@@ -362,77 +364,177 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
 }
 
 /**
- * Flag0 / Flag1 那一格：只读两行（数值 / 含义），点开是一个**选值**的下拉。
+ * Flag0 / Flag1 那一格：**默认只是两行文字**（数值 / 含义），点一下才挂上那个选值的下拉。
+ *
+ * ⚠️ 别退回"每格一个 combobox"：这张表 17 行 × 2 列 = 34 格，每格都挂一个 Base UI Combobox
+ * 就是 34 份状态机 + 34 份 items 数组（每份 90 多项），而其中 33 份永远不会被点开 ✗。
+ * 现在 `open` 为真才渲染它，一张表同时最多一个实例。
  *
  * 为什么不是输入框：掩码是让人挑的，不是让人敲的 —— 一个格子里可能置着好几个位
  * （游戏数据里出现最多的 8207 = 5 个效果同时生效），敲数字既看不出含义，
  * 也容易敲出游戏里根本没出现过的组合。下拉列的是**值**（单个位在前、组合在后，见
  * flagValueOptions），选中就把那个字面值写进格子；含义是 flagEffects() 现算的，不落盘。
  *
- * 行高：两行 13px + 11px = 24px，与行号握把撑出来的那 24px 一样高，所以整张表的行高不变。
+ * 字号/字重：与同表里那些可编辑格**完全一致**（EditableCell 的 CELL_TEXT：`text-base md:text-sm`
+ * + `tabular-nums`）。⚠️ 只写 `text-xs` 会继承表格的 12px —— 比邻格（桌面下 14px）小一档，
+ * 看着就是"这一格的字更小" ✗。**一格一行**（数值 + 含义），所以行高由这一行撑回 25px 上下。
  */
-function FlagPickerCell({value, meaningOf, unchanged, options, searchPlaceholder, tdClassName, onCommit}: {
+function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}: {
     value: string
     /** 把一个取值翻成含义（0 显示成"无"）—— 列表每一项与格子里那行灰字都走它。 */
     meaningOf: (raw: string) => string
     unchanged: boolean
     options: string[]
-    searchPlaceholder: string
     tdClassName: string
     onCommit: (value: string) => void
 }) {
+    /**
+     * 弹层开合 + 查询串，**都由我们控**。设计要点：
+     *   · 静止时这一格就是**静态文本**（与 `EditableCell` 同款 ✓）—— 不为每格常驻输入框/按钮：
+     *     格子很多，常驻输入框会重 ✗
+     *   · 点一下 → **只在这一格**挂一个我们自己的 `<input>`（打字搜索就在这儿 ✓）
+     *   · 下拉只取组件的 `Popup / List / Item`，**不用它的 Input / Trigger**（Root 是状态与过滤的所有者，
+     *     那两个都是可选零件 ✓）；弹层用 `anchor` 锚到这一格 ✓（ComboboxContent 支持该 prop ✓）
+     *   · 过滤：我们的输入框 → 受控 `inputValue` → 组件自己过滤列表 ✓（搜索逻辑不用自己写 ✓）
+     */
+    const [open, setOpen] = useState(false)
+    const [query, setQuery] = useState("")
+    const cellRef = useRef<HTMLTableCellElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+    /**
+     * 打开后把焦点**从列表项抢回输入框**。
+     *
+     * 组件打开弹层时会 focus 列表里的项（`useListNavigation` 的 `runFocus`），于是用户打不了字、
+     * 输入框也没有"正在编辑"的样子 ✗（用户报的"输入状态不在"）。用**双 rAF** 等它那个 focusFrame
+     * 先跑完，再把焦点夺回来 ✓（**不全选** —— 全选会整段反色，用户否掉了 ✗）
+     */
+    useEffect(() => {
+        if (!open) return
+        let raf = requestAnimationFrame(() => {
+            raf = requestAnimationFrame(() => {
+                inputRef.current?.focus()
+            })
+        })
+        return () => cancelAnimationFrame(raf)
+    }, [open])
+
+    /** 静态态那个按钮（关闭后焦点回它，见 ComboboxContent 的 finalFocus）✓ */
+    const btnRef = useRef<HTMLButtonElement>(null)
+
+    // 一行：`数值`（**贴格子左边缘**，占一个定宽槽 w-21 = 84px）+ **2 个空格** + 描述。
+    //   4          允许闪避
+    //   1073741856  允许攻击命中
+    // 定宽槽是"描述对齐"的关键：数值长短不一，但槽宽固定，所以描述**都从同一个 x 起**。
+    // ⚠️ 槽宽要**正好等于最长那串数字**、不留余量：14px 的 tabular-nums 每位约 8.4px，10 位（如
+    // 1073741856 / 4294967295）= 84px = w-21 —— 这样最长那行的缝才正好是 2 个空格 ✓
+    // （给 96px 时最长那行的缝变成 20px ≈ 5 个空格，用户一眼看出"过宽了" ✗）。
+    //    · 数值**左对齐**（贴格子左边，用户明确要求 —— 右对齐时 Flag1 那一对看着像居中 ✗）
+    //    · 短数字后面的缝自然更宽，这是"描述对齐 + 数值靠左"的必然结果
+    //    · 若反过来用 justify-between（描述贴最右）→ 缝会被整格剩余宽度撑开（实测 29px ≈ 7 空格）✗
+    // 含义过长时**不截断**（用户要求单元格完整显示）：配套前提是表格用 `min-w-full`（不是 `w-full`），
+    // 列宽跟着内容走、不够宽就整表横向滚动，而不是把邻列挤扁（`w-full` 时踩过：开始/结束 被挤成 `0001` ✗）。
+    // 数值跟着"与原版逐格比较"灰/亮；含义恒灰。
+    // 落地上：那个 84px 槽就是 InputGroup 里的 **input**（w-21!），含义是它右边的 addon。
+    const lines = (
+        <span className={cn("flex items-baseline gap-2", unchanged && "text-muted-foreground")}>
+            <span className="w-21 shrink-0 text-left tabular-nums">{value}</span>
+            <span className="whitespace-nowrap text-muted-foreground">{meaningOf(value)}</span>
+        </span>
+    )
+    const buttonClass = "block w-full cursor-default px-1 py-0.5 text-left text-base tabular-nums md:text-sm"
+
     return (
-        <td className={tdClassName}>
+        // data-picker-open：下拉开着时焦点在 portal 里（不在这一格内），靠这个属性让 cell-focus 继续画焦点环。
+        <td ref={cellRef} className={tdClassName} data-picker-open={open ? "" : undefined}>
+            {/* Combobox 常驻（Root 很轻），但它的弹层只在 open 时才渲染 —— 静止态这一格与别的格子一样是静态文本 ✓ */}
             <Combobox
                 items={options}
-                // 空白值（数据里真有 Flag1 为空的轨）不在 options 里，给 null 免得回填不上。
-                value={options.includes(value) ? value : null}
-                autoHighlight
-                // 搜索按**含义**匹配（"闪避"、"重力"）：按数字搜没意义，而含义才是人记得住的东西。
-                itemToStringLabel={(option: string) => meaningOf(option)}
-                onValueChange={(next) => {
-                    if (next !== null && next !== value) onCommit(next)
-                }}
-            >
-                {/* 整格都是触发器：点一下展开、再点一下收起，由官方触发器自己管
-                    （与"角色动作"页那个"选择角色"combo 同一套，不需要我们翻 open 状态）。 */}
-                <ComboboxTrigger
-                    render={
-                        <button type="button" className="block w-full cursor-default px-1 py-0 text-left text-xs">
-                            <span
-                                className={`block leading-[13px] whitespace-nowrap ${
-                                    unchanged ? "text-muted-foreground" : ""
-                                }`}
-                            >
-                                {value}
-                            </span>
-                            {/* 含义行截断：位组合出来的含义能长到四十多个字符（8207 是 5 个效果），
-                                不截的话那一列会被撑到几百像素、把后面几列挤出屏幕。完整含义在弹层里看。 */}
-                            <span className="block max-w-[10rem] truncate text-[10px] leading-[11px] text-muted-foreground/70">
-                                {meaningOf(value)}
-                            </span>
-                        </button>
-                    }
-                />
-                {/* min-w：官方弹层宽度是跟着**锚点**（这一格）走的，而 flag 那一格只有几十像素宽，
-                    照原样弹出来放不下"允许走路取消 + 允许连段至下一动作 …"这种多效果含义。 */}
-                <ComboboxContent className="min-w-[22rem]">
-                    <ComboboxInput showTrigger={false} placeholder={searchPlaceholder}/>
-                    <ComboboxList className="max-h-[264px]">
-                        {(option: string) => (
-                            <ComboboxItem key={option} value={option}>
-                                {/* 列表项本身是 flex（右边还有对勾的位置），所以两行得自己包一层竖排。 */}
-                                <span className="flex flex-col">
-                                    <span className="leading-4">{option}</span>
-                                    <span className="text-xs leading-4 text-muted-foreground">
-                                        {meaningOf(option)}
+                    // 空白值（数据里真有 Flag1 为空的轨）不在 options 里，给 null 免得回填不上。
+                    value={options.includes(value) ? value : null}
+                    // 查询串受控：我们的输入框写它，组件拿它过滤列表 ✓（所以不需要组件的 Input ✓）
+                    inputValue={query}
+                    onInputValueChange={setQuery}
+                    open={open}
+                    // ⚠️ 也别加 autoHighlight：它会把**第一项**高亮并滚到顶部 ✗。
+                    // ⚠️ 这里返回**数值**（不是含义）：输入框显示的正是它 —— 于是点开前后单元格文本完全一致
+                    //（`32` 在输入框里、`允许转身` 在右侧 addon 里，位置与显示态一模一样）。代价：下拉的
+                    // 过滤按数值匹配（按含义搜就得让输入框显示含义，那样一点开文本就变了 ✗）。
+                    onValueChange={(next) => {
+                        // ⚠️ null = "当前没选中"（把输入框清空时 Base UI 就是这么回调的），**不是选了值**：
+                        // 这里不能关下拉/退编辑态，否则用户一清空就被踢出输入状态（用户明确要求保持 ✗）。
+                        if (next === null) return
+                        if (next !== value) onCommit(next)
+                        setOpen(false)
+                    }}
+                    onOpenChange={setOpen}
+                >
+                    {/* 单元格自己就是一个 **InputGroup**（官方 Combobox 的用法）：里面那个 input 是数值，
+                        含义作为 inline-end addon 跟在后面 —— 就是官方示例里 `12 results` 那个位置。
+                        ⚠️ 覆盖必须**打进内层**：ComboboxInput 内部是 `<InputGroup><InputGroupInput/></InputGroup>`，
+                        只写外层那串类治不了里面那个自带 h-9 / px-2.5 的表单控件（会变成一个大搜索框 ✗）。
+                        InputGroupAddon 靠 order-first / order-last 定位，所以 DOM 顺序不影响左右。 */}
+                    {/* 关着时：**整格**都是触发器（button 铺满 td，点边缘也算 ✓，焦点环/整格交互与原来一致）。
+                        开着时：换成输入框，在格子里打字过滤 —— 弹层里因此不放搜索框 ✓。
+                        关键点：那次"打开"的点击**落在组件自己的触发器上**，组件才收得到指针事件、
+                        才会把已选项滚进视野（见 menuOpen 的注释）；只把输入框当触发器会让可点区域缩成输入框 ✗。 */}
+                    {/* 开着时：我们的输入框（**84px 数值槽**）+ 右侧含义 —— 与静止态同一套排法、同一个 x ✓
+                        ⚠️ 三个坑（都被用户当场发现过）：
+                          · 只放输入框会把**含义弄丢** ✗ → 含义得自己再放一个 span ✓
+                          · 颜色**不能挂 `focus:`** —— 弹层一开组件的列表导航会把焦点抢到列表项上 ✗，
+                            输入框于是拿不到 focus 那个样式（"没变白" ✗）→ 它在编辑态恒为默认白字 ✓
+                          · 同理 `autoFocus` 会被抢走（"输入状态不在" ✗）→ 用上面那个 effect 抢回来 ✓ */}
+                    {open ? (
+                    <span className="flex items-baseline gap-2 px-1 py-0.5 text-base md:text-sm">
+                        <input
+                            ref={inputRef}
+                            // 值只放**占位符**、不放进 value：于是既没有"一进来就被全选"✗，第一下打字也不会接在数值后面 ✓
+                            // 占位符用**前景色** —— 看着就是"这一格的值"，不是灰提示 ✓
+                            value={query}
+                            placeholder={value}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Escape") setOpen(false)
+                            }}
+                            className="w-21 shrink-0 bg-transparent p-0 text-left text-base tabular-nums outline-none placeholder:text-foreground md:text-sm"
+                        />
+                        {/* ⚠️ 字号必须显式写（或由外层带上）：不写就继承表格的 `text-xs`(12px)，描述会比静止态小一档 ✗ */}
+                        <span className="whitespace-nowrap text-muted-foreground">{meaningOf(value)}</span>
+                    </span>
+                    ) : (
+                /* 静止态：与 `EditableCell` 一样的**静态文本**（数值占 84px 槽 + 2 空格 + 含义灰）✓
+                   点一下才进编辑态 —— 不常驻输入框/按钮（格子很多，常驻输入框会重 ✗） */
+                <button ref={btnRef} type="button" className={buttonClass} onClick={() => { setQuery(""); setOpen(true) }}>
+                    {lines}
+                </button>
+            )}
+                    {/* 弹层宽度跟着**内容**（w-max）：描述不截断，得让最长那项把弹层撑开；
+                        max-w 兜底，免得极端组合撑出屏。列表项内部也去掉了 truncate。 */}
+                    {/* finalFocus：关闭时焦点**回这一格**。这是组件自己的 API（`ComboboxPopup.finalFocus` ✓）。
+                        ⚠️ 不配它，组件会按默认规则"把焦点还给触发器" —— 可我们这套**没有它的触发器** ✗
+                        （弹层由我们自己那格文本按钮打开），于是它退而求其次 focus 文档里第一个可聚焦元素，
+                        有时就落到分区工具条的"添加"上 ✗（用户截图里那个 tooltip）。 */}
+                    <ComboboxContent
+                        anchor={cellRef}
+                        finalFocus={() => btnRef.current ?? null}
+                        className="w-max min-w-[22rem] max-w-[44rem]">
+                        {/* max-h：每项 26px（字号 14px 不缩，上下内边距各 3px：20 + 3×2；基类 py-1.5 = 6px，
+                            一路减到 py-[3px]），18rem = 288px 因此能放下 11 行（用户要求至少 10 行 ✓）。 */}
+                        <ComboboxList className="max-h-[18rem]">
+                            {(option: string) => (
+                                // 一项**一行**，与单元格同一套排法（数值定宽槽 + 2 空格 + 含义灰）——
+                                // 上下对照着看时，两处的数值与含义在同一条竖线上。
+                                // 字号**不缩**（与单元格同为 14px）；紧凑靠内边距：基类 py-1.5 → py-[3px]
+                                // （上下各减 3px：32px → 26px）。组件没有 size 属性，只能这样在调用点压。
+                                <ComboboxItem key={option} value={option} className="py-[3px]">
+                                    <span className="flex items-baseline gap-2">
+                                        <span className="w-21 shrink-0 text-left tabular-nums">{option}</span>
+                                        <span className="whitespace-nowrap text-muted-foreground">{meaningOf(option)}</span>
                                     </span>
-                                </span>
-                            </ComboboxItem>
-                        )}
-                    </ComboboxList>
-                </ComboboxContent>
-            </Combobox>
+                                </ComboboxItem>
+                            )}
+                        </ComboboxList>
+                    </ComboboxContent>
+                </Combobox>
         </td>
     )
 }
@@ -474,7 +576,7 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                 removed ? "bg-[#542526]" : ""
             }`}
         >
-            <td className={`sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
+            <td className={`handle-divider sticky left-0 z-40 w-[68px] border-r border-b p-0 ${removed ? "bg-[#542526]" : "bg-[#171717]"}`}>
                 <RowHandle
                     index={index}
                     selected={selected}
@@ -495,7 +597,7 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                     const values = column.picker === "flag0" ? FLAG0_VALUES : FLAG1_VALUES
                     const raw = String(row[column.key] ?? "")
                     return (
-                        <FlagPickerCell
+                        <FlagCell
                             key={column.label}
                             value={raw}
                             meaningOf={(value) => {
@@ -505,7 +607,6 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                             }}
                             unchanged={!diff || !diff.has(String(column.key))}
                             options={flagValueOptions(raw, values, names)}
-                            searchPlaceholder={t.flagSearch}
                             tdClassName={tdClassName}
                             onCommit={(value) => onEdit(column.key, value)}
                         />
@@ -578,11 +679,11 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
                     <thead>
                         <tr>
-                            <th className="sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
+                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#171717] p-0 text-center font-medium">
                                 {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
                                 <div className="flex items-stretch">
                                     <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
-                                    <div className="w-8 shrink-0 border-l leading-6" />
+                                    <div className="w-8 shrink-0 leading-6" />
                                 </div>
                             </th>
                             {columns.map((column) => (

@@ -24,7 +24,7 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useEffect, useMemo, useState} from "react"
+import {memo, useEffect, useMemo, useRef, useState} from "react"
 
 import {
     ActionIDs,
@@ -161,6 +161,16 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
 }) {
     const [draft, setDraft] = useState(value)
     const [editing, setEditing] = useState(false)
+    /**
+     * **进编辑态那一刻的值**：清空输入框时拿它当占位符。
+     *
+     * 为什么需要它：`placeholder` 只有动作表那几张会给（那是后端的"原值"模型），轨表这些格子的
+     * `value` 就是当前值、没有原值可传 —— 于是清空输入框后要**等失焦提交**（提交时后端会把空串
+     * 还原成原值）才看着"占位符回来了" ✗。这里就地记一份，清空即显示 ✓。
+     * 对**没改过**的格子，这个值就等于游戏原值 ✓；对已经改过一次的格子，它是那次改动后的值（略有偏差，
+     * 想要严格等于原值就得把 baseline 从弹层穿透到每个格子）。
+     */
+    const beforeEdit = useRef(value)
     // 没在编辑的格子跟着外部值走：别处保存完、重读回来的新值要上屏。
     if (!editing && draft !== value) setDraft(value)
 
@@ -183,7 +193,7 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
 
     // 双击挂在 td 上：它两个状态下都不换（早先是挂在 display:contents 那层上兜住 div↔input 的切换）。
     return (
-        <td className={tdClassName} onClick={() => setEditing(true)} onDoubleClick={onDoubleClick}>
+        <td className={tdClassName} onClick={() => { beforeEdit.current = value; setEditing(true) }} onDoubleClick={onDoubleClick}>
             {/*
              * 显示态那段文本**两个状态下都留在流里**——它才是列宽的唯一来源。
              *
@@ -197,7 +207,7 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
             <div
                 // 编辑中这层被输入框盖住且不可见，就别再让它进 Tab 序列。
                 tabIndex={editing ? -1 : 0}
-                onFocus={() => setEditing(true)}
+                onFocus={() => { beforeEdit.current = value; setEditing(true) }}
                 onKeyDown={(e) => onCopy(e, false)}
                 className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
                     value === "" || unchanged ? "text-muted-foreground" : ""
@@ -233,7 +243,9 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                         const input = e.currentTarget
                         if (input.selectionStart === input.selectionEnd) input.select()
                     }}
-                    placeholder={placeholder}
+                    // 空值时显示占位符：动作表给的是后端原值；轨表没给，就退回"进编辑前的那个值"，
+                    // 于是**一清空就立刻看到灰字**，不必等失焦 ✓
+                    placeholder={placeholder ?? beforeEdit.current}
                     // inset-0 + h-auto：脱离文档流（固有宽度不参与列宽计算），并向四边拉伸铺满格子。
                     // h-auto! 必须写 —— Input 基类自带 h-9（36px），四边都定位时 height 不是 auto 就会
                     // 忽略 bottom、按 36px 渲染。拉伸后高度自然跟随单元格，不必写死 24px。

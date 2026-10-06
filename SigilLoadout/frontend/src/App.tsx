@@ -300,12 +300,28 @@ export default function App() {
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined
         let overlayEscOnKeyDown = false
+        /**
+         * Esc 归谁。
+         *
+         * ⚠️ 判定**不能只看 `e.target`**：弹窗自己的焦点管理有可能谁都没聚焦（焦点在 `<body>` 上），
+         * 这时 `target.closest(...)` 是 null ✗ → 误判成"不在浮层"，keyup 之后 150ms 把主窗口收进托盘 ✗。
+         * 用户实测的时序正是这条：**按下 Esc 弹窗关掉、主窗口还在；松开 Esc 才隐藏** ✓（那是 keyup 里的计时器 ✓）。
+         * 所以再补一条**文档状态**判断：只要文档里还挂着模态/浮层，这次 Esc 就不归"隐藏窗口"管 ✓。
+         */
+        const hasOverlay = () =>
+            !!document.querySelector(
+                '[data-slot="combobox-content"], [data-picker-open], [role="dialog"], [role="alertdialog"]'
+            )
         const isInOverlay = (e: KeyboardEvent) =>
-            !!(e.target as HTMLElement | null)?.closest?.(
+            !!((e.target as HTMLElement | null)?.closest?.(
                 // Esc 归谁：打开的浮层，以及两个编辑页里的数值框——那两页把 Esc 定义成"放开这个框"
                 // （见 SkillRow 与 LimitBonusEditorPanel），不该同时把整个窗口藏到托盘去。
-                '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], .skill-rows input, .ability-rows input'
-            )
+                //
+                // ⚠️ `[data-picker-open]` 必须留着：flag 单元格的下拉开着时，焦点在**我们自己的 input** 上，
+                // 而它在 `<td>` 里、**不在 portal 的弹层里** ✗ —— 只按 combobox-content 判会把这次 Esc
+                // 误判成"不在浮层"，于是连窗口一起藏掉 ✗（用户报的"按 esc 把主窗口也隐藏了"）。
+                '[data-slot="combobox-content"], [data-picker-open], [role="dialog"], [role="alertdialog"], .skill-rows input, .ability-rows input'
+            ) || hasOverlay())
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return
             // 两条路都赋值：丢一次 keyup 不能把下一次 Esc 也吞掉。

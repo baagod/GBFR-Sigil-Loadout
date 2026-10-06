@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from "react"
+import {Fragment, useEffect, useMemo, useRef, useState} from "react"
 import {arrayMove} from "@dnd-kit/sortable"
 import {
     LoadFlags,
@@ -478,11 +478,16 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         {infos.map((info) => {
             const key = trackKey(info)
             const count = info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0)
+            // ⚠️ 标题**不能包在分区那个 div 里**：sticky 只在自己父元素的范围内吸顶 —— 包进去的话，
+            // 分区一结束标题就被自己的分区顶着往上走，上半截被滚动容器上沿切掉，露出一行半截字 ✗。
+            // 提出来做**滚动容器的直接子元素**（Fragment 不生成节点），标题就永远钉在顶部；下一个标题
+            // 上来时靠"同 z-index、DOM 在后"盖住它 ✓（各平台的分节列表就是这么做的）。
             return (
-                <div key={key} className="not-last:border-b">
+                <Fragment key={key}>
                     {/* 标题与工具条包在**同一个 sticky 容器**里：工具条是绝对定位叠上去的，不参与这行排版，
                         所以只钉标题会把按钮留在地上。z-[60] **必须高过表格里所有吸顶格**（表头 "#" 是 50、
-                        表体 "#" 是 40、焦点框是 30）—— 给 30 时表体会画到标题上面（实测把标题整个盖住）。 */}
+                        表体 "#" 是 40、焦点框是 30）—— 给 30 时表体会画到标题上面（实测把标题整个盖住）。
+                        ⚠️ 分区之间**不画分隔线**（原来这里是 `not-last:border-b`）：用户要求全去掉。 */}
                     <div className="sticky top-0 z-[60] bg-popover">
                         <div className="flex w-full items-start py-2 text-left text-sm font-medium">
                             <span className="flex w-full items-baseline gap-1.5">
@@ -492,7 +497,12 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 )}
                             </span>
                         </div>
-                        <div className="absolute right-10 top-2 flex h-4 items-center">
+                        {/* 工具条容器：绝对定位叠在箭头左边（40px = 箭头 16 + 基类 mr-1.5 + 间隙）。
+                            `inset-y-0 + items-center`：让按钮组在**这一行的高度里**居中，与标题文字同一中心线
+                            （实测两者的中心都落在这行的 18px 处）。以前写死 `top-2 h-4`：那是按"8px 内边距 +
+                            16px 高"算的，而这行高 36、中心在 18 —— 按钮组一直比标题高 2px ✗。
+                            绝对定位不参与排版，所以它多高都不会把这行撑高。 */}
+                        <div className="absolute inset-y-0 right-10 flex items-center">
                             <TrackToolbar
                                 t={t}
                                 canCopy={count > 0}
@@ -532,14 +542,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                             />
                         )}
                     </div>
-                </div>
+                </Fragment>
             )
         })}
 
-        {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。 */}
-        <div className="not-last:border-b">
-            {/* FSM 这块没有按钮组，但**外面这层 div 不能省**：sticky 只能在父元素范围内吸顶。 */}
-            <div className="sticky top-0 z-[60] bg-popover">
+        {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。
+            标题与内容**不包一层 div**（同上面几条轨）：包起来 sticky 就只能在那一块里吸顶、离场时露半截。 */}
+        <div className="sticky top-0 z-[60] bg-popover">
                 <div className="flex w-full items-start py-2 text-sm font-medium">{t.fsmScope}</div>
             </div>
             <div className="pt-1 pb-0">
@@ -575,7 +584,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                     </div>
                 )}
             </div>
-        </div>
         </>
     )
 
@@ -587,6 +595,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 2) `max-w-full` 兜住更小的窗口（此时弹层铺满、不溢出）。 */}
             <DialogContent
                 showCloseButton={false}
+                /**
+                 * ⚠️ `initialFocus={() => false}`：弹窗默认会 focus **里面第一个可聚焦元素** ✗ ——
+                 * 那就是分区工具条的"添加"按钮，于是"点单元格 → Esc → 关掉 → 再点同一个号"就把焦点
+                 * 甩到它头上 ✗（用户截图）。返回 `false` = 不抢焦点，焦点留在打开它的那个号上 ✓
+                 * （这是 Base UI `DialogPopup` 自带的 prop，见 DialogPopup.d.ts:24 ✓）
+                 */
+                initialFocus={() => false}
                 className="flex max-h-[88vh] w-[836px] max-w-full flex-col sm:max-w-[836px]"
             >
                 <DialogHeader>

@@ -182,6 +182,29 @@
     ⚠️ `& *` 是同权重（0,1,0）压住表内所有元素：**表内任何单独的边框色都会被它吃掉**（谁在后谁赢，
     而这条通常在后）。要给某一格单独上色，得先把它改成更精确的选择器。
 */
+/*
+    行号格里那条分隔线（数字 | 握把）。
+
+    ⚠️ 别改回"给握把那半截加 border-l"：那两半的高度靠 `h-full`（百分比），而**表格里百分比高度
+    解析不可靠** —— 行高正好由行号格自己撑（24px）时看着是通的；一旦行高由别处撑起（flags 表现在是
+    两行格子撑 45px），那半截还是 24px，线就断成一段段（实测：tr/td 45px、内层与两半都是 24px）。
+    画在 td 的伪元素上就没有这个问题：`inset: 0` 跟着整格走，也不参与排版。
+
+    left: 36px = w-9（数字那半截的宽度，见 RowHandle）；表头那一格用同一个宽度对齐。
+*/
+@utility handle-divider {
+    &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 36px;
+        width: 1px;
+        background-color: var(--input);
+        pointer-events: none;
+    }
+}
+
 @utility table-border {
     border-color: var(--input);
 
@@ -216,11 +239,18 @@
 @utility cell-focus {
     position: relative;
 
-    &:focus-within {
+    /*
+        `[data-picker-open]`：下拉弹出时焦点**跑进了 portal**（弹层挂在 body 上，不在这一格里面），
+        于是 `:focus-within` 不再成立、环会消失 —— 那一格自己挂上这个属性，环照画。
+        两处（z-index 与环）都要带，否则环会被吸顶列盖住。
+    */
+    &:focus-within,
+    &[data-picker-open] {
         z-index: 30;
     }
 
-    &:focus-within::after {
+    &:focus-within::after,
+    &[data-picker-open]::after {
         content: "";
         position: absolute;
         inset: -1px;
@@ -234,11 +264,13 @@
         没有格线时它就越过表格边缘 1px：**点一下最后一列，容器会平白冒出一条横向滚动条**。
         这两条把环压回格子内（右/下各收 1px，其余三边照旧）。
     */
-    &:last-child:focus-within::after {
+    &:last-child:focus-within::after,
+    &:last-child[data-picker-open]::after {
         right: 0;
     }
 
-    tr:last-child > &:focus-within::after {
+    tr:last-child > &:focus-within::after,
+    tr:last-child > &[data-picker-open]::after {
         bottom: 0;
     }
 }
