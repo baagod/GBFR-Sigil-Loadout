@@ -234,20 +234,24 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 		t.Fatalf("SaveActionFields（清空）: %v", err)
 	}
 
-	deployed, err := loadActionTable(filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg"))
+	// 清空这一格 = 回原值。它是这张表**唯一**的改动 → 整张表与原表数值一致：mod 里那份产物被清掉
+	// （游戏回去读它自己的原表 —— 那里面当然就是原值，这正是这条测试要证的事，见 actionprune.go）。
+	deployedPath := filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg")
+	if _, err := os.Stat(deployedPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("清空之后这张表与原表一致，mod 里不该再留着产物（err=%v）", err)
+	}
+	actions, err = service.LoadActions()
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := recordByID(deployed, "6")
-	if record == nil {
-		t.Fatal("部署出去的表里没有 id_ = 6")
+	cleared := ""
+	for _, action := range actions {
+		if action.ID == "6" {
+			cleared = fieldValue(action, "abilityChargeTime_")
+		}
 	}
-	got, err := actionFieldValue(record.entry("abilityChargeTime_"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != original {
-		t.Fatalf("清空后部署出去的是 %q，want 原值 %q", got, original)
+	if cleared != original {
+		t.Fatalf("清空后这一格显示的是 %q，want 原值 %q", cleared, original)
 	}
 }
 
@@ -621,13 +625,10 @@ func TestSaveActionFieldsKeepsUntouchedBytes(t *testing.T) {
 		t.Fatalf("原样写回却改了文件（在第 %d 个字节起不一样，共 %d 字节）", diffBytes(before, after), len(before))
 	}
 
+	// 原样写回 = 与原表一致：mod 里**不该**有产物（没改动就不部署，见 actionprune.go）。
 	deployed := filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg")
-	got, err := os.ReadFile(deployed)
-	if err != nil {
-		t.Fatalf("没部署到 mod 目录: %v", err)
-	}
-	if !bytes.Equal(got, before) {
-		t.Fatal("部署到 mod 的与源文件不是同一份字节")
+	if _, err := os.Stat(deployed); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("原样写回却把动作表部署出去了（err=%v）", err)
 	}
 }
 
@@ -725,7 +726,7 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	want := FlagRow{
 		Index: 0, Config: "1", StartTime: "0.000000", EndTime: "0.016667",
 		LayerFlag: "4294967295", Flag0: "32", Flag1: "0", SysFlag: "0", FreeArg: "0 0 0 0",
-		Flag0Effects: "允许追加攻击命中", Flag1Effects: "",
+		Flag0Effects: "允许攻击命中", Flag1Effects: "",
 	}
 	if first != want {
 		t.Fatalf("第一行解成了 %+v，want %+v", first, want)
@@ -738,7 +739,7 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 		{5, "允许释放技能", ""},
 		{3, "", "消耗技能充能"},
 		{4, "", "未知bit27"},
-		{8, "允许走路取消", ""},
+		{8, "允许移动取消", ""},
 	} {
 		if got := rows[tc.index].Flag0Effects; got != tc.flag0 {
 			t.Fatalf("第 %d 行的 Flag0Effects = %q，want %q", tc.index+1, got, tc.flag0)
@@ -766,8 +767,8 @@ func TestFlagEffectsTranslatesTheMask(t *testing.T) {
 		{"0", flag0Names, ""},
 		{"", flag0Names, ""},
 		{"abc", flag0Names, ""},
-		{"1", flag0Names, "允许走路取消"},
-		{"10", flag0Names, "允许连段至下一动作 + 允许跳跃取消"},
+		{"1", flag0Names, "允许移动取消"},
+		{"10", flag0Names, "允许连接动画 + 允许跳跃取消"},
 		{"16", flag0Names, "未知bit4"},
 		{"8192", flag0Names, "允许释放技能"},
 		{"256", flag1Names, "未知bit8"},
@@ -954,7 +955,8 @@ func toolForTest(t *testing.T) string {
 	return devPath
 }
 
-// Deploy：动作表总是搬；flags 轨只搬这次会话改过的 motion（别的 motion 一份都不该出现在 mod 里）。
+// Deploy：没改过的动作表**不搬**（与原表一致就不留产物，见 actionprune.go）；
+// flags 轨只搬这次会话真改过的 motion（别的 motion 一份都不该出现在 mod 里）。
 func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
 	sampleActionTable(t, cfg)
@@ -966,8 +968,8 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 		t.Fatalf("Deploy: %v", err)
 	}
 	actionDst := filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg")
-	if _, err := os.Stat(actionDst); err != nil {
-		t.Fatalf("动作表没部署过去: %v", err)
+	if _, err := os.Stat(actionDst); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("一次都没改过，动作表却部署过去了（err=%v）", err)
 	}
 	if _, err := os.Stat(filepath.Join(modDir, "pl")); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("一次都没改过，却搬了 flags 轨过去")
@@ -976,6 +978,13 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	rows, err := service.LoadFlags("3451")
 	if err != nil {
 		t.Fatal(err)
+	}
+	// **真改一个值**：只"打开又保存"不算改动（那种情况与原表逐字节相同，同样会被清掉），
+	// 不改成实际不同的值就测不出"只搬碰过的 motion"这一条。
+	if rows[0].Flag0 == "0" {
+		rows[0].Flag0 = "1"
+	} else {
+		rows[0].Flag0 = "0"
 	}
 	if err := service.SaveFlags("3451", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)

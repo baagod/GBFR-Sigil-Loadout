@@ -37,7 +37,7 @@ const CELL_INPUT =
 // `td` 画（style.css 的 cell-focus，`inset:-1px` 那圈）。Esc 退出编辑后焦点正好停在**这一层**上，
 // 浏览器那圈默认 outline（1px auto）就会额外画一遍，看着像格子里多了一层内边框 ✗（用户实测：
 // Flag0/1 没有、别的格子有）。压掉它，环仍然由 td 画 ✓。
-const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-sm whitespace-nowrap outline-none"
+export const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md:text-sm whitespace-nowrap outline-none"
 
 /**
  * 一个可编辑的格：**平时是文本，点一下才变输入框**，回车或失焦提交。值没变就什么都不做——

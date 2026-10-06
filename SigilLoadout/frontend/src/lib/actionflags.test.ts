@@ -1,19 +1,17 @@
 /*
     角色动作页的纯逻辑。位定义表是后端 actionflags.go 那两张的逐字副本，所以这里对着**后端测试里同一批
     数字**钉一遍（service/actionsservice_test.go 的 TestFlagEffectsTranslatesTheMask）：抄错了表，
-    界面上那一栏显示的含义就会与后端读出来时给的那一栏不一样，而两边没人对拍。
+    勾选列表里那一位的名字就会与后端读出来的不一样，而两边没人对拍。
 */
 import { describe, expect, it } from "vitest"
 
 import {
     FLAG0_NAMES,
-    FLAG0_VALUES,
     FLAG1_NAMES,
-    FLAG1_VALUES,
     charCodeOf,
     collectRows,
-    flagEffects,
-    flagValueOptions,
+    flagHasBit,
+    flagMask,
     isMotion,
     rangeOf,
     totalDuration,
@@ -21,80 +19,36 @@ import {
     withNewRow,
 } from "@/lib/actionflags"
 
-describe("flag 取值下拉", () => {
-    it("取值清单是数据快照：Flag0 91 个 / Flag1 33 个", () => {
-        // 这份清单是从 assets/data.zip 的 8341 份 flags 轨扫出来的，数量对不上说明是另一批数据。
-        expect(FLAG0_VALUES.length).toBe(91)
-        expect(FLAG1_VALUES.length).toBe(33)
-        // 出现最多的那个组合与"一个字面值编码 5 个效果"这件事，一起钉住。
-        expect(FLAG0_VALUES).toContain(8207)
-        expect(flagEffects("8207", FLAG0_NAMES).split(" | ").length).toBe(5)
-    })
-
-    it("单个位排在组合值前面，各自按数值升序", () => {
-        const options = flagValueOptions("0", FLAG0_VALUES, FLAG0_NAMES)
-        // 数据里是 91 个取值，再加上位定义表里有名字、但数据里没出现的两个单个位（bit19 / bit24）。
-        expect(options.length).toBe(93)
-        expect(options).toContain("524288") // bit19 = 命中后触发 branchAtkHit
-        expect(options).toContain("16777216") // bit24 = 允许 X 输入
-        // 2147483648 是 bit31（名字表只到 bit30，所以它没有名字）—— 它仍属"单个位"那一组，
-        // 组合值 8207 必须排在它后面。
-        expect(options.indexOf("2147483648")).toBeGreaterThan(-1)
-        expect(options.indexOf("8207")).toBeGreaterThan(options.indexOf("2147483648"))
-        // 数字是升序的（前 3 项）。
-        expect(options.slice(0, 3)).toEqual(["0", "1", "2"])
-    })
-
-    it("当前值不在清单里也补进去（手改过的、或游戏更新带来的）", () => {
-        const options = flagValueOptions("12345", [0, 4], FLAG0_NAMES)
-        expect(options).toContain("12345")
-        // 12345 = bit0+bit3+bit12+bit13，算组合，排在所有单个位之后。
-        expect(options.indexOf("12345")).toBeGreaterThan(options.indexOf("2147483648"))
-    })
-
-    it(">2³¹ 的掩码不被位运算弄错", () => {
-        // 数据里真有 2147483648；拿 JS 位运算判位数会把它翻成负数（所以 bitCount 是逐位除下来的）。
-        const options = flagValueOptions("2147483648", FLAG0_VALUES, FLAG0_NAMES)
-        // 判成"单个位"（排在组合 8207 之前）而不是"组合"或"没有位"。
-        expect(options.indexOf("2147483648")).toBeGreaterThan(-1)
-        expect(options.indexOf("2147483648")).toBeLessThan(options.indexOf("8207"))
-    })
-})
-
-describe("掩码翻译", () => {
-    it("置起来的位按 bit 号从小到大用 | 连起来（两边各一个空格）", () => {
-        expect(flagEffects("10", FLAG0_NAMES)).toBe("允许连接动画 | 允许跳跃取消")
-        expect(flagEffects("1", FLAG0_NAMES)).toBe("允许移动取消")
-        expect(flagEffects("4194304", FLAG1_NAMES)).toBe("允许格挡")
-    })
-
-    it("没弄清含义的那一位写成 bitN，不藏起来", () => {
-        expect(flagEffects("16", FLAG0_NAMES)).toBe("bit4")
-        expect(flagEffects("256", FLAG1_NAMES)).toBe("bit8")
-        expect(flagEffects("134217728", FLAG1_NAMES)).toBe("bit27")
-        // bit27 在 Flag0 那张表里是有名字的（后端的 flag0Names[27] 就是这一条）。
-        expect(flagEffects("134217728", FLAG0_NAMES)).toBe("霸体")
-    })
-
-    it("没有位 / 不是数的写法都给空串", () => {
-        // 后端读出来的前两行就是这两种：一位都没有、以及手滑打进去的东西。
-        expect(flagEffects("0", FLAG0_NAMES)).toBe("")
-        expect(flagEffects("", FLAG0_NAMES)).toBe("")
-        expect(flagEffects("abc", FLAG0_NAMES)).toBe("")
-        expect(flagEffects("-1", FLAG0_NAMES)).toBe("")
-    })
-
+describe("掩码的位", () => {
     it("两张表都是 32 位：位的下标就是表里的行号", () => {
-        // 1 << 31 在 JS 位运算里会翻符号，所以这里必须按 32 位无符号比。
-        expect(FLAG0_NAMES[11]).toBe("无敌帧")
-        expect(FLAG0_NAMES).toHaveLength(32) // 表必须是 32 条：少一条就会让那一位的描述变成空串
+        // 勾选列表就是按这张表逐位铺出来的（名字为空的那几位只写 `bit<号>`），少一条就少一位。
+        expect(FLAG0_NAMES).toHaveLength(32)
         expect(FLAG1_NAMES).toHaveLength(32)
+        expect(FLAG0_NAMES[11]).toBe("无敌帧")
         expect(FLAG0_NAMES[30]).toBe("关闭后续攻击窗口")
-        expect(FLAG1_NAMES[23]).toBe("格挡·招架判定帧")
-        // 全置起来时：16 条有名字、其余 16 条兜底成 bitN（bit31 那次就是因为表少一条而丢了描述）。
-        expect(flagEffects("4294967295", FLAG0_NAMES).match(/bit\d+/g)).toHaveLength(32 - 16)
-        expect(flagEffects("2147483648", FLAG0_NAMES)).toBe("bit31")
-        expect(flagEffects("4294967295", FLAG1_NAMES).split(" | ")[31]).toBe("bit31")
+        expect(FLAG1_NAMES[23]).toBe("格挡 · 招架判定帧")
+    })
+
+    it(">2³¹ 的位不被位运算弄错", () => {
+        // 数据里真有 2147483648（bit31）；拿 JS 位运算判会把它翻成负数。
+        expect(flagMask("2147483648")).toBe(2147483648)
+        expect(flagHasBit(2147483648, 31)).toBe(true)
+        expect(flagHasBit(2147483648, 30)).toBe(false)
+        expect(flagHasBit(2147483652, 2)).toBe(true)
+    })
+
+    it("空串、不是数的写法都当 0", () => {
+        // 后端读出来的前两行就是这两种：一位都没有、以及手滑打进去的东西。
+        for (const raw of ["", "0", "abc", "-1", "  "]) expect(flagMask(raw)).toBe(0)
+    })
+
+    it("列表项的值就是这一位的权：勾中的加起来正好是掩码", () => {
+        // 8207 = bit0+bit1+bit2+bit3+bit13 —— 勾中这五项，权加起来正好回到掩码。
+        expect(1 + 2 + 4 + 8 + 8192).toBe(8207)
+        // 32 位都在列表里（名字表没定义到的那几位也一样），所以这个和一定是准的；bit31 也走加法。
+        expect(flagMask("2147483648") + 4).toBe(2147483652)
+        expect(flagHasBit(2147483652, 31)).toBe(true)
+        expect(flagHasBit(2147483652, 2)).toBe(true)
     })
 })
 

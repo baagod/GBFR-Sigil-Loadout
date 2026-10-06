@@ -13,7 +13,7 @@ import {SortableContext, useSortable, verticalListSortingStrategy} from "@dnd-ki
 import type {FlagRow, TrackRow, TrackTable} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
 import {EditableCell} from "@/components/EditableCell"
-import {FLAG0_NAMES, FLAG0_VALUES, FLAG1_NAMES, FLAG1_VALUES, flagEffects, flagValueOptions} from "@/lib/actionflags"
+import {FLAG0_NAMES, FLAG1_NAMES} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -309,20 +309,15 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                 // 叠在什么底色上就跟着漂；弹窗底色一改成默认那个 #0a0a0a 就不再是同一个颜色了）。
                 const tdClassName = `border-r border-b p-0 cell-focus ${removed ? "" : "bg-[#1a1a1a]"}`
                 if (column.picker) {
+                    // 位定义表：下标就是位号。格子里只有数值，含义在勾选列表里逐项给（见 FlagCell）。
                     const names = column.picker === "flag0" ? FLAG0_NAMES : FLAG1_NAMES
-                    const values = column.picker === "flag0" ? FLAG0_VALUES : FLAG1_VALUES
                     const raw = String(row[column.key] ?? "")
                     return (
                         <FlagCell
                             key={column.label}
                             value={raw}
-                            meaningOf={(value) => {
-                                const parsed = Number.parseInt(value.trim(), 10)
-                                if (!Number.isFinite(parsed)) return ""
-                                return parsed === 0 ? t.flagNone : flagEffects(value, names)
-                            }}
+                            names={names}
                             unchanged={!diff || !diff.has(String(column.key))}
-                            options={flagValueOptions(raw, values, names)}
                             tdClassName={tdClassName}
                             onCommit={(value) => onEdit(column.key, value)}
                         />

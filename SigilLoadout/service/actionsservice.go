@@ -311,6 +311,11 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 	if _, err := mergedActionTable(cfg, edits); err != nil {
 		return err
 	}
+	// 改回原值的那些改动别再记账，也别再把这张表部署出去（见 actionprune.go）。
+	edits, err = dropUnchangedActionTable(cfg, edits)
+	if err != nil {
+		return err
+	}
 	if err := saveActionEdits(edits); err != nil {
 		return err
 	}
@@ -318,7 +323,17 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 }
 
 // deployActionTable 把"原始 + 改动"合成一份 msgpack 写进 mod 目录（源文件一个字节都不碰）。
+//
+// 当前角色的改动全是空操作 → 与原表一致：不留产物（mod 里那份删掉，游戏读它自己的原表），
+// 也不去读原表做合并。见 actionprune.go。
 func (s *ActionsService) deployActionTable(cfg actionConfig, edits []actionEdit) error {
+	unchanged, err := actionTableUnchanged(cfg, charCode(cfg), edits)
+	if err != nil {
+		return err
+	}
+	if unchanged {
+		return removeDeployed(deployActionPath(cfg))
+	}
 	body, err := mergedActionTable(cfg, edits)
 	if err != nil {
 		return err
@@ -454,12 +469,27 @@ func (s *ActionsService) Deploy() error {
 	if err != nil {
 		return err
 	}
+	// 三类表都先过一遍清理：和原表数值一致的整份表，账本与 mod 里都不留（见 actionprune.go）。
+	edits, err = dropUnchangedActionTable(cfg, edits)
+	if err != nil {
+		return err
+	}
+	if err := saveActionEdits(edits); err != nil {
+		return err
+	}
 	if err := s.deployActionTable(cfg, edits); err != nil {
 		return err
 	}
 
 	trackEdits, err := loadTrackEdits()
 	if err != nil {
+		return err
+	}
+	trackEdits, err = dropUnchangedTracks(cfg, trackEdits)
+	if err != nil {
+		return err
+	}
+	if err := saveTrackEdits(trackEdits); err != nil {
 		return err
 	}
 	if err := s.deployRefs(cfg, trackEdits, trackRefsOf(trackEdits, charCode(cfg), "")); err != nil {
@@ -471,6 +501,13 @@ func (s *ActionsService) Deploy() error {
 	// 更新都会被整个换掉，只搬"本次会话碰过的"会让上次保存出来的那些再也回不来。
 	globalEdits, err := loadGlobalParamEdits()
 	if err != nil {
+		return err
+	}
+	globalEdits, err = dropUnchangedGlobalParams(cfg, globalEdits)
+	if err != nil {
+		return err
+	}
+	if err := saveGlobalParamEdits(globalEdits); err != nil {
 		return err
 	}
 	for _, table := range globalParamTables(globalEdits) {
@@ -570,6 +607,14 @@ func (s *ActionsService) DeployMissingTracks(motion string) error {
 	}
 	edits, err := loadTrackEdits()
 	if err != nil {
+		return err
+	}
+	// 先清理：与原表逐字节一致的轨不算改动，账本与 mod 里都不留（见 actionprune.go）。
+	edits, err = dropUnchangedTracks(cfg, edits)
+	if err != nil {
+		return err
+	}
+	if err := saveTrackEdits(edits); err != nil {
 		return err
 	}
 	missing, err := missingRefs(cfg, trackRefsOf(edits, charCode(cfg), motion))
