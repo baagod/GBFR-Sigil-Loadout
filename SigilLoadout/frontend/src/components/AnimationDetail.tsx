@@ -16,7 +16,8 @@ import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigi
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
-import {FlagsGrid, TrackGrid, TrackToolbar, type Marked} from "@/components/TrackGrid"
+import {FlagsGrid, TrackGrid, type Marked} from "@/components/TrackGrid"
+import {TrackToolbar} from "@/components/TrackToolbar"
 import {withNewRow} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
