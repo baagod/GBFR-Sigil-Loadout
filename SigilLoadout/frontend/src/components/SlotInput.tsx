@@ -66,6 +66,9 @@ export function SlotInput({
             ref={host}
             type="text"
             inputMode="decimal"
+            // 标记"这一格自己管 Esc"（放开焦点，见下面的 onKeyDown）。外壳那记"Esc 收进托盘"靠它让路
+            // （见 App.tsx）——**标记跟着框走**，所以哪一页用它都自动成立，不必再给每页的容器起类名。
+            data-esc-own=""
             aria-label={label}
             placeholder={String(original)}
             value={typed ?? (value === null ? "" : String(value))}

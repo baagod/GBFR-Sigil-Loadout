@@ -493,7 +493,13 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                             placeholder={value}
                             onChange={(e) => setQuery(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === "Escape") setOpen(false)
+                                if (e.key !== "Escape") return
+                                // ⚠️ 必须**拦住**这一记 Esc，别让它继续冒泡：动画详情弹窗（Base UI Dialog）
+                                // 在 document 上也听着 Esc，不拦就会连弹窗一起关掉（用户实测：一格 Esc 关两层）。
+                                // 我们这套没用组件的 Input/Trigger，弹层也就不认这是"自己人"的 Esc，
+                                // 只能在这里明说：这一记归本格。
+                                e.stopPropagation()
+                                setOpen(false)
                             }}
                             className="w-21 shrink-0 bg-transparent p-0 text-left text-base tabular-nums outline-none placeholder:text-foreground md:text-sm"
                         />

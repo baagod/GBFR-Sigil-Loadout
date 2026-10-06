@@ -293,20 +293,16 @@ export default function App() {
         edit({exclusiveState: withExclusiveToggle(latest.current.exclusiveState, charaHashes, skillHash, value)})
     }
 
-    // Esc 隐藏到托盘，**除非**焦点在浮层（下拉列表/对话框）里：那里它归浮层，只关浮层。浮层判断在
-    // keydown 做（Base UI 会在 keydown 期间卸载弹层，keyup 就看不到它了），结果留给 keyup 用。
-    // 推迟到 keyup 才藏：keydown 就藏掉的话，这一记 keyup 会落到游戏窗口上。
+    // Esc 隐藏到托盘，**除非**这一记 Esc 是浮层（下拉列表/对话框）的：那里它只关浮层。
+    // 和别的 Windows 程序一样**按下就藏**，不等松手——原先推迟到 keyup 再等 150ms，用户实测"松开才藏"很迟钝。
     // 菜单热键不在这里处理：它是 mod 的全局注册，按一下就是开关这个窗口（见 windowstate.go 的 wmToggle）。
     useEffect(() => {
-        let timer: ReturnType<typeof setTimeout> | undefined
-        let overlayEscOnKeyDown = false
         /**
          * Esc 归谁。
          *
          * ⚠️ 判定**不能只看 `e.target`**：弹窗自己的焦点管理有可能谁都没聚焦（焦点在 `<body>` 上），
-         * 这时 `target.closest(...)` 是 null ✗ → 误判成"不在浮层"，keyup 之后 150ms 把主窗口收进托盘 ✗。
-         * 用户实测的时序正是这条：**按下 Esc 弹窗关掉、主窗口还在；松开 Esc 才隐藏** ✓（那是 keyup 里的计时器 ✓）。
-         * 所以再补一条**文档状态**判断：只要文档里还挂着模态/浮层，这次 Esc 就不归"隐藏窗口"管 ✓。
+         * 这时 `target.closest(...)` 是 null ✗ → 误判成"不在浮层"，把主窗口收进托盘 ✗（用户报过）。
+         * 所以再补一条**文档状态**判断：只要文档里还挂着模态/浮层，这一记 Esc 就不归"隐藏窗口"管 ✓。
          */
         const hasOverlay = () =>
             !!document.querySelector(
@@ -314,40 +310,37 @@ export default function App() {
             )
         const isInOverlay = (e: KeyboardEvent) =>
             !!((e.target as HTMLElement | null)?.closest?.(
-                // Esc 归谁：打开的浮层，以及两个编辑页里的数值框——那两页把 Esc 定义成"放开这个框"
-                // （见 SkillRow 与 LimitBonusEditorPanel），不该同时把整个窗口藏到托盘去。
+                // Esc 归谁：打开的浮层，以及把 Esc 定义成"放开这个框"的数值框（SlotInput，
+                // 见它的 onKeyDown）——那里不该同时把整个窗口藏到托盘去。
                 //
                 // ⚠️ `[data-picker-open]` 必须留着：flag 单元格的下拉开着时，焦点在**我们自己的 input** 上，
                 // 而它在 `<td>` 里、**不在 portal 的弹层里** ✗ —— 只按 combobox-content 判会把这次 Esc
                 // 误判成"不在浮层"，于是连窗口一起藏掉 ✗（用户报的"按 esc 把主窗口也隐藏了"）。
-                '[data-slot="combobox-content"], [data-picker-open], [role="dialog"], [role="alertdialog"], .skill-rows input, .ability-rows input'
+                //
+                // ⚠️ `[data-esc-own]` 是 SlotInput 自己带的（跟着框走）。`.skill-rows` / `.ability-rows`
+                // 那两条是按页给的类名，专精技能页当初漏了 → 那一页按 Esc 会连窗口一起藏掉（实测过）；
+                // 留着它们只是不改既有行为，新页面用 SlotInput 一律靠标记生效。
+                '[data-slot="combobox-content"], [data-picker-open], [role="dialog"], [role="alertdialog"], [data-esc-own], .skill-rows input, .ability-rows input'
             ) || hasOverlay())
+        // 捕获阶段：Base UI 在 React 处理这一记 keydown 时就卸载弹层，冒泡阶段的监听器会看到一个
+        // 已经摘下来的 target，从而错判成"不在浮层"，把窗口藏掉。捕获阶段弹层还活着，这一刻的
+        // 文档状态就是权威判据。
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return
-            // 两条路都赋值：丢一次 keyup 不能把下一次 Esc 也吞掉。
-            overlayEscOnKeyDown = isInOverlay(e)
-            if (overlayEscOnKeyDown) return
-            clearTimeout(timer)
+            // 中文输入法正在组字时按 Esc：那是"取消这次组字"，不是"隐藏窗口" ✗（用户敲拼音敲到一半，
+            // 一记 Esc 把窗口收走、半截输入全丢）。Chromium 在组字期间的 keydown 上给 isComposing ✓，
+            // 组字结束（compositionend）之后的那一记才照常隐藏 ✓。
+            if (e.isComposing) return
+            // 按住不放时系统会补发 keydown（`repeat === true`）：浮层被真按下那一下关掉之后，重复键会继续
+            // 走进来、按"已经没有浮层"把主窗口也收进托盘。**这是 Windows 的默认行为**（用户实测：别的程序
+            // 长按 Esc 隐藏后不松手、焦点转给微信，它过一会也被隐藏），所以这里**不**过滤重复键 —— 别再加
+            // `if (e.repeat) return`。
+            if (isInOverlay(e)) return
             e.preventDefault()
+            void MinimiseApp()
         }
-        const onKeyUp = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return
-            if (overlayEscOnKeyDown) {
-                overlayEscOnKeyDown = false
-                return
-            }
-            clearTimeout(timer)
-            timer = setTimeout(() => void MinimiseApp(), 150)
-        }
-        // 捕获阶段：Base UI 在 React 处理 keydown 时卸载弹层，冒泡阶段的监听器会看到一个已经
-        // 摘下来的 target，从而错判成"不在浮层"，把窗口藏掉。捕获阶段弹层还活着。
         document.addEventListener("keydown", onKeyDown, true)
-        document.addEventListener("keyup", onKeyUp, true)
-        return () => {
-            document.removeEventListener("keydown", onKeyDown, true)
-            document.removeEventListener("keyup", onKeyUp, true)
-            clearTimeout(timer)
-        }
+        return () => document.removeEventListener("keydown", onKeyDown, true)
     }, [])
 
     /*
