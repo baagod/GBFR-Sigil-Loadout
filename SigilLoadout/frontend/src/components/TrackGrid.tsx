@@ -404,7 +404,16 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
      *   · 过滤：我们的输入框 → 受控 `inputValue` → 组件自己过滤列表 ✓（搜索逻辑不用自己写 ✓）
      */
     const [open, setOpen] = useState(false)
-    const [query, setQuery] = useState("")
+    /**
+     * 过滤串（受控给组件的 `inputValue`）。`null` = **用户还没打字**，与"打字打到空"是两回事：
+     *   · null → 输入框里显示的是**这一格的值本身**（真 value，可拖选、可点光标 ✓），而过滤串是空串
+     *     → 列表一开就是全部选项 ✓（不会一进来就被这一格的值过滤成一项 ✗）。
+     *   · 字符串 → 输入框显示用户打的内容、列表按它过滤 ✓（就是搜新值）。
+     *
+     * ⚠️ 别再退回"值只放 placeholder"那套：placeholder **不是内容**，鼠标既选不中、也插不进光标
+     * （用户实测：只有 Flag0/Flag1 这两列这样，别的格子用的是真 value ✓）。
+     */
+    const [query, setQuery] = useState<string | null>(null)
     /**
      * 本格在不在**输入态**（= 挂着输入框）。
      *
@@ -438,7 +447,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
             if (target?.closest?.('[data-slot="combobox-content"]')) return
             focusBackRef.current = false // 用户已经挪到别处：收尾时别把焦点抢回来 ✗
             setEditing(false)
-            setQuery("")
+            setQuery(null)
         }
         document.addEventListener("pointerdown", onDown, true)
         return () => document.removeEventListener("pointerdown", onDown, true)
@@ -461,7 +470,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
     }, [open])
 
     /** 静态态那个按钮（关闭后焦点回它，见 ComboboxContent 的 finalFocus）✓ */
-    const btnRef = useRef<HTMLButtonElement>(null)
+    const btnRef = useRef<HTMLDivElement>(null)
 
     /**
      * 本格的收尾：收列表 + 退编辑 + 清掉查询串 + 焦点交给静态按钮。
@@ -475,7 +484,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
         flushSync(() => {
             setOpen(false)
             setEditing(false)
-            setQuery("")
+            setQuery(null)
         })
         btnRef.current?.focus({preventScroll: true})
     }
@@ -500,7 +509,16 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
             <span className="whitespace-nowrap text-muted-foreground">{meaningOf(value)}</span>
         </span>
     )
-    const buttonClass = "block w-full cursor-default px-1 py-0.5 text-left text-base tabular-nums md:text-sm"
+    // outline-none：焦点圈由表格那条 row-focus（整行一条 ring 色线）负责，格子上不再画一圈。
+    // select-text：这一格的静态文字**可以被鼠标拖选**（用户要求；见下面 div 那条注释）。
+    const buttonClass = "block w-full cursor-default px-1 py-0.5 text-left text-base tabular-nums outline-none select-text md:text-sm"
+    /** 进编辑态（挂输入框）并挂出下拉：点这一格、或键盘 Enter/Space 都走它。 */
+    const openEditor = () => {
+        setQuery(null) // 还没打字：输入框显示这一格的值本身，列表不过滤
+        focusBackRef.current = true
+        setEditing(true)
+        setOpen(true)
+    }
 
     return (
         // data-picker-open：下拉开着时焦点在 portal 里（不在这一格内），靠这个属性让 cell-focus 继续画焦点环。
@@ -511,8 +529,9 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                     // 空白值（数据里真有 Flag1 为空的轨）不在 options 里，给 null 免得回填不上。
                     value={options.includes(value) ? value : null}
                     // 查询串受控：我们的输入框写它，组件拿它过滤列表 ✓（所以不需要组件的 Input ✓）
-                    inputValue={query}
-                    onInputValueChange={setQuery}
+                    // `null`（还没打字）→ 空串：列表一开就是全部选项 ✓
+                    inputValue={query ?? ""}
+                    onInputValueChange={(next) => setQuery(next)}
                     open={open}
                     // ⚠️ 也别加 autoHighlight：它会把**第一项**高亮并滚到顶部 ✗。
                     // ⚠️ 在**本格**上再点一下（输入框、右边的含义、格的空白处）不该收起列表：弹层挂在
@@ -565,9 +584,10 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                             // "这一格自己管 Esc"：外壳那记"Esc 收进托盘"因此让路（见 App.tsx）——
                             // 列表被 Esc 收起来之后 `data-picker-open` 就没了，那时全靠这个标记挡住外壳。
                             data-esc-own=""
-                            // 值只放**占位符**、不放进 value：于是既没有"一进来就被全选"✗，第一下打字也不会接在数值后面 ✓
-                            // 占位符用**前景色** —— 看着就是"这一格的值"，不是灰提示 ✓
-                            value={query}
+                            // 值是**真 value**：`null`（还没打字）时就是这一格的值本身 —— 于是鼠标能拖选、
+                            // 也能点出光标（原来是放在 placeholder 里，placeholder 不是内容，两样都做不到 ✗）。
+                            // 打字之后这里显示用户打的内容（那就是搜索串 ✓）。
+                            value={query ?? value}
                             placeholder={value}
                             // 打字即重新展开列表（列表可能是被 Esc 收起来的，接着打字要能继续搜）。
                             onChange={(e) => {
@@ -597,10 +617,30 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                     </span>
                     ) : (
                 /* 静止态：与 `EditableCell` 一样的**静态文本**（数值占 84px 槽 + 2 空格 + 含义灰）✓
-                   点一下才进编辑态 —— 不常驻输入框/按钮（格子很多，常驻输入框会重 ✗） */
-                <button ref={btnRef} type="button" className={buttonClass} onClick={() => { setQuery(""); focusBackRef.current = true; setEditing(true); setOpen(true) }}>
+                   点一下才进编辑态 —— 不常驻输入框/按钮（格子很多，常驻输入框会重 ✗）
+
+                   ⚠️ 这里用 div + role="button"，**不是** <button>：Chromium 里 <button> 内的文字
+                   用鼠标拖选选不中（程序化 Range 反而能选中，一不小心就误判成"已经能选了" ✗）——
+                   用户要求这一格的文字能拖选复制。代价是键盘可达性得自己补（tabIndex + Enter/Space）。 */
+                <div
+                    ref={btnRef}
+                    role="button"
+                    tabIndex={0}
+                    className={buttonClass}
+                    onClick={() => {
+                        // 刚才那一拖是在选文字（选出了东西）→ 这一记 click 是拖选的收尾，别顺手把下拉也打开。
+                        if (window.getSelection()?.toString()) return
+                        openEditor()
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            openEditor()
+                        }
+                    }}
+                >
                     {lines}
-                </button>
+                </div>
             )}
                     {/* 弹层宽度跟着**内容**（w-max）：描述不截断，得让最长那项把弹层撑开；
                         max-w 兜底，免得极端组合撑出屏。列表项内部也去掉了 truncate。 */}
