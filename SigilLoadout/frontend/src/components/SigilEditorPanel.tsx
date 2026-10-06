@@ -349,9 +349,11 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
                         {/*
                             一个清除按钮，只在有东西可清时出现，而且光标要回到框里：刚被点击的就是这个按钮，
                             它马上就会消失，没有这一步下一次敲键就不知去向。
+                            ⚠️ `align="inline-end"` 不能省：InputGroupAddon 默认 **inline-start**（order-first），
+                            省掉这个叉就会跑到搜索词**左边** ✗（同 SlotRow 那个 "/ 45"）。
                         */}
                         {query !== "" && (
-                            <InputGroupAddon>
+                            <InputGroupAddon align="inline-end">
                                 <InputGroupButton
                                     aria-label={t.clearSearch}
                                     onClick={() => {
