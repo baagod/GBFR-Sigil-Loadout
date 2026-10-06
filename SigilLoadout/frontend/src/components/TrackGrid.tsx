@@ -46,7 +46,7 @@ function RowHandle({index, selected, gripLabel, dragging, listeners, attributes,
         // 边框画在 td 上（不是这个 div）：这样"最后一行的下边框"才归表格管（见 table 上的
         // [&_tr:last-child>*]:border-b-0 —— 不去掉它就会跟容器外框那条挨在一起，看着是 2px）。
         // h-full 让选区底色铺满整格。
-        <div className={`flex h-full items-stretch ${selected ? "bg-white/12" : ""}`}>
+        <div className={`flex h-full items-stretch ${selected ? "bg-[#353535]" : ""}`}>
             {/* 两半都写死宽度（36 + 20 = 56 = w-14）：表头与表体的可用宽度本来就不一样，
                 用 flex-1 的话两边会各算各的分割位置，竖线就错开了。 */}
             <div
@@ -119,7 +119,12 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
                 // 颜色用中性叠加层（10% 白，与 --border 同一个透明度），而不是发白的 primary。
                 // 不用 shadcn 那句 hover:bg-muted/50：它在这张表上几乎看不出 —— docs 里表格坐在
                 // --background(#0a0a0a) 上，这里坐在 --popover(#171717) 上，同一个 50% 只抬升几级。
-                selected ? "bg-linear-to-b from-white/12 to-white/12" : ""
+                // ⚠️ 选中行必须是**逐格实色**：格子们本来就都不透明（可编辑格 #1a1a1a、只读格默认底色），
+                // 只在 tr 上铺半透明底色会被它们盖住 —— 实测现象就是"选了行但没有一行高亮" ✗。
+                // 所以：tr 给实色 #353535，同时用 `[&>td]:bg-transparent!` 把格子的底色让开
+                // （`!` 是必需的：两边都是单类工具类，谁赢只看样式表顺序）。# 那格的内层 div 自己是不透明
+                // 的实色，吸顶时照样遮得住滚过来的列。
+                selected ? "bg-[#353535] [&>td]:bg-transparent!" : ""
             } ${
                 // 假删除：整行刷成 #542526（暗红底，一眼看出这行不生效；保存时这一行不部署）。
                 removed ? "bg-[#542526]" : ""
@@ -283,7 +288,12 @@ function SortableFlagRow({row, index, columns, t, selected, diff, original, onSe
                 // 颜色用中性叠加层（10% 白，与 --border 同一个透明度），而不是发白的 primary。
                 // 不用 shadcn 那句 hover:bg-muted/50：它在这张表上几乎看不出 —— docs 里表格坐在
                 // --background(#0a0a0a) 上，这里坐在 --popover(#171717) 上，同一个 50% 只抬升几级。
-                selected ? "bg-linear-to-b from-white/12 to-white/12" : ""
+                // ⚠️ 选中行必须是**逐格实色**：格子们本来就都不透明（可编辑格 #1a1a1a、只读格默认底色），
+                // 只在 tr 上铺半透明底色会被它们盖住 —— 实测现象就是"选了行但没有一行高亮" ✗。
+                // 所以：tr 给实色 #353535，同时用 `[&>td]:bg-transparent!` 把格子的底色让开
+                // （`!` 是必需的：两边都是单类工具类，谁赢只看样式表顺序）。# 那格的内层 div 自己是不透明
+                // 的实色，吸顶时照样遮得住滚过来的列。
+                selected ? "bg-[#353535] [&>td]:bg-transparent!" : ""
             } ${
                 // 假删除：整行刷成 #542526（暗红底，一眼看出这行不生效；保存时这一行不部署）。
                 removed ? "bg-[#542526]" : ""

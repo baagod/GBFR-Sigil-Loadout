@@ -54,7 +54,7 @@ import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
-import {charCodeOf, isMotion} from "@/lib/actionflags"
+import {charCodeOf, clickRow, extendRow, isMotion, isSelected, type RowSelection} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
@@ -97,7 +97,7 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
     这几个类**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
 */
 function actionHeaderClass(key: string): string {
-    if (key === "id_") return "sticky top-0 left-0 z-50 bg-[#1f1f1f] text-center font-medium"
+    if (key === "id_") return "sticky top-0 left-10 z-50 bg-[#1f1f1f] text-center font-medium"
     if (isHighlightedColumn(key)) return "sticky top-0 z-10 bg-primary text-primary-foreground text-center font-medium"
     return "sticky top-0 z-10 bg-[#1f1f1f] text-center font-medium"
 }
@@ -238,6 +238,25 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     // 第一帧永远是它自己的底色（≈黑），就是用户实测的"开弹窗闪一下黑框"。现在是主窗口里的 dialog
     // （AnimationDetail 自己就渲染一个 <Dialog>），没有第二个合成表面。
     const [motTarget, setMotTarget] = useState<{motion: string; charCode: string} | null>(null)
+    /**
+     * 动作表的行选中。**只做选中与高亮**（这张表的行是"记录"，没有行序可换，所以不接拖拽 ——
+     * 这一点与轨表不同）。语义见 actionflags.ts 的 clickRow：点 = 只选这一行、Shift = 拉一段、
+     * Ctrl = 逐个增删。
+     */
+    const [sel, setSel] = useState<RowSelection | null>(null)
+    /**
+     * 正按着行号那格（用来支持"按住划过一片"连续扩选）。
+     *
+     * ⚠️ 必须是**按住**才扩：只按"鼠标划过"就扩的话，选区会被随手一划莫名其妙地改掉 ✗。
+     */
+    const [dragging, setDragging] = useState(false)
+    useEffect(() => {
+        if (!dragging) return
+        // 在哪儿松手都算结束（划出表格、划到窗口外都收得住）。
+        const stop = () => setDragging(false)
+        window.addEventListener("mouseup", stop)
+        return () => window.removeEventListener("mouseup", stop)
+    }, [dragging])
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -560,6 +579,15 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         <table className="border-separate border-spacing-0 text-xs">
                             <thead>
                                 <tr>
+                                    {/* 「#」：行号 + 选中手柄。
+                                        ⚠️ 宽度**用内容钉死**，不能只写 w-10：这是 auto 布局的表格，单元格上的
+                                        w-10 只是"建议值"，实测被内容压回 18px ✗ —— 而下面 id_ 那列是按
+                                        left-10（40px）吸附的，两者不一致时 id_ 会被推到自己右邻列身上
+                                        （一行 id 被压成 `?L1000_01`，中间还留一条 22px 的空档）。
+                                        39 + 那 1px 右边框 = 40 = left-10，正好对上（border-box）。 */}
+                                    <th className={`${ACTION_CELL} sticky top-0 left-0 z-50 bg-[#1f1f1f] px-0 py-1 text-center font-medium text-base md:text-sm`}>
+                                        <div className="w-[39px]">#</div>
+                                    </th>
                                     {keys.map((key) => (
                                         <th key={key} className={`${ACTION_CELL_PAD} ${actionHeaderClass(key)}`}>
                                             {key}
@@ -568,8 +596,36 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                 </tr>
                             </thead>
                             <tbody>
-                                {actions.map((action) => (
+                                {actions.map((action, index) => {
+                                    // 选中行整行换一个更亮的底色。**写死、逐格给**：这些格本来是不透明的
+                                    // （可编辑格 #1a1a1a、只读格默认底色），只在 tr 上铺半透明底色会被盖住 ✗；
+                                    // 而且吸顶那两格也必须是不透明色，才遮得住横向滚过来的列。
+                                    const selected = isSelected(sel, index)
+                                    const cellBg = selected ? "bg-[#353535]" : "bg-[#1a1a1a]"
+                                    const readOnlyBg = selected ? "bg-[#353535]" : "bg-background"
+                                    return (
                                     <tr key={action.id}>
+                                        {/* 行号 + 选中手柄。只认左键；Shift 拉一段、Ctrl 逐个增删（与轨表的 # 一致）。
+                                            宽度与表头同样**用内容钉死**（39 + 1 边框 = 40 = id_ 的 left-10）。 */}
+                                        <td
+                                            className={`${ACTION_CELL} sticky left-0 z-30 px-0 py-1 text-center text-base tabular-nums select-none md:text-sm ${
+                                                selected ? "bg-[#353535]" : "bg-background"
+                                            } cursor-default`}
+                                            onMouseDown={(e) => {
+                                                if (e.button !== 0) return
+                                                e.preventDefault()
+                                                setSel((prev) =>
+                                                    clickRow(prev, index, {shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey}),
+                                                )
+                                                setDragging(true)
+                                            }}
+                                            // 按住划过一片 = 连续扩选（松手在 window 的 mouseup 上收尾）。
+                                            onMouseEnter={() => {
+                                                if (dragging) setSel((prev) => extendRow(prev, index))
+                                            }}
+                                        >
+                                            <div className="w-[39px]">{index + 1}</div>
+                                        </td>
                                         {keys.map((key) =>
                                             isReadOnlyColumn(key) ? (
                                                 <td
@@ -582,9 +638,9 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                                         // 取默认底色 = 与"透明"同一个观感，功能上也成立。
                                                         // id_ 里是记录号，**居中**（与表头一致）；高亮标记只做在表头上。
                                                         key === "id_"
-                                                            ? "sticky left-0 z-40 bg-background text-center tabular-nums"
+                                                            ? `sticky left-10 z-40 ${readOnlyBg} text-center tabular-nums`
                                                             : key === "abilityTag_"
-                                                              ? "bg-background tabular-nums"
+                                                              ? `${readOnlyBg} tabular-nums`
                                                               : ""
                                                     }`}
                                                 >
@@ -597,7 +653,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                             ) : (
                                                 <EditableCell
                                                     key={key}
-                                                    tdClassName={`${ACTION_CELL} p-0 cell-focus bg-[#1a1a1a]`}
+                                                    tdClassName={`${ACTION_CELL} p-0 cell-focus ${cellBg}`}
                                                     mono
                                                     value={draft[action.id]?.[key] ?? ""}
                                                     placeholder={originals[action.id]?.[key]}
@@ -611,7 +667,8 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                             ),
                                         )}
                                     </tr>
-                                ))}
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>

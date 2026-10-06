@@ -74,7 +74,15 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
      */
     unchanged?: boolean
 }) {
-    const [draft, setDraft] = useState(value)
+    /**
+     * 这一格显示的那份文本：**没填过值就是原值**（`placeholder`）。
+     *
+     * 点开编辑时预填的也是它 —— 于是接着改原值不用先看着灰字再手打一遍；失焦时若草稿**等于原值**
+     * 就当作"没改"（提交空串退回原值，见下面 onBlur）。轨表那几张传的是真值、不给 `placeholder`，
+     * 所以它们的行为一点不变。
+     */
+    const shown = value !== "" ? value : (placeholder ?? "")
+    const [draft, setDraft] = useState(shown)
     const [editing, setEditing] = useState(false)
     /** 显示态那层文本（焦点环由 td 的 `:focus-within` 画，见 style.css 的 cell-focus）。 */
     const textRef = useRef<HTMLDivElement>(null)
@@ -100,11 +108,8 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
      * 想要严格等于原值就得把 baseline 从弹层穿透到每个格子）。
      */
     const beforeEdit = useRef(value)
-    // 没在编辑的格子跟着外部值走：别处保存完、重读回来的新值要上屏。
-    if (!editing && draft !== value) setDraft(value)
-
-    /** 这一格显示的那份文本：没填值时就是原值。 */
-    const shown = value !== "" ? value : (placeholder ?? "")
+    // 没在编辑的格子跟着**显示值**走：别处保存完、重读回来的新值要上屏，预填的那份也要跟着回正。
+    if (!editing && draft !== shown) setDraft(shown)
 
     /**
      * Ctrl+C：**直接复制整格文本**，不用先划选。有选区时（只在编辑态可能）交给浏览器，
@@ -170,6 +175,14 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                         // Esc 那条路已经自己收过尾（焦点交给文本层、草稿丢掉）→ 这一次 blur 不提交。
                         if (skipCommitRef.current) {
                             skipCommitRef.current = false
+                            return
+                        }
+                        // 草稿等于**原值**（placeholder）就是"没改"：提交空串退回原值（后端把空串当
+                        // "回到原值"，这也是"点开原值 → 直接失焦"那条路的正常收尾）。
+                        // ⚠️ 只有真知道原值的表会传 placeholder；轨表传的是真值，走下面那条老规矩
+                        //（值没变就什么都不做）。
+                        if (placeholder !== undefined && draft === placeholder) {
+                            if (value !== "") onCommit("")
                             return
                         }
                         if (draft !== value) onCommit(draft)

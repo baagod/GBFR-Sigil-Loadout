@@ -180,12 +180,68 @@ export function rangeOf(range: RowRange, length: number): {start: number; end: n
 }
 
 /**
- * 取出选中区间里的那几行，**按表里的上下顺序**排，每行都是深拷贝：插进去的那份要能独立编辑，
- * 不能还连着表里那一行。一行都没选给空数组。
+ * 选中：一段区间（anchor 是 shift 的起点、focus 是终点）+ **Ctrl 逐个点中的那些**。
+ *
+ * ⚠️ Ctrl 点过之后区间要**收起来**（focus = null），只留 anchor 当下一次的起点：不收的话"区间里那行"
+ * 永远落在选中集合里，Ctrl 再点它取消不掉 ✗。
  */
-export function collectRows<T>(rows: T[], range: RowRange): T[] {
-    const {start, end} = rangeOf(range, rows.length)
+export type RowSelection = RowRange & {picked?: ReadonlySet<number>}
+
+/**
+ * 点一行之后的新选中：
+ *   · **Ctrl** —— 把"当前选中的整批"收进 picked，再在这一行上增删（所以区间里那行也取消得掉）；
+ *   · **Shift** —— 从 anchor 拉到这一行（替换整批，和资源管理器一样）；
+ *   · 什么都不按 —— 只选这一行。
+ */
+export function clickRow(
+    sel: RowSelection | null,
+    index: number,
+    mods: {shift?: boolean; ctrl?: boolean},
+): RowSelection {
+    if (mods.ctrl) {
+        const picked = new Set(sel ? selectedRows(sel) : [])
+        if (picked.has(index)) picked.delete(index)
+        else picked.add(index)
+        return {anchor: index, focus: null, picked}
+    }
+    if (mods.shift && sel?.anchor !== null && sel?.anchor !== undefined) {
+        return {anchor: sel.anchor, focus: index, picked: new Set()}
+    }
+    return {anchor: index, focus: index, picked: new Set()}
+}
+
+/** 按住行号划到这一行：把区间另一端拉到这儿（Ctrl 点中的那些留着）。一行都没选时从这一行起一段。 */
+export function extendRow(sel: RowSelection | null, index: number): RowSelection {
+    return sel ? {...sel, focus: index} : {anchor: index, focus: index, picked: new Set()}
+}
+
+/** 选中的行下标，升序去重（区间 ∪ picked）。**不夹到表长**：调用方手上有数组，自己过滤。 */
+export function selectedRows(sel: RowSelection | null): number[] {
+    if (!sel) return []
+    const out = new Set<number>(sel.picked ?? [])
+    const {anchor, focus} = sel
+    if (anchor !== null && focus !== null) {
+        for (let index = Math.min(anchor, focus); index <= Math.max(anchor, focus); index++) out.add(index)
+    }
+    return [...out].sort((a, b) => a - b)
+}
+
+/** 这一行选没选中。渲染每一行时用（比每次算整批便宜）。 */
+export function isSelected(sel: RowSelection | null, index: number): boolean {
+    if (!sel) return false
+    if (sel.picked?.has(index)) return true
+    const {anchor, focus} = sel
+    return anchor !== null && focus !== null && index >= Math.min(anchor, focus) && index <= Math.max(anchor, focus)
+}
+
+/**
+ * 取出选中的那几行（区间 ∪ Ctrl 点中的），**按表里的上下顺序**排，每行都是深拷贝：插进去的那份要能
+ * 独立编辑，不能还连着表里那一行。一行都没选给空数组。
+ */
+export function collectRows<T>(rows: T[], sel: RowSelection): T[] {
     const picked: T[] = []
-    for (let index = start; index <= end; index++) picked.push(cloneRow(rows[index]))
+    for (const index of selectedRows(sel)) {
+        if (index >= 0 && index < rows.length) picked.push(cloneRow(rows[index]))
+    }
     return picked
 }

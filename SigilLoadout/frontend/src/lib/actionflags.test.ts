@@ -9,14 +9,18 @@ import {
     FLAG0_NAMES,
     FLAG1_NAMES,
     charCodeOf,
+    clickRow,
     collectRows,
     flagHasBit,
     flagMask,
     isMotion,
+    isSelected,
     rangeOf,
+    selectedRows,
     totalDuration,
     totalFrames,
     withNewRow,
+    type RowSelection,
 } from "@/lib/actionflags"
 
 describe("掩码的位", () => {
@@ -124,6 +128,48 @@ describe("选中区间", () => {
     it("号码脏了（行被删掉）就夹回表里，不越界也不炸", () => {
         expect(rangeOf({anchor: 1, focus: 9}, 3)).toEqual({start: 1, end: 2, count: 2})
         expect(rangeOf({anchor: -4, focus: 0}, 3)).toEqual({start: 0, end: 0, count: 1})
+    })
+})
+
+describe("选中：点 / Shift / Ctrl", () => {
+    it("什么都不按：只选这一行", () => {
+        const sel = clickRow(clickRow(null, 3, {}), 5, {})
+        expect(selectedRows(sel)).toEqual([5])
+        expect(isSelected(sel, 5)).toBe(true)
+        expect(isSelected(sel, 3)).toBe(false)
+    })
+
+    it("Shift：从 anchor 拉到这一行（闭区间，替换整批）", () => {
+        expect(selectedRows(clickRow(clickRow(null, 3, {}), 6, {shift: true}))).toEqual([3, 4, 5, 6])
+        // 往回拉也一样。
+        expect(selectedRows(clickRow(clickRow(null, 3, {}), 1, {shift: true}))).toEqual([1, 2, 3])
+    })
+
+    it("Ctrl：逐个增删，保留原来选中的整批", () => {
+        let sel: RowSelection | null = clickRow(null, 2, {})
+        sel = clickRow(sel, 7, {ctrl: true})
+        expect(selectedRows(sel)).toEqual([2, 7])
+        sel = clickRow(sel, 7, {ctrl: true}) // 再点一次 = 取消
+        expect(selectedRows(sel)).toEqual([2])
+    })
+
+    it("Ctrl 也要能取消掉“区间选出来的”那一行（所以 Ctrl 点过之后区间要收起来）", () => {
+        const sel = clickRow(clickRow(null, 4, {}), 4, {ctrl: true})
+        expect(selectedRows(sel)).toEqual([])
+        expect(isSelected(sel, 4)).toBe(false)
+    })
+
+    it("一行都没选给空", () => {
+        expect(selectedRows(null)).toEqual([])
+        expect(isSelected(null, 0)).toBe(false)
+    })
+
+    it("复制选中行时，Ctrl 点中的那些也要取到（且按上下顺序）", () => {
+        const rows = [0, 1, 2, 3, 4].map((index) => ({tag: String(index)}))
+        let sel: RowSelection | null = clickRow(null, 1, {})
+        sel = clickRow(sel, 4, {ctrl: true})
+        sel = clickRow(sel, 2, {ctrl: true})
+        expect(collectRows(rows, sel).map((row) => row.tag)).toEqual(["1", "2", "4"])
     })
 })
 
