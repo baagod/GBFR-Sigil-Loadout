@@ -8,7 +8,7 @@ func TrayOnClick() {
 			log.Printf("tray click panic: %v", r)
 		}
 	}()
-	hwnd := findToolWindow()
+	hwnd := findMainWindow()
 	if hwnd == 0 {
 		return
 	}

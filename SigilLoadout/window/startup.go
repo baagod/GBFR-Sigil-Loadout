@@ -22,7 +22,7 @@ func EnsureSingleInstance() {
 	}
 	if cerr == syscall.ERROR_ALREADY_EXISTS {
 		log.Printf("single-instance: existing instance detected, activating its window")
-		hwnd := findToolWindow()
+		hwnd := findMainWindow()
 		if hwnd != 0 {
 			procShowWindow.Call(hwnd, 5) // SW_SHOW
 			procPostMessageW.Call(hwnd, wmActivate, 0, 0)

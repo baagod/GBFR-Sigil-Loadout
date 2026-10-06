@@ -24,7 +24,7 @@ const mutexName = "Local\\GBFRSigilLoadout"
 // fakeHide 必须 post 到 UI 线程：SetForegroundWindow 等的是窗口自身线程，而它正阻塞在这个调用里。
 const wmFakeHide = 0x8011
 
-// wmClose 是原生的"关闭"命令：用户点 X 与 PostClose 走的是同一条。
+// wmClose 是原生的"关闭"命令（= 用户点 X）。HandleMsg 用它判"假隐藏到托盘"。
 const wmClose = 0x0010
 
 // 由托盘与"工具没开"的兜底 post 的激活命令：显示/还原/聚焦。只有工具自己发它（mod 侧不发）。
@@ -46,7 +46,6 @@ var (
 	procFindWindowW                = user32.NewProc("FindWindowW")
 	procGetForegroundWindow        = user32.NewProc("GetForegroundWindow")
 	procPostMessageW               = user32.NewProc("PostMessageW")
-	procSendMessageW               = user32.NewProc("SendMessageW")
 	procSetForegroundWindow        = user32.NewProc("SetForegroundWindow")
 	procShowWindow                 = user32.NewProc("ShowWindow")
 	procGetWindowLong              = user32.NewProc("GetWindowLongW")
@@ -120,16 +119,13 @@ func nextForegroundWindow(hwnd uintptr) uintptr {
 	return 0
 }
 
-// findToolWindow 找**主窗口**，没找到时返回 0。
+// findMainWindow 找**主窗口**，没找到时返回 0。
 //
 // 分两步，顺序不能反：先用手柄，只有还没记下来时才回落到按标题找。
 //
-// 为什么要这样：FindWindowW 是按标题精确匹配的，而工具窗口（动画详情 / 全局参数）现在与主窗口**同名**
-// （用户要求标题栏只写 GBFR Sigil Loadout）。同名之后标题再也认不出哪扇是主窗口，拿错的后果很具体：
-// 主窗口里按 Esc / 点 X → HideToTray → 把**工具窗口**假隐藏成 alpha 0 的隐形窗，主窗口还杵在那儿 ✗；
-// 托盘点一下也可能激活工具窗口。主窗口句柄在启动时就记下来了（WatchMainWindow），之后一直用它，
-// 因此这条回落只在启动最初那一小段里跑到 —— 那时一扇工具窗口都还没开出来，标题仍然是唯一的 ✓。
-func findToolWindow() uintptr {
+// 为什么要这样：FindWindowW 是按标题精确匹配的，只在启动最初那一小段才可靠 —— 主窗口句柄是
+// WatchMainWindow 在后台记下来的（见那里），拿到之后就一直用它，不再按标题找。
+func findMainWindow() uintptr {
 	if hwnd := mainHwnd.Load(); hwnd != 0 {
 		return hwnd
 	}
@@ -138,22 +134,14 @@ func findToolWindow() uintptr {
 	return hwnd
 }
 
-// FindMainWindow 是给 main 用的：主窗口建好后把它的 HWND 记下来（见 SetMainWindowHandle）。
-// 找不到返回 0。
-func FindMainWindow() uintptr { return findToolWindow() }
-
-// mainHwnd 是主窗口的 HWND，由 main 在建完窗口后立刻写入（见 SetMainWindowHandle）。
+// mainHwnd 是主窗口的 HWND，由 WatchMainWindow 在后台写入。
 var mainHwnd atomic.Uintptr
 
-// SetMainWindowHandle 记下主窗口。用于把 mot 窗口（第二扇）的消息挡在 HandleMsg 之外。
-func SetMainWindowHandle(hwnd uintptr) { mainHwnd.Store(hwnd) }
-
-// WatchMainWindow 在后台把主窗口的 HWND 记下来（见 SetMainWindowHandle）。
+// WatchMainWindow 在后台把主窗口的 HWND 记下来（写进 mainHwnd，之后 findMainWindow 直接用）。
 //
 // 为什么不能"启动时调一次"：NewWithOptions 之后原生窗口还没落地，那一刻 FindWindowW 返回 0 ✗。
-// 而记 0 是**危险**的 —— isMainWindow 对 0 是放行（fail open），于是 mot 窗口点 X / 按取消时，
-// 那记 WM_CLOSE 会被 HandleMsg 当成主窗口的命令拿去**假隐藏**：窗口不关、还变成 alpha 0 的透明窗 ✗✗
-// （实测踩过：两扇"关掉"的 mot 窗口 exStyle 都带上了 0x80000|0x80|0x20，alpha=0、enabled=false）。
+// 而记 0 是**危险**的 —— isMainWindow 对 0 是放行（fail open），别的顶层窗口那记 WM_CLOSE 会被
+// HandleMsg 当成主窗口的命令拿去**假隐藏**：窗口不关、还变成 alpha 0 的透明窗 ✗✗。
 //
 // 退避重试（最多 ~10 秒，20 毫秒起翻倍），拿到就停。放在 goroutine 里，所以这里可以随便分配 ——
 // 拦截器（系统线程）里不行。
@@ -161,7 +149,7 @@ func WatchMainWindow() {
 	go func() {
 		delay := 20 * time.Millisecond
 		for range 12 {
-			if hwnd := findToolWindow(); hwnd != 0 {
+			if hwnd := findMainWindow(); hwnd != 0 {
 				mainHwnd.Store(hwnd)
 				return
 			}
@@ -173,28 +161,10 @@ func WatchMainWindow() {
 	}()
 }
 
-// SendClose 给窗口发一记原生关闭命令（= 用户点 X）。
+// isMainWindow 判断这条消息来自**主窗口**。
 //
-// 为什么要它：这一版 Wails 的 WebviewWindow.Close() **只发 WindowClosing 事件、不真关窗口** ✗
-// （源码 pkg/application/webview_window.go：InvokeSync(func(){ w.emit(events.Common.WindowClosing) })）
-// —— 实测在服务里调它，事件发了、窗口还留在屏幕上。真关只能走原生这条路。
-//
-// ⚠️ 必须是 **SendMessage**，不能用 PostMessage：框架自己关窗口用的就是 SendMessage
-// （webview_window_windows.go 的 `func (w *windowsWebviewWindow) close()`，注释写着"与点 X 同一条路"），
-// 而实测 PostMessage 那记石沉大海 —— 窗口不动、连 WindowClosing 都不发 ✗。
-// SendMessage 会直接进窗口过程，所以**必须在 UI 线程上发**（见 motwindow.go 的 InvokeSync）：
-// 同线程的 SendMessage 就是一次直接调用，不会死等自己。
-func SendClose(hwnd uintptr) {
-	if hwnd == 0 {
-		return
-	}
-	procSendMessageW.Call(hwnd, wmClose, 0, 0)
-}
-
-// isMainWindow 判断这条消息来自**主窗口**（而不是第二扇 mot 窗口）。
-//
-// 为什么需要它：WndProcInterceptor 是**全局**的（WindowsOptions 里那一个），进程里每一扇窗口的消息都会
-// 走到 HandleMsg。不判的话 mot 窗口点 X 会被 WM_CLOSE 那条当成"用户点了主窗口的 X"而假隐藏 ——
+// 为什么需要它：WndProcInterceptor 是**全局**的（WindowsOptions 里那一个），进程里每一扇顶层窗口的消息
+// 都会走到 HandleMsg。不判的话，别的窗口点 X 会被 WM_CLOSE 那条当成"用户点了主窗口的 X"而假隐藏 ——
 // 窗口关不掉、toolHidden 还被立起来，主窗口的热键与托盘全乱 ✗。
 //
 // ⚠️ 这里**只准做整数比较**，不许分配、不许调 Win32：这个回调跑在 Windows 的系统线程上（g0），

@@ -608,14 +608,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         </>
     )
 
-    /** 标题那一行：弹层与独立窗口共用。 */
+    /** 标题 = `<角色码>_<动画号>`（弹窗标题与调试都用它）。 */
     const title = `${charCode}_${motion}`
 
-    /** 保存并部署：一直可点——没改动时点了也只是读一遍。 */
-    const saveButton = <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
-
-    /* 失败条 + 滚动区：弹层与独立窗口共用。
-       按钮排**不共用**：用户把保存挪到了标题右边，独立窗口里也没有"取消"了（退出靠 Esc / 窗口的 X）。 */
+    /* 失败条 + 滚动区。按钮排在标题那一行里（见下面的 DialogHeader）。 */
     const body = (
         <>
             {failure && <p className="text-xs text-destructive">{failure}</p>}
@@ -673,7 +669,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                             <Button variant="outline" onClick={onClose}>
                                 {t.cancel}
                             </Button>
-                            {saveButton}
+                            {/* 保存并部署：一直可点 —— 没改动时点了也只是读一遍。 */}
+                            <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
                         </div>
                     </div>
                 </DialogHeader>

@@ -290,6 +290,34 @@ function SortableTrackRow({row, index, columns, t, selected, diff, onSelect, onE
     )
 }
 
+/**
+ * 两张轨表共用的表头：`#`/握把那格 + 各列。`labels` 就是列名（两张表都是拿列名当 key —— 同表内唯一）。
+ *
+ * `#` 那格分成两半（行号 + 握把那半截的占位）：不这么画，表体里那条分隔竖线到表头就断了。
+ */
+function TrackTableHead({labels}: {labels: string[]}) {
+    return (
+        <thead>
+            <tr>
+                <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium text-base md:text-sm">
+                    <div className="flex items-stretch">
+                        <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
+                        <div className="w-8 shrink-0 leading-6" />
+                    </div>
+                </th>
+                {labels.map((label) => (
+                    <th
+                        key={label}
+                        className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap text-base md:text-sm"
+                    >
+                        {label}
+                    </th>
+                ))}
+            </tr>
+        </thead>
+    )
+}
+
 /** 通用轨的表格：列是后端给的（该轨所有属性的并集，按首次出现排），格子直接改，行拖握把重排。 */
 export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}: {
     table: TrackTable | undefined
@@ -327,26 +355,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                 任何东西叠（标题那层不再有边框），收起时表格根本不挂载。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
-                    <thead>
-                        <tr>
-                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium text-base md:text-sm">
-                                {/* 表头这一格也分成两半（`#` + 握把那半截的占位）：不这么画，
-                                    表体里那条分隔竖线到表头就断了。 */}
-                                <div className="flex items-stretch">
-                                    <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
-                                    <div className="w-8 shrink-0 leading-6" />
-                                </div>
-                            </th>
-                            {table.columns.map((column) => (
-                                <th
-                                    key={column}
-                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap text-base md:text-sm"
-                                >
-                                    {column}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
+                    <TrackTableHead labels={table.columns} />
                     <tbody>
                         <SortableContext items={table.rows.map((_, index) => index)} strategy={verticalListSortingStrategy}>
                             {table.rows.map((row, index) => (
@@ -843,25 +852,7 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                 min-w-full 同上：flags 的这几列通常比容器窄，不补满右边就会空出一截。 */}
             <div className="overflow-x-auto overflow-y-hidden border table-border">
                 <table className="min-w-full border-separate border-spacing-0 text-xs [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0">
-                    <thead>
-                        <tr>
-                            <th className="handle-divider sticky top-0 left-0 z-50 w-[68px] border-r border-b bg-[#1f1f1f] p-0 text-center font-medium text-base md:text-sm">
-                                {/* 同通用轨：`#` 与握把那半截各占一半，分隔线才会一路贯通。 */}
-                                <div className="flex items-stretch">
-                                    <div className="w-9 shrink-0 px-1.5 leading-6">#</div>
-                                    <div className="w-8 shrink-0 leading-6" />
-                                </div>
-                            </th>
-                            {columns.map((column) => (
-                                <th
-                                    key={column.label}
-                                    className="sticky top-0 z-10 border-r border-b bg-[#1f1f1f] px-2 py-1 text-center font-medium whitespace-nowrap text-base md:text-sm"
-                                >
-                                    {column.label}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
+                    <TrackTableHead labels={columns.map((column) => column.label)} />
                     <tbody>
                         <SortableContext items={rows.map((_, index) => index)} strategy={verticalListSortingStrategy}>
                             {rows.map((row, index) => (
