@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from "react"
+import {flushSync} from "react-dom"
 import {cn} from "cn"
 import {
     DndContext,
@@ -457,6 +458,23 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
     /** 静态态那个按钮（关闭后焦点回它，见 ComboboxContent 的 finalFocus）✓ */
     const btnRef = useRef<HTMLButtonElement>(null)
 
+    /**
+     * 本格的收尾：收列表 + 退编辑 + 清掉查询串 + 焦点交给静态按钮。
+     *
+     * ⚠️ 前几件事和"交焦点"必须挤在**同一个任务**里（`flushSync` 当场把静态按钮挂上，紧接着同步
+     * focus）：否则从输入框卸载到按钮拿到焦点之间，`td` 的 `:focus-within` 会空掉一阵，焦点环闪一下 ✗
+     *（实测：选中一项那条路空 19 帧、Esc 退编辑那条路空 2 帧，都看得见）。
+     * `preventScroll`：免得 focus 顺手把表格滚一格。
+     */
+    const endEdit = () => {
+        flushSync(() => {
+            setOpen(false)
+            setEditing(false)
+            setQuery("")
+        })
+        btnRef.current?.focus({preventScroll: true})
+    }
+
     // 一行：`数值`（**贴格子左边缘**，占一个定宽槽 w-21 = 84px）+ **2 个空格** + 描述。
     //   4          允许闪避
     //   1073741856  允许攻击命中
@@ -517,8 +535,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                         // 这里不能关下拉/退编辑态，否则用户一清空就被踢出输入状态（用户明确要求保持 ✗）。
                         if (next === null) return
                         if (next !== value) onCommit(next)
-                        setOpen(false)
-                        setEditing(false) // 选完就收工：回到静态文本（与 Esc 只收列表不同）
+                        endEdit()
                     }}
                 >
                     {/* 单元格自己就是一个 **InputGroup**（官方 Combobox 的用法）：里面那个 input 是数值，
@@ -566,19 +583,7 @@ function FlagCell({value, meaningOf, unchanged, options, tdClassName, onCommit}:
                                     setOpen(false)
                                     return
                                 }
-                                setEditing(false)
-                                setQuery("")
-                                // 这一下没有弹层收尾，组件的 finalFocus 不会被调用 → 焦点自己交给静态按钮
-                                // （不然它会掉到弹窗容器上，焦点环和 Tab 顺序都断在这一格 ✗）。
-                                // 用**双 rAF**：输入框卸载那一帧，Base UI 的焦点管理会把焦点收进弹窗容器
-                                // （实测），得等它跑完再抢回来；用户要是已经点到别处就不抢 ✓（这个 effect
-                                // 之外没有人再动焦点）。
-                                requestAnimationFrame(() => {
-                                    requestAnimationFrame(() => {
-                                        if (cellRef.current?.contains(document.activeElement)) return
-                                        btnRef.current?.focus()
-                                    })
-                                })
+                                endEdit()
                             }}
                             className="w-21 shrink-0 bg-transparent p-0 text-left text-base tabular-nums outline-none placeholder:text-foreground md:text-sm"
                         />
