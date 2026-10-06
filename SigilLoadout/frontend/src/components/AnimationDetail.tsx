@@ -77,7 +77,7 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
 /**
  * 动画详情页。
  *
- * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「通用轨」的清单里点一个号。
+ * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「轨迹表」的清单里点一个号。
  * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨 + FSM。
  */
 export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {

@@ -52,6 +52,7 @@ import {AnimationDetail} from "@/components/AnimationDetail"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
+import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
@@ -68,8 +69,11 @@ const isReadOnlyColumn = (key: string) => key === "id_" || key === "abilityTag_"
 // 两档，**内边距别混在同一格里**：td 这里是普通模板字符串，不过 cn()（只有它带 tailwind-merge），
 // 谁赢由样式表里 p 与 px/py 的先后决定（p 排在前面），写成 "px-2 py-1 p-0" 时 p-0 一点用都没有、
 // 格子照样被撑开。只读格（id_）用带内边距那档；可编辑格不带——里面那个输入框要**铺满整格**。
+// 字号与**可编辑格完全一致**（`text-base md:text-sm`，本窗口下 14px）：这里的两种用法 —— 表头 th 与
+// 只读格 td —— 都不走 EditableCell，光靠 ACTION_CELL 会继承表格那层 text-xs（12px），于是表头/只读列
+// 比邻格小一号（用户实测：表头要 14px、id_ 与 abilityTag_ 两列也要 14px）。字重不变（表头 500、表体 400）。
 const ACTION_CELL = "border-r border-b align-middle whitespace-nowrap"
-const ACTION_CELL_PAD = `${ACTION_CELL} px-2 py-1`
+const ACTION_CELL_PAD = `${ACTION_CELL} px-2 py-1 text-base md:text-sm`
 
 // 这两类是"改一段动作链"要一起动的格子，**表头**都用反色标出来
 // （bg-primary / text-primary-foreground，与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）：
@@ -445,13 +449,11 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     const [idsText, setIdsText] = useState("")
     const [idsApplied, setIdsApplied] = useState("")
 
-    // 下方那块地方归谁：顶栏那个开关按钮在「通用轨」与「动作表」之间切（**默认通用轨**，
-    // 切一下才到动作表）；旁边那个「全局参数」按钮是**临时**换到第三块地方。
+    // 下方那块地方归谁：顶栏那个 ToggleGroup 在「动作表 / 轨迹表 / 全局参数」三块之间单选切换
+    //（**默认动作表**，即 "actions"）。
     // 三块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
     // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
-    const [section, setSection] = useState<"general" | "actions" | "globals">("general")
-    // 进「全局参数」之前在看哪一块：再点一次那个按钮要**回到原来那一块**（不是回到某个固定的页签）。
-    const [beforeGlobals, setBeforeGlobals] = useState<"general" | "actions">("general")
+    const [section, setSection] = useState<"general" | "actions" | "globals">("actions")
     // 「动画详情」：正在看哪个 motion（null = 没开）。
     //
     // ⚠️ 这里以前是"开一扇独立窗口"（motwindow.go），理由与「全局参数」那条完全一样：第二扇窗口的
@@ -656,21 +658,6 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
         setBusy(false)
     }
 
-    /**
-     * 「全局参数」按钮：点一下把下方那块地方换成那十几张表的清单，再点一下**回到进去之前看的那一块**。
-     *
-     * 清单是**临时的第三块地方**，不是第四个页签：这些表不分角色（路径里没有角色码），做成页签就等于把它
-     * 和"当前角色"摆在同一层，看着像跟着角色走的东西。
-     */
-    const toggleGlobals = () => {
-        if (section === "globals") {
-            setSection(beforeGlobals)
-            return
-        }
-        setBeforeGlobals(section)
-        setSection("globals")
-    }
-
     return (
         <div className="flex h-full min-h-0 flex-col">
             {/*
@@ -706,8 +693,9 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         样式一律用 Input 的默认：**只给一个宽度**——它的基类自带 w-full，放进这一行会独占整行。 */}
                     {/* 搜索动作 id 的输入框：按官方 InputGroup 的写法，放大镜作为 addon 排在框**里面**的左边
                         （addon 默认 align=inline-start，CSS 是 order-first；裸 svg 由 addon 自己给 size-4）。
-                        宽度从原来 Input 的 className 挪到 InputGroup 上——Input 基类自带 w-full。 */}
-                    <InputGroup className="w-[200px]">
+                        宽度：`flex-1` —— **吃掉这一行的剩余空间**（用户要求；原来是写死的 200px，右边空出一截）。
+                        宽度写在 InputGroup 上而不是 Input 上：Input 基类自带 w-full，它自己撑满外层就行。 */}
+                    <InputGroup className="flex-1">
                         <InputGroupInput
                             value={idsText}
                             onChange={(e) => setIdsText(e.target.value)}
@@ -721,24 +709,32 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                             <Search />
                         </InputGroupAddon>
                     </InputGroup>
-                    {/* 通用轨 / 动作表 的开关。按钮上写的是**点一下会去的那一块**（目标），不是当前看着的
-                        那一块 —— 所以看着动作表时它写「通用轨」，反之亦然。
-                        **不给任何自定义类**：就用 Button 的 outline 变体原样（字号/字重/字色/底色都由它定），
-                        留在左边这一组（`ml-auto` 在「全局参数」上，右边那一组才被顶到最右）。
-                        默认停在「通用轨」（section 初值 general）。 */}
-                    <Button
+                    {/* 三块地方（动作表 / 轨迹表 / 全局参数）的切换：**单一选中态**的 ToggleGroup。
+                        原来是两个"开关式"按钮，各有一个毛病：
+                          · 「通用轨 / 动作表」那个按钮，文字写的是**点一下会去的那一块**（目标），不是当前
+                            看着的那一块 ✗ —— 看着动作表时它写着「通用轨」。
+                          · 「全局参数」那个要靠 beforeGlobals 记住"进去之前看的是哪块" ✗。
+                        单选之后两个毛病一起没了：三个标签就是三块自己的名字，选中态就是 section 本身。
+                        `multiple={false}` 必须**显式**给（Base UI 的 ToggleGroup 默认是多选）；`value` 是数组，
+                        取第一个。与「保存」同属右边那一组（用户要求：紧挨保存）—— 搜索框现在 flex-1 吃掉剩余
+                        空间，`ml-auto` 只是兜底（外面那一行 flex-wrap 一旦换行，它仍把这组顶到最右）。
+                        「全局参数」是**临时的第三块地方**、不是第四个页签：那些表不分角色（路径里没有角色码），
+                        做成页签就等于把它和"当前角色"摆在同一层，看着像跟着角色走的东西。 */}
+                    <ToggleGroup
+                        className="ml-auto"
                         variant="outline"
-                        onClick={() => setSection((prev) => (prev === "actions" ? "general" : "actions"))}
+                        multiple={false}
+                        value={[section]}
+                        onValueChange={(next) => {
+                            const picked = next[0]
+                            // 取到的就是下面三个 Item 的 value（TS 只把它们当 string，这里收回联合类型）。
+                            if (picked) setSection(picked as typeof section)
+                        }}
                     >
-                        {section === "actions" ? t.generalTracks : t.actionsSection}
-                    </Button>
-                    {/* 「全局参数」：解包目录 system\player\ 下那十几张**不分角色**的表。
-                        点一下把下方那块地方换成表名清单，再点一下回原来那一块。
-                        它和保存是**右边那一组**（用户要求：紧挨保存），`ml-auto` 因此挂在这里 —— 顶到最右的是
-                        这一组，不是保存自己。**不给任何自定义类**：与旁边那个开关同一个 outline 长相。 */}
-                    <Button className="ml-auto" variant="outline" onClick={toggleGlobals}>
-                        {t.globalParams}
-                    </Button>
+                        <ToggleGroupItem value="actions">{t.actionsSection}</ToggleGroupItem>
+                        <ToggleGroupItem value="general">{t.generalTracks}</ToggleGroupItem>
+                        <ToggleGroupItem value="globals">{t.globalParams}</ToggleGroupItem>
+                    </ToggleGroup>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
                         松紧不一，英文 Save 那档就白留一截）。
