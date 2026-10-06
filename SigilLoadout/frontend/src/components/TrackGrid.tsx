@@ -30,7 +30,7 @@ import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
 import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
 import {Combobox, ComboboxContent, ComboboxItem, ComboboxList} from "@/components/ui/combobox"
-import {EditableCell} from "@/components/ActionsPanel"
+import {EditableCell} from "@/components/EditableCell"
 import {FLAG0_NAMES, FLAG0_VALUES, FLAG1_NAMES, FLAG1_VALUES, flagEffects, flagValueOptions} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
