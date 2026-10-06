@@ -251,7 +251,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
    （受控 query、两级 Esc、焦点在输入框与列表之间的来回），和"表格 / 行 / 拖拽"不是一件事。 */
 
 /** flags 的一行。同 SortableTrackRow，只是格子按 flags 那几列渲染。 */
-function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onExtend, onEdit}: {
+function SortableFlagRow({row, index, columns, t, selected, diff, original, onSelect, onExtend, onEdit}: {
     row: FlagRow
     index: number
     columns: {label: string; key: keyof FlagRow; text?: (row: FlagRow) => string; picker?: "flag0" | "flag1"; align?: "center"}[]
@@ -259,6 +259,8 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
     selected: boolean
     /** 这一行与原表不同的列；null = 整行与原表一致（整行灰）。 */
     diff: Set<string> | null
+    /** 这一行对应的**原表那一行**（新行没有）。选值列表靠它标出"原值就置着的位"。 */
+    original?: FlagRow
     onSelect: (shift: boolean) => void
     onExtend: () => void
     onEdit: (key: keyof FlagRow, value: string) => void
@@ -318,6 +320,7 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
                             value={raw}
                             names={names}
                             unchanged={!diff || !diff.has(String(column.key))}
+                            original={original ? String(original[column.key] ?? "") : undefined}
                             tdClassName={tdClassName}
                             onCommit={(value) => onEdit(column.key, value)}
                         />
@@ -349,12 +352,14 @@ function SortableFlagRow({row, index, columns, t, selected, diff, onSelect, onEx
 }
 
 /** flags 的专用表格：只列有意义的那几列；Flag0 / Flag1 是**选值格**（数值 + 含义同一格，点开选值）。 */
-export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}: {
+export function FlagsGrid({rows, sel, t, diffs, originals, onSelect, onExtend, onEdit, onReorder}: {
     rows: FlagRow[]
     sel: {from: number; to: number} | null
     t: Messages
     /** 每行与原表的差异列（下标与行一一对应，见 diffRows）。 */
     diffs: (Set<string> | null)[] | undefined
+    /** 原表那些行（后端 LoadFlagsOriginal）：选值列表靠它标出"原值就置着的位"。 */
+    originals?: FlagRow[]
     onSelect: (index: number, shift: boolean) => void
     onExtend: (index: number) => void
     onEdit: (index: number, key: keyof FlagRow, value: string) => void
@@ -382,6 +387,11 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
     ]
     const inRange = (index: number) =>
         sel !== null && index >= Math.min(sel.from, sel.to) && index <= Math.max(sel.from, sel.to)
+    // 行身份 `orig` = 这一行对应原表第几行（新行是 -1，没有对应）。选值列表拿原行标"原值灰"。
+    const originalOf = (row: FlagRow) => {
+        const orig = (row as Marked<FlagRow>).orig
+        return orig !== undefined && orig >= 0 ? originals?.[orig] : undefined
+    }
     return (
         <DndContext
             sensors={sensors}
@@ -406,6 +416,7 @@ export function FlagsGrid({rows, sel, t, diffs, onSelect, onExtend, onEdit, onRe
                                     columns={columns}
                                     t={t}
                                     diff={diffs?.[index] ?? null}
+                                    original={originalOf(row)}
                                     selected={inRange(index)}
                                     onSelect={(shift) => onSelect(index, shift)}
                                     onExtend={() => onExtend(index)}
