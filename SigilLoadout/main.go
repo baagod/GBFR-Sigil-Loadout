@@ -116,6 +116,12 @@ func main() {
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
+	// 动画详情那扇独立窗口（mot）：开/关注入给外壳服务，前端就能开它（见 motwindow.go 与 shellservice.go）。
+	shellService.BindMotionWindow(openMotionWindow, closeMotionWindow)
+	// 主窗口句柄交给后台去记：全局的 WndProc 拦截器靠它把 mot 窗口的消息挡在状态机之外
+	// （见 window/win32.go 的 isMainWindow）。这里不能同步取 —— 这一刻原生窗口还没落地，取到的是 0，
+	// 而 0 会让拦截器放行一切，mot 窗口的 WM_CLOSE 就会被当成主窗口的命令拿去假隐藏 ✗。
+	window.WatchMainWindow()
 	// 四条链的写入都带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
 	// 否则最后一次编辑就丢了（service 里那四个 FlushNow 都是一行转调，见 debouncedwrite.go）。
 	for _, flush := range []func(){

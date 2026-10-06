@@ -13,7 +13,7 @@ import {
 } from "../../bindings/sigilloadout/service/actionsservice"
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
-import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid, TrackToolbar, type Marked} from "@/components/TrackGrid"
 import {withNewRow} from "@/lib/actionflags"
@@ -80,11 +80,16 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
  * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「通用轨」的清单里点一个号。
  * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨 + FSM。
  */
-export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
+export function AnimationDetail({motion: initialMotion, charCode, t, onClose, inWindow = false}: {
     motion: string
     charCode: string
     t: Messages
     onClose: () => void
+    /**
+     * true = 这一份内容渲染在**独立窗口**里（没有弹层外壳，整扇窗口都是它，见 MotionWindow.tsx）；
+     * 默认 false = 页面内的模态弹层。两条路共用下面同一份 body，只有外壳不同。
+     */
+    inWindow?: boolean
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])
     // 当前真正载入的动画号：进来那一个（保留成 state 是为了载入与改动都按同一个名字办事）。
@@ -587,12 +592,62 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         </>
     )
 
+    /** 标题那一行：弹层与独立窗口共用。 */
+    const title = `${charCode}_${motion}`
+
+    /* 失败条 + 滚动区 + 按钮排：弹层与独立窗口共用同一份（只有外壳不同，见 inWindow）。 */
+    const body = (
+        <>
+            {failure && <p className="text-xs text-destructive">{failure}</p>}
+
+            {/* scrollbar-gutter-stable：内容高过一屏时这条滚动条会出现，若不留预留位就会吃掉
+                约 15px 横向空间、整块内容跟着重排（一出一进就是抖动）。预留之后它出现/消失都不动布局。
+                pr-2 是滚动条与表格之间的 8px，在预留位**内侧**，所以那点间距不受影响。 */}
+            <div className="min-h-0 flex-1 overflow-auto pr-2 scrollbar-gutter-stable">
+                {loaded && infos.length === 0 && (
+                    <p className="text-xs text-muted-foreground">{t.trackNone}</p>
+                )}
+                {/* 三条轨（flags/effect/attack…）+ FSM：常开、直接铺开，右侧没有折叠箭头。
+                    整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
+                {loaded && sections}
+            </div>
+
+            {/* 按钮排：取消在左、主操作在右（照官方示例）。保存**一直可点**——没改动时点了也只是读一遍。
+                独立窗口里不能用 DialogFooter（它内部那条可选的 Close 会依赖 Dialog 上下文），这里自己排。 */}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={onClose}>
+                    {t.cancel}
+                </Button>
+                <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
+            </div>
+        </>
+    )
+
+    /*
+        独立窗口模式：整扇窗口都是它，没有弹层外壳。尺寸由**窗口自己**定（motwindow.go：客户区 1080×800），
+        所以这里只是铺满 + 内边距与弹层一致（p-6 / gap-6）。标题用 <h2>：DialogTitle 走 Base UI 的
+        Dialog 上下文，离开 <Dialog> 会报错 ✗。
+    */
+    if (inWindow) {
+        return (
+            <div className="flex h-screen flex-col gap-6 bg-popover p-6 text-sm text-popover-foreground">
+                <h2 className="font-heading text-base leading-none font-medium">{title}</h2>
+                {body}
+            </div>
+        )
+    }
+
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-            {/* 宽度 836。⚠️ 两条都要带变体/正确写法：
-                1) 基类里那条是 `sm:max-w-md`（448px），带变体的类跟无变体的 max-w 不算同一冲突组，
-                   必须写 `sm:max-w-[836px]` 才顶得掉它，否则"写了 836 却仍是 448"；
-                2) `max-w-full` 兜住更小的窗口（此时弹层铺满、不溢出）。 */}
+            {/* 尺寸 1080 × 800（用户给的），**但绝不能超出主窗口**。
+                这里踩过两个坑，别再往回改：
+                1) 基类里那条 `sm:max-w-md`（448px）带变体，无变体的 `max-w-full` 顶不掉它
+                   → 必须用**同变体**的 `sm:max-w-none` 把它放掉；
+                2) 反过来，若在调用点写 `sm:max-w-[1080px]`，它在 ≥sm 时**压过** `max-w-full`
+                   （媒体查询里的声明更晚生效）→ 窗口只有 900 宽时弹层照样 1080、直接溢出去 ✗
+                   （用户截图就是这一版）。所以宽度写成 `min(1080px, 100vw - 2rem)` 自带视口兜底。
+                高度同思路：目标 800，小窗口下 `calc(100vh - 2rem)` 兜底（和宽度同样留 16px 边）。
+                ⚠️ 现在 mot 走的是**独立窗口**（见 MotionWindow.tsx），这条弹层路只剩"渲染成弹层"时才会用到。 */}
             <DialogContent
                 showCloseButton={false}
                 /**
@@ -602,37 +657,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                  * （这是 Base UI `DialogPopup` 自带的 prop，见 DialogPopup.d.ts:24 ✓）
                  */
                 initialFocus={() => false}
-                className="flex max-h-[88vh] w-[836px] max-w-full flex-col sm:max-w-[836px]"
+                className="flex h-[min(800px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col sm:max-w-none"
             >
                 <DialogHeader>
                     {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
-                    <DialogTitle className="text-base font-medium">
-                        {`${charCode}_${motion}`}
-                    </DialogTitle>
+                    <DialogTitle className="text-base font-medium">{title}</DialogTitle>
                 </DialogHeader>
-
-                {failure && <p className="text-xs text-destructive">{failure}</p>}
-
-                {/* scrollbar-gutter-stable：内容高过一屏时这条滚动条会出现，若不留预留位就会吃掉
-                    约 15px 横向空间、整块内容跟着重排（一出一进就是抖动）。预留之后它出现/消失都不动布局。
-                    pr-2 是滚动条与表格之间的 8px，在预留位**内侧**，所以那点间距不受影响。 */}
-                <div className="min-h-0 flex-1 overflow-auto pr-2 scrollbar-gutter-stable">
-                    {loaded && infos.length === 0 && (
-                        <p className="text-xs text-muted-foreground">{t.trackNone}</p>
-                    )}
-                    {/* 三条轨（flags/effect/attack…）+ FSM：常开、直接铺开，右侧没有折叠箭头。
-                        整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
-                    {loaded && sections}
-                </div>
-
-                {/* 按钮那排用官方的 DialogFooter（右对齐、自带间隔与换行）。
-                    顺序照官方示例：取消在左、主操作在右。保存**一直可点**——没改动时点了也只是读一遍。 */}
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        {t.cancel}
-                    </Button>
-                    <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
-                </DialogFooter>
+                {body}
             </DialogContent>
         </Dialog>
     )

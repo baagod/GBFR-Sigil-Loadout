@@ -48,7 +48,7 @@ import {
 import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
-import {AnimationDetail} from "@/components/AnimationDetail"
+import {CloseMotionWindow, OpenMotionWindow} from "../../bindings/sigilloadout/service/shellservice"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {charCodeOf, isMotion} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
@@ -443,8 +443,6 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     const [idsText, setIdsText] = useState("")
     const [idsApplied, setIdsApplied] = useState("")
 
-    // 动画详情页显示的是哪个动画号（null = 关着）。
-    const [detail, setDetail] = useState<string | null>(null)
     // 下方那块地方归谁：顶栏那个开关按钮在「通用轨」与「动作表」之间切（**默认通用轨**，
     // 切一下才到动作表）。
     // 两块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
@@ -519,11 +517,13 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     }
 
     /**
-     * 双击 saveMotIdNN_：把那格的动画号读出来（四位十六进制小写），弹出**动画详情页**——四条轨都在
-     * 那一层里看、改、存（flags 也在那边，主面板不再有第二处 flags 表）。
+     * 双击 saveMotIdNN_：把那格的动画号读出来（四位十六进制小写），打开**动画详情那扇独立窗口**
+     * （四条轨都在那边看、改、存；flags 也在那边，主面板不再有第二处 flags 表）。
      *
      * 格子里没填时**用原值**：这一页现在是"原值灰显为占位符、留空 = 不动"，所以没改过的格子输入框是空的
      * ——双击它当然也该打开它原本指向的那个动画（原值就在占位符里）。
+     *
+     * ⚠️ 窗口是**单例**（Go 侧守着）：已经开着一扇时这一记只把它提到前台，不会开出第二扇。
      */
     const openMotion = (id: string, key: string) => {
         const typed = (draft[id]?.[key] ?? "").trim().toLowerCase()
@@ -532,17 +532,20 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
             console.error(t.badMotion(value))
             return
         }
-        setDetail(value)
+        void OpenMotionWindow(value, charCode)
     }
 
     /**
      * 换角色：后端把三条路径（动作表 / 轨 / FSM）**一次**换掉，然后这一页整个重读。
      *
      * 换角色等于换一张表：动作表里没保存的草稿要清掉——留着就是把旧角色的改动写到新角色头上。
+     * mot 窗口也要**先关掉**：它的保存走的是后端那份"当前角色"，换角色之后从旧窗口点保存会写到
+     * 新角色目录下 ✗（那扇窗口的数据是按旧角色读的）。
      */
     const switchCharacter = async (code: string) => {
         setBusy(true)
         try {
+            CloseMotionWindow()
             await SetCharacter(code)
             setActionsDirty(false)
             await loadAll()
@@ -706,7 +709,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         section === "general" ? "flex-1" : "h-0 overflow-hidden -mt-4"
                     }`}
                 >
-                    <HiddenMotionList t={t} charCode={charCode} onOpen={(motion) => setDetail(motion)} />
+                    <HiddenMotionList t={t} charCode={charCode} onOpen={(motion) => void OpenMotionWindow(motion, charCode)} />
                 </div>
                 <div
                     className={`flex min-h-0 flex-col ${
@@ -791,15 +794,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                 </div>
             </div>
 
-            {/* 动画详情页：点动画号弹出来的那一层（四条轨 + FSM）。 */}
-            {detail && (
-                <AnimationDetail
-                    motion={detail}
-                    charCode={charCode}
-                    t={t}
-                    onClose={() => setDetail(null)}
-                />
-            )}
+            {/* 动画详情不再在这里弹层：它是一扇**独立窗口**（Go 侧开，见 motwindow.go / MotionWindow.tsx）。 */}
         </div>
     )
 }

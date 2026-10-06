@@ -122,6 +122,11 @@ func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _
 	if w == nil {
 		return 0, false
 	}
+	// 拦截器是全局的：mot 窗口（动画详情那扇独立的窗口）的消息也会走到这里。它**不归这套状态机管** ——
+	// 放它进来点 X 会被假隐藏（关不掉），还会把 toolHidden 立起来，主窗口的热键与托盘跟着乱 ✗。
+	if !isMainWindow(hwnd) {
+		return 0, false
+	}
 	switch msg {
 	case 0x0010: // WM_CLOSE：假隐藏到托盘（WebView 保持活着）
 		if quitting.Load() {
