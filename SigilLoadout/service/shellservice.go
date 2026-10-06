@@ -9,50 +9,12 @@ import (
 // 服务的职责是读 mod 数据、把玩家配置写到本地。
 type ShellService struct {
 	exit *application.MenuItem
-	// 动画详情那扇**独立窗口**的开/关由 main 注入：窗口是应用级的东西（app.Window.NewWithOptions），
-	// service 包拿不到 app，而反向 import main 不成（循环）。注入之后这里只是两行转调。
-	openMotion  func(motion, charCode string) error
-	showMotion  func()
-	closeMotion func()
 }
 
 // NewShellService 接住托盘菜单里那条"退出"：菜单由 main 造（NewMenu 不碰 globalApplication，
 // 所以能在 application.New() 之前造），文案之后由前端按当前语言推过来（见 SetTrayExitLabel）。
 func NewShellService(exit *application.MenuItem) *ShellService {
 	return &ShellService{exit: exit}
-}
-
-// BindMotionWindow 由 main 注入 mot 窗口的开/显示/关（见 motwindow.go）。不注入时三个方法都是空转。
-//
-// show 是分开的一条：那扇窗口是 Hidden 建出来的，要等**前端画完第一帧**再显示（见 motwindow.go），
-// 否则屏幕上会先闪一个空框。
-func (s *ShellService) BindMotionWindow(open func(motion, charCode string) error, show func(), close func()) {
-	s.openMotion = open
-	s.showMotion = show
-	s.closeMotion = close
-}
-
-// OpenMotionWindow 由前端在"双击动画号 / 点隐藏 mot 清单里的一行"时调用。
-// 单例：已经有一扇就直接前置，不新建（这条限制在 main 那边的 openMotionWindow 里）。
-func (s *ShellService) OpenMotionWindow(motion, charCode string) error {
-	if s.openMotion == nil {
-		return nil
-	}
-	return s.openMotion(motion, charCode)
-}
-
-// ShowMotionWindow 由 mot 窗口自己在画完第一帧后调用（见 MotionWindow.tsx）。
-func (s *ShellService) ShowMotionWindow() {
-	if s.showMotion != nil {
-		s.showMotion()
-	}
-}
-
-// CloseMotionWindow 由 mot 窗口里那排按钮调用（取消）。
-func (s *ShellService) CloseMotionWindow() {
-	if s.closeMotion != nil {
-		s.closeMotion()
-	}
 }
 
 // MinimiseApp 由前端在 Esc 时调用（见 App.tsx），好把窗口收进托盘；X 按钮走 window 包的 WndProc

@@ -116,13 +116,12 @@ func main() {
 		Hidden:           false,
 		BackgroundColour: application.NewRGB(10, 10, 10),
 	})
-	// 动画详情那扇独立窗口（mot）：开/显示/关注入给外壳服务，前端就能用它们（见 motwindow.go 与
-	// shellservice.go）。单例。show 单独一条：那扇窗口是 Hidden 建的，要等前端画完第一帧再显示。
-	// （「全局参数」那张表不再是独立窗口：它在主窗口里用一个 dialog 显示，见 GlobalParamPanel.tsx。）
-	shellService.BindMotionWindow(openMotionWindow, showMotionWindow, closeMotionWindow)
-	// 主窗口句柄交给后台去记：全局的 WndProc 拦截器靠它把 mot 窗口的消息挡在状态机之外
+	// 两扇工具页（「全局参数」与「动画详情」）都**不再是独立窗口**了：前者是页面里的一栏，后者是
+	// 主窗口里的 dialog（见 ActionsPanel / GlobalParamPanel / AnimationDetail）。少开一扇窗口就少一个
+	// 合成表面，而"第二扇窗口的第一帧永远是它自己的底色"正是用户实测那个黑框的来源。
+	// 主窗口句柄交给后台去记：全局的 WndProc 拦截器靠它把别的窗口的消息挡在状态机之外
 	// （见 window/win32.go 的 isMainWindow）。这里不能同步取 —— 这一刻原生窗口还没落地，取到的是 0，
-	// 而 0 会让拦截器放行一切，mot 窗口的 WM_CLOSE 就会被当成主窗口的命令拿去假隐藏 ✗。
+	// 而 0 会让拦截器放行一切 ✗。
 	window.WatchMainWindow()
 	// 四条链的写入都带防抖，所以关窗口会和定时器赛跑：防抖里还压着的那份必须在退出路上发出去，
 	// 否则最后一次编辑就丢了（service 里那四个 FlushNow 都是一行转调，见 debouncedwrite.go）。

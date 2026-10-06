@@ -80,16 +80,11 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
  * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「通用轨」的清单里点一个号。
  * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨 + FSM。
  */
-export function AnimationDetail({motion: initialMotion, charCode, t, onClose, inWindow = false}: {
+export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     motion: string
     charCode: string
     t: Messages
     onClose: () => void
-    /**
-     * true = 这一份内容渲染在**独立窗口**里（没有弹层外壳，整扇窗口都是它，见 MotionWindow.tsx）；
-     * 默认 false = 页面内的模态弹层。两条路共用下面同一份 body，只有外壳不同。
-     */
-    inWindow?: boolean
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])
     // 当前真正载入的动画号：进来那一个（保留成 state 是为了载入与改动都按同一个名字办事）。
@@ -631,28 +626,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
     )
 
     /*
-        独立窗口模式：整扇窗口都是它，没有弹层外壳。尺寸由**窗口自己**定（motwindow.go：客户区 1080×800），
-        所以这里只是铺满 + 内边距与弹层一致（p-6 / gap-6）。标题用 <h2>：DialogTitle 走 Base UI 的
-        Dialog 上下文，离开 <Dialog> 会报错 ✗。
+        主窗口里的模态弹层（由 ActionsPanel 在点动画号时挂上）。尺寸见下面 DialogContent 那段注释。
 
         按钮：**保存挪到标题右侧、没有取消**（用户要求）—— 标题那一行两端对齐，底下不再有按钮排。
-        关这扇窗口靠 Esc 或窗口的 X（见 MotionWindow.tsx）。
+        关这层靠 Esc、右上角的 X，或标题栏那条（Dialog 自己的行为）。
 
         标题下面那条线（用户要求）把标题与表格分开，用的是全站默认的 --border —— 与主窗口页签下那条
         同一个色（表格自己那些行线走 --input，比它亮一档）。两扇弹窗同一套，见 GlobalParamPanel.tsx。
     */
-    if (inWindow) {
-        return (
-            <div className="flex h-screen flex-col gap-6 p-6 text-sm">
-                <div className="flex items-center justify-between gap-4 border-b pb-4">
-                    <h2 className="font-heading text-base leading-none font-medium">{title}</h2>
-                    {saveButton}
-                </div>
-                {body}
-            </div>
-        )
-    }
-
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             {/* 尺寸 1080 × 800（用户给的），**但绝不能超出主窗口**。
@@ -662,8 +643,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose, in
                 2) 反过来，若在调用点写 `sm:max-w-[1080px]`，它在 ≥sm 时**压过** `max-w-full`
                    （媒体查询里的声明更晚生效）→ 窗口只有 900 宽时弹层照样 1080、直接溢出去 ✗
                    （用户截图就是这一版）。所以宽度写成 `min(1080px, 100vw - 2rem)` 自带视口兜底。
-                高度同思路：目标 800，小窗口下 `calc(100vh - 2rem)` 兜底（和宽度同样留 16px 边）。
-                ⚠️ 现在 mot 走的是**独立窗口**（见 MotionWindow.tsx），这条弹层路只剩"渲染成弹层"时才会用到。 */}
+                高度同思路：目标 800，小窗口下 `calc(100vh - 2rem)` 兜底（和宽度同样留 16px 边）。 */}
             <DialogContent
                 showCloseButton={false}
                 /**

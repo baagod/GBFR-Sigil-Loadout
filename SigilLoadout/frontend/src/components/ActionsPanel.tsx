@@ -48,10 +48,7 @@ import {
 import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
-import {
-    CloseMotionWindow,
-    OpenMotionWindow,
-} from "../../bindings/sigilloadout/service/shellservice"
+import {AnimationDetail} from "@/components/AnimationDetail"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
@@ -455,11 +452,20 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     const [section, setSection] = useState<"general" | "actions" | "globals">("general")
     // 进「全局参数」之前在看哪一块：再点一次那个按钮要**回到原来那一块**（不是回到某个固定的页签）。
     const [beforeGlobals, setBeforeGlobals] = useState<"general" | "actions">("general")
-    // 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
+    // 「动画详情」：正在看哪个 motion（null = 没开）。
     //
-    // ⚠️ 这块以前是"开一扇独立窗口"，后来是"弹一个 dialog"，现在**两者都不要**（用户要求）：直接就是
-    // 页面上的一栏。独立窗口的问题是"第二扇窗口的第一帧永远是它自己的底色"（用户实测的黑框），
-    // dialog 则是多余的一层。
+    // ⚠️ 这里以前是"开一扇独立窗口"（motwindow.go），理由与「全局参数」那条完全一样：第二扇窗口的
+    // 第一帧永远是它自己的底色（≈黑），就是用户实测的"开弹窗闪一下黑框"。现在是主窗口里的 dialog
+    // （AnimationDetail 自己就渲染一个 <Dialog>），没有第二个合成表面。
+    const [motTarget, setMotTarget] = useState<{motion: string; charCode: string} | null>(null)
+
+    /**
+     * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
+     *
+     * ⚠️ 这块以前是"开一扇独立窗口"，后来是"弹一个 dialog"，现在**两者都不要**（用户要求）：直接就是
+     * 页面上的一栏。独立窗口的问题是"第二扇窗口的第一帧永远是它自己的底色"（用户实测的黑框），
+     * dialog 则是多余的一层。
+     */
     const [gpTable, setGpTable] = useState("")
     // 这张表有没有没保存的改动 + 它的"保存"动作：保存按钮在页面工具条上（用户要求：面板里不要保存），
     // 所以由面板把这两样交给这里，`handleSaveAndDeploy` 一起保存。
@@ -549,20 +555,20 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
             console.error(t.badMotion(value))
             return
         }
-        void OpenMotionWindow(value, charCode)
+        setMotTarget({motion: value, charCode})
     }
 
     /**
      * 换角色：后端把三条路径（动作表 / 轨 / FSM）**一次**换掉，然后这一页整个重读。
      *
-     * 换角色等于换一张表：动作表里没保存的草稿要清掉——留着就是把旧角色的改动写到新角色头上。
-     * mot 窗口也要**先关掉**：它的保存走的是后端那份"当前角色"，换角色之后从旧窗口点保存会写到
-     * 新角色目录下 ✗（那扇窗口的数据是按旧角色读的）。
+     * 换角色等于换一张表：动作表里没保存的草稿要清掉 —— 留着就是把旧角色的改动写到新角色头上。
+     * 动画详情那个 dialog 也要**先关掉**：它的数据是按旧角色读的，保存走的又是后端那份"当前角色"，
+     * 换角色之后再点保存就会写到新角色目录下 ✗。
      */
     const switchCharacter = async (code: string) => {
         setBusy(true)
         try {
-            CloseMotionWindow()
+            setMotTarget(null)
             await SetCharacter(code)
             setActionsDirty(false)
             await loadAll()
@@ -753,7 +759,7 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         section === "general" ? "flex-1" : "h-0 overflow-hidden -mt-4"
                     }`}
                 >
-                    <HiddenMotionList t={t} charCode={charCode} onOpen={(motion) => void OpenMotionWindow(motion, charCode)} />
+                    <HiddenMotionList t={t} charCode={charCode} onOpen={(motion) => setMotTarget({motion, charCode})} />
                 </div>
                 <div
                     className={`flex min-h-0 flex-col ${
@@ -866,7 +872,16 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                 </div>
             </div>
 
-            {/* 动画详情仍是一扇**独立窗口**（Go 侧开，见 motwindow.go / MotionWindow.tsx）。 */}
+            {/* 动画详情：主窗口里的 dialog（不再是独立窗口 —— 那扇窗口的第一帧永远是它自己的底色，
+                就是用户实测的"开弹窗闪一下黑框"）。AnimationDetail 自带 <Dialog>，挂上就是弹层。 */}
+            {motTarget && (
+                <AnimationDetail
+                    motion={motTarget.motion}
+                    charCode={motTarget.charCode}
+                    t={t}
+                    onClose={() => setMotTarget(null)}
+                />
+            )}
         </div>
     )
 }
