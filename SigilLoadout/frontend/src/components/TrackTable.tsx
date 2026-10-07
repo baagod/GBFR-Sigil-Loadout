@@ -305,7 +305,7 @@ export function TrackRow({index, columns, values, original, editing, removed, se
                                 `text-base md:text-sm`（本窗口下 14px）—— 光靠表格那层 text-xs 会小一档 ✗。
                                 选中 / 假删除那层也得自己在场：这一格若吸顶，就得是不透明的实色才遮得住
                                 滚过来的列（td 在选中的行里被 tr 让开了，见上面那句 [&>td]:bg-transparent!）。 */}
-                            <div className={`px-1 py-0.5 text-base whitespace-nowrap md:text-sm ${cover}`}>
+                            <div className={`px-1.5 py-0.5 text-base whitespace-nowrap md:text-sm ${cover}`}>
                                 {column.text ? column.text(value) : value}
                             </div>
                         </td>
