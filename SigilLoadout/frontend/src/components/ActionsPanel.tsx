@@ -24,7 +24,7 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useEffect, useMemo, useRef, useState, type CSSProperties} from "react"
+import {memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from "react"
 
 import {
     ActionIDs,
@@ -55,6 +55,7 @@ import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf, isMotion, isSelected} from "@/lib/actionflags"
+import {abilityName} from "@/lib/ability"
 import {useRowSelection} from "@/lib/useRowSelection"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
@@ -87,6 +88,9 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
     ⚠️ 只给差的那一段（不把 `bg-[#1f1f1f]` 与 `bg-primary` 同时写上）：两边都是单类工具类，谁赢只看
     样式表顺序。
 */
+/** 冻结列的左边界：表头与数据格必须用**同一个字符串**，各写一份迟早只改一处、两行错位。 */
+const FROZEN_LEFT = "left-[var(--frozen-left,95px)]"
+
 /** 横向滚动时冻住的数据列（表头那一格由 actionHeaderClass 给同一个 left）。 */
 const FROZEN: Record<string, string> = {
     id_: " text-center sticky left-10 z-40",
@@ -95,7 +99,7 @@ const FROZEN: Record<string, string> = {
     // 记录号是 3~4 位，56px 够用。
     // 左边界是**量出来的**（--frozen-left，见 ActionsPanelBase 的 ResizeObserver）：id_ 列会被等比摊宽，
     // 能力名长短一变、列数一变，摊到的宽度就变，写死像素迟早错位、缝会再露。95px 只是量出来之前的兜底。
-    abilityTag_: " sticky left-[var(--frozen-left,95px)] z-30",
+    abilityTag_: ` sticky ${FROZEN_LEFT} z-30`,
 }
 
 function actionHeaderClass(key: string): string {
@@ -103,7 +107,7 @@ function actionHeaderClass(key: string): string {
     // abilityTag_ 也冻住：左边界紧接着 id_（见 FROZEN 的宽度约定）。它可能同时是被点亮的那几列之一，
     // 所以底色仍然按 isHighlightedColumn 走。
     if (key === "abilityTag_") {
-        return `left-[var(--frozen-left,95px)] z-40 ${isHighlightedColumn(key) ? "bg-primary text-primary-foreground" : "bg-[#1f1f1f]"}`
+        return `${FROZEN_LEFT} z-40 ${isHighlightedColumn(key) ? "bg-primary text-primary-foreground" : "bg-[#1f1f1f]"}`
     }
     if (isHighlightedColumn(key)) return "z-10 bg-primary text-primary-foreground"
     return "z-10 bg-[#1f1f1f]"
@@ -260,42 +264,25 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * 量的是 id_ 那一格的右边界，减去外框的边框（CSS 的 left 是相对 padding box，与这个坐标系一致），
      * 写进 --frozen-left 给两列用。id_ 是第 2 列（第 1 列是行号握把）。
      */
-    const frameRef = useRef<HTMLDivElement | null>(null)
     // null = 还没量到：那时不给 --frozen-left，让样式里的兜底值顶上（比先写成 0 强，0 会让列贴到最左、
     // 压在行号握把上）。
     const [frozenLeft, setFrozenLeft] = useState<number | null>(null)
-    useEffect(() => {
-        // 表格是异步出来的（先 IPC 取数据），挂载那一刻 frame 里可能一行都没有 —— 所以这里用 rAF 一直试，
-        // 量到就停（停之后由 ResizeObserver 接管：换角色/换语言会改列宽）。
-        let raf = 0
-        let observer: ResizeObserver | null = null
+    /** 外框挂上来的那一刻量一次 —— 它就挂在"表格真渲染了"那一帧上（数据没到之前这块整个不挂载），
+     *  行已经在 DOM 里。之后由 ResizeObserver 接管：换角色/换语言会重摊列宽。 */
+    const frameRef = useCallback((frame: HTMLDivElement | null) => {
+        if (!frame) return
         const measure = () => {
-            const frame = frameRef.current
-            const cell = frame?.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
-            if (!frame || !cell) return false
+            const cell = frame.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
+            if (!cell) return
             const box = frame.getBoundingClientRect()
             setFrozenLeft(Math.round(cell.getBoundingClientRect().right - box.left - frame.clientLeft))
-            if (!observer) {
-                observer = new ResizeObserver(() => {
-                    const again = frameRef.current?.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
-                    if (!again) return
-                    const b = frame.getBoundingClientRect()
-                    setFrozenLeft(Math.round(again.getBoundingClientRect().right - b.left - frame.clientLeft))
-                })
-                observer.observe(frame)
-                const table = frame.querySelector("table")
-                if (table) observer.observe(table)
-            }
-            return true
         }
-        const tick = () => {
-            if (!measure()) raf = requestAnimationFrame(tick)
-        }
-        tick()
-        return () => {
-            cancelAnimationFrame(raf)
-            observer?.disconnect()
-        }
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(frame)
+        const table = frame.querySelector("table")
+        if (table) observer.observe(table)
+        return () => observer.disconnect()
     }, [])
 
     /**
@@ -342,11 +329,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                           bg: "bg-background",                          // abilityTag_ 显示成技能名（ability.lang.json，随语言变）：姬塔（AB_PL0100_*）
                           // 与古兰是同一个角色的两个性别、技能相同，改查古兰那份；都查不到（预留槽）就原样
                           // 显示键名，不编造。
-                          text:
-                              key === "abilityTag_"
-                                  ? (tag: string) =>
-                                        abilityNames[tag] ?? abilityNames[tag.replace(/^AB_PL0100/, "AB_PL0000")] ?? tag
-                                  : undefined,
+                          text: key === "abilityTag_" ? (tag: string) => abilityName(abilityNames, tag) : undefined,
                           head: actionHeaderClass(key),
                       }
                     : {label: key, key, kind: "editable", bg: "bg-[#1a1a1a]", head: actionHeaderClass(key)},
