@@ -54,7 +54,8 @@ import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
-import {charCodeOf, clickRow, extendRow, isMotion, isSelected, type RowSelection} from "@/lib/actionflags"
+import {charCodeOf, isMotion, isSelected} from "@/lib/actionflags"
+import {useRowSelection} from "@/lib/useRowSelection"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
@@ -229,24 +230,11 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
     // （AnimationDetail 自己就渲染一个 <Dialog>），没有第二个合成表面。
     const [motTarget, setMotTarget] = useState<{motion: string; charCode: string} | null>(null)
     /**
-     * 动作表的行选中。**只做选中与高亮**（这张表的行是"记录"，没有行序可换，所以不接拖拽 ——
-     * 这一点与轨表不同）。语义见 actionflags.ts 的 clickRow：点 = 只选这一行、Shift = 拉一段、
-     * Ctrl = 逐个增删。
+     * 动作表的行选中（**只做选中与高亮** —— 这张表的行是"记录"，没有行序可换，所以不接拖拽，这一点与轨表
+     * 不同）。点 / Shift / Ctrl / 按住划过那套手感全在 useRowSelection 里，两张表同一份。
+     * 这张表只有一张，所以 key 用一个常量。
      */
-    const [sel, setSel] = useState<RowSelection | null>(null)
-    /**
-     * 正按着行号那格（用来支持"按住划过一片"连续扩选）。
-     *
-     * ⚠️ 必须是**按住**才扩：只按"鼠标划过"就扩的话，选区会被随手一划莫名其妙地改掉 ✗。
-     */
-    const [dragging, setDragging] = useState(false)
-    useEffect(() => {
-        if (!dragging) return
-        // 在哪儿松手都算结束（划出表格、划到窗口外都收得住）。
-        const stop = () => setDragging(false)
-        window.addEventListener("mouseup", stop)
-        return () => window.removeEventListener("mouseup", stop)
-    }, [dragging])
+    const {sel, select, extendTo} = useRowSelection<"actions">()
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -626,15 +614,10 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                                     diff={null}
                                     handle={ACTION_HANDLE}
                                     t={t}
-                                    // 只认左键；Shift 拉一段、Ctrl 逐个增删（与轨表的 # 一致）。
-                                    onSelect={(shift, ctrl) => {
-                                        setSel((prev) => clickRow(prev, index, {shift, ctrl}))
-                                        setDragging(true)
-                                    }}
-                                    // 按住划过一片 = 连续扩选（松手在 window 的 mouseup 上收尾）。
-                                    onExtend={() => {
-                                        if (dragging) setSel((prev) => extendRow(prev, index))
-                                    }}
+                                    // 只认左键；Shift 拉一段、Ctrl 逐个增删；按住划过连续扩选
+                                    //（松手在 window 的 mouseup 上收尾）—— 与轨表同一份实现。
+                                    onSelect={(shift, ctrl) => select("actions", index, shift, ctrl)}
+                                    onExtend={() => extendTo("actions", index)}
                                     onEdit={(key, value) => editField(action.id, key, value)}
                                     // 反色那几列双击就打开这个 motion 的动画详情（别的列不给双击）。
                                     onCellDoubleClick={(key) => {

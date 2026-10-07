@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useMemo, useRef, useState} from "react"
+import {Fragment, useEffect, useMemo, useState} from "react"
 import {arrayMove} from "@dnd-kit/sortable"
 import {
     DeployMissingTracks,
@@ -18,7 +18,8 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid, type Marked} from "@/components/TrackGrid"
 import {TrackToolbar} from "@/components/TrackToolbar"
-import {clickRow, extendRow, selectedRows, withNewRow, type RowSelection} from "@/lib/actionflags"
+import {selectedRows, withNewRow} from "@/lib/actionflags"
+import {useRowSelection} from "@/lib/useRowSelection"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
@@ -103,16 +104,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
     const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
     /**
-     * 当前分区里选中的行（与动作表同一套语义，见 lib/actionflags 的 clickRow）：
-     * 一段区间（anchor/focus）+ **Ctrl 逐个点中的那些**（picked）。`key` 是分区身份 ——
-     * **一次只认一个分区**，切到别的分区就等于换了个选区。
+     * 当前分区里选中的行：一套区间 + Ctrl 逐个点中的（语义见 lib/actionflags 的 clickRow）。
+     * `key` 是分区身份 —— **一次只认一个分区**，切到别的分区就等于换了个选区。
+     * 这套状态与拖选开关在 lib/useRowSelection 里，与动作表同一份实现。
      */
-    const [sel, setSel] = useState<(RowSelection & {key: string}) | null>(null)
+    const {sel, setSel, select, extendTo} = useRowSelection()
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
-    // "正在拖选"：同步版本（ref），按下与第一次划过同一帧时 state 还没落地。
-    const draggingRef = useRef(false)
     /**
      * 打开弹层时那份**原表**（深拷、之后只读）。
      *
@@ -192,15 +191,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         }
     }, [motion])
 
-    /** 拖选收尾：松开鼠标就停。挂在 window 上是因为鼠标常常已经跑出行号那一列了；带清理函数。 */
-    useEffect(() => {
-        const onUp = () => {
-            draggingRef.current = false
-        }
-        window.addEventListener("mouseup", onUp)
-        return () => window.removeEventListener("mouseup", onUp)
-    }, [])
-
     const markDirty = (key: string) =>
         setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]))
 
@@ -241,24 +231,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
     /** 这个分区里选中了哪几行（升序下标）。**一次只认一个分区**，所以 key 不对时就是"一行都没选"。 */
     const selectedIn = (key: string): number[] => (sel?.key === key ? selectedRows(sel) : [])
-
-    /**
-     * 按下行号：不按修饰键就把锚点重开在这一行（区间塌成一行）、Shift 从旧锚点扩到这一行、
-     * Ctrl / Cmd 逐个增删（见 clickRow）。顺带记上"正在拖选"，鼠标划过哪一行由 extendTo 接着改 focus
-     *（和动作页那张表同一套手感）。
-     */
-    const select = (key: string, index: number, shift: boolean, ctrl: boolean) => {
-        // 焦点那一步（把编辑框 blur 掉）在共用的 RowHandle 里，两张表都走那一条。
-        draggingRef.current = true
-        setSel((prev) => ({key, ...clickRow(prev?.key === key ? prev : null, index, {shift, ctrl})}))
-    }
-
-    /** 鼠标在行号上划过：只有按着的时候才扩区间——不然划过整张表会被选个精光。 */
-    const extendTo = (key: string, index: number) => {
-        // 读 ref 而不是那个 state：按下与"第一次划过某一行"落在同一帧里时 state 还没落地，读 state 会漏掉第一行。
-        if (!draggingRef.current) return
-        setSel((prev) => (prev?.key === key ? {key, ...extendRow(prev, index)} : prev))
-    }
 
     /**
      * 键盘：Ctrl+C / Ctrl+V 复制插入（能在动画之间用，剪贴板在模块级）；**Del = 删除 / 恢复**选中行
@@ -446,6 +418,9 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         try {
             // 整张表原样交给后端（含行身份 `orig` / `removed`）：由它决定"哪些行进 XML"（假删除的不进）、
             // 并把行身份跟改动一起存进 track_edits.json —— 下次打开照样认得每一行是原版第几行。
+            //
+            // ⚠️ 这两句**必须顺序发**，别看着"互不相干"就并成 Promise.all：它们写的是**同一本账**
+            //（track_edits.json 的读-改-写），并行就是其中一次的改动被另一次覆盖掉。
             if (dirty.includes(flagsKey)) {
                 await SaveFlags(motion, flags)
             }

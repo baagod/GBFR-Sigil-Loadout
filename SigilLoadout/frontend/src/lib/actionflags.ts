@@ -1,5 +1,5 @@
 /*
-    角色动作页的纯逻辑：位掩码表、motion 文本、flags 行的增行、选中区间与复制、时长。
+    角色动作页的纯逻辑：位掩码表、motion 文本、flags 行的增行、选中区间。
 
     行的搬动不在这里：那是 dnd-kit 的 arrayMove 干的（见 ActionsPanel），这一层不再维护「第几行」——
     FlagRow.Index 只是后端解析时编的顺序号，写回时后端按**数组顺序**写，根本不看它（actionflags.go 的
@@ -111,19 +111,6 @@ export function charCodeOf(path: string): string {
     return parts.length >= 2 ? parts[parts.length - 2] : ""
 }
 
-/** 行的时间。认不出来的当 0——只有时长与帧数是这么算的，写回时还是原文。 */
-const time = (value: string): number => {
-    const parsed = Number.parseFloat(value)
-    return Number.isFinite(parsed) ? parsed : 0
-}
-
-/** 总时长（最大 EndTime，秒）；没有行就是 0。 */
-export const totalDuration = (rows: { endTime: string }[]): number =>
-    rows.reduce((max, row) => Math.max(max, time(row.endTime)), 0)
-
-/** 帧数 = 总时长 × 60。 */
-export const totalFrames = (rows: { endTime: string }[]): number => Math.round(totalDuration(rows) * 60)
-
 /**
  * 加一行：LayerFlag 钉死 4294967295，时间抄最后一行，其余给后端认的默认值（见 actionflags.go 里那份
  * XML 的形状）。时间抄不到（一个空轨）就给 0。行号不用管：那是数组下标算出来的。
@@ -158,26 +145,8 @@ export function withNewRow<T extends {
     ]
 }
 
-/** 深拷贝一行：整行上都是字符串，不是的话原样带过去（插进表里的那份以后各改各的，不许再连着源行）。 */
-const cloneRow = <T,>(row: T): T => (typeof structuredClone === "function" ? structuredClone(row) : {...row})
-
 /** 选中区间的两端。两边都为 null 就是一行都没选；哪一头大哪一头小不管，取 min/max。 */
 export type RowRange = {anchor: number | null; focus: number | null}
-
-/**
- * 算出选中区间：起点是两端的较小者、终点是较大者（闭区间，起止都算在内），count 是行数。
- * 一行都没选给 {start: 0, end: -1, count: 0}——空区间写成 end = start - 1，取行时天然取不到东西。
- *
- * 号码夹到 0..length-1 上：行的增删会让记下的号码脏掉，夹一下比让调用方各自小心更省事。
- */
-export function rangeOf(range: RowRange, length: number): {start: number; end: number; count: number} {
-    const {anchor, focus} = range
-    if (anchor === null || focus === null || length === 0) return {start: 0, end: -1, count: 0}
-    const clamp = (value: number) => Math.min(Math.max(value, 0), length - 1)
-    const start = clamp(Math.min(anchor, focus))
-    const end = clamp(Math.max(anchor, focus))
-    return {start, end, count: end - start + 1}
-}
 
 /**
  * 选中：一段区间（anchor 是 shift 的起点、focus 是终点）+ **Ctrl 逐个点中的那些**。
@@ -232,16 +201,4 @@ export function isSelected(sel: RowSelection | null, index: number): boolean {
     if (sel.picked?.has(index)) return true
     const {anchor, focus} = sel
     return anchor !== null && focus !== null && index >= Math.min(anchor, focus) && index <= Math.max(anchor, focus)
-}
-
-/**
- * 取出选中的那几行（区间 ∪ Ctrl 点中的），**按表里的上下顺序**排，每行都是深拷贝：插进去的那份要能
- * 独立编辑，不能还连着表里那一行。一行都没选给空数组。
- */
-export function collectRows<T>(rows: T[], sel: RowSelection): T[] {
-    const picked: T[] = []
-    for (const index of selectedRows(sel)) {
-        if (index >= 0 && index < rows.length) picked.push(cloneRow(rows[index]))
-    }
-    return picked
 }

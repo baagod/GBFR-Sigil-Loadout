@@ -70,12 +70,6 @@ var defaultActionIDs = []string{"4", "6", "954"}
 // Path 是当前配置的动作表文件（没配过就是解包出来的那份副本）。
 func (s *ActionsService) Path() string { return s.config().Path }
 
-// FlagsDir 是 flags 轨（XML）所在目录。
-func (s *ActionsService) FlagsDir() string { return s.config().FlagsDir }
-
-// FsmDir 是这个角色的 FSM（.msg）所在目录。
-func (s *ActionsService) FsmDir() string { return s.config().FsmDir }
-
 func (s *ActionsService) SetPath(p string) error {
 	return saveActionPath("动作表", p, func(c *actionConfig, path string) { c.Path = path })
 }

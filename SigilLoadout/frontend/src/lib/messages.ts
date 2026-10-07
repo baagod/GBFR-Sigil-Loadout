@@ -55,7 +55,6 @@ const zh = {
 
     // 角色动作页
     loading: "读取中…",
-    charSearch: "搜索角色 | PL 码",
     idsHint: "搜索 id_，以空格分隔。",
     charEmpty: "解包目录里没有别的角色动作表",
     /** 清单上的记录这张表里一条都没有：不是错误，是 ids 与表不匹配（见后端 LoadActions）。 */
@@ -73,16 +72,8 @@ const zh = {
     globalParams: "全局参数",
     /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨的那组。 */
     hmRangeSkill: "技能",
-    /** 暂不使用：「他角色引用」筛选与行内标记已移除；后端字段仍在，留着以后用。 */
-    hmRangeReferenced: "他角色引用",
     /** 组标题。「技能」那一组直接复用 hmRangeSkill。 */
     hmGroupOther: "其他",
-    /** 行上标记：别的角色动作表里点到了这个号。 */
-    hmRefByOther: (list: string) => `他角色引用 ${list}`,
-    /** 行上标记：与另一个号轨内容逐字节相同（那个号被动作表引用时更像"正主"）。 */
-    hmDuplicate: (motion: string, referenced: boolean) =>
-        referenced ? `与 ${motion} 内容相同（${motion} 被引用）` : `与 ${motion} 内容相同`,
-    fsmList: "FSM：",
     // 动画详情页
     trackNone: "这个动画没有轨文件",
     fsmScope: "FSM（本角色可用，与当前动画无关）",
@@ -98,8 +89,6 @@ const zh = {
     colFreeArg: "FreeArg",
     colFlag0: "Flag0",
     colFlag1: "Flag1",
-    /** flag 下拉里搜索框的占位符：按**含义**搜（"闪避"、"重力"），不是按数字。 */
-    flagSearch: "搜索",
     /** 行号那一列右半截的握把（拖着重排），以及复制/插入那两枚按钮。 */
     dragRow: "拖这里移动这一行",
     copySelected: "复制",
@@ -149,7 +138,6 @@ export const messages: Record<Lang, Messages> = {
         noBonuses: "No boostable entries",
 
         loading: "Loading…",
-        charSearch: "Search Character | PL Code",
         idsHint: "Search id_, space-separated.",
         charEmpty: "No other character action tables extracted",
         actionsEmpty: "No matching actions",
@@ -163,12 +151,7 @@ export const messages: Record<Lang, Messages> = {
         actionsSection: "Action table",
         globalParams: "Global Params",
         hmRangeSkill: "Skills",
-        hmRangeReferenced: "Used by others",
         hmGroupOther: "Other",
-        hmRefByOther: (list: string) => `Used by ${list}`,
-        hmDuplicate: (motion: string, referenced: boolean) =>
-            referenced ? `Same content as ${motion} (${motion} is referenced)` : `Same content as ${motion}`,
-        fsmList: "FSM:",
         trackNone: "No track files for this animation",
         fsmScope: "FSM (available to this character, unrelated to this animation)",
         badMotion: (motion: string) => `A motion is four lowercase hex digits (e.g. 3400); this is "${motion}"`,
@@ -182,7 +165,6 @@ export const messages: Record<Lang, Messages> = {
         colFreeArg: "FreeArg",
         colFlag0: "Flag0",
         colFlag1: "Flag1",
-        flagSearch: "Search",
         dragRow: "Drag here to move this row",
         copySelected: "Copy",
     cutSelected: "Cut",
@@ -224,7 +206,6 @@ export const messages: Record<Lang, Messages> = {
         noBonuses: "強化できる項目がありません",
 
         loading: "読み込み中…",
-        charSearch: "キャラクター | PL コード で検索",
         idsHint: "id_ を検索、空白区切り。",
         charEmpty: "解包先に他のキャラクターのアクション表がありません",
         actionsEmpty: "該当するアクションがありません",
@@ -238,12 +219,7 @@ export const messages: Record<Lang, Messages> = {
         actionsSection: "アクション表",
         globalParams: "全体パラメータ",
         hmRangeSkill: "スキル",
-        hmRangeReferenced: "他キャラ参照",
         hmGroupOther: "その他",
-        hmRefByOther: (list: string) => `他キャラ参照 ${list}`,
-        hmDuplicate: (motion: string, referenced: boolean) =>
-            referenced ? `${motion} と内容同一（${motion} は参照あり）` : `${motion} と内容同一`,
-        fsmList: "FSM：",
         trackNone: "このアニメには軌ファイルがありません",
         fsmScope: "FSM（このキャラで使用可・このアニメとは無関係）",
         badMotion: (motion: string) => `モーションは 4 桁の 16 進小文字（例 3400）です。ここは「${motion}」`,
@@ -257,7 +233,6 @@ export const messages: Record<Lang, Messages> = {
         colFreeArg: "FreeArg",
         colFlag0: "Flag0",
         colFlag1: "Flag1",
-        flagSearch: "検索",
         dragRow: "ここをドラッグしてこの行を移動",
         copySelected: "コピー",
     cutSelected: "切り取り",
@@ -299,7 +274,6 @@ export const messages: Record<Lang, Messages> = {
         noBonuses: "강화할 항목이 없습니다",
 
         loading: "불러오는 중…",
-        charSearch: "캐릭터 | PL 코드 검색",
         idsHint: "id_ 검색, 공백 구분.",
         charEmpty: "다른 캐릭터의 액션 표가 없습니다",
         actionsEmpty: "일치하는 액션이 없습니다",
@@ -313,12 +287,7 @@ export const messages: Record<Lang, Messages> = {
         actionsSection: "액션 표",
         globalParams: "전역 파라미터",
         hmRangeSkill: "스킬",
-        hmRangeReferenced: "타 캐릭터 참조",
         hmGroupOther: "기타",
-        hmRefByOther: (list: string) => `타 캐릭터 참조 ${list}`,
-        hmDuplicate: (motion: string, referenced: boolean) =>
-            referenced ? `${motion} 와 내용 동일 (${motion} 참조됨)` : `${motion} 와 내용 동일`,
-        fsmList: "FSM:",
         trackNone: "이 애니메이션에는 트랙 파일이 없습니다",
         fsmScope: "FSM(이 캐릭터 사용 가능, 이 애니메이션과 무관)",
         badMotion: (motion: string) => `모션은 4자리 16진수 소문자(예 3400)입니다. 여기는 "${motion}"`,
@@ -332,7 +301,6 @@ export const messages: Record<Lang, Messages> = {
         colFreeArg: "FreeArg",
         colFlag0: "Flag0",
         colFlag1: "Flag1",
-        flagSearch: "검색",
         dragRow: "여기를 끌어서 이 행을 이동",
         copySelected: "복사",
     cutSelected: "잘라내기",

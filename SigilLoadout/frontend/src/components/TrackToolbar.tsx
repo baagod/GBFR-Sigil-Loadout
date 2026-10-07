@@ -22,9 +22,8 @@ import type {Messages} from "@/lib/messages"
 */
 
 /** 一条轨那排按钮：压在标题行右侧，谁被选中就删谁。 */
-export function TrackToolbar({t, className, canCopy, canCut, canPaste, canRemove, onAdd, onCopy, onCut, onPaste, onRemove}: {
+export function TrackToolbar({t, canCopy, canCut, canPaste, canRemove, onAdd, onCopy, onCut, onPaste, onRemove}: {
     t: Messages
-    className?: string
     canCopy: boolean
     canCut: boolean
     canPaste: boolean
@@ -48,7 +47,7 @@ export function TrackToolbar({t, className, canCopy, canCut, canPaste, canRemove
         // `[&_svg:not([class*='size-'])]:size-4` 会把图标钉在 16px，换 size 档也不会跟着变大。
         // 按钮禁用时 Tooltip 也一起 disabled（SkillRow 的惯例）：禁用的按钮收不到指针事件。
         <TooltipProvider>
-            <div className={`flex items-center gap-2 ${className ?? ""}`}>
+            <div className="flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger
                         render={

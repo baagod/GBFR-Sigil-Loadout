@@ -10,15 +10,11 @@ import {
     FLAG1_NAMES,
     charCodeOf,
     clickRow,
-    collectRows,
     flagHasBit,
     flagMask,
     isMotion,
     isSelected,
-    rangeOf,
     selectedRows,
-    totalDuration,
-    totalFrames,
     withNewRow,
     type RowSelection,
 } from "@/lib/actionflags"
@@ -66,19 +62,10 @@ describe("motion 的写法", () => {
     })
 })
 
-describe("角色码与时长", () => {
+describe("角色码", () => {
     it("角色码从动作表的所在目录取", () => {
         expect(charCodeOf("D:\\Games\\Relink\\gen\\extracted\\system\\player\\data\\pl1000\\pl1000_action.msg")).toBe("pl1000")
         expect(charCodeOf("pl1000_action.msg")).toBe("")
-    })
-
-    it("总时长是最大 EndTime，帧数是它 × 60", () => {
-        const rows = [{ endTime: "0.000000" }, { endTime: "1.46667" }, { endTime: "0.433333" }]
-        expect(totalDuration(rows)).toBeCloseTo(1.46667)
-        expect(totalFrames(rows)).toBe(88)
-        // 单独一行也走同一条路（flags 表的「帧」那一列就是这么算的）。
-        expect(totalFrames([{ endTime: "0.016667" }])).toBe(1)
-        expect(totalFrames([])).toBe(0)
     })
 })
 
@@ -106,28 +93,6 @@ describe("加一行", () => {
 
     it("一行都没有时时间给 0", () => {
         expect(withNewRow([], blank)[0]).toMatchObject({ startTime: "0", endTime: "0" })
-    })
-})
-
-describe("选中区间", () => {
-    it("两端哪个大哪个小都行，取 min/max 当闭区间", () => {
-        expect(rangeOf({anchor: 1, focus: 3}, 5)).toEqual({start: 1, end: 3, count: 3})
-        // 往下拖出来的是 anchor > focus，与往上拖同一个区间。
-        expect(rangeOf({anchor: 3, focus: 1}, 5)).toEqual({start: 1, end: 3, count: 3})
-        expect(rangeOf({anchor: 2, focus: 2}, 5)).toEqual({start: 2, end: 2, count: 1})
-    })
-
-    it("一行都没选给空区间（count 0，且 end < start，取行时天然取不到）", () => {
-        expect(rangeOf({anchor: null, focus: null}, 5)).toEqual({start: 0, end: -1, count: 0})
-        // 只有一头也不算选中。
-        expect(rangeOf({anchor: 2, focus: null}, 5).count).toBe(0)
-        // 空表。
-        expect(rangeOf({anchor: 0, focus: 0}, 0).count).toBe(0)
-    })
-
-    it("号码脏了（行被删掉）就夹回表里，不越界也不炸", () => {
-        expect(rangeOf({anchor: 1, focus: 9}, 3)).toEqual({start: 1, end: 2, count: 2})
-        expect(rangeOf({anchor: -4, focus: 0}, 3)).toEqual({start: 0, end: 0, count: 1})
     })
 })
 
@@ -164,33 +129,10 @@ describe("选中：点 / Shift / Ctrl", () => {
         expect(isSelected(null, 0)).toBe(false)
     })
 
-    it("复制选中行时，Ctrl 点中的那些也要取到（且按上下顺序）", () => {
-        const rows = [0, 1, 2, 3, 4].map((index) => ({tag: String(index)}))
+    it("Ctrl 点中的那些也要取到（且按上下顺序）", () => {
         let sel: RowSelection | null = clickRow(null, 1, {})
         sel = clickRow(sel, 4, {ctrl: true})
         sel = clickRow(sel, 2, {ctrl: true})
-        expect(collectRows(rows, sel).map((row) => row.tag)).toEqual(["1", "2", "4"])
-    })
-})
-
-describe("复制选中的行", () => {
-    // tag 拿原来的下标拼，好认出取出来的是哪一行。
-    const rows = [0, 1, 2, 3].map((index) => ({ index, tag: String(index), flag0: "0" }))
-
-    it("按表里的上下顺序取整个区间", () => {
-        expect(collectRows(rows, {anchor: 1, focus: 3}).map((row) => row.tag)).toEqual(["1", "2", "3"])
-        expect(collectRows(rows, {anchor: 3, focus: 1}).map((row) => row.tag)).toEqual(["1", "2", "3"])
-        expect(collectRows(rows, {anchor: 2, focus: 2}).map((row) => row.tag)).toEqual(["2"])
-    })
-
-    it("取出来的每一行都是深拷贝：改复制的那份不动表里那一行", () => {
-        const copied = collectRows(rows, {anchor: 1, focus: 1})
-        expect(copied[0]).not.toBe(rows[1])
-        copied[0].flag0 = "16"
-        expect(rows[1].flag0).toBe("0")
-    })
-
-    it("一行都没选给空数组", () => {
-        expect(collectRows(rows, {anchor: null, focus: null})).toEqual([])
+        expect(selectedRows(sel)).toEqual([1, 2, 4])
     })
 })
