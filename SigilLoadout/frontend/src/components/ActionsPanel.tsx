@@ -24,7 +24,7 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from "react"
+import {memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties} from "react"
 
 import {
     ActionIDs,
@@ -267,22 +267,36 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     // null = 还没量到：那时不给 --frozen-left，让样式里的兜底值顶上（比先写成 0 强，0 会让列贴到最左、
     // 压在行号握把上）。
     const [frozenLeft, setFrozenLeft] = useState<number | null>(null)
-    /** 外框挂上来的那一刻量一次 —— 它就挂在"表格真渲染了"那一帧上（数据没到之前这块整个不挂载），
-     *  行已经在 DOM 里。之后由 ResizeObserver 接管：换角色/换语言会重摊列宽。 */
-    const frameRef = useCallback((frame: HTMLDivElement | null) => {
+    const frameRef = useRef<HTMLDivElement | null>(null)
+
+    /** 量 id_ 那一格的右边界（见上面那段），写进 --frozen-left。 */
+    const measureFrozenLeft = () => {
+        const frame = frameRef.current
         if (!frame) return
-        const measure = () => {
-            const cell = frame.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
-            if (!cell) return
-            const box = frame.getBoundingClientRect()
-            setFrozenLeft(Math.round(cell.getBoundingClientRect().right - box.left - frame.clientLeft))
-        }
-        measure()
-        const observer = new ResizeObserver(measure)
+        const cell = frame.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
+        if (!cell) return
+        const box = frame.getBoundingClientRect()
+        const left = Math.round(cell.getBoundingClientRect().right - box.left - frame.clientLeft)
+        // ⚠️ 0 或负数一律丢掉：那一块被压成 h-0（切到别的页签时）rect 全是 0，写进去 `--frozen-left: 0px`
+        // 会把 abilityTag_ 贴到最左 —— 它 z-30 低于 `#`(z-40) 与 id_(z-40)，于是整列被盖住，看着就是
+        // "冻结没了"（实测踩过）。宁可用旧值 / 兜底值。
+        if (left <= 0) return
+        setFrozenLeft(left)
+    }
+
+    /**
+     * 之后由 ResizeObserver 接管：窗口缩放、字体变化这些也会重摊列宽。它的回调晚一帧没关系 —— 那是
+     *  用户自己触发的重排，本来就要等下一次布局。 */
+    useEffect(() => {
+        const frame = frameRef.current
+        if (!frame) return
+        const observer = new ResizeObserver(measureFrozenLeft)
         observer.observe(frame)
         const table = frame.querySelector("table")
         if (table) observer.observe(table)
         return () => observer.disconnect()
+        // 只挂一次：量的是"当前那一帧"的 DOM。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     /**
@@ -302,6 +316,15 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
 
     // 表头按**后端给的字段顺序**排（87 列），两条记录同一套。
     const keys = useMemo(() => (actions[0]?.fields ?? []).map((field) => field.key), [actions])
+
+    /**
+     * 会改变列宽或可见性的东西一变，就在**绘制之前**补量一次。
+     *
+     * 技能名是异步到的（`abilityNames` 一到位整张表就重摊一次列宽），量晚了会看见 abilityTag_ 先错位再
+     * 跳回来 —— `#` 与 id_ 分别锚在 left-0 / left-10 上，不受这一量影响，所以只有它在抖（用户实测）。
+     * `section` 也要进依赖：切回这一页时那块从 h-0 变回可见，得当场量（那时 rect 才是真的）。
+     */
+    useLayoutEffect(measureFrozenLeft, [abilityNames, keys, section])
 
     // 只读那两列（见 isReadOnlyColumn）——取值那条路要用它。
     const readOnlyKeys = useMemo(() => keys.filter(isReadOnlyColumn), [keys])
