@@ -87,8 +87,24 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
     ⚠️ 只给差的那一段（不把 `bg-[#1f1f1f]` 与 `bg-primary` 同时写上）：两边都是单类工具类，谁赢只看
     样式表顺序。
 */
+/** 横向滚动时冻住的数据列（表头那一格由 actionHeaderClass 给同一个 left）。 */
+const FROZEN: Record<string, string> = {
+    id_: " text-center sticky left-10 z-40",
+    // 96px = handle 40 + id_ 列实测宽 56。**这个数就是 id_ 列的自然宽度**（auto 布局下写 w-* 定不住它，
+    // 试过：48 被顶成 55、64 照样 55）。sticky 的 left 连不滚动时也生效，留大了静止时就有一道缝 ——
+    // 记录号是 3~4 位，56px 够用。
+    // 95 而不是 96：id_ 的右边界就在 96，留 1px 的话两列之间会有一条透明缝，横向滚过的列名会从缝里
+    // 透出来（实测过）。压 1px 让两块底色贴住，格线由 id_ 那一列自己的右边框照常画。
+    abilityTag_: " sticky left-[95px] z-30",
+}
+
 function actionHeaderClass(key: string): string {
     if (key === "id_") return "left-10 z-50 bg-[#1f1f1f]"
+    // abilityTag_ 也冻住：左边界紧接着 id_（见 FROZEN 的宽度约定）。它可能同时是被点亮的那几列之一，
+    // 所以底色仍然按 isHighlightedColumn 走。
+    if (key === "abilityTag_") {
+        return `left-[95px] z-40 ${isHighlightedColumn(key) ? "bg-primary text-primary-foreground" : "bg-[#1f1f1f]"}`
+    }
     if (isHighlightedColumn(key)) return "z-10 bg-primary text-primary-foreground"
     return "z-10 bg-[#1f1f1f]"
 }
@@ -194,9 +210,11 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
     )
 }
 
-function ActionsPanelBase({t, charaNames, charaTable, playable}: {
+function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     t: Messages
     charaNames: Record<string, string>
+    /** 能力键 -> 名字（ability.lang.json）：abilityTag_ 那一列显示用；缺条目回落键名。 */
+    abilityNames: Record<string, string>
     /** 角色表（chara.json）：名字的颜色从这里取，和专属 / 角色强化 / 专精技能三页同一个来源。 */
     charaTable: CharaTable
     /** 可玩角色名单，**按游戏内部顺序**（App 从专属表推出来）。空数组视为"名单还不知道"，那时不过滤不排序。 */
@@ -274,13 +292,22 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                           key,
                           kind: "text",
                           // tabular-nums：一列记录号 / 技能号，位数对齐了才好扫。
-                          cell: `tabular-nums${key === "id_" ? " text-center sticky left-10 z-40" : ""}`,
-                          bg: "bg-background",
+                          // 冻结列：`#`（40px，由 handle 自己 left-0）→ id_（定宽 48px）→ abilityTag_（88px）。
+                          // left 是硬编码像素，所以 id_ 必须定宽（w-12），不然 abilityTag_ 会随记录号位数错位。
+                          cell: `tabular-nums${FROZEN[key] ?? ""}`,
+                          bg: "bg-background",                          // abilityTag_ 显示成技能名（ability.lang.json，随语言变）：姬塔（AB_PL0100_*）
+                          // 与古兰是同一个角色的两个性别、技能相同，改查古兰那份；都查不到（预留槽）就原样
+                          // 显示键名，不编造。
+                          text:
+                              key === "abilityTag_"
+                                  ? (tag: string) =>
+                                        abilityNames[tag] ?? abilityNames[tag.replace(/^AB_PL0100/, "AB_PL0000")] ?? tag
+                                  : undefined,
                           head: actionHeaderClass(key),
                       }
                     : {label: key, key, kind: "editable", bg: "bg-[#1a1a1a]", head: actionHeaderClass(key)},
             ),
-        [keys],
+        [keys, abilityNames],
     )
 
     /**

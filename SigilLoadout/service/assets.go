@@ -90,12 +90,20 @@ func LoadAssets() error {
 	return loadAssetsFrom(filepath.Join(appfiles.ExeDir(), assetsDir))
 }
 
+// abilityNamesByLang 是 ability.lang.json：{语言: {能力键: 名字}}，键就是动作表 abilityTag_ 那一列
+// 的写法（AB_PL0000_01）。查不到名字的键（预留槽）由调用方回落成键名；姬塔（AB_PL0100_*）不在这张
+// 表里 —— 她与古兰是同一个角色的两个性别，名字取古兰那份，映射由调用方做。
+var abilityNamesByLang map[string]map[string]string
+
 func loadAssetsFrom(dir string) error {
 	var err error
 	if gemNamesByLang, err = readAsset[map[string]map[string]string](dir, "sigils.lang.json"); err != nil {
 		return err
 	}
 	if charaNamesByLang, err = readAsset[map[string]map[string]string](dir, "chara.lang.json"); err != nil {
+		return err
+	}
+	if abilityNamesByLang, err = readAsset[map[string]map[string]string](dir, "ability.lang.json"); err != nil {
 		return err
 	}
 	if skillInfo, err = readAsset[map[string]SkillInfo](dir, "skill_status.json"); err != nil {

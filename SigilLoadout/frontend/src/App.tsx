@@ -3,7 +3,7 @@ import {Button} from "@/components/ui/button"
 import {ButtonGroup} from "@/components/ui/button-group"
 import {Checkbox} from "@/components/ui/checkbox"
 import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
-import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/service/loadoutservice"
+import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames, AbilityNames} from "../bindings/sigilloadout/service/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/service/shellservice"
 import {Characters} from "../bindings/sigilloadout/service/limitbonusservice"
 import {messages, type Messages} from "@/lib/messages"
@@ -68,7 +68,7 @@ const LOADOUT_HEADER = `shrink-0 overflow-y-hidden ${GUTTER}`
 
 // 每语言的显示名表在 Go 侧只在启动时读一次（main.go 的 loadAssets），之后不再变，所以缓存住：
 // 换语言命中缓存就同步落地，标签与外层文字同一帧换掉，否则要先显示旧名字、等 IPC 回来再跳一次。
-const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string> }>()
+const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string>; abilities: Record<string, string> }>()
 
 export default function App() {
     const [skills, setSkills] = useState<Skill[]>([])
@@ -85,6 +85,8 @@ export default function App() {
     const [names, setNames] = useState<Record<string, string>>({})
     // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页与能力强化页的行标签。
     const [charaNames, setCharaNames] = useState<Record<string, string>>({})
+    // 能力名（ability.lang.json：{能力键: 名字}），专职动作表的 abilityTag_ 列；姬塔由前端映射到古兰。
+    const [abilityNames, setAbilityNames] = useState<Record<string, string>>({})
     // 角色表（chara.json）：PL 码 → {hash, element, color}。颜色已经按属性算好记在角色上，所以取色是
     // 一步。语言无关，只在挂载时取一次，切语言不重取。
     const [charaTable, setCharaTable] = useState<CharaTable>({})
@@ -236,21 +238,24 @@ export default function App() {
         if (hit) {
             setNames(hit.names)
             setCharaNames(hit.charas)
+            setAbilityNames(hit.abilities)
             return
         }
         let cancelled = false
-        Promise.all([GemNames(lang), CharaNames(lang)])
-            .then(([gems, charas]) => {
+        Promise.all([GemNames(lang), CharaNames(lang), AbilityNames(lang)])
+            .then(([gems, charas, abilities]) => {
                 if (cancelled) return
-                const entry = {names: gems ?? {}, charas: charas ?? {}}
+                const entry = {names: gems ?? {}, charas: charas ?? {}, abilities: abilities ?? {}}
                 nameCache.set(lang, entry)
                 setNames(entry.names)
                 setCharaNames(entry.charas)
+                setAbilityNames(entry.abilities)
             })
             .catch(() => {
                 if (cancelled) return
                 setNames({})
                 setCharaNames({})
+            setAbilityNames({})
             })
         return () => {
             cancelled = true
@@ -478,7 +483,7 @@ export default function App() {
                     这一页自己就是滚动盒（上半区横滚、下半区纵滚），所以外层不再给 overflow-auto。
                 */}
                 <TabsPanel value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
-                    <ActionsPanel t={t} charaNames={charaNames} charaTable={charaTable} playable={playableChars} />
+                    <ActionsPanel t={t} charaNames={charaNames} abilityNames={abilityNames} charaTable={charaTable} playable={playableChars} />
                 </TabsPanel>
             </Tabs>
         </div>

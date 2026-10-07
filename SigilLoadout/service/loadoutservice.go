@@ -58,6 +58,12 @@ func (s *LoadoutService) CharaNames(lang string) map[string]string {
 	return pick(lang, charaNamesByLang)
 }
 
+// AbilityNames returns the ability display names for one language: {能力键: 名字}, sliced out of the
+// shipped ability.lang.json（生成器 texts 子命令产出）；不认得的语言回落中文。
+func (s *LoadoutService) AbilityNames(lang string) map[string]string {
+	return pick(lang, abilityNamesByLang)
+}
+
 // LoadConfig 在没有配置时返回一份空配置：编辑器从零开始，没有内置预设。
 func (s *LoadoutService) LoadConfig() (string, error) {
 	data, err := os.ReadFile(filepath.Join(appfiles.UserDir(), loadoutFileName))

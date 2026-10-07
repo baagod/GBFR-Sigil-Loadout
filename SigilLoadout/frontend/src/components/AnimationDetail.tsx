@@ -648,18 +648,18 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 initialFocus={() => false}
                 className="flex h-[min(800px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col sm:max-w-none"
             >
-                {/* 标题行 = 按钮行：左标题、右「取消 / 保存」，`border-b pb-4` 就是标题下面那条线。
+                {/* 标题行 = 按钮行：左标题、右「保存 / 取消」，`border-b pb-4` 就是标题下面那条线。
                     行内用 flex 两端对齐（DialogHeader 自己是 flex-col，所以里面再包一层 flex-row）。 */}
                 <DialogHeader className="border-b pb-4">
                     <div className="flex items-center justify-between gap-4">
                         {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
                         <DialogTitle className="text-base font-medium">{title}</DialogTitle>
                         <div className="flex items-center gap-2">
+                            {/* 保存并部署：一直可点 —— 没改动时点了也只是读一遍。 */}
+                            <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
                             <Button variant="outline" onClick={onClose}>
                                 {t.cancel}
                             </Button>
-                            {/* 保存并部署：一直可点 —— 没改动时点了也只是读一遍。 */}
-                            <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
                         </div>
                     </div>
                 </DialogHeader>
