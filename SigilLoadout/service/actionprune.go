@@ -1,16 +1,12 @@
-// 账本清理：一张表如果**改动全是空操作**，那它和原表数值一致 —— 它不该留在 mod 里（那份产物是
-// "这条表被改过"的证据，也是唯一会被游戏读到的东西），也不该再记在账本里（界面上那个"改动"标记
-// 同理）。于是：账本里去掉它，mod 里那份删掉，游戏回去读它自己的原表。
-//
-// "空操作"的三种形态：
-//
-//	· Value 为 nil —— 这条改动的意思本来就是"回原值"（见 actionedits.go / globalparamedits.go）；
-//	· 值等于原表在该路径上的值 —— 用户手工改回去了；
-//	· 轨是整份 XML，比的是**逐字节相同**（写进 mod 的 BXM 由这份 XML 编出来，bxm.go 是确定性的，
-//	  XML 相同 ⇒ 产物相同）。
-//
-// 三类各一个 drop*，只处理**当前角色/当前那张表**：原表是按动作表所在目录取来的（charCode），
-// 别的角色的表不能用这一份原表去比。
+/*
+账本清理：一张表如果**改动全是空操作**，那它和原表数值一致 —— 它不该留在 mod 里（那份产物是"这条表被
+改过"的证据，也是唯一会被游戏读到的东西），也不该再记在账本里。于是账本里去掉它、mod 里那份删掉，
+游戏回去读它自己的原表。
+
+"有没有改"由谁回答：动作表 / 全局参数在**合成**那一步顺手算出来（见 mergeActionTable / mergeGlobalParam
+的 changed 与 deploy* 的返回值）；轨的判据是整份 XML，所以判在写文件那一处（trackXMLUnchanged）与存账本
+之前（dropUnchangedTracks）。一律只谈**当前角色 / 当前那张表**：原表是按动作表所在目录取来的。
+*/
 package service
 
 import (
@@ -27,150 +23,65 @@ func removeDeployed(path string) error {
 	return nil
 }
 
-// dropUnchangedGlobalParams 把"改动全是空操作"的整张全局参数表从账本里去掉，并删掉 mod 里那份产物。
-func dropUnchangedGlobalParams(cfg actionConfig, edits []globalParamEdit) ([]globalParamEdit, error) {
-	kept := make([]globalParamEdit, 0, len(edits))
-	for _, table := range globalParamTables(edits) {
-		unchanged, err := globalParamUnchanged(cfg, table, edits)
-		if err != nil {
-			return nil, err
-		}
-		if unchanged {
-			if err := removeDeployed(deployGlobalParamPath(table)); err != nil {
-				return nil, err
-			}
-			continue // 这张表的改动整批丢掉
-		}
-		for _, edit := range edits {
-			if edit.Table == table {
-				kept = append(kept, edit)
-			}
-		}
-	}
-	return kept, nil
-}
-
-// globalParamUnchanged 判断这张表的改动是不是全是空操作。表里一条改动都没有也算一致
-// （没改过就不该有产物）——不过调用方只在 globalParamTables 给出的表上问，所以那种情况到不了这儿。
-func globalParamUnchanged(cfg actionConfig, table string, edits []globalParamEdit) (bool, error) {
-	root, err := loadGlobalParamOriginal(cfg, table)
-	if err != nil {
-		return false, err
-	}
-	// 原表各路径的值。走 flattenGlobalParams 而不是自己递归：界面上看到的路径就是它算的，
-	// 两处必须同一份记法（同名兄弟键的 #1 / #2 后缀也一样）。
-	fields := make([]ActionField, 0, 64)
-	flattenGlobalParams(root, "", &fields, map[string]*msgValue{})
-	original := make(map[string]string, len(fields))
-	for _, field := range fields {
-		original[field.Key] = field.Original
-	}
-	for _, edit := range edits {
-		if edit.Table != table || edit.Value == nil {
-			continue // 回原值 = 空操作
-		}
-		if original[edit.Path] != *edit.Value {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// dropUnchangedActionTable 把"当前角色的动作表与原表数值一致"的改动整批去掉，并删掉 mod 里那份。
-// 别的角色的改动原样留着：它们的原表不是这一份。
-func dropUnchangedActionTable(cfg actionConfig, edits []actionEdit) ([]actionEdit, error) {
-	char := charCode(cfg)
-	unchanged, err := actionTableUnchanged(cfg, char, edits)
-	if err != nil || !unchanged {
-		return edits, err
-	}
-	if err := removeDeployed(deployActionPath(cfg)); err != nil {
-		return nil, err
-	}
-	kept := make([]actionEdit, 0, len(edits))
-	for _, edit := range edits {
-		if edit.Char != char {
-			kept = append(kept, edit)
-		}
-	}
-	return kept, nil
-}
-
-// actionTableUnchanged 判断当前角色这张动作表的改动是不是全是空操作。
-func actionTableUnchanged(cfg actionConfig, char string, edits []actionEdit) (bool, error) {
-	mine := make([]actionEdit, 0, len(edits))
-	for _, edit := range edits {
-		if edit.Char == char {
-			mine = append(mine, edit)
-		}
-	}
-	if len(mine) == 0 {
-		return true, nil
-	}
-	root, err := loadActionOriginal(cfg)
-	if err != nil {
-		return false, err
-	}
-	for _, edit := range mine {
-		if edit.Value == nil {
-			continue // 回原值 = 空操作
-		}
-		record := recordByID(root, edit.ID)
-		if record == nil {
-			return false, nil // 原表里没有这条记录：无从判断，保守地当成"改过"
-		}
-		field := record.entry(edit.Field)
-		if field == nil {
-			return false, nil
-		}
-		// 走 actionFieldValue：数组那几格（supportEffectList_）在界面上是 JSON 串，scalar 给不出来。
-		original, err := actionFieldValue(field)
-		if err != nil {
-			return false, nil
-		}
-		if original != *edit.Value {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// dropUnchangedTracks 把"改动后与原表逐字节一致"的轨从账本里去掉，并删掉 mod 里那份产物。
+// dropUnchangedTracks 把"改动后与原表一致"的轨从账本里去掉，并删掉 mod 里那份产物。
 func dropUnchangedTracks(cfg actionConfig, edits []trackEdit) ([]trackEdit, error) {
 	char := charCode(cfg)
 	kept := make([]trackEdit, 0, len(edits))
 	for _, edit := range edits {
-		if edit.Char != char {
-			kept = append(kept, edit)
-			continue
+		if edit.Char == char {
+			unchanged, err := trackXMLUnchanged(cfg, edit.Motion, edit.Sub, edit.Kind, []byte(edit.XML))
+			if err != nil {
+				return nil, err
+			}
+			if unchanged {
+				if err := removeDeployed(deployTrackPath(cfg, edit.Motion, edit.Sub, edit.Kind)); err != nil {
+					return nil, err
+				}
+				continue
+			}
 		}
-		unchanged, err := trackUnchanged(cfg, edit)
-		if err != nil {
-			return nil, err
-		}
-		if !unchanged {
-			kept = append(kept, edit)
-			continue
-		}
-		if err := removeDeployed(deployTrackPath(cfg, edit.Motion, edit.Sub, edit.Kind)); err != nil {
-			return nil, err
-		}
+		kept = append(kept, edit)
 	}
 	return kept, nil
 }
 
-// trackUnchanged 判断这条轨改动后的 XML 是不是与原表逐字节相同。
+// trackXMLUnchanged 判断这份 XML 与原表是不是**同一份数据**（部署那条路用的是同一条判据）。
 //
-// 取不到原表（容器里没有这一条、名字不合法）时返回 false = **保守地当成"改过"**：清理这种事，
-// 拿不准就别删（部署那条路自会为读不到原表报错）。
-func trackUnchanged(cfg actionConfig, edit trackEdit) (bool, error) {
-	xmlPath, err := trackXMLPath(cfg, edit.Motion, edit.Sub, edit.Kind)
+// 取不到原表（容器里没有这一条、解包目录也没有、名字不合法）时返回 false = **保守地当成"改过"**：
+// 清理这种事，拿不准就别删（部署那条路自会为读不到原表报错）。
+func trackXMLUnchanged(cfg actionConfig, motion, sub, kind string, raw []byte) (bool, error) {
+	xmlPath, err := trackXMLPath(cfg, motion, sub, kind)
 	if err != nil {
 		return false, nil
 	}
-	primal, err := trackPrimalXML(cfg, edit.Motion, edit.Sub, edit.Kind, xmlPath)
+	primal, err := trackPrimalXML(cfg, motion, sub, kind, xmlPath)
 	if err != nil {
 		return false, nil
 	}
-	return bytes.Equal([]byte(edit.XML), primal), nil
+	left, ok := canonicalTrackXML(raw)
+	if !ok {
+		return false, nil
+	}
+	right, ok := canonicalTrackXML(primal)
+	if !ok {
+		return false, nil
+	}
+	return bytes.Equal(left, right), nil
+}
+
+// canonicalTrackXML 把一份轨 XML 归一成同一套写法（编成 BXM 再解回来）。
+//
+// 比"改没改"只能比这个：原表那份 XML 是从 .bxm 现转出来的（紧凑），界面上那份是自己拼的（缩进过），
+// 字节永远不同 —— 直接比字节会在"其实没改"的轨上判成改过（实测踩过）。归一之后两边都是同一套写法，
+// 数据一样就一样。写不出来（XML 坏 / 认不出的结构）就 ok = false。
+func canonicalTrackXML(raw []byte) ([]byte, bool) {
+	body, err := xmlToBXM(raw)
+	if err != nil {
+		return nil, false
+	}
+	tree, err := decodeBXM(body)
+	if err != nil {
+		return nil, false
+	}
+	return treeToXML(tree), true
 }

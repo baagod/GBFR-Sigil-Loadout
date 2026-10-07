@@ -91,6 +91,12 @@ export type TrackColumn = {
      * `text-center` 这种跟底色无关的类混在一串里，一让开就把居中一起丢了。
      */
     bg?: string
+    /**
+     * 这一列**冻结**（`cell` 里有 `sticky`）：横向滚过来的列必须被它挡住 —— 选中那行时 tr 只让开非吸顶格
+     * 的底色（`[&>td:not(.sticky)]:bg-transparent!`），冻结列得自己带上底色与选中那层，否则后面的列会从
+     * 它底下穿过去（格子里没文本时最明显）。
+     */
+    frozen?: boolean
     /** 表头那一格的类（反色列 `bg-primary` / 吸顶列的 `left-10 z-50`）；不给就是普通表头。 */
     head?: string
     /** `kind: "text"`：这一格显示什么（不给就原样显示值）。 */
@@ -237,10 +243,10 @@ export function RowHandle({index, cover, grip, number, gripLabel, drag, onSelect
  * 14% 实测：弹层里落在 #383838、主窗口里落在 #2d2d2d。
  *
  * 两条都必须照顾到，缺一条就白干：
- *   · 格子自己的底色要**让开**（`[&>td]:bg-transparent!`，`!` 必需：两边都是单类工具类，谁赢只看样式表
- *     顺序），不然叠加层被不透明的格子盖住 = 选了行也看不出高亮 ✗；
- *   · 吸顶的那两格（`#` 与只读文本格）自己要带一层**不透明的合成色**（底色 + 叠加层，见下面 `cover`），
- *     不然横向滚过来的列就从它们身上透出来了 ✗。
+ *   · **不吸顶**的那些格子自己的底色要**让开**（`[&>td:not(.sticky)]:bg-transparent!`，`!` 必需：两边都是
+ *     单类工具类，谁赢只看样式表顺序），不然叠加层被不透明的格子盖住 = 选了行也看不出高亮 ✗；
+ *   · 吸顶/冻结的那几格（`#` 与只读文本列）自己要带上**不透明的合成色**（底色 + 叠加层，见下面 `cover`
+ *     与 `frozen` 那一段），不然横向滚过来的列就从它们身上透出来了 ✗（`not(.sticky)` 就是为它们留的）。
  */
 export function TrackRow({index, columns, values, original, editing, removed, selected, diff, handle, t, drag, onSelect, onExtend, onEdit, onCellDoubleClick}: TrackRowProps & {
     drag?: Drag
@@ -261,7 +267,9 @@ export function TrackRow({index, columns, values, original, editing, removed, se
                 removed ? "bg-[#542526]" : ""
             } ${
                 // 选中：叠加上面那层（背景图），并把格子自己的底色让开 —— 两个坑位互不顶替，标色照旧看得见。
-                selected ? `${overlay} [&>td]:bg-transparent!` : ""
+                // **吸顶那几列不让**（`not(.sticky)`）：它们必须不透明才遮得住横向滚过来的列，
+                // 底色与选中那层由格子自己带上（见下面 frozen 那一段）。
+                selected ? `${overlay} [&>td:not(.sticky)]:bg-transparent!` : ""
             }`}
         >
             {/* 行号那半截**不可编辑**，于是不上色（= 默认底色）；它吸顶，所以底色得是不透明的。
@@ -283,7 +291,16 @@ export function TrackRow({index, columns, values, original, editing, removed, se
             {columns.map((column) => {
                 // 假删除的行：底色让开（整条暗红才透得出来）——所以底色是单独一项，`cell` 里那些跟底色
                 // 无关的类（居中、吸顶）照旧留着。
-                const cell = `${column.kind === "text" ? CELL : FOCUS_CELL} ${column.cell ?? ""} ${removed ? "" : (column.bg ?? "")}`
+                // 冻结列例外：它得自己带上"底色 + 选中那层"（tr 那记 bg-transparent! 已经跳过了 sticky），
+                // 于是格子里有没有文本都挡得住滚过来的列。
+                const frozen = column.frozen === true
+                const cell = `${column.kind === "text" ? CELL : FOCUS_CELL} ${column.cell ?? ""} ${
+                    frozen
+                        ? `${removed ? "bg-[#542526]" : (column.bg ?? "")} ${overlay}`
+                        : removed
+                          ? ""
+                          : (column.bg ?? "")
+                }`
                 if (column.kind === "picker") {
                     return (
                         <FlagCell
@@ -303,9 +320,9 @@ export function TrackRow({index, columns, values, original, editing, removed, se
                         <td key={column.label} className={cell}>
                             {/* 只读文本列（不走 EditableCell，所以得自己带上字号）：与可编辑格同为
                                 `text-base md:text-sm`（本窗口下 14px）—— 光靠表格那层 text-xs 会小一档 ✗。
-                                选中 / 假删除那层也得自己在场：这一格若吸顶，就得是不透明的实色才遮得住
-                                滚过来的列（td 在选中的行里被 tr 让开了，见上面那句 [&>td]:bg-transparent!）。 */}
-                            <div className={`px-1.5 py-0.5 text-base whitespace-nowrap md:text-sm ${cover}`}>
+                                这一层只在**不吸顶**的格子上负责选中 / 假删除那层；吸顶列（frozen）的合成色
+                                在 td 上，它不能再叠一层（会白亮一档 ✗）。 */}
+                            <div className={`px-1.5 py-0.5 text-base whitespace-nowrap md:text-sm ${frozen ? "" : cover}`}>
                                 {column.text ? column.text(value) : value}
                             </div>
                         </td>

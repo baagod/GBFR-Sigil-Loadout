@@ -70,3 +70,74 @@ func TestDeployLeavesNoActionTableWhenNothingEdited(t *testing.T) {
 		t.Fatalf("没有改动时 mod 里不该有动作表（err=%v）", err)
 	}
 }
+
+/*
+轨的保存自己就要把"与原表一致"的产物删掉：详情页那个「保存」走的是 SaveFlags / SaveTracks，
+它后面虽然还会调 DeployMissingTracks 兜一遍，但这条规矩不该只靠调用方记得再调一次。
+*/
+func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	writeTrackAsset(t, cfg, "3400", "0", flagsKind, readFixture(t, "pl1000_3400_0_seq_edit_flags.bxm"))
+	deployed := deployTrackPath(cfg, "3400", "0", flagsKind)
+
+	rows, err := service.LoadFlags("3400")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := rows[0].Flag0
+
+	// 先真的改一个值：产物该在。
+	rows[0].Flag0 = "1"
+	if err := service.SaveFlags("3400", rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(deployed); err != nil {
+		t.Fatalf("改过之后 mod 里该有这份产物: %v", err)
+	}
+
+	// 再改回原值：与原表逐字节一致了 —— 产物删掉。
+	rows, err = service.LoadFlags("3400")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows[0].Flag0 = original
+	if err := service.SaveFlags("3400", rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(deployed); !os.IsNotExist(err) {
+		t.Fatalf("与原表一致之后 mod 里不该再留着这份产物（err=%v）", err)
+	}
+}
+
+// 全局参数同理：SaveGlobalParam 自己就该删掉那份产物，不必等页面那个「保存」末尾的 Deploy。
+func TestSaveGlobalParamRemovesDeploymentWhenBackToOriginal(t *testing.T) {
+	service, _ := globalParamFixture(t, "guardparam.msg", sampleGuardParam())
+	const table = "guardparam.msg"
+	deployed := deployGlobalParamPath(table)
+
+	rows, err := service.LoadGlobalParam(table)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, _ := valueOf(t, rows, "GuardParam.GuardGageMax")
+
+	rows = setValue(rows, "GuardParam.GuardGageMax", "99")
+	if err := service.SaveGlobalParam(table, rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(deployed); err != nil {
+		t.Fatalf("改过之后 mod 里该有这份产物: %v", err)
+	}
+
+	rows, err = service.LoadGlobalParam(table)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows = setValue(rows, "GuardParam.GuardGageMax", original)
+	if err := service.SaveGlobalParam(table, rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(deployed); !os.IsNotExist(err) {
+		t.Fatalf("与原表一致之后 mod 里不该再留着这份产物（err=%v）", err)
+	}
+}

@@ -261,6 +261,14 @@ func TestSaveTracksConvertsTheWholeBatchInOneGo(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadTrack %s: %v", spec.kind, err)
 		}
+		// 改一格再保存：与原表一致的那种保存**不留产物**了（见 actionprune.go），
+		// 所以下面那把尺子量的是"改过的那份 XML"。取行里真有的那一列改，免得撞上"并集里有、这行没有"。
+		for _, column := range table.Columns {
+			if _, ok := table.Rows[0].Values[column]; ok {
+				table.Rows[0].Values[column] = "12345"
+				break
+			}
+		}
 		tables = append(tables, *table)
 	}
 
@@ -268,11 +276,7 @@ func TestSaveTracksConvertsTheWholeBatchInOneGo(t *testing.T) {
 		t.Fatalf("SaveTracks: %v", err)
 	}
 
-	for _, spec := range kinds {
-		source, err := os.ReadFile(filepath.Join(cfg.FlagsDir, "pl1000_3400_0_seq_edit_"+spec.kind+".xml"))
-		if err != nil {
-			t.Fatal(err)
-		}
+	for i, spec := range kinds {
 		deployed, err := os.ReadFile(filepath.Join(modDir, "pl", "pl1000", "pl1000_3400_0_seq_edit_"+spec.kind+".bxm"))
 		if err != nil {
 			t.Fatalf("%s 没部署到 mod 目录: %v", spec.kind, err)
@@ -280,7 +284,11 @@ func TestSaveTracksConvertsTheWholeBatchInOneGo(t *testing.T) {
 		if string(deployed[:3]) != "BXM" {
 			t.Fatalf("%s 部署出去的不是 BXM（头三个字节 % x）", spec.kind, deployed[:3])
 		}
-		if want := convertForTest(t, source); !bytes.Equal(deployed, want) {
+		edited, err := buildTrackXML(&tables[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := convertForTest(t, edited); !bytes.Equal(deployed, want) {
 			t.Fatalf("%s 部署出去的 BXM 与工具直接转源 XML 的结果不是同一份", spec.kind)
 		}
 	}

@@ -129,42 +129,53 @@ func (s *ActionsService) SaveGlobalParam(table string, fields []ActionField) err
 	for _, field := range fields {
 		edits = setGlobalParamEdit(edits, table, field.Key, field.Value)
 	}
-	// 先试合一遍：多出来的路径、认不出的形状都在这儿报出来，确认没问题再落改动表 —— 否则一个坏改动
-	// 会先被存下来，下次打开界面就带着它（与 SaveActionFields 同一条规矩）。
-	if _, err := mergedGlobalParam(cfg, table, edits); err != nil {
+	// 部署这一步把三件事一次办完：非法路径当场报错（坏改动不会先被存下来）、"有没有真改动"顺手算出来、
+	// 该写的字节也合成了。它同时决定账本该记什么：全是空操作的那些改动不记账，mod 里那份也删掉
+	// （见 actionprune.go）。
+	kept, err := s.deployGlobalParam(cfg, table, edits)
+	if err != nil {
 		return err
 	}
-	if err := saveGlobalParamEdits(edits); err != nil {
-		return err
-	}
-	return deployGlobalParam(cfg, table, edits)
+	return saveGlobalParamEdits(kept)
 }
 
 /*
-mergedGlobalParam 现读一份**原始**表、把这张表的改动套上去、编码成 msgpack 字节。
+mergeGlobalParam 现读一份**原始**表、把这张表的改动套上去，一次算出：合并后的字节（没有真改动时是 nil）、
+有没有真改动、以及多出来的路径 / 认不出的形状这些错。
 
-合并是就地改树的，所以它不接受外面传进来的树：自己读一份、用完就扔 —— 调用两次不会互相污染
-（与 mergedActionTable 同一个理由）。
+原表各路径的值走 flattenGlobalParams 拿（不是自己递归）：界面上看到的路径就是它算的，两处必须同一份记法。
+合并是就地改树的，所以它自己读一份、用完就扔。
 */
-func mergedGlobalParam(cfg actionConfig, table string, edits []globalParamEdit) ([]byte, error) {
+func mergeGlobalParam(cfg actionConfig, table string, edits []globalParamEdit) ([]byte, bool, error) {
 	root, err := loadGlobalParamOriginal(cfg, table)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	nodes := map[string]*msgValue{}
 	var rows []ActionField
 	flattenGlobalParams(root, "", &rows, nodes)
+	original := make(map[string]string, len(rows))
+	for _, row := range rows {
+		original[row.Key] = row.Original
+	}
 
+	changed := false
 	for path, value := range mergeGlobalParamEdits(edits, table) {
 		node := nodes[path]
 		if node == nil {
-			return nil, fmt.Errorf("改动里有 %s 的 %s，但表里没有这一格", table, path)
+			return nil, false, fmt.Errorf("改动里有 %s 的 %s，但表里没有这一格", table, path)
+		}
+		if original[path] != value {
+			changed = true
 		}
 		if err := setGlobalParamValue(node, value); err != nil {
-			return nil, fmt.Errorf("%s 的 %s: %w", table, path, err)
+			return nil, false, fmt.Errorf("%s 的 %s: %w", table, path, err)
 		}
 	}
-	return encodeMsgpack(root), nil
+	if !changed {
+		return nil, false, nil
+	}
+	return encodeMsgpack(root), true, nil
 }
 
 // loadGlobalParamOriginal 读**原始**表：随包容器 data.zip 里那条 system/player/<表>.msg（只读，发布版的
@@ -209,14 +220,33 @@ func deployGlobalParamPath(table string) string {
 	return filepath.Join(actionsModDir, "system", "player", table)
 }
 
-// deployGlobalParam 把"原始 + 改动"合成一份 msgpack 写进 mod 目录（源文件一个字节都不碰）。
-// 调用方持有 s.mu。
-func deployGlobalParam(cfg actionConfig, table string, edits []globalParamEdit) error {
-	body, err := mergedGlobalParam(cfg, table, edits)
+/*
+deployGlobalParam 把这张表写进 mod（源文件一个字节都不碰），并把**清理后**的改动表还给调用方。
+
+改动全是空操作 → 与原表数值一致：不留产物（mod 里那份删掉，游戏回去读它自己的原表），这一批改动也不再
+记账。与 deployActionTable 同一条规矩（见 actionprune.go）。调用方持有 s.mu。
+*/
+func (s *ActionsService) deployGlobalParam(cfg actionConfig, table string, edits []globalParamEdit) ([]globalParamEdit, error) {
+	body, changed, err := mergeGlobalParam(cfg, table, edits)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return appfiles.WriteAtomic(deployGlobalParamPath(table), body)
+	if !changed {
+		if err := removeDeployed(deployGlobalParamPath(table)); err != nil {
+			return nil, err
+		}
+		kept := make([]globalParamEdit, 0, len(edits))
+		for _, edit := range edits {
+			if edit.Table != table {
+				kept = append(kept, edit)
+			}
+		}
+		return kept, nil
+	}
+	if err := appfiles.WriteAtomic(deployGlobalParamPath(table), body); err != nil {
+		return nil, err
+	}
+	return edits, nil
 }
 
 // setGlobalParamValue 把界面上那一格的文本写回节点。

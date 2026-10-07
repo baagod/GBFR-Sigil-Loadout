@@ -327,6 +327,9 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                           // left 是硬编码像素，所以 id_ 必须定宽（w-12），不然 abilityTag_ 会随记录号位数错位。
                           cell: `tabular-nums${FROZEN[key] ?? ""}`,
                           bg: "bg-background",                          // abilityTag_ 显示成技能名（ability.lang.json，随语言变）：姬塔（AB_PL0100_*）
+                          // 这一列冻结（`cell` 里有 sticky）：选中那行时它得自己带上底色与选中那层，
+                          // 否则横向滚过来的列会从它底下穿过去（格子里没文本时最明显，见 TrackColumn 的 frozen）。
+                          frozen: FROZEN[key] !== undefined,
                           // 与古兰是同一个角色的两个性别、技能相同，改查古兰那份；都查不到（预留槽）就原样
                           // 显示键名，不编造。
                           text: key === "abilityTag_" ? (tag: string) => abilityName(abilityNames, tag) : undefined,
@@ -559,10 +562,10 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                         onSelect={(code) => void switchCharacter(code)}
                         t={t}
                     />
-                    {/* 记录清单：这一页显示哪几条记录（空格分隔）。id_ 是各角色自己的一套编号，
-                        所以换角色之后常常要改这里；"一条都对不上"的报错也是提示改它。
-                        样式一律用 Input 的默认：**只给一个宽度**——它的基类自带 w-full，放进这一行会独占整行。 */}
-                    {/* 搜索动作 id 的输入框：按官方 InputGroup 的写法，放大镜作为 addon 排在框**里面**的左边
+                    {/* 记录清单：这一页显示哪几条记录（空格分隔）。一个 token 两种判据 —— `id_` 认它，或者
+                        它引用的某个 `saveMotId01_~12_` 认它（见后端 recordsMatching），所以搜 mot 号也能捞。
+                        样式用 Input 的默认：**只给一个宽度**——它的基类自带 w-full，放进这一行会独占整行。 */}
+                    {/* 搜索 id_ / mot 号的输入框：按官方 InputGroup 的写法，放大镜作为 addon 排在框**里面**的左边
                         （addon 默认 align=inline-start，CSS 是 order-first；裸 svg 由 addon 自己给 size-4）。
                         宽度：`flex-1` —— **吃掉这一行的剩余空间**（用户要求；原来是写死的 200px，右边空出一截）。
                         宽度写在 InputGroup 上而不是 Input 上：Input 基类自带 w-full，它自己撑满外层就行。 */}

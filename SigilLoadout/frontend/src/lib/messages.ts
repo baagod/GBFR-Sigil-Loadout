@@ -55,7 +55,7 @@ const zh = {
 
     // 角色动作页
     loading: "读取中…",
-    idsHint: "搜索 id_，以空格分隔。",
+    idsHint: "搜索 id_ 或 mot 号，以空格分隔。",
     charEmpty: "解包目录里没有别的角色动作表",
     /** 清单上的记录这张表里一条都没有：不是错误，是 ids 与表不匹配（见后端 LoadActions）。 */
     actionsEmpty: "无搜索动作",
@@ -138,7 +138,7 @@ export const messages: Record<Lang, Messages> = {
         noBonuses: "No boostable entries",
 
         loading: "Loading…",
-        idsHint: "Search id_, space-separated.",
+        idsHint: "Search id_ or a mot number (partial match), space-separated.",
         charEmpty: "No other character action tables extracted",
         actionsEmpty: "No matching actions",
         cancel: "Cancel",
@@ -206,7 +206,7 @@ export const messages: Record<Lang, Messages> = {
         noBonuses: "強化できる項目がありません",
 
         loading: "読み込み中…",
-        idsHint: "id_ を検索、空白区切り。",
+        idsHint: "id_ または mot 番号を検索（部分一致）、空白区切り。",
         charEmpty: "解包先に他のキャラクターのアクション表がありません",
         actionsEmpty: "該当するアクションがありません",
         cancel: "キャンセル",
@@ -274,7 +274,7 @@ export const messages: Record<Lang, Messages> = {
         noBonuses: "강화할 항목이 없습니다",
 
         loading: "불러오는 중…",
-        idsHint: "id_ 검색, 공백 구분.",
+        idsHint: "id_ 또는 mot 번호 검색 (부분 일치), 공백 구분.",
         charEmpty: "다른 캐릭터의 액션 표가 없습니다",
         actionsEmpty: "일치하는 액션이 없습니다",
         cancel: "취소",

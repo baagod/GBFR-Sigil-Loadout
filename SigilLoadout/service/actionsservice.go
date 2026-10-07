@@ -179,12 +179,13 @@ func deployActionPath(cfg actionConfig) string {
 }
 
 /*
-LoadActions 读动作表，给出要显示的那几条记录。**按 id_ 找，不按下标。**
+LoadActions 读动作表，给出要显示的那几条记录。
 
-清单**空** = 全部：表里有几条就列几条，顺序照文件里的顺序（界面上的清空搜索框就是这个意思）。
+清单里的**一个 token 有两种判据**：`id_` 认它，或者它引用的任一 `saveMotId01_~12_` 认它（**包含**就算，
+见 recordsMatching）—— 界面上只有一个搜索框，用户不必先声明搜的是哪一种。清单**空** = 全部，顺序照文件。
 
-清单非空时，表里没有的 id 跳过而不是报错：那份清单是跨角色共用的（见 defaultActionIDs），炎帝的表里
-没有 954 很正常。一条都对不上也不是错误，界面在表格位置提示。
+表里一条都认不出来的 token 跳过而不是报错（那份清单跨角色共用，炎帝的表里没有 954 很正常）；一条都对不上
+也不是错误，界面在表格位置提示。
 */
 func (s *ActionsService) LoadActions() ([]Action, error) {
 	cfg := s.config()
@@ -204,25 +205,70 @@ func (s *ActionsService) LoadActions() ([]Action, error) {
 	}
 
 	actions := make([]Action, 0, len(ids))
-	for _, id := range ids {
-		record := recordByID(original, id)
-		if record == nil {
-			continue
-		}
-		fields, err := actionFields(record)
-		if err != nil {
-			return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", id, err)
-		}
-		// 原值照给，改动叠在上面：界面把 Value 填进输入框、把 Original 当灰色占位符。
-		for i := range fields {
-			if value, ok := changed[id][fields[i].Key]; ok {
-				edited := value
-				fields[i].Value = &edited
+	// 同一条记录只上一次：一个 motion 号可能被好几条动作引用，两个 token 也可能撞到同一条。
+	seen := make(map[string]bool, len(ids))
+	for _, token := range ids {
+		for _, record := range recordsMatching(original, token) {
+			idField := record.entry("id_")
+			if idField == nil || seen[idField.str] {
+				continue
 			}
+			seen[idField.str] = true
+			fields, err := actionFields(record)
+			if err != nil {
+				return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", idField.str, err)
+			}
+			// 原值照给，改动叠在上面：界面把 Value 填进输入框、把 Original 当灰色占位符。
+			for i := range fields {
+				if value, ok := changed[idField.str][fields[i].Key]; ok {
+					edited := value
+					fields[i].Value = &edited
+				}
+			}
+			actions = append(actions, Action{ID: idField.str, Fields: fields})
 		}
-		actions = append(actions, Action{ID: id, Fields: fields})
 	}
 	return actions, nil
+}
+
+/*
+recordsMatching 挑出"认这个 token"的记录，按文件里的顺序。
+
+两种判据共用一个 token：`id_` 认它，或者它引用的某个 `saveMotId01_~12_` 认它 —— 判据就是 containsToken
+（**包含**就算，大小写不敏感）。界面上只有那一个搜索框，用户不必先声明搜的是哪一种。
+
+`*` **没有任何特殊含义**：它就是个普通字符，既不当通配符、也不会被剔掉（数据里没有它，所以带 `*` 的
+输入自然搜不到东西）。于是 `3430` 是精确命中（mot 恒为 4 位），`3a` 能搜到 `3a00`（含连续的 `3a`）、
+搜不到 `34a0`（那三个字符是 `3` `4` `a`）。
+*/
+func recordsMatching(root *msgValue, token string) []*msgValue {
+	pattern := strings.ToLower(token)
+	out := make([]*msgValue, 0, 4)
+	for _, entry := range root.entries {
+		record := entry.value
+		if record.format != msgMap {
+			continue
+		}
+		if field := record.entry("id_"); field != nil && containsToken(field.str, pattern) {
+			out = append(out, record)
+			continue
+		}
+		for _, field := range record.entries {
+			if !strings.HasPrefix(field.key.str, "saveMotId") {
+				continue
+			}
+			if containsToken(field.value.scalar(), pattern) {
+				out = append(out, record)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// containsToken 值里含不含这一段（大小写不敏感；pattern 已经折过小写）。
+func containsToken(value, pattern string) bool {
+	return strings.Contains(strings.ToLower(value), pattern)
 }
 
 /*
@@ -298,8 +344,6 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 		}
 	}
 
-	// 先试合一遍（非法值在这儿报出来），确认没问题再落改动表 —— 否则一个坏值会先被存下来，
-	// 下次打开界面就带着它。合并会改动读进来的那棵树，所以每次合并都现读一份原始表。
 	edits, err := loadActionEdits()
 	if err != nil {
 		return err
@@ -308,64 +352,81 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 	for _, field := range fields {
 		edits = setActionEdit(edits, char, id, field.Key, field.Value)
 	}
-	if _, err := mergedActionTable(cfg, edits); err != nil {
-		return err
-	}
-	// 改回原值的那些改动别再记账，也别再把这张表部署出去（见 actionprune.go）。
-	edits, err = dropUnchangedActionTable(cfg, edits)
+	// 部署这一步把三件事一次办完：非法值当场报错（坏值不会先被存下来）、"有没有真改动"顺手算出来、
+	// 该写的字节也合成了。它同时决定账本该记什么 —— 全是空操作的改动不记账，mod 里那份也删掉
+	// （见 actionprune.go）。
+	kept, err := s.deployActionTable(cfg, edits)
 	if err != nil {
 		return err
 	}
-	if err := saveActionEdits(edits); err != nil {
-		return err
-	}
-	return s.deployActionTable(cfg, edits)
+	return saveActionEdits(kept)
 }
 
-// deployActionTable 把"原始 + 改动"合成一份 msgpack 写进 mod 目录（源文件一个字节都不碰）。
-//
-// 当前角色的改动全是空操作 → 与原表一致：不留产物（mod 里那份删掉，游戏读它自己的原表），
-// 也不去读原表做合并。见 actionprune.go。
-func (s *ActionsService) deployActionTable(cfg actionConfig, edits []actionEdit) error {
-	unchanged, err := actionTableUnchanged(cfg, charCode(cfg), edits)
-	if err != nil {
-		return err
-	}
-	if unchanged {
-		return removeDeployed(deployActionPath(cfg))
-	}
-	body, err := mergedActionTable(cfg, edits)
-	if err != nil {
-		return err
-	}
-	return appfiles.WriteAtomic(deployActionPath(cfg), body)
-}
+/*
+deployActionTable 把当前角色的动作表写进 mod（源文件一个字节都不碰），并把**清理后**的改动表还给调用方。
 
-// mergedActionTable 现读一份**原始**动作表、把改动套上去、编码成 msgpack 字节。
-//
-// 合并是就地改树的，所以它不接受外面传进来的树：自己读一份，用完就扔 —— 调用两次不会互相污染
-// （撤销一格时尤其重要：拿合并过的树再合一次，旧值会留在上面）。
-func mergedActionTable(cfg actionConfig, edits []actionEdit) ([]byte, error) {
-	original, err := loadActionOriginal(cfg)
+改动全是空操作 → 与原表数值一致：不留产物（mod 里那份删掉，游戏读它自己的原表），这一批改动也不再记账。
+别的角色的改动原样留着：它们的原表不是这一份。
+*/
+func (s *ActionsService) deployActionTable(cfg actionConfig, edits []actionEdit) ([]actionEdit, error) {
+	body, changed, err := mergeActionTable(cfg, edits)
 	if err != nil {
 		return nil, err
 	}
+	if !changed {
+		if err := removeDeployed(deployActionPath(cfg)); err != nil {
+			return nil, err
+		}
+		char := charCode(cfg)
+		kept := make([]actionEdit, 0, len(edits))
+		for _, edit := range edits {
+			if edit.Char != char {
+				kept = append(kept, edit)
+			}
+		}
+		return kept, nil
+	}
+	if err := appfiles.WriteAtomic(deployActionPath(cfg), body); err != nil {
+		return nil, err
+	}
+	return edits, nil
+}
+
+/*
+mergeActionTable 现读一份**原始**动作表、把改动套上去，一次算出：合并后的字节（没有真改动时是 nil，
+因为调用方要的只是"删掉 mod 里那份"）、有没有真改动、以及多出来的记录 / 格子 / 非法值这些错。
+
+逐格比的是 actionFieldValue 给的**界面写法**（数组那几格是 JSON 串）；取值失败时保守地当作"改过" ——
+清理这种事，拿不准就别删。合并是就地改树的，所以它自己读一份、用完就扔。
+*/
+func mergeActionTable(cfg actionConfig, edits []actionEdit) ([]byte, bool, error) {
+	original, err := loadActionOriginal(cfg)
+	if err != nil {
+		return nil, false, err
+	}
+	changed := false
 	for id, fields := range mergeActionEdits(edits, charCode(cfg)) {
 		record := recordByID(original, id)
 		if record == nil {
-			return nil, fmt.Errorf("改动里有 id_ = %q，但动作表里没有这条记录", id)
+			return nil, false, fmt.Errorf("改动里有 id_ = %q，但动作表里没有这条记录", id)
 		}
 		for key, value := range fields {
 			node := record.entry(key)
 			if node == nil {
-				return nil, fmt.Errorf("改动里有 id_ = %q 的 %s，但记录里没有这一格", id, key)
+				return nil, false, fmt.Errorf("改动里有 id_ = %q 的 %s，但记录里没有这一格", id, key)
+			}
+			if before, err := actionFieldValue(node); err != nil || before != value {
+				changed = true
 			}
 			if err := setActionFieldValue(node, value); err != nil {
-				return nil, fmt.Errorf("id_ = %q 的 %s: %w", id, key, err)
+				return nil, false, fmt.Errorf("id_ = %q 的 %s: %w", id, key, err)
 			}
 		}
 	}
-	return encodeMsgpack(original), nil
+	if !changed {
+		return nil, false, nil
+	}
+	return encodeMsgpack(original), true, nil
 }
 
 // LoadFlags 读某个 motion 的 flags 轨并解析成行（改过就是这个角色的改动，没改过就是随包的原始数据）；
@@ -469,15 +530,12 @@ func (s *ActionsService) Deploy() error {
 	if err != nil {
 		return err
 	}
-	// 三类表都先过一遍清理：和原表数值一致的整份表，账本与 mod 里都不留（见 actionprune.go）。
-	edits, err = dropUnchangedActionTable(cfg, edits)
+	// 动作表：部署这一步顺手把"全是空操作"的改动从账本里清掉（见 actionprune.go）。
+	edits, err = s.deployActionTable(cfg, edits)
 	if err != nil {
 		return err
 	}
 	if err := saveActionEdits(edits); err != nil {
-		return err
-	}
-	if err := s.deployActionTable(cfg, edits); err != nil {
 		return err
 	}
 
@@ -503,17 +561,14 @@ func (s *ActionsService) Deploy() error {
 	if err != nil {
 		return err
 	}
-	globalEdits, err = dropUnchangedGlobalParams(cfg, globalEdits)
-	if err != nil {
-		return err
+	for _, table := range globalParamTables(globalEdits) {
+		globalEdits, err = s.deployGlobalParam(cfg, table, globalEdits)
+		if err != nil {
+			return err
+		}
 	}
 	if err := saveGlobalParamEdits(globalEdits); err != nil {
 		return err
-	}
-	for _, table := range globalParamTables(globalEdits) {
-		if err := deployGlobalParam(cfg, table, globalEdits); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -550,12 +605,7 @@ func trackRefsOf(edits []trackEdit, char, motion string) []trackRef {
 	return refs
 }
 
-/*
-deployRefs 把这几条轨按改动合成 XML、编成 BXM 搬进 mod（调用方持有 s.mu）。
-
-onlyMissing = 只搬 mod 目录里**还没有文件**的那些（详情页点保存时的补部署，见 DeployMissingTracks）；
-false = 全搬 —— Deploy 那条路要的是"账本重新投影一遍"，文件已经在也得重写（资产换过时内容会变）。
-*/
+// deployRefs 把这几条轨按改动合成 XML、编成 BXM 搬进 mod（调用方持有 s.mu）。
 func (s *ActionsService) deployRefs(cfg actionConfig, edits []trackEdit, refs []trackRef) error {
 	items := make([]trackWrite, 0, len(refs))
 	for _, ref := range refs {
@@ -736,12 +786,25 @@ flags 的保存、通用轨的保存、以及 Deploy 里"把改动表里记着�
 */
 func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWrite) error {
 	for _, item := range items {
+		dst := deployTrackPath(cfg, item.motion, item.sub, item.kind)
+		// 与原表逐字节一致的轨**不留产物**：改回原值之后再保存，mod 里那份要消失（游戏回去读自己的
+		// 原表）。判据与账本清理同一条（见 actionprune.go 的 trackXMLUnchanged），落在写文件这一处
+		// 就不管从哪个入口来的都成立。
+		unchanged, err := trackXMLUnchanged(cfg, item.motion, item.sub, item.kind, item.raw)
+		if err != nil {
+			return err
+		}
+		if unchanged {
+			if err := removeDeployed(dst); err != nil {
+				return err
+			}
+			continue
+		}
 		body, err := xmlToBXM(item.raw)
 		if err != nil {
 			return fmt.Errorf("把 %s_%s_%s_seq_edit_%s 的 XML 编成 BXM: %w",
 				charCode(cfg), item.motion, item.sub, item.kind, err)
 		}
-		dst := deployTrackPath(cfg, item.motion, item.sub, item.kind)
 		if err := appfiles.WriteAtomic(dst, body); err != nil {
 			return fmt.Errorf("部署到 %s: %w", dst, err)
 		}

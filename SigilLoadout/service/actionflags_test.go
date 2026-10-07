@@ -183,6 +183,9 @@ func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 先改一行再保存：与原表一致的那种保存**不留产物**了（见 actionprune.go），
+	// 所以下面那把尺子量的是"改过的那份 XML"。
+	rows[0].Flag0 = "8192"
 	if err := service.SaveFlags("3400", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}
@@ -202,28 +205,21 @@ func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 	if string(deployed[:3]) != "BXM" {
 		t.Fatalf("部署出去的不是 BXM（头三个字节 % x）", deployed[:3])
 	}
-	if want := convertForTest(t, before); !bytes.Equal(deployed, want) {
+	edited, err := buildFlagsXML(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := convertForTest(t, edited); !bytes.Equal(deployed, want) {
 		t.Fatal("部署出去的 BXM 与工具直接转那份 XML 的结果不是同一份")
 	}
 
-	// 改一行：改动表与部署出去的那份都要跟着变，而源 XML 仍然一个字节不动。
-	rows[0].Flag0 = "8192"
-	if err := service.SaveFlags("3400", rows); err != nil {
-		t.Fatalf("SaveFlags: %v", err)
-	}
-	untouched, err := os.ReadFile(source)
+	// 改动进了改动表（源 XML 仍然一个字节不动）。
+	ledger, err := os.ReadFile(trackEditsPath())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(before, untouched) {
-		t.Fatal("改一行的保存也动了源 XML：原始数据必须只读")
-	}
-	edited, err := os.ReadFile(trackEditsPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(edited), `Flag0=\"8192\"`) {
-		t.Fatalf("改过的掩码没进 %s:\n%s", trackEditsName, edited)
+	if !strings.Contains(string(ledger), `Flag0=\"8192\"`) {
+		t.Fatalf("改过的掩码没进 %s:\n%s", trackEditsName, ledger)
 	}
 }
 

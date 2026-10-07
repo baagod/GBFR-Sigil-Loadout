@@ -126,6 +126,133 @@ func TestLoadActionsReturnsEmptyInsteadOfErroringWhenNoIDMatches(t *testing.T) {
 }
 
 /*
+搜索框里除了 id_ 还能写 motion 号：一个 token 两种判据（`id_` 等于它，或它引用的 `saveMotId*_` 等于它，
+见 recordsMatching）。这里用一个**真表里真被引用过**的 mot 号去搜，不写死号 —— 样本表是哪个角色都能跑。
+*/
+func TestLoadActionsMatchesMotionNumbersToo(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	// 先把全表读出来，取第一个被引用的 mot 号，以及引用它的那些 id（按表顺序、去重）。
+	all, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	motion := ""
+	var referencing []string
+	referenced := map[string]bool{}
+	for _, action := range all {
+		for _, field := range action.Fields {
+			if !strings.HasPrefix(field.Key, "saveMotId") || !isMotion(field.Original) {
+				continue
+			}
+			if motion == "" {
+				motion = field.Original
+			}
+			if field.Original == motion && !referenced[action.ID] {
+				referenced[action.ID] = true
+				referencing = append(referencing, action.ID)
+			}
+		}
+	}
+	if motion == "" {
+		t.Skip("这张样本表里没有一个像 mot 号的 saveMotId*_")
+	}
+
+	// 只用 mot 号搜：引用它的记录一条不少，且按表顺序。
+	if err := service.SetActionIDs(motion); err != nil {
+		t.Fatal(err)
+	}
+	got, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != len(referencing) {
+		t.Fatalf("用 mot %s 搜到 %d 条，want %d 条（%v）", motion, len(got), len(referencing), referencing)
+	}
+	for i, action := range got {
+		if action.ID != referencing[i] {
+			t.Fatalf("第 %d 条是 id_=%s，want %s", i, action.ID, referencing[i])
+		}
+	}
+
+	// id 与 mot 混着写：两种判据都认，同一条记录不会重复出现。
+	id := all[0].ID
+	if err := service.SetActionIDs(id + " " + motion); err != nil {
+		t.Fatal(err)
+	}
+	got, err = service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, action := range got {
+		if seen[action.ID] {
+			t.Fatalf("id_=%s 出现了两次", action.ID)
+		}
+		seen[action.ID] = true
+	}
+	if !seen[id] {
+		t.Fatalf("混着写之后按 id_ 的那条没出来：%v", got)
+	}
+	for _, want := range referencing {
+		if !seen[want] {
+			t.Fatalf("混着写之后引用 mot %s 的 id_=%s 没出来", motion, want)
+		}
+	}
+
+	// 模糊（含匹配）：拿这个 mot 号的**中间两位**搜，引用它的记录都该在。
+	mid := motion[1:3]
+	if err := service.SetActionIDs(mid); err != nil {
+		t.Fatal(err)
+	}
+	got, err = service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fuzzy := map[string]bool{}
+	for _, action := range got {
+		fuzzy[action.ID] = true
+	}
+	for _, want := range referencing {
+		if !fuzzy[want] {
+			t.Fatalf("用 %s 搜不到引用 mot %s 的 id_=%s", mid, motion, want)
+		}
+	}
+}
+
+// 判据是**包含**（大小写不敏感）。`*` 没有任何特殊含义 —— 就是个普通字符，数据里没有它，所以带 `*`
+// 的输入搜不到东西（既不当通配符，也不会被剔掉）。
+func TestContainsToken(t *testing.T) {
+	cases := []struct {
+		value, token string
+		want         bool
+	}{
+		{"34a0", "34a0", true},
+		{"34a0", "34", true},
+		{"34a0", "4a", true},
+		{"34a0", "3430", false},
+		{"34a0", "3a", false}, // 34a0 里没有连续的 "3a"
+		{"3a00", "3a", true},
+		{"3a00", "3a*", false},  // `*` 是普通字符，值里没有它
+		{"3a00", "*3a*", false}, // 同上
+		{"3a00", "00", true},
+		{"3430", "34", true},
+		{"3430", "31", false},
+		{"3430", "34*0", false},
+		{"34A2", "34a2", true}, // 手打大写也认
+		{"1004", "4", true},
+		{"6", "4", false},
+		{"3430", "*", false},
+	}
+	for _, c := range cases {
+		if got := containsToken(c.value, strings.ToLower(c.token)); got != c.want {
+			t.Errorf("含匹配(%q, %q) = %v，want %v", c.value, c.token, got, c.want)
+		}
+	}
+}
+
+/*
 保存**不写源文件**：改动进用户目录的 action_edits.json，原始动作表从此只读。
 
 这是这一页换成"原值 + 改动"模型要保证的第一件事。以前是保存即覆盖源，手滑把一格留空就把原值写没了
@@ -143,7 +270,7 @@ func TestSaveActionFieldsNeverWritesTheSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields := actions[1].Fields
+	fields := actionByID(t, actions, "6").Fields
 	for i := range fields {
 		if fields[i].Key == "abilityChargeTime_" {
 			fields[i].Value = strPtr("95")
@@ -200,7 +327,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields := actions[1].Fields
+	fields := actionByID(t, actions, "6").Fields
 	for i := range fields {
 		if fields[i].Key == "abilityChargeTime_" {
 			fields[i].Value = strPtr("95")
@@ -214,7 +341,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields = actions[1].Fields
+	fields = actionByID(t, actions, "6").Fields
 	original := ""
 	for i := range fields {
 		if fields[i].Key == "abilityChargeTime_" {
@@ -250,6 +377,18 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 	}
 }
 
+// actionByID 按 id_ 从清单里取一条：清单是**含匹配**，命中的条数与顺序都不固定，不能按下标认。
+func actionByID(t *testing.T, actions []Action, id string) Action {
+	t.Helper()
+	for _, action := range actions {
+		if action.ID == id {
+			return action
+		}
+	}
+	t.Fatalf("清单里没有 id_ = %s（共 %d 条）", id, len(actions))
+	return Action{}
+}
+
 // fieldValue 取界面看到的**有效值**：有改动就是改动，没有就是原值（与前端 value ?? original 同义）。
 func fieldValue(action Action, key string) string {
 	for _, field := range action.Fields {
@@ -267,20 +406,34 @@ func fieldValue(action Action, key string) string {
 记录清单也是设置项（第五个）：默认是炎帝的 4/6 与 Fediel 的 954，界面上那个输入框改的就是它。
 
 分隔符认空白，逗号也一并收下（从别处粘 "4,6,954" 是常事）；空清单当场拒绝。
+
+⚠️ 判据是**含匹配**（见 matchesToken）：清单里写 4 / 6 会连带把 40、34a0 这些也捞出来。所以这条钉的是
+"4 与 6 自己在结果里、4 排在 6 前面（文件顺序）、字段是整份"，而不是"结果只有这两条"。
 */
 func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
+	if err := service.SetActionIDs("4 6"); err != nil {
+		t.Fatalf("SetActionIDs: %v", err)
+	}
 	actions, err := service.LoadActions()
 	if err != nil {
 		t.Fatalf("LoadActions: %v", err)
 	}
-	if len(actions) != 2 || actions[0].ID != "4" || actions[1].ID != "6" {
-		t.Fatalf("拿到的不是 id_ 4 与 6：%+v", actions)
+	at := map[string]int{}
+	for i, action := range actions {
+		at[action.ID] = i
 	}
-
-	tear := actions[0]
+	tearAt, okTear := at["4"]
+	powerAt, okPower := at["6"]
+	if !okTear || !okPower {
+		t.Fatalf("id_ 4 与 6 都该在结果里（共 %d 条）", len(actions))
+	}
+	if tearAt >= powerAt {
+		t.Fatalf("4 该排在 6 前面（文件顺序），实际 %d vs %d", tearAt, powerAt)
+	}
+	tear, power := actions[tearAt], actions[powerAt]
 	if len(tear.Fields) != 87 {
 		t.Fatalf("id_ = 4 给了 %d 个字段，want 全部 87 个", len(tear.Fields))
 	}
@@ -291,7 +444,6 @@ func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
 		t.Fatalf("id_ = 4 的名字是 %q", got)
 	}
 
-	power := actions[1]
 	if got := fieldValue(power, "actionName_"); got != "【アビリティ】アーマー突進＋強Break" {
 		t.Fatalf("id_ = 6 的名字是 %q", got)
 	}
@@ -356,7 +508,7 @@ func TestSaveActionFieldsWritesTheEditBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields := actions[1].Fields
+	fields := actionByID(t, actions, "6").Fields
 	for i := range fields {
 		if fields[i].Key == "abilityChargeTime_" {
 			fields[i].Value = strPtr("95")
@@ -370,16 +522,17 @@ func TestSaveActionFieldsWritesTheEditBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fieldValue(reread[1], "abilityChargeTime_"); got != "95" {
+	six, before6 := actionByID(t, reread, "6"), actionByID(t, actions, "6")
+	if got := fieldValue(six, "abilityChargeTime_"); got != "95" {
 		t.Fatalf("改的那一格读回来是 %q", got)
 	}
-	if got := fieldValue(reread[1], "actionName_"); got != fieldValue(actions[1], "actionName_") {
+	if got := fieldValue(six, "actionName_"); got != fieldValue(before6, "actionName_") {
 		t.Fatalf("没改的格子被动了：actionName_ = %q", got)
 	}
-	if len(reread[1].Fields) != len(actions[1].Fields) {
-		t.Fatalf("字段个数从 %d 变成了 %d", len(actions[1].Fields), len(reread[1].Fields))
+	if len(six.Fields) != len(before6.Fields) {
+		t.Fatalf("字段个数从 %d 变成了 %d", len(before6.Fields), len(six.Fields))
 	}
-	if got := fieldValue(reread[0], "abilityChargeTime_"); got != fieldValue(actions[0], "abilityChargeTime_") {
+	if got := fieldValue(actionByID(t, reread, "4"), "abilityChargeTime_"); got != fieldValue(actionByID(t, actions, "4"), "abilityChargeTime_") {
 		t.Fatalf("只改了 id_ = 6，id_ = 4 却跟着变了（%q）", got)
 	}
 }
