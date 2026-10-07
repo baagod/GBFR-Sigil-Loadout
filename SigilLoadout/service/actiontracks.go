@@ -726,6 +726,9 @@ SaveTracks 一次把若干条改过的轨记下来并部署（界面上详情页
 与 flags 的保存走同一段管线（同一把锁、同一个部署函数，见 writeAndDeployTracks）。
 */
 func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
+	if !isMotion(motion) {
+		return fmt.Errorf("motion 号 %q 不合法", motion)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
