@@ -19,12 +19,14 @@ import {SortableTrackRow, TrackTable, TRACK_HANDLE, type TrackColumn} from "@/co
 /* TrackToolbar（那排按钮：加行 / 复制 / 粘贴 / 剪切 / 删除）搬去了 @/components/TrackToolbar。 */
 
 /** 通用轨的表格：列是后端给的（该轨所有属性的并集，按首次出现排），格子直接改，行拖握把重排。 */
-export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onReorder}: {
+export function TrackGrid({table, sel, t, diffs, originals, onSelect, onExtend, onEdit, onReorder}: {
     table: TrackTableData | undefined
     sel: RowSelection | null
     t: Messages
     /** 每行与原表的差异列（下标与行一一对应，见 diffRows）。 */
     diffs: (Set<string> | null)[] | undefined
+    /** 原表那些行（后端 LoadTrackOriginal）：清空输入框时显示的灰字就是它。 */
+    originals?: TrackRow[]
     onSelect: (index: number, shift: boolean, ctrl: boolean) => void
     onExtend: (index: number) => void
     onEdit: (index: number, column: string, value: string) => void
@@ -41,6 +43,8 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                     index={index}
                     columns={columns}
                     values={row.values}
+                    // 这一行对应原表第几行（新增 / 粘贴出来的行没有那一栏）——占位符取的就是那一行的值。
+                    original={row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined}
                     // 被"假删除"的原行：暗红底标记一下；值照旧可编辑，改动由后端存进行身份保住
                     //（仍是删除态时不写进游戏）。
                     removed={row.removed === true}

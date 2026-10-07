@@ -56,15 +56,20 @@ export const CELL_TEXT = "flex h-full w-full items-center px-1 py-0 text-base md
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono, placeholder, unchanged}: {
+export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono, placeholder, unchanged, override}: {
     /** 这个格的 td 类，由调用点给（各表的边框/底色/吸顶不一样）。 */
     tdClassName: string
     value: string
     onCommit: (value: string) => void
     onDoubleClick?: () => void
     mono?: boolean
-    /** 原值：留空时显示它（动作表的"原值 / 改动"模型，见后端 actionedits.go）。 */
+    /** 这一格的**原值**（游戏原版那一份）：清空输入框时显示的灰字就是它，只跟着数据走。 */
     placeholder?: string
+    /**
+     * 原值模型（动作表 / 全局参数那套）：`value` 是**改动**，空着就显示 `placeholder`（原值）当灰字，
+     * 草稿提交回原值等于"没改"（提交空串，见下面 onBlur）。轨表不给它 —— 那边的 `value` 就是真值。
+     */
+    override?: boolean
     /**
      * 这一格**还等于打开时的原值**（没动过）→ 显示成 muted 灰。
      *
@@ -75,13 +80,11 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
     unchanged?: boolean
 }) {
     /**
-     * 这一格显示的那份文本：**没填过值就是原值**（`placeholder`）。
+     * 这一格显示的那份文本：原值模型下**没填过值就是原值**（`placeholder`），轨表就是 `value` 本身。
      *
-     * 点开编辑时预填的也是它 —— 于是接着改原值不用先看着灰字再手打一遍；失焦时若草稿**等于原值**
-     * 就当作"没改"（提交空串退回原值，见下面 onBlur）。轨表那几张传的是真值、不给 `placeholder`，
-     * 所以它们的行为一点不变。
+     * 点开编辑时预填的也是它；失焦时若草稿等于原值就当作"没改"（见下面 onBlur）。
      */
-    const shown = value !== "" ? value : (placeholder ?? "")
+    const shown = override ? (value !== "" ? value : (placeholder ?? "")) : value
     const [draft, setDraft] = useState(shown)
     const [editing, setEditing] = useState(false)
     /** 显示态那层文本（焦点环由 td 的 `:focus-within` 画，见 style.css 的 cell-focus）。 */
@@ -98,16 +101,6 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
      * （Enter 走的还是 blur 那条唯一提交路径，只是不经这里。）
      */
     const skipCommitRef = useRef(false)
-    /**
-     * **进编辑态那一刻的值**：清空输入框时拿它当占位符。
-     *
-     * 为什么需要它：`placeholder` 只有动作表那几张会给（那是后端的"原值"模型），轨表这些格子的
-     * `value` 就是当前值、没有原值可传 —— 于是清空输入框后要**等失焦提交**（提交时后端会把空串
-     * 还原成原值）才看着"占位符回来了" ✗。这里就地记一份，清空即显示 ✓。
-     * 对**没改过**的格子，这个值就等于游戏原值 ✓；对已经改过一次的格子，它是那次改动后的值（略有偏差，
-     * 想要严格等于原值就得把 baseline 从弹层穿透到每个格子）。
-     */
-    const beforeEdit = useRef(value)
     // 没在编辑的格子跟着**显示值**走：别处保存完、重读回来的新值要上屏，预填的那份也要跟着回正。
     if (!editing && draft !== shown) setDraft(shown)
 
@@ -127,7 +120,7 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
 
     // 双击挂在 td 上：它两个状态下都不换（早先是挂在 display:contents 那层上兜住 div↔input 的切换）。
     return (
-        <td className={tdClassName} onClick={() => { beforeEdit.current = value; setEditing(true) }} onDoubleClick={onDoubleClick}>
+        <td className={tdClassName} onClick={() => setEditing(true)} onDoubleClick={onDoubleClick}>
             {/*
              * 显示态那段文本**两个状态下都留在流里**——它才是列宽的唯一来源。
              *
@@ -151,7 +144,6 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                         skipFocusRef.current = false
                         return
                     }
-                    beforeEdit.current = value
                     setEditing(true)
                 }}
                 onKeyDown={(e) => onCopy(e, false)}
@@ -177,11 +169,10 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                             skipCommitRef.current = false
                             return
                         }
-                        // 草稿等于**原值**（placeholder）就是"没改"：提交空串退回原值（后端把空串当
+                        // 原值模型下，草稿等于**原值**就是"没改"：提交空串退回原值（后端把空串当
                         // "回到原值"，这也是"点开原值 → 直接失焦"那条路的正常收尾）。
-                        // ⚠️ 只有真知道原值的表会传 placeholder；轨表传的是真值，走下面那条老规矩
-                        //（值没变就什么都不做）。
-                        if (placeholder !== undefined && draft === placeholder) {
+                        // 轨表的 value 就是真值，没有这一层，值没变就什么都不做。
+                        if (override && placeholder !== undefined && draft === placeholder) {
                             if (value !== "") onCommit("")
                             return
                         }
@@ -230,9 +221,9 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                         const input = e.currentTarget
                         if (input.selectionStart === input.selectionEnd) input.select()
                     }}
-                    // 空值时显示占位符：动作表给的是后端原值；轨表没给，就退回"进编辑前的那个值"，
-                    // 于是**一清空就立刻看到灰字**，不必等失焦 ✓
-                    placeholder={placeholder ?? beforeEdit.current}
+                    // 空值时显示的就是**这一格的原值**（调用点给的 placeholder）：它只跟着数据走，
+                    // 输入框里怎么打字都不影响它。
+                    placeholder={placeholder}
                     // inset-0 + h-auto：脱离文档流（固有宽度不参与列宽计算），并向四边拉伸铺满格子。
                     // h-auto! 必须写 —— Input 基类自带 h-9（36px），四边都定位时 height 不是 auto 就会
                     // 忽略 bottom、按 36px 渲染。拉伸后高度自然跟随单元格，不必写死 24px。

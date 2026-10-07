@@ -318,7 +318,9 @@ export function TrackRow({index, columns, values, original, editing, removed, se
                         mono
                         value={value}
                         // 草稿等于**原值**就是"没改"（提交空串退回原值）——只有动作表那套会传原值。
-                        placeholder={editing === "override" ? original?.[column.key] : undefined}
+                        placeholder={original?.[column.key]}
+                        // 动作表那套是"值是改动、空着显示原值"；轨表的值就是真值，所以只有前者给 override。
+                        override={editing === "override"}
                         // 轨表：值就是真值，与原表不同才点亮（整行灰 = 没动过）。
                         unchanged={editing === "override" ? undefined : !diff || !diff.has(column.key)}
                         onCommit={(value) => onEdit(column.key, value)}

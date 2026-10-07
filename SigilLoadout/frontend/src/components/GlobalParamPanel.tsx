@@ -152,6 +152,7 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
                                     tdClassName="relative w-full border-b p-0 align-middle"
                                     value={field.value ?? ""}
                                     placeholder={field.original}
+                                    override
                                     onCommit={(value) => edit(i, value)}
                                 />
                             </tr>

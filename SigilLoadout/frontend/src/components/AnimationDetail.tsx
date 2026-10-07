@@ -531,6 +531,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 sel={sel?.key === key ? sel : null}
                                 t={t}
                                 diffs={diffs?.[key]}
+                                originals={baseline?.tables[key]?.rows}
                                 onSelect={(index, shift, ctrl) => select(key, index, shift, ctrl)}
                                 onExtend={(index) => extendTo(key, index)}
                                 onEdit={(index, column, value) => editValue(key, index, column, value)}
