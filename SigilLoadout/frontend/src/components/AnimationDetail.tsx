@@ -18,7 +18,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid, type Marked} from "@/components/TrackGrid"
 import {TrackToolbar} from "@/components/TrackToolbar"
-import {withNewRow} from "@/lib/actionflags"
+import {clickRow, extendRow, selectedRows, withNewRow, type RowSelection} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
@@ -73,8 +73,8 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
 "本动画会调用 FSM" 是另一码事，它**能从数据里扫出来**：这个动画所有轨的 Flag1 第 4 位（bit4 = 调用FSM技能）。
 炎帝 211 个动画里只有 3470（赤焰旋涡）有，t=0.7333。
 
-选中：点行号选一行、按着 Shift 点选一段（**一次只认一个分区**，切到别的分区就等于换了个选区）。
-复制/插入按分区隔离——复制的是 attack 的行，就只能插回 attack（行里有哪些列不一样，混着插会丢字段）。
+选中：点行号选一行、按着 Shift 点选一段、Ctrl / Cmd 点逐个增删（**一次只认一个分区**，切到别的分区就等于
+换了个选区）。复制/插入按分区隔离——复制的是 attack 的行，就只能插回 attack（行里有哪些列不一样，混着插会丢字段）。
 */
 /**
  * 动画详情页。
@@ -102,7 +102,12 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     const [fsmName, setFsmName] = useState<string | null>(null)
     // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
     const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
-    const [sel, setSel] = useState<{key: string; from: number; to: number} | null>(null)
+    /**
+     * 当前分区里选中的行（与动作表同一套语义，见 lib/actionflags 的 clickRow）：
+     * 一段区间（anchor/focus）+ **Ctrl 逐个点中的那些**（picked）。`key` 是分区身份 ——
+     * **一次只认一个分区**，切到别的分区就等于换了个选区。
+     */
+    const [sel, setSel] = useState<(RowSelection & {key: string}) | null>(null)
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
@@ -234,31 +239,25 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
     // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
 
-    const rangeOf = (key: string, count: number) => {
-        if (!sel || sel.key !== key || count === 0) return {from: count, to: count - 1}
-        return {from: Math.min(sel.from, sel.to), to: Math.max(sel.from, sel.to)}
-    }
+    /** 这个分区里选中了哪几行（升序下标）。**一次只认一个分区**，所以 key 不对时就是"一行都没选"。 */
+    const selectedIn = (key: string): number[] => (sel?.key === key ? selectedRows(sel) : [])
 
     /**
-     * 按下行号：不按 Shift 就把锚点重开在这一行（区间塌成一行），按着 Shift 就从旧锚点扩到这一行。
-     * 顺带记上"正在拖选"，鼠标划过哪一行由 extendTo 接着改 focus（和动作页那张 flags 表同一套手感）。
+     * 按下行号：不按修饰键就把锚点重开在这一行（区间塌成一行）、Shift 从旧锚点扩到这一行、
+     * Ctrl / Cmd 逐个增删（见 clickRow）。顺带记上"正在拖选"，鼠标划过哪一行由 extendTo 接着改 focus
+     *（和动作页那张表同一套手感）。
      */
-    const select = (key: string, index: number, shift: boolean) => {
-        // 先把编辑框的焦点收掉：行号那半截的 mousedown 里有 preventDefault（为了拖选时不选中文字），
-        // 浏览器就不会替你转移焦点了 —— 焦点还在输入框里，Del 会被输入框自己吃掉，
-        // 于是"删过一次就再也删不动" ✗。blur 也顺手把没提交的编辑按正常路径提交掉 ✓。
-        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    const select = (key: string, index: number, shift: boolean, ctrl: boolean) => {
+        // 焦点那一步（把编辑框 blur 掉）在共用的 RowHandle 里，两张表都走那一条。
         draggingRef.current = true
-        setSel((prev) =>
-            prev && prev.key === key && shift ? {...prev, to: index} : {key, from: index, to: index}
-        )
+        setSel((prev) => ({key, ...clickRow(prev?.key === key ? prev : null, index, {shift, ctrl})}))
     }
 
     /** 鼠标在行号上划过：只有按着的时候才扩区间——不然划过整张表会被选个精光。 */
     const extendTo = (key: string, index: number) => {
         // 读 ref 而不是那个 state：按下与"第一次划过某一行"落在同一帧里时 state 还没落地，读 state 会漏掉第一行。
         if (!draggingRef.current) return
-        setSel((prev) => (prev && prev.key === key ? {...prev, to: index} : prev))
+        setSel((prev) => (prev?.key === key ? {key, ...extendRow(prev, index)} : prev))
     }
 
     /**
@@ -270,7 +269,9 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.altKey) return
-            if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]")) return
+            // 输入框里打字时不抢按键；`[data-copy-own]` 是**格子自己收下 Ctrl+C** 的意思（FlagCell 那一格
+            // 复制的是自己的值，不是选中的行）—— 与 App.tsx 那记"Esc 收托盘"用的 `data-esc-own` 同一套约定。
+            if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable], [data-copy-own]")) return
             const key = sel?.key
             const info = infos.find((one) => trackKey(one) === key)
             if (event.key === "Delete" && !event.ctrlKey && !event.metaKey) {
@@ -283,10 +284,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             if (!key || !info) return
             if (event.key === "c") {
                 event.preventDefault()
-                copySelected(key, info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0), info.kind)
+                copySelected(key, info.kind)
             } else if (event.key === "x") {
                 event.preventDefault()
-                cutSelected(key, info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0), info.kind)
+                cutSelected(key, info.kind)
             } else if (event.key === "v") {
                 event.preventDefault()
                 pasteBelow(key, info.kind)
@@ -331,11 +332,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         markDirty(key)
     }
 
-    const copySelected = (key: string, count: number, kind: string) => {
-        const {from, to} = rangeOf(key, count)
-        if (to < from) return
-        const rows =
-            key === flagsKey ? flags.slice(from, to + 1) : (tables[key]?.rows ?? []).slice(from, to + 1)
+    const copySelected = (key: string, kind: string) => {
+        const picked = new Set(selectedIn(key))
+        if (picked.size === 0) return
+        const all = key === flagsKey ? flags : (tables[key]?.rows ?? [])
+        const rows = all.filter((_, index) => picked.has(index))
         // 假删除掉的行不参与复制（它们不参与部署，复制出去也没有意义）。
         const kept = rows.filter((row) => !(row as Marked<object>).removed)
         if (kept.length === 0) return
@@ -349,8 +350,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * 所以"剪到原行"只是标红（`removeSelected` 只对非原行真删）—— 原行始终留在表里，
      * 贴回来、或者再按一次 Del 恢复都成立 ✓
      */
-    const cutSelected = (key: string, count: number, kind: string) => {
-        copySelected(key, count, kind)
+    const cutSelected = (key: string, kind: string) => {
+        copySelected(key, kind)
         removeSelected(key)
     }
 
@@ -358,8 +359,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         if (!clip || clip.rows.length === 0) return
         // 分区之间不能混插：行里有哪些列不一样，混着插会丢字段。所以种类不匹配时**什么都不做**。
         if (clip.kind !== kind) return
-        const count = key === flagsKey ? flags.length : (tables[key]?.rows.length ?? 0)
-        const at = count === 0 ? 0 : rangeOf(key, count).to + 1
+        // 插在**选中那几行的下面**（Ctrl 点散的也照最下面那一行）；一行都没选就插到最前面。
+        // selectedIn 是升序的，所以最后那个就是最下面那行。
+        const picked = selectedIn(key)
+        const at = picked.length === 0 ? 0 : picked[picked.length - 1] + 1
         const copies = clip.rows.length
         if (key === flagsKey) {
             const rows = clip.rows as FlagRow[]
@@ -388,7 +391,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             })
         }
         markDirty(key)
-        setSel({key, from: at, to: at + copies - 1})
+        // 选中落到刚插进去的那几行上（粘贴出来的就是它们）。
+        setSel({key, anchor: at, focus: at + copies - 1, picked: new Set()})
     }
 
     /**
@@ -401,14 +405,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     const removeSelected = (key: string) => {
         if (sel?.key !== key) return
         const current = key === flagsKey ? flags : (tables[key]?.rows ?? [])
-        const {from, to} = rangeOf(key, current.length)
-        if (to < from) return
-        const selected = current.slice(from, to + 1) as Marked<object>[]
+        const picked = new Set(selectedIn(key))
+        if (picked.size === 0) return
+        const selected = current.filter((_, index) => picked.has(index)) as Marked<object>[]
         // 全都是"已删除"的原行 → 这次是恢复；否则是删除（混着选时按删除走：该恢复的保持、该删的删）。
         const originals = selected.filter((row) => isOriginal(row))
         const restore = originals.length > 0 && originals.every((row) => row.removed)
         const kept = <T extends object>(row: T, index: number): T[] => {
-            if (index < from || index > to) return [row]
+            if (!picked.has(index)) return [row]
             if (!isOriginal(row as Marked<object>)) return [] // 新行：无处可恢复 → 真删
             return [{...row, removed: !restore} as T]
         }
@@ -505,12 +509,15 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 )}
                             </span>
                         </div>
-                        {/* 工具条容器：绝对定位叠在箭头左边（40px = 箭头 16 + 基类 mr-1.5 + 间隙）。
+                        {/* 工具条容器：`right-0` = **贴紧表格右侧**（这一层的宽度就是内容区，右边留着的
+                            那点空隙是容器的 pr-2 与滚动条预留位，都在它外面）。
+                            以前写的是 right-10：那是"让开折叠箭头"的（40px = 箭头 16 + 基类 mr-1.5 + 间隙），
+                            而分区早就常开、没有箭头了 —— 那 40px 就一直空着。
                             `inset-y-0 + items-center`：让按钮组在**这一行的高度里**居中，与标题文字同一中心线
                             （实测两者的中心都落在这行的 18px 处）。以前写死 `top-2 h-4`：那是按"8px 内边距 +
                             16px 高"算的，而这行高 36、中心在 18 —— 按钮组一直比标题高 2px ✗。
                             绝对定位不参与排版，所以它多高都不会把这行撑高。 */}
-                        <div className="absolute inset-y-0 right-10 flex items-center">
+                        <div className="absolute inset-y-0 right-0 flex items-center">
                             <TrackToolbar
                                 t={t}
                                 canCopy={count > 0}
@@ -518,8 +525,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
                                 canRemove={sel?.key === key}
                                 onAdd={() => addRow(key)}
-                                onCopy={() => copySelected(key, count, info.kind)}
-                                onCut={() => cutSelected(key, count, info.kind)}
+                                onCopy={() => copySelected(key, info.kind)}
+                                onCut={() => cutSelected(key, info.kind)}
                                 onPaste={() => pasteBelow(key, info.kind)}
                                 onRemove={() => removeSelected(key)}
                             />
@@ -533,7 +540,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 t={t}
                                 diffs={diffs?.[key]}
                                 originals={baseline?.flags}
-                                onSelect={(index, shift) => select(key, index, shift)}
+                                onSelect={(index, shift, ctrl) => select(key, index, shift, ctrl)}
                                 onExtend={(index) => extendTo(key, index)}
                                 onEdit={editFlag}
                                 onReorder={(from, to) => reorder(key, from, to)}
@@ -544,7 +551,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 sel={sel?.key === key ? sel : null}
                                 t={t}
                                 diffs={diffs?.[key]}
-                                onSelect={(index, shift) => select(key, index, shift)}
+                                onSelect={(index, shift, ctrl) => select(key, index, shift, ctrl)}
                                 onExtend={(index) => extendTo(key, index)}
                                 onEdit={(index, column, value) => editValue(key, index, column, value)}
                                 onReorder={(from, to) => reorder(key, from, to)}

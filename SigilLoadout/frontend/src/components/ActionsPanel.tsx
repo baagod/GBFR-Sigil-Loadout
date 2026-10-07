@@ -48,7 +48,7 @@ import {
 import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
-import {EditableCell} from "@/components/EditableCell"
+import {ACTION_HANDLE, TrackRow, TrackTable, type TrackColumn} from "@/components/TrackTable"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
@@ -58,23 +58,12 @@ import {charCodeOf, clickRow, extendRow, isMotion, isSelected, type RowSelection
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
-// 只读列：**不许编辑、直接显示当前值、用带内边距那档格子**。
+// 只读列：**不许编辑、直接显示当前值**。
 //   id_        —— 后端用来找记录的那把钥匙，改了等于换了另一条记录；
 //   abilityTag_ —— 关联技能（`AB_PL1000_04` 这种），是**别的字段/别的系统拿来查表的引用**，
 //                  形如技能名但本质是个键（见 docs/action/动作表字段文档.md §1）。改它不会"改坏"，
 //                  但会悄悄让那一行指向另一个技能，所以只读。
 const isReadOnlyColumn = (key: string) => key === "id_" || key === "abilityTag_"
-
-// 动作表的单元格：字段名比五位数宽，格子按内容撑，整张表横向滚。
-//
-// 两档，**内边距别混在同一格里**：td 这里是普通模板字符串，不过 cn()（只有它带 tailwind-merge），
-// 谁赢由样式表里 p 与 px/py 的先后决定（p 排在前面），写成 "px-2 py-1 p-0" 时 p-0 一点用都没有、
-// 格子照样被撑开。只读格（id_）用带内边距那档；可编辑格不带——里面那个输入框要**铺满整格**。
-// 字号与**可编辑格完全一致**（`text-base md:text-sm`，本窗口下 14px）：这里的两种用法 —— 表头 th 与
-// 只读格 td —— 都不走 EditableCell，光靠 ACTION_CELL 会继承表格那层 text-xs（12px），于是表头/只读列
-// 比邻格小一号（用户实测：表头要 14px、id_ 与 abilityTag_ 两列也要 14px）。字重不变（表头 500、表体 400）。
-const ACTION_CELL = "border-r border-b align-middle whitespace-nowrap"
-const ACTION_CELL_PAD = `${ACTION_CELL} px-2 py-1 text-base md:text-sm`
 
 // 这两类是"改一段动作链"要一起动的格子，**表头**都用反色标出来
 // （bg-primary / text-primary-foreground，与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）：
@@ -84,22 +73,23 @@ const ACTION_CELL_PAD = `${ACTION_CELL} px-2 py-1 text-base md:text-sm`
 const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key === "controlTypeHash_"
 
 /*
-    动作表的表头那一格的类（底色 + 吸顶）。**只有表头**这么上色，表体格子另有各自主色（见下面 td 那段）。
+    动作表的表头**按列**多要的那一段类（字号、内边距、格线、居中都由共用的表头给，见 TrackTableHead）。
 
     底色一律 `#1f1f1f`（写死，不走 `--muted`：那个还兼着页签栏底座、按钮 hover、combobox tag 等好几处，
     改它会全站跟着变；而且本应用只有深色一套 —— index.html 上 `dark` 是写死的 —— 为它造一个 token
     等于造一个永远用不到的浅色变体）。它比表体的可编辑格（#1a1a1a）亮一点点，表头才分得出来。
       · 普通列    —— `z-10 bg-[#1f1f1f]`
-      · `id_`     —— 吸顶（纵向 top-0，横向 left-0）：横向滚到第 80 列时还知道这是哪条记录。
-                      它是两轴都钉的那一格，z-50 要压在别的表头上面；底色仍与其他表头一致。
-      · 反色列    —— `saveMotId*` / `controlTypeHash_` 换成 `bg-primary`（浅底深字），
-                      一眼看出双击哪几格能加载 flags。
-    这几个类**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
+      · 反色列    —— `z-10 bg-primary text-primary-foreground`（与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）
+      · `id_`    —— `left-10 z-50`：**两轴都钉**，要压在别的表头上面。left-10 = 40px = 「#」那列
+                      (39 + 1 边框，见 ACTION_HANDLE)。它不取反色，底色与其他表头一致。
+    底色这几串**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
+    ⚠️ 只给差的那一段（不把 `bg-[#1f1f1f]` 与 `bg-primary` 同时写上）：两边都是单类工具类，谁赢只看
+    样式表顺序。
 */
 function actionHeaderClass(key: string): string {
-    if (key === "id_") return "sticky top-0 left-10 z-50 bg-[#1f1f1f] text-center font-medium"
-    if (isHighlightedColumn(key)) return "sticky top-0 z-10 bg-primary text-primary-foreground text-center font-medium"
-    return "sticky top-0 z-10 bg-[#1f1f1f] text-center font-medium"
+    if (key === "id_") return "left-10 z-50 bg-[#1f1f1f]"
+    if (isHighlightedColumn(key)) return "z-10 bg-primary text-primary-foreground"
+    return "z-10 bg-[#1f1f1f]"
 }
 
 // 共用的可编辑格与其两个类常量（CELL_INPUT / CELL_TEXT）搬去了 @/components/EditableCell ——
@@ -275,6 +265,48 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
 
     // 表头按**后端给的字段顺序**排（87 列），两条记录同一套。
     const keys = useMemo(() => (actions[0]?.fields ?? []).map((field) => field.key), [actions])
+
+    // 只读那两列（见 isReadOnlyColumn）——取值那条路要用它。
+    const readOnlyKeys = useMemo(() => keys.filter(isReadOnlyColumn), [keys])
+
+    /**
+     * 动作表的列：字段名就是键，全部可编辑；`id_` / `abilityTag_` 是**只读文本格**，`id_` 还吸顶
+     * （横向滚到第 80 列时还知道这是哪条记录）。
+     *
+     * 底色按列给：只读的走**默认底色**（--background，也就是"不上色" —— 全站那条规矩：可编辑的格
+     * #1a1a1a、不可编辑的格透明）。吸顶那一列必须不透明才遮得住滚过来的列，取默认底色 = 与"透明"
+     * 同一个观感、功能上也成立。
+     */
+    const columns = useMemo<TrackColumn[]>(
+        () =>
+            keys.map((key) =>
+                isReadOnlyColumn(key)
+                    ? {
+                          label: key,
+                          key,
+                          kind: "text",
+                          // tabular-nums：一列记录号 / 技能号，位数对齐了才好扫。
+                          cell: `tabular-nums${key === "id_" ? " text-center sticky left-10 z-40" : ""}`,
+                          bg: "bg-background",
+                          head: actionHeaderClass(key),
+                      }
+                    : {label: key, key, kind: "editable", bg: "bg-[#1a1a1a]", head: actionHeaderClass(key)},
+            ),
+        [keys],
+    )
+
+    /**
+     * 这一行的值：草稿盖在原值上，**只读那两列再拿原值盖回来**。
+     *
+     * ⚠️ 不能写 `draft[id]?.[key] ?? originals[id]?.[key]`：draft 是 loadAll 按 `field.value ?? ""`
+     * 建的，**没改过的格子在它那里是空字符串、不是 undefined**，`??` 因此永远不回落 —— 这两列会整列
+     * 显示为空。
+     */
+    const cellsOf = (id: string) => {
+        const cells = {...draft[id]}
+        for (const key of readOnlyKeys) cells[key] = originals[id]?.[key] ?? ""
+        return cells
+    }
 
     /**
      * 下拉里的角色，**按游戏内部顺序**：后端给的是字母序，这里换成 playable 的顺序——与专属 /
@@ -574,103 +606,43 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                     //
                     // 两条滚动条都留默认：scrollbar-gutter-stable 给纵向那条常驻沟槽，免得它一出现/
                     // 消失，八十多列就跟着左右抖一下。
+                    //
+                    // 外框与滚动都在**这一层**（`frame={false}` 把它留给这里）：它才是滚动视口，框得钉住
+                    // 不跟着内容跑 —— 138 行的表滚起来时上边框、左边框必须还在。格线颜色不自定义：全站
+                    // 默认的 --border 就是这套表的格线（深色下 10% 白）。
                     <div className="min-h-0 overflow-auto border table-border scrollbar-gutter-stable">
-                        {/* 格线颜色**不自定义**：全站默认的 --border 就是这套表的格线（深色下 10% 白）。 */}
-                        <table className="border-separate border-spacing-0 text-xs">
-                            <thead>
-                                <tr>
-                                    {/* 「#」：行号 + 选中手柄。
-                                        ⚠️ 宽度**用内容钉死**，不能只写 w-10：这是 auto 布局的表格，单元格上的
-                                        w-10 只是"建议值"，实测被内容压回 18px ✗ —— 而下面 id_ 那列是按
-                                        left-10（40px）吸附的，两者不一致时 id_ 会被推到自己右邻列身上
-                                        （一行 id 被压成 `?L1000_01`，中间还留一条 22px 的空档）。
-                                        39 + 那 1px 右边框 = 40 = left-10，正好对上（border-box）。 */}
-                                    <th className={`${ACTION_CELL} sticky top-0 left-0 z-50 bg-[#1f1f1f] px-0 py-1 text-center font-medium text-base md:text-sm`}>
-                                        <div className="w-[39px]">#</div>
-                                    </th>
-                                    {keys.map((key) => (
-                                        <th key={key} className={`${ACTION_CELL_PAD} ${actionHeaderClass(key)}`}>
-                                            {key}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {actions.map((action, index) => {
-                                    // 选中行整行换一个更亮的底色。**写死、逐格给**：这些格本来是不透明的
-                                    // （可编辑格 #1a1a1a、只读格默认底色），只在 tr 上铺半透明底色会被盖住 ✗；
-                                    // 而且吸顶那两格也必须是不透明色，才遮得住横向滚过来的列。
-                                    const selected = isSelected(sel, index)
-                                    const cellBg = selected ? "bg-[#353535]" : "bg-[#1a1a1a]"
-                                    const readOnlyBg = selected ? "bg-[#353535]" : "bg-background"
-                                    return (
-                                    <tr key={action.id}>
-                                        {/* 行号 + 选中手柄。只认左键；Shift 拉一段、Ctrl 逐个增删（与轨表的 # 一致）。
-                                            宽度与表头同样**用内容钉死**（39 + 1 边框 = 40 = id_ 的 left-10）。 */}
-                                        <td
-                                            className={`${ACTION_CELL} sticky left-0 z-30 px-0 py-1 text-center text-base tabular-nums select-none md:text-sm ${
-                                                selected ? "bg-[#353535]" : "bg-background"
-                                            } cursor-default`}
-                                            onMouseDown={(e) => {
-                                                if (e.button !== 0) return
-                                                e.preventDefault()
-                                                setSel((prev) =>
-                                                    clickRow(prev, index, {shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey}),
-                                                )
-                                                setDragging(true)
-                                            }}
-                                            // 按住划过一片 = 连续扩选（松手在 window 的 mouseup 上收尾）。
-                                            onMouseEnter={() => {
-                                                if (dragging) setSel((prev) => extendRow(prev, index))
-                                            }}
-                                        >
-                                            <div className="w-[39px]">{index + 1}</div>
-                                        </td>
-                                        {keys.map((key) =>
-                                            isReadOnlyColumn(key) ? (
-                                                <td
-                                                    key={key}
-                                                    className={`${ACTION_CELL_PAD} ${
-                                                        // 只读列的底色 = **默认底色**（--background #0a0a0a），也就是"不上色"
-                                                        // —— 全站那条规矩：可编辑的格 #1a1a1a，不可编辑的格透明
-                                                        // （用户要求，见 EditableCell 那个调用点）。
-                                                        // id_ 那列同时吸顶，所以它必须**不透明**才遮得住滚过来的列；
-                                                        // 取默认底色 = 与"透明"同一个观感，功能上也成立。
-                                                        // id_ 里是记录号，**居中**（与表头一致）；高亮标记只做在表头上。
-                                                        key === "id_"
-                                                            ? `sticky left-10 z-40 ${readOnlyBg} text-center tabular-nums`
-                                                            : key === "abilityTag_"
-                                                              ? `${readOnlyBg} tabular-nums`
-                                                              : ""
-                                                    }`}
-                                                >
-                                                    {/* 只读列一律显示**原值**。
-                                                        ⚠️ 不能写 `draft[...] ?? originals[...]`：draft 是 loadAll 里按
-                                                        `field.value ?? ""` 建出来的，**没改过的格子在那里是空字符串、不是
-                                                        undefined**，`??` 因此永远不回落 —— 这两列会整列显示为空。 */}
-                                                    {originals[action.id]?.[key] ?? ""}
-                                                </td>
-                                            ) : (
-                                                <EditableCell
-                                                    key={key}
-                                                    tdClassName={`${ACTION_CELL} p-0 cell-focus ${cellBg}`}
-                                                    mono
-                                                    value={draft[action.id]?.[key] ?? ""}
-                                                    placeholder={originals[action.id]?.[key]}
-                                                    onCommit={(value) => editField(action.id, key, value)}
-                                                    onDoubleClick={
-                                                        isHighlightedColumn(key)
-                                                            ? () => void openMotion(action.id, key)
-                                                            : undefined
-                                                    }
-                                                />
-                                            ),
-                                        )}
-                                    </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
+                        <TrackTable columns={columns} handle={ACTION_HANDLE} frame={false}>
+                            {actions.map((action, index) => (
+                                <TrackRow
+                                    key={action.id}
+                                    index={index}
+                                    columns={columns}
+                                    values={cellsOf(action.id)}
+                                    original={originals[action.id]}
+                                    // 动作表那套"值是改动、空着显示原值当占位符"（见后端 actionedits.go）。
+                                    editing="override"
+                                    selected={isSelected(sel, index)}
+                                    // 这张表没有"与原表不同就点亮"那回事（灰/亮由 placeholder 表达）。
+                                    diff={null}
+                                    handle={ACTION_HANDLE}
+                                    t={t}
+                                    // 只认左键；Shift 拉一段、Ctrl 逐个增删（与轨表的 # 一致）。
+                                    onSelect={(shift, ctrl) => {
+                                        setSel((prev) => clickRow(prev, index, {shift, ctrl}))
+                                        setDragging(true)
+                                    }}
+                                    // 按住划过一片 = 连续扩选（松手在 window 的 mouseup 上收尾）。
+                                    onExtend={() => {
+                                        if (dragging) setSel((prev) => extendRow(prev, index))
+                                    }}
+                                    onEdit={(key, value) => editField(action.id, key, value)}
+                                    // 反色那几列双击就打开这个 motion 的动画详情（别的列不给双击）。
+                                    onCellDoubleClick={(key) => {
+                                        if (isHighlightedColumn(key)) void openMotion(action.id, key)
+                                    }}
+                                />
+                            ))}
+                        </TrackTable>
                     </div>
                 )}
                 </div>
@@ -686,9 +658,9 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                         selected={gpTable}
                         onOpen={setGpTable}
                         onLoaded={(tables) => setGpTable((cur) => cur || tables[0] || "")}
-                        // w-max：左栏**按最长的名字自适应宽度**；pr-5：右侧那条竖线离条目底色**拉开 20px**
-                        // （用户要求）。条目自己是 w-full，于是底色右边缘正好落在竖线左边 20px 处。
-                        className="w-max shrink-0 border-r pr-5"
+                        // w-max：左栏**按最长的名字自适应宽度**；pr-3：右侧那条竖线离条目底色**拉开 12px**
+                        // （用户要求）。条目自己是 w-full，于是底色右边缘正好落在竖线左边 12px 处。
+                        className="w-max shrink-0 border-r pr-3"
                     />
                     {gpTable !== "" && (
                         <GlobalParamPanel
