@@ -24,7 +24,7 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useEffect, useMemo, useRef, useState} from "react"
+import {memo, useEffect, useMemo, useRef, useState, type CSSProperties} from "react"
 
 import {
     ActionIDs,
@@ -93,9 +93,9 @@ const FROZEN: Record<string, string> = {
     // 96px = handle 40 + id_ 列实测宽 56。**这个数就是 id_ 列的自然宽度**（auto 布局下写 w-* 定不住它，
     // 试过：48 被顶成 55、64 照样 55）。sticky 的 left 连不滚动时也生效，留大了静止时就有一道缝 ——
     // 记录号是 3~4 位，56px 够用。
-    // 95 而不是 96：id_ 的右边界就在 96，留 1px 的话两列之间会有一条透明缝，横向滚过的列名会从缝里
-    // 透出来（实测过）。压 1px 让两块底色贴住，格线由 id_ 那一列自己的右边框照常画。
-    abilityTag_: " sticky left-[95px] z-30",
+    // 左边界是**量出来的**（--frozen-left，见 ActionsPanelBase 的 ResizeObserver）：id_ 列会被等比摊宽，
+    // 能力名长短一变、列数一变，摊到的宽度就变，写死像素迟早错位、缝会再露。95px 只是量出来之前的兜底。
+    abilityTag_: " sticky left-[var(--frozen-left,95px)] z-30",
 }
 
 function actionHeaderClass(key: string): string {
@@ -103,7 +103,7 @@ function actionHeaderClass(key: string): string {
     // abilityTag_ 也冻住：左边界紧接着 id_（见 FROZEN 的宽度约定）。它可能同时是被点亮的那几列之一，
     // 所以底色仍然按 isHighlightedColumn 走。
     if (key === "abilityTag_") {
-        return `left-[95px] z-40 ${isHighlightedColumn(key) ? "bg-primary text-primary-foreground" : "bg-[#1f1f1f]"}`
+        return `left-[var(--frozen-left,95px)] z-40 ${isHighlightedColumn(key) ? "bg-primary text-primary-foreground" : "bg-[#1f1f1f]"}`
     }
     if (isHighlightedColumn(key)) return "z-10 bg-primary text-primary-foreground"
     return "z-10 bg-[#1f1f1f]"
@@ -253,6 +253,50 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * 这张表只有一张，所以 key 用一个常量。
      */
     const {sel, select, extendTo} = useRowSelection<"actions">()
+    /**
+     * 冻结列的左边界**量出来**，不写死：auto 布局下 id_ 列会被等比摊宽（能力名长短、列数、记录号位数
+     * 一变就变），写死像素会让"id_ 与 abilityTag_ 之间透出一条缝"，横向滚过的列名从缝里透出来。
+     *
+     * 量的是 id_ 那一格的右边界，减去外框的边框（CSS 的 left 是相对 padding box，与这个坐标系一致），
+     * 写进 --frozen-left 给两列用。id_ 是第 2 列（第 1 列是行号握把）。
+     */
+    const frameRef = useRef<HTMLDivElement | null>(null)
+    // null = 还没量到：那时不给 --frozen-left，让样式里的兜底值顶上（比先写成 0 强，0 会让列贴到最左、
+    // 压在行号握把上）。
+    const [frozenLeft, setFrozenLeft] = useState<number | null>(null)
+    useEffect(() => {
+        // 表格是异步出来的（先 IPC 取数据），挂载那一刻 frame 里可能一行都没有 —— 所以这里用 rAF 一直试，
+        // 量到就停（停之后由 ResizeObserver 接管：换角色/换语言会改列宽）。
+        let raf = 0
+        let observer: ResizeObserver | null = null
+        const measure = () => {
+            const frame = frameRef.current
+            const cell = frame?.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
+            if (!frame || !cell) return false
+            const box = frame.getBoundingClientRect()
+            setFrozenLeft(Math.round(cell.getBoundingClientRect().right - box.left - frame.clientLeft))
+            if (!observer) {
+                observer = new ResizeObserver(() => {
+                    const again = frameRef.current?.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
+                    if (!again) return
+                    const b = frame.getBoundingClientRect()
+                    setFrozenLeft(Math.round(again.getBoundingClientRect().right - b.left - frame.clientLeft))
+                })
+                observer.observe(frame)
+                const table = frame.querySelector("table")
+                if (table) observer.observe(table)
+            }
+            return true
+        }
+        const tick = () => {
+            if (!measure()) raf = requestAnimationFrame(tick)
+        }
+        tick()
+        return () => {
+            cancelAnimationFrame(raf)
+            observer?.disconnect()
+        }
+    }, [])
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -626,7 +670,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                     // 默认的 --border 就是这套表的格线（深色下 10% 白）。
                     // 最后一行补回下边框（`!` 压掉共用表格里那条 last-child 去边框的规则）：框铺满高度之后，
                     // 表格内容与下面那片空地之间得有一条线，不然最后一行像是被截断的。
-                    <div className="min-h-0 flex-1 overflow-auto border table-border scrollbar-gutter-stable [&_tbody_tr:last-child>*]:border-b!">
+                    <div ref={frameRef} style={frozenLeft === null ? undefined : ({["--frozen-left"]: `${frozenLeft}px`} as CSSProperties)} className="min-h-0 flex-1 overflow-auto border table-border scrollbar-gutter-stable [&_tbody_tr:last-child>*]:border-b!">
                         <TrackTable columns={columns} handle={ACTION_HANDLE} frame={false}>
                             {actions.map((action, index) => (
                                 <TrackRow
