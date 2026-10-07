@@ -275,6 +275,18 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         return () => window.removeEventListener("keydown", onKey)
     })
 
+    /**
+     * 打开弹层时把主窗口那边的焦点收掉。
+     *
+     * 弹层不抢焦点（见 DialogContent 的 initialFocus），而**双击单元格会先让它进编辑态**、输入框正拿着
+     * 焦点 —— 那一记 Esc 会被输入框收下（退出编辑态，它还 `stopPropagation`），弹层根本收不到，于是
+     * "什么都不做、按一次 Esc"关不掉它（用户报的两次 Esc）。焦点收回 body 之后，App 那记"Esc 收托盘"
+     * 照样让路（文档里挂着 `role=dialog`，见 App.tsx 的 hasOverlay）。
+     */
+    useEffect(() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    }, [])
+
     /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     const reorder = (key: string, from: number, to: number) => {
         if (key === flagsKey) setFlags((prev) => arrayMove(prev, from, to))
