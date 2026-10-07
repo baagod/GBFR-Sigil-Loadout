@@ -587,9 +587,8 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                 ) : keys.length === 0 ? (
                     <div className="pb-1 text-xs text-muted-foreground">{t.loading}</div>
                 ) : (
-                    // 高度**不封顶**，也不写 flex-1：它是这个纵向 flex 里的一项，基准高度 = 内容高度
-                    // （行数多高就多高），装不下时靠 flex-shrink + min-h-0 压到剩余高度，再由
-                    // overflow-auto 自己滚。于是"行少 = 盒子就矮（不留一片空边框）、行多 = 吃满窗口"。
+                    // flex-1：**框铺满剩下的高度**（用户要求 —— 行少的时候也不留一段没框的空地）。
+                    // 装不下时照样靠 min-h-0 + overflow-auto 自己滚，行多时同样吃满窗口。
                     // 写死 max-h 就等于"窗口再大也只露固定几行"。
                     //
                     // 两条滚动条都留默认：scrollbar-gutter-stable 给纵向那条常驻沟槽，免得它一出现/
@@ -598,7 +597,9 @@ function ActionsPanelBase({t, charaNames, charaTable, playable}: {
                     // 外框与滚动都在**这一层**（`frame={false}` 把它留给这里）：它才是滚动视口，框得钉住
                     // 不跟着内容跑 —— 138 行的表滚起来时上边框、左边框必须还在。格线颜色不自定义：全站
                     // 默认的 --border 就是这套表的格线（深色下 10% 白）。
-                    <div className="min-h-0 overflow-auto border table-border scrollbar-gutter-stable">
+                    // 最后一行补回下边框（`!` 压掉共用表格里那条 last-child 去边框的规则）：框铺满高度之后，
+                    // 表格内容与下面那片空地之间得有一条线，不然最后一行像是被截断的。
+                    <div className="min-h-0 flex-1 overflow-auto border table-border scrollbar-gutter-stable [&_tbody_tr:last-child>*]:border-b!">
                         <TrackTable columns={columns} handle={ACTION_HANDLE} frame={false}>
                             {actions.map((action, index) => (
                                 <TrackRow
