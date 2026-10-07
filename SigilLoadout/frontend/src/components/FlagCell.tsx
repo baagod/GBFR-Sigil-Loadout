@@ -84,8 +84,11 @@ export function FlagCell({value, names, unchanged, tdClassName, original, onComm
             setOpen(false)
             setClosing(true) // 关：进入收尾动画期（环继续画）
         }
-        document.addEventListener("scroll", onScroll, true)
-        return () => document.removeEventListener("scroll", onScroll, true)
+        // passive：这个监听只用来"看到滚动就收起列表"，从不 preventDefault —— 不声明 passive 的话
+        // 浏览器每次滚动都要等它跑完。capture 是必须的（scroll 不冒泡，只能从捕获阶段看到）。
+        const opts = {capture: true, passive: true} as const
+        document.addEventListener("scroll", onScroll, opts)
+        return () => document.removeEventListener("scroll", onScroll, opts)
     }, [open])
     const mask = flagMask(value)
     const originalMask = flagMask(original ?? "")

@@ -41,7 +41,7 @@ const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = [
  * Go 那边 `orig` 是 `*int`（没原行就**不写这一栏**，见 actionrowmarks.go 的 origPtr），
  * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
  */
-const isOriginal = (row: {orig?: number | null}): row is {orig: number} => row.orig != null
+const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
 
 /**
  * 每行与原表**对应那行**的差异列（null = 这一行与原表一致）。
@@ -206,7 +206,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      */
     const editFlag = (index: number, key: keyof FlagRow, value: string) => {
         const row = flags[index]
-        const orig = row && isOriginal(row) ? baseline?.flags[row.orig] : undefined
+        const orig = isOriginal(row) ? baseline?.flags[row.orig] : undefined
         const next = value === "" && orig ? String(orig[key] ?? "") : value
         setFlags((prev) =>
             prev.map((r, i) => {
@@ -222,7 +222,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     /** 改通用轨的一格。清空同样 = 回到原值（见 editFlag）；删除态的行照样能改。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
         const row = tables[key]?.rows[index]
-        const orig = row && isOriginal(row) ? baseline?.tables[key]?.rows[row.orig] : undefined
+        const orig = isOriginal(row) ? baseline?.tables[key]?.rows[row.orig] : undefined
         const next = value === "" && orig ? (orig.values[column] ?? "") : value
         setTables((prev) => {
             const table = prev[key]
