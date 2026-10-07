@@ -62,8 +62,8 @@ type TrackRow struct {
 	Index    int               `json:"index"`
 	Values   map[string]string `json:"values"`
 	Children []TrackChild      `json:"children"`
-	Orig     int               `json:"orig"`
-	Removed  bool              `json:"removed"`
+	Orig     *int              `json:"orig,omitempty"`
+	Removed  bool              `json:"removed,omitzero"`
 }
 
 // TrackChild 是行里的一个子元素：Tag 是标签名（Ailment00…），Values 同上一层的规矩。
@@ -746,7 +746,7 @@ func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
 		marks := make([]rowMark, 0, len(table.Rows))
 		kept := make([]TrackRow, 0, len(table.Rows))
 		for _, row := range table.Rows {
-			mark := rowMark{Orig: row.Orig, Removed: row.Removed}
+			mark := rowMark{Orig: origValue(row.Orig), Removed: row.Removed}
 			if row.Removed {
 				// 假删除的行不进 XML，所以它的**当前值**只能存在这里 —— 重开时要原样回来。
 				self := row

@@ -28,6 +28,23 @@ type rowMark struct {
 // noOriginal 表示"这一行在原版里没有对应行"（新增 / 粘贴出来的）。
 const noOriginal = -1
 
+// origPtr 把"原版第几行"包成 API 模型上的**可选**字段：新增 / 粘贴出来的行不写这一栏。
+// 于是前端拿到的是 null，而不是一个要靠 `-1` 约定去猜的数字（老写法是 int，缺字段会被解成 0 = 原版第 0 行）。
+func origPtr(orig int) *int {
+	if orig < 0 {
+		return nil
+	}
+	return &orig
+}
+
+// origValue 是回来那一趟：没写这一栏（null）= noOriginal。账本（rowMark）那边仍然是 int。
+func origValue(orig *int) int {
+	if orig == nil {
+		return noOriginal
+	}
+	return *orig
+}
+
 // fallbackMarks 是没有存过行身份时（老改动、或别人手写的 XML）的兜底：行号即原版行号，一个都没被假删除。
 func fallbackMarks(count int) []rowMark {
 	marks := make([]rowMark, count)
@@ -93,7 +110,7 @@ func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
 	sources, ok := rowSources(marks, len(current))
 	if !ok {
 		for i := range current {
-			current[i].Orig = i
+			current[i].Orig = origPtr(i)
 			current[i].Removed = false
 		}
 		for _, mark := range marks {
@@ -104,7 +121,7 @@ func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
 			if mark.Track != nil {
 				row = *mark.Track // 有当前值就用当前值（假删除期间可能被改过）
 			}
-			row.Orig = mark.Orig
+			row.Orig = origPtr(mark.Orig)
 			row.Removed = true
 			current = append(current, row)
 		}
@@ -114,18 +131,18 @@ func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
 	for i, src := range sources {
 		if src != noOriginal {
 			row := current[src]
-			row.Orig = marks[i].Orig
+			row.Orig = origPtr(marks[i].Orig)
 			row.Removed = false
 			out = append(out, row)
 			continue
 		}
-		row := TrackRow{Orig: marks[i].Orig, Removed: true, Values: map[string]string{}}
+		row := TrackRow{Orig: origPtr(marks[i].Orig), Removed: true, Values: map[string]string{}}
 		if mark := marks[i]; mark.Track != nil {
 			row = *mark.Track // 当前值（假删除期间可能被改过）
 		} else if orig := marks[i].Orig; orig >= 0 && orig < len(prim) {
 			row = prim[orig]
 		}
-		row.Orig = marks[i].Orig
+		row.Orig = origPtr(marks[i].Orig)
 		row.Removed = true
 		out = append(out, row)
 	}
@@ -137,7 +154,7 @@ func mergeFlagRows(marks []rowMark, current, prim []FlagRow) []FlagRow {
 	sources, ok := rowSources(marks, len(current))
 	if !ok {
 		for i := range current {
-			current[i].Orig = i
+			current[i].Orig = origPtr(i)
 			current[i].Removed = false
 		}
 		for _, mark := range marks {
@@ -148,7 +165,7 @@ func mergeFlagRows(marks []rowMark, current, prim []FlagRow) []FlagRow {
 			if mark.Flag != nil {
 				row = *mark.Flag
 			}
-			row.Orig = mark.Orig
+			row.Orig = origPtr(mark.Orig)
 			row.Removed = true
 			current = append(current, row)
 		}
@@ -158,18 +175,18 @@ func mergeFlagRows(marks []rowMark, current, prim []FlagRow) []FlagRow {
 	for i, src := range sources {
 		if src != noOriginal {
 			row := current[src]
-			row.Orig = marks[i].Orig
+			row.Orig = origPtr(marks[i].Orig)
 			row.Removed = false
 			out = append(out, row)
 			continue
 		}
-		row := FlagRow{Orig: marks[i].Orig, Removed: true}
+		row := FlagRow{Orig: origPtr(marks[i].Orig), Removed: true}
 		if mark := marks[i]; mark.Flag != nil {
 			row = *mark.Flag
 		} else if orig := marks[i].Orig; orig >= 0 && orig < len(prim) {
 			row = prim[orig]
 		}
-		row.Orig = marks[i].Orig
+		row.Orig = origPtr(marks[i].Orig)
 		row.Removed = true
 		out = append(out, row)
 	}

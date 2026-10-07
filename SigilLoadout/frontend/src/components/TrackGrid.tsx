@@ -5,7 +5,9 @@ import {SortableTrackRow, TrackTable, TRACK_HANDLE, type TrackColumn} from "@/co
 
 /**
  * 行身份（后端给的，见 Go 侧 actionrowmarks.go）：
- * - `orig`：这一行对应**游戏原版**第几行（-1 = 新增 / 粘贴出来的，原版里没有它）；
+ * - `orig`：这一行对应**游戏原版**第几行（**没有这一栏** = 新增 / 粘贴出来的，原版里没有它；
+ *   Go 那边是 `*int`，见 actionrowmarks.go 的 origPtr —— 所以这里是 `number | null`，不用再拿
+ *   `-1` 当哨兵，也不用把行断言成别的类型去读它）；
  * - `removed`：这一行被**假删除**了（界面上刷成暗红底标记一下，保存时不写进游戏文件）。
  *   它**照样可以编辑**，而且改动不会丢：后端把那行的**当前值**一起存进行身份里（见 Go 侧
  *   actionrowmarks.go 的 Track / Flag），重开时原样回来。删除也不是实时写回：一切都等到按「保存」。
@@ -13,7 +15,6 @@ import {SortableTrackRow, TrackTable, TRACK_HANDLE, type TrackColumn} from "@/co
  * 它必须记在行上：改过的原行，光看值已经和新行分不出来了（后端把行身份跟改动一起存进
  * track_edits.json，重启后照样认得）。编辑会把行换成新对象（`{...row}`），字段自动跟着走过去。
  */
-export type Marked<T> = T & {orig?: number; removed?: boolean}
 
 /* TrackToolbar（那排按钮：加行 / 复制 / 粘贴 / 剪切 / 删除）搬去了 @/components/TrackToolbar。 */
 
@@ -42,7 +43,7 @@ export function TrackGrid({table, sel, t, diffs, onSelect, onExtend, onEdit, onR
                     values={row.values}
                     // 被"假删除"的原行：暗红底标记一下；值照旧可编辑，改动由后端存进行身份保住
                     //（仍是删除态时不写进游戏）。
-                    removed={(row as Marked<TrackRow>).removed === true}
+                    removed={row.removed === true}
                     selected={isSelected(sel, index)}
                     diff={diffs?.[index] ?? null}
                     handle={TRACK_HANDLE}
@@ -108,9 +109,8 @@ export function FlagsGrid({rows, sel, t, diffs, originals, onSelect, onExtend, o
     return (
         <TrackTable columns={columns} handle={TRACK_HANDLE} drag={{onReorder}}>
             {rows.map((row, index) => {
-                // 行身份 `orig` = 这一行对应原表第几行（新行是 -1，没有对应）。选值格拿原行标"原值灰"。
-                const orig = (row as Marked<FlagRow>).orig
-                const original = orig !== undefined && orig >= 0 ? originals?.[orig] : undefined
+                // 行身份 `orig` = 这一行对应原表第几行（新行没有这一栏 = null）。选值格拿原行标"原值灰"。
+                const original = row.orig != null ? originals?.[row.orig] : undefined
                 return (
                     <SortableTrackRow
                         key={index}
@@ -118,7 +118,7 @@ export function FlagsGrid({rows, sel, t, diffs, originals, onSelect, onExtend, o
                         columns={columns}
                         values={cells(row)}
                         original={original ? cells(original) : undefined}
-                        removed={(row as Marked<FlagRow>).removed === true}
+                        removed={row.removed === true}
                         selected={isSelected(sel, index)}
                         diff={diffs?.[index] ?? null}
                         handle={TRACK_HANDLE}

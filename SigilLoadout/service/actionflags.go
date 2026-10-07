@@ -44,8 +44,8 @@ type FlagRow struct {
 	FreeArg      string `json:"freeArg"`
 	Flag0Effects string `json:"flag0Effects"`
 	Flag1Effects string `json:"flag1Effects"`
-	Orig         int    `json:"orig"`
-	Removed      bool   `json:"removed"`
+	Orig         *int   `json:"orig,omitempty"`
+	Removed      bool   `json:"removed,omitzero"`
 }
 
 // flag0Names / flag1Names 是位定义表：**下标就是 bit 号**，空串 = 还没弄清含义的那一位（给界面时

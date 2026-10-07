@@ -424,7 +424,7 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	marks := make([]rowMark, 0, len(rows))
 	kept := make([]FlagRow, 0, len(rows))
 	for _, row := range rows {
-		mark := rowMark{Orig: row.Orig, Removed: row.Removed}
+		mark := rowMark{Orig: origValue(row.Orig), Removed: row.Removed}
 		if row.Removed {
 			// 假删除的行不进 XML，当前值只能存在这里（重开时原样回来）。
 			self := row

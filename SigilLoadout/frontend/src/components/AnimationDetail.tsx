@@ -16,7 +16,7 @@ import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigi
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
-import {FlagsGrid, TrackGrid, type Marked} from "@/components/TrackGrid"
+import {FlagsGrid, TrackGrid} from "@/components/TrackGrid"
 import {TrackToolbar} from "@/components/TrackToolbar"
 import {selectedRows, withNewRow} from "@/lib/actionflags"
 import {useRowSelection} from "@/lib/useRowSelection"
@@ -34,8 +34,14 @@ const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = [
     "freeArg",
 ]
 
-/** 这一行在原版里有没有对应行（有才是"原行"：删除只做假删除）。 */
-const isOriginal = (row: {orig?: number}) => row.orig !== undefined && row.orig >= 0
+/**
+ * 这一行在原版里有没有对应行（有才是"原行"：删除只做假删除）。
+ *
+ * 写成类型守卫，`row.orig` 在调用点直接窄化成 number —— 不用再 `row.orig as number`。
+ * Go 那边 `orig` 是 `*int`（没原行就**不写这一栏**，见 actionrowmarks.go 的 origPtr），
+ * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
+ */
+const isOriginal = (row: {orig?: number | null}): row is {orig: number} => row.orig != null
 
 /**
  * 每行与原表**对应那行**的差异列（null = 这一行与原表一致）。
@@ -199,8 +205,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * **清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值，而不是一个空串。
      */
     const editFlag = (index: number, key: keyof FlagRow, value: string) => {
-        const row = flags[index] as Marked<FlagRow> | undefined
-        const orig = row && isOriginal(row) ? baseline?.flags[row.orig as number] : undefined
+        const row = flags[index]
+        const orig = row && isOriginal(row) ? baseline?.flags[row.orig] : undefined
         const next = value === "" && orig ? String(orig[key] ?? "") : value
         setFlags((prev) =>
             prev.map((r, i) => {
@@ -215,8 +221,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
     /** 改通用轨的一格。清空同样 = 回到原值（见 editFlag）；删除态的行照样能改。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
-        const row = tables[key]?.rows[index] as Marked<TrackRow> | undefined
-        const orig = row && isOriginal(row) ? baseline?.tables[key]?.rows[row.orig as number] : undefined
+        const row = tables[key]?.rows[index]
+        const orig = row && isOriginal(row) ? baseline?.tables[key]?.rows[row.orig] : undefined
         const next = value === "" && orig ? (orig.values[column] ?? "") : value
         setTables((prev) => {
             const table = prev[key]
@@ -292,12 +298,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 if (!table) return prev
                 // 新行照抄最后一行的列（空表就只有空值）：这几种轨一行几十个字段，从零填不如改现成的。
                 const last = table.rows[table.rows.length - 1]
-                // orig 必须显式写成 -1：新行是 `{...last}` 抄出来的，不然它会被当成原行去"假删除"、
-                // 也会拿最后一行的原值去比。
+                // orig 必须显式清成 null：新行是 `{...last}` 抄出来的，不然它会被当成原行去"假删除"、
+                // 也会拿最后一行的原值去比。空轨兜底那一行同理（Go 那边 `*int` 收到 null = 没有原行）。
                 const row: TrackRow = last
-                    ? {...last, index: table.rows.length, children: [], orig: -1, removed: undefined}
-                    // 空轨兜底那一行也必须显式写 -1：Go 那边 orig 是 int，缺字段会解成 0 = "原版第 0 行" ✗。
-                    : ({index: 0, values: {}, children: [], orig: -1, removed: undefined} as TrackRow)
+                    ? {...last, index: table.rows.length, children: [], orig: null, removed: undefined}
+                    : ({index: 0, values: {}, children: [], orig: null, removed: undefined} as TrackRow)
                 return {...prev, [key]: {...table, rows: [...table.rows, row]}}
             })
         }
@@ -310,7 +315,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         const all = key === flagsKey ? flags : (tables[key]?.rows ?? [])
         const rows = all.filter((_, index) => picked.has(index))
         // 假删除掉的行不参与复制（它们不参与部署，复制出去也没有意义）。
-        const kept = rows.filter((row) => !(row as Marked<object>).removed)
+        const kept = rows.filter((row) => row.removed !== true)
         if (kept.length === 0) return
         // 同时写进模块级剪贴板：关掉这个弹层、换一套动画再 Ctrl+V 时，靠它拿到内容。
         clipboard = {kind, rows: kept}
@@ -341,7 +346,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             // 粘贴出来的是**新行**：清掉原表标记（否则它会被当成原行去"假删除"）。
             setFlags((prev) => [
                 ...prev.slice(0, at),
-                ...rows.map((row) => ({...row, orig: -1, removed: undefined})),
+                ...rows.map((row) => ({...row, orig: null, removed: undefined})),
                 ...prev.slice(at),
             ])
         } else {
@@ -354,8 +359,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 const inserted = rows.map((row, i) => ({
                     ...row,
                     index: at + i,
-                    // 粘贴出来的是**新行**：原版里没有它（orig = -1）。
-                    orig: -1,
+                    // 粘贴出来的是**新行**：原版里没有它（orig = null）。
+                    orig: null,
                     removed: undefined,
                     children: row.children.map((child) => ({...child, values: {...child.values}})),
                 }))
@@ -379,14 +384,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         const current = key === flagsKey ? flags : (tables[key]?.rows ?? [])
         const picked = new Set(selectedIn(key))
         if (picked.size === 0) return
-        const selected = current.filter((_, index) => picked.has(index)) as Marked<object>[]
+        const selected = current.filter((_, index) => picked.has(index))
         // 全都是"已删除"的原行 → 这次是恢复；否则是删除（混着选时按删除走：该恢复的保持、该删的删）。
         const originals = selected.filter((row) => isOriginal(row))
         const restore = originals.length > 0 && originals.every((row) => row.removed)
-        const kept = <T extends object>(row: T, index: number): T[] => {
+        const kept = <T extends {orig?: number | null; removed?: boolean}>(row: T, index: number): T[] => {
             if (!picked.has(index)) return [row]
-            if (!isOriginal(row as Marked<object>)) return [] // 新行：无处可恢复 → 真删
-            return [{...row, removed: !restore} as T]
+            if (!isOriginal(row)) return [] // 新行：无处可恢复 → 真删
+            return [{...row, removed: !restore}]
         }
         if (key === flagsKey) setFlags((prev) => prev.flatMap(kept))
         else
@@ -698,8 +703,8 @@ function blankFlag(rows: FlagRow[]): FlagRow {
         freeArg: "0 0 0 0",
         flag0Effects: "",
         flag1Effects: "",
-        // 新行必须显式写 -1：Go 那边 orig 是 int，缺字段会被解成 0 = "原版第 0 行" ✗。
-        orig: -1,
+        // 新行必须显式写 null：Go 那边 orig 是 `*int`，null = 原版里没有这一行（不写这一栏）。
+        orig: null,
         removed: undefined,
     } as FlagRow
 }

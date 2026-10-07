@@ -30,6 +30,12 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	}
 
 	first := rows[0]
+	// 行身份 Orig 是 *int（新增 / 粘贴出来的行是 nil）：拿整个结构去 == 会比**指针地址**，
+	// 所以先把它摘下来单独比号，再比其余字段。
+	if got := origValue(first.Orig); got != 0 {
+		t.Fatalf("第一行的行身份 = %d，want 0（原版第 0 行）", got)
+	}
+	first.Orig = nil
 	want := FlagRow{
 		Index: 0, Config: "1", StartTime: "0.000000", EndTime: "0.016667",
 		LayerFlag: "4294967295", Flag0: "32", Flag1: "0", SysFlag: "0", FreeArg: "0 0 0 0",
