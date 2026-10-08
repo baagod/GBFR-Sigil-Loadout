@@ -22,7 +22,7 @@ import {LoadActions, SaveActionFields} from "../../bindings/sigilloadout/service
 import {ActionsTable, PINNED_COUNT, ROW_HEIGHT} from "@/components/ActionsTable"
 import type {Messages} from "@/lib/messages"
 
-/** 组件要的那一份文案；只用到 loading，其余给空串撑住类型。 */
+/** 组件要的那一份文案；用例真正调到的都在这里，其余给空串撑住类型。 */
 const t = {loading: "读取中…"} as unknown as Messages
 
 /**
@@ -37,7 +37,9 @@ const KEYS = ["id_", "abilityTag_", ...Array.from({length: 85}, (_, i) => `actio
 /** 拿来试"长值截断"的那一列（取值时用它定位）。 */
 const LongField = "actionFreeWork0_"
 
-/** 造一条记录：`changed` 里点名的字段算"改过"，其余一律"没改过"（value = null）。 */
+/**
+ * 造一条记录：`changed` 里点名的字段算"改过"，其余一律"没改过"（value = null）。
+ */
 function makeRow(id: string, changed: Record<string, string> = {}) {
     return {
         id,
@@ -89,9 +91,19 @@ async function renderWithSave() {
     return {container, save: () => (latest as () => Promise<void>)()}
 }
 
-/** 第 row 行（0 起）第 col 列（0 起）的那个 td。 */
+/**
+ * 第 row 行（0 起）第 col 列（0 起）的那个 td。
+ *
+ * ⚠️ 行号列（`#`）是每个 `<tr>` 的**第一个 td**，而它**不在列模型里**（见组件里 HANDLE_WIDTH 那段）——
+ * 所以数据列的下标要从 1 起数。`tbody tr` 的`td` 顺序 = 行号 → 各数据列。
+ */
 function cellAt(container: HTMLElement, row: number, col: number) {
-    return container.querySelectorAll("tbody tr")[row].querySelectorAll("td")[col]
+    return container.querySelectorAll("tbody tr")[row].querySelectorAll("td")[col + 1]
+}
+
+/** 行号格（第一个 td）：不在列模型、不参与选区，只显示序号。 */
+function handleAt(container: HTMLElement, row: number) {
+    return container.querySelectorAll("tbody tr")[row].querySelector("td")!
 }
 
 /**
@@ -126,9 +138,15 @@ afterEach(() => {
 })
 
 describe("新的动作表（TanStack Table v9）", () => {
-    it("87 列全部渲染成表头", async () => {
+    it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
         const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} />)
-        await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length))
+        await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
+        // 第一格是 `#`，而且**没有** `data-col-id` —— 量自然宽度那一趟按这个属性挑列，
+        // 带上它就会被当成一个数据列量进去（列数就变了）。
+        const handle = container.querySelector("thead th") as HTMLElement
+        expect(handle.textContent).toBe("#")
+        expect(handle.getAttribute("data-col-id")).toBeNull()
+        expect(handle.style.width).toBe("40px")
     })
 
     /*
@@ -146,7 +164,8 @@ describe("新的动作表（TanStack Table v9）", () => {
         const table = container.querySelector("table") as HTMLTableElement
         expect(table.className).toContain("table-fixed")
         expect(table.style.width).not.toBe("")
-        expect((container.querySelector("thead th") as HTMLElement).style.width).not.toBe("")
+        // 数据列看**第二格**（第一格是行号，它给的是固定宽度，不能拿它当"量过了"的证据）。
+        expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).not.toBe("")
     })
 
     /*
@@ -155,9 +174,9 @@ describe("新的动作表（TanStack Table v9）", () => {
     */
     it("表头列名截断：内层带 truncate，且完整列名挂在 title 上", async () => {
         const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} />)
-        await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length))
+        await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
 
-        const head = container.querySelectorAll("thead th")[0]
+        const head = container.querySelectorAll("thead th")[1]
         const inner = head.firstElementChild!
         expect(inner.className).toContain("truncate")
         // 截断之后光看列名认不出是哪个字段，所以完整名挂在 title 上
@@ -250,7 +269,8 @@ describe("新的动作表（TanStack Table v9）", () => {
         const container = await renderTable()
 
         const ids = [...container.querySelectorAll("tbody tr")].map(
-            (tr) => tr.querySelector("td")!.firstElementChild!.textContent,
+            // 每行第一格是行号（不在列模型里），所以取**第二格**才是 `id_`。
+            (tr) => tr.querySelectorAll("td")[1].firstElementChild!.textContent,
         )
         expect(ids).toEqual(["99", "101", "1000"])
     })
@@ -404,21 +424,76 @@ describe("新的动作表（TanStack Table v9）", () => {
     it("前两列钉住：表头与格子都带 sticky，且只有它们打了量宽标记", async () => {
         const container = await renderTable()
 
+        // 表头那行第一格是行号（也 sticky，但**没有** `data-col-id`，不算数据列），所以数据列从 1 起数。
         const headCells = container.querySelectorAll("thead th")
+        const cellAtHead = (column: number) => headCells[column + 1]
+        // 表体每行的第一格同样是行号。
         const firstRowCells = container.querySelectorAll("tbody tr")[0].querySelectorAll("td")
+        const cellAtBody = (column: number) => firstRowCells[column + 1]
 
         for (let index = 0; index < PINNED_COUNT; index++) {
-            expect(headCells[index].className).toContain("sticky")
+            expect(cellAtHead(index).className).toContain("sticky")
             // 表头每列都带 `data-col-id`：量"自然宽度"那一趟按它认列（见组件里那段测量）。
-            expect(headCells[index].getAttribute("data-col-id")).toBe(KEYS[index])
-            expect(firstRowCells[index].className).toContain("sticky")
+            expect(cellAtHead(index).getAttribute("data-col-id")).toBe(KEYS[index])
+            expect(cellAtBody(index).className).toContain("sticky")
         }
 
         // 第 PINNED_COUNT + 1 列**不该**钉住。
         // ⚠️ 只判 sticky、不判 `style.left`：宽度是**量完才写**的，而 happy-dom 不做布局
         // （量出来全是 0），所以这里量不到 left —— 真实的 left 由真浏览器验（tools/debug 那套）。
-        expect(firstRowCells[PINNED_COUNT].className).not.toContain("sticky")
+        expect(cellAtBody(PINNED_COUNT).className).not.toContain("sticky")
     })
+
+    /*
+        行号列：**每个 `<tr>` 的第一格**，横向钉在最左、宽度与表头那个 `#` 一致，
+        序号按**显示顺序**从 1 数起（默认按 `id_` 升序，所以它不恒等于数据原来的下标）。
+
+        它**不在列模型里**：数据格的下标因此一个都没动（这是选它这么做的全部理由 ——
+        见组件里 HANDLE_WIDTH 那段）。
+    */
+    it("行号列：每行第一格是序号（从 1 起），宽度与表头 `#` 一致，且不移位数据列下标", async () => {
+        table = [makeRow("1000"), makeRow("99")]
+        const container = await renderTable()
+
+        // 排序后 99 在前：行号跟着**显示顺序**走（1、2），不是数据原本的下标。
+        expect(handleAt(container, 0).textContent).toBe("1")
+        expect(handleAt(container, 1).textContent).toBe("2")
+        // 显示顺序确实是 99 在前 —— 顺便证明"行号 = 显示位置"这层关系
+        expect(cellAt(container, 0, KEYS.indexOf("id_")).textContent).toBe("99")
+
+        const handleHead = container.querySelector("thead th") as HTMLElement
+        expect(handleHead.textContent).toBe("#")
+        expect(handleHead.style.width).toBe("40px")
+        expect(handleAt(container, 0).style.width).toBe("40px")
+        // 横向钉住才不会被滚过去的列盖住；纵向吸顶由表头那行自己给。
+        expect(handleHead.className).toContain("sticky")
+        expect(handleAt(container, 0).className).toContain("sticky")
+    })
+
+    /*
+        行号格的光标是**和 `➡` 一模一样的自定义箭头**（Excel / WPS 行号上就是它）。
+
+        系统光标里没有这一支，所以是自带的 SVG 图标（data URI）+ 热点 `4 12`，后面再挂个 `e-resize`
+        兜底。**不是**表格那支十字 —— 十字只给数据格（`cell-selectable`）。
+
+        ⚠️ 这条要盯着**那个 `td` 自己**：`cursor` 是继承属性，而 `cell-selectable` 显式命中了 td，
+        里层 div 上写光标一点用都没有（继承只在"没有规则命中"时才轮到）。
+    */
+    it("行号格的光标是自定义的 ➡ 箭头（写在 td 上，数据格仍是十字）", async () => {
+        const container = await renderTable()
+
+        const handle = handleAt(container, 0) as HTMLElement
+        expect(handle.style.cursor).toContain("svg+xml") // 自带图标
+        expect(handle.style.cursor).toContain("4 12") // 热点 = 箭头尖端
+        expect(handle.style.cursor).toContain("e-resize") // 不吃图标时的兜底
+
+        const handleHead = container.querySelector("thead th") as HTMLElement
+        expect(handleHead.style.cursor).toContain("svg+xml")
+
+        // 数据格那支十字照旧（别把行号那格的处理顺手扩到数据格上）
+        expect(cellAt(container, 0, 0).className).toContain("cell-selectable")
+    })
+
 
     it("值超长时截断：显示态带 truncate（overflow:hidden + ellipsis + nowrap）", async () => {
         const container = await renderTable()

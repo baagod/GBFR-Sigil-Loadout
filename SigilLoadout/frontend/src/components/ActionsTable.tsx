@@ -105,6 +105,42 @@ const features = tableFeatures({
 const PINNED_COUNT = 2
 
 /**
+ * 行号列（`#`）的宽度 —— **39px + 1px 右边框 = 40**。
+ *
+ * ⚠️ 它**不进列模型**（不是 `ColumnDef`）：库的选区列下标走 `getDisplayOrderedColumns()`，
+ * 那个函数**不排除** `enableCellSelection: false` 的列（排除只发生在 `getSelectableColumns()`，
+ * 那是"全选"用的）。所以只要行号进了列模型，`getCellSelectionBounds()` 的列下标就整体 +1，
+ * 而 `row.getAllCells()` 也跟着 +1 —— 复制/粘贴那段"按下标取格"的逻辑（含只读列判定）全得跟着搬。
+ *
+ * 它是**行头**不是数据：固定宽度、锚在 `left-0`，排在所有钉住列**左边**（负方向），
+ * 于是钉住列的 `getStart("start")` 一个都不用动。
+ */
+const HANDLE_WIDTH = 40
+
+/** 行号格的类：横向钉在最左（纵向吸顶由表头那行自己给），z 与表头同档规矩见 PINNED。 */
+const HANDLE_CELL = "sticky left-0 z-40 border-r border-b bg-background p-0 text-center"
+
+/**
+ * 行号格的光标：**和 `➡` 一模一样的箭头**（Excel / WPS 行号上就是它）。
+ *
+ * 系统光标里**没有**这一支 —— `e-resize` 是"左右双向箭头"（不是它），`default` 是那支斜的指针，
+ * 所以只能自带图标。图标用**内联 SVG 的 data URI**画一个 ➡：不落文件、不用管打包路径与 2x 缩放，
+ * 改形状/改色就在这一行里改。
+ *
+ * 配色是**白身 + 黑边**（用户定的）：本应用是深色界面，黑箭头会糊在底色里；而那圈黑边保证它落到
+ * 浅色格子上也还看得见 —— 这正是 Excel / WPS 给自己那支黑箭头加白边的同一个理由，只是反过来用。
+ *
+ * `4 12` 是**热点**（箭头尖端），必须落在图形内，否则整条 `cursor` 声明作废。
+ * 末尾的 `e-resize` 是**兜底**：万一哪天不吃 data URI 了，也还是个箭头而不是十字。
+ *
+ * ⚠️ 必须让**那个 `td` 自己**带上它，写在里层 div 上没用：`cell-selectable` 的 `cursor: cell`
+ * （见 style.css）是**显式命中这个 td** 的规则，而 `cursor` 是继承属性 —— td 一旦定死 `cell`，
+ * 里层写什么都没用（继承只在"没有规则命中"时才轮到）。
+ */
+const HANDLE_CURSOR =
+    'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M3 8.5h9V4l9 8-9 8v-4.5H3z" fill="%23fff" stroke="%23111" stroke-width="2" stroke-linejoin="round"/></svg>\') 4 12, e-resize'
+
+/**
  * 行高：**钉在 `td` 上**，不靠内容撑 —— 格子一空就塌成一条线，空行点不中也填不了字。
  * 钉在这里还有个好处：显示态与编辑态同高，进出编辑行高不跳。
  */
@@ -130,6 +166,12 @@ const INPUT_PADDING = "pl-1 pr-0 py-0.5"
 /** 表头内边距：左右都与数据格相同。 */
 const HEAD_PADDING = "pl-1 pr-2"
 const FONT = "text-base md:text-sm"
+
+/**
+ * 行号格的内层：高度、内边距、字号都照 `CellText` 抄 —— 格子高度、数字基线与数据格才齐平。
+ * 多了个 `justify-center`：行号居中（表头那个 `#` 也走它，两行才对得齐）。
+ */
+const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${CELL_PADDING} ${FONT} tabular-nums`
 
 /** 导出给测试：它们要断言"空行也有高度""钉住列的 left"，跟着常量走才不会改一次值就改一次测试。 */
 export {ROW_HEIGHT, PINNED_COUNT}
@@ -535,7 +577,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                     （整数，边界落在整像素上）。没量之前保持 `table-auto` —— 那时得让浏览器先按内容
                     排一遍，我们才知道每列该多宽。
                 */
-                style={measured ? {width: table.getTotalSize()} : undefined}
+                style={measured ? {width: table.getTotalSize() + HANDLE_WIDTH} : undefined}
+                /*
+                    ⚠️ 表宽必须**自己把行号那 40px 加上**：`getTotalSize()` 只算数据列（行号不入列模型）。
+                    漏了它，`table-fixed` 下浏览器会把这 40px 从各数据列里摊走 —— 每列比量出来的整数
+                    窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil` 的那件事，换个入口再来一遍）。
+                */
                 className={`${measured ? "table-fixed " : ""}border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
             >
                 <thead>
@@ -543,6 +590,14 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                         // 表头整行吸顶，而且**必须压过表体所有钉住的格子**（它们都是 `z-40`）：
                         // 垂直滚动时表体的冻结列会滑到表头的位置上，给同层的 40 就会被它们盖住。
                         <tr key={headerGroup.id} className="sticky top-0 z-50">
+                            {/*
+                                行号列 —— **不属于列模型**（见 HANDLE_WIDTH 那段）。
+                                不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
+                                宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
+                            */}
+                            <th className={`${HANDLE_CELL} top-0 font-medium`} style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}>
+                                <div className={HANDLE_INNER}>#</div>
+                            </th>
                             {headerGroup.headers.map((header) => {
                                 const pinned = header.column.getIsPinned()
                                 return (
@@ -586,6 +641,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 没被选中的行它是空串 —— 一次拖拽写入，绝大多数行因此整行跳过。
                             */
                             edgeKey={rowSelectionKey(table.state.cellSelection, selectionBounds, rowIndex, row.id)}
+                            /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）。 */
+                            rowNumber={rowIndex + 1}
                             measured={measured}
                             abilityNames={abilityNames}
                             wasSelectedRef={wasSelectedRef}
@@ -636,6 +693,7 @@ function rowSelectionKey(
  */
 const ActionRowView = memo(function ActionRowView({
     row,
+    rowNumber,
     measured,
     abilityNames,
     wasSelectedRef,
@@ -644,6 +702,8 @@ const ActionRowView = memo(function ActionRowView({
     row: Row<typeof features, ActionRow>
     /** 这一行外观的指纹：只参与 `memo` 比较，渲染不用。 */
     edgeKey: string
+    /** 行号列里显示的数字（从 1 数起）。 */
+    rowNumber: number
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */
     measured: boolean
     abilityNames: Record<string, string>
@@ -652,6 +712,10 @@ const ActionRowView = memo(function ActionRowView({
 }) {
     return (
         <tr>
+            {/* 行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与选区。 */}
+            <td className={HANDLE_CELL} style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}>
+                <div className={HANDLE_INNER}>{rowNumber}</div>
+            </td>
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {row.getAllCells().map((cell) => {
                 const pinned = cell.column.getIsPinned()
