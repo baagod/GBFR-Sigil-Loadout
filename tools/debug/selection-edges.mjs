@@ -187,8 +187,15 @@ const thickness = {
 
 console.log(`选区: ${sel.n} 格  rect=[${sel.L},${sel.T}..${sel.R},${sel.B}]  inset=${sel.inset}  z-index=${sel.z}`)
 console.log(`四边厚度（选区色像素）: 上=${thickness.上}  下=${thickness.下}  左=${thickness.左}  右=${thickness.右}`)
-const thin = Object.entries(thickness).filter(([, n]) => n < 2)
-console.log(thin.length === 0 ? "✅ 四条边都是完整 2px" : `❌ 不足 2px 的边: ${thin.map(([k, n]) => `${k}=${n}px`).join(" ")}`)
+/*
+    四条边都该是 **2px**。
+
+    ⚠️ 第一行的上边框**也只能是 2px**（它画在表体首行自己的头两像素里）。试过让表头把它那条下边线
+    也画成选区色，结果是上边框变成 3px、且整条表头全被涂绿（`:has()` 是按表头整行命中的）——
+    与其它三边不一致，已撤销。所以首行上边框上面会紧贴着表头那道格线，这是"表头必须吸顶"下的定局。
+*/
+const bad = Object.entries(thickness).filter(([, n]) => n < 2)
+console.log(bad.length === 0 ? "✅ 四条边都是完整 2px" : `❌ 不足 2px 的边: ${bad.map(([k, n]) => `${k}=${n}px`).join(" ")}`)
 
 if (SHOT) {
     const big = await send("Page.captureScreenshot", {

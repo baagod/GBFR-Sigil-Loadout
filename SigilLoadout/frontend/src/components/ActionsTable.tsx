@@ -24,6 +24,7 @@ import {
     useRef,
     useState,
     type ClipboardEvent,
+    type MouseEvent as ReactMouseEvent,
     type Ref,
     type RefObject,
 } from "react"
@@ -33,6 +34,7 @@ import {
     columnSizingFeature,
     createSortedRowModel,
     flexRender,
+    rowSelectionFeature,
     rowSortingFeature,
     sortFn_alphanumeric,
     tableFeatures,
@@ -43,6 +45,7 @@ import {
     type ColumnDef,
     type ColumnSizingState,
     type Row,
+    type RowSelectionState,
     type SortingState,
 } from "@tanstack/react-table"
 
@@ -91,15 +94,37 @@ const displayText = (key: string, raw: string, names: Record<string, string>) =>
  *     整个 `sortFns` 对象会把 6 个内置全打进包里，官方已标 deprecated。
  *     `alphanumeric` 是**自然排序**（`item2` 排在 `item10` 前面），所以 `101 < 1000` ——
  *     不是字典序那种 `1000 < 101`。
+ *   · `rowSelectionFeature` —— **点行号选行**的状态：`row.getIsSelected()` / `toggleSelected()`，
+ *     按 `id_` 记，所以排序之后仍然对得上。
+ *     ⚠️ 库那个 `getToggleSelectedHandler()` **不用**：它是给**复选框**写的，增删方向取自
+ *     `event.target.checked`（源码里就是 `const checked = event.target.checked`）—— 行号格上没有
+ *     `checked`，走它只会把行永远置成"取消"。手势那一层见 `clickRowHandle` / `dragSelectTo`。
  */
 const features = tableFeatures({
     cellSelectionFeature,
     columnPinningFeature,
     columnSizingFeature,
+    rowSelectionFeature,
     rowSortingFeature,
     sortedRowModel: createSortedRowModel(),
     sortFns: {alphanumeric: sortFn_alphanumeric},
 })
+
+/**
+ * 行选中的叠加层（`background-image` 的浅色）：整行都要带上，**只读列也不例外**。
+ *
+ * 为什么是渐变而不是 `background-color`：格子自己已经有底色（可编辑 `#1a1a1a` / 只读
+ * `--background`），`background-color` 只有一份、占了就把底色顶掉；`background-image` 是另一个
+ * 坑位，两层能同时存在（与旧表、轨表同一套观感）。
+ *
+ * ⚠️ 必须**逐格**加，不能只写在 `<tr>` 上让它往下透：不吸顶的格子底色不透明，会把 tr 那层盖掉；
+ * 而钉住的只读列（`#` / `id_` / `abilityTag_`）**必须**不透明（否则横向滚过来的列会从它底下透出来），
+ * 只能自己把这层叠加上去。试过用 tr 上一条任意变体一把管完 —— Tailwind 会编译出来但不生效。
+ */
+const ROW_SELECTED_OVERLAY = "bg-linear-to-b from-white/14 to-white/14"
+
+/** 这一格的底色（`own`）之上，若整行被选中就再叠一层。 */
+const cellOverlay = (rowSelected: boolean, own: string) => (rowSelected ? `${own} ${ROW_SELECTED_OVERLAY}` : own)
 
 /** 默认钉住前几列。用**序号**不用字段名：字段名是数据给的，写死就等于把"有哪些列"抄了一份。 */
 const PINNED_COUNT = 2
@@ -117,8 +142,20 @@ const PINNED_COUNT = 2
  */
 const HANDLE_WIDTH = 40
 
-/** 行号格的类：横向钉在最左（纵向吸顶由表头那行自己给），z 与表头同档规矩见 PINNED。 */
-const HANDLE_CELL = "sticky left-0 z-40 border-r border-b bg-background p-0 text-center"
+/**
+ * 行号格的类：横向钉在最左（纵向吸顶由表头那行自己给），z 与表头同档规矩见 PINNED。
+ *
+ * `select-none` 是**行选中**要的：按住行号拖过多行时，浏览器会把划过的数字当"选文字"涂成蓝底
+ * （实测），和行选中那层浅色叠在一起，看着像"选中了数字"。禁掉之后拖拽只改选中、不选文字。
+ * 数据格不用管：它们带 `cell-selectable`，那份样式里已经有 `user-select: none`。
+ *
+ * 底色**不写在这里**：表头那一格要与别的表头同色，表体那几格要与页面同色 —— 两边不一样，所以
+ * 拆成"表体用 `READ_ONLY_BG`（与只读列同一份）、表头用 `HANDLE_HEAD_BG`"。
+ */
+const HANDLE_CELL = "cell-handle sticky left-0 z-40 border-r border-b p-0 text-center select-none"
+
+/** 表头行号格的底色：**与别的表头一致**（用户要求）。与 `HEAD_CELL` 同一档灰，改要一起改。 */
+const HANDLE_HEAD_BG = "bg-[#1f1f1f]"
 
 /**
  * 行号格的光标：**和 `➡` 一模一样的箭头**（Excel / WPS 行号上就是它）。
@@ -313,6 +350,19 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const copiedColumnsRef = useRef<string[]>([])
     /** 复制/粘贴的结果提示（列对不上、跳过了几格…）。 */
     const [notice, setNotice] = useState("")
+    /**
+     * **按行选中**（点行号）：`id_` → true。状态归库（`rowSelectionFeature`），这里只持有受控值。
+     */
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+    /**
+     * **正在按住行号拖选**（划过多行）。存的是**起始行的 id**。
+     *
+     * ⚠️ 必须是 **ref** 不是 state：按下与"第一次划到某一行"可能落在同一帧，那时 state 还没落地，
+     * 读 state 会漏掉划过的第一行（旧表的 `useRowSelection` 里踩过同一个坑）。
+     */
+    const dragRowRef = useRef<string | null>(null)
+    /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
+    const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
     const [error, setError] = useState("")
 
@@ -362,12 +412,13 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         getRowId: (originalRow) => originalRow.id,
         // 单元格选择：全表都能选（**只读列也要能选** —— 复制时得带上它们的值，只是粘贴时不写回去）。
         enableCellSelection: true,
-        // 钉住哪几列 / 按什么排 / 每列多宽：都是**受控状态** —— 值由我们给，库通过 onChange 把
-        // 用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态；这里用 state 这一档就够）。
-        state: {columnPinning: pinning, columnSizing, sorting},
+        // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪几行：都是**受控状态** —— 值由我们给，库通过 onChange
+        // 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态；这里用 state 这一档就够）。
+        state: {columnPinning: pinning, columnSizing, sorting, rowSelection},
         onColumnPinningChange: setPinning,
         onColumnSizingChange: setColumnSizing,
         onSortingChange: setSorting,
+        onRowSelectionChange: setRowSelection,
     })
 
     /*
@@ -556,6 +607,131 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      */
     const selectionBounds = table.getCellSelectionBounds()
 
+    /**
+     * 显示顺序的行（= 渲染顺序）。取**一次**给下面几处共用：
+     *   · 行号列的框要不要画上下边（看邻行）；
+     *   · 行选中的拖拽区间（`dragSelectTo` 按下标算两端）。
+     * 别在 map 里再取一遍 —— 那是每行一次的多余调用，拖拽时每次 mousemove 都要重跑（用户反馈卡顿）。
+     */
+    const modelRows = table.getRowModel().rows
+
+    /*
+        ========================== 选中：一套模型，两处入口 ==========================
+
+        屏幕上只有**一种**选中。两套（单元格选区 / 整行）**互斥**：动哪一边，另一边就清空 ——
+        不留两套同时亮着的状态，否则分不清"现在选中的是格还是行"。
+
+        两边的区别只有"范围"：
+          · 从**数据格**按下 → 选**单元格**（起点就是按下那一格，之后拖拽/Shift 扩成一片）；
+          · 从**行号**按下   → 选**整行**（一行就是那一行的全部列）。
+
+        所以这里只有两个"设选中"的入口，清场各写一次，别在调用点抄：
+          · `table.resetCellSelection(true)` —— 库的 API，把单元格选区清空；
+          · `setRowSelection({})` —— 行选中是受控 state，直接给空对象。
+    */
+
+    /** 设**单元格**选区：先把行选中清掉（互斥那一半）。库那边交给 `cell.getSelectionStartHandler()`。 */
+    const startCellSelection = (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
+        setRowSelection({})
+        dragRowRef.current = null
+        cell.getSelectionStartHandler()(e)
+    }
+
+    /** 设**行**选中：先把单元格选区清掉（互斥的另一半）。 */
+    const setRowsSelected = (next: RowSelectionState) => {
+        table.resetCellSelection(true)
+        setRowSelection(next)
+    }
+
+    /**
+     * 光标底下是**哪一行**（没有就是 `null`）：按各行的 y 区间判断。
+     *
+     * 为什么要这个（而不是靠每个行号格的 `mouseenter`）：Excel / WPS 的手感是"**从行号按下之后，
+     * 鼠标可以移出行号那一列**，在表格任意位置上下拖，选区跟着走"。只绑行号格的话，鼠标一出去就
+     * 断在列边缘 —— 用户实测就是这个问题。
+     *
+     * 只在这一张表的行里找（`tableRef` 限定）：页面上还有别的表（轨表等），别误伤。
+     */
+    const rowIdAtY = (clientY: number): string | null => {
+        const el = tableRef.current
+        if (!el) return null
+        for (const row of el.querySelectorAll<HTMLTableRowElement>("tbody tr")) {
+            const rect = row.getBoundingClientRect()
+            if (clientY >= rect.top && clientY < rect.bottom) {
+                return row.dataset.rowId ?? null
+            }
+        }
+        return null
+    }
+
+    /**
+     * 按行号**按住拖选**：从一端到另一端整段选中（`until` 省略时用起点锚点）。
+     * 与旧表 `extendRow` 同一条口径：拖拽就是"拉出一段"，Ctrl 点中的那些会被替换掉。
+     */
+    const dragSelectTo = (rowId: string, until?: string) => {
+        const from = until ?? dragRowRef.current
+        if (from === null) return
+        const modelRows = table.getRowModel().rows
+        const fromIndex = modelRows.findIndex((r) => r.id === from)
+        const toIndex = modelRows.findIndex((r) => r.id === rowId)
+        if (fromIndex < 0 || toIndex < 0) return
+        const next: RowSelectionState = {}
+        for (let i = Math.min(fromIndex, toIndex); i <= Math.max(fromIndex, toIndex); i++) next[modelRows[i].id] = true
+        setRowsSelected(next)
+        rowAnchorRef.current = from
+    }
+
+    /**
+     * 按行号**点一下 / Ctrl / Shift**。语义与旧表 `clickRow` 一致（两张表手感不许漂）：
+     *   · **Ctrl/Cmd** —— 在这一行上增删，其余不动（锚点跟着挪到这一行，供下一次 Shift 用）；
+     *   · **Shift** —— 从锚点连选到这一行（**替换**整批，跟资源管理器一样）；
+     *   · 什么都不按 —— **只选这一行**；若这一行本来就在选中的一段里，则**收敛到这一行**
+     *     （点选区内部 = 把选区缩成点的那一行）。所以再点一次才取消。
+     */
+    const clickRowHandle = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
+        const id = row.id
+        if (mods.ctrlKey || mods.metaKey) {
+            table.resetCellSelection(true)
+            row.toggleSelected()
+            rowAnchorRef.current = id
+            return
+        }
+        if (mods.shiftKey && rowAnchorRef.current !== null) {
+            dragSelectTo(id, rowAnchorRef.current)
+            return
+        }
+        const selectedIds = Object.keys(rowSelection)
+        // 已经在选中的一段里 → 收敛到这一行；否则整批换成这一行。
+        setRowsSelected(selectedIds.includes(id) ? (selectedIds.length === 1 ? {} : {[id]: true}) : {[id]: true})
+        rowAnchorRef.current = id
+    }
+
+    /**
+     * 拖拽的收尾与**跟随**：
+     *   · `mouseup` 挂 window —— 松手时鼠标常常已经跑出行号那一列，甚至跑出窗口；
+     *   · `mousemove` 挂 document，并且**按光标所在的行走**（`rowIdAtY`），不是按"划过了哪个行号格"——
+     *     这样按住之后鼠标移到表格任何位置、上下拖，选区都跟着（Excel / WPS 的手感，用户实测要求）。
+     *     只绑行号格的 `mouseenter` 会在列边缘断掉。
+     *
+     * 两个监听都只在**真的在拖**（`dragRowRef` 非空）时才干活；不在拖时它们是空转（一次 ref 读）。
+     */
+    useEffect(() => {
+        const stop = () => {
+            dragRowRef.current = null
+        }
+        const follow = (e: MouseEvent) => {
+            if (dragRowRef.current === null) return
+            const id = rowIdAtY(e.clientY)
+            if (id !== null) dragSelectTo(id)
+        }
+        window.addEventListener("mouseup", stop)
+        document.addEventListener("mousemove", follow)
+        return () => {
+            window.removeEventListener("mouseup", stop)
+            document.removeEventListener("mousemove", follow)
+        }
+    })
+
     if (error) return <p className="text-sm text-destructive">{error}</p>
     if (keys.length === 0) return <p className="text-xs text-muted-foreground">{t.loading}</p>
 
@@ -595,7 +771,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
                                 宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
                             */}
-                            <th className={`${HANDLE_CELL} top-0 font-medium`} style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}>
+                            <th className={`${HANDLE_CELL} ${HANDLE_HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}>
                                 <div className={HANDLE_INNER}>#</div>
                             </th>
                             {headerGroup.headers.map((header) => {
@@ -612,7 +788,11 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                         */
                                         style={{
                                             width: measured ? header.getSize() : undefined,
-                                            left: measured && pinned ? header.column.getStart("start") : undefined,
+                                            /*
+                                                ‼️ 同上（表体那一格）：库给钉住列的 `left` 是从 0 起算的，
+                                                行号那 40px 得自己加 —— 否则 `id_` 的表头会盖住 `#` 表头。
+                                            */
+                                            left: measured && pinned ? HANDLE_WIDTH + header.column.getStart("start") : undefined,
                                         }}
                                         // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
                                         data-col-id={header.column.id}
@@ -632,23 +812,50 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                     ))}
                 </thead>
                 <tbody>
-                    {table.getRowModel().rows.map((row, rowIndex) => (
-                        <ActionRowView
-                            key={row.id}
-                            row={row}
-                            /*
-                                这一行外观的**指纹**：只有它变了才重渲（见 `rowSelectionKey`）。
-                                没被选中的行它是空串 —— 一次拖拽写入，绝大多数行因此整行跳过。
-                            */
-                            edgeKey={rowSelectionKey(table.state.cellSelection, selectionBounds, rowIndex, row.id)}
-                            /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）。 */
-                            rowNumber={rowIndex + 1}
-                            measured={measured}
-                            abilityNames={abilityNames}
-                            wasSelectedRef={wasSelectedRef}
-                            edit={edit}
-                        />
-                    ))}
+                    {/*
+                        ‼️ `getRowModel()` **只在这里取一次**（`modelRows`），别再在 map 里取第二遍 ——
+                        那等于每行都问一次库，51 行就是 51 次多余调用，而拖拽选区时每次 mousemove 都要
+                        重跑这一整段（用户反馈"选择有点卡顿"就是这类每行重复调用堆出来的）。
+                    */}
+                    {modelRows.map((row, rowIndex) => {
+                        /*
+                            行选中那圈框的**上下边**（框从行号列**后面**开始，序号列不画框）：
+                            段首那一行挂 `cell-edge-top`、段尾那一行挂 `cell-edge-bottom`；左右两条在
+                            `ActionRowView` 里按列位置挂。**整行的行选中共用这一份**，每个数据格拿同一串。
+                        */
+                        const rowSelected = row.getIsSelected()
+                        /*
+                            "是不是这一段的头/尾"：上面（下面）那一行**没被选中**（或压根没有）就是头（尾）。
+                            ⚠️ 这里**不能用** `rowIndex === modelRows.length - 1` 当"尾"的判据 ——
+                            最后一行确实是尾，但中间断开的一段（Ctrl 点选出来的）尾巴也要画，所以一律
+                            看"下一行在不在同一段里"。
+                        */
+                        const isTop = rowSelected && !modelRows[rowIndex - 1]?.getIsSelected()
+                        const isBottom = rowSelected && !modelRows[rowIndex + 1]?.getIsSelected()
+                        const rowEdges = rowSelected ? `${isTop ? "cell-edge-top" : ""} ${isBottom ? "cell-edge-bottom" : ""}` : ""
+                        return (
+                            <ActionRowView
+                                key={row.id}
+                                row={row}
+                                /*
+                                    这一行外观的**指纹**：只有它变了才重渲（见 `rowSelectionKey`）。
+                                    没被选中的行它是空串 —— 一次拖拽写入，绝大多数行因此整行跳过。
+                                */
+                                edgeKey={rowSelectionKey(table.state.cellSelection, selectionBounds, rowIndex, row.id)}
+                                /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）。 */
+                                rowNumber={rowIndex + 1}
+                                /** 整行选中的上下边（段首/段尾），数据格逐格拿同一串。 */
+                                rowEdges={rowEdges}
+                                measured={measured}
+                                abilityNames={abilityNames}
+                                wasSelectedRef={wasSelectedRef}
+                                edit={edit}
+                                dragRowRef={dragRowRef}
+                                clickRowHandle={clickRowHandle}
+                                startCellSelection={startCellSelection}
+                            />
+                        )
+                    })}
                 </tbody>
             </table>
             </div>
@@ -694,30 +901,67 @@ function rowSelectionKey(
 const ActionRowView = memo(function ActionRowView({
     row,
     rowNumber,
+    rowEdges,
     measured,
     abilityNames,
     wasSelectedRef,
     edit,
+    dragRowRef,
+    clickRowHandle,
+    startCellSelection,
 }: {
     row: Row<typeof features, ActionRow>
     /** 这一行外观的指纹：只参与 `memo` 比较，渲染不用。 */
     edgeKey: string
     /** 行号列里显示的数字（从 1 数起）。 */
     rowNumber: number
+    /**
+     * 整行被选中时，这一行数据格要挂的**上下边**（段首 `cell-edge-top` / 段尾 `cell-edge-bottom`）。
+     * 空串 = 这一行没被选中（那时边由单元格选区那套自己画）。
+     */
+    rowEdges: string
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */
     measured: boolean
     abilityNames: Record<string, string>
     wasSelectedRef: RefObject<boolean>
     edit: (rowId: string, key: string, value: string | null) => void
+    /** 拖选起点（按下哪一行）：`null` = 没在拖。 */
+    dragRowRef: RefObject<string | null>
+    /** 行号上按下：点 / Ctrl / Shift（语义见 `ActionsTable` 的 `clickRowHandle`）。 */
+    clickRowHandle: (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => void
+    /** 数据格上按下：选单元格，并**先把行选中清掉**（两套选中互斥）。 */
+    startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
 }) {
+    const rowSelected = row.getIsSelected()
     return (
-        <tr>
-            {/* 行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与选区。 */}
-            <td className={HANDLE_CELL} style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}>
+        /* `data-row-id`：行拖拽时要按"光标在哪一行"找 row id（见 `ActionsTable.rowIdAtY`）—— */
+        /* DOM 拿得到，不用再往库那边问一遍。 */
+        <tr data-row-id={row.id}>
+            {/*
+                行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与**单元格**选区。
+
+                **它自己不画框** —— 用户要求：按行选中时框从行号列**后面**开始（`| xx | xx |`），
+                序号列保持原样。那圈框由下面的**数据格**挂 `cell-edge-*` 画（上下边来自 `rowEdges`，
+                左右边按列位置在这里判）。
+
+                行选中的三个手势（与旧表同一套手感）：
+                  · 按下 —— 记下起始行（拖选用），再按修饰键点/Ctrl/Shift 改选中；
+                  · 划过 —— 只有"正按着"时才把区间拉到这一行；
+                  · 松手 —— 在 window 上收尾（鼠标常会跑出行号那一列）。
+                ⚠️ 这只格子不在列模型里，所以 `cell.getSelectionStartHandler()` 那套与它无关，两者不打架。
+            */}
+            <td
+                className={`${cellOverlay(rowSelected, `${READ_ONLY_BG} ${HANDLE_CELL}`)}`}
+                style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
+                onMouseDown={(e) => {
+                    dragRowRef.current = row.id
+                    clickRowHandle(row, e)
+                }}
+            >
                 <div className={HANDLE_INNER}>{rowNumber}</div>
             </td>
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
-            {row.getAllCells().map((cell) => {
+            {row.getAllCells().map((cell, index) => {
                 const pinned = cell.column.getIsPinned()
                 const key = cell.column.id
                 const readOnly = READ_ONLY_KEYS.has(key)
@@ -727,6 +971,19 @@ const ActionRowView = memo(function ActionRowView({
                 /** 显示值直接用库给的：`accessorFn` 就是 `shownValue`，与排序同一口径。 */
                 const shown = String(cell.getValue() ?? "")
                 const selected = cell.getIsSelected()
+                /*
+                    行选中那圈框挂在**数据格**上（框从行号列后面开始，用户要求）：
+                      · 上下两条：来自 `rowEdges`（段首/段尾那一行的每一格都挂同一个）；
+                      · 左边界：第一格挂（行选中是从最左那一列起的，左边一定要有）；
+                      · **右边界不挂** —— 最后一列的右边界正好在**表格最外沿**，那 1px 会伸到表外
+                        （用户截图里那条突兀的绿边），而且横向滚动时它紧贴滚动条、会来回闪。
+                        所以行选中在右端是"敞口"的，靠这一列自己的格线收边。
+                    ⚠️ 行选中与单元格选区**互斥**（见 `ActionsTable` 那段模型说明），所以这里用三元
+                    二选一，不把 `selectionClass()` 的结果也叠上来（那会画出两圈）。
+                */
+                const edges = rowSelected
+                    ? `${rowEdges} ${index === 0 ? "cell-edge-left" : ""}`
+                    : selectionClass(cell)
                 return (
                     <td
                         key={cell.id}
@@ -734,16 +991,32 @@ const ActionRowView = memo(function ActionRowView({
                         // `getStart('start')` 拿偏移，与表头算出来的是同一个值，两边不会偏。
                         style={{
                             width: measured ? cell.column.getSize() : undefined,
-                            left: measured && pinned ? cell.column.getStart("start") : undefined,
+                            /*
+                                ‼️ 钉住列的 `left` **必须自己加上行号那 40px**。
+
+                                行号列不在库的列模型里（见 HANDLE_WIDTH 那段），所以库算"钉住区里的偏移"
+                                是**从 0 开始**的 —— `getStart('start')` 给第一列 `id_` 的就是 `0`。
+                                不加这个偏移的话，`id_` 的 `left:0` 与行号格的 `left:0` 撞在一起，
+                                横向滚动时 `id_`（DOM 在后）整个盖住行号列，看着就是**行号列没冻结**
+                                （实测：滚 3000px 后左侧显示的是 `101`，不是行号）。
+                                表头那一侧本来就加了（见 HEAD_OFFSET），表体这边以前漏了。
+                            */
+                            left: measured && pinned ? HANDLE_WIDTH + cell.column.getStart("start") : undefined,
                         }}
                         /*
                             **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减）。
                             ⚠️ mousedown 里**先**记下"按下之前这一格选没选中"：库的 handler 会立刻改掉
                             选中状态，等 click / focus 时再读就读到改后的了 —— "先选后编"全靠这一份。
                         */
+                        /*
+                            **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减）。
+                            走 `startCellSelection`：它会**先把行选中清掉**（两套选中互斥，见那段模型说明）。
+                            ⚠️ mousedown 里**先**记下"按下之前这一格选没选中"：库的 handler 会立刻改掉
+                            选中状态，等 click / focus 时再读就读到改后的了 —— "先选后编"全靠这一份。
+                        */
                         onMouseDown={(e) => {
                             wasSelectedRef.current = selected
-                            cell.getSelectionStartHandler()(e)
+                            startCellSelection(cell, e)
                         }}
                         // 按住划过来 → 选区另一端拉到这一格（没按住时库内部 no-op）。
                         onMouseEnter={cell.getSelectionExtendHandler()}
@@ -752,25 +1025,76 @@ const ActionRowView = memo(function ActionRowView({
                             // 为了盖住那 1px 格线），绝对定位得有定位祖先。钉住的格子本身就是
                             // `sticky`（也是定位元素），再写 `relative` 会跟它抢同一个属性。
                             pinned ? PINNED.cell : "relative"
-                        } ${readOnly ? READ_ONLY_BG : `${EDITABLE_BG} cell-focus`} ${selectionClass(cell)}`}
+                        } ${cellOverlay(rowSelected, readOnly ? READ_ONLY_BG : EDITABLE_BG)} ${
+                            readOnly ? "" : "cell-focus"
+                        } ${edges}`}
                     >
-                        {readOnly ? (
-                            // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
-                            // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
-                            <CellText text={displayText(key, shown, abilityNames)} />
-                        ) : (
-                            <Cell
-                                value={raw}
-                                original={original}
-                                onCommit={(value) => edit(row.id, key, value)}
-                                // "先选后编"：这一格被点时该不该进编辑，看**按下之前**它选没选中。
-                                shouldEditOnClick={() => wasSelectedRef.current}
-                            />
-                        )}
+                        <CellContent
+                            rowId={row.id}
+                            fieldKey={key}
+                            readOnly={readOnly}
+                            raw={raw}
+                            original={original}
+                            shown={shown}
+                            abilityNames={abilityNames}
+                            wasSelectedRef={wasSelectedRef}
+                            edit={edit}
+                        />
                     </td>
                 )
             })}
         </tr>
+    )
+})
+
+/**
+ * 一格的**内容**（只读文本 / 可编辑格）—— **`memo` 就是这一层存在的理由**。
+ *
+ * 为什么把"内容"从"格子"里拆出来：拖拽选区时每穿过一格就写一次选中 state，那一行的 `<td>`
+ * 必须重建（它的类要改：选中底色、选区轮廓），但**格子里装的东西一个字节都没变** ——
+ * 只读就是一串文本、可编辑就是同一个 `Cell`。不拆的话，每行 88 个格子的子树跟着白重建，
+ * 一次拖拽下来就是几千次无谓重渲（实测：20 次移动触发 357 次行重渲，覆盖全部 51 行）。
+ *
+ * 入参全是**稳定值**（`row.id` / 字段名 / 值 / 名字表 / `edit`），所以选中态一变它就被 `memo`
+ * 挡住，只有"值真的改了"才重渲。
+ */
+const CellContent = memo(function CellContent({
+    rowId,
+    fieldKey,
+    readOnly,
+    raw,
+    original,
+    shown,
+    abilityNames,
+    wasSelectedRef,
+    edit,
+}: {
+    rowId: string
+    fieldKey: string
+    readOnly: boolean
+    /** 改动值（空串 = 没改过）。 */
+    raw: string
+    /** 原值（只读时显示它；可编辑时当灰色占位符）。 */
+    original: string
+    /** 显示值（`accessorFn` 给的，与排序同口径）。 */
+    shown: string
+    abilityNames: Record<string, string>
+    wasSelectedRef: RefObject<boolean>
+    edit: (rowId: string, key: string, value: string | null) => void
+}) {
+    if (readOnly) {
+        // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
+        // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
+        return <CellText text={displayText(fieldKey, shown, abilityNames)} />
+    }
+    return (
+        <Cell
+            value={raw}
+            original={original}
+            onCommit={(value) => edit(rowId, fieldKey, value)}
+            // "先选后编"：这一格被点时该不该进编辑，看**按下之前**它选没选中。
+            shouldEditOnClick={() => wasSelectedRef.current}
+        />
     )
 })
 
