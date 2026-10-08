@@ -25,3 +25,7 @@ openwiki/.run.json
 
 # deploy 留档的 mod 日志（排查用，不入库）
 /logs/
+
+# 调试环境的可重建产物（源文件 serve.mjs / entry.tsx / index.html / build.ps1 仍然入库）
+tools/debug/entry.js
+tools/debug/*.png

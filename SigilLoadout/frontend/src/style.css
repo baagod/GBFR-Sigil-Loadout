@@ -172,17 +172,6 @@
 }
 
 /*
-    角色动作页三张表（动作表 / flags / FSM）的边框色：外框与格线**同一支**，颜色只写在这一处。
-
-    用的是主题里的 --input（深色下 #404040），不是新造的颜色 —— Button 的 outline 变体、Input、
-    Checkbox 的边框都是它。选它是因为表内输入框没有底色、格子之间只靠这几条线分，默认那颗
-    --border（10% 白 ≈#222323）在满屏密线里太淡。浅色主题下 --input 与 --border 本来就是同一个值，
-    所以那边等于没变。
-
-    ⚠️ `& *` 是同权重（0,1,0）压住表内所有元素：**表内任何单独的边框色都会被它吃掉**（谁在后谁赢，
-    而这条通常在后）。要给某一格单独上色，得先把它改成更精确的选择器。
-*/
-/*
     行号格里那条分隔线（数字 | 握把）。
 
     ⚠️ 别改回"给握把那半截加 border-l"：那两半的高度靠 `h-full`（百分比），而**表格里百分比高度
@@ -205,6 +194,15 @@
     }
 }
 
+/*
+    表格外框、格线与表头的颜色，全站只写在这一处：统一用 `--input`（深色下 #404040）。
+
+    不用默认那颗 `--border`：表内输入框没有底色，格子之间只靠这几条线分开，而 `--border`（10% 白
+    ≈ #222323）在满屏密线里太淡。浅色主题下 `--input` 与 `--border` 本来就是同一个值，那边等于没变。
+
+    ⚠️ `& *` 同权重（0,1,0）压住表内所有元素：**表内任何单独的边框色都会被它吃掉**（同权重看先后，
+    这条通常在后）。要给某一格单独上色，得先把它改成更精确的选择器。
+*/
 @utility table-border {
     border-color: var(--input);
 
@@ -214,43 +212,40 @@
 }
 
 /*
-    ⚠️ 角色动作页这三张表**不做悬停反馈** —— 用户明确要求、且声明永久不做。不要再往 td/tr 上挂
-    `hover:` 底色或任何悬停叠加层（2026-10-04 做过一版伪元素叠加层，已按用户要求整段撤掉）。
+    ⚠️ 角色动作页这三张表**不做悬停反馈** —— 用户明确要求、永久不做：不要再往 td/tr 上挂 `hover:`
+    底色或任何悬停叠加层。
 
-    技术上也别绕：行/格的**背景色只有一个坑位**，挂上去会顶掉假删除那行的红、也会顶掉选中那层
-    （`bg-linear-to-b from-white/14`，走背景图）；要同时成立就得再用伪元素单开一层 —— 那是为了一件
-    用户不要的东西去加复杂度。
+    技术上也没有坑位：行 / 格的**背景色只有一份**，占了会顶掉假删除那行的红、也会顶掉选中那层
+    （`bg-linear-to-b from-white/14`，走背景图）；要同时成立就得再开一层伪元素 —— 为一件用户不要的
+    东西加复杂度。
 */
 
 /*
-    格子获得焦点时的那圈线：**从格子的外沿往里画 2px**。
+    聚焦 / 编辑中的格子那一圈线：**从格子外沿往里画 2px**，画在 `::after` 上（`::before` 留给选区框）。
 
-    为什么不直接用 ring：ring 是画在输入框**外面**的（box-shadow），2px 会越出格子 —— 上沿顶进表头、
-    左右顶进邻格；改成 inset 又紧贴格线，2px 环 + 1px 格线连成一条 3px 的带子，看着像加粗。
+    不用 ring：ring 画在输入框**外面**（box-shadow），2px 会越出格子 —— 上沿顶进表头、左右顶进邻格；
+    改成 inset 又紧贴格线，2px 环 + 1px 格线连成一条 3px 的带子，看着像加粗。伪元素用 `inset: -1px`
+    正好铺满"格子 + 那一圈 1px 格线"，边框朝里画 2px —— 正好压住这一格的四条格线，且一点都不越界。
+    最后一行 / 最后一列那两条边没有格线（表格上有 `[&_tr>*:last-child]:border-r-0`），`inset: -1px`
+    会越过表格边缘 1px（点一下最后一列，容器就平白冒出一条横向滚动条），所以右 / 下各收回 1px。
 
-    这里用一个盖在格子上的伪元素：inset:-1px 让它正好铺满"格子 + 那一圈 1px 格线"，边框朝里画 2px，
-    于是这圈线正好**压住那一格的四条格线**，而且一点都不越界。z-index 高过吸顶表头的 20，免得第一行的
-    焦点框上沿被表头盖掉。
+    `[data-picker-open]`：下拉弹出时焦点**跑进了 portal**（弹层挂在 body 上，不在这一格里面），
+    `:focus-within` 便不成立、环会消失 —— 那一格自己挂上这个属性，环照画；z-index 与环两处都要带，
+    否则环会被吸顶列盖住。
 
-      ⚠️ 由此产生一条约束：**任何吸顶列都必须排在 30 之上**，否则一聚焦，那格的内容就画到吸顶列上面
-      （实测穿过动作表第一列 id_）。现在的顺序：**分区标题 60** > 吸顶表头第一列 50 > 吸顶表体第一列 40 >
-      聚焦格 30 > 普通表头 10 —— 分区标题必须压在所有吸顶格之上（给 30 时表体第一列会盖住标题）。
+    ⚠️ z 顺序别调：**吸顶列必须排在 30 之上**，否则一聚焦，那格的内容就画到吸顶列上面（实测穿过动作
+    表第一列 `id_`）。分区标题 60 > 吸顶表头 50（`#` / `id_`）、吸顶表头 40（`abilityTag_`）> 吸顶表体
+    40（`#` / `id_` / `abilityTag_`，三列互不重叠，同层安全）> 聚焦格 30 > 普通表头 10 —— 分区标题又
+    必须压在所有吸顶格之上（给 30 时表体第一列会盖住标题）。
 */
 @utility cell-focus {
     position: relative;
 
-    /*
-        `[data-picker-open]`：下拉弹出时焦点**跑进了 portal**（弹层挂在 body 上，不在这一格里面），
-        于是 `:focus-within` 不再成立、环会消失 —— 那一格自己挂上这个属性，环照画。
-        两处（z-index 与环）都要带，否则环会被吸顶列盖住。
-    */
-    &:focus-within,
-    &[data-picker-open] {
+    &:is(:focus-within, [data-picker-open]) {
         z-index: 30;
     }
 
-    &:focus-within::after,
-    &[data-picker-open]::after {
+    &:is(:focus-within, [data-picker-open])::after {
         content: "";
         position: absolute;
         inset: -1px;
@@ -258,21 +253,119 @@
         pointer-events: none;
     }
 
-    /*
-        ⚠️ 最后一列 / 最后一行**没有那两条边框**（见表格的 `[&_tr>*:last-child]:border-r-0`、
-        `[&_tr:last-child>*]:border-b-0`），而上面的 inset:-1px 是按"格子 + 那圈格线"算的 ——
-        没有格线时它就越过表格边缘 1px：**点一下最后一列，容器会平白冒出一条横向滚动条**。
-        这两条把环压回格子内（右/下各收 1px，其余三边照旧）。
-    */
-    &:last-child:focus-within::after,
-    &:last-child[data-picker-open]::after {
+    &:last-child:is(:focus-within, [data-picker-open])::after {
         right: 0;
     }
 
-    tr:last-child > &:focus-within::after,
-    tr:last-child > &[data-picker-open]::after {
+    tr:last-child > &:is(:focus-within, [data-picker-open])::after {
         bottom: 0;
     }
+}
+
+/*
+    单元格选择（`cellSelectionFeature`）：选中的格子上一层底色，并**只画落在外边界上的那几条边**
+    （`cell.getSelectionEdges()` 说哪条在外围）—— 于是任意多个矩形拼起来是**一条连续轮廓**，而不是
+    每格一圈框。那块几何判断是库替我们算的：自己写要逐格看四个方向的邻格。
+*/
+.cell-selectable {
+    /* 拖拽划过一片时别把文字选蓝；十字光标是表格的通用语（xlsx 同款）。 */
+    cursor: cell;
+    user-select: none;
+}
+
+/*
+    选区轮廓用**伪元素**画，**不用 inset 阴影**：inset 阴影被**裁剪在元素的 padding box 里**，而相邻格
+    之间隔着 1px 格线（`border-b` / `border-r`）—— 每格的边框画到格线就停、下一格从格线另一侧重新
+    开始，**每个连接处缺 1px**（给阴影加 `spread: -1px` 也救不回来：**裁剪先发生**）。伪元素用
+    `inset: -1px` **直接盖住那 1px 格线**，四条边这才连成一条。
+
+    ⚠️ 用 `::before` 而不是 `::after`：`::after` 被 `cell-focus` 的焦点环占着，而同一个格子上两者
+    **可能同时存在**（一边编辑、一边在选区里）。
+*/
+.cell-selectable::before {
+    content: "";
+    position: absolute;
+    /* 四边各超出 1px 盖住格线；左边在"左邻是冻结列"时收回，见下面那条规则。 */
+    inset: -1px;
+    pointer-events: none;
+    border: 0 solid #007a55;
+    /*
+        ⚠️ 要盖在**焦点环**（`cell-focus` 的 `::after`）之上：拖拽的 mousedown 会把焦点落到起始格，
+        而可编辑格带着 `cell-focus`，两个伪元素于是在同一格上打架 —— `::after` 后画，不压住的话灰环
+        盖掉起始格那两条边，看着就是"第一个格子没被选区框包围"（实测：从只读的冻结列起选就正常，
+        因为那两列没有 `cell-focus`、压根不画焦点环）。只压重叠的那两条边，其余边照旧可见。
+
+        ⚠️ 伪元素要 `position: absolute`，所以所在格子必须是定位元素：非钉住的格子由渲染那层带
+        `relative`，钉住的本身就是 `sticky`。
+    */
+    z-index: 1;
+}
+
+.cell-edge-top::before {
+    border-top-width: 2px;
+}
+
+.cell-edge-right::before {
+    border-right-width: 2px;
+}
+
+.cell-edge-bottom::before {
+    border-bottom-width: 2px;
+}
+
+.cell-edge-left::before {
+    border-left-width: 2px;
+}
+
+/*
+    ⚠️ **左邻是冻结列时，选区框的左边收回格子里**（其余三边照旧超出 1px 盖格线）。
+
+    左边框外面是"未选中区"，本来就没有要盖的格线；而它左边紧邻的若是**冻结列**（`sticky z-40`，比
+    表体格高一层），超出那 1px 会被它压掉，左边框看着就"细了一半"（用户截图指出来的）。上下超出仍要
+    （盖行格线），右边超出仍要（盖列格线）。用相邻选择器精确表达这个条件 —— 不要靠加 z-index，那会让
+    横向滚动时选区格盖住冻结列。
+*/
+td.sticky + td.cell-edge-left::before {
+    left: 0;
+}
+
+/*
+    ⚠️ 选中的格子**不画焦点环**：拖拽选区的起点格在 mousedown 时就会拿到焦点，于是同一格上同时有
+    选区框（`::before`，只画外边界那几条边）和焦点环（`::after`，**四边全画**）—— 外圈那两条被盖住，
+    剩下的右、下两条露出来，看着就是"第一格自己还有另一圈框、跟选区不统一"（用户圈出来的正是这两条）。
+    选中时那圈归选区框管，焦点环让位。
+
+    特异性必须压过 `@utility cell-focus` 生成的 `.cell-focus:focus-within::after`（0,2,0）：这里的
+    `td` 前缀凑到 (0,2,1)，**别改成 `.cell-selected::after`**，也别指望样式表顺序 —— utility 层和
+    普通 CSS 谁在后并不由我们写的位置决定。
+*/
+td.cell-selected:focus-within::after {
+    content: none;
+}
+
+/*
+    选中那层用 **background-image**（渐变）而不是 `background-color`：格子自己已经有底色（可编辑
+    `#1a1a1a` / 只读 `--background`），`background-color` 只有一份、写了就把底色顶掉；`background-image`
+    是另一个坑位，两层能同时存在。
+
+    ⚠️ **别给锚点格（`cell-focused`）单独提亮**：WPS / Excel 的选区是一片**均匀**的底色，早先让选区
+    第一格更深，看着就成了"它选得跟别人不一样"。类名仍然照发（将来做键盘导航还要标锚点）。
+*/
+.cell-selected {
+    background-image: linear-gradient(rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.07));
+}
+
+/*
+    选区里那个**锚点格**（拖拽 / Shift 的起点）**不填选中底色**，只留选区边框。
+
+    Excel 就是这么区分的：选区填浅色，而"活动单元格"是**白底**的 —— 一眼看出"现在打字会打到哪一格"，
+    不用去数边框。WPS 也区分，只是它的底色浅、不那么显眼。
+
+    ⚠️ 特异性要压过 `.cell-selected`（同为单类，0,1,0 —— 谁赢只看样式表顺序）：加个 `td` 前缀
+    凑到 (0,1,1)，别指望顺序。
+*/
+td.cell-focused {
+    background-image: none;
 }
 
 /*

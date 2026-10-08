@@ -49,6 +49,7 @@ import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
 import {ACTION_HANDLE, TrackRow, TrackTable, type TrackColumn} from "@/components/TrackTable"
+import {ActionsTable} from "@/components/ActionsTable"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
@@ -84,6 +85,8 @@ const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key 
       · 反色列    —— `z-10 bg-primary text-primary-foreground`（与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）
       · `id_`    —— `left-10 z-50`：**两轴都钉**，要压在别的表头上面。left-10 = 40px = 「#」那列
                       (39 + 1 边框，见 ACTION_HANDLE)。它不取反色，底色与其他表头一致。
+      · `abilityTag_` —— `z-40`（`left` 走量出来的 --frozen-left）。比 `id_` 低一层，但**必须高于
+                      聚焦格那层 30**（见 style.css 的 cell-focus），否则编辑中的格子会穿透它。
     底色这几串**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
     ⚠️ 只给差的那一段（不把 `bg-[#1f1f1f]` 与 `bg-primary` 同时写上）：两边都是单类工具类，谁赢只看
     样式表顺序。
@@ -97,9 +100,12 @@ const FROZEN: Record<string, string> = {
     // 96px = handle 40 + id_ 列实测宽 56。**这个数就是 id_ 列的自然宽度**（auto 布局下写 w-* 定不住它，
     // 试过：48 被顶成 55、64 照样 55）。sticky 的 left 连不滚动时也生效，留大了静止时就有一道缝 ——
     // 记录号是 3~4 位，56px 够用。
-    // 左边界是**量出来的**（--frozen-left，见 ActionsPanelBase 的 ResizeObserver）：id_ 列会被等比摊宽，
+    // 左边界是**量出来的**（--frozen-left，见 ActionsPanelBase 的 useLayoutEffect）：id_ 列会被等比摊宽，
     // 能力名长短一变、列数一变，摊到的宽度就变，写死像素迟早错位、缝会再露。95px 只是量出来之前的兜底。
-    abilityTag_: ` sticky ${FROZEN_LEFT} z-30`,
+    //
+    // z-40：**必须高过聚焦格那层 30**（style.css 的 cell-focus 给聚焦/编辑中的格子 z-index: 30）——
+    // 给 30 就是同层，谁在上面只看 DOM 顺序，于是横向滚过来的编辑框会画在这一列上面（实测穿透）。
+    abilityTag_: ` sticky ${FROZEN_LEFT} z-40`,
 }
 
 function actionHeaderClass(key: string): string {
@@ -245,6 +251,15 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     // 三块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
     // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
     const [section, setSection] = useState<"general" | "actions" | "globals">("actions")
+
+    /*
+        ⚠️ **临时**：动作表用哪一套渲染 —— 现有的手写 TrackTable，还是新搭的 TanStack Table 骨架
+        （见 ActionsTable.tsx）。两套并存只为"边用边比"，等新的补齐功能、验完就删掉这个开关和旧那套。
+        默认 legacy：新表还是个骨架，不该抢默认。
+    */
+    const [actionsView, setActionsView] = useState<"legacy" | "tanstack">("legacy")
+    /** 新表的保存动作（它自己持有数据与草稿，外面只负责在「保存」时喊它一声）。 */
+    const ttSaveRef = useRef<(() => Promise<void>) | null>(null)
     // 「动画详情」：正在看哪个 motion（null = 没开）。
     //
     // ⚠️ 这里以前是"开一扇独立窗口"（motwindow.go），理由与「全局参数」那条完全一样：第二扇窗口的
@@ -276,28 +291,15 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         const cell = frame.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
         if (!cell) return
         const box = frame.getBoundingClientRect()
-        const left = Math.round(cell.getBoundingClientRect().right - box.left - frame.clientLeft)
+        // **向上取整**：宁可多半像素（两列轻微重叠，看不出来），也不要少半像素 —— 少一点就在 id_ 与
+        // abilityTag_ 之间透出一条缝，横向滚过的列名会从缝里露出来（用户截图里那一小格 "a…"）。
+        const left = Math.ceil(cell.getBoundingClientRect().right - box.left - frame.clientLeft)
         // ⚠️ 0 或负数一律丢掉：那一块被压成 h-0（切到别的页签时）rect 全是 0，写进去 `--frozen-left: 0px`
-        // 会把 abilityTag_ 贴到最左 —— 它 z-30 低于 `#`(z-40) 与 id_(z-40)，于是整列被盖住，看着就是
-        // "冻结没了"（实测踩过）。宁可用旧值 / 兜底值。
+        // 会让这一列离开原位、压在 `#` 与 id_ 上（那是它左边界量错的样子，用户看着就是"冻结没了"）。
+        // 宁可用旧值 / 兜底值。
         if (left <= 0) return
         setFrozenLeft(left)
     }
-
-    /**
-     * 之后由 ResizeObserver 接管：窗口缩放、字体变化这些也会重摊列宽。它的回调晚一帧没关系 —— 那是
-     *  用户自己触发的重排，本来就要等下一次布局。 */
-    useEffect(() => {
-        const frame = frameRef.current
-        if (!frame) return
-        const observer = new ResizeObserver(measureFrozenLeft)
-        observer.observe(frame)
-        const table = frame.querySelector("table")
-        if (table) observer.observe(table)
-        return () => observer.disconnect()
-        // 只挂一次：量的是"当前那一帧"的 DOM。
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -325,6 +327,25 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * `section` 也要进依赖：切回这一页时那块从 h-0 变回可见，得当场量（那时 rect 才是真的）。
      */
     useLayoutEffect(measureFrozenLeft, [abilityNames, keys, section])
+
+    /**
+     * 之后交给 ResizeObserver：**盯的就是被量的那一格**（不是 frame / table）。
+     *
+     * ⚠️ 盯 table 兜不住：列宽重摊时总宽常常不变（一列变宽、另一列变窄），RO 不触发，缝就一直留在那儿
+     * （用户截图：id_ 与 abilityTag_ 之间露出一小格滚过的列名）。盯 id_ 那一格，它一变就重量。
+     * 依赖 keys：换角色 / 换表会重建行，observer 得绑到新的那一格上。
+     */
+    useEffect(() => {
+        const frame = frameRef.current
+        if (!frame) return
+        const observer = new ResizeObserver(measureFrozenLeft)
+        observer.observe(frame)
+        const cell = frame.querySelector("tbody tr > td:nth-child(2)")
+        if (cell) observer.observe(cell)
+        return () => observer.disconnect()
+        // 只按 keys 重绑：量的是"当前那一帧"的 DOM。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keys])
 
     // 只读那两列（见 isReadOnlyColumn）——取值那条路要用它。
     const readOnlyKeys = useMemo(() => keys.filter(isReadOnlyColumn), [keys])
@@ -548,6 +569,10 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
             if (gpDirty) {
                 await gpSaveRef.current?.()
             }
+            // 动作表切到新那套（TanStack）时，草稿住在 ActionsTable 里，保存由它自己做。
+            if (actionsView === "tanstack") {
+                await ttSaveRef.current?.()
+            }
             await Deploy()
         } catch (e) {
             console.error(e)
@@ -632,6 +657,21 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                         <ToggleGroupItem value="general">{t.generalTracks}</ToggleGroupItem>
                         <ToggleGroupItem value="globals">{t.globalParams}</ToggleGroupItem>
                     </ToggleGroup>
+                    {/* ⚠️ **临时**：动作表的实现切换（现有手写表 / 新的 TanStack 骨架）。做成**独立**一个
+                        按钮、而不是 ToggleGroup 的第四项：两者是不同的选择维度（那三个是"看哪一块"，
+                        这个是"这一块用哪套渲染"），而且 ToggleGroup 一加第四项就变成"看轨迹表时也选中
+                        TanStack"这种说不清的组合。等新的补齐功能、这个开关就该删掉。 */}
+                    <Button
+                        variant={actionsView === "legacy" ? "outline" : "default"}
+                        disabled={busy}
+                        onClick={() => {
+                            // 两套表各有自己的草稿，切换不会把它带过去 —— 留着就是"改在 A 上、存在 B 上"。
+                            setActionsDirty(false)
+                            setActionsView((view) => (view === "legacy" ? "tanstack" : "legacy"))
+                        }}
+                    >
+                        {actionsView === "legacy" ? t.tanstackTable : t.legacyTable}
+                    </Button>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
                         松紧不一，英文 Save 那档就白留一截）。
@@ -666,6 +706,32 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                     <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
                 ) : keys.length === 0 ? (
                     <div className="pb-1 text-xs text-muted-foreground">{t.loading}</div>
+                ) : actionsView === "tanstack" ? (
+                    // ⚠️ **临时**：新的 TanStack Table 骨架。它自己读数据、自己持草稿（见 ActionsTable.tsx），
+                    // 所以上面那份 actions/draft 一概不喂给它；保存走 saveRef（见 handleSaveAndDeploy）。
+                    // 现有一整套设置（frameRef 的 --frozen-left 量宽、ResizeObserver）**不作用于它** ——
+                    // 这一版没有冻结列。等新表补齐功能，这一段条件渲染连同旧那套一起删。
+                    <ActionsTable
+                        /*
+                            换角色 = 换**一整份**数据（`switchCharacter` 先 `SetCharacter`，`LoadActions`
+                            之后读到的才是新角色那一份）。而这张表是自己挂载时读一次、没人告诉它角色变了，
+                            所以要用 `key` 把它**整个重新挂载**。
+
+                            为什么用 `key` 而不是传一个 `charaCode` 进去在 `useEffect` 里重读：换角色要清的
+                            不只是数据 —— 还有 `rows`/`keys`/`pinning`/量出来的 `left`/每格草稿。逐个清
+                            迟早漏一个（比如草稿没清，旧角色的改动会挂到新角色的行上）。`key` 是 React
+                            官方的"重置状态"手法，重新挂载即全清，漏不掉。
+                        */
+                        key={charCode}
+                        t={t}
+                        // 技能键 → 名字：它把 `abilityTag_` 那一列显示成技能名（与现有表同一个来路）。
+                        abilityNames={abilityNames}
+                        // 它数据到位后把保存动作交出来（与 GlobalParamPanel 同一个约定），
+                        // 外面那个「保存」按钮再一起调 —— 这个组件自己没有工具条。
+                        onSaveReady={(save) => {
+                            ttSaveRef.current = save
+                        }}
+                    />
                 ) : (
                     // flex-1：**框铺满剩下的高度**（用户要求 —— 行少的时候也不留一段没框的空地）。
                     // 装不下时照样靠 min-h-0 + overflow-auto 自己滚，行多时同样吃满窗口。

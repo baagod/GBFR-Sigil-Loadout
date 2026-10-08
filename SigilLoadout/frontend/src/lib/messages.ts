@@ -68,6 +68,14 @@ const zh = {
     generalTracks: "轨迹表",
     /** 手风琴第二个条目的标题：下面那块地方放动作表。 */
     actionsSection: "动作表",
+    /**
+     * ⚠️ **临时**：动作表实现切换的那枚按钮。
+     *
+     * 按钮文字写的是**点一下会去的那一套**（与三个页签那枚 ToggleGroup 同一个约定）：看着现有表时
+     * 写着「TanStack 表」，点它就换过去。等新的补齐功能、这枚按钮删掉时，这两个键一起删。
+     */
+    tanstackTable: "TanStack 表",
+    legacyTable: "现有表",
     /** 工具栏上那个切换按钮：「全局参数」那张 16 张表的清单（system\player\*.msg，不分角色）。 */
     globalParams: "全局参数",
     /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨的那组。 */
@@ -149,6 +157,8 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "Save",
         generalTracks: "Track table",
         actionsSection: "Action table",
+        tanstackTable: "TanStack table",
+        legacyTable: "Current table",
         globalParams: "Global Params",
         hmRangeSkill: "Skills",
         hmGroupOther: "Other",
@@ -217,6 +227,8 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "保存",
         generalTracks: "トラック表",
         actionsSection: "アクション表",
+        tanstackTable: "TanStack 表",
+        legacyTable: "現行の表",
         globalParams: "全体パラメータ",
         hmRangeSkill: "スキル",
         hmGroupOther: "その他",
@@ -285,6 +297,8 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "저장",
         generalTracks: "트랙 표",
         actionsSection: "액션 표",
+        tanstackTable: "TanStack 표",
+        legacyTable: "현재 표",
         globalParams: "전역 파라미터",
         hmRangeSkill: "스킬",
         hmGroupOther: "기타",
