@@ -182,15 +182,15 @@ describe("新的动作表（TanStack Table v9）", () => {
         表头也要截断（数据格截了、表头漏过）：列宽按内容排之后，表头名如果比所有数据都长，
         它会把整列撑宽 —— 那正是"看着像一列特别宽的空白列"。截断让列宽只跟内容走。
     */
-    it("表头列名截断：内层带 truncate，且完整列名挂在 title 上", async () => {
+    it("表头列名截断：内层带 truncate，且**不挂** title 提示", async () => {
         const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
 
         const head = container.querySelectorAll("thead th")[1]
         const inner = head.firstElementChild!
         expect(inner.className).toContain("truncate")
-        // 截断之后光看列名认不出是哪个字段，所以完整名挂在 title 上
-        expect(head.getAttribute("title")).toBe(KEYS[0])
+        // 用户要求移除悬停提示：完整列名不再挂 title（截断了就让它截断）。
+        expect(head.getAttribute("title")).toBeNull()
     })
 
     it("没改过的格子显示**灰色原值**（占位符）", async () => {
@@ -239,8 +239,7 @@ describe("新的动作表（TanStack Table v9）", () => {
     */
     /*
         `abilityTag_` 显示的是**技能名**而不是键，但**数据层没动** —— `values` 里始终是键、提交给后端的
-        也是键，翻译只发生在显示那一层。所以这里既断言"看到的是名字"，也断言"title 里还留着原键"
-        （想核对它指向哪个键时能对回去）。
+        也是键，翻译只发生在显示那一层。所以这里断言"看到的是名字"，而数据仍由下面那组只读用例守住。
     */
     it("abilityTag_ 显示技能名：数据层仍是键（显示归显示，提交的还是键）", async () => {
         const container = await renderTable()

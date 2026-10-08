@@ -348,8 +348,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      * 不留这一份就没法判断"这坨值原本是哪几列"。
      */
     const copiedColumnsRef = useRef<string[]>([])
-    /** 复制/粘贴的结果提示（列对不上、跳过了几格…）。 */
-    const [notice, setNotice] = useState("")
     /**
      * **按行选中**（点行号）：`id_` → true。状态归库（`rowSelectionFeature`），这里只持有受控值。
      */
@@ -506,7 +504,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         e.preventDefault()
         e.clipboardData.setData("text/plain", toTsv(grid))
         copiedColumnsRef.current = columns
-        setNotice(`已复制 ${grid.length} 行 × ${columns.length} 列`)
     }
 
     /**
@@ -522,10 +519,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         if ((e.target as HTMLElement).tagName === "INPUT") return
         const text = e.clipboardData.getData("text/plain")
         const bounds = table.getCellSelectionBounds()[0]
-        if (!bounds) {
-            setNotice("先选中一格，再粘贴")
-            return
-        }
+        if (!bounds) return
         if (!text) return
         e.preventDefault()
 
@@ -550,40 +544,23 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                     .slice(startCol, startCol + 3)
                     .map((cell) => cell.column.id)
                     .join(", ")
-                setNotice(`列对不上，没有粘贴 —— 剪贴板是 [${want}…]，这里是 [${got}…]`)
+                setError(`列对不上，没有粘贴 —— 剪贴板是 [${want}…]，这里是 [${got}…]`)
                 return
             }
         }
 
-        let written = 0
-        let skipped = 0
-        let clipped = 0
         for (let r = 0; r < incoming.length; r++) {
             const row = modelRows[startRow + r]
-            if (!row) {
-                clipped += incoming[r].length
-                continue
-            }
+            if (!row) continue
             const cells = row.getAllCells()
             for (let c = 0; c < incoming[r].length; c++) {
                 const cell = cells[startCol + c]
-                if (!cell) {
-                    clipped++
-                    continue
-                }
-                if (READ_ONLY_KEYS.has(cell.column.id)) {
-                    skipped++
-                    continue
-                }
+                if (!cell) continue
+                // ③ 只读列跳过：匹配检查仍按全部列算，但值不写回去。
+                if (READ_ONLY_KEYS.has(cell.column.id)) continue
                 edit(row.id, cell.column.id, incoming[r][c])
-                written++
             }
         }
-        setNotice(
-            `已粘贴 ${written} 格` +
-                (skipped ? ` · 跳过只读 ${skipped} 格` : "") +
-                (clipped ? ` · 越界丢弃 ${clipped} 格` : ""),
-        )
     }
 
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
@@ -732,7 +709,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         }
     })
 
-    if (error) return <p className="text-sm text-destructive">{error}</p>
+    if (error) return <p className="text-xs text-destructive">{error}</p>
     if (keys.length === 0) return <p className="text-xs text-muted-foreground">{t.loading}</p>
 
     return (
@@ -743,8 +720,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
         <div className="flex min-h-0 flex-1 flex-col" onCopy={handleCopy} onPaste={handlePaste}>
-            {/* 复制/粘贴的结果（列对不上、跳过了几格…）：没有它，Ctrl+V 没反应时用户不知道发生了什么。 */}
-            {notice && <p className="shrink-0 px-2 py-0.5 text-xs text-muted-foreground">{notice}</p>}
             <div className="min-h-0 flex-1 overflow-auto border table-border">
             <table
                 ref={tableRef}
@@ -797,8 +772,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                         // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
                                         data-col-id={header.column.id}
                                         className={`${HEAD_CELL} ${pinned ? PINNED.header : ""}`}
-                                        // 截断之后光看列名认不出是哪个字段，完整名挂 title 上。
-                                        title={header.column.id}
                                     >
                                         <div className="truncate">
                                             {header.isPlaceholder
