@@ -16,7 +16,13 @@ import {ActionsTable} from "@/components/ActionsTable"
 import type {Messages} from "@/lib/messages"
 
 /** 组件要的那一份文案；用例真正调到的都在这里，其余给空串撑住类型。 */
-export const t = {loading: "读取中…"} as unknown as Messages
+export const t = {
+    loading: "读取中…",
+    // 与 messages.ts 的 zh 同一句（用例要断言它上屏）
+    multiAreaCopy: "请选择同一行或同一列中的单元格。",
+    multiAreaCopyTitle: "无法复制选中区域",
+    ok: "确定",
+} as unknown as Messages
 
 /**
  * 技能键 → 名字（`ability.lang.json` 的形状）。只放一条真正命中的，其余**故意查不到** ——

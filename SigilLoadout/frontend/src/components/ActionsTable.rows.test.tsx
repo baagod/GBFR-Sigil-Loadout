@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 /*
-    动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单元格选区互斥）
+    动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）—— 与单元格选区**同一套模型**、能并存
 */
 import {describe, expect, it, vi} from "vitest"
-import {fireEvent} from "@testing-library/react"
+import {fireEvent, screen} from "@testing-library/react"
 
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -11,11 +11,11 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     SaveActionFields: vi.fn(),
 }))
 
-import {KEYS, cellAt, handleAt, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, clipboardStub, handleAt, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
 
-describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单元格选区互斥）", () => {
+describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () => {
     it("行号列：每行第一格是序号（从 1 起），宽度与表头 `#` 一致，且不移位数据列下标", async () => {
         setRows([makeRow("1000"), makeRow("99")])
         const container = await renderTable()
@@ -63,10 +63,10 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单
         ============ 按行号选行（点 / Shift / Ctrl / 拖）============
 
         "点 / Shift 连选 / Ctrl 逐个加减"与旧表 `clickRow` 同一套语义；"按住划过一片"库里没有，
-        由组件的 `dragSelectTo` 接。选中的标记 = 行号格上那圈框（`row-handle-frame`）。
+        由组件的 `extendRowSpanTo` 接。选中的标记 = 行号格上那圈框（`row-handle-frame`）。
     */
 
-    it("点行号：选中那一行，再点一次取消", async () => {
+    it("点行号：选中那一行；再点一次仍是它（与单击单元格同一套语义，没有「再点取消」）", async () => {
         const container = await renderTable()
         pressHandle(container, 1)
         fireEvent.mouseUp(window)
@@ -75,7 +75,26 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单
 
         pressHandle(container, 1)
         fireEvent.mouseUp(window)
-        expect(rowSelectedAt(container, 1)).toBe(false)
+        expect(rowSelectedAt(container, 1)).toBe(true)
+        expect(rowSelectedAt(container, 0)).toBe(false)
+    })
+
+    /*
+        ‼️ 行块**就是**一条"整行宽的区"（统一模型），所以只选一行时 Ctrl+C = **复制整行**（Excel 的行为）。
+        顺带钉住另一件事：这种情形**不能**弹"不能对多重选定区域使用此命令" —— 那句话只给"多片跨行又跨列"。
+    */
+    it("只选一行时 Ctrl+C：复制整行（87 个值），且不弹多区域提示", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        pressHandle(container, 0)
+        fireEvent.mouseUp(window)
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        const 文本 = String(clipboard.data["text/plain"])
+        expect(文本.split("\t")).toHaveLength(KEYS.length)
+        expect(文本.startsWith("1000\t")).toBe(true) // 第一格是 id_ 原值
+        expect(screen.queryByText(/同一行或同一列/)).toBeNull()
     })
 
     it("Shift 点行号：从锚点连选一段（第 2 行 → 第 4 行，中间一起选中）", async () => {
@@ -112,6 +131,54 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单
         ⚠️ happy-dom 不做布局，`getBoundingClientRect()` 全是 0 —— 那样每行都覆盖 y=0、第一次就命中
         第一行，测不出"跟随"。所以这里给每行**造一段假的 y 区间**（20px 一行），再按真实 y 派发移动。
     */
+    /*
+        ‼️ 用户要求：**行号列上 Ctrl 按住拖动 = 追加一段**（Excel/WPS 的"继续加选"）。
+        以前行号拖动一律"整段替换"，于是 Ctrl 一拖就把先前选的行清光。
+    */
+    it("Ctrl 按住拖行号：**追加**一段（先前的行一个都不掉）", async () => {
+        setRows([makeRow("1003"), makeRow("1000"), makeRow("1002"), makeRow("1001")])
+        const container = await renderTable()
+
+        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
+        rows.forEach((row, index) => {
+            const top = index * 20
+            row.getBoundingClientRect = () =>
+                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
+        })
+
+        // 先选第 0 行
+        pressHandle(container, 0)
+        fireEvent.mouseUp(window)
+        expect(rowSelectedAt(container, 0)).toBe(true)
+
+        // Ctrl 按在第 2 行，拖到第 3 行
+        pressHandle(container, 2, {ctrlKey: true})
+        fireEvent.mouseMove(cellAt(container, 3, 2), {clientY: 65})
+        fireEvent.mouseUp(window)
+
+        expect([0, 1, 2, 3].map((r) => rowSelectedAt(container, r))).toEqual([true, false, true, true])
+    })
+
+    it("不按 Ctrl 拖行号：仍然是**整段替换**（与上面那条互为反面）", async () => {
+        setRows([makeRow("1003"), makeRow("1000"), makeRow("1002"), makeRow("1001")])
+        const container = await renderTable()
+
+        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
+        rows.forEach((row, index) => {
+            const top = index * 20
+            row.getBoundingClientRect = () =>
+                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
+        })
+
+        pressHandle(container, 0)
+        fireEvent.mouseUp(window)
+        pressHandle(container, 2)
+        fireEvent.mouseMove(cellAt(container, 3, 2), {clientY: 65})
+        fireEvent.mouseUp(window)
+
+        expect([0, 1, 2, 3].map((r) => rowSelectedAt(container, r))).toEqual([false, false, true, true])
+    })
+
     it("按住行号拖过几行：整段选中（鼠标移出行号列也照样跟随）", async () => {
         setRows([makeRow("1003"), makeRow("1000"), makeRow("1002"), makeRow("1001")])
         const container = await renderTable()
@@ -158,9 +225,9 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单
         const lastCol = KEYS.length - 1
         // 段首那行的第一格：上 + 左
         expect(edges(1, 0)).toBe("cell-edge-left cell-edge-top")
-        // 段首那行的最后一格：只有上 —— **右边界不画**（最后一列的右边正好在表格最外沿，
-        // 那 1px 会伸到表外，用户截图里那条突兀的绿边就是它）
-        expect(edges(1, lastCol)).toBe("cell-edge-top")
+        // 段首那行的最后一格：上 + 右 —— 整行选区就是**一条普通的区**，边框由库算（与单元格选区同一套），
+        // 不再有"行选中刻意不画右边"那条特例（那是两套模型并存时的补丁）
+        expect(edges(1, lastCol)).toBe("cell-edge-right cell-edge-top")
         // 段尾那行的第一格：下 + 左
         expect(edges(2, 0)).toBe("cell-edge-bottom cell-edge-left")
         // 段首整行都带上边、段尾整行都带下边（行选中是"整行算一个块"，与单元格选区按格算不同）
@@ -174,48 +241,46 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖 / 与单
         **只读列也要算被选中**：选中一行时 `#` / `id_` / `abilityTag_` 三格都得带上那层浅色。
         它们钉住、底色必须不透明（挡得住横向滚过来的列），所以叠加层是**逐格**加的，不能靠 tr 往下透。
     */
-    it("选行时只读列同样带上选中叠加层（# / id_ / abilityTag_）", async () => {
+    /*
+        整行选中时**只读列也是选中的**（`id_` / `abilityTag_`）。
+        数据格（含只读列）走的是**同一条** `.cell-selected` —— 整行选区就是"一条普通的区"；
+        行号格不在列模型里、拿不到它，所以由 `cell-row-selected` 叠同一条底纹。
+    */
+    it("选行时只读的 id_ / abilityTag_ 同样被选中；行号格靠自己的底纹类", async () => {
         const container = await renderTable()
 
         pressHandle(container, 0)
         fireEvent.mouseUp(window)
 
         for (const col of [KEYS.indexOf("id_"), KEYS.indexOf("abilityTag_")]) {
-            expect(cellAt(container, 0, col).className).toContain("cell-row-selected")
+            expect(cellAt(container, 0, col).className).toContain("cell-selected")
         }
-        // 不选中的行不该带上
-        expect(cellAt(container, 1, KEYS.indexOf("id_")).className).not.toContain("cell-row-selected")
+        expect(handleAt(container, 0).className).toContain("cell-row-selected")
+        // 不选中的行不带
+        expect(cellAt(container, 1, KEYS.indexOf("id_")).className).not.toContain("cell-selected")
     })
 
     /*
-        **两套选中互斥**（同一个逻辑，两边各一次）：屏幕上只该有一种选中。
+        ‼️ **行块与单元格区能同时存在**（统一模型；Excel 的截图就是这么选的）。
+        以前两套 state 互斥、动一边清另一边 —— 那正是"怎么还不是一回事"的根源。
     */
-    it("选行时把单元格选区收掉", async () => {
+    it("Ctrl 追加一行后，再拖一片单元格：**两者同时选中**", async () => {
         const container = await renderTable()
 
-        const cell = cellAt(container, 0, 2)
-        fireEvent.mouseDown(cell)
-        fireEvent.mouseUp(document)
-        expect(cell.className).toContain("cell-selected")
-
-        pressHandle(container, 0)
-        fireEvent.mouseUp(window)
-        expect(rowSelectedAt(container, 0)).toBe(true)
-        expect(cellAt(container, 0, 2).className).not.toContain("cell-selected")
-    })
-
-    it("选格时把行选中收掉（互斥的另一半）", async () => {
-        const container = await renderTable()
-
-        pressHandle(container, 0)
+        pressHandle(container, 0) // 整行选中第 1 行
         fireEvent.mouseUp(window)
         expect(rowSelectedAt(container, 0)).toBe(true)
 
-        const cell = cellAt(container, 0, 2)
-        fireEvent.mouseDown(cell)
+        // 再按 Ctrl 拖一片**单元格**（在第 2 行）：追加，不替换
+        const cell = cellAt(container, 1, 2)
+        fireEvent.mouseDown(cell, {ctrlKey: true})
+        fireEvent.mouseEnter(cellAt(container, 1, 3), {ctrlKey: true})
         fireEvent.mouseUp(document)
-        expect(cell.className).toContain("cell-selected")
-        expect(rowSelectedAt(container, 0)).toBe(false)
+
+        expect(cellAt(container, 1, 2).className).toContain("cell-selected")
+        expect(cellAt(container, 1, 3).className).toContain("cell-selected")
+        // 行块还在（两套并存）
+        expect(rowSelectedAt(container, 0)).toBe(true)
     })
 
 })

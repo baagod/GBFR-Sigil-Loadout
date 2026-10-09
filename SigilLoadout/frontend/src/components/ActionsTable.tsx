@@ -36,16 +36,26 @@ import {
     useTable,
     type Cell,
     type CellSelectionState,
+    type CellSelectionBounds,
     type ColumnDef,
     type ColumnSizingState,
     type Row,
-    type RowSelectionState,
     type SortingState,
 } from "@tanstack/react-table"
 
 import {LoadActions, SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {ActionRowView, rowSelectionKey} from "@/components/actions-table/ActionRowView"
 import {
+    rowFullySelected,
     HANDLE_CELL,
     HANDLE_CURSOR,
     HANDLE_HEAD_BG,
@@ -56,7 +66,7 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {READ_ONLY_KEYS, features, type ActionRow, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {READ_ONLY_KEYS, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
 
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
@@ -143,14 +153,14 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      */
     const [cellSelection, setCellSelection] = useState<CellSelectionState>([])
     /**
-     * **按行选中**（点行号）：`id_` → true。状态归库（`rowSelectionFeature`），这里只持有受控值。
-     */
-    const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-    /**
      * **正在按住行号拖选**（划过多行）。存的是**起始行的 id**。
      *
      * ⚠️ 必须是 **ref** 不是 state：按下与"第一次划到某一行"可能落在同一帧，那时 state 还没落地，
      * 读 state 会漏掉划过的第一行（旧表的 `useRowSelection` 里踩过同一个坑）。
+     *
+     * ‼️ 行号列的选区**不再单独存一份** —— 它就是 `cellSelection` 里"整行宽的那个区"
+     * （见 `selectRowSpan`）。这个 ref 只剩两个用途：拖动期间当"正在拖"的开关，以及给
+     * `ActionRowView` 判"要不要跳过单元格的扩展处理器"。
      */
     const dragRowRef = useRef<string | null>(null)
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
@@ -158,6 +168,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const tableRef = useRef<HTMLTableElement>(null)
     /** 数据读不回来（后端/绑定出错）—— 只装这一件事；粘贴不再有"列对不上"那种拒绝。 */
     const [loadError, setLoadError] = useState("")
+    /** 复制被拒的提示（多片跨行又跨列，见 `planCopy` 那段）；下一次复制/粘贴时清掉。 */
+    const [copyHint, setCopyHint] = useState("")
     /**
      * **撤销栈**（Ctrl+Z）。一"步"= 一批改动（粘一次 = 一步）：每项是那一步动过的格子，撤销时把它们
      * 写回**改前值**即可。之所以存"改前值"而不是"反向操作"：值就地在 `values` 里，写回旧值是唯一需要
@@ -243,13 +255,21 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             略掉解析不出的范围，不是崩），可以接受。
         */
         autoResetCellSelection: false,
+        /*
+            ‼️ **多片选区按库的默认（开）**：Ctrl 追加一片、Ctrl 点已选中的格做**减选**（`operation:"exclude"`）
+            都是库的行为，我们不再自己维护"选区是什么形状"。
+
+            代价与约束（都在 `planCopy` 那一段收口）：Excel / WPS 对**多重选定区域**只允许
+            "同一行"或"同一列"，跨行又跨列时它们直接拒绝。我们照同一条规矩：能拼就拼成一维块，
+            不能拼就**不复制 + 给一行提示**，绝不自己发明一种"多片怎么拼"的口径。
+        */
+        enableMultiCellRangeSelection: true,
         // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪几行 / 选了哪一片格：都是**受控状态** —— 值由我们给，
         // 库通过 onChange 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态）。
-        state: {columnPinning: pinning, columnSizing, sorting, rowSelection, cellSelection},
+        state: {columnPinning: pinning, columnSizing, sorting, cellSelection},
         onColumnPinningChange: setPinning,
         onColumnSizingChange: setColumnSizing,
         onSortingChange: setSorting,
-        onRowSelectionChange: setRowSelection,
         onCellSelectionChange: setCellSelection,
     })
 
@@ -384,24 +404,79 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      * `getCellSelectionBounds()` 给的列下标是同一套坐标系；`getVisibleLeafColumns()` 不带钉住重排，
      * 拿它取会错位。
      */
-    const selectedGrid = (): {grid: string[][]} => {
-        const bounds = table.getCellSelectionBounds()[0]
-        if (!bounds) return {grid: []}
+    /**
+     * 复制的那一刻算三样东西：**剪贴板文本**（值表）、**复制区的形状**（虚线按片画）、**原值快照**
+     * （切窗口回来核对源区在不在）。
+     *
+     * ‼️ **返回 `null` = 这次选区形状不能复制** —— 规则与 Excel / WPS 一致（用户实测 + 反推）：
+     *
+     *   多重选定区域**必须能沿着同一根轴排成一条**：
+     *     · 所有片**共享同一个行范围**（`min/maxRowIndex` 都相同）→ 按列序**左右拼**（同一行上选几段就是这种）；
+     *     · 或所有片**共享同一个列范围** → 按行序**上下拼**（同一列上选几段；两段整行块也属于这种，
+     *       因为整行块的列范围都是"全部列"）；
+     *     · **两者都不满足 → 拒绝**，并给那句提示
+     *       （Excel："这不适用于当前所选内容。请选择同一行或同一列中的单元格。"；
+     *        WPS："不能对多重选定区域使用此命令"）。
+     *
+     *   实测对照：`A1 + C1`（共享行）允许；`A1 + B2`（行、列都不同）拒绝；**两段整行块**允许（列范围都是"全部列"，
+     *   上下拼成一块）；而"两段整行块 + 一小片单元格"必被拒 —— 因为那一片的列范围不是"全部列"了。
+     *
+     * ⚠️ 单个片天然满足（自己和自己共享行范围）→ 走"左右拼"那条就等于原来的矩形，不必特判。
+     */
+    const planCopy = (bounds: CellSelectionBounds[]): {grid: string[][]; areas: CopyArea[]; snapshot: Map<string, string>} | null => {
+        /** `[a, b]` 的下标序列（含两端）。 */
+        const range = (a: number, b: number) => Array.from({length: Math.max(0, b - a + 1)}, (_, i) => a + i)
+        if (bounds.length === 0) return null
         const modelRows = table.getRowModel().rows
-        const grid: string[][] = []
-        for (let r = bounds.minRowIndex; r <= bounds.maxRowIndex; r++) {
-            const row = modelRows[r]
-            if (!row) continue
-            const cells = row.getAllCells()
-            const line: string[] = []
-            for (let c = bounds.minColumnIndex; c <= bounds.maxColumnIndex; c++) {
-                const cell = cells[c]
-                if (!cell) continue
-                line.push(row.original.originals[cell.column.id] ?? "")
+
+        // 合法性：多片必须能沿同一根轴排成一条（共享同一行范围，或共享同一列范围）。单片天然满足。
+        const first = bounds[0]
+        const sameRowExtent = bounds.every((b) => b.minRowIndex === first.minRowIndex && b.maxRowIndex === first.maxRowIndex)
+        const sameColumnExtent = bounds.every((b) => b.minColumnIndex === first.minColumnIndex && b.maxColumnIndex === first.maxColumnIndex)
+        if (!sameRowExtent && !sameColumnExtent) return null
+
+        /*
+            **一趟收两样**：每片的行/列 id（虚线按片画要用）+ 每一格"复制那一刻的原值"（切窗口回来核对源区）。
+            值的**唯一来源就是这个 snapshot**，值表也从它拼 —— 不再有第二处读原值的地方。
+        */
+        const areas: CopyArea[] = []
+        const snapshot = new Map<string, string>()
+        for (const b of bounds) {
+            // 片内每行的列是同一套，取第一行的就够
+            const cells = modelRows[b.minRowIndex]?.getAllCells() ?? []
+            const columnIds = range(b.minColumnIndex, b.maxColumnIndex)
+                .map((c) => cells[c]?.column.id)
+                .filter((id): id is string => !!id)
+            const rowIds: string[] = []
+            for (const r of range(b.minRowIndex, b.maxRowIndex)) {
+                const row = modelRows[r]
+                if (!row) continue
+                rowIds.push(row.id)
+                for (const columnId of columnIds) snapshot.set(snapshotKey(row.id, columnId), row.original.originals[columnId] ?? "")
             }
-            grid.push(line)
+            areas.push({rowIds, columnIds})
         }
-        return {grid}
+        const valueAt = (rowId: string, columnId: string) => snapshot.get(snapshotKey(rowId, columnId)) ?? ""
+
+        /** 各片按 `key` 排序后的下标（左右拼按列序、上下拼按行序）。 */
+        const orderBy = (key: (b: CellSelectionBounds) => number) =>
+            bounds.map((_, i) => i).sort((x, y) => key(bounds[x]) - key(bounds[y]))
+
+        let grid: string[][]
+        if (sameRowExtent) {
+            // 左右拼：每一行里，把各片在这一行的那段按列序接起来
+            const order = orderBy((b) => b.minColumnIndex)
+            grid = range(first.minRowIndex, first.maxRowIndex).map((r) => {
+                const rowId = modelRows[r]?.id ?? ""
+                return order.flatMap((i) => areas[i].columnIds.map((columnId) => valueAt(rowId, columnId)))
+            })
+        } else {
+            // 上下拼：各片按行序接起来（片内可能多列，直接按它自己的行列铺开）
+            grid = orderBy((b) => b.minRowIndex).flatMap((i) =>
+                areas[i].rowIds.map((rowId) => areas[i].columnIds.map((columnId) => valueAt(rowId, columnId))),
+            )
+        }
+        return {grid, areas, snapshot}
     }
 
     /** 光标所在的输入框里**选中了文字**没有（编辑框 vs 表格，见 `handleCopy` 那道闸）。 */
@@ -415,17 +490,43 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         每次渲染换一个新函数就等于"挂一个旧的、摘一个新的"，白白多跑一遍 effect。
     */
     const handleCopy = (e: ClipboardEvent) => {
+        const target = e.target as HTMLElement | null
+        /*
+            ‼️ **表头不参与表格复制**（列名归浏览器）：从表头发起的这一记 Ctrl+C 直接让过去 ——
+            列名本来就是可以自由选、自由复制的。顺带把**复制区那圈虚线撤掉**：剪贴板里已经不是那片格子了，
+            再圈着"剪贴板内容来自这里"就是假的（用户要求：复制列名时清空复制区）。
+
+            判据用**事件从哪儿发起**（`closest("thead")`），不用"页面上有没有文字选区"：后者是全局状态，
+            会残留（选过列名再拖选格子时未必被收掉），于是还得额外在每次按下时清一次选区才能保证判据确定。
+            发起方是**这一记事件自己的事实**，没有那个问题。实测：表头选区下 copy 的 target 就在 `thead` 里。
+        */
+        if (target?.closest("thead")) {
+            clearCopySource()
+            return
+        }
         /*
             ‼️ 编辑框里**只有选中了文字**才让给浏览器（复制那几个字）；**没选中文字就别静默什么都不做**。
 
             这里原来是一句 `target.tagName === "INPUT"` 就 `return`：用户在编辑框里按 Ctrl+C（比如只想复制
             这一格的值），因为框里没有选区，浏览器什么也不复制、表格又直接早退 —— 表现就是**按 Ctrl+C 毫无反应**，
-            而且剪贴板里还留着上一次的内容，看着更莫名其妙（用户报的"选区选好了、Ctrl+C 没反应"，
-            实测探针命中的正是这一条）。
+            而且剪贴板里还留着上一次的内容（用户报的"选区选好了、Ctrl+C 没反应"，探针命中的正是这一条）。
         */
-        const tag = (e.target as HTMLElement)?.tagName
-        if (tag === "INPUT" && hasSelectedText()) return
-        const {grid} = selectedGrid()
+        if (target?.tagName === "INPUT" && hasSelectedText()) return
+        /*
+            ⚠️ 这里**必须**把两件事分开（踩过）：
+              · 压根没有单元格选区（比如只选了行）→ **什么都不做**（不写剪贴板、不提示）；
+              · 有选区但形状不能复制（多片跨行又跨列）→ 才给那句提示。
+            混成一个 `null` 的话，**只选行按 Ctrl+C 会弹出"不能对多重选定区域使用此命令"** —— 误报。
+        */
+        const bounds = table.getCellSelectionBounds()
+        if (bounds.length === 0) return
+        const plan = planCopy(bounds)
+        if (!plan) {
+            setCopyHint(t.multiAreaCopy)
+            return
+        }
+        setCopyHint("")
+        const {grid, areas, snapshot} = plan
         if (grid.length === 0) return
         e.preventDefault()
         e.clipboardData?.setData("text/plain", toTsv(grid))
@@ -434,30 +535,9 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
             新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
             ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
+            ⚠️ **按片存**（不是外接矩形）：多片时虚线要每片各画一圈。
         */
-        const bounds = table.getCellSelectionBounds()[0]
-        const modelRows = table.getRowModel().rows
-        if (!bounds) {
-            copySourceRef.current = null
-            setCopySourceVersion((v) => v + 1)
-            return
-        }
-        const rowIds: string[] = []
-        const columnIds: string[] = []
-        const snapshot = new Map<string, string>()
-        for (let r = bounds.minRowIndex; r <= bounds.maxRowIndex; r++) {
-            const row = modelRows[r]
-            if (!row) continue
-            rowIds.push(row.id)
-            const cells = row.getAllCells()
-            for (let c = bounds.minColumnIndex; c <= bounds.maxColumnIndex; c++) {
-                const columnId = cells[c]?.column.id
-                if (!columnId) continue
-                if (!columnIds.includes(columnId)) columnIds.push(columnId)
-                snapshot.set(snapshotKey(row.id, columnId), row.original.originals[columnId] ?? "")
-            }
-        }
-        copySourceRef.current = {rowIds, columnIds, snapshot}
+        copySourceRef.current = {areas, snapshot}
         setCopySourceVersion((v) => v + 1)
         /*
             ‼️ 复制完把**选区收掉 + 焦点也从格子上摘掉**（用户要求："复制后第一个格子有内边框，需要移除"）。
@@ -486,8 +566,21 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const handlePaste = (e: ClipboardEvent) => {
         if ((e.target as HTMLElement).tagName === "INPUT") return
         const text = e.clipboardData?.getData("text/plain") ?? ""
-        const bounds = table.getCellSelectionBounds()[0]
-        if (!bounds || !text) return
+        /*
+            ‼️ 落点用选区的**外接矩形**（`bounds` 是多片时逐片给的）：本表的铺块规则
+            （`floor(选区 / 块)`、落点 = 左上角）本来就是按一个矩形定义的；多片时取外接矩形是唯一
+            不需要再发明一套"多片怎么铺"的口径。
+            （多片**粘贴**在 Excel/WPS 里的确切行为还没实测过 —— 若实测与这条不符，改这里一处即可。）
+        */
+        const areas = table.getCellSelectionBounds()
+        if (areas.length === 0 || !text) return
+        const bounds = areas.reduce((box, b) => ({
+            minRowIndex: Math.min(box.minRowIndex, b.minRowIndex),
+            maxRowIndex: Math.max(box.maxRowIndex, b.maxRowIndex),
+            minColumnIndex: Math.min(box.minColumnIndex, b.minColumnIndex),
+            maxColumnIndex: Math.max(box.maxColumnIndex, b.maxColumnIndex),
+        }))
+        setCopyHint("")
         e.preventDefault()
 
         const modelRows = table.getRowModel().rows
@@ -550,48 +643,99 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
 
     /**
      * 显示顺序的行（= 渲染顺序）。取**一次**给下面几处共用：
-     *   · 行号列的框要不要画上下边（看邻行）；
-     *   · 行选中的拖拽区间（`dragSelectTo` 按下标算两端）。
+     *   · 行号格判定"这一行是不是整行选中"（按行下标）；
+     *   · 行号拖动时按光标所在的行找 row id。
      * 别在 map 里再取一遍 —— 那是每行一次的多余调用，拖拽时每次 mousemove 都要重跑（用户反馈卡顿）。
      */
     const modelRows = table.getRowModel().rows
+    /**
+     * 整行选区的**列方向两端** + 最后一列下标（行号格的选中判据要用）。
+     *
+     * 取 `getAllCells()` 的**渲染顺序**：与 `getCellSelectionBounds()` 给的列下标是同一套坐标系
+     * （钉住列在前）。**取一次给整段共用** —— 拖行号时每次 mousemove 都要用，不能每次去问库。
+     */
+    const sheetColumns = (modelRows[0]?.getAllCells() ?? []).map((cell) => cell.column.id)
+    const firstColumnId = sheetColumns[0] ?? ""
+    const lastColumnId = sheetColumns[sheetColumns.length - 1] ?? ""
+    const lastColumnIndex = sheetColumns.length - 1
 
     /*
-        ========================== 选中：一套模型，两处入口 ==========================
+        ========================== 选中：**一套模型** ==========================
 
-        屏幕上只有**一种**选中。两套（单元格选区 / 整行）**互斥**：动哪一边，另一边就清空 ——
-        不留两套同时亮着的状态，否则分不清"现在选中的是格还是行"。
+        屏幕上只有**一种**选中，就是库的 `cellSelection`（一个"区域列表"）。行号与数据格只是**范围**不同：
 
-        两边的区别只有"范围"：
-          · 从**数据格**按下 → 选**单元格**（起点就是按下那一格，之后拖拽/Shift 扩成一片）；
-          · 从**行号**按下   → 选**整行**（一行就是那一行的全部列）。
+          · 从**数据格**按下 → 一个格子区（起点是那一格，拖拽/Shift 扩成一片）；
+          · 从**行号**按下   → 一个**整行宽**的区（`selectRowSpan`）。
 
-        所以这里只有两个"设选中"的入口，清场各写一次，别在调用点抄：
-          · `setCellSelection([])` —— 单元格选区是受控 state（见它那段说明），直接给空数组；
-          · `setRowSelection({})` —— 行选中是受控 state，直接给空对象。
+        两边**能同时存在**（Excel 就是这么干的，用户给了截图）：Ctrl 追加、Shift 扩当前那一片、
+        拖拽改焦点 —— 语义完全一致，只是"从哪儿起手"不同。所以**没有**第二档 state，
+        也没有"动一边清另一边"那种互斥逻辑。
     */
 
-    /** 设**单元格**选区：先把行选中清掉（互斥那一半）。库那边交给 `cell.getSelectionStartHandler()`。 */
+    /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
-        setRowSelection({})
-        dragRowRef.current = null
+        dragRowRef.current = null // 行号那边的拖动就此收手（两套手势不能同时进行）
         cell.getSelectionStartHandler()(e)
     }
 
     /**
      * 把单元格选区**直接设成这一片**（左上角 + 右下角两个角给库）。
      *
-     * 走 `setCellSelection` 这个受控 setter（不是 `table.setCellSelection`）：库把它交给 `onCellSelectionChange`
-     * 是有隐形前置条件的（没接那个回调就**静默什么都不做**），自己持 state 就没有这一层依赖。
+     * 走库的 `table.selectCellRange`：它内部就是 `mode: "replace"` → `setCellSelection([range])`，
+     * 与我们手写那一行等价 —— 顺带白拿库的归一化（`operation` / `additive` 那些），
+     * 也少一份"自己维护选区形状"的责任。前提（`onCellSelectionChange` 已接）见上面 `cellSelection` 那段。
      */
     const selectRange = (anchorRowId: string, anchorColumnId: string, focusRowId: string, focusColumnId: string) => {
-        setCellSelection([{anchorRowId, anchorColumnId, focusRowId, focusColumnId}])
+        table.selectCellRange({anchorRowId, anchorColumnId, focusRowId, focusColumnId})
     }
 
-    /** 设**行**选中：先把单元格选区清掉（互斥的另一半）。 */
-    const setRowsSelected = (next: RowSelectionState) => {
-        setCellSelection([])
-        setRowSelection(next)
+    /**
+     * 按行号把**一整行**写成一个"整行宽"的区（Excel 的模型：行块本身就是个区，跟单元格区同住一处）。
+     *
+     * `mode`：`replace`（直接拖 / 单击）· `include`（Ctrl 追加）· `exclude`（Ctrl 点在已整行选中的行上 = 减选）。
+     */
+    const selectRowSpan = (anchorRowId: string, focusRowId: string, mode: "replace" | "include" | "exclude") => {
+        if (!firstColumnId || !lastColumnId) return
+        table.selectCellRange({anchorRowId, anchorColumnId: firstColumnId, focusRowId, focusColumnId: lastColumnId}, {mode})
+    }
+
+    /**
+     * 拖动中：**只挪最后一个区的 focus 行**（列角保持整行宽）—— 与库自己的扩展处理器同一套语义
+     * （`old.slice(0,-1)` + 改 focus），所以"往前拖能缩回、往后拖能伸长"，且前面那些区一个都不掉。
+     */
+    const extendRowSpanTo = (focusRowId: string) => {
+        if (!lastColumnId) return
+        table.setCellSelection((old) => {
+            if (old.length === 0) return old
+            return [...old.slice(0, -1), {...old[old.length - 1], focusRowId, focusColumnId: lastColumnId}]
+        })
+    }
+
+    /**
+     * 按行号**点一下 / Ctrl / Shift** —— 全部落到 `cellSelection` 上，与单元格那套**同一种手势语义**：
+     *   · 什么都不按 —— 整行替换成这一行；
+     *   · **Ctrl/Cmd** —— 整行**追加**一段；这一行本来就整行选中了 → **减选**（`exclude`）；
+     *   · **Shift** —— 把**当前那个区**改成"锚点行 → 这一行"的整行宽一段（其他区保留，与单元格 Shift 一致）；
+     *   · 按住拖动（上面 `extendRowSpanTo`）—— 把它拉成一段。
+     */
+    const clickRowHandle = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
+        const id = row.id
+        if (mods.ctrlKey || mods.metaKey) {
+            // 这一行本来就整行选中了 → 减选；否则追加一段
+            const rowIndex = modelRows.findIndex((r) => r.id === id)
+            const alreadyFull = rowFullySelected(table.getCellSelectionBounds(), rowIndex, lastColumnIndex)
+            selectRowSpan(id, id, alreadyFull ? "exclude" : "include")
+            rowAnchorRef.current = id
+            return
+        }
+        if (mods.shiftKey && rowAnchorRef.current !== null) {
+            // 把**当前那个区**改成"锚点行 → 这一行"（其他区保留），与单元格 Shift 同一语义
+            const span = {anchorRowId: rowAnchorRef.current, anchorColumnId: firstColumnId, focusRowId: id, focusColumnId: lastColumnId}
+            table.setCellSelection((old) => (old.length === 0 ? [span] : [...old.slice(0, -1), span]))
+            return
+        }
+        selectRowSpan(id, id, "replace")
+        rowAnchorRef.current = id
     }
 
     /**
@@ -616,48 +760,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     }
 
     /**
-     * 按行号**按住拖选**：从一端到另一端整段选中（`until` 省略时用起点锚点）。
-     * 与旧表 `extendRow` 同一条口径：拖拽就是"拉出一段"，Ctrl 点中的那些会被替换掉。
-     */
-    const dragSelectTo = (rowId: string, until?: string) => {
-        const from = until ?? dragRowRef.current
-        if (from === null) return
-        const modelRows = table.getRowModel().rows
-        const fromIndex = modelRows.findIndex((r) => r.id === from)
-        const toIndex = modelRows.findIndex((r) => r.id === rowId)
-        if (fromIndex < 0 || toIndex < 0) return
-        const next: RowSelectionState = {}
-        for (let i = Math.min(fromIndex, toIndex); i <= Math.max(fromIndex, toIndex); i++) next[modelRows[i].id] = true
-        setRowsSelected(next)
-        rowAnchorRef.current = from
-    }
-
-    /**
-     * 按行号**点一下 / Ctrl / Shift**。语义与旧表 `clickRow` 一致（两张表手感不许漂）：
-     *   · **Ctrl/Cmd** —— 在这一行上增删，其余不动（锚点跟着挪到这一行，供下一次 Shift 用）；
-     *   · **Shift** —— 从锚点连选到这一行（**替换**整批，跟资源管理器一样）；
-     *   · 什么都不按 —— **只选这一行**；若这一行本来就在选中的一段里，则**收敛到这一行**
-     *     （点选区内部 = 把选区缩成点的那一行）。所以再点一次才取消。
-     */
-    const clickRowHandle = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
-        const id = row.id
-        if (mods.ctrlKey || mods.metaKey) {
-            setCellSelection([])
-            row.toggleSelected()
-            rowAnchorRef.current = id
-            return
-        }
-        if (mods.shiftKey && rowAnchorRef.current !== null) {
-            dragSelectTo(id, rowAnchorRef.current)
-            return
-        }
-        const selectedIds = Object.keys(rowSelection)
-        // 已经在选中的一段里 → 收敛到这一行；否则整批换成这一行。
-        setRowsSelected(selectedIds.includes(id) ? (selectedIds.length === 1 ? {} : {[id]: true}) : {[id]: true})
-        rowAnchorRef.current = id
-    }
-
-    /**
      * 拖拽的收尾与**跟随**：
      *   · `mouseup` 挂 window —— 松手时鼠标常常已经跑出行号那一列，甚至跑出窗口；
      *   · `mousemove` 挂 document，并且**按光标所在的行走**（`rowIdAtY`），不是按"划过了哪个行号格"——
@@ -673,7 +775,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         const follow = (e: MouseEvent) => {
             if (dragRowRef.current === null) return
             const id = rowIdAtY(e.clientY)
-            if (id !== null) dragSelectTo(id)
+            if (id !== null) extendRowSpanTo(id)
         }
         window.addEventListener("mouseup", stop)
         document.addEventListener("mousemove", follow)
@@ -764,10 +866,45 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
         <div className="flex min-h-0 flex-1 flex-col" onKeyDown={handleUndo}>
+            {/*
+                复制被拒：**用对话框**（Excel / WPS 也是弹框说这句话），不是表格上方一行小字。
+                只在"多片跨行又跨列"时开（见 `planCopy`）；`copyHint` 非空即开，关掉就清空。
+            */}
+            <AlertDialog open={copyHint !== ""} onOpenChange={(open) => !open && setCopyHint("")}>
+                {/* `size="sm"` = 官方那个窄档（`max-w-xs`）：提示只有一句话，默认那档 512px 太空。 */}
+                <AlertDialogContent size="sm">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{t.multiAreaCopyTitle}</AlertDialogTitle>
+                        <AlertDialogDescription>{copyHint}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        {/*
+                            `size="sm"` 的页脚是**两列网格**（官方 sm 档如此），只放一个按钮会只占左半格。
+                            这里让它跨两列 → **占满底部**。只在调用点加类，`ui/alert-dialog.tsx` 保持官方原样。
+                        */}
+                        <AlertDialogAction className="col-span-2" onClick={() => setCopyHint("")}>
+                            {t.ok}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             {/* 滚动容器：吸顶表头与格子里的伪元素都按它定位。 */}
             <div className="min-h-0 flex-1 overflow-auto border table-border">
             <table
                 ref={tableRef}
+                /*
+                    ‼️ 按下就**收掉页面上残留的文字选区**（捕获阶段，先于任何格子的 handler）。
+
+                    为什么需要（真机实测，别删）：表头的文字选区**不会**被表体的拖拽自动收掉 —— 我们自己的
+                    mousedown handler 会 `preventDefault`，浏览器那套"点别处就收起选区"的默认行为因此不发生。
+                    于是有这样的序列：复制列名 → 拖一片格子（格子确实选中了）→ Ctrl+C ⇒
+                    **copy 事件仍然认表头当源**（事件跟着"页面选区"走，不是跟着刚拖出来的单元格选区走），
+                    表格那一记复制就**静默失效**：剪贴板没变、虚线也不出。
+                    实测：不收选区时那一步剪贴板仍是上一次的列名；捕获阶段收掉后立刻正常。
+
+                    （这与"复制判据"是两件事：判据只看事件从哪儿发起，见 `handleCopy` 里 `closest("thead")` 那段。）
+                */
+                onMouseDownCapture={() => window.getSelection()?.removeAllRanges()}
                 /*
                     量完列宽之后才锁布局：`table-fixed` + 显式总宽 = 每列宽度**完全照着 state 走**
                     （整数，边界落在整像素上）。没量之前保持 `table-auto` —— 那时得让浏览器先按内容
@@ -837,24 +974,17 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                     */}
                     {modelRows.map((row, rowIndex) => {
                         /*
-                            行选中那圈框的**上下边**（框从行号列**后面**开始，序号列不画框）：
-                            段首那一行挂 `cell-edge-top`、段尾那一行挂 `cell-edge-bottom`；左右两条在
-                            `ActionRowView` 里按列位置挂。**整行的行选中共用这一份**，每个数据格拿同一串。
+                            ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
+                            整行选中如今就是 `cellSelection` 里的一条区（见 `selectRowSpan`），不再有
+                            `rowSelection` 那一档 —— 所以行块与单元格区**能同时存在**（Excel 就是这个模型）。
+                            边框不用这里画：库的 `cell.getSelectionEdges()` 会按那片区的边界逐格给边。
                         */
-                        const rowSelected = row.getIsSelected()
-                        /*
-                            "是不是这一段的头/尾"：上面（下面）那一行**没被选中**（或压根没有）就是头（尾）。
-                            ⚠️ 这里**不能用** `rowIndex === modelRows.length - 1` 当"尾"的判据 ——
-                            最后一行确实是尾，但中间断开的一段（Ctrl 点选出来的）尾巴也要画，所以一律
-                            看"下一行在不在同一段里"。
-                        */
-                        const isTop = rowSelected && !modelRows[rowIndex - 1]?.getIsSelected()
-                        const isBottom = rowSelected && !modelRows[rowIndex + 1]?.getIsSelected()
-                        const rowEdges = rowSelected ? `${isTop ? "cell-edge-top" : ""} ${isBottom ? "cell-edge-bottom" : ""}` : ""
+                        const rowSelected = rowFullySelected(selectionBounds, rowIndex, lastColumnIndex)
                         return (
                             <ActionRowView
                                 key={row.id}
                                 row={row}
+                                rowSelected={rowSelected}
                                 /*
                                     这一行外观的**指纹**：只有它变了才重渲（见 `rowSelectionKey`）。
                                     没被选中的行它是空串 —— 一次拖拽写入，绝大多数行因此整行跳过。
@@ -862,8 +992,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 edgeKey={rowSelectionKey(table.state.cellSelection, selectionBounds, rowIndex, row.id)}
                                 /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）。 */
                                 rowNumber={rowIndex + 1}
-                                /** 整行选中的上下边（段首/段尾），数据格逐格拿同一串。 */
-                                rowEdges={rowEdges}
                                 measured={measured}
                                 abilityNames={abilityNames}
                                 pressRef={pressRef}

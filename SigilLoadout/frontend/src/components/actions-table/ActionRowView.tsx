@@ -15,7 +15,7 @@ import {
     HANDLE_WIDTH,
     PINNED_CELL,
     READ_ONLY_BG,
-    cellBg,
+    HANDLE_SELECTED_BG,
     cellCopyRing,
     selectionClass,
 } from "./classes"
@@ -58,8 +58,8 @@ export function rowSelectionKey(
  */
 export const ActionRowView = memo(function ActionRowView({
     row,
+    rowSelected,
     rowNumber,
-    rowEdges,
     measured,
     abilityNames,
     pressRef,
@@ -78,10 +78,11 @@ export const ActionRowView = memo(function ActionRowView({
     /** 行号列里显示的数字（从 1 数起）。 */
     rowNumber: number
     /**
-     * 整行被选中时，这一行数据格要挂的**上下边**（段首 `cell-edge-top` / 段尾 `cell-edge-bottom`）。
-     * 空串 = 这一行没被选中（那时边由单元格选区那套自己画）。
+     * 这一行是不是**整行都在选区里**（由 `ActionsTable` 按选区矩形算出来，见 `rowFullySelected`）。
+     * 只用来点亮**行号格**自己 —— 数据格的选中/边框全部由库的 `cell.getIsSelected()` /
+     * `getSelectionEdges()` 给（整行选区就是一条普通的区）。
      */
-    rowEdges: string
+    rowSelected: boolean
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */
     measured: boolean
     abilityNames: Record<string, string>
@@ -98,12 +99,11 @@ export const ActionRowView = memo(function ActionRowView({
     dragRowRef: RefObject<string | null>
     /** 行号上按下：点 / Ctrl / Shift（语义见 `ActionsTable` 的 `clickRowHandle`）。 */
     clickRowHandle: (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => void
-    /** 数据格上按下：选单元格，并**先把行选中清掉**（两套选中互斥）。 */
+    /** 数据格上按下：交给库的开始处理器（与行号那套同一个选区模型，不互斥）。 */
     startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
     /** 某一格**进入编辑**了：复制源那圈虚线要撤（规则②的口径是"动过源区"，进编辑就算动）。 */
     onEnterEdit: () => void
 }) {
-    const rowSelected = row.getIsSelected()
     return (
         /* `data-row-id`：行拖拽时要按"光标在哪一行"找 row id（见 `ActionsTable.rowIdAtY`）—— */
         /* DOM 拿得到，不用再往库那边问一遍。 */
@@ -112,8 +112,8 @@ export const ActionRowView = memo(function ActionRowView({
                 行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与**单元格**选区。
 
                 **它自己不画框** —— 用户要求：按行选中时框从行号列**后面**开始（`| xx | xx |`），
-                序号列保持原样。那圈框由下面的**数据格**挂 `cell-edge-*` 画（上下边来自 `rowEdges`，
-                左右边按列位置在这里判）。
+                序号列保持原样。那圈框由下面的**数据格**挂 `cell-edge-*` 画 —— 整行选区就是一条普通的区，
+                四条边都由库的 `cell.getSelectionEdges()` 给（见下面那段）。
 
                 行选中的三个手势（与旧表同一套手感）：
                   · 按下 —— 记下起始行（拖选用），再按修饰键点/Ctrl/Shift 改选中；
@@ -122,7 +122,7 @@ export const ActionRowView = memo(function ActionRowView({
                 ⚠️ 这只格子不在列模型里，所以 `cell.getSelectionStartHandler()` 那套与它无关，两者不打架。
             */}
             <td
-                className={`${cellBg(rowSelected, `${READ_ONLY_BG} ${HANDLE_CELL}`)}`}
+                className={`${READ_ONLY_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
                 style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
@@ -132,7 +132,7 @@ export const ActionRowView = memo(function ActionRowView({
                 <div className={HANDLE_INNER}>{rowNumber}</div>
             </td>
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
-            {row.getAllCells().map((cell, index) => {
+            {row.getAllCells().map((cell) => {
                 const pinned = cell.column.getIsPinned()
                 const key = cell.column.id
                 const readOnly = READ_ONLY_KEYS.has(key)
@@ -143,18 +143,11 @@ export const ActionRowView = memo(function ActionRowView({
                 const shown = String(cell.getValue() ?? "")
                 const selected = cell.getIsSelected()
                 /*
-                    行选中那圈框挂在**数据格**上（框从行号列后面开始，用户要求）：
-                      · 上下两条：来自 `rowEdges`（段首/段尾那一行的每一格都挂同一个）；
-                      · 左边界：第一格挂（行选中是从最左那一列起的，左边一定要有）；
-                      · **右边界不挂** —— 最后一列的右边界正好在**表格最外沿**，那 1px 会伸到表外
-                        （用户截图里那条突兀的绿边），而且横向滚动时它紧贴滚动条、会来回闪。
-                        所以行选中在右端是"敞口"的，靠这一列自己的格线收边。
-                    ⚠️ 行选中与单元格选区**互斥**（见 `ActionsTable` 那段模型说明），所以这里用三元
-                    二选一，不把 `selectionClass()` 的结果也叠上来（那会画出两圈）。
+                    ‼️ 边框只走**库那一套**（`cell.getSelectionEdges()`）：整行选区就是一条普通的区，
+                    行块的上/下/左/右边界库自己算得出来。以前这里是"行选中另画一遍"（`rowEdges` +
+                    手算左右边），那正是两套模型并存留下的补丁 —— 统一之后删掉了。
                 */
-                const edges = rowSelected
-                    ? `${rowEdges} ${index === 0 ? "cell-edge-left" : ""}`
-                    : selectionClass(cell)
+                const edges = selectionClass(cell)
                 return (
                     <td
                         key={cell.id}
@@ -181,25 +174,35 @@ export const ActionRowView = memo(function ActionRowView({
                         }}
                         /*
                             **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减）。
-                            走 `startCellSelection`：它会**先把行选中清掉**（两套选中互斥，见那段模型说明）。
+                            走 `startCellSelection`：交给库的开始处理器（与行号那套同一个选区模型）。
                             ⚠️ mousedown 里**先**把"按下之前这一格"的选区事实整体记下（`PressFacts`）：
                             库的 handler 会立刻改掉选中状态，等 click / focus 时再读就读到改后的了。
                         */
                         onMouseDown={(e) => {
-                            // "按下之前的选区是不是就只有这一格" —— 那时库还没被这一次按下改动。
-                            const bounds = table.getCellSelectionBounds()[0]
+                            /*
+                                "按下之前的选区是不是**就只有这一格**" —— 那时库还没被这一次按下改动。
+                                ‼️ 判据要**整份**看（不是只看第一片）：多片选区的第一片可能正好是一格，
+                                只看 `[0]` 会把"多片选中"误判成"单选一格"。
+                            */
+                            const bounds = table.getCellSelectionBounds()
                             pressRef.current = {
                                 cellKey: snapshotKey(row.id, cell.column.id),
                                 wasSelected: selected,
                                 wasOnlyCell:
-                                    !!bounds &&
-                                    bounds.minRowIndex === bounds.maxRowIndex &&
-                                    bounds.minColumnIndex === bounds.maxColumnIndex,
+                                    bounds.length === 1 &&
+                                    bounds[0].minRowIndex === bounds[0].maxRowIndex &&
+                                    bounds[0].minColumnIndex === bounds[0].maxColumnIndex,
                             }
                             startCellSelection(cell, e)
                         }}
-                        // 按住划过来 → 选区另一端拉到这一格（没按住时库内部 no-op）。
-                        onMouseEnter={cell.getSelectionExtendHandler()}
+                        /*
+                            按住划过来 → 选区另一端拉到这一格（没按住时库内部 no-op）。
+                            ⚠️ **行号拖动期间让位**：那时指针正在数据格上划过，若让库把 focus 挪到
+                            "光标底下那一格"，整行选区会被拉成"到中间某列为止"的格区（行就不整了）。
+                        */
+                        onMouseEnter={(e) => {
+                            if (dragRowRef.current === null) cell.getSelectionExtendHandler()(e)
+                        }}
                         /*
                             复制区那圈虚线：**这一格在复制区外圈的那几条边**（`copyRingEdge`，
                             与库的 `cell.getSelectionEdges()` 同一个思路）。样式在 style.css 的
@@ -210,7 +213,7 @@ export const ActionRowView = memo(function ActionRowView({
                             // 为了盖住那 1px 格线），绝对定位得有定位祖先。钉住的格子本身就是
                             // `sticky`（也是定位元素），再写 `relative` 会跟它抢同一个属性。
                             pinned ? PINNED_CELL : "relative"
-                        } ${cellBg(rowSelected, readOnly ? READ_ONLY_BG : EDITABLE_BG)} ${
+                        } ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${
                             readOnly ? "" : "cell-focus"
                         } ${edges} ${cellCopyRing(copySource, row.id, cell.column.id)}`}
                     >

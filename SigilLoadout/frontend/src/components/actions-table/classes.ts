@@ -3,7 +3,7 @@
 
     纯字符串与纯函数，不碰 React —— 渲染那两层（`ActionRowView` / `Cell`）从这里取类名。
 */
-import type {Cell} from "@tanstack/react-table"
+import type {Cell, CellSelectionBounds} from "@tanstack/react-table"
 
 import {features, type ActionRow, type CopySource} from "./model"
 
@@ -13,20 +13,15 @@ export const READ_ONLY_BG = "bg-background"
 export const EDITABLE_BG = "bg-[#1a1a1a]"
 
 /**
- * 整行选中的底色（用户要求：**与单元格选区同一层、同一个亮度**）。
+ * 整行选中时**行号格**要叠的底纹类。
  *
- * ‼️ 它就是 `.cell-selected` 那条 `inset box-shadow`（7% 白，实测 42,42,42），不是另画一层：
- * 用户报过"选行的背景色比选区亮"—— 当时这里走的是 `bg-linear-to-b from-white/14`（实测 58,58,58）。
- * 两者写在一起、共用一个类，才不会再各自漂移。
+ * 只有行号格用得上它：它不在列模型里，拿不到 `.cell-selected`（数据格是"那个整行宽的区"里的一员，
+ * 自己就带 `.cell-selected`）。
  *
- * ⚠️ 必须**逐格**加，不能只写在 `<tr>` 上让它往下透：不吸顶的格子底色不透明，会把 tr 那层盖掉；
- * 而钉住的只读列（`#` / `id_` / `abilityTag_`）**必须**不透明（否则横向滚过来的列会从它底下透出来），
- * 只能自己把这层叠加上去。试过用 tr 上一条任意变体一把管完 —— Tailwind 会编译出来但不生效。
+ * ‼️ 它与 `.cell-selected` **共用同一条 `inset box-shadow`**（7% 白，实测 42,42,42）—— 用户报过
+ * "选行的背景色比选区亮"（当时这边走 `bg-linear-to-b from-white/14`，实测 58,58,58）；写在一起才不漂。
  */
-const ROW_SELECTED_BG = "cell-row-selected"
-
-/** 这一格的底色（`own`）之上，若整行被选中就再加一层行选中底色。 */
-export const cellBg = (rowSelected: boolean, own: string) => (rowSelected ? `${own} ${ROW_SELECTED_BG}` : own)
+export const HANDLE_SELECTED_BG = "cell-row-selected"
 
 /** 默认钉住前几列。用**序号**不用字段名：字段名是数据给的，写死就等于把"有哪些列"抄了一份。 */
 export const PINNED_COUNT = 2
@@ -168,11 +163,31 @@ const ringClasses = (edges: RingEdges, prefix: "cell-edge" | "cell-copy") =>
         .join(" ")
 
 /**
- * 一格在**复制源那片**外圈的哪几条边上（不在那片里 → `null`）。
+ * 这一行是不是被**某个"整行宽"的区**盖住。
  *
- * 那一片的外圈**就是两串 id 之间的行列区间**：某一侧为真 ⟺ 那一侧的邻格不在同一片里 ——
- * 与库自己的 `cell.getSelectionEdges()` 同一个思路，只是把"同一片"换成"复制源那两串 id"
+ * 用途两处：行号格自己的选中态；Ctrl 点行号时判"该增还是该减"（已经整行选中 → `exclude`）。
+ * 判据：存在一个正面区域，行范围覆盖这一行、**列范围覆盖全部列**（`0 .. 最后一列`）。
+ */
+export const rowFullySelected = (bounds: CellSelectionBounds[], rowIndex: number, lastColumnIndex: number) =>
+    lastColumnIndex >= 0 &&
+    bounds.some(
+        (b) =>
+            b.minRowIndex <= rowIndex &&
+            rowIndex <= b.maxRowIndex &&
+            b.minColumnIndex === 0 &&
+            b.maxColumnIndex === lastColumnIndex,
+    )
+
+/**
+ * 一格在**复制区外圈**的哪几条边上（不在任何一片里 → `null`）。
+ *
+ * 每一片的外圈**就是它那两串 id 之间的行列区间**：某一侧为真 ⟺ 那一侧的邻格不在**同一片**里 ——
+ * 与库自己的 `cell.getSelectionEdges()` 同一个思路，只是把"同一片"换成"复制源那几片 id"
  * （复制之后选区会被清掉，所以不能直接用库那份）。
+ *
+ * ‼️ **逐片判**：每片各自成圈 —— 拿所有片的外接矩形去圈，会把中间没选的格子也圈进来。
+ * 片与片互不重叠（`getCellSelectionBounds()` 给的就是归一化、互不相交的正面区域），所以一格
+ * 至多落在一片里，命中即可返回。
  *
  * ‼️ **两个装饰都画**：选区那圈实线（`::before`）与复制区那圈虚线（`::after`）是两条线同时存在，
  * 重合处由样式表的归属表定（复制区赢）。所以这里**不扣**选区的边 —— 扣了就永远看不到重合处的虚线。
@@ -183,15 +198,18 @@ const ringClasses = (edges: RingEdges, prefix: "cell-edge" | "cell-copy") =>
  */
 function copyRingEdge(copy: CopySource | null, rowId: string, columnId: string): RingEdges | null {
     if (!copy) return null
-    const rowIndex = copy.rowIds.indexOf(rowId)
-    const colIndex = copy.columnIds.indexOf(columnId)
-    if (rowIndex < 0 || colIndex < 0) return null
-    return {
-        top: rowIndex === 0,
-        bottom: rowIndex === copy.rowIds.length - 1,
-        left: colIndex === 0,
-        right: colIndex === copy.columnIds.length - 1,
+    for (const area of copy.areas) {
+        const rowIndex = area.rowIds.indexOf(rowId)
+        const colIndex = area.columnIds.indexOf(columnId)
+        if (rowIndex < 0 || colIndex < 0) continue
+        return {
+            top: rowIndex === 0,
+            bottom: rowIndex === area.rowIds.length - 1,
+            left: colIndex === 0,
+            right: colIndex === area.columnIds.length - 1,
+        }
     }
+    return null
 }
 
 /**

@@ -3,7 +3,7 @@
     动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 先选后编）
 */
 import {describe, expect, it, vi} from "vitest"
-import {fireEvent} from "@testing-library/react"
+import {fireEvent, screen} from "@testing-library/react"
 
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -13,11 +13,247 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {PINNED_COUNT} from "@/components/actions-table/classes"
 
-import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
 
 describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 先选后编）", () => {
+    /*
+        用户要求：**允许复制列名**，而且复制列名时要**清空表格复制区** ——
+        那圈虚线圈的是"剪贴板里就是这片格子"，剪贴板换成列名之后这个说法就不成立了。
+
+        判据是"这一记 Ctrl+C **从哪儿发起**"：表头（`thead`）不参与表格复制。
+        所以**从表头里**派发 copy（真实情况就是表头那个 DIV 上的选区在复制），表格必须让开。
+    */
+    it("从表头发起的 Ctrl+C：让给浏览器（不写格子 TSV），并清空复制区那圈虚线", async () => {
+        const container = await renderTable()
+
+        // 先造一个复制区（选一格 → Ctrl+C），确认虚线在
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        expect(copyBoxOf(container)).not.toBeNull()
+
+        // ⚠️ 目标是表头**里面**那个 DIV（列名文字就在它里面），不是 th 本身
+        const headerInner = container.querySelector("thead th > div")!
+        const clipboard = clipboardStub()
+        fireEvent.copy(headerInner, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBeUndefined() // 表格没抢（列名归浏览器）
+        expect(copyBoxOf(container)).toBeNull() // 复制区清空
+    })
+
+    /*
+        这一条钉住"表头不参与"的**另一面**：表体（格子）发起时照旧归表格 ——
+        否则上面那条一旦写成"任何 copy 都让开"，整张表的复制粘贴就静默失效了。
+    */
+    it("从表体（格子）发起的 Ctrl+C：照旧由表格接管", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(cellAt(container, 0, 2), {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).not.toBeUndefined()
+    })
+
+    /*
+        ‼️ **多片选区**（Ctrl 追加 / Ctrl 减选）—— 库的默认行为，我们不再关它。
+        但**复制**要照 Excel / WPS 的规矩（用户实测）：多重选定区域**只允许同一行或同一列**，
+        跨行又跨列时它们直接拒绝。这几条把"能拼就拼、不能拼就拒绝"钉住。
+    */
+    /*
+        ‼️ 用户要的是"**已经选了一片，再 Ctrl 拖动继续加选**"（不是 Ctrl 点一下）。
+        这条必须走 **mouseEnter**（真实拖动的路径）：库的扩展处理器只移动"最后一片"的 focus，
+        前面的片必须原样留着。
+    */
+    it("Ctrl **拖选**第二片：第一片必须留着（加选，不是替换）", async () => {
+        const container = await renderTable()
+
+        // 第一片：第 0 行 第 2..3 列
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        fireEvent.mouseEnter(cellAt(container, 0, 3))
+        fireEvent.mouseUp(document)
+        expect(cellAt(container, 0, 2).className).toContain("cell-selected")
+
+        // 第二片：Ctrl 按在第 1 行 第 2 列，拖到第 1 行 第 3 列
+        fireEvent.mouseDown(cellAt(container, 1, 2), {ctrlKey: true})
+        fireEvent.mouseEnter(cellAt(container, 1, 3), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+
+        for (const [r, c] of [
+            [0, 2],
+            [0, 3],
+            [1, 2],
+            [1, 3],
+        ]) {
+            expect(cellAt(container, r, c).className).toContain("cell-selected")
+        }
+    })
+
+    it("Ctrl 点同一列的另一格：追加成第二片（两格都选中）", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.mouseDown(cellAt(container, 1, 2), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+
+        expect(cellAt(container, 0, 2).className).toContain("cell-selected")
+        expect(cellAt(container, 1, 2).className).toContain("cell-selected")
+    })
+
+    /*
+        ‼️ 这两条是**用户在 Excel 里实测过允许**的多片形状（截图：两段整行块都带虚线框；
+        A1:B2 + D1:E2 也都带虚线框）。它们正是"共享同一个列范围 / 共享同一个行范围"的两种情形 ——
+        所以判据**不能用提示的字面**（"只能同一行或同一列"那种单行/单列理解），否则会误拒这两条。
+    */
+    it("两段整行块 → 上下拼成一整块（Excel 实测允许）", async () => {
+        setRows([makeRow("1000"), makeRow("1001"), makeRow("1002"), makeRow("1003")])
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
+        rows.forEach((row, index) => {
+            const top = index * 20
+            row.getBoundingClientRect = () =>
+                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
+        })
+
+        // 第一段：行号 0 拖到行号 1
+        pressHandle(container, 0)
+        fireEvent.mouseMove(cellAt(container, 1, 2), {clientY: 25})
+        fireEvent.mouseUp(window)
+        // 第二段：Ctrl 从行号 2 拖到行号 3
+        pressHandle(container, 2, {ctrlKey: true})
+        fireEvent.mouseMove(cellAt(container, 3, 2), {clientY: 65})
+        fireEvent.mouseUp(window)
+
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        const 行 = String(clipboard.data["text/plain"]).split("\n")
+        expect(行).toHaveLength(4) // 两段各 2 行 → 上下拼成 4 行
+        expect(行[0].split("\t")[0]).toBe("1000")
+        expect(行[3].split("\t")[0]).toBe("1003")
+    })
+
+    it("两块共享同一行范围（A1:B2 + D1:E2）→ 左右拼（Excel 实测允许）", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        // 第一块：第 0..1 行 × 第 0..1 列
+        fireEvent.mouseDown(cellAt(container, 0, 0))
+        for (const [r, c] of [
+            [0, 1],
+            [1, 0],
+            [1, 1],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c))
+        }
+        fireEvent.mouseUp(document)
+        // 第二块：Ctrl 加第 0..1 行 × 第 3..4 列
+        fireEvent.mouseDown(cellAt(container, 0, 3), {ctrlKey: true})
+        for (const [r, c] of [
+            [0, 4],
+            [1, 3],
+            [1, 4],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c), {ctrlKey: true})
+        }
+        fireEvent.mouseUp(document)
+
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        const 行 = String(clipboard.data["text/plain"]).split("\n")
+        expect(行).toHaveLength(2) // 行范围相同 → 还是 2 行
+        expect(行[0].split("\t")).toHaveLength(4) // 两块各 2 列 → 左右拼成 4 列
+        expect(行[0].split("\t").slice(0, 2)).toEqual(["1000", "AB_PL1000_01"])
+    })
+
+    it("同一列的两片 → 复制拼成一列（不是外接矩形）", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        // 第 0 列（id_）第 0、1 行：原值就是记录号，拼起来一目了然
+        selectCell(cellAt(container, 0, 0))
+        fireEvent.mouseDown(cellAt(container, 1, 0), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBe("1000\n1001")
+    })
+
+    it("同一行的两片 → 复制拼成一行", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        selectCell(cellAt(container, 0, 0))
+        fireEvent.mouseDown(cellAt(container, 0, 1), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBe("1000\tAB_PL1000_01")
+    })
+
+    it("跨行又跨列的两片 → 不复制，并给出提示（与 Excel / WPS 同一句口径）", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        selectCell(cellAt(container, 0, 0))
+        fireEvent.mouseDown(cellAt(container, 1, 1), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBeUndefined() // 没写剪贴板
+        // 提示是**对话框**（不是表格上方一行小字）：窄档（官方 size="sm"）+ 标题 + 说明 + 确定
+        expect(screen.getByRole("alertdialog").getAttribute("data-size")).toBe("sm")
+        expect(screen.getByText("无法复制选中区域")).toBeTruthy()
+        expect(screen.getByText(/同一行或同一列/)).toBeTruthy()
+    })
+
+    it("多片复制：虚线**每片各一圈**（不是外接矩形一圈）", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 0))
+        fireEvent.mouseDown(cellAt(container, 1, 0), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+
+        // 两片各 1 格 → 2 格各带一整圈；若是外接矩形就有 4 格
+        expect(copyCellsOf(container)).toHaveLength(2)
+    })
+
+    it("Ctrl 点**已选中**的格 = 减选：那一格掉出选区", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        expect(cellAt(container, 0, 2).className).toContain("cell-selected")
+
+        fireEvent.mouseDown(cellAt(container, 0, 2), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+
+        expect(cellAt(container, 0, 2).className).not.toContain("cell-selected")
+    })
+
+    /*
+        ‼️ 这条护的是**浏览器行为**，happy-dom 复现不了（真机量出来的，别删）：
+
+        表头的文字选区不会被表体拖拽自动收掉（我们的 mousedown 会 `preventDefault`，浏览器"点别处收选区"
+        的默认行为不发生），而 **copy 事件跟着页面选区走** —— 于是"复制列名 → 拖一片格子 → Ctrl+C"
+        这一记 Ctrl+C 仍然认表头当源：格子复制静默失效（剪贴板没变、虚线不出）。
+        真机实测：不收选区时那一步剪贴板还是上一次的列名；捕获阶段收掉后立刻正常。
+
+        所以表内一按下就在**捕获阶段**收掉残留选区。
+    */
+    it("表内按下会先收掉页面残留的文字选区（否则表头复制之后，表体那次 Ctrl+C 会静默失效）", async () => {
+        const container = await renderTable()
+        const removeAllRanges = vi.fn()
+        const spy = vi.spyOn(window, "getSelection").mockReturnValue({removeAllRanges} as unknown as Selection)
+
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+
+        expect(removeAllRanges).toHaveBeenCalled()
+        spy.mockRestore()
+    })
+
     it("复制：取原值（键），不是显示的技能名", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()

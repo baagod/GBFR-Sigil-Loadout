@@ -8,7 +8,6 @@ import {
     columnPinningFeature,
     columnSizingFeature,
     createSortedRowModel,
-    rowSelectionFeature,
     rowSortingFeature,
     sortFn_alphanumeric,
     tableFeatures,
@@ -51,21 +50,32 @@ export const displayText = (key: string, raw: string, names: Record<string, stri
  *     整个 `sortFns` 对象会把 6 个内置全打进包里，官方已标 deprecated。
  *     `alphanumeric` 是**自然排序**（`item2` 排在 `item10` 前面），所以 `101 < 1000` ——
  *     不是字典序那种 `1000 < 101`。
- *   · `rowSelectionFeature` —— **点行号选行**的状态：`row.getIsSelected()` / `toggleSelected()`，
- *     按 `id_` 记，所以排序之后仍然对得上。
- *     ⚠️ 库那个 `getToggleSelectedHandler()` **不用**：它是给**复选框**写的，增删方向取自
- *     `event.target.checked`（源码里就是 `const checked = event.target.checked`）—— 行号格上没有
- *     `checked`，走它只会把行永远置成"取消"。手势那一层见 `clickRowHandle` / `dragSelectTo`。
+ *   · ⚠️ **`rowSelectionFeature` 故意不登记**：行号选行走 `cellSelectionFeature` —— 一整行就是
+ *     "一个整行宽的区"（见 `ActionsTable.selectRowSpan`），于是行块与单元格区同住一处、能同时存在
+ *     （Excel 的模型）。库那个 `getToggleSelectedHandler()` 也用不了：它给**复选框**写的，方向取自
+ *     `event.target.checked`（源码第一行就是它），行号格上没有 `checked`。
  */
 export const features = tableFeatures({
     cellSelectionFeature,
     columnPinningFeature,
     columnSizingFeature,
-    rowSelectionFeature,
     rowSortingFeature,
     sortedRowModel: createSortedRowModel(),
     sortFns: {alphanumeric: sortFn_alphanumeric},
 })
+
+/**
+ * **复制区的一片**：行 id × 列 id（各按渲染顺序）。
+ *
+ * 为什么是"一片一片"而不是"两串 id"：Excel/WPS 允许多重选区（Ctrl 追加），
+ * 而那圈虚线要**每片各画一圈** —— 单片的外接矩形在"同一行选了两段"时会连没选的格子一起圈进去。
+ */
+export type CopyArea = {
+    /** 这一片的行 id（渲染顺序）：第 0 个就是第一行。 */
+    rowIds: string[]
+    /** 这一片的列 id（渲染顺序）：第 0 个就是第一列。 */
+    columnIds: string[]
+}
 
 /**
  * 剪贴板里那一份东西的**来源**（复制时记下来）。
@@ -74,9 +84,8 @@ export const features = tableFeatures({
  * （= 用户量出来的规矩，见下）全靠它判断。
  */
 export type CopySource = {
-    /** 源区的行 id / 列 id（渲染顺序），**按顺序**存的：第 0 个就是那片的第一行/第一列。 */
-    rowIds: string[]
-    columnIds: string[]
+    /** 复制区（可能多片，见 `CopyArea`）：虚线按片画。 */
+    areas: CopyArea[]
     /** 源区每一格**复制那一刻的原值**，键见 `snapshotKey`。切窗口回来时拿它核对源区还在不在。 */
     snapshot: Map<string, string>
 }

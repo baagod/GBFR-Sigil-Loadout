@@ -68,6 +68,10 @@ const zh = {
     generalTracks: "轨迹表",
     /** 手风琴第二个条目的标题：下面那块地方放动作表。 */
     actionsSection: "动作表",
+    /** 多重选定区域跨行又跨列时不能复制（Excel / WPS 同一条规矩，见 ActionsTable 的 planCopy）。 */
+    multiAreaCopy: "请选择同一行或同一列中的单元格。",
+    /** 复制被拒对话框的**标题**（说明那句见 multiAreaCopy）。 */
+    multiAreaCopyTitle: "无法复制选中区域",
     /** 工具栏上那个切换按钮：「全局参数」那张 16 张表的清单（system\player\*.msg，不分角色）。 */
     globalParams: "全局参数",
     /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨的那组。 */
@@ -149,6 +153,8 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "Save",
         generalTracks: "Track table",
         actionsSection: "Action table",
+        multiAreaCopy: "Select cells in the same row or column.",
+        multiAreaCopyTitle: "Can't copy the selected areas",
         globalParams: "Global Params",
         hmRangeSkill: "Skills",
         hmGroupOther: "Other",
@@ -217,6 +223,8 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "保存",
         generalTracks: "トラック表",
         actionsSection: "アクション表",
+        multiAreaCopy: "同じ行または同じ列のセルを選んでください。",
+        multiAreaCopyTitle: "選択範囲をコピーできません",
         globalParams: "全体パラメータ",
         hmRangeSkill: "スキル",
         hmGroupOther: "その他",
@@ -285,6 +293,8 @@ export const messages: Record<Lang, Messages> = {
         saveAndDeploy: "저장",
         generalTracks: "트랙 표",
         actionsSection: "액션 표",
+        multiAreaCopy: "같은 행이나 같은 열의 셀을 선택하세요.",
+        multiAreaCopyTitle: "선택한 영역을 복사할 수 없습니다",
         globalParams: "전역 파라미터",
         hmRangeSkill: "스킬",
         hmGroupOther: "기타",
