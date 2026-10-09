@@ -540,20 +540,16 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         copySourceRef.current = {areas, snapshot}
         setCopySourceVersion((v) => v + 1)
         /*
-            ‼️ 复制完把**选区收掉 + 焦点也从格子上摘掉**（用户要求："复制后第一个格子有内边框，需要移除"）。
+            ‼️ **复制不再收掉选区**（用户要求：按 Ctrl+C 那一刻选区底色留着）。
 
-            那圈"内边框"是**焦点环**（`style.css` 的 `cell-focus`，`:focus-within` 时给 2px `--ring` 实线）。
-            平时它被 `td.cell-selected:focus-within::after { content: none }` 压着（选中的格子不画焦点环），
-            可选区一收，那个"锚点格"就不再是 `cell-selected` —— 焦点环当场露出来，正好套在复制区左上那一格上。
-            所以两件事一起做：收选区（去掉那块选中底色）+ 摘焦点（去掉那圈内边框）。
+            这里以前连着做两件事：`setCellSelection([])` + 从格子上摘焦点 —— 起因是"收掉选区"会让锚点格
+            不再是 `cell-selected`，于是那圈**焦点环**（`cell-focus`，`:focus-within` 时 2px `--ring`）
+            当场露出来套在复制区左上角（用户当年报的"复制后第一个格子有内边框"）。
 
-            与 Excel 一致：那圈虚线本身就是"剪贴板里是哪片"的标记，再叠一层底色和焦点环纯属噪音。
-            粘贴落点读的是**按下那一刻**的 `getCellSelectionBounds()`（见 `handlePaste`），所以
-            "选一片 → Ctrl+C → 原地 Ctrl+V"照样能贴在原处，不受清选区影响。
+            现在选区留着 → 锚点格仍是 `cell-selected` → `td.cell-selected:focus-within::after { content: none }`
+            继续压着焦点环，所以"摘焦点"那一下也一并删了（它本来就是那件事的配套）。
+            剪贴板那圈虚线仍是"哪片在剪贴板里"的标记，与选区底色并存。
         */
-        setCellSelection([])
-        const active = document.activeElement
-        if (active instanceof HTMLElement && tableRef.current?.contains(active)) active.blur()
     }
 
     /**

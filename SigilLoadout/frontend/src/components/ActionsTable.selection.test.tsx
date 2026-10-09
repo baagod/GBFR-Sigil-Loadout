@@ -549,6 +549,24 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(cellAt(container, 0, 5).className).not.toMatch(/cell-copy-/)
     })
 
+    /*
+        ‼️ 用户要求：**按 Ctrl+C 那一刻不移除选区底色** —— 虚线照出、底色留着，两者并存。
+        这是"复制区生命周期"的第一条不变量，别再被顺手清掉（以前 `handleCopy` 里就有那句 `setCellSelection([])`）。
+    */
+    it("Ctrl+C 之后：选区底色留着，复制区虚线同时出现", async () => {
+        const container = await renderTable()
+
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        fireEvent.mouseEnter(cellAt(container, 0, 3))
+        fireEvent.mouseUp(document)
+        expect(container.querySelectorAll("td.cell-selected")).toHaveLength(2)
+
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+
+        expect(container.querySelectorAll("td.cell-selected")).toHaveLength(2) // 底色不动
+        expect(copyBoxOf(container)).not.toBeNull() // 虚线照出
+    })
+
     /* 动到源区 → 虚线撤（规则②：判据是"动过"，不是"值跟复制时不一样"）。 */
     it("复制后：往源区里粘贴 → 虚线撤掉", async () => {
         const container = await renderTable()
@@ -556,9 +574,8 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
         expect(copyBoxOf(container)).not.toBeNull()
-        // 复制会把选区收掉（用户要求，见 `handleCopy`），所以要粘哪里得重新选一下
-        expect(container.querySelectorAll("td.cell-selected")).toHaveLength(0)
-        selectCell(cellAt(container, 0, 2))
+        // ‼️ 复制**不再**收掉选区（用户要求）：虚线出来了，选中的那格照样亮着 —— 所以直接原地粘
+        expect(container.querySelectorAll("td.cell-selected").length).toBeGreaterThan(0)
 
         fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-原值")})
 
