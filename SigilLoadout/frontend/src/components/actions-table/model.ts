@@ -13,6 +13,7 @@ import {
     tableFeatures,
 } from "@tanstack/react-table"
 import {abilityName} from "@/lib/ability"
+import {CELL_CHOICES} from "@/lib/controltypes"
 
 /**
  * **只读**的列：这些格子存的是**引用键**，不是可编辑的值。
@@ -26,6 +27,32 @@ import {abilityName} from "@/lib/ability"
  * 只读列改不了、也就**不可能产生改动**，所以显示与保存都只看原值（见 `shownValue` 与保存那两处）。
  */
 export const READ_ONLY_KEYS = new Set(["id_", "abilityTag_"])
+
+/**
+ * **选值格**的列：这些格子只能从一份固定的值表里挑，不能手打（现在只有 `controlTypeHash_` 一列）。
+ *
+ * 为什么这一列要上锁：它拿的是**哈希**，游戏按整数比；填成十六进制（`4582EE4A`）解析不出整数 →
+ * 技能直接放不出来（docs/action/动作表字段文档.md 记着这个坑，"编辑器应加防护"）。
+ * 于是这一列：格子里挂一个下拉、粘贴进来时校验（见 `acceptPaste`），别处照旧当普通格子使。
+ *
+ * ⚠️ 表外的值**一个都不删**：列表只有那 53 项，格子里的值不在其中时列表里没有任何一项被选中，
+ * 打开看一眼关掉什么都不动（见 `CellPick` 那段）。
+ */
+export const PICKER_KEYS = new Set(["controlTypeHash_"])
+
+/**
+ * 粘贴进来的这一格值，**收不收**。
+ *
+ * 只对选值格设闸：不在册的值**原样保留当前值**（这一格不写、也不算一步撤销），并且**不给任何提示**
+ * —— 用户的口径是"不通过就当没粘过"。别的列一律放行（它们本来就是自由文本/数值）。
+ *
+ * 空串也**不收**：用户的口径是"只能从列表里选、不能输入"，而空串不是列表项。所以往这一列粘一格空的
+ * 等于什么都没发生（与"粘了十六进制"同一条路：不写、不提示、不占撤销步）。
+ */
+export function acceptPaste(columnId: string, value: string): boolean {
+    if (!PICKER_KEYS.has(columnId)) return true
+    return CELL_CHOICES.has(value)
+}
 
 /**
  * 一格的**显示文本**：`abilityTag_` 翻成技能名，其余原样。查不到名字就回落**键名本身**

@@ -73,7 +73,7 @@ export const ACTION_HANDLE: HandleColumn = {
 }
 
 /**
- * 一列。`kind` 就是格子的三种形态：只读文本 / 可编辑格（EditableCell）/ 选值格（FlagCell，
+ * 一列。`kind` 就是格子的三种形态：只读文本 / 可编辑格（EditableCell）/ 位选值格（FlagCell，
  * 只有轨表有）。
  */
 export type TrackColumn = {

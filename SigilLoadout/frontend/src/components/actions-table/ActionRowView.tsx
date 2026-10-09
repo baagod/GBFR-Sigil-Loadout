@@ -6,6 +6,7 @@ import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
 import type {Cell, CellSelectionBounds, CellSelectionState, Row, Table} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
+import {PICKER_KEYS} from "./model"
 import {
     CELL_BASE,
     EDITABLE_BG,
@@ -14,6 +15,7 @@ import {
     HANDLE_INNER,
     HANDLE_WIDTH,
     PINNED_CELL,
+    PICK_TD,
     READ_ONLY_BG,
     HANDLE_SELECTED_BG,
     cellCopyRing,
@@ -150,6 +152,9 @@ export const ActionRowView = memo(function ActionRowView({
                     手算左右边），那正是两套模型并存留下的补丁 —— 统一之后删掉了。
                 */
                 const edges = selectionClass(cell)
+                /* 选值格（`controlTypeHash_`）与别的格子走同一条路，这里不为它开岔路 —— 唯一的差别是
+                   点它会展开列表（见 CellContent 的 `picker` 分支），以及它的格线改由 `PICK_TD` 画。 */
+                const picker = !readOnly && PICKER_KEYS.has(key)
                 return (
                     <td
                         key={cell.id}
@@ -210,19 +215,18 @@ export const ActionRowView = memo(function ActionRowView({
                             与库的 `cell.getSelectionEdges()` 同一个思路）。样式在 style.css 的
                             `.cell-copy-*` —— 用**伪元素**画，`inset: 0` 正好压在格线上，不参与布局。
                         */
-                        className={`${CELL_BASE} ${
+                        className={`${CELL_BASE} ${picker ? PICK_TD : ""} ${
                             // 非钉住的格子要 `relative`：选区轮廓是**伪元素**画的（`inset: -1px`，
                             // 为了盖住那 1px 格线），绝对定位得有定位祖先。钉住的格子本身就是
                             // `sticky`（也是定位元素），再写 `relative` 会跟它抢同一个属性。
                             pinned ? PINNED_CELL : "relative"
-                        } ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${
-                            readOnly ? "" : "cell-focus"
-                        } ${edges} ${cellCopyRing(copySource, row.id, cell.column.id)}`}
+                        } ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${edges} ${cellCopyRing(copySource, row.id, cell.column.id)}`}
                     >
                         <CellContent
                             rowId={row.id}
                             fieldKey={key}
                             readOnly={readOnly}
+                            picker={picker}
                             raw={raw}
                             original={original}
                             shown={shown}

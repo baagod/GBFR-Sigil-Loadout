@@ -221,6 +221,82 @@
 */
 
 /*
+    选值格（`controlTypeHash_`）右端那个下拉箭头 —— **纯 CSS 画的，不多一个 DOM 节点**。
+
+    为什么不用内联 SVG / 图标组件：这张表有上千个选值格，箭头是**纯装饰**（点击区是整格，
+    它自己 `pointer-events: none`），为它给每格多挂一个元素不值当。
+
+    ⚠️ 用 `mask` 不用 `background-image`：mask 的**颜色**由 `background` 决定，于是箭头能跟文字的颜色走
+    （没改过的灰字格子，箭头也跟着灰）—— background 画的图是一份固定颜色，在灰字格子里会比文字更亮。
+    `-webkit-mask` 那份给 WebView2 留的（`mask` 简写在 Chromium 上已支持）。
+
+    几何：`top/bottom: 0` + `margin: auto 0` 竖直居中；右沿留 **12px** —— 贴死在格线边上会和格线黏成一条。
+    文本那边的让位见 `PICK_TEXT`（12 + 12 + 4px 空隙）。
+*/
+.cell-pick-mark::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 12px;
+    bottom: 0;
+    width: 12px;
+    margin: auto 0;
+    height: 12px;
+    background-color: var(--muted-foreground);
+    -webkit-mask: var(--pick-arrow) center / 12px 12px no-repeat;
+    mask: var(--pick-arrow) center / 12px 12px no-repeat;
+    pointer-events: none;
+}
+
+/* 箭头形状（chevron-down）：白色只作蒙版的 alpha，真正上屏的颜色是上面那句 background-color。 */
+:root {
+    --pick-arrow: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M1.5 3.75 6 8.25l4.5-4.5" fill="none" stroke="%23fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+}
+
+/*
+    选值格的**弹层里也要用表格那根十字光标**。
+
+    为什么：弹层挂在 `body` 上、item 自己也带 `cursor: default`；指针停在格子**下边缘**点开时，
+    命中目标会在"列表项（箭头）"与"格子（十字）"之间换一次，光标跟着跳一下。
+
+    ⚠️ 只给**选值格的弹层**（`CellPick` 在 `ComboboxContent` 上加的 `cell-pick-list` 标记）：
+    别的下拉（因子编辑页那些）不在表格里，光标该保持箭头。
+*/
+.cell-pick-list,
+.cell-pick-list * {
+    cursor: cell;
+}
+
+/*
+    选值格弹层**不带动画**。
+
+    为什么：弹层基类带 `data-open:animate-in fade-in zoom-in-95` + `duration-100`，而展开的同一瞬间
+    库会把第一项设成高亮（`useListNavigation` 的 `focusItemOnOpen`）—— 两者叠在一起时高亮会在动画期间
+    "冒出来又撤掉"，看着就是闪一下。把这个标记类的动画停掉即可，不需要任何"闸门/延迟"。
+
+    ⚠️ 只覆盖这一层，`ui/combobox` 基类一个字不动；别的下拉照旧带动画。
+*/
+.cell-pick-list {
+    animation: none !important;
+    transition: none !important;
+}
+
+/*
+    选值格那一格：**格线用 `box-shadow` 画，`border` 全去掉**（见 classes.ts 的 `PICK_TD`）。
+
+    为什么：`border` 属于 `<td>` 自己的盒，格线那 1px 因此永远归 `<td>` 命中 —— 贴在格线上点，
+    事件到不了格子里的内容层（"边框不触发"）。阴影不占盒、也不参与命中测试，所以去掉 border 之后
+    格子的 border-box 就等于内容盒，内容层能铺满整格。
+    画法：`inset` 阴影从 padding box 内沿往里收 1px，位置正好顶掉被去掉的那条右/下边框；
+    用 inset 而不是外阴影，是为了不越出格子（与 `cell-edge-*` / `cell-copy-*` 那两套同一个规矩）。
+*/
+.cell-pick-td {
+    border-right-width: 0;
+    border-bottom-width: 0;
+    box-shadow: inset -1px 0 0 0 var(--border), inset 0 -1px 0 0 var(--border);
+}
+
+/*
     聚焦 / 编辑中的格子那一圈线：**从格子外沿往里画 2px**，画在 `::after` 上（`::before` 留给选区框）。
 
     不用 ring：ring 画在输入框**外面**（box-shadow），2px 会越出格子 —— 上沿顶进表头、左右顶进邻格；
@@ -260,6 +336,23 @@
     tr:last-child > &:is(:focus-within, [data-picker-open])::after {
         bottom: 0;
     }
+
+    /*
+        选值格（`controlTypeHash_`）：它的触发器是**原始 Trigger**（见 CellPick），base-ui 在列表打开时
+        会给触发器挂 `data-popup-open`。列表一开焦点就进了 portal，`:focus-within` 当场不成立 ——
+        这一条把环续上（**只有列表真的开着时**属性才在，所以不会变成"每格常亮一圈"）。
+    */
+    &:has(.cell-pick-mark[data-popup-open]) {
+        z-index: 30;
+    }
+
+    &:has(.cell-pick-mark[data-popup-open])::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border: 2px solid var(--ring);
+        pointer-events: none;
+    }
 }
 
 /*
@@ -275,7 +368,6 @@
 
 /*
     ============ 冻结列 / 行号列的"层高"（一个类定死，别再拿工具类改） ============
-
     这一格永远压在横向滚动的内容之上，所以它的 z 必须高过**它所在那一行里**所有会滚动的东西：
 
       聚焦/编辑中的格子 30（`cell-focus`）

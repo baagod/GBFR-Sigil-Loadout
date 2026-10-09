@@ -66,7 +66,7 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {READ_ONLY_KEYS, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {READ_ONLY_KEYS, acceptPaste, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
 
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
@@ -599,14 +599,22 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         })
         if (!plan.range) return
 
+        /*
+            **选值格（`controlTypeHash_`）的粘贴校验**：值不在册的这一格**不写**（当前值原样留着）。
+            用户的口径是"不通过就当没粘过"——**不提示、也不占一步撤销**：过滤后一条都不剩时整次粘贴就是个
+            空操作（连撤销栈都不入）。其余列一律放行（见 model 的 `acceptPaste`）。
+        */
+        const writes = plan.writes.filter((write) => acceptPaste(write.columnId, write.value))
+        if (writes.length === 0) return
+
         batchingRef.current = true
         try {
-            for (const write of plan.writes) edit(write.rowId, write.columnId, write.value)
+            for (const write of writes) edit(write.rowId, write.columnId, write.value)
         } finally {
             batchingRef.current = false
         }
-        // 一整次粘贴 = **一步撤销**：清单是 `[行, 列, 改前值]`。
-        undoRef.current.push(plan.writes)
+        // 一整次粘贴 = **一步撤销**：清单是 `[行, 列, 改前值]`（被校验挡掉的那几格不在里面）。
+        undoRef.current.push(writes)
         // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
         selectRange(
             modelRows[plan.range.firstRow].id,
