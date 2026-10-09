@@ -35,4 +35,12 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
         expect(规则.length).toBeGreaterThan(0)
         expect(规则.some((sel) => sel.includes("th.cell-pinned") && sel.includes("td.cell-pinned"))).toBe(true)
     })
+
+    /*
+        ‼️ 护的是"**活动格不填底色**"（Excel 的约定）：拖选起点那一格即使带 `.cell-selected` 也要让掉底色，
+        别的格子照旧。少了这条，用户要的"第一格无选区白底"就会退回"所有格子一个色"。
+    */
+    it("活动格（cell-active）让掉选中底色", () => {
+        expect(代码).toMatch(/td\.cell-selected\.cell-active\s*\{[^}]*box-shadow:\s*none/)
+    })
 })

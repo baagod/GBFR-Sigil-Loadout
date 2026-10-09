@@ -104,6 +104,8 @@ export const ActionRowView = memo(function ActionRowView({
     /** 某一格**进入编辑**了：复制源那圈虚线要撤（规则②的口径是"动过源区"，进编辑就算动）。 */
     onEnterEdit: () => void
 }) {
+    /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
+    const rowCells = row.getAllCells()
     return (
         /* `data-row-id`：行拖拽时要按"光标在哪一行"找 row id（见 `ActionsTable.rowIdAtY`）—— */
         /* DOM 拿得到，不用再往库那边问一遍。 */
@@ -132,7 +134,7 @@ export const ActionRowView = memo(function ActionRowView({
                 <div className={HANDLE_INNER}>{rowNumber}</div>
             </td>
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
-            {row.getAllCells().map((cell) => {
+            {rowCells.map((cell) => {
                 const pinned = cell.column.getIsPinned()
                 const key = cell.column.id
                 const readOnly = READ_ONLY_KEYS.has(key)

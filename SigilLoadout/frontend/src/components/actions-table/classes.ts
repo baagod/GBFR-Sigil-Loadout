@@ -131,19 +131,22 @@ export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b bg-[
 export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
 
 /**
- * 这一格**选中相关**的类（具体样式在 `style.css`，结构照官方 cell-selection 示例）。
+ * 这一格**选中相关**的类（具体样式在 `style.css`）。
  *
  *   · `cell-selected` —— 底色
  *   · `cell-edge-*`   —— **只画"落在外边界上"的那几条边**（`getSelectionEdges()` 告诉我们哪几条）。
  *     这样任意多个矩形拼起来是**一条连续轮廓**，而不是每格一圈框。这块几何判断是库替我们算的。
- *   · `cell-focused`  —— 选区里那个锚点格
+ *   · `cell-active`   —— **活动格**（拖选/点击的起点）：底色让掉（Excel 的约定 —— 选区里那一格保持原底色，
+ *     一眼看出"从哪一格开始拖的"）。换一格重新拖选时它不再是活动格，底色自然回来。
+ *     行号选行也走这一条：行手势把区的锚点列设成第一格**数据列**（`id_`，序号列不在列模型里），
+ *     于是"开始拖的那一行第一格"就是活动格 —— 与拖选单元格同一套逻辑，没有第二种规则。
  *
  * 没选中时**提前返回**：`getSelectionEdges()` 会再解析一遍位置，只为发现"没选中"不值当
  * （大表里绝大多数格子都没选中）。
  */
 export function selectionClass(cell: Cell<typeof features, ActionRow>): string {
-    if (!cell.getIsSelected()) return cell.getIsFocused() ? "cell-focused" : ""
-    return ["cell-selected", cell.getIsFocused() && "cell-focused", ringClasses(cell.getSelectionEdges(), "cell-edge")]
+    if (!cell.getIsSelected()) return ""
+    return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(cell.getSelectionEdges(), "cell-edge")]
         .filter(Boolean)
         .join(" ")
 }

@@ -578,6 +578,15 @@ td.cell-selected:focus-within::after {
 }
 
 /*
+    ‼️ **活动格不填底色**（Excel 的约定，用户实测要求）：拖选 / 点击的起点那一格保持原底色，只画轮廓 ——
+    一眼看出"从哪一格开始拖的"。换一格重新拖选时它不再是活动格，底色自然就回来了。
+    类由 classes.ts 的 selectionClass 给（`cell-active`：选中 + 聚焦时才挂；行号选行也走同一条）。
+*/
+td.cell-selected.cell-active {
+    box-shadow: none;
+}
+
+/*
     「全局参数」表：一行里任意一格拿到焦点时，**整行**的下沿画一条 2px 的线（颜色 = 输入框聚焦时那个
     `--ring`，见 ui/input.tsx 的 focus-visible:border-ring）。
 

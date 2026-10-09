@@ -97,6 +97,42 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         expect(screen.queryByText(/同一行或同一列/)).toBeNull()
     })
 
+    /*
+        ‼️ **行号选行的活动格**与拖选单元格**同一套逻辑**（都是库的聚焦格 = 那个区锚点那一格）：
+        行手势把区的锚点列设成第一格**数据列**（`id_` —— 序号列不在列模型里），
+        所以"开始点 / 开始拖的那一行第一格"不填底色，序号格与其余格照旧。
+    */
+    it("选整行：活动格是本行第一个数据格（id_），序号格与其余格不带", async () => {
+        const container = await renderTable()
+
+        pressHandle(container, 1)
+        fireEvent.mouseUp(window)
+
+        expect(cellAt(container, 1, KEYS.indexOf("id_")).className).toContain("cell-active")
+        expect(cellAt(container, 1, KEYS.indexOf("abilityTag_")).className).not.toContain("cell-active")
+        expect(handleAt(container, 1).className).not.toContain("cell-active")
+    })
+
+    it("拖选多行：活动格是**开始那一行**的第一格数据格", async () => {
+        setRows([makeRow("1000"), makeRow("1001"), makeRow("1002")])
+        const container = await renderTable()
+
+        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
+        rows.forEach((row, index) => {
+            const top = index * 20
+            row.getBoundingClientRect = () =>
+                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
+        })
+
+        pressHandle(container, 0)
+        fireEvent.mouseMove(cellAt(container, 2, 2), {clientY: 45})
+        fireEvent.mouseUp(window)
+
+        expect([0, 1, 2].map((r) => rowSelectedAt(container, r))).toEqual([true, true, true])
+        expect(cellAt(container, 0, KEYS.indexOf("id_")).className).toContain("cell-active") // 起点那一行
+        expect(cellAt(container, 2, KEYS.indexOf("id_")).className).not.toContain("cell-active")
+    })
+
     it("Shift 点行号：从锚点连选一段（第 2 行 → 第 4 行，中间一起选中）", async () => {
         setRows([makeRow("1000"), makeRow("1001"), makeRow("1002"), makeRow("1003"), makeRow("1004")])
         const container = await renderTable()

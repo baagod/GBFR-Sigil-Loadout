@@ -168,6 +168,35 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(行[0].split("\t").slice(0, 2)).toEqual(["1000", "AB_PL1000_01"])
     })
 
+    /*
+        ‼️ **活动格（拖选/点击的起点）不填底色** —— Excel 的约定（用户实测要求）：
+        起点的"底色让掉"由 CSS 管（`td.cell-selected.cell-active { box-shadow: none }`），
+        这里钉住**类**：只有起点那一格带 `cell-active`，换一格重新拖选后原来那格就不带了。
+    */
+    it("活动格标记：只有拖选起点那一格带 cell-active，换格重拖后消失", async () => {
+        const container = await renderTable()
+
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        for (const [r, c] of [
+            [0, 3],
+            [1, 2],
+            [1, 3],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c))
+        }
+        fireEvent.mouseUp(document)
+
+        expect(cellAt(container, 0, 2).className).toContain("cell-active") // 起点
+        expect(cellAt(container, 1, 3).className).toContain("cell-selected")
+        expect(cellAt(container, 1, 3).className).not.toContain("cell-active")
+
+        // 换一格重新拖选 → 原来那格不再是活动格（底色随之回来）
+        fireEvent.mouseDown(cellAt(container, 1, 3))
+        fireEvent.mouseUp(document)
+        expect(cellAt(container, 0, 2).className).not.toContain("cell-active")
+        expect(cellAt(container, 1, 3).className).toContain("cell-active")
+    })
+
     it("同一列的两片 → 复制拼成一列（不是外接矩形）", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()
