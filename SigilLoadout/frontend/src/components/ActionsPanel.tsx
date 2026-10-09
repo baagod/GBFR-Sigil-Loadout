@@ -24,18 +24,9 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties} from "react"
+import {memo, useEffect, useMemo, useRef, useState} from "react"
 
-import {
-    ActionIDs,
-    Deploy,
-    ListCharacters,
-    LoadActions,
-    Path,
-    SaveActionFields,
-    SetActionIDs,
-    SetCharacter,
-} from "../../bindings/sigilloadout/service/actionsservice"
+import {LoadActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy} from "../../bindings/sigilloadout/service/actionsservice"
 import {Button} from "@/components/ui/button"
 import {
     Combobox,
@@ -48,76 +39,15 @@ import {
 import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
-import {ACTION_HANDLE, TrackRow, TrackTable, type TrackColumn} from "@/components/TrackTable"
 import {ActionsTable} from "@/components/ActionsTable"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
-import {charCodeOf, isMotion, isSelected} from "@/lib/actionflags"
-import {abilityName} from "@/lib/ability"
-import {useRowSelection} from "@/lib/useRowSelection"
+import {charCodeOf} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
-
-// 只读列：**不许编辑、直接显示当前值**。
-//   id_        —— 后端用来找记录的那把钥匙，改了等于换了另一条记录；
-//   abilityTag_ —— 关联技能（`AB_PL1000_04` 这种），是**别的字段/别的系统拿来查表的引用**，
-//                  形如技能名但本质是个键（见 docs/action/动作表字段文档.md §1）。改它不会"改坏"，
-//                  但会悄悄让那一行指向另一个技能，所以只读。
-const isReadOnlyColumn = (key: string) => key === "id_" || key === "abilityTag_"
-
-// 这两类是"改一段动作链"要一起动的格子，**表头**都用反色标出来
-// （bg-primary / text-primary-foreground，与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）：
-//   saveMotId*      —— 双击它加载那个 motion 的 flags
-//   controlTypeHash_ —— 决定"这一串 mot 播几段"（见 docs/action/动作表字段文档.md §5），
-//                       填了 mot 却没改类型 = 那几段根本不会播，所以它必须和 mot 列摆在一个视觉组里。
-const isHighlightedColumn = (key: string) => key.startsWith("saveMotId") || key === "controlTypeHash_"
-
-/*
-    动作表的表头**按列**多要的那一段类（字号、内边距、格线、居中都由共用的表头给，见 TrackTableHead）。
-
-    底色一律 `#1f1f1f`（写死，不走 `--muted`：那个还兼着页签栏底座、按钮 hover、combobox tag 等好几处，
-    改它会全站跟着变；而且本应用只有深色一套 —— index.html 上 `dark` 是写死的 —— 为它造一个 token
-    等于造一个永远用不到的浅色变体）。它比表体的可编辑格（#1a1a1a）亮一点点，表头才分得出来。
-      · 普通列    —— `z-10 bg-[#1f1f1f]`
-      · 反色列    —— `z-10 bg-primary text-primary-foreground`（与默认按钮同一对：浅底 #e5e5e5 + 深字 #171717）
-      · `id_`    —— `left-10 z-50`：**两轴都钉**，要压在别的表头上面。left-10 = 40px = 「#」那列
-                      (39 + 1 边框，见 ACTION_HANDLE)。它不取反色，底色与其他表头一致。
-      · `abilityTag_` —— `z-40`（`left` 走量出来的 --frozen-left）。比 `id_` 低一层，但**必须高于
-                      聚焦格那层 30**（见 style.css 的 cell-focus），否则编辑中的格子会穿透它。
-    底色这几串**只此一处**：以前表头类是内联在 JSX 里的，改底色时漏掉了 `id_` 那一格（只剩它还是旧色）。
-    ⚠️ 只给差的那一段（不把 `bg-[#1f1f1f]` 与 `bg-primary` 同时写上）：两边都是单类工具类，谁赢只看
-    样式表顺序。
-*/
-/** 冻结列的左边界：表头与数据格必须用**同一个字符串**，各写一份迟早只改一处、两行错位。 */
-const FROZEN_LEFT = "left-[var(--frozen-left,95px)]"
-
-/** 横向滚动时冻住的数据列（表头那一格由 actionHeaderClass 给同一个 left）。 */
-const FROZEN: Record<string, string> = {
-    id_: " text-center sticky left-10 z-40",
-    // 96px = handle 40 + id_ 列实测宽 56。**这个数就是 id_ 列的自然宽度**（auto 布局下写 w-* 定不住它，
-    // 试过：48 被顶成 55、64 照样 55）。sticky 的 left 连不滚动时也生效，留大了静止时就有一道缝 ——
-    // 记录号是 3~4 位，56px 够用。
-    // 左边界是**量出来的**（--frozen-left，见 ActionsPanelBase 的 useLayoutEffect）：id_ 列会被等比摊宽，
-    // 能力名长短一变、列数一变，摊到的宽度就变，写死像素迟早错位、缝会再露。95px 只是量出来之前的兜底。
-    //
-    // z-40：**必须高过聚焦格那层 30**（style.css 的 cell-focus 给聚焦/编辑中的格子 z-index: 30）——
-    // 给 30 就是同层，谁在上面只看 DOM 顺序，于是横向滚过来的编辑框会画在这一列上面（实测穿透）。
-    abilityTag_: ` sticky ${FROZEN_LEFT} z-40`,
-}
-
-function actionHeaderClass(key: string): string {
-    if (key === "id_") return "left-10 z-50 bg-[#1f1f1f]"
-    // abilityTag_ 也冻住：左边界紧接着 id_（见 FROZEN 的宽度约定）。它可能同时是被点亮的那几列之一，
-    // 所以底色仍然按 isHighlightedColumn 走。
-    if (key === "abilityTag_") {
-        return `${FROZEN_LEFT} z-40 ${isHighlightedColumn(key) ? "bg-primary text-primary-foreground" : "bg-[#1f1f1f]"}`
-    }
-    if (isHighlightedColumn(key)) return "z-10 bg-primary text-primary-foreground"
-    return "z-10 bg-[#1f1f1f]"
-}
 
 // 共用的可编辑格与其两个类常量（CELL_INPUT / CELL_TEXT）搬去了 @/components/EditableCell ——
 // 它在 ActionsPanel 里时会形成 ActionsPanel ↔ GlobalParamPanel、ActionsPanel → AnimationDetail →
@@ -230,15 +160,11 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     /** 可玩角色名单，**按游戏内部顺序**（App 从专属表推出来）。空数组视为"名单还不知道"，那时不过滤不排序。 */
     playable: string[]
 }) {
-    // 动作表：actions 是后端给的那一份（每格带**原值**与**改动**）。draft[id][key] 是玩家改过的文本，
-    // 没改过的格子留空 —— 输入框显示 originals 里的原值当灰色占位符（见后端 actionedits.go 的模型）。
+    // 动作表：actions 是后端给的那一份（每格的**原值**与**改动**都在 `fields` 里）。
+    // ⚠️ 这里只留一份"字段清单"给外面的量宽用；**改动与草稿全归 `ActionsTable`**（它自己读写、自己保存）。
     const [actions, setActions] = useState<
         {id: string; fields: {key: string; original: string; value: string | null}[]}[]
     >([])
-    const [draft, setDraft] = useState<Record<string, Record<string, string>>>({})
-    // 每一格的原值（随包资产里那份）：占位符与只读列都用它；改动不在这儿。
-    const [originals, setOriginals] = useState<Record<string, Record<string, string>>>({})
-    const [actionsDirty, setActionsDirty] = useState(false)
     // charCode 是当前角色（从动作表路径上取），characters 是下拉的候选（解包目录里有的那些）。
     const [charCode, setCharCode] = useState("")
     const [characters, setCharacters] = useState<string[]>([])
@@ -251,13 +177,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     // 三块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
     // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
     const [section, setSection] = useState<"general" | "actions" | "globals">("actions")
-
-    /*
-        ⚠️ **临时**：动作表用哪一套渲染 —— 现有的手写 TrackTable，还是新搭的 TanStack Table 骨架
-        （见 ActionsTable.tsx）。两套并存只为"边用边比"，等新的补齐功能、验完就删掉这个开关和旧那套。
-        默认 legacy：新表还是个骨架，不该抢默认。
-    */
-    const [actionsView, setActionsView] = useState<"legacy" | "tanstack">("legacy")
     /** 新表的保存动作（它自己持有数据与草稿，外面只负责在「保存」时喊它一声）。 */
     const ttSaveRef = useRef<(() => Promise<void>) | null>(null)
     // 「动画详情」：正在看哪个 motion（null = 没开）。
@@ -266,40 +185,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     // 第一帧永远是它自己的底色（≈黑），就是用户实测的"开弹窗闪一下黑框"。现在是主窗口里的 dialog
     // （AnimationDetail 自己就渲染一个 <Dialog>），没有第二个合成表面。
     const [motTarget, setMotTarget] = useState<{motion: string; charCode: string} | null>(null)
-    /**
-     * 动作表的行选中（**只做选中与高亮** —— 这张表的行是"记录"，没有行序可换，所以不接拖拽，这一点与轨表
-     * 不同）。点 / Shift / Ctrl / 按住划过那套手感全在 useRowSelection 里，两张表同一份。
-     * 这张表只有一张，所以 key 用一个常量。
-     */
-    const {sel, select, extendTo} = useRowSelection<"actions">()
-    /**
-     * 冻结列的左边界**量出来**，不写死：auto 布局下 id_ 列会被等比摊宽（能力名长短、列数、记录号位数
-     * 一变就变），写死像素会让"id_ 与 abilityTag_ 之间透出一条缝"，横向滚过的列名从缝里透出来。
-     *
-     * 量的是 id_ 那一格的右边界，减去外框的边框（CSS 的 left 是相对 padding box，与这个坐标系一致），
-     * 写进 --frozen-left 给两列用。id_ 是第 2 列（第 1 列是行号握把）。
-     */
-    // null = 还没量到：那时不给 --frozen-left，让样式里的兜底值顶上（比先写成 0 强，0 会让列贴到最左、
-    // 压在行号握把上）。
-    const [frozenLeft, setFrozenLeft] = useState<number | null>(null)
-    const frameRef = useRef<HTMLDivElement | null>(null)
-
-    /** 量 id_ 那一格的右边界（见上面那段），写进 --frozen-left。 */
-    const measureFrozenLeft = () => {
-        const frame = frameRef.current
-        if (!frame) return
-        const cell = frame.querySelector<HTMLElement>("tbody tr > td:nth-child(2)")
-        if (!cell) return
-        const box = frame.getBoundingClientRect()
-        // **向上取整**：宁可多半像素（两列轻微重叠，看不出来），也不要少半像素 —— 少一点就在 id_ 与
-        // abilityTag_ 之间透出一条缝，横向滚过的列名会从缝里露出来（用户截图里那一小格 "a…"）。
-        const left = Math.ceil(cell.getBoundingClientRect().right - box.left - frame.clientLeft)
-        // ⚠️ 0 或负数一律丢掉：那一块被压成 h-0（切到别的页签时）rect 全是 0，写进去 `--frozen-left: 0px`
-        // 会让这一列离开原位、压在 `#` 与 id_ 上（那是它左边界量错的样子，用户看着就是"冻结没了"）。
-        // 宁可用旧值 / 兜底值。
-        if (left <= 0) return
-        setFrozenLeft(left)
-    }
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -318,84 +203,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
 
     // 表头按**后端给的字段顺序**排（87 列），两条记录同一套。
     const keys = useMemo(() => (actions[0]?.fields ?? []).map((field) => field.key), [actions])
-
-    /**
-     * 会改变列宽或可见性的东西一变，就在**绘制之前**补量一次。
-     *
-     * 技能名是异步到的（`abilityNames` 一到位整张表就重摊一次列宽），量晚了会看见 abilityTag_ 先错位再
-     * 跳回来 —— `#` 与 id_ 分别锚在 left-0 / left-10 上，不受这一量影响，所以只有它在抖（用户实测）。
-     * `section` 也要进依赖：切回这一页时那块从 h-0 变回可见，得当场量（那时 rect 才是真的）。
-     */
-    useLayoutEffect(measureFrozenLeft, [abilityNames, keys, section])
-
-    /**
-     * 之后交给 ResizeObserver：**盯的就是被量的那一格**（不是 frame / table）。
-     *
-     * ⚠️ 盯 table 兜不住：列宽重摊时总宽常常不变（一列变宽、另一列变窄），RO 不触发，缝就一直留在那儿
-     * （用户截图：id_ 与 abilityTag_ 之间露出一小格滚过的列名）。盯 id_ 那一格，它一变就重量。
-     * 依赖 keys：换角色 / 换表会重建行，observer 得绑到新的那一格上。
-     */
-    useEffect(() => {
-        const frame = frameRef.current
-        if (!frame) return
-        const observer = new ResizeObserver(measureFrozenLeft)
-        observer.observe(frame)
-        const cell = frame.querySelector("tbody tr > td:nth-child(2)")
-        if (cell) observer.observe(cell)
-        return () => observer.disconnect()
-        // 只按 keys 重绑：量的是"当前那一帧"的 DOM。
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keys])
-
-    // 只读那两列（见 isReadOnlyColumn）——取值那条路要用它。
-    const readOnlyKeys = useMemo(() => keys.filter(isReadOnlyColumn), [keys])
-
-    /**
-     * 动作表的列：字段名就是键，全部可编辑；`id_` / `abilityTag_` 是**只读文本格**，`id_` 还吸顶
-     * （横向滚到第 80 列时还知道这是哪条记录）。
-     *
-     * 底色按列给：只读的走**默认底色**（--background，也就是"不上色" —— 全站那条规矩：可编辑的格
-     * #1a1a1a、不可编辑的格透明）。吸顶那一列必须不透明才遮得住滚过来的列，取默认底色 = 与"透明"
-     * 同一个观感、功能上也成立。
-     */
-    const columns = useMemo<TrackColumn[]>(
-        () =>
-            keys.map((key) =>
-                isReadOnlyColumn(key)
-                    ? {
-                          label: key,
-                          key,
-                          kind: "text",
-                          // tabular-nums：一列记录号 / 技能号，位数对齐了才好扫。
-                          // 冻结列：`#`（40px，由 handle 自己 left-0）→ id_（定宽 48px）→ abilityTag_（88px）。
-                          // left 是硬编码像素，所以 id_ 必须定宽（w-12），不然 abilityTag_ 会随记录号位数错位。
-                          cell: `tabular-nums${FROZEN[key] ?? ""}`,
-                          bg: "bg-background",                          // abilityTag_ 显示成技能名（ability.lang.json，随语言变）：姬塔（AB_PL0100_*）
-                          // 这一列冻结（`cell` 里有 sticky）：选中那行时它得自己带上底色与选中那层，
-                          // 否则横向滚过来的列会从它底下穿过去（格子里没文本时最明显，见 TrackColumn 的 frozen）。
-                          frozen: FROZEN[key] !== undefined,
-                          // 与古兰是同一个角色的两个性别、技能相同，改查古兰那份；都查不到（预留槽）就原样
-                          // 显示键名，不编造。
-                          text: key === "abilityTag_" ? (tag: string) => abilityName(abilityNames, tag) : undefined,
-                          head: actionHeaderClass(key),
-                      }
-                    : {label: key, key, kind: "editable", bg: "bg-[#1a1a1a]", head: actionHeaderClass(key)},
-            ),
-        [keys, abilityNames],
-    )
-
-    /**
-     * 这一行的值：草稿盖在原值上，**只读那两列再拿原值盖回来**。
-     *
-     * ⚠️ 不能写 `draft[id]?.[key] ?? originals[id]?.[key]`：draft 是 loadAll 按 `field.value ?? ""`
-     * 建的，**没改过的格子在它那里是空字符串、不是 undefined**，`??` 因此永远不回落 —— 这两列会整列
-     * 显示为空。
-     */
-    const cellsOf = (id: string) => {
-        const cells = {...draft[id]}
-        for (const key of readOnlyKeys) cells[key] = originals[id]?.[key] ?? ""
-        return cells
-    }
 
     /**
      * 下拉里的角色，**按游戏内部顺序**：后端给的是字母序，这里换成 playable 的顺序——与专属 /
@@ -427,23 +234,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         setIdsApplied(ids ?? "")
 
         // 这一步失败就抛给调用方，由动作表那一块显示错误；上面几份不受影响。
-        const table = (await LoadActions()) ?? []
-        setActions(table)
-        const map: Record<string, Record<string, string>> = {}
-        const base: Record<string, Record<string, string>> = {}
-        for (const action of table) {
-            const values: Record<string, string> = {}
-            const original: Record<string, string> = {}
-            for (const field of action.fields) {
-                // 草稿只装**玩家改过的**：没改过的留空，于是输入框显示灰色占位符（原值）。
-                values[field.key] = field.value ?? ""
-                original[field.key] = field.original
-            }
-            map[action.id] = values
-            base[action.id] = original
-        }
-        setDraft(map)
-        setOriginals(base)
+        setActions((await LoadActions()) ?? [])
     }
 
     useEffect(() => {
@@ -451,32 +242,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         // 只读一次：这几份数据在 Go 侧是文件，切语言不改它们。失败文案在读取那一刻取当前语言那一份。
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
-
-    /** 改一格：只在真的变了的时候记改动。 */
-    const editField = (id: string, key: string, value: string) => {
-        if (draft[id]?.[key] === value) return
-        setDraft((prev) => ({...prev, [id]: {...prev[id], [key]: value}}))
-        setActionsDirty(true)
-    }
-
-    /**
-     * 双击 saveMotIdNN_：把那格的动画号读出来（四位十六进制小写），打开**动画详情那扇独立窗口**
-     * （四条轨都在那边看、改、存；flags 也在那边，主面板不再有第二处 flags 表）。
-     *
-     * 格子里没填时**用原值**：这一页现在是"原值灰显为占位符、留空 = 不动"，所以没改过的格子输入框是空的
-     * ——双击它当然也该打开它原本指向的那个动画（原值就在占位符里）。
-     *
-     * ⚠️ 窗口是**单例**（Go 侧守着）：已经开着一扇时这一记只把它提到前台，不会开出第二扇。
-     */
-    const openMotion = (id: string, key: string) => {
-        const typed = (draft[id]?.[key] ?? "").trim().toLowerCase()
-        const value = typed !== "" ? typed : (originals[id]?.[key] ?? "").trim().toLowerCase()
-        if (!isMotion(value)) {
-            console.error(t.badMotion(value))
-            return
-        }
-        setMotTarget({motion: value, charCode})
-    }
 
     /**
      * 换角色：后端把三条路径（动作表 / 轨 / FSM）**一次**换掉，然后这一页整个重读。
@@ -490,7 +255,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         try {
             setMotTarget(null)
             await SetCharacter(code)
-            setActionsDirty(false)
             await loadAll()
         } catch (e) {
             console.error(e)
@@ -517,7 +281,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         setBusy(true)
         try {
             await SetActionIDs(typed)
-            setActionsDirty(false)
             await loadAll()
             setIdsText(typed)
         } catch (e) {
@@ -542,37 +305,20 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [idsText, idsApplied])
 
-    /** 保存动作表：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。 */
-    const saveActions = async () => {
-        for (const action of actions) {
-            await SaveActionFields(action.id, action.fields.map((field) => ({
-                key: field.key,
-                // 空 = 没填 = 这一格回到原值（null），**不是**写成空串 —— 留空不再等于清空。
-                value: (draft[action.id]?.[field.key] ?? "").trim() === "" ? null : draft[action.id]![field.key],
-            })))
-        }
-    }
-
     /**
-     * 保存即部署：动作表有改动才保存；「全局参数」那张表同理（它的保存按钮就在这里，用户要求合并）；
-     * 最后一律部署一次（轨的保存在详情页那一层里各自做）。
+     * 保存即部署：「全局参数」那张表有改动就先保存（它的保存按钮就在这里，用户要求合并）；
+     * 动作表由 `ActionsTable` 自己保存（草稿住在它那儿，见 `ttSaveRef`）；最后一律部署一次。
      *
      * **界面上不报结果**：这一排不要提示（用户明确要求）。失败写 console.error，要查就看 DevTools。
      */
     const handleSaveAndDeploy = async () => {
         setBusy(true)
         try {
-            if (actionsDirty) {
-                await saveActions()
-                setActionsDirty(false)
-            }
             if (gpDirty) {
                 await gpSaveRef.current?.()
             }
-            // 动作表切到新那套（TanStack）时，草稿住在 ActionsTable 里，保存由它自己做。
-            if (actionsView === "tanstack") {
-                await ttSaveRef.current?.()
-            }
+            // 动作表的草稿住在 ActionsTable 里，保存由它自己做（它数据到位时把动作交出来）。
+            await ttSaveRef.current?.()
             await Deploy()
         } catch (e) {
             console.error(e)
@@ -657,21 +403,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                         <ToggleGroupItem value="general">{t.generalTracks}</ToggleGroupItem>
                         <ToggleGroupItem value="globals">{t.globalParams}</ToggleGroupItem>
                     </ToggleGroup>
-                    {/* ⚠️ **临时**：动作表的实现切换（现有手写表 / 新的 TanStack 骨架）。做成**独立**一个
-                        按钮、而不是 ToggleGroup 的第四项：两者是不同的选择维度（那三个是"看哪一块"，
-                        这个是"这一块用哪套渲染"），而且 ToggleGroup 一加第四项就变成"看轨迹表时也选中
-                        TanStack"这种说不清的组合。等新的补齐功能、这个开关就该删掉。 */}
-                    <Button
-                        variant={actionsView === "legacy" ? "outline" : "default"}
-                        disabled={busy}
-                        onClick={() => {
-                            // 两套表各有自己的草稿，切换不会把它带过去 —— 留着就是"改在 A 上、存在 B 上"。
-                            setActionsDirty(false)
-                            setActionsView((view) => (view === "legacy" ? "tanstack" : "legacy"))
-                        }}
-                    >
-                        {actionsView === "legacy" ? t.tanstackTable : t.legacyTable}
-                    </Button>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
                         松紧不一，英文 Save 那档就白留一截）。
@@ -706,11 +437,10 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                     <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
                 ) : keys.length === 0 ? (
                     <div className="pb-1 text-xs text-muted-foreground">{t.loading}</div>
-                ) : actionsView === "tanstack" ? (
-                    // ⚠️ **临时**：新的 TanStack Table 骨架。它自己读数据、自己持草稿（见 ActionsTable.tsx），
-                    // 所以上面那份 actions/draft 一概不喂给它；保存走 saveRef（见 handleSaveAndDeploy）。
-                    // 现有一整套设置（frameRef 的 --frozen-left 量宽、ResizeObserver）**不作用于它** ——
-                    // 这一版没有冻结列。等新表补齐功能，这一段条件渲染连同旧那套一起删。
+                ) : (
+                    // ⚠️ 新表（TanStack）**已转正**：它就是动作表本身，旧的 TrackTable 那套连同切换开关一起删了。
+                    // 它自己读数据、自己持草稿（见 ActionsTable.tsx），所以上面那份 actions/draft 一概不喂给它；
+                    // 保存走 saveRef（见 handleSaveAndDeploy）。
                     <ActionsTable
                         /*
                             换角色 = 换**一整份**数据（`switchCharacter` 先 `SetCharacter`，`LoadActions`
@@ -732,48 +462,6 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                             ttSaveRef.current = save
                         }}
                     />
-                ) : (
-                    // flex-1：**框铺满剩下的高度**（用户要求 —— 行少的时候也不留一段没框的空地）。
-                    // 装不下时照样靠 min-h-0 + overflow-auto 自己滚，行多时同样吃满窗口。
-                    // 写死 max-h 就等于"窗口再大也只露固定几行"。
-                    //
-                    // 两条滚动条都留默认：scrollbar-gutter-stable 给纵向那条常驻沟槽，免得它一出现/
-                    // 消失，八十多列就跟着左右抖一下。
-                    //
-                    // 外框与滚动都在**这一层**（`frame={false}` 把它留给这里）：它才是滚动视口，框得钉住
-                    // 不跟着内容跑 —— 138 行的表滚起来时上边框、左边框必须还在。格线颜色不自定义：全站
-                    // 默认的 --border 就是这套表的格线（深色下 10% 白）。
-                    // 最后一行补回下边框（`!` 压掉共用表格里那条 last-child 去边框的规则）：框铺满高度之后，
-                    // 表格内容与下面那片空地之间得有一条线，不然最后一行像是被截断的。
-                    <div ref={frameRef} style={frozenLeft === null ? undefined : ({["--frozen-left"]: `${frozenLeft}px`} as CSSProperties)} className="min-h-0 flex-1 overflow-auto border table-border scrollbar-gutter-stable [&_tbody_tr:last-child>*]:border-b!">
-                        <TrackTable columns={columns} handle={ACTION_HANDLE} frame={false}>
-                            {actions.map((action, index) => (
-                                <TrackRow
-                                    key={action.id}
-                                    index={index}
-                                    columns={columns}
-                                    values={cellsOf(action.id)}
-                                    original={originals[action.id]}
-                                    // 动作表那套"值是改动、空着显示原值当占位符"（见后端 actionedits.go）。
-                                    editing="override"
-                                    selected={isSelected(sel, index)}
-                                    // 这张表没有"与原表不同就点亮"那回事（灰/亮由 placeholder 表达）。
-                                    diff={null}
-                                    handle={ACTION_HANDLE}
-                                    t={t}
-                                    // 只认左键；Shift 拉一段、Ctrl 逐个增删；按住划过连续扩选
-                                    //（松手在 window 的 mouseup 上收尾）—— 与轨表同一份实现。
-                                    onSelect={(shift, ctrl) => select("actions", index, shift, ctrl)}
-                                    onExtend={() => extendTo("actions", index)}
-                                    onEdit={(key, value) => editField(action.id, key, value)}
-                                    // 反色那几列双击就打开这个 motion 的动画详情（别的列不给双击）。
-                                    onCellDoubleClick={(key) => {
-                                        if (isHighlightedColumn(key)) void openMotion(action.id, key)
-                                    }}
-                                />
-                            ))}
-                        </TrackTable>
-                    </div>
                 )}
                 </div>
                 {/* 「全局参数」：解包目录 system\player\ 下那十几张不分角色的表。

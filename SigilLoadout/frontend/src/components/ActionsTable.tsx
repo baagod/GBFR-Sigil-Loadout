@@ -23,8 +23,8 @@ import {
     useMemo,
     useRef,
     useState,
-    type ClipboardEvent,
-    type MouseEvent as ReactMouseEvent,
+    type CSSProperties,
+    type KeyboardEvent as ReactKeyboardEvent,    type MouseEvent as ReactMouseEvent,
     type Ref,
     type RefObject,
 } from "react"
@@ -46,6 +46,7 @@ import {
     type ColumnSizingState,
     type Row,
     type RowSelectionState,
+    type Table,
     type SortingState,
 } from "@tanstack/react-table"
 
@@ -66,6 +67,14 @@ import type {Messages} from "@/lib/messages"
  */
 const READ_ONLY_KEYS = new Set(["id_", "abilityTag_"])
 
+/**
+ * 剪贴板事件用**浏览器原生的**类型，不是 React 那个合成事件。
+ *
+ * 为什么：`copy` / `paste` 现在挂在 `document` 上（见那段说明 —— 挂在表格容器上会漏掉"焦点在表格外"
+ * 的那些 Ctrl+C），那两条监听的参数类型就是原生 `ClipboardEvent`；React 的合成类型对不上。
+ */
+type ClipboardEvent = globalThis.ClipboardEvent
+
 /** 只读格的底色：与页面同色（= 看起来"不上色"）。**必须是不透明的** —— 钉住的列要挡住滚过来的列。 */
 const READ_ONLY_BG = "bg-background"
 /** 可编辑格的底色：比页面亮一档，一眼看出"这一格能改"。 */
@@ -83,7 +92,7 @@ const displayText = (key: string, raw: string, names: Record<string, string>) =>
  *
  *   · `columnPinningFeature` —— 列的**逻辑固定**（`getIsPinned` / `getPinnedIndex`）。
  *     ⚠️ 它只给"哪几列被钉住"这件事的**状态与分组**，**一个像素的样式都不给** ——
- *     sticky / left / z 序 / 不透明底色都是渲染那层自己写的（见 PINNED）。
+ *     sticky / left / z 序 / 不透明底色都是渲染那层自己写的（见 `PINNED_CELL` 与 style.css 的 `.cell-pinned`）。
  *   · `rowSortingFeature` + `sortedRowModel` —— 排序的**状态**与**真正重排**，两样缺一不可：
  *     只登记 feature 而不给 row model，`getRowModel()` 照旧返回原顺序（排序**静默失效**）。
  *   · `columnSizingFeature` —— 列宽的 state（`getSize` / `getStart` / `getTotalSize`）。
@@ -120,11 +129,16 @@ const features = tableFeatures({
  * ⚠️ 必须**逐格**加，不能只写在 `<tr>` 上让它往下透：不吸顶的格子底色不透明，会把 tr 那层盖掉；
  * 而钉住的只读列（`#` / `id_` / `abilityTag_`）**必须**不透明（否则横向滚过来的列会从它底下透出来），
  * 只能自己把这层叠加上去。试过用 tr 上一条任意变体一把管完 —— Tailwind 会编译出来但不生效。
+ *
+ * ‼️ 行选中与单元格选区的底色**必须是同一层**（用户报过："选择行的背景色和普通选区的背景色不一致"）。
+ * 两边原先各写一套、数值还不同：这里以前是 `bg-linear-to-b from-white/14 to-white/14`（实测 58,58,58），
+ * 而 `.cell-selected` 是 `inset box-shadow` 的 7% 白（实测 42,42,42）—— 同一份"选中"两种亮度。
+ * 现在两边统一走 `.cell-row-selected` / `.cell-selected`，同样是 **7% 白的 `inset box-shadow`**。
  */
-const ROW_SELECTED_OVERLAY = "bg-linear-to-b from-white/14 to-white/14"
+const ROW_SELECTED_BG = "cell-row-selected"
 
-/** 这一格的底色（`own`）之上，若整行被选中就再叠一层。 */
-const cellOverlay = (rowSelected: boolean, own: string) => (rowSelected ? `${own} ${ROW_SELECTED_OVERLAY}` : own)
+/** 这一格的底色（`own`）之上，若整行被选中就再加一层行选中底色。 */
+const cellBg = (rowSelected: boolean, own: string) => (rowSelected ? `${own} ${ROW_SELECTED_BG}` : own)
 
 /** 默认钉住前几列。用**序号**不用字段名：字段名是数据给的，写死就等于把"有哪些列"抄了一份。 */
 const PINNED_COUNT = 2
@@ -143,7 +157,7 @@ const PINNED_COUNT = 2
 const HANDLE_WIDTH = 40
 
 /**
- * 行号格的类：横向钉在最左（纵向吸顶由表头那行自己给），z 与表头同档规矩见 PINNED。
+ * 行号格的类：横向钉在最左（纵向吸顶由表头那行自己给），层高与别的冻结列同一档（见 `PINNED_CELL`）。
  *
  * `select-none` 是**行选中**要的：按住行号拖过多行时，浏览器会把划过的数字当"选文字"涂成蓝底
  * （实测），和行选中那层浅色叠在一起，看着像"选中了数字"。禁掉之后拖拽只改选中、不选文字。
@@ -152,7 +166,7 @@ const HANDLE_WIDTH = 40
  * 底色**不写在这里**：表头那一格要与别的表头同色，表体那几格要与页面同色 —— 两边不一样，所以
  * 拆成"表体用 `READ_ONLY_BG`（与只读列同一份）、表头用 `HANDLE_HEAD_BG`"。
  */
-const HANDLE_CELL = "cell-handle sticky left-0 z-40 border-r border-b p-0 text-center select-none"
+const HANDLE_CELL = "cell-handle cell-pinned sticky left-0 border-r border-b p-0 text-center select-none"
 
 /** 表头行号格的底色：**与别的表头一致**（用户要求）。与 `HEAD_CELL` 同一档灰，改要一起改。 */
 const HANDLE_HEAD_BG = "bg-[#1f1f1f]"
@@ -214,17 +228,17 @@ const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${CELL_PADD
 export {ROW_HEIGHT, PINNED_COUNT}
 
 /**
- * 钉住的列：**只管 `sticky` 与 z 层**，底色由调用点按"只读 / 可编辑"给（埋在常量里的话，
- * 只读列就没法用别的底色 —— 而两个只读列恰好都是钉住的），且**一律不透明**（它底下会滚过别的列）。
- * `sticky` 两边都要写：表体那格没有公共类兜底，漏了就只是"带个 z-index 的普通格子"。
+ * 钉住的列 / 行号格：**只负责"吸顶 + 层高"**（底色由调用点按"只读 / 可编辑"给 —— 两个只读列恰好
+ * 都是钉住的，埋进常量里它们就没法用别的底色）。
  *
- * ⚠️ z 的**唯一硬约束**：钉住的列必须**高过聚焦格那层 30**（`style.css` 的 `cell-focus` 给
- * 聚焦/编辑中的格子 `z-index: 30`）。给 30 就是同层，谁在上面只看 DOM 顺序（表体在后、在上），
- * 于是横向滚过来的编辑框会画在冻结列上面（穿透）；给 40 才压得住。
+ * ‼️ 这里**不能出现任何 `position`**（除了 `sticky` 本身）：`td.cell-edge-*` 那几条提层规则特异性
+ * 比工具类高，顺手写个 `relative` 会把 `sticky` 顶掉，冻结列就跟着横向滚动跑走、底下滚过来的列
+ * 连点击一起接管（用户报的"拖冻结列却选中了别的列"）。
+ * 层高也不写工具类，由 `style.css` 的 `table td.cell-pinned` 定（那里写了为什么）。
  */
-const PINNED = {header: "sticky z-40", cell: "sticky z-40"}
+const PINNED_CELL = "cell-pinned sticky"
 
-/** 表头单元格的公共类（钉住的列由 PINNED.header 覆盖 z 与底色）。 */
+/** 表头单元格的公共类（钉住的列由 `PINNED_CELL` 把层高顶上去）。 */
 const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b bg-[#1f1f1f] ${HEAD_PADDING} font-medium whitespace-nowrap ${FONT}`
 
 /**
@@ -263,6 +277,62 @@ function selectionClass(cell: Cell<typeof features, ActionRow>): string {
 }
 
 /**
+ * 一格落在**复制源那片**的外边界上的哪几条边（只返回 `cell-copy-*`；不在那片里就是空串）。
+ *
+ * 几何与选区那份**同源**：一条边成立 = 本格在那片里，而**那一侧邻格不在那片里**。
+ *
+ * ‼️ **两个类都挂**：选区那圈实线（`::before` 的 `border`）与复制源那圈虚线（`outline`，画在 border
+ * 之上）是**两条线同时存在**，重合的地方虚线压在上面 —— 用户定的"在复制区里选一格，选区加自己的实线
+ * 边框，但不要退出复制区虚线；重合处虚线赢"。所以这里**不扣**选区的边，扣了就永远看不到重合处的虚线。
+ *
+ * ⚠️ 判据只用 `rowIds` / `columnIds` 的下标（**别**拿 `getAllCells()` 的 index 去套）：这两串是
+ * `handleCopy` 直接从 `getCellSelectionBounds()` 那套下标里取出来的，本身就是**选区坐标系**
+ * （行号列不在列模型里，所以两套相差 1）。混用会让"复制一格"变成"第一行/第一列"。
+ */
+/**
+ * 一格在复制区**外圈**的哪几条边上（只有那几条边要画虚线）。
+ *
+ * 那一片的外圈**就是两串 id 之间的行列区间**，判据用下标一次出，纯逻辑、与布局无关 ——
+ * 与库自己的 `cell.getSelectionEdges()` 同一个思路（某一侧为真 ⟺ 那一侧的邻格不在同一片里），
+ * 只是把"同一片"换成"复制源那两串 id"（复制之后选区会被清掉，所以不能直接用库那份）。
+ *
+ * ⚠️ 下标只能拿 `rowIds` / `columnIds` 自己比（别混 `getAllCells()` 的 index）：
+ * 那两串是 `handleCopy` 从 `getCellSelectionBounds()` 那套下标里取出来的，本身就是同一坐标系
+ * （行号列不在列模型里，两套相差 1）。
+ */
+function copyRingEdge(copy: CopySource | null, rowId: string, columnId: string) {
+    if (!copy) return null
+    const rowIndex = copy.rowIds.indexOf(rowId)
+    const colIndex = copy.columnIds.indexOf(columnId)
+    if (rowIndex < 0 || colIndex < 0) return null
+    return {
+        top: rowIndex === 0,
+        bottom: rowIndex === copy.rowIds.length - 1,
+        left: colIndex === 0,
+        right: colIndex === copy.columnIds.length - 1,
+    }
+}
+
+/**
+ * 一格在复制区外圈要画的边 → **类名字符串**（没有就是空串）。
+ *
+ * 与 `cell-edge-*`（选区轮廓）同一套写法：逐格挂"自己有哪几条边"，样式表按类名画线，
+ * **每格只画自己那几条**。这样"复制区内部没有线"是结构上必然的 —— 内部的格子一个类都不挂。
+ */
+const cellCopyRing = (copy: CopySource | null, rowId: string, columnId: string) => {
+    const edge = copyRingEdge(copy, rowId, columnId)
+    if (!edge) return ""
+    return [
+        edge.top && "cell-copy-top",
+        edge.right && "cell-copy-right",
+        edge.bottom && "cell-copy-bottom",
+        edge.left && "cell-copy-left",
+    ]
+        .filter(Boolean)
+        .join(" ")
+}
+
+/**
  * 一个值转成 TSV 里的一个字段。
  *
  * 两条都要有：**含分隔符/换行/引号就加引号并把内部引号翻倍**（否则粘回表格会串列），
@@ -277,6 +347,66 @@ const escapeTsvValue = (value: unknown): string => {
 
 /** 二维值表 → TSV 文本（每行一块）。 */
 const toTsv = (grid: string[][]): string => grid.map((line) => line.map(escapeTsvValue).join("\t")).join("\n")
+
+/**
+ * **粘贴规则**（用户拿 Excel / WPS 逐条量出来的，表格内复制与表格外粘进来的**同一套**）：
+ *
+ * ```
+ * 两份数 = floor(选区 / 剪贴板的块)，最小 1 份
+ * 结果区 = 份数 × 块
+ * ```
+ *
+ * 逐条：
+ *   ① 落点 = 选区的**左上角**（`getCellSelectionBounds()[0]` 的最小行列），往右下铺；
+ *   ② 块里的值按 `块[r % 块行数][c % 块列数]` 取 —— 也就是"铺不满一份就丢掉那一格"：
+ *        · 复制 1×1 → 选 2×3：`floor(2/1)=2`、`floor(3/1)=3` → **铺满 2×3**；
+ *        · 复制 1×3 → 选 1×4 / 1×5：`floor(4/3)=floor(5/3)=1` → **只写 1×3**，剩下凑不满一份、不动；
+ *        · 复制 1×3 → 选 1×6：`floor(6/3)=2` → 铺 1×6；
+ *        · 复制 2×2 → 选 3×3：`floor(3/2)=1` → **只写 2×2**（第 3 行/列凑不满，不动）；
+ *        · 复制 2×3 → 选 4×1：`floor(4/2)=2`、`floor(1/3)=1` → 铺 4×3。
+ *      **最小 1 份**是必须的：选区比块小（比如选一格粘一片）时按一份写，块照原样铺出去。
+ *   ③ **只读列跳过**（`id_` / `abilityTag_` 写不回去）：位置照占、值不写 —— 整块不会左移；
+ *   ④ 铺出表右 / 表下**直接丢**（表的行列数是定的，不自己加）；
+ *   ⑤ 值写进 `values`（"改动"那一栏）；**不裁空格、不解析引号**（与 Excel 一致）；
+ *   ⑥ 粘完把**选区扩成刚粘的那一片**（Excel 就是这个手感：接着粘 / 复制有落点）；
+ *   ⑦ 一整次粘贴 = **一步撤销**，Ctrl+Z 一次退回（逐格记的话得按十几次）。
+ */
+
+/**
+ * 剪贴板里那一份东西的**来源**（复制时记下来）。
+ *
+ * 为什么要它：`clipboardData` 只装文本，**装不下"这片是从哪儿复制的"**。而"复制源那圈虚线什么时候撤"
+ * （= 用户量出来的规矩，见下）全靠它判断。
+ */
+type CopySource = {
+    /** 源区的行 id / 列 id（渲染顺序），**按顺序**存的：第 0 个就是那片的第一行/第一列。 */
+    rowIds: string[]
+    columnIds: string[]
+    /** 源区每一格**复制那一刻的原值**，键见 `snapshotKey`。切窗口回来时拿它核对源区还在不在。 */
+    snapshot: Map<string, string>
+}
+
+/** `snapshot` 的键：行 id 与列 id 拼起来。用 `\u0000` 分隔 —— 字段名里不可能出现它（TSV 里也不是分隔符）。 */
+const snapshotKey = (rowId: string, columnId: string) => `${rowId}\u0000${columnId}`
+
+/**
+ * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
+ *
+ * **会消失**
+ *   ① **开始新一次复制** —— 换成新的一片（`handleCopy` 里直接覆盖）；
+ *   ② **动过源区**：在源区里编辑一格、往源区里粘贴、或者撤销一步改到源区 —— 只要有一次写入落在源区里，
+ *      这圈虚线就撤（哪怕写进去的值跟原来一模一样：用户的口径是"源区被动了"）。
+ *      注意**粘到源区以外不会撤**（跟 Excel 一样：连粘多处是常规用法）；
+ *   ③ **Esc** —— 立刻撤（剪贴板里东西还在，只是不再高亮源区）；
+ *   ④ **切出去再切回来时源区已经对不上**了 —— 用户的说法是"它回来时会检查剪贴板内容是否还与复制区一致，
+ *      不一致就移除虚线"。我们这张表没有别的程序能改它，所以等价做法是：窗口重新获得焦点时，
+ *      拿 `snapshot` 与当前值核一遍，对不上就撤。
+ *
+ * **不会消失**（这几条也照 Excel）
+ *   · 粘到别的地方；
+ *   · 切程序 / 切页签；
+ *   · 滚动、拖选区、点别的地方。
+ */
 
 /** 一行：一条动作记录。TanStack 要 data 是对象/数组，后端那种 `fields: [{key,...}]` 得先摊平。 */
 type ActionRow = {
@@ -320,6 +450,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     onSaveReady?: (save: () => Promise<void>) => void
 }) {
     const [rows, setRows] = useState<ActionRow[]>([])
+    /**
+     * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
+     * 稳定，见下）、读不到最新的 `rows`；走 `setRows` 的 updater 里读则会踩 React 重跑 updater 那个坑。
+     */
+    const rowsRef = useRef<ActionRow[]>([])
+    rowsRef.current = rows
     /** 字段顺序（= 表头顺序）：后端保证同一份表里每条记录的键序列一致，取第一条即可。 */
     const [keys, setKeys] = useState<string[]>([])
     /** 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `PINNED_COUNT` 个字段）。 */
@@ -328,6 +464,13 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
     /** 量过了没有 —— 没量之前用 `table-auto`（要量出**自然宽度**），量完切 `table-fixed`。 */
     const [measured, setMeasured] = useState(false)
+    /**
+     * "这块被显示出来之后再来一遍"的开关（量列宽那趟的重试计数）。
+     *
+     * 这张表常挂载在分块里，启动时它那份容器是 `display:none` —— 隐藏着量什么都是 0，
+     * 所以量不到就**先不置 `measured`**，靠这个计数在下一帧重跑（见那段 `useLayoutEffect`）。
+     */
+    const [shownTick, setShownTick] = useState(0)
     /**
      * 排序：**默认按 `id_` 升序**（记录号从小到大，扫起来才有顺序感）。
      *
@@ -341,13 +484,40 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      * "先选后编"全靠它：库的 start handler 在 mousedown 里会**立刻**改掉选中状态，等 `click` 时
      * 再去读，读到的已经是改过之后的（必然"已选中"）—— 于是第一次单击也会进编辑 ✗。
      * 所以要在 mousedown 那一刻把"之前的答案"记下来，click 与 focus 都用这一份。
+     *
+     * ‼️ 还要记**是哪个格子**（`wasSelectedCellRef`）：这一份是整张表共享的，不记格子身份的话，
+     * 上一格留下的 `true` 会被**下一格**读到 —— 表现是"点过 A 格之后，去 B 格拖选的第一下直接进编辑"
+     * （实测踩到：在复制区里拖选一次就把那圈虚线撤了，因为拖选的第一下被当成了"进编辑"）。
      */
     const wasSelectedRef = useRef(false)
+    /** 上面那个 `wasSelectedRef` 是**哪一格**的（`行id\u0000列id`）—— 不匹配就一律当 false。 */
+    const wasSelectedCellRef = useRef("")
     /**
-     * 复制下来的**源列 id 序列**。粘贴时要核对目标列对不对得上 —— 剪贴板里只有值、没有列名，
-     * 不留这一份就没法判断"这坨值原本是哪几列"。
+     * **按下之前选区是不是"就只有这一格"**。
+     *
+     * 为什么还要这一条：从多格里点其中一格（或在里面拖选），意图是"把选区收到这一格 / 拉一片"，
+     * 不是编辑 —— 实测：单格拖选的按下与松开在同一格、位移 0，光看"有没有拖"分不出来，照样会误进编辑
+     * 并把复制区那圈虚线撤掉。加上这条之后：**只有"本来就单选这一格、再点一下"才进编辑**。
      */
-    const copiedColumnsRef = useRef<string[]>([])
+    const wasOnlyCellRef = useRef(false)
+    /**
+     * **这一次按下是不是"拖"**（按下到松开移动超过几个像素）。
+     *
+     * 与 `wasOnlyCellRef` 互补：多格选中时点一格靠前者拦、单选一格时拖出去靠这条拦。
+     */
+    const draggedRef = useRef(false)
+    /** 按下时的坐标（与松开比距离，见 `draggedRef`）。 */
+    const downAtRef = useRef<{x: number; y: number} | null>(null)
+    /**
+     * **单元格选区**（受控）。
+     *
+     * ⚠️ 这档**必须**接进 `state` + `onCellSelectionChange`，跟我们其它几档一样 —— 库的
+     * `setCellSelection` / `resetCellSelection` 都是走 `onCellSelectionChange` 的（`setStateSlice`：
+     * **没有这个回调就直接 return，什么都不发生**），而适配器每次重渲染又会用 `options.state` 把内部
+     * 原子覆盖一遍。少了这两项，选区就是"改了、随即被抹回空"——现象是**点格子毫无反应**，
+     * 复制拿到空选区、粘贴没有落点（整条复制粘贴失效，且不报错）。
+     */
+    const [cellSelection, setCellSelection] = useState<CellSelectionState>([])
     /**
      * **按行选中**（点行号）：`id_` → true。状态归库（`rowSelectionFeature`），这里只持有受控值。
      */
@@ -362,7 +532,33 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
-    const [error, setError] = useState("")
+    /** 数据读不回来（后端/绑定出错）—— 只装这一件事；粘贴不再有"列对不上"那种拒绝。 */
+    const [loadError, setLoadError] = useState("")
+    /**
+     * **撤销栈**（Ctrl+Z）。一"步"= 一批改动（粘一次 = 一步）：每项是 `[行, 列, 改前值]` 的清单，
+     * 撤销时倒着把值写回去即可。之所以存"改前值"而不是"反向操作"：值就地在 `values` 里，写回旧值是
+     * 唯一需要的信息，无需知道它是编辑来的还是粘贴来的。
+     *
+     * 用 ref 不用 state：它不进渲染，进 state 只会让整张表跟着重渲。
+     */
+    const undoRef = useRef<Array<Array<[string, string, string]>>>([])
+    /** 撤销**正在写回**时立起来 —— 写回本身不许再进栈（否则一次撤销记一条，可以无限撤销）。 */
+    const undoingRef = useRef(false)
+    /** **正在粘贴**：这期间 `edit` 不记账，由粘贴那一处把整片当**一步**记下来。 */
+    const batchingRef = useRef(false)
+    /**
+     * **复制源**（剪贴板里那份是从哪儿复制的）—— 画那圈虚线用；`null` = 没有（复制过又被撤掉了）。
+     * 归 ref：它不直接渲染，渲染用的是下面那份 `copySource` 快照。
+     */
+    const copySourceRef = useRef<CopySource | null>(null)
+    /**
+     * 复制源的**渲染快照**（`copySourceRef` 的可渲染副本）。
+     *
+     * 为什么要两份：`ref` 改了不会触发重渲，而"虚线该撤了"这件事必须**马上**上屏。用 `version` 当依赖、
+     * 从 ref 现算一份 —— 比"把整个 Map 塞进 state"省事，也不会跟 `edit` 的 `[]` 依赖打架。
+     */
+    const [copySourceVersion, setCopySourceVersion] = useState(0)
+    const copySource = useMemo(() => copySourceRef.current, [copySourceVersion])
 
     useEffect(() => {
         void (async () => {
@@ -387,7 +583,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 setMeasured(false)
                 setColumnSizing({})
             } catch (e) {
-                setError(String(e))
+                setLoadError(String(e))
             }
         })()
     }, [])
@@ -410,13 +606,23 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         getRowId: (originalRow) => originalRow.id,
         // 单元格选择：全表都能选（**只读列也要能选** —— 复制时得带上它们的值，只是粘贴时不写回去）。
         enableCellSelection: true,
-        // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪几行：都是**受控状态** —— 值由我们给，库通过 onChange
-        // 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态；这里用 state 这一档就够）。
-        state: {columnPinning: pinning, columnSizing, sorting, rowSelection},
+        /*
+            ‼️ **关掉"数据一变就清空选区"**。它按 `data` 的引用变来判"数据换了"，而我们每次改一格都会换
+            `rows` 数组（`setRows`），于是**粘一次就会把刚设好的选区当场地清掉**（实测：粘完 6 格选中数归 0）。
+            粘完选中刚粘的那一片是用户明确要的（Excel 就是这个手感）。
+            代价：真·重读数据（`LoadActions`）之后选区可能指向不存在的行 —— 那条路本来就会把 `keys`/`rows`
+            整体换掉，界面上表都重建了，库对"角落已解析不了"的选区是**跳过**（`getCellSelectionBounds` 会
+            略掉解析不出的范围，不是崩），可以接受。
+        */
+        autoResetCellSelection: false,
+        // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪几行 / 选了哪一片格：都是**受控状态** —— 值由我们给，
+        // 库通过 onChange 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态）。
+        state: {columnPinning: pinning, columnSizing, sorting, rowSelection, cellSelection},
         onColumnPinningChange: setPinning,
         onColumnSizingChange: setColumnSizing,
         onSortingChange: setSorting,
         onRowSelectionChange: setRowSelection,
+        onCellSelectionChange: setCellSelection,
     })
 
     /*
@@ -432,11 +638,30 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
           ② 这里量每列、取整、写进 `columnSizing`，置 `measured`；
           ③ 之后用 `table-fixed` + `column.getSize()`，列宽从此由 state 说了算、与内容脱钩
              （代价：**编辑内容后列宽不再自动跟随** —— 这是换掉亚像素的必然代价）。
+
+        ‼️ **必须等这块真的被显示出来再量**（`hasSize` 那道闸 + `shownTick` 重试）。
+        原因是踩过的坑：这张表在「通用配装 / 角色动作」这类分块里是**常挂载**的，启动时它那份
+        容器是 `display:none` —— **不在可视树里，量什么都是 0**。以前默认落在旧表上、新表是切过去
+        才挂载（那时已可见）所以量得对；新表转正之后它一开始就挂在那儿，于是启动必量出 0，列宽被
+        锁成库里的默认 20px，切过去看到的表头一行一个字母（用户报的"你自己部署后打开变成这样"）。
+        修法就是"量不到就**先不置 `measured`**、等它出来再来一遍"——**不改任何交互行为**，
+        只是把这趟测量挪到"可见"那一刻。
     */
     useLayoutEffect(() => {
         if (measured || keys.length === 0) return
         const el = tableRef.current
         if (!el) return
+        /*
+            ‼️ **可见性判据是"这个 `<table>` 自己没有尺寸"**，不能去看它的祖先 —— 祖先里有一层是
+            `flex-1` 的滚动容器，纵向永远是 0（这工具的表靠外层滚动），拿它当判据会**永远**重试。
+            隐藏时 `<table>` 的 rect 是 0×0，显示出来才有宽高，这个判据干净且足够。
+        */
+        const rect = el.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) {
+            // 还没显示：等下一帧再看（`shownTick` 是重跑本 effect 的开关）。
+            const raf = requestAnimationFrame(() => setShownTick((v) => v + 1))
+            return () => cancelAnimationFrame(raf)
+        }
         const sizes: ColumnSizingState = {}
         for (const th of el.querySelectorAll<HTMLElement>("thead th[data-col-id]")) {
             const id = th.dataset.colId
@@ -451,35 +676,90 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         }
         setColumnSizing(sizes)
         setMeasured(true)
-    }, [measured, keys])
+    }, [measured, keys, shownTick])
 
     /**
      * 改一格：只换那一行的对象（TanStack 靠引用变才知道要重算），别的行原样留着。
      *
      * `useCallback` 不是为了省这点开销 —— 是为了让**引用稳定**：它会作为 prop 传给 `memo` 化的
      * 行组件，每次渲染换一个新函数的话，`memo` 的比较永远不相等、整片表照旧重渲，那层就白做了。
+     *
+     * ⚠️ 撤销栈的 push **不能**写在 `setRows` 的 updater 里：updater 允许被 React 重跑（StrictMode
+     * 就会），跑一次记一笔 = 一次编辑要按两下 Ctrl+Z。所以"变没变 / 改前值"先用 `rowsRef` 判完、
+     * 记完，再交一个纯映射给 `setRows`。
      */
     const edit = useCallback((rowId: string, key: string, value: string | null) => {
-        setRows((prev) =>
-            prev.map((row) => (row.id === rowId ? {...row, values: {...row.values, [key]: value ?? ""}} : row)),
-        )
+        const next = value ?? ""
+        const before = rowsRef.current.find((row) => row.id === rowId)?.values[key] ?? ""
+        if (before === next) return // 值没变不是一步：不写 state、也不进撤销栈
+        if (!undoingRef.current && !batchingRef.current) undoRef.current.push([[rowId, key, before]])
+        /*
+            动到复制源那一片 → 那圈虚线撤掉（规则②，见上面 `CopySource` 那段）。
+            判据是"**动过**"而不是"值跟复制时不一样"：往源区里粘一个跟原来一模一样的值，虚线照样撤。
+            这里直接写 ref + bump，不走 `clearCopySource()` —— `edit` 的依赖必须是 `[]`（引用稳定，
+            见上面那段），调外面那个每次渲染都新建的函数会把它钉死在首帧那一份上。
+        */
+        const source = copySourceRef.current
+        if (source && source.snapshot.has(snapshotKey(rowId, key))) {
+            copySourceRef.current = null
+            setCopySourceVersion((v) => v + 1)
+        }
+        setRows((prev) => prev.map((row) => (row.id === rowId ? {...row, values: {...row.values, [key]: next}} : row)))
     }, [])
 
     /**
-     * 选中区域里的**真值**（二维）+ 它的列 id 序列。
+     * 清除复制源（那圈虚线跟着消失）。
+     *
+     * 三个入口都走它：进编辑（`onEnterEdit`）、Esc、切窗口回来核对发现源区变了。另外**动到源区的写入**
+     * 走 `edit` 里那条内联分支（那里不能用这个函数，原因见 `edit`）。
+     */
+    const clearCopySource = useCallback(() => {
+        if (!copySourceRef.current) return
+        copySourceRef.current = null
+        setCopySourceVersion((v) => v + 1)
+    }, [])
+
+    /**
+     * 撤销一步（Ctrl+Z）：把这一步记下的"改前值"倒着写回去。
+     *
+     * 倒着写是**必须的**：一步里同一个格子被写过两次时（粘贴块自己叠到自己上），只有"后写的那条
+     * 先还原"才回得到原样。
+     */
+    const handleUndo = (e: KeyboardEvent | ReactKeyboardEvent) => {
+        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return
+        // 编辑框里的 Ctrl+Z 归浏览器（撤的是这一次输入），跟表格的历史不是一回事。
+        if ((e.target as HTMLElement).tagName === "INPUT") return
+        const step = undoRef.current.pop()
+        if (!step) return
+        e.preventDefault()
+        undoingRef.current = true
+        setRows((prev) =>
+            prev.map((row) => {
+                let values = row.values
+                for (const [rowId, key, before] of step) {
+                    if (row.id !== rowId) continue
+                    values = {...values, [key]: before}
+                }
+                return values === row.values ? row : {...row, values}
+            }),
+        )
+        undoingRef.current = false
+    }
+
+    /**
+     * 选中区域里的**原值**（二维）。
      *
      * ⚠️ 不能用 `table.getSelectedCellRangesData()`：它走 `accessorFn`，而我们那个算的是**显示值**
-     * （`abilityTag_` 会给"碎魂"）—— 复制出去再粘回来就把中文名写进键的位置了。所以取**数据本身**。
+     * （`abilityTag_` 会给技能名）—— 复制出去再粘回来就把中文名写进键的位置了。所以取**数据本身**。
      *
      * 列顺序用 `row.getAllCells()` 的 —— 那是**渲染顺序**（钉住列在前），跟
      * `getCellSelectionBounds()` 给的列下标是同一套坐标系；`getVisibleLeafColumns()` 不带钉住重排，
      * 拿它取会错位。
      */
-    const selectedGrid = (): {columns: string[]; grid: string[][]} => {
+    const selectedGrid = (): {grid: string[][]} => {
         const bounds = table.getCellSelectionBounds()[0]
-        if (!bounds) return {columns: [], grid: []}
+        if (!bounds) return {grid: []}
         const modelRows = table.getRowModel().rows
-        const columns: string[] = []
         const grid: string[][] = []
         for (let r = bounds.minRowIndex; r <= bounds.maxRowIndex; r++) {
             const row = modelRows[r]
@@ -489,78 +769,146 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             for (let c = bounds.minColumnIndex; c <= bounds.maxColumnIndex; c++) {
                 const cell = cells[c]
                 if (!cell) continue
-                if (r === bounds.minRowIndex) columns.push(cell.column.id)
                 line.push(row.original.originals[cell.column.id] ?? "")
             }
             grid.push(line)
         }
-        return {columns, grid}
+        return {grid}
     }
 
+    /** 光标所在的输入框里**选中了文字**没有（编辑框 vs 表格，见 `handleCopy` 那道闸）。 */
+    const hasSelectedText = () => {
+        const el = document.activeElement
+        return el instanceof HTMLInputElement && el.selectionStart !== el.selectionEnd
+    }
+
+    /*
+        ‼️ `useCallback`（依赖全是稳定值）：这两个处理器挂在 `document` 上（见下面那段 `useEffect`），
+        每次渲染换一个新函数就等于"挂一个旧的、摘一个新的"，白白多跑一遍 effect。
+    */
     const handleCopy = (e: ClipboardEvent) => {
-        if ((e.target as HTMLElement).tagName === "INPUT") return // 编辑框里自己那套复制
-        const {columns, grid} = selectedGrid()
+        /*
+            ‼️ 编辑框里**只有选中了文字**才让给浏览器（复制那几个字）；**没选中文字就别静默什么都不做**。
+
+            这里原来是一句 `target.tagName === "INPUT"` 就 `return`：用户在编辑框里按 Ctrl+C（比如只想复制
+            这一格的值），因为框里没有选区，浏览器什么也不复制、表格又直接早退 —— 表现就是**按 Ctrl+C 毫无反应**，
+            而且剪贴板里还留着上一次的内容，看着更莫名其妙（用户报的"选区选好了、Ctrl+C 没反应"，
+            实测探针命中的正是这一条）。
+        */
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === "INPUT" && hasSelectedText()) return
+        const {grid} = selectedGrid()
         if (grid.length === 0) return
         e.preventDefault()
-        e.clipboardData.setData("text/plain", toTsv(grid))
-        copiedColumnsRef.current = columns
+        e.clipboardData?.setData("text/plain", toTsv(grid))
+
+        /*
+            顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
+            新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
+            ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
+        */
+        const bounds = table.getCellSelectionBounds()[0]
+        const modelRows = table.getRowModel().rows
+        if (!bounds) {
+            copySourceRef.current = null
+            setCopySourceVersion((v) => v + 1)
+            return
+        }
+        const rowIds: string[] = []
+        const columnIds: string[] = []
+        const snapshot = new Map<string, string>()
+        for (let r = bounds.minRowIndex; r <= bounds.maxRowIndex; r++) {
+            const row = modelRows[r]
+            if (!row) continue
+            rowIds.push(row.id)
+            const cells = row.getAllCells()
+            for (let c = bounds.minColumnIndex; c <= bounds.maxColumnIndex; c++) {
+                const columnId = cells[c]?.column.id
+                if (!columnId) continue
+                if (!columnIds.includes(columnId)) columnIds.push(columnId)
+                snapshot.set(snapshotKey(row.id, columnId), row.original.originals[columnId] ?? "")
+            }
+        }
+        copySourceRef.current = {rowIds, columnIds, snapshot}
+        setCopySourceVersion((v) => v + 1)
+        /*
+            ‼️ 复制完把**选区收掉 + 焦点也从格子上摘掉**（用户要求："复制后第一个格子有内边框，需要移除"）。
+
+            那圈"内边框"是**焦点环**（`style.css` 的 `cell-focus`，`:focus-within` 时给 2px `--ring` 实线）。
+            平时它被 `td.cell-selected:focus-within::after { content: none }` 压着（选中的格子不画焦点环），
+            可选区一收，那个"锚点格"就不再是 `cell-selected` —— 焦点环当场露出来，正好套在复制区左上那一格上。
+            所以两件事一起做：收选区（去掉那块选中底色）+ 摘焦点（去掉那圈内边框）。
+
+            与 Excel 一致：那圈虚线本身就是"剪贴板里是哪片"的标记，再叠一层底色和焦点环纯属噪音。
+            粘贴落点读的是**按下那一刻**的 `getCellSelectionBounds()`（见 `handlePaste`），所以
+            "选一片 → Ctrl+C → 原地 Ctrl+V"照样能贴在原处，不受清选区影响。
+        */
+        setCellSelection([])
+        const active = document.activeElement
+        if (active instanceof HTMLElement && tableRef.current?.contains(active)) active.blur()
     }
 
     /**
-     * 粘贴。规则（用户定的）：
-     *   ① 值取自剪贴板，写进 `values`（改动那一栏）；
-     *   ② **列必须逐个对得上**（列名就是字段身份）—— 对不上**整次拒绝**，不留"写了一半"的状态；
-     *   ③ **只读列跳过**（`id_` / `abilityTag_` 不写回去）—— 匹配检查仍按全部列算；
-     *   ④ 越界**截断**，并把丢弃/跳过的格数报出来。
-     *
-     * 起点是选区的**左上角**（`getCellSelectionBounds()` 的最小行列）—— 选了一格就从那一格往右下铺。
+     * 粘贴 —— 规则见文件上方 `toTsv` 后面那段「粘贴规则」（两条式子：`floor(选区 / 块)`、最小 1 份）。
+     * 这里只写实现上的三处要点：
+     *   · `copiesDown/Right` 就是那份数（`Math.max(1, floor(选区尺寸 / 块尺寸))`）；
+     *   · `block[r % blockRows][c % blockCols]` 就是"铺不满一份就丢掉那一格"；
+     *   · 只读列 / 越界都是"这一格不写"，但**位置照占**（不然整块会左移）。
      */
     const handlePaste = (e: ClipboardEvent) => {
         if ((e.target as HTMLElement).tagName === "INPUT") return
-        const text = e.clipboardData.getData("text/plain")
+        const text = e.clipboardData?.getData("text/plain") ?? ""
         const bounds = table.getCellSelectionBounds()[0]
-        if (!bounds) return
-        if (!text) return
+        if (!bounds || !text) return
         e.preventDefault()
 
-        const incoming = text
+        const block = text
             .replace(/\r\n?/g, "\n")
             .replace(/\n$/, "")
             .split("\n")
             .map((line) => line.split("\t"))
+        const blockRows = block.length
+        const blockCols = Math.max(...block.map((line) => line.length))
 
         const modelRows = table.getRowModel().rows
         const startRow = bounds.minRowIndex
         const startCol = bounds.minColumnIndex
         const firstCells = modelRows[startRow]?.getAllCells()
         if (!firstCells) return
+        /** 真正写进去的那一片的下标范围（`-1` = 一格都没写）：撤销栈和"粘完扩选区"都要用。 */
+        let lastRow = -1
+        let lastCol = -1
+        /** 一步撤销的清单：`[行, 列, 改前值]`（改前值就是那一格当前的**改动值**，空串 = 没改过）。 */
+        const step: Array<[string, string, string]> = []
 
-        // ② 列逐个核对：有一格对不上就整次拒绝（剪贴板里没有列名，靠复制时留下的那一份）。
-        const source = copiedColumnsRef.current
-        for (let c = 0; c < source.length; c++) {
-            if (firstCells[startCol + c]?.column.id !== source[c]) {
-                const want = source.slice(0, 3).join(", ")
-                const got = firstCells
-                    .slice(startCol, startCol + 3)
-                    .map((cell) => cell.column.id)
-                    .join(", ")
-                setError(`列对不上，没有粘贴 —— 剪贴板是 [${want}…]，这里是 [${got}…]`)
-                return
-            }
-        }
+        // 份数至少 1：选区比块小（比如选一格粘一片）时按一份写，别缩水。
+        const copiesDown = Math.max(1, Math.floor((bounds.maxRowIndex - startRow + 1) / blockRows))
+        const copiesRight = Math.max(1, Math.floor((bounds.maxColumnIndex - startCol + 1) / blockCols))
 
-        for (let r = 0; r < incoming.length; r++) {
-            const row = modelRows[startRow + r]
-            if (!row) continue
-            const cells = row.getAllCells()
-            for (let c = 0; c < incoming[r].length; c++) {
-                const cell = cells[startCol + c]
-                if (!cell) continue
-                // ③ 只读列跳过：匹配检查仍按全部列算，但值不写回去。
-                if (READ_ONLY_KEYS.has(cell.column.id)) continue
-                edit(row.id, cell.column.id, incoming[r][c])
+        batchingRef.current = true
+        try {
+            for (let r = 0; r < copiesDown * blockRows; r++) {
+                const row = modelRows[startRow + r]
+                if (!row) continue // 铺出表尾之外：丢
+                const cells = row.getAllCells()
+                for (let c = 0; c < copiesRight * blockCols; c++) {
+                    const cell = cells[startCol + c]
+                    // 只读列跳过、越界丢弃 —— 两件事都是"这一格不写"。
+                    if (!cell || READ_ONLY_KEYS.has(cell.column.id)) continue
+                    const value = block[r % blockRows][c % blockCols] ?? ""
+                    step.push([row.id, cell.column.id, row.original.values[cell.column.id] ?? ""])
+                    edit(row.id, cell.column.id, value)
+                    lastCol = startCol + c
+                    lastRow = startRow + r
+                }
             }
+        } finally {
+            batchingRef.current = false
         }
+        if (step.length === 0) return
+        undoRef.current.push(step)
+        // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
+        selectRange(modelRows[startRow].id, firstCells[startCol].column.id, modelRows[lastRow].id, modelRows[lastRow].getAllCells()[lastCol].column.id)
     }
 
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
@@ -603,7 +951,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
           · 从**行号**按下   → 选**整行**（一行就是那一行的全部列）。
 
         所以这里只有两个"设选中"的入口，清场各写一次，别在调用点抄：
-          · `table.resetCellSelection(true)` —— 库的 API，把单元格选区清空；
+          · `setCellSelection([])` —— 单元格选区是受控 state（见它那段说明），直接给空数组；
           · `setRowSelection({})` —— 行选中是受控 state，直接给空对象。
     */
 
@@ -614,9 +962,19 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         cell.getSelectionStartHandler()(e)
     }
 
+    /**
+     * 把单元格选区**直接设成这一片**（左上角 + 右下角两个角给库）。
+     *
+     * 走 `setCellSelection` 这个受控 setter（不是 `table.setCellSelection`）：库把它交给 `onCellSelectionChange`
+     * 是有隐形前置条件的（没接那个回调就**静默什么都不做**），自己持 state 就没有这一层依赖。
+     */
+    const selectRange = (anchorRowId: string, anchorColumnId: string, focusRowId: string, focusColumnId: string) => {
+        setCellSelection([{anchorRowId, anchorColumnId, focusRowId, focusColumnId}])
+    }
+
     /** 设**行**选中：先把单元格选区清掉（互斥的另一半）。 */
     const setRowsSelected = (next: RowSelectionState) => {
-        table.resetCellSelection(true)
+        setCellSelection([])
         setRowSelection(next)
     }
 
@@ -668,7 +1026,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const clickRowHandle = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
         const id = row.id
         if (mods.ctrlKey || mods.metaKey) {
-            table.resetCellSelection(true)
+            setCellSelection([])
             row.toggleSelected()
             rowAnchorRef.current = id
             return
@@ -703,13 +1061,83 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         }
         window.addEventListener("mouseup", stop)
         document.addEventListener("mousemove", follow)
+        /*
+            记"这一次按下是不是拖"：`mousedown` 抓起始坐标（**捕获阶段**，先于格子的 handler）、
+            `mousemove` 按位移判（同一格里挪 4px 也算拖）。进编辑要用它（见 `draggedRef`）。
+        */
+        const rememberDown = (e: MouseEvent) => {
+            downAtRef.current = {x: e.clientX, y: e.clientY}
+            draggedRef.current = false
+        }
+        const markDragged = (e: MouseEvent) => {
+            const from = downAtRef.current
+            if (!from) return
+            if (Math.abs(e.clientX - from.x) > 3 || Math.abs(e.clientY - from.y) > 3) draggedRef.current = true
+        }
+        document.addEventListener("mousedown", rememberDown, true)
+        document.addEventListener("mousemove", markDragged, true)
         return () => {
             window.removeEventListener("mouseup", stop)
             document.removeEventListener("mousemove", follow)
+            document.removeEventListener("mousedown", rememberDown, true)
+            document.removeEventListener("mousemove", markDragged, true)
         }
     })
 
-    if (error) return <p className="text-xs text-destructive">{error}</p>
+    /**
+     * 复制源那圈虚线的两条**外部**退出路径（规则③④，见 `CopySource` 那段）。
+     *
+     * 为什么挂 `paste` 也得挂一份：在源区**外面**粘一下（copy → paste 到别处）在 Excel 里**不撤**虚线，
+     * 但接着切出去再切回来时它会核对剪贴板与源区是否还一致 —— 我们的等价做法就是"**窗口重新获得焦点**时
+     * 拿 `snapshot` 核一遍当前值"。而粘贴本身会改数据，所以把核对也挂一份在 `paste` 上：粘完立刻核。
+     */
+    useEffect(() => {
+        const verify = () => {
+            const source = copySourceRef.current
+            if (!source) return
+            for (const [key, original] of source.snapshot) {
+                const separator = key.indexOf("\u0000")
+                const row = rowsRef.current.find((r) => r.id === key.slice(0, separator))
+                // 源区那一格现在显示的值（没改过就是原值）与复制那一刻对不上 → 源区过期，撤虚线。
+                if (!row || shownValue(row, key.slice(separator + 1)) !== original) {
+                    copySourceRef.current = null
+                    setCopySourceVersion((v) => v + 1)
+                    return
+                }
+            }
+        }
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return            // 编辑框里按 Esc 是"退出编辑"（`Cell` 自己处理，且它会 stopPropagation 掉；这里再挡一层兜底）。
+            if ((e.target as HTMLElement).tagName === "INPUT") return
+            clearCopySource()
+        }
+        /*
+            ‼️ **复制 / 粘贴必须挂在 `document` 上，不能只挂在表格容器上。**
+
+            为什么：`copy` / `paste` 事件的目标是**当前有焦点的那个元素**。表格里没有焦点时（刚点过工具栏、
+            搜索框，或点过表格外的空白），事件在 `body` 上触发、**根本不冒泡到表格容器** —— 表现就是
+            "选区明明选好了，按 Ctrl+C 毫无反应"（用户报的随机失效，实测诊断打出
+            `早退:有选区但选不出网格 | target: BODY`，而 `handleCopy` 一次都没被调用）。
+            挂到 `document` 上就与焦点无关了；两个处理器内部本来就有闸门：
+              · `handleCopy` —— 编辑框里选中了文字就让给浏览器；没有单元格选区就什么都不做；
+              · `handlePaste` —— 没有单元格选区就不拦。
+            所以在别的表（轨迹表 / 全局参数）里按 Ctrl+C 也不会被这张表抢走。
+        */
+        document.addEventListener("copy", handleCopy)
+        document.addEventListener("paste", handlePaste)
+        window.addEventListener("focus", verify)
+        document.addEventListener("paste", verify)
+        document.addEventListener("keydown", onKeyDown)
+        return () => {
+            document.removeEventListener("copy", handleCopy)
+            document.removeEventListener("paste", handlePaste)
+            window.removeEventListener("focus", verify)
+            document.removeEventListener("paste", verify)
+            document.removeEventListener("keydown", onKeyDown)
+        }
+    })
+
+    if (loadError) return <p className="text-xs text-destructive">{loadError}</p>
     if (keys.length === 0) return <p className="text-xs text-muted-foreground">{t.loading}</p>
 
     return (
@@ -719,7 +1147,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             `border-separate border-spacing-0`：格线是每格自己的 `border-r/border-b`，不是 collapse 共享的。
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
-        <div className="flex min-h-0 flex-1 flex-col" onCopy={handleCopy} onPaste={handlePaste}>
+        <div className="flex min-h-0 flex-1 flex-col" onKeyDown={handleUndo}>
+            {/* 滚动容器：吸顶表头与格子里的伪元素都按它定位。 */}
             <div className="min-h-0 flex-1 overflow-auto border table-border">
             <table
                 ref={tableRef}
@@ -738,9 +1167,9 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             >
                 <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
-                        // 表头整行吸顶，而且**必须压过表体所有钉住的格子**（它们都是 `z-40`）：
-                        // 垂直滚动时表体的冻结列会滑到表头的位置上，给同层的 40 就会被它们盖住。
-                        <tr key={headerGroup.id} className="sticky top-0 z-50">
+                        // 表头整行吸顶，**再高冻结层一层**（表头 60 > 冻结 50）：垂直滚动时表体的冻结列
+                        // 会滑到表头的位置上，压不住就穿出来。
+                        <tr key={headerGroup.id} className="sticky top-0 z-60">
                             {/*
                                 行号列 —— **不属于列模型**（见 HANDLE_WIDTH 那段）。
                                 不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
@@ -771,7 +1200,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                         }}
                                         // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
                                         data-col-id={header.column.id}
-                                        className={`${HEAD_CELL} ${pinned ? PINNED.header : ""}`}
+                                        className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} bg-[#1f1f1f]` : ""}`}
                                     >
                                         <div className="truncate">
                                             {header.isPlaceholder
@@ -822,10 +1251,17 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 measured={measured}
                                 abilityNames={abilityNames}
                                 wasSelectedRef={wasSelectedRef}
+                                wasSelectedCellRef={wasSelectedCellRef}
+                                wasOnlyCellRef={wasOnlyCellRef}
+                                /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
+                                copySource={copySource}
+                                draggedRef={draggedRef}
+                                table={table}
                                 edit={edit}
                                 dragRowRef={dragRowRef}
                                 clickRowHandle={clickRowHandle}
                                 startCellSelection={startCellSelection}
+                                onEnterEdit={clearCopySource}
                             />
                         )
                     })}
@@ -878,10 +1314,16 @@ const ActionRowView = memo(function ActionRowView({
     measured,
     abilityNames,
     wasSelectedRef,
+    wasSelectedCellRef,
+    wasOnlyCellRef,
+    copySource,
+    draggedRef,
+    table,
     edit,
     dragRowRef,
     clickRowHandle,
     startCellSelection,
+    onEnterEdit,
 }: {
     row: Row<typeof features, ActionRow>
     /** 这一行外观的指纹：只参与 `memo` 比较，渲染不用。 */
@@ -897,6 +1339,16 @@ const ActionRowView = memo(function ActionRowView({
     measured: boolean
     abilityNames: Record<string, string>
     wasSelectedRef: RefObject<boolean>
+    /** 上面那份 `wasSelectedRef` 属于**哪一格**（`行id\u0000列id`）；不匹配就一律当"没选中"。 */
+    wasSelectedCellRef: RefObject<string>
+    /** 按下之前选区是不是**就只有这一格**（多格选着点一格 = 收选区，不进编辑）。 */
+    wasOnlyCellRef: RefObject<boolean>
+    /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
+    copySource: CopySource | null
+    /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
+    draggedRef: RefObject<boolean>
+    /** 表格实例：按下时要问一句"现在的选区是不是收缩成了一格"（见 `wasOnlyCellRef`）。 */
+    table: Table<typeof features, ActionRow>
     edit: (rowId: string, key: string, value: string | null) => void
     /** 拖选起点（按下哪一行）：`null` = 没在拖。 */
     dragRowRef: RefObject<string | null>
@@ -904,6 +1356,8 @@ const ActionRowView = memo(function ActionRowView({
     clickRowHandle: (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => void
     /** 数据格上按下：选单元格，并**先把行选中清掉**（两套选中互斥）。 */
     startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
+    /** 某一格**进入编辑**了：复制源那圈虚线要撤（规则②的口径是"动过源区"，进编辑就算动）。 */
+    onEnterEdit: () => void
 }) {
     const rowSelected = row.getIsSelected()
     return (
@@ -924,7 +1378,7 @@ const ActionRowView = memo(function ActionRowView({
                 ⚠️ 这只格子不在列模型里，所以 `cell.getSelectionStartHandler()` 那套与它无关，两者不打架。
             */}
             <td
-                className={`${cellOverlay(rowSelected, `${READ_ONLY_BG} ${HANDLE_CELL}`)}`}
+                className={`${cellBg(rowSelected, `${READ_ONLY_BG} ${HANDLE_CELL}`)}`}
                 style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
@@ -960,6 +1414,11 @@ const ActionRowView = memo(function ActionRowView({
                 return (
                     <td
                         key={cell.id}
+                        /*
+                            列身份写在 DOM 上：量列宽那一趟按 `th[data-col-id]` 挑列。**少了它会悄悄退化**
+                            （量宽退化成量到全部列）。
+                        */
+                        data-col-id={cell.column.id}
                         // 宽度与表头**同一套**来源（库的 sizing state，整数）；钉住的列用
                         // `getStart('start')` 拿偏移，与表头算出来的是同一个值，两边不会偏。
                         style={{
@@ -978,29 +1437,34 @@ const ActionRowView = memo(function ActionRowView({
                         }}
                         /*
                             **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减）。
-                            ⚠️ mousedown 里**先**记下"按下之前这一格选没选中"：库的 handler 会立刻改掉
-                            选中状态，等 click / focus 时再读就读到改后的了 —— "先选后编"全靠这一份。
-                        */
-                        /*
-                            **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减）。
                             走 `startCellSelection`：它会**先把行选中清掉**（两套选中互斥，见那段模型说明）。
                             ⚠️ mousedown 里**先**记下"按下之前这一格选没选中"：库的 handler 会立刻改掉
                             选中状态，等 click / focus 时再读就读到改后的了 —— "先选后编"全靠这一份。
                         */
                         onMouseDown={(e) => {
                             wasSelectedRef.current = selected
+                            wasSelectedCellRef.current = snapshotKey(row.id, cell.column.id)
+                            // "按下之前的选区是不是就只有这一格"（见 `wasOnlyCellRef`）
+                            const bounds = table.getCellSelectionBounds()[0]
+                            wasOnlyCellRef.current =
+                                !!bounds && bounds.minRowIndex === bounds.maxRowIndex && bounds.minColumnIndex === bounds.maxColumnIndex
                             startCellSelection(cell, e)
                         }}
                         // 按住划过来 → 选区另一端拉到这一格（没按住时库内部 no-op）。
                         onMouseEnter={cell.getSelectionExtendHandler()}
+                        /*
+                            复制区那圈虚线：**这一格在复制区外圈的那几条边**（`copyRingEdge`，
+                            与库的 `cell.getSelectionEdges()` 同一个思路）。样式在 style.css 的
+                            `.cell-copy-*` —— 用**伪元素**画，`inset: 0` 正好压在格线上，不参与布局。
+                        */
                         className={`${CELL_BASE} ${
                             // 非钉住的格子要 `relative`：选区轮廓是**伪元素**画的（`inset: -1px`，
                             // 为了盖住那 1px 格线），绝对定位得有定位祖先。钉住的格子本身就是
                             // `sticky`（也是定位元素），再写 `relative` 会跟它抢同一个属性。
-                            pinned ? PINNED.cell : "relative"
-                        } ${cellOverlay(rowSelected, readOnly ? READ_ONLY_BG : EDITABLE_BG)} ${
+                            pinned ? PINNED_CELL : "relative"
+                        } ${cellBg(rowSelected, readOnly ? READ_ONLY_BG : EDITABLE_BG)} ${
                             readOnly ? "" : "cell-focus"
-                        } ${edges}`}
+                        } ${edges} ${cellCopyRing(copySource, row.id, cell.column.id)}`}
                     >
                         <CellContent
                             rowId={row.id}
@@ -1011,7 +1475,17 @@ const ActionRowView = memo(function ActionRowView({
                             shown={shown}
                             abilityNames={abilityNames}
                             wasSelectedRef={wasSelectedRef}
+                            wasSelectedCellRef={wasSelectedCellRef}
+                            wasOnlyCellRef={wasOnlyCellRef}
+                            /*
+                                "这一格在**上一次 mousedown 之前**选没选中" —— `td` 的 handler 在那一下里
+                                已经把它写进 ref 了（连同格子身份），这里渲染时取出来往下传，给 `Cell` 的
+                                focus 闸门用。别在这里再写一遍 ref（那会把它盖成"按下之后"的答案）。
+                            */
+                            preSelected={wasSelectedRef.current && wasSelectedCellRef.current === snapshotKey(row.id, key)}
+                            draggedRef={draggedRef}
                             edit={edit}
+                            onEnterEdit={onEnterEdit}
                         />
                     </td>
                 )
@@ -1040,7 +1514,12 @@ const CellContent = memo(function CellContent({
     shown,
     abilityNames,
     wasSelectedRef,
+    wasSelectedCellRef,
+    wasOnlyCellRef,
+    preSelected,
+    draggedRef,
     edit,
+    onEnterEdit,
 }: {
     rowId: string
     fieldKey: string
@@ -1053,7 +1532,23 @@ const CellContent = memo(function CellContent({
     shown: string
     abilityNames: Record<string, string>
     wasSelectedRef: RefObject<boolean>
+    /** 上面那份 `wasSelectedRef` 属于**哪一格**（`行id\u0000列id`）；不匹配就一律当"没选中"。 */
+    wasSelectedCellRef: RefObject<string>
+    /** 按下之前选区是不是**就只有这一格**（多格选着点一格 = 收选区，不进编辑）。 */
+    wasOnlyCellRef: RefObject<boolean>
+    /**
+     * **这一格在这下 mousedown 之前选没选中**。
+     *
+     * 为什么不在这里现读 `wasSelectedRef`：`td` 的 mousedown 在**冒泡后**才轮到我们这层，那时它已经被
+     * 改写成"按下之后"了。所以由 `td` 在它自己的 handler 里（那时是对的）写进 ref，渲染时取出来传下去。
+     * 用来闸住 focus 那条进编辑的路（见 `Cell` 里的 `skipFocusEditRef`）。
+     */
+    preSelected: boolean
+    /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 是"拖出去拉选区"，不该进编辑。 */
+    draggedRef: RefObject<boolean>
     edit: (rowId: string, key: string, value: string | null) => void
+    /** 进入编辑态时喊一声（复制源那圈虚线要撤，见 `CopySource` 那段规则②）。 */
+    onEnterEdit: () => void
 }) {
     if (readOnly) {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
@@ -1065,8 +1560,15 @@ const CellContent = memo(function CellContent({
             value={raw}
             original={original}
             onCommit={(value) => edit(rowId, fieldKey, value)}
-            // "先选后编"：这一格被点时该不该进编辑，看**按下之前**它选没选中。
-            shouldEditOnClick={() => wasSelectedRef.current}
+            /*
+                "先选后编"：**本来就只有这一格选中、再点一下**才进编辑。
+                两个条件缺一不可（见 `wasOnlyCellRef` / `draggedRef` 的注释）：多格选着点一格 = 收选区、
+                按住拖 = 拉选区，都不是编辑。
+            */
+            shouldEditOnClick={() => wasSelectedRef.current && wasOnlyCellRef.current && wasSelectedCellRef.current === snapshotKey(rowId, fieldKey)}            /* 同一个判据的"按下前"快照，给 focus 那条路闸门用（见 `Cell` 里的 `skipFocusEditRef`）。 */
+            preSelected={preSelected}
+            dragged={draggedRef}
+            onEnterEdit={onEnterEdit}
         />
     )
 })
@@ -1079,7 +1581,7 @@ const CellContent = memo(function CellContent({
  * 只设 `opacity-0`（透明、仍占位、且仍可聚焦 —— Esc 那条路要用），**绝不离开文档流** ——
  * 详见 `Cell` 里那段。
  */
-function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFocus, ref}: {
+function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFocus, onMouseDown, ref}: {
     text: string
     /** 灰色：这一格显示的是**原值**（还没改过）。 */
     muted?: boolean
@@ -1090,6 +1592,8 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
     /** 显示态 `0`（可聚焦）、编辑态 `-1`（避开 Tab 序列）—— Esc 退出编辑要把焦点交回这一层。 */
     tabIndex?: number
     onFocus?: () => void
+    /** 按下（可编辑列用它把"这一格之前选没选中"交回外层；见 `Cell` 里那段）。 */
+    onMouseDown?: (e: ReactMouseEvent) => void
     ref?: Ref<HTMLDivElement>
 }) {
     return (
@@ -1097,6 +1601,7 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
             ref={ref}
             tabIndex={tabIndex}
             onFocus={onFocus}
+            onMouseDown={onMouseDown}
             // 编辑态这层是透明的：别把同一份文本再塞进无障碍树（那时该读的是上面那个输入框）。
             aria-hidden={hidden || undefined}
             // `truncate` = overflow:hidden + text-overflow:ellipsis + white-space:nowrap（一个类给全）。
@@ -1118,7 +1623,7 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-function Cell({value, original, onCommit, shouldEditOnClick}: {
+function Cell({value, original, onCommit, shouldEditOnClick, preSelected, dragged, onEnterEdit}: {
     /** 这一格的**改动**（空串 = 没改过）。 */
     value: string
     /** 这一格的**原值**：没改过时显示它当占位符。 */
@@ -1133,14 +1638,23 @@ function Cell({value, original, onCommit, shouldEditOnClick}: {
      * 只会把"点之前"的旧状态固定下来。
      */
     shouldEditOnClick: () => boolean
+    /**
+     * **进编辑那一瞬间**喊一声：复制源那圈虚线要撤（用户定的规矩 —— 不是等改完提交，
+     * 而是"进入编辑"就算动了源区）。`onClick` 与 `onFocus` 两条进编辑的路都得喊。
+     */
+    onEnterEdit: () => void
+    /**
+     * **这一格在这下 mousedown 之前选没选中**（由 `td` 在它自己的 handler 里取好、渲染时传下来；
+     * 在下面那个 mousedown 里读 ref 是读不到的 —— 那时已经被改成"按下之后"了）。
+     */
+    preSelected: boolean
+    /** **这一次按下之后鼠标有没有真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不进编辑。 */
+    dragged: RefObject<boolean>
 }) {
     const [editing, setEditing] = useState(false)
     /** 显示值：没改过就是原值。 */
     const shown = value === "" ? original : value
-    /*
-        草稿的初值是 `shown`（**不是** `value`）—— `value` 在"没改过"时是空串，那样点开会是个空框；
-        而口径要求预填原值。绑定也必须绑 `draft`：绑 `shown` 的话用户一删空就被弹回原值，清不掉。
-    */
+
     const [draft, setDraft] = useState(shown)
     /** 是不是"没改过"那一态（只决定灰不灰；用 `value` 判，因为原值本身可能就是空串）。 */
     const placeholder = value === ""
@@ -1153,6 +1667,20 @@ function Cell({value, original, onCommit, shouldEditOnClick}: {
     const skipFocusRef = useRef(false)
     /** Esc 之后输入框紧接着会失焦：那一次 blur **不许提交**（Esc = 放弃草稿）。 */
     const skipCommitRef = useRef(false)
+    /**
+     * **这一次 focus 不许进编辑**（这一格在这下 mousedown 之前**没**被选中）。
+     * 为什么需要它：`mousedown → focus` 之间隔着重渲，整表共享的"之前选没选中"已经被这次 mousedown
+     * 改写成 true 了 —— 不闸住的话，点一个没选中的格子、或在选区里按下开始拖选，都会**直接进编辑**。
+     */
+    const skipFocusEditRef = useRef(false)
+    /**
+     * 进编辑的唯一入口：先把"进编辑"这件事播出去（复制区那圈虚线要撤，见 `CopySource` 规则②），
+     * 再改自己的状态。**两条进编辑的路都得走它**，否则"从焦点进来"那条会漏掉播报。
+     */
+    const enterEdit = () => {
+        onEnterEdit()
+        setEditing(true)
+    }
 
     // 没在编辑时跟着显示值走：别处保存完、重读回来的新值要上屏，草稿也跟着回正。
     if (!editing && draft !== shown) setDraft(shown)
@@ -1173,9 +1701,19 @@ function Cell({value, original, onCommit, shouldEditOnClick}: {
                 ref={textRef}
                 text={shown}
                 muted={placeholder}
+                /*
+                    ‼️ **这一格在按下之前没被选中 → 这一次 focus 不许进编辑**（拖选的第一下、或者点一个
+                    没选中的格子，都只算"选中"）。不闸的话：`wasSelectedRef` 在 `td` 的 mousedown 里刚被
+                    改成 true，紧接着的 focus 就读成"已经选中"→ 直接进编辑（实测：在复制区里拖选第一下
+                    就进编辑，把复制区那圈虚线撤了）。
+                    `preSelected` 是渲染时从 `td` 那一刻的快照取下来的 —— 在这里现读 ref 只会读到"按下之后"。
+                */
+                onMouseDown={() => {
+                    if (!preSelected || dragged) skipFocusEditRef.current = true
+                }}
                 /* "先选后编"：只有按下之前这一格已经在选中区里，click 才进编辑（判据见 `shouldEditOnClick`）。 */
                 onClick={() => {
-                    if (shouldEditOnClick()) setEditing(true)
+                    if (!dragged.current && shouldEditOnClick()) enterEdit()
                 }}
                 hidden={editing}
                 // 编辑中别让它进 Tab 序列（上面已经压着输入框）；显示态可聚焦，Esc 才有地方落焦点。
@@ -1186,15 +1724,15 @@ function Cell({value, original, onCommit, shouldEditOnClick}: {
                         skipFocusRef.current = false
                         return
                     }
-                    /*
-                        ⚠️ 和 `onClick` 用**同一个判据**，别在这儿无条件进编辑。
-
-                        鼠标按下的顺序是 `mousedown → focus → mouseup → click` —— 焦点比 click **早**，
-                        所以"聚焦即编辑"会在 click 之前就把编辑态打开，"先选中、再点一次才编辑"根本
-                        轮不到 click 那一步。`wasSelectedRef` 在 mousedown 里已经写好，这里读到的
-                        正是"按下之前选没选中"。
-                    */
-                    if (shouldEditOnClick()) setEditing(true)
+                    // 这一格在按下之前没被选中 → 这一下只算"选中"，别进编辑（见 `skipFocusEditRef`）。
+                    if (skipFocusEditRef.current) {
+                        skipFocusEditRef.current = false
+                        return
+                    }
+                    // 拖出去扩选（`dragged`）也一律不进编辑：那一下的意图是选一片，不是编辑。
+                    if (dragged.current) return
+                    /* 剩下的情况与 `onClick` 同一个判据：按下之前这一格已经在选中区里 → 进编辑。 */
+                    if (shouldEditOnClick()) enterEdit()
                 }}
             />
             {editing && (
@@ -1255,3 +1793,6 @@ function Cell({value, original, onCommit, shouldEditOnClick}: {
         </>
     )
 }
+
+
+

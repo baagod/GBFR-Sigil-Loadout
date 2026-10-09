@@ -106,11 +106,43 @@ function handleAt(container: HTMLElement, row: number) {
     return container.querySelectorAll("tbody tr")[row].querySelector("td")!
 }
 
+/** happy-dom 没有真剪贴板：给 `fireEvent.copy/paste` 塞一个能读写的替身。 */
+function clipboardStub(text = "") {
+    const data: Record<string, string> = text ? {"text/plain": text} : {}
+    return {
+        data,
+        getData: (type: string) => data[type] ?? "",
+        setData: (type: string, value: string) => {
+            data[type] = value
+        },
+    }
+}
+
+/** 从一个格子开始建选区（mousedown 就是"起点"）。 */
+function selectCell(cell: HTMLElement) {
+    fireEvent.mouseDown(cell)
+    fireEvent.mouseUp(document)
+}
+
+/**
+ * 复制区那圈虚线 = **复制区外圈那排格子**上的 `cell-copy-*` 类（每格只挂自己那几条边）。
+ * 复制区**内部**的格子一个类都不挂 —— 所以"内部没有线"是结构上必然的。
+ * 样式用伪元素画的（`inset: 0`，压在格线上）；happy-dom 不做布局，像素的事归真机。
+ */
+function copyCellsOf(container: HTMLElement): HTMLElement[] {
+    return [...container.querySelectorAll<HTMLElement>("tbody td")].filter((td) => /cell-copy-/.test(td.className))
+}
+
+/** 有没有那圈虚线（任意一格挂了就算有）。 */
+function copyBoxOf(container: HTMLElement): HTMLElement | null {
+    return copyCellsOf(container)[0] ?? null
+}
+
 /* ==================== 按行号选行：点 / Shift / Ctrl / 拖 ==================== */
 
 /** 这一行按行号选中了没有（行号格带上那层浅色叠加 = 选中）。 */
 const rowSelectedAt = (container: HTMLElement, row: number) =>
-    (handleAt(container, row).className ?? "").includes("from-white/14")
+    (handleAt(container, row).className ?? "").includes("cell-row-selected")
 
 /** 按下行号格：修饰键会进 `nativeEvent`。 */
 const pressHandle = (container: HTMLElement, row: number, mods: {shiftKey?: boolean; ctrlKey?: boolean} = {}) =>
@@ -170,12 +202,42 @@ describe("新的动作表（TanStack Table v9）", () => {
         **流程**：量过之后必须切 `table-fixed`、并且显式给宽度。真实像素由真浏览器验（tools/debug）。
     */
     it("列宽：量出自然宽度后取整，并锁进 table-fixed（消掉亚像素的断线）", async () => {
-        const container = await renderTable()
-        const table = container.querySelector("table") as HTMLTableElement
-        expect(table.className).toContain("table-fixed")
-        expect(table.style.width).not.toBe("")
-        // 数据列看**第二格**（第一格是行号，它给的是固定宽度，不能拿它当"量过了"的证据）。
-        expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).not.toBe("")
+        /*
+            happy-dom 不做布局，`getBoundingClientRect()` 一律是 0 —— 而这张表的量宽**必须先"看得见"**
+            （隐藏容器里量什么都是 0，见 `useLayoutEffect` 里那段）。所以这里把尺寸**显式喂进去**：
+            `<table>` 给个非 0 的框、表头给自然宽度（77.4 → 向上取整成 78）。
+        */
+        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+            if (this.tagName === "TABLE") return {width: 900, height: 300} as DOMRect
+            if (this.tagName === "TH") return {width: 77.4, height: 24} as DOMRect
+            return {width: 0, height: 0} as DOMRect
+        })
+        try {
+            const container = await renderTable()
+            const table = container.querySelector("table") as HTMLTableElement
+            expect(table.className).toContain("table-fixed")
+            expect(table.style.width).not.toBe("")
+            // 数据列看**第二格**（第一格是行号，它给的是固定宽度，不能拿它当"量过了"的证据）。
+            expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).not.toBe("")
+            // 向上取整（77.4 → 78）：`round` 会取成 77、比自然宽度还窄，表头末尾就被截成 …
+            expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).toBe("78px")
+        } finally {
+            vi.restoreAllMocks()
+        }
+    })
+
+    /* 反过来的那一半：容器还藏着（rect 0×0）时**不许**锁死列宽，否则切过去就是一列一个字母。 */
+    it("列宽：容器还没显示出来时不测量（不锁成默认宽度）", async () => {
+        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({width: 0, height: 0} as DOMRect)
+        try {
+            const container = await renderTable()
+            const table = container.querySelector("table") as HTMLTableElement
+            // 还没量过：不带 table-fixed（那正是"按内容排一遍"的前提），列宽也不写死
+            expect(table.className).not.toContain("table-fixed")
+            expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).toBe("")
+        } finally {
+            vi.restoreAllMocks()
+        }
     })
 
     /*
@@ -312,97 +374,425 @@ describe("新的动作表（TanStack Table v9）", () => {
         用户报的"输入框可以穿透冻结列"。给 40 才压得住。
         （原表 `ActionsPanel` 的 `FROZEN` 注释记的是同一个坑，它的冻结列也是 z-40。）
     */
-    it("冻结列 z 高过聚焦格的 30（否则编辑框会穿透它）；表头行又要高过冻结列", async () => {
+    /*
+        层高不变量（次序固定，改动前先看 `style.css` 的 `.cell-pinned` 那段）：
+
+          聚焦/编辑中的格子 30  <  选区轮廓的提层 41  <  **冻结层 50**  <  吸顶表头行 60
+
+        ‼️ 层高写在 `style.css` 的 `table td.cell-pinned` 里，**不用 Tailwind 的 `z-*`**：
+        工具类特异性只有 (0,1,0)，会被 `td.cell-edge-*` 那几条提层规则按源序/特异性压回去 ——
+        冻结列一旦掉回 41，横滚过来的列就盖住它并**抢走点击**（用户报的"拖冻结列却选了别的列"）。
+    */
+    it("层高：冻结列挂 cell-pinned（层高写在 CSS 里，压得住 41 那档），吸顶表头行再高一层", async () => {
         const container = await renderTable()
 
         const pinnedCell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
-        expect(pinnedCell.className).toContain("z-40")
+        expect(pinnedCell.className).toContain("cell-pinned")
+        // 必须还是 sticky：挂 `relative`（哪怕只是顺手写的 position）会让冻结列跟着横向滚动跑掉
+        expect(pinnedCell.className).toContain("sticky")
         expect(pinnedCell.className).not.toContain("z-10")
 
         const pinnedHead = container.querySelectorAll("thead th")[KEYS.indexOf("abilityTag_")]
-        expect(pinnedHead.className).toContain("z-40")
+        expect(pinnedHead.className).toContain("cell-pinned")
 
-        // 表头行得比 40 更高：垂直滚动时表体冻结列会滑到表头位置上
-        expect(container.querySelector("thead tr")!.className).toContain("z-50")
+        // 表头行得比冻结列更高：垂直滚动时表体冻结列会滑到表头位置上
+        expect(container.querySelector("thead tr")!.className).toContain("z-60")
     })
 
     /*
-        复制取的是**数据真值**，不是屏幕上显示的那个名字。
+        复制取的是**原值**（用户定的口径，与 WPS / Excel 的"当前显示值"不同）。
 
         `abilityTag_` 那一格显示"能力一"，但数据里是 `AB_PL1000_01` —— 复制成中文名的话，
         粘回另一行就把名字写进了键的位置，数据就坏了。所以复制**不能**走 `accessorFn`
         （它算的是显示值），得直接读 `originals`。
     */
-    it("复制：取数据真值（键），不是显示的技能名", async () => {
+    it("复制：取原值（键），不是显示的技能名", async () => {
         const container = await renderTable()
-        const cell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
+        const clipboard = clipboardStub()
 
-        fireEvent.mouseDown(cell) // 选中这一格
-        fireEvent.mouseUp(document)
-
-        const clipboard = {
-            data: {} as Record<string, string>,
-            setData(type: string, value: string) {
-                this.data[type] = value
-            },
-            getData(type: string) {
-                return this.data[type] ?? ""
-            },
-        }
+        selectCell(cellAt(container, 0, KEYS.indexOf("abilityTag_")))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
 
         expect(clipboard.data["text/plain"]).toBe("AB_PL1000_01")
     })
 
+    /*
+        ‼️ **焦点在表格外面时也必须复制成功**（用户报的"选区选好了、Ctrl+C 没反应"）。
+
+        `copy` 事件的目标是**当前有焦点的元素**：焦点不在表格里时（刚点过工具栏 / 搜索框 / 表格外空白），
+        事件在 `body` 上触发，**不冒泡进表格容器** —— 挂在容器上的 `onCopy` 一次都不会被调用。
+        实测诊断打出过 `早退:有选区但选不出网格 | target: BODY`，而 `handleCopy` 根本没进。
+        所以监听挂在 `document` 上；这条测试就是把它钉住：在 `body` 上复制照样要拿到那一片的数据。
+    */
+    it("复制：焦点在表格外（copy 事件落在 body 上）也要成功", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        selectCell(cellAt(container, 0, 2))
+
+        fireEvent.copy(document.body, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBe("actionFreeWork0_-原值")
+    })
+
+    /* 改过的格子复制出去仍是**原值**：第 2 行（`1001`）那一列显示"…-改过"、原值"…-原值"。 */
+    it("复制：改过的格子也还是原值", async () => {
+        const container = await renderTable()
+        const clipboard = clipboardStub()
+
+        selectCell(cellAt(container, 1, KEYS.indexOf(LongField)))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBe("actionFreeWork0_-原值")
+        expect(clipboard.data["text/plain"]).not.toBe("actionFreeWork0_-改过")
+    })
+
     it("粘贴：写进改动那一栏，跳过只读列（id_ / abilityTag_ 不写）", async () => {
         const container = await renderTable()
         const target = cellAt(container, 0, 2) // 第 3 列（可编辑）
-        fireEvent.mouseDown(target) // 从这一格开始铺
-        fireEvent.mouseUp(document)
+        selectCell(target) // 从这一格开始铺
 
-        const clipboard = {
-            data: {"text/plain": "动作表粘贴测试"},
-            getData(type: string) {
-                return this.data[type] ?? ""
-            },
-            setData() {},
-        }
-        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboard})
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("动作表粘贴测试")})
 
         expect(target.textContent).toBe("动作表粘贴测试")
     })
 
     /*
-        列对不上就**整次拒绝**（用户定的规则）：列名就是字段身份，硬写会把值塞进别的字段。
-        这里剪贴板是从别处来的（没有源列信息）时不该拦，所以先复制一片建立"源列"，再往错位处粘。
+        ⚠️ 这条是**旧规则的墓碑**：以前粘贴要拿"复制时留下的源列"逐个核对列名，对不上就整次拒绝。
+        现在口径是"跟 Excel / WPS 一样，只看位置、不看列名"，所以同样的动作**必须写进去**。
     */
-    it("粘贴：列对不上时整次拒绝，一个字都不写", async () => {
+    it("粘贴：不校验列名（粘到别的列上照样写）", async () => {
         const container = await renderTable()
-        const copyCell = cellAt(container, 0, 2) // 复制第 3 列
-        fireEvent.mouseDown(copyCell)
-        fireEvent.mouseUp(document)
+        const clipboard = clipboardStub()
 
-        const clipboard = {
-            data: {} as Record<string, string>,
-            setData(type: string, value: string) {
-                this.data[type] = value
-            },
-            getData(type: string) {
-                return this.data[type] ?? ""
-            },
-        }
+        selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
         expect(clipboard.data["text/plain"]).toBeTruthy()
 
-        // 粘到**第 4 列**（列名对不上第 3 列）→ 应当整次拒绝
-        const wrong = cellAt(container, 1, 3)
-        const before = wrong.textContent
-        fireEvent.mouseDown(wrong)
-        fireEvent.mouseUp(document)
-        clipboard.data["text/plain"] = "不该写进去"
-        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboard})
+        const wrong = cellAt(container, 1, 3) // 与源列名对不上
+        selectCell(wrong)
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("不该被拒")})
 
-        expect(wrong.textContent).toBe(before)
+        expect(wrong.textContent).toBe("不该被拒")
+    })
+
+    /*
+        粘贴规则：**两份数 = `floor(选区 / 块)`，最小 1 份**；结果 = 份数 × 块；只读列占位不写；
+        越界直接丢。完整规则在 `ActionsTable.tsx` 文件上方「粘贴规则」那段（用户拿 Excel / WPS 量的）。
+    */
+    it("粘贴：1×1 铺满选区（2 行 3 列）", async () => {
+        const container = await renderTable()
+
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        for (const [r, c] of [
+            [0, 3],
+            [0, 4],
+            [1, 2],
+            [1, 3],
+            [1, 4],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c))
+        }
+        fireEvent.mouseUp(document)
+
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲")})
+
+        for (const r of [0, 1]) {
+            for (const c of [2, 3, 4]) expect(cellAt(container, r, c).textContent).toBe("甲")
+        }
+    })
+
+    it("粘贴：2×2 块铺进 2×2 选区；粘完选区就是那一片", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.mouseEnter(cellAt(container, 0, 3))
+        fireEvent.mouseEnter(cellAt(container, 1, 3))
+        fireEvent.mouseUp(document)
+
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\n丙\t丁")})
+
+        expect(cellAt(container, 0, 2).textContent).toBe("甲")
+        expect(cellAt(container, 0, 3).textContent).toBe("乙")
+        expect(cellAt(container, 1, 2).textContent).toBe("丙")
+        expect(cellAt(container, 1, 3).textContent).toBe("丁")
+        for (const [r, c] of [
+            [0, 2],
+            [0, 3],
+            [1, 2],
+            [1, 3],
+        ]) {
+            expect(cellAt(container, r, c).className).toContain("cell-selected")
+        }
+    })
+
+    it("粘贴：1×3 到 1×5 —— 凑不满第二份，后两格不动", async () => {
+        const container = await renderTable()
+        const untouched = cellAt(container, 0, 5).textContent
+
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        for (const c of [3, 4, 5]) fireEvent.mouseEnter(cellAt(container, 0, c))
+        fireEvent.mouseUp(document)
+
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\t丙")})
+
+        expect(cellAt(container, 0, 2).textContent).toBe("甲")
+        expect(cellAt(container, 0, 3).textContent).toBe("乙")
+        expect(cellAt(container, 0, 4).textContent).toBe("丙")
+        expect(cellAt(container, 0, 5).textContent).toBe(untouched)
+    })
+
+    it("粘贴：2×2 到 3×3 —— 只写 2×2（第 3 行/列凑不满一份）", async () => {
+        table.push(makeRow("1002"))
+        const container = await renderTable()
+
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        for (const [r, c] of [
+            [0, 3],
+            [0, 4],
+            [1, 2],
+            [1, 3],
+            [1, 4],
+            [2, 2],
+            [2, 3],
+            [2, 4],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c))
+        }
+        fireEvent.mouseUp(document)
+
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\n丙\t丁")})
+
+        expect(cellAt(container, 0, 2).textContent).toBe("甲")
+        expect(cellAt(container, 1, 3).textContent).toBe("丁")
+        expect(cellAt(container, 2, 2).className).not.toContain("cell-selected")
+    })
+
+    it("粘贴：横跨只读列时位置不左移（只读那格的值丢掉）", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 0)) // 从 `id_` 开始（只读）
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\t丙")})
+
+        expect(cellAt(container, 0, 0).textContent).toBe("1000") // 只读列没被改
+        expect(cellAt(container, 0, 1).textContent).toBe("能力一") // 同上
+        expect(cellAt(container, 0, 2).textContent).toBe("丙") // 第 3 格落到第 3 列
+    })
+
+    it("粘贴：越界直接丢（粘到最后一列也不炸）", async () => {
+        const container = await renderTable()
+        const last = KEYS.length - 1
+
+        selectCell(cellAt(container, 0, last))
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙")})
+
+        expect(cellAt(container, 0, last).textContent).toBe("甲")
+    })
+
+    /* 撤销：**一次粘贴 = 一步**（Ctrl+Z 一下就全退回去）。 */
+    it("粘贴后 Ctrl+Z：整次粘贴一步退回", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\n丙\t丁")})
+        expect(cellAt(container, 0, 3).textContent).toBe("乙")
+
+        fireEvent.keyDown(cellAt(container, 0, 2), {key: "z", ctrlKey: true})
+
+        expect(cellAt(container, 0, 2).textContent).toBe("actionFreeWork0_-原值")
+        expect(cellAt(container, 0, 3).textContent).toBe("actionFreeWork1_-原值")
+        expect(cellAt(container, 1, 2).textContent).toBe("actionFreeWork0_-改过")
+        expect(cellAt(container, 1, 3).textContent).toBe("actionFreeWork1_-原值")
+    })
+
+    /* 撤销一格编辑：退回**原值**那一态（不是空字符串）。 */
+    it("编辑后 Ctrl+Z：退回没改过（显示原值）", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2)
+
+        clickToEdit(cell)
+        const input = cell.querySelector("input")!
+        fireEvent.change(input, {target: {value: "手改的值"}})
+        fireEvent.blur(input)
+        expect(cell.textContent).toBe("手改的值")
+
+        fireEvent.keyDown(cell, {key: "z", ctrlKey: true})
+        expect(cell.textContent).toBe("actionFreeWork0_-原值")
+    })
+
+    /* 编辑框里的 Ctrl+Z 归浏览器（撤这一次输入），不许被表格的历史接管。 */
+    it("编辑框里按 Ctrl+Z：不动表格的历史", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2)
+
+        clickToEdit(cell)
+        const input = cell.querySelector("input")!
+        fireEvent.change(input, {target: {value: "手改的值"}})
+        fireEvent.keyDown(input, {key: "z", ctrlKey: true})
+
+        expect(cell.querySelector("input")).not.toBeNull() // 还在编辑态
+        fireEvent.blur(input)
+        expect(cell.textContent).toBe("手改的值")
+    })
+
+    /*
+        复制区那圈虚线：**只给复制区外圈那排格子**挂 `cell-copy-*`（每格只挂自己那几条边），
+        复制区**内部**的格子一个类都不挂。什么时候撤见 `CopySource` 那段。
+    */
+    it("复制后：只有最外圈挂虚线类，内部与区外都不挂", async () => {
+        table.push(makeRow("1002")) // 3 行，才分得出"内部"
+        const container = await renderTable()
+        expect(copyCellsOf(container)).toHaveLength(0) // 还没复制：一格都没有
+
+        // 选 3×3 后复制
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        for (const [r, c] of [
+            [0, 3],
+            [0, 4],
+            [1, 2],
+            [1, 3],
+            [1, 4],
+            [2, 2],
+            [2, 3],
+            [2, 4],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c))
+        }
+        fireEvent.mouseUp(document)
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+
+        // 最外圈：四角都该有（角上挂两条边）
+        expect(cellAt(container, 0, 2).className).toMatch(/cell-copy-top/)
+        expect(cellAt(container, 0, 2).className).toMatch(/cell-copy-left/)
+        expect(cellAt(container, 0, 4).className).toMatch(/cell-copy-right/)
+        expect(cellAt(container, 2, 2).className).toMatch(/cell-copy-bottom/)
+        expect(cellAt(container, 2, 4).className).toMatch(/cell-copy-bottom/)
+        // 正中心那格（上下左右都在复制区内部）与区外：都不挂
+        expect(cellAt(container, 1, 3).className).not.toMatch(/cell-copy-/)
+        expect(cellAt(container, 0, 5).className).not.toMatch(/cell-copy-/)
+    })
+
+    /* 动到源区 → 虚线撤（规则②：判据是"动过"，不是"值跟复制时不一样"）。 */
+    it("复制后：往源区里粘贴 → 虚线撤掉", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        expect(copyBoxOf(container)).not.toBeNull()
+        // 复制会把选区收掉（用户要求，见 `handleCopy`），所以要粘哪里得重新选一下
+        expect(container.querySelectorAll("td.cell-selected")).toHaveLength(0)
+        selectCell(cellAt(container, 0, 2))
+
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-原值")})
+
+        expect(copyBoxOf(container)).toBeNull()
+    })
+
+    /* 粘到源区**外面** → 虚线留着（Excel 就是这条：连粘多处是常规用法）。 */
+    it("复制后：粘到别处 → 虚线还在", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+
+        selectCell(cellAt(container, 0, 6))
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("别处")})
+
+        expect(cellAt(container, 0, 6).textContent).toBe("别处")
+        expect(copyBoxOf(container)).not.toBeNull()
+    })
+
+    /* Esc → 虚线撤（规则③）；滚动 / 点别处**不撤**。 */
+    it("复制后：按 Esc → 虚线撤掉", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        expect(copyBoxOf(container)).not.toBeNull()
+
+        fireEvent.keyDown(document, {key: "Escape"})
+
+        expect(copyBoxOf(container)).toBeNull()
+    })
+
+    /* 规则①：再复制一片 → 换成新的那片。 */
+    it("复制后：再复制别处 → 换成新的一片", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        selectCell(cellAt(container, 0, 6))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+
+        // 换成新的一片：虚线挂到新那格上，旧的那格撤掉
+        expect(cellAt(container, 0, 6).className).toMatch(/cell-copy-/)
+        expect(cellAt(container, 0, 2).className).not.toMatch(/cell-copy-/)
+    })
+
+    /*
+        选区与复制区是**两套完全独立的东西**（用户定的）：**选区一个字都不改**（原来怎么画就怎么画），
+        复制区那圈虚线只画在自己最外圈那排格子上，所以它不会碰掉选区的边。
+    */
+    it("复制后：在复制区里再选一片 → 选区照旧、复制区那圈也在", async () => {
+        const container = await renderTable()
+
+        // 复制 (0,2) 一格
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+
+        // 再把 (0,2) 选进一个 2×3 的选区里（拖选，起点就是源区那一格）
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        for (const [r, c] of [
+            [0, 3],
+            [0, 4],
+            [1, 2],
+            [1, 3],
+            [1, 4],
+        ]) {
+            fireEvent.mouseEnter(cellAt(container, r, c))
+        }
+        fireEvent.mouseUp(document)
+
+        // 选区那圈：一个字没改（连复制区里那一格也照旧挂着自己的边类）
+        expect(cellAt(container, 0, 2).className).toContain("cell-selected")
+        expect(cellAt(container, 0, 2).className).toContain("cell-edge-top")
+        expect(cellAt(container, 1, 4).className).toContain("cell-edge-right")
+        // 复制区那圈也在
+        expect(copyBoxOf(container)).not.toBeNull()
+    })
+
+    /* 进编辑就撤（规则②：不是等改完提交，进编辑那一瞬间就算"动过源区"）。 */
+    it("复制后：点开源区那一格进编辑 → 虚线撤掉（值还没改）", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        expect(copyBoxOf(container)).not.toBeNull()
+
+        clickToEdit(cellAt(container, 0, 2)) // 第二下进编辑
+
+        expect(cellAt(container, 0, 2).querySelector("input")).not.toBeNull()
+        expect(copyBoxOf(container)).toBeNull()
+    })
+
+    /*
+        在复制区里**拖选**（第一下按下就落在一片里）不许被当成"进编辑" ——
+        否则一拖就把编辑框打开、还按规则把复制区那圈虚线撤了（实测踩过）。
+    */
+    it("复制后：在复制区里拖选 → 不进编辑、虚线不被撤", async () => {
+        const container = await renderTable()
+
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        expect(copyBoxOf(container)).not.toBeNull()
+
+        // 从源区那一格按下、划到旁边一格再松手（= 拖选，不是点）
+        fireEvent.mouseDown(cellAt(container, 0, 2))
+        fireEvent.mouseEnter(cellAt(container, 0, 3))
+        fireEvent.mouseUp(document)
+
+        expect(container.querySelectorAll("tbody input")).toHaveLength(0) // 没进编辑
+        expect(copyBoxOf(container)).not.toBeNull() // 虚线还在
     })
 
     /*
@@ -626,10 +1016,10 @@ describe("新的动作表（TanStack Table v9）", () => {
         fireEvent.mouseUp(window)
 
         for (const col of [KEYS.indexOf("id_"), KEYS.indexOf("abilityTag_")]) {
-            expect(cellAt(container, 0, col).className).toContain("from-white/14")
+            expect(cellAt(container, 0, col).className).toContain("cell-row-selected")
         }
         // 不选中的行不该带上
-        expect(cellAt(container, 1, KEYS.indexOf("id_")).className).not.toContain("from-white/14")
+        expect(cellAt(container, 1, KEYS.indexOf("id_")).className).not.toContain("cell-row-selected")
     })
 
     /*
