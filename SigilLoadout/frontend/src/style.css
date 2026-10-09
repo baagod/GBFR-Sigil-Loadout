@@ -282,21 +282,6 @@
 }
 
 /*
-    选值格那一格：**格线用 `box-shadow` 画，`border` 全去掉**（见 classes.ts 的 `PICK_TD`）。
-
-    为什么：`border` 属于 `<td>` 自己的盒，格线那 1px 因此永远归 `<td>` 命中 —— 贴在格线上点，
-    事件到不了格子里的内容层（"边框不触发"）。阴影不占盒、也不参与命中测试，所以去掉 border 之后
-    格子的 border-box 就等于内容盒，内容层能铺满整格。
-    画法：`inset` 阴影从 padding box 内沿往里收 1px，位置正好顶掉被去掉的那条右/下边框；
-    用 inset 而不是外阴影，是为了不越出格子（与 `cell-edge-*` / `cell-copy-*` 那两套同一个规矩）。
-*/
-.cell-pick-td {
-    border-right-width: 0;
-    border-bottom-width: 0;
-    box-shadow: inset -1px 0 0 0 var(--border), inset 0 -1px 0 0 var(--border);
-}
-
-/*
     聚焦 / 编辑中的格子那一圈线：**从格子外沿往里画 2px**，画在 `::after` 上（`::before` 留给选区框）。
 
     不用 ring：ring 画在输入框**外面**（box-shadow），2px 会越出格子 —— 上沿顶进表头、左右顶进邻格；

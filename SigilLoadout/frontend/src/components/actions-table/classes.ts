@@ -109,11 +109,11 @@ export const FONT = "text-base md:text-sm"
  *   · `relative` —— 箭头绝对定位在右端（**不占文本的宽度**：这一列大部分格子是 10 位数字，
  *     文本区里再挤进一个箭头就会把数字截掉一截）。
  *
- * 这一层就是**触发器**，所以它的盒子要铺满整格（含格线）—— 靠 `PICK_TD` 把格线从 `<td>` 的
- * `border` 换成不占盒的 `box-shadow` 实现，见那条注释。
+ * 这一层是**触发器**，盒子到 `<td>` 的内容盒为止（131×24）；格线是 `<td>` 自己的 `border-r/border-b`，
+ * 这一列不为此动格线（原因见 `CellPick` 顶部那段，一句话：换画法会把整列格线弄花）。
  *
- * ⚠️ 这一格**没有自己画的框**：格线由 `PICK_TD` 那张阴影画，外壳那一圈由表格容器负责（与别的格子同一套）。
- * "选中/聚焦那一圈环"照旧由 `cell-focus` 画在 `<td>` 上 —— 与别的可编辑格完全一样（这一格不为它开任何例外），
+ * ⚠️ 这一格**没有自己画的框**：格线就是 `<td>` 自己的 `border-r/border-b`，外壳那一圈由表格容器负责
+ * （与别的格子同一套）；"选中/聚焦那一圈环"照旧由 `cell-focus` 画在 `<td>` 上，与别的可编辑格一样 ——
  * 所以这里不能出现 `ring` / `outline` / `border` / 阴影。
  *
  * ⚠️ 这一层**不能用** `truncate`：它是 flex 容器，`truncate` 那三条属性会落到容器上，
@@ -166,18 +166,6 @@ export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b bg-[
  * 选中态与本格落在选区哪条边上，由 `selectionClass` 另外给类名（样式在 style.css）。
  */
 export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
-
-/**
- * **选值格那一格专用**（`CellPick`）：格线改用 `box-shadow` 画，`border` 全部去掉。
- *
- * 为什么非这样不可：`<td>` 的 `border-r/border-b` 属于**它自己的盒**（border-box 132×25），
- * 而格子里的内容层只能铺到**内容盒**（131×24）—— 贴在格线上那一像素因此永远命中 `<td>` 而不是
- * 内容层（实测：JS 与 CDP 两种命中口径都报 TD），点它什么都不发生（用户报的"边框不触发事件"）。
- * 阴影不占盒、也不参与命中测试，所以格子的 border-box 就等于内容盒 ⇒ 内容层能铺满整格、**整格可点**。
- * 用 `inset` 阴影（画在 padding box 内沿 1px）而不是外阴影，是为了**不越出格子** —— 与
- * 选区框（`cell-edge-*`）、复制区虚线（`cell-copy-*`）那两套伪元素同一个规矩。
- */
-export const PICK_TD = "cell-pick-td"
 
 /**
  * 这一格**选中相关**的类（具体样式在 `style.css`）。
