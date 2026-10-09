@@ -8,58 +8,21 @@
       # 1) 带调试端口启动工具（main.go 的 debugBrowserArgs 读这个环境变量）
       $env:GBFR_WEBVIEW_DEBUG_PORT = '9222'; Start-Process <mod>\SigilLoadout.exe
       # 2) 或者直接用 tools\deploy-quick.ps1 -DebugPort 9222（它顺手把端口开好）
-      node tools/debug/cdp-probe.mjs [--page 角色动作] [--tanstack] [--shot 输出.png] [--expr "JS"]
+      node tools/debug/cdp-probe.mjs [--page 角色动作] [--shot 输出.png] [--expr "JS"]
 
-    默认：量动作表（TanStack 那张）的列宽 / 表头溢出 / 钉住列，并打印 JSON。
+    默认：量动作表那 87 列的列宽 / 表头溢出 / 钉住列，并打印 JSON。
 */
 import {writeFileSync} from "node:fs"
 
-const args = process.argv.slice(2)
-const opt = (name, fallback = null) => {
-    const i = args.indexOf(`--${name}`)
-    return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : fallback
-}
-const has = (name) => args.includes(`--${name}`)
+import {connectCdp, makeOpt} from "./cdp.mjs"
 
+const opt = makeOpt()
 const PORT = opt("port", "9222")
 
-/** 连上页面 target，给一个 send(method, params) 用。 */
-async function connect() {
-    const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()
-    const page = list.find((t) => t.type === "page")
-    if (!page) throw new Error("找不到 page target")
-    const ws = new WebSocket(page.webSocketDebuggerUrl)
-    await new Promise((res, rej) => {
-        ws.onopen = res
-        ws.onerror = () => rej(new Error("WebSocket 连不上"))
-    })
-    let id = 0
-    const send = (method, params) =>
-        new Promise((res) => {
-            const myId = ++id
-            const onMsg = (ev) => {
-                const m = JSON.parse(ev.data)
-                if (m.id === myId) {
-                    ws.removeEventListener("message", onMsg)
-                    res(m)
-                }
-            }
-            ws.addEventListener("message", onMsg)
-            ws.send(JSON.stringify({id: myId, method, params}))
-        })
-    const evaluate = async (expression) => {
-        const r = await send("Runtime.evaluate", {expression, returnByValue: true, awaitPromise: true})
-        if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 300))
-        return r.result?.result?.value
-    }
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-    return {send, evaluate, sleep, close: () => ws.close()}
-}
-
-/** 默认测量：动作表（TanStack 那张）的布局事实。 */
+/** 默认测量：动作表的布局事实。 */
 const MEASURE = `JSON.stringify((() => {
   const tt = [...document.querySelectorAll("table")].find(t => t.querySelectorAll("thead th").length > 20)
-  if (!tt) return {错误: "没找到宽表（TanStack 表没打开？）", 页面表格数: document.querySelectorAll("table").length}
+  if (!tt) return {错误: "没找到宽表（动作表没打开？先切到「角色动作」页签）", 页面表格数: document.querySelectorAll("table").length}
   const th = [...tt.querySelectorAll("thead th")]
   const td = [...tt.querySelectorAll("tbody tr:first-child td")]
   const inner = th.map(h => h.firstElementChild).filter(Boolean)
@@ -87,17 +50,13 @@ const MEASURE = `JSON.stringify((() => {
   }
 })())`
 
-const cdp = await connect()
+const cdp = await connectCdp(PORT)
 try {
     if (opt("page")) {
         await cdp.evaluate(
             `[...document.querySelectorAll("button,[role=tab]")].find(e => e.textContent.trim() === ${JSON.stringify(opt("page"))})?.click()`,
         )
         await cdp.sleep(1500)
-    }
-    if (has("tanstack")) {
-        await cdp.evaluate(`[...document.querySelectorAll("button")].find(b => b.textContent.includes("TanStack"))?.click()`)
-        await cdp.sleep(2000)
     }
     const expr = opt("expr", MEASURE)
     const out = await cdp.evaluate(expr)

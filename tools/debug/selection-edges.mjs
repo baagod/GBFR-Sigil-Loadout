@@ -17,11 +17,9 @@
 import {writeFileSync} from "node:fs"
 import {inflateSync} from "node:zlib"
 
-const argv = process.argv.slice(2)
-const opt = (name, fallback) => {
-    const i = argv.indexOf(`--${name}`)
-    return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : fallback
-}
+import {connectCdp, makeOpt} from "./cdp.mjs"
+
+const opt = makeOpt()
 const ROW = Number(opt("row", 0))
 const COL = Number(opt("col", 2))
 const SPAN = Number(opt("span", 3))
@@ -30,24 +28,7 @@ const PORT = opt("port", "9222")
 
 /* ---------------------------------- CDP ---------------------------------- */
 
-const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()
-const page = list.find((t) => t.type === "page")
-if (!page) throw new Error("找不到 page target（工具没开调试端口？）")
-const ws = new WebSocket(page.webSocketDebuggerUrl)
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error("WebSocket 连不上")) })
-let msgId = 0
-const send = (method, params) => new Promise((res) => {
-    const my = ++msgId
-    const onMsg = (ev) => { const m = JSON.parse(ev.data); if (m.id === my) { ws.removeEventListener("message", onMsg); res(m) } }
-    ws.addEventListener("message", onMsg)
-    ws.send(JSON.stringify({id: my, method, params}))
-})
-const evaluate = async (expression) => {
-    const r = await send("Runtime.evaluate", {expression, returnByValue: true, awaitPromise: true})
-    if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 300))
-    return r.result?.result?.value
-}
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const {send, evaluate, sleep, close} = await connectCdp(PORT)
 const mouse = (type, x, y, buttons) =>
     send("Input.dispatchMouseEvent", {type, x, y, button: "left", buttons, clickCount: 1})
 
@@ -110,7 +91,7 @@ function decodePng(buf) {
 
 const rect = JSON.parse(await evaluate(`(() => {
     const t = [...document.querySelectorAll("table")].find(x => x.querySelectorAll("[data-col-id]").length > 20)
-    if (!t) return JSON.stringify({错误: "没找到宽表（动作表没开？没切到 TanStack 表？）"})
+    if (!t) return JSON.stringify({错误: "没找到宽表（动作表没打开？先切到「角色动作」页签）"})
     const f = t.closest("div[class*=overflow]"); f.scrollLeft = 0; f.scrollTop = 0
     const rows = [...t.querySelectorAll("tbody tr")]
     const cell = (r, c) => { const b = rows[r].querySelectorAll("td")[c].getBoundingClientRect(); return {x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2)} }
@@ -205,4 +186,4 @@ if (SHOT) {
     writeFileSync(SHOT, Buffer.from(big.result.data, "base64"))
     console.log(`8 倍放大图: ${SHOT}`)
 }
-ws.close()
+close()
