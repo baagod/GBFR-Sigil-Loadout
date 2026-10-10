@@ -2,7 +2,7 @@ import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from
 import {Button} from "@/components/ui/button"
 import {ButtonGroup} from "@/components/ui/button-group"
 import {Checkbox} from "@/components/ui/checkbox"
-import {Tabs, TabsList, TabsPanel, TabsTrigger} from "@/components/ui/tabs"
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames, AbilityNames} from "../bindings/sigilloadout/service/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/service/shellservice"
 import {Characters} from "../bindings/sigilloadout/service/limitbonusservice"
@@ -429,7 +429,7 @@ export default function App() {
                     四页都 keepMounted：否则每次切页都要卸载/重挂 10 行 SlotRow（每行两个 Base UI 下拉）。
                     切页于是只剩显示/隐藏，代价是四页启动时都挂上（专属页 29 行，可忽略）。
                 */}
-                <TabsPanel value="general" keepMounted className={LOADOUT_FRAME}>
+                <TabsContent value="general" keepMounted className={LOADOUT_FRAME}>
                     <div className={LOADOUT_HEADER}>
                         <div className={HEADER_ROW}>
                             <div className="pl-0.5 pr-3">
@@ -449,8 +449,8 @@ export default function App() {
                             <SlotRow key={row} row={row} slot={slot} sigils={index} t={t} updateSlot={updateSlot} />
                         ))}
                     </div>
-                </TabsPanel>
-                <TabsPanel value="exclusive" keepMounted className={LOADOUT_FRAME}>
+                </TabsContent>
+                <TabsContent value="exclusive" keepMounted className={LOADOUT_FRAME}>
                     <div className={LOADOUT_ROWS}>
                         <ExclusivePanel
                             table={exclusiveTable}
@@ -461,30 +461,30 @@ export default function App() {
                             onChange={updateExclusive}
                         />
                     </div>
-                </TabsPanel>
+                </TabsContent>
                 {/*
                     keepMounted：这一页的编辑状态活在组件里，而后端落盘要等 500ms 防抖（见
                     editservice.go）。切走就卸载的话，在防抖窗口内切回来会读到还没写下的旧文件——
                     屏幕上刚敲的数字消失，随后那份旧列表还会把磁盘上的新值覆盖掉。
                 */}
-                <TabsPanel value="sigilEditor" keepMounted className="min-h-0 flex-1 overflow-auto">
+                <TabsContent value="sigilEditor" keepMounted className="min-h-0 flex-1 overflow-auto">
                     <SigilEditorPanel lang={lang} />
-                </TabsPanel>
+                </TabsContent>
                 {/* keepMounted：理由与因子编辑页相同——这一页的编辑状态活在组件里，而后端落盘要等防抖。 */}
-                <TabsPanel value="limitBonus" keepMounted className="min-h-0 flex-1 overflow-auto">
+                <TabsContent value="limitBonus" keepMounted className="min-h-0 flex-1 overflow-auto">
                     <LimitBonusEditorPanel lang={lang} charaTable={charaTable} charaNames={charaNames} />
-                </TabsPanel>
+                </TabsContent>
                 {/* keepMounted：理由同上——这一页的编辑状态也活在组件里，落盘要走防抖。 */}
-                <TabsPanel value="skillboard" keepMounted className="min-h-0 flex-1 overflow-auto">
+                <TabsContent value="skillboard" keepMounted className="min-h-0 flex-1 overflow-auto">
                     <SkillboardPanel lang={lang} charaNames={charaNames} charaTable={charaTable} />
-                </TabsPanel>
+                </TabsContent>
                 {/*
                     keepMounted：这一页的编辑状态也活在组件里（动作表的改动、flags 的行），切走就丢。
                     这一页自己就是滚动盒（上半区横滚、下半区纵滚），所以外层不再给 overflow-auto。
                 */}
-                <TabsPanel value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
+                <TabsContent value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
                     <ActionsPanel t={t} charaNames={charaNames} abilityNames={abilityNames} charaTable={charaTable} playable={playableChars} />
-                </TabsPanel>
+                </TabsContent>
             </Tabs>
         </div>
     )

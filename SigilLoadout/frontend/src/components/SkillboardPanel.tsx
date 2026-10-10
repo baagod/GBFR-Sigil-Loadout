@@ -362,7 +362,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     return (
         /*
             这一页自己就是滚动的那个盒子（h-full min-h-0 flex-col，同另外三页）：**不能**让外层
-            TabsPanel 去滚。
+            TabsContent 去滚。
         */
         <div className="flex h-full min-h-0 flex-col page-padding">
             <div className="min-h-0 flex-1 overflow-y-auto pr-4 scrollbar-gutter-stable">

@@ -274,7 +274,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
         判据用元素本身，不用 data-slot：行里的控件就是十个数值框与那个勾选框，而它们是 <input>
         与 <span role="checkbox">（Base UI 的 Checkbox 不渲染成 button，所以这里不能只写
         button）。拿 data-slot 当"这是控件"的代理就得处理"最近的 data-slot 元素在不在这一行里"
-        ——列表外面也有 data-slot（面板整个包在 TabsPanel 里），代理于是把每一行都判成控件、
+        ——列表外面也有 data-slot（面板整个包在 TabsContent 里），代理于是把每一行都判成控件、
         整行再也点不开。语义判据没有这个歧义。
     */
     const isControl = (e: MouseEvent<HTMLElement>) =>
