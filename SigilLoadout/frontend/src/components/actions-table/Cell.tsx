@@ -70,38 +70,44 @@ export const CellContent = memo(function CellContent({
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
         return <CellText text={displayText(fieldKey, shown, abilityNames)} />
     }
+    /*
+        ‼️ "先选后编"的**唯一**判据：按下之前这一格是唯一选中格，这一次点击才算"进编辑"。
+        两个条件缺一不可（见 `PressFacts` / `draggedRef`）：多格选着点一格 = 收选区、按住拖 = 拉选区。
+
+        **选值格与普通格子共用它**（普通格子 = 换成输入框，选值格 = 展开列表）：选中、拖选、进编辑
+        三条行为两边必须一模一样，别给选值格另开一条"点一下就展开"的路。
+    */
+    const shouldEditOnClick = () => {
+        const press = pressRef.current
+        return press !== null && press.cellKey === snapshotKey(rowId, fieldKey) && press.wasSelected && press.wasOnlyCell
+    }
     if (picker) {
         /*
-            选值格：**没有"进编辑"这一说** —— 格子里那层文本就是下拉的触发器（见 CellPick）。
-            它不参与"先选中、再点一次才编辑"那套闸门（`PressFacts` / `draggedRef`）：那一套管的是
-            "什么时候换成输入框"，而这里根本没有输入框 —— 点一下就展开列表，与别的表的选值格一致。
-            改一格 = 在列表里挑一项 → `onCommit` → 与别的格子同一条 `edit`（撤销栈、复制源规则都照旧）。
+            选值格：格子里那层文本就是下拉的触发器（见 `CellPick`）；"进编辑"= **展开列表**，同样走
+            上面那道闸门，`dragged` 一并交下去（拖过 = 拉选区，不展开）。
         */
         // 清单给**稳定的 Set 引用**（`CELL_CHOICES` / `branchPick.ids`）：CellPick 里那份重排才挂得住 memo。
         const pick = BRANCH_KEYS.has(fieldKey)
             ? {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
             : {choices: CELL_CHOICES}
-        return <CellPick value={raw} original={original} unchanged={raw === ""} onCommit={(value) => edit(rowId, fieldKey, value)} {...pick} />
+        return (
+            <CellPick
+                value={raw}
+                original={original}
+                unchanged={raw === ""}
+                onCommit={(value) => edit(rowId, fieldKey, value)}
+                shouldEditOnClick={shouldEditOnClick}
+                dragged={draggedRef}
+                {...pick}
+            />
+        )
     }
     return (
         <Cell
             value={raw}
             original={original}
             onCommit={(value) => edit(rowId, fieldKey, value)}
-            /*
-                "先选后编"：**本来就只有这一格选中、再点一下**才进编辑。
-                两个条件缺一不可（见 `PressFacts` / `draggedRef`）：多格选着点一格 = 收选区、
-                按住拖 = 拉选区，都不是编辑。
-            */
-            shouldEditOnClick={() => {
-                const press = pressRef.current
-                return (
-                    press !== null &&
-                    press.cellKey === snapshotKey(rowId, fieldKey) &&
-                    press.wasSelected &&
-                    press.wasOnlyCell
-                )
-            }}
+            shouldEditOnClick={shouldEditOnClick}
             preSelected={preSelected}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}

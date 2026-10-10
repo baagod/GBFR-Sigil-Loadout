@@ -1,9 +1,10 @@
-import {useEffect, useMemo, useRef, useState} from "react"
+import {type RefObject, useEffect, useMemo, useRef, useState} from "react"
 import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
 
 /*
-    动作表里的**选值格**：格子里是那个值 + 一个小箭头，点一下在格子下面挂出列表挑一个。
+    动作表里的**选值格**：格子里是那个值 + 一个小箭头，**先选中、再点一下**才在格子下面挂出列表挑一个
+    （与普通格子"先进编辑态"同一道闸门，见下面 `shouldEditOnClick`）。
 
       · `choices` —— 清单（Set，稳定引用）。`controlTypeHash_` 用 `CELL_CHOICES`；`branchXAtk_`
         用**当前表里所有 `id_`**（用户口径：值是"转到哪个动作"）。
@@ -27,7 +28,17 @@ import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classe
       列表的内边距**用组件的默认值**（`p-1` = 上下左右各 4px），这一列不再覆盖它。
 */
 
-export function CellPick({value, original, unchanged, choices, optional, searchPlaceholder, onCommit}: {
+export function CellPick({
+    value,
+    original,
+    unchanged,
+    choices,
+    optional,
+    searchPlaceholder,
+    onCommit,
+    shouldEditOnClick,
+    dragged,
+}: {
     /** 这一格的**改动值**（空串 = 没改过）；列表的选中态看的是"实际显示的那个值"。 */
     value: string
     /** 这一格的**原值**（只读那一份）：值清空时显示它，也是"改回原样"的判据。 */
@@ -42,6 +53,13 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
     searchPlaceholder?: string
     /** 提交这一格；`null` = 回到原值（与别的格子同一条口径）。 */
     onCommit: (next: string | null) => void
+    /**
+     * 与普通格子**同一道闸门**："按下之前这一格是唯一选中格"才把这次点击算作进编辑（= 展开列表）。
+     * 做成函数而不是布尔值：渲染发生在 mousedown 之前，那一刻还没有答案。
+     */
+    shouldEditOnClick: () => boolean
+    /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不展开。 */
+    dragged: RefObject<boolean>
 }) {
     const [open, setOpen] = useState(false)
     /**
@@ -53,6 +71,16 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
     const [instantClose, setInstantClose] = useState(false)
     /** 关列表时要不要把焦点还回这一格（用户点到别处时不还，免得顶掉他刚点开的那一格）。 */
     const focusBackRef = useRef(true)
+    /**
+     * 指针正按在这一格上（`pointerdown` 起、`pointerup`/`pointercancel` 止，都挂 document ——
+     * 拖出这一格时松开不落在触发器上）。
+     *
+     * 为什么要它：库是**在按下那一刻**就请求展开的，而"这一下会不会变成拖"要到第一次 mousemove
+     * 才有答案（`dragged`）—— 所以按下期间到的请求得先押后（见 `pendingOpenRef`）。
+     */
+    const pointerDownRef = useRef(false)
+    /** 有一次展开请求是"按着的时候到的"，押后到松开那一刻再按闸门裁决。 */
+    const pendingOpenRef = useRef(false)
 
     /** 格子里显示的那份文本：没改过就是原值（`-1` 照原样，不归一化）。 */
     const shown = value === "" ? original : value
@@ -68,6 +96,38 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
         () => [...new Set([shown, original, ...(optional ? [optional] : []), ...choices])].filter(inChoices),
         [shown, original, choices, optional],
     )
+
+    /*
+        按下 / 松开都挂 document：拖出这一格时松开不落在触发器上。
+        `[]` 依赖：用到的 `dragged` 是 ref、`shouldEditOnClick` 对一个格子实例恒定（只读 `pressRef`），
+        所以不会读到过期的值。
+    */
+    useEffect(() => {
+        const onDown = (e: PointerEvent) => {
+            if (cellRef.current?.contains(e.target as Node)) pointerDownRef.current = true
+        }
+        /*
+            **松开那一刻裁决**（`dragged` 此时已成定局）：真机上库的请求在按下时到，就在这里定；
+            请求若晚到（测试环境如此），走 `onOpenChange` 里那条路 —— 两条路用的是同一道闸门。
+        */
+        const release = () => {
+            pointerDownRef.current = false
+            if (!pendingOpenRef.current) return
+            pendingOpenRef.current = false
+            if (!dragged.current && shouldEditOnClick()) {
+                setInstantClose(false)
+                setOpen(true)
+            }
+        }
+        document.addEventListener("pointerdown", onDown, true)
+        document.addEventListener("pointerup", release, true)
+        document.addEventListener("pointercancel", release, true)
+        return () => {
+            document.removeEventListener("pointerdown", onDown, true)
+            document.removeEventListener("pointerup", release, true)
+            document.removeEventListener("pointercancel", release, true)
+        }
+    }, [])
 
     // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
     useEffect(() => {
@@ -108,9 +168,29 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
             /* `-1` 是清单里的一项，**照原样提交**；其余挑回原值就把改动清掉（交 `null`）。 */
             onValueChange={(next: string | null) => next && onCommit(next === original && next !== optional ? null : next)}
             open={open}
-            onOpenChange={(next) => {
-                if (next) setInstantClose(false) // 开：复位"立刻消失"（弹层这时才重新挂载）
-                setOpen(next)
+            onOpenChange={(next, eventDetails) => {
+                if (!next) {
+                    pendingOpenRef.current = false
+                    setOpen(false)
+                    return
+                }
+                /*
+                    ‼️ 库是**在按下那一刻**就请求展开的，而那时"这一下会不会变成拖"还没有答案
+                    （`dragged` 要等第一次 mousemove）→ 按着时到的请求一律先押后（松开时再定）。
+                    松开之后才到的请求（环境差异）就地判 —— 两条路用**同一道闸门**：
+                    拖过、或按下之前不是唯一选中格，都只算"选中"。
+                */
+                if (pointerDownRef.current) {
+                    pendingOpenRef.current = true
+                    eventDetails.cancel()
+                    return
+                }
+                if (dragged.current || !shouldEditOnClick()) {
+                    eventDetails.cancel()
+                    return
+                }
+                setInstantClose(false) // 开：复位"立刻消失"（弹层这时才重新挂载）
+                setOpen(true)
             }}
         >
             {/* 触发器用库的（自带箭头）—— 别换回原始 `Trigger` 自己画一个。 */}
