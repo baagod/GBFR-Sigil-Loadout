@@ -76,6 +76,13 @@ export const HANDLE_CURSOR =
     'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M3 8.5h9V4l9 8-9 8v-4.5H3z" fill="%23fff" stroke="%23111" stroke-width="2" stroke-linejoin="round"/></svg>\') 4 12, e-resize'
 
 /**
+ * **表头整行**的光标：与 `HANDLE_CURSOR` **同一枚箭头**、同一套配色与描边，只是转 90° 朝下
+ * （热点与兜底一起转：`4 12` → `12 4`、`e-resize` → `s-resize`）。两枚是一套，改要一起改。
+ */
+export const HANDLE_HEAD_CURSOR =
+    'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M8.5 3h7v9h4.5l-8 9-8-9h4.5z" fill="%23fff" stroke="%23111" stroke-width="2" stroke-linejoin="round"/></svg>\') 12 4, s-resize'
+
+/**
  * 行高：**钉在 `td` 上**，不靠内容撑 —— 格子一空就塌成一条线，空行点不中也填不了字。
  * 钉在这里还有个好处：显示态与编辑态同高，进出编辑行高不跳。
  */

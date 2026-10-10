@@ -57,8 +57,8 @@ import {ActionRowView, rowSelectionKey} from "@/components/actions-table/ActionR
 import {
     rowFullySelected,
     HANDLE_CELL,
-    HANDLE_CURSOR,
     HANDLE_HEAD_BG,
+    HANDLE_HEAD_CURSOR,
     HANDLE_INNER,
     HANDLE_WIDTH,
     HEAD_CELL,
@@ -1007,13 +1007,17 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                     {table.getHeaderGroups().map((headerGroup) => (
                         // 表头整行吸顶，**再高冻结层一层**（表头 60 > 冻结 50）：垂直滚动时表体的冻结列
                         // 会滑到表头的位置上，压不住就穿出来。
-                        <tr key={headerGroup.id} className="sticky top-0 z-60">
+                        /*
+                            表头**整行**一个光标：`cursor` 是继承属性，写在 `<tr>` 上一次覆盖所有 `<th>`。
+                            （别往 `HEAD_CELL` 里塞 —— Tailwind 容不下带引号的 `url()`。）
+                        */
+                        <tr key={headerGroup.id} className="sticky top-0 z-60" style={{cursor: HANDLE_HEAD_CURSOR}}>
                             {/*
                                 行号列 —— **不属于列模型**（见 HANDLE_WIDTH 那段）。
                                 不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
                                 宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
                             */}
-                            <th className={`${HANDLE_CELL} ${HANDLE_HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}>
+                            <th className={`${HANDLE_CELL} ${HANDLE_HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
                                 <div className={HANDLE_INNER}>#</div>
                             </th>
                             {headerGroup.headers.map((header) => {

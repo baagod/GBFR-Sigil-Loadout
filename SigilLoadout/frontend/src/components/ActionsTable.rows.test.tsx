@@ -11,7 +11,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     SaveActionFields: vi.fn(),
 }))
 
-import {KEYS, cellAt, clipboardStub, handleAt, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, clipboardStub, handleAt, stubRowRects, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
 
@@ -44,16 +44,20 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         ⚠️ 这条要盯着**那个 `td` 自己**：`cursor` 是继承属性，而 `cell-selectable` 显式命中了 td，
         里层 div 上写光标一点用都没有（继承只在"没有规则命中"时才轮到）。
     */
-    it("行号格的光标是自定义的 ➡ 箭头（写在 td 上，数据格仍是十字）", async () => {
+    it("光标：行号格是 ➡（写在 td 上），表头整行是 ↓（写在 tr 上），数据格仍是十字", async () => {
         const container = await renderTable()
 
         const handle = handleAt(container, 0) as HTMLElement
         expect(handle.style.cursor).toContain("svg+xml") // 自带图标
-        expect(handle.style.cursor).toContain("4 12") // 热点 = 箭头尖端
+        expect(handle.style.cursor).toContain("4 12") // 热点（落在图形内即可，出界整条声明作废）
         expect(handle.style.cursor).toContain("e-resize") // 不吃图标时的兜底
 
-        const handleHead = container.querySelector("thead th") as HTMLElement
-        expect(handleHead.style.cursor).toContain("svg+xml")
+        // 表头**整行**换成向下那枚（`HANDLE_HEAD_CURSOR`）：写在 `<tr>` 上继承给每个 `<th>`，格子自己不带。
+        const headRow = container.querySelector("thead tr") as HTMLElement
+        expect(headRow.style.cursor).toContain("svg+xml")
+        expect(headRow.style.cursor).toContain("12 4")
+        expect(headRow.style.cursor).toContain("s-resize")
+        expect((container.querySelector("thead th") as HTMLElement).style.cursor).toBe("")
 
         // 数据格那支十字照旧（别把行号那格的处理顺手扩到数据格上）
         expect(cellAt(container, 0, 0).className).toContain("cell-selectable")
@@ -117,12 +121,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         setRows([makeRow("1000"), makeRow("1001"), makeRow("1002")])
         const container = await renderTable()
 
-        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
-        rows.forEach((row, index) => {
-            const top = index * 20
-            row.getBoundingClientRect = () =>
-                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
-        })
+        stubRowRects(container)
 
         pressHandle(container, 0)
         fireEvent.mouseMove(cellAt(container, 2, 2), {clientY: 45})
@@ -175,12 +174,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         setRows([makeRow("1003"), makeRow("1000"), makeRow("1002"), makeRow("1001")])
         const container = await renderTable()
 
-        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
-        rows.forEach((row, index) => {
-            const top = index * 20
-            row.getBoundingClientRect = () =>
-                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
-        })
+        stubRowRects(container)
 
         // 先选第 0 行
         pressHandle(container, 0)
@@ -199,12 +193,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         setRows([makeRow("1003"), makeRow("1000"), makeRow("1002"), makeRow("1001")])
         const container = await renderTable()
 
-        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
-        rows.forEach((row, index) => {
-            const top = index * 20
-            row.getBoundingClientRect = () =>
-                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
-        })
+        stubRowRects(container)
 
         pressHandle(container, 0)
         fireEvent.mouseUp(window)
@@ -219,12 +208,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         setRows([makeRow("1003"), makeRow("1000"), makeRow("1002"), makeRow("1001")])
         const container = await renderTable()
 
-        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
-        rows.forEach((row, index) => {
-            const top = index * 20
-            row.getBoundingClientRect = () =>
-                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
-        })
+        stubRowRects(container)
 
         pressHandle(container, 0) // 起点（显示第 1 行 = id_ 1000）
         // 鼠标移到**第 3 行的数据格**上（不在行号列里）：y 落在第 3 行那段区间里
