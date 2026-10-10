@@ -13,7 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {PINNED_COUNT} from "@/components/actions-table/classes"
 
-import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
 
@@ -90,9 +90,56 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         }
     })
 
-    it("Ctrl 点同一列的另一格：追加成第二片（两格都选中）", async () => {
+    /*
+        ‼️ 用户口径（WPS 实测）：**格拖移出行号列之后要接着拖** —— 移到行号格上不触发选行，
+        只是继续把那一格选区往下扩。行号拖当年也是这么修的（文档级 mousemove 按 Y 算行），
+        现在两条拖拽共用同一条"挪最后一个区的 focus"。
+    */
+    it("格拖移到行号列：接着扩单元格，而不是变成选行", async () => {
+        setRows([makeRow("1000"), makeRow("1001"), makeRow("1002"), makeRow("1003")])
         const container = await renderTable()
 
+        stubRowRects(container)
+
+        fireEvent.mouseDown(cellAt(container, 0, 3))
+        fireEvent.mouseMove(handleAt(container, 3), {clientY: 65})
+        fireEvent.mouseUp(window)
+
+        // 那一列从第 0 行扩到第 3 行；**没有**变成整行（第 4 列不选中）
+        expect(cellAt(container, 3, 3).className).toContain("cell-selected")
+        expect(cellAt(container, 3, 4).className).not.toContain("cell-selected")
+    })
+
+    /*
+        表头带也一样：行钳到**第一行**（`clientY` 在所有行之上），**列跟着指针下的表头走** ——
+        于是在表头带上左右移动也能把选区拉宽 / 收窄。
+    */
+    it("格拖移到表头带：行钳到第一行、列跟着指针走", async () => {
+        setRows([makeRow("1000"), makeRow("1001"), makeRow("1002"), makeRow("1003")])
+        const container = await renderTable()
+
+        stubRowRects(container)
+        // 表头格：第 0 个是行号表头，所以"第 4 列"的表头是 [4 + 1]。
+        const headAt = (column: number) => container.querySelectorAll("thead th")[column + 1] as HTMLElement
+
+        fireEvent.mouseDown(cellAt(container, 3, 2))
+        fireEvent.mouseMove(headAt(4), {clientY: -5}) // 在所有行之上 = 表头带里
+        fireEvent.mouseUp(window)
+
+        // 行 0..3 × 列 2..4 整块选中（第 5 列不该被带上）
+        for (const [r, c] of [
+            [0, 2],
+            [0, 4],
+            [3, 2],
+            [3, 4],
+        ]) {
+            expect(cellAt(container, r, c).className).toContain("cell-selected")
+        }
+        expect(cellAt(container, 0, 5).className).not.toContain("cell-selected")
+    })
+
+    it("Ctrl 点同一列的另一格：追加成第二片（两格都选中）", async () => {
+        const container = await renderTable()
         selectCell(cellAt(container, 0, 2))
         fireEvent.mouseDown(cellAt(container, 1, 2), {ctrlKey: true})
         fireEvent.mouseUp(document)
@@ -111,12 +158,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         const container = await renderTable()
         const clipboard = clipboardStub()
 
-        const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
-        rows.forEach((row, index) => {
-            const top = index * 20
-            row.getBoundingClientRect = () =>
-                ({top, bottom: top + 20, height: 20, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
-        })
+        stubRowRects(container)
 
         // 第一段：行号 0 拖到行号 1
         pressHandle(container, 0)

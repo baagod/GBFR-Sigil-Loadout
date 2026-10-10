@@ -165,6 +165,20 @@ export function handleAt(container: HTMLElement, row: number) {
     return container.querySelectorAll("tbody tr")[row].querySelector("td")!
 }
 
+/**
+ * 把每行桩成 `height` px 高（默认 20）—— `rowIdAtY` 那类"按光标 Y 算行"的逻辑靠它。
+ * 返回这些行，测试若要逐行断言可直接用。
+ */
+export function stubRowRects(container: HTMLElement, height = 20) {
+    const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
+    rows.forEach((row, index) => {
+        const top = index * height
+        row.getBoundingClientRect = () =>
+            ({top, bottom: top + height, height, left: 0, right: 100, width: 100, x: 0, y: top}) as DOMRect
+    })
+    return rows
+}
+
 /** happy-dom 没有真剪贴板：给 `fireEvent.copy/paste` 塞一个能读写的替身。 */
 export function clipboardStub(text = "") {
     const data: Record<string, string> = text ? {"text/plain": text} : {}

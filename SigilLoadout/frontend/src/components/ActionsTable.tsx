@@ -171,6 +171,13 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      * `ActionRowView` 判"要不要跳过单元格的扩展处理器"。
      */
     const dragRowRef = useRef<string | null>(null)
+    /**
+     * 正在**从数据格**拖选区（与行号拖是同一套跟随机制的两种起点）。
+     *
+     * ⚠️ 别拿 `e.buttons` 代替它：那样"在表格空白处按住拖"也会被当成格拖去改选区。
+     * 这个标记只由**数据格的 mousedown** 点起来（见 `startCellSelection`）。
+     */
+    const dragCellRef = useRef(false)
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
@@ -702,6 +709,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
         dragRowRef.current = null // 行号那边的拖动就此收手（两套手势不能同时进行）
+        dragCellRef.current = true
         cell.getSelectionStartHandler()(e)
     }, [])
 
@@ -730,15 +738,27 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     }
 
     /**
-     * 拖动中：**只挪最后一个区的 focus 行**（列角保持整行宽）—— 与库自己的扩展处理器同一套语义
-     * （`old.slice(0,-1)` + 改 focus），所以"往前拖能缩回、往后拖能伸长"，且前面那些区一个都不掉。
+     * 拖动中：**只挪最后一个区的 focus**（锚点不动），`focusColumnId` 不给就**保持原列**。
+     *
+     * 与库自己的扩展处理器同一套语义（`old.slice(0,-1)` + 改 focus），所以"往前拖能缩回、往后拖能
+     * 伸长"，且前面那些区一个都不掉。"不给列"那条正是指针跑出行号列 / 表外时用的 —— 只改行、不动列，
+     * 于是**不必记住"上一格是哪一列"**（那种影子状态还会过期）。
      */
+    const extendFocusTo = (focusRowId: string, focusColumnId?: string) => {
+        tableInstanceRef.current.setCellSelection((old) => {
+            if (old.length === 0) return old
+            const last = old[old.length - 1]
+            const next = focusColumnId === undefined ? {...last, focusRowId} : {...last, focusRowId, focusColumnId}
+            // 两角没动就别写 state（拖动中每次 mousemove 都会走到这里）
+            if (next.focusRowId === last.focusRowId && next.focusColumnId === last.focusColumnId) return old
+            return [...old.slice(0, -1), next]
+        })
+    }
+
+    /** 行号拖：列角保持**整行宽**，只挪行。 */
     const extendRowSpanTo = (focusRowId: string) => {
         if (!lastColumnId) return
-        table.setCellSelection((old) => {
-            if (old.length === 0) return old
-            return [...old.slice(0, -1), {...old[old.length - 1], focusRowId, focusColumnId: lastColumnId}]
-        })
+        extendFocusTo(focusRowId, lastColumnId)
     }
 
     /**
@@ -778,11 +798,11 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     )
 
     /**
-     * 光标底下是**哪一行**（没有就是 `null`）：按各行的 y 区间判断。
+     * 光标底下是**哪一行**：按各行的 y 区间判断，跑到表体两端之外就钳到第一行 / 最后一行。
      *
      * 为什么要这个（而不是靠每个行号格的 `mouseenter`）：Excel / WPS 的手感是"**从行号按下之后，
      * 鼠标可以移出行号那一列**，在表格任意位置上下拖，选区跟着走"。只绑行号格的话，鼠标一出去就
-     * 断在列边缘 —— 用户实测就是这个问题。
+     * 断在列边缘 —— 用户实测就是这个问题。**行号拖与格拖共用这条口径**（两边行为必须一致）。
      *
      * 只在这一张表的行里找（`tableRef` 限定）：页面上还有别的表（轨表等），别误伤。
      */
@@ -795,6 +815,14 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 return row.dataset.rowId ?? null
             }
         }
+        /*
+            跑到表体两端之外（表头带 / 表尾下面）就**钳到第一行 / 最后一行** —— 拖出去也接着扩。
+            行号拖与格拖共用这一条口径（WPS 的手感）。
+        */
+        const body = el.querySelector("tbody")?.getBoundingClientRect()
+        if (!body) return null
+        if (clientY < body.top) return modelRows[0]?.id ?? null
+        if (clientY > body.bottom) return modelRows[modelRows.length - 1]?.id ?? null
         return null
     }
 
@@ -810,11 +838,29 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     useEffect(() => {
         const stop = () => {
             dragRowRef.current = null
+            dragCellRef.current = false
         }
         const follow = (e: MouseEvent) => {
-            if (dragRowRef.current === null) return
+            /*
+                **行号拖**：按光标所在的 Y 算行 —— 鼠标移出行号那一列也接着拖。
+                **格拖**：数据格之间的扩展仍交给库的 `mouseenter`（Shift/Ctrl 的模式语义在它手里），
+                这里只补它够不着的地方 —— 表头带**列跟着指针走**（表头格也带 `data-col-id`），
+                行号列 / 表外则**只挪行、列不动**。
+
+                ⚠️ "指针在不在数据格上"用 `e.target.closest("td[data-col-id]")` 判，**别按坐标去量列**：
+                量列得读表头的 rect，而单测里只有行的 rect 是桩过的。
+            */
+            if (dragRowRef.current !== null) {
+                const id = rowIdAtY(e.clientY)
+                if (id !== null) extendRowSpanTo(id)
+                return
+            }
+            if (!dragCellRef.current) return
+            const el = e.target as HTMLElement | null
+            if (el?.closest?.("td[data-col-id]")) return // 数据格上：库自己的 mouseenter 在扩
             const id = rowIdAtY(e.clientY)
-            if (id !== null) extendRowSpanTo(id)
+            if (id === null) return
+            extendFocusTo(id, (el?.closest?.("th[data-col-id]") as HTMLElement | null)?.dataset.colId)
         }
         window.addEventListener("mouseup", stop)
         document.addEventListener("mousemove", follow)
