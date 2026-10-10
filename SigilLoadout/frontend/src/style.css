@@ -220,38 +220,7 @@
     东西加复杂度。
 */
 
-/*
-    选值格（`controlTypeHash_`）右端那个下拉箭头 —— **纯 CSS 画的，不多一个 DOM 节点**。
-
-    为什么不用内联 SVG / 图标组件：这张表有上千个选值格，箭头是**纯装饰**（点击区是整格，
-    它自己 `pointer-events: none`），为它给每格多挂一个元素不值当。
-
-    ⚠️ 用 `mask` 不用 `background-image`：mask 的**颜色**由 `background` 决定，于是箭头能跟文字的颜色走
-    （没改过的灰字格子，箭头也跟着灰）—— background 画的图是一份固定颜色，在灰字格子里会比文字更亮。
-    `-webkit-mask` 那份给 WebView2 留的（`mask` 简写在 Chromium 上已支持）。
-
-    几何：`top/bottom: 0` + `margin: auto 0` 竖直居中；右沿留 **12px** —— 贴死在格线边上会和格线黏成一条。
-    文本那边的让位见 `PICK_TEXT`（12 + 12 + 4px 空隙）。
-*/
-.cell-pick-mark::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 12px;
-    bottom: 0;
-    width: 12px;
-    margin: auto 0;
-    height: 12px;
-    background-color: var(--muted-foreground);
-    -webkit-mask: var(--pick-arrow) center / 12px 12px no-repeat;
-    mask: var(--pick-arrow) center / 12px 12px no-repeat;
-    pointer-events: none;
-}
-
-/* 箭头形状（chevron-down）：白色只作蒙版的 alpha，真正上屏的颜色是上面那句 background-color。 */
-:root {
-    --pick-arrow: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M1.5 3.75 6 8.25l4.5-4.5" fill="none" stroke="%23fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>');
-}
+/* 选值格的箭头不在这里画：`ComboboxTrigger` 自带（原先那个 12px 的 mask `::after` 已删）。 */
 
 /*
     选值格的**弹层不覆盖光标** —— 列表里保持组件默认的箭头（⛔ 别再整层设成表格那根十字）。
@@ -741,5 +710,3 @@ td.cell-selected.cell-active {
         border-top: 0;
     }
 }
-
-

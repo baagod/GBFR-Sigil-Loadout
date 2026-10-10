@@ -1,6 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from "react"
-import {Combobox as ComboboxPrimitive} from "@base-ui/react"
-import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList} from "@/components/ui/combobox"
+import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
 
 /*
@@ -114,7 +113,8 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
                 setOpen(next)
             }}
         >
-            <ComboboxPrimitive.Trigger
+            {/* 触发器用库的（自带箭头）—— 别换回原始 `Trigger` 自己画一个。 */}
+            <ComboboxTrigger
                 render={<div ref={cellRef} className={`${PICK_CELL} ${PICK_MARK}`} tabIndex={0} />}
                 nativeButton={false}
                 // 这一格自己收下 Ctrl/Cmd+C 与 Esc（见 App 里那两条白名单）——别让表格/窗口接走。
@@ -126,7 +126,7 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
                 }}
             >
                 <span className={`${PICK_TEXT} ${unchanged ? "text-muted-foreground" : ""}`}>{shown}</span>
-            </ComboboxPrimitive.Trigger>
+            </ComboboxTrigger>
             <ComboboxContent
                 anchor={cellRef}
                 sideOffset={1}
@@ -149,9 +149,9 @@ export function CellPick({value, original, unchanged, choices, optional, searchP
                         <ComboboxItem
                             key={item}
                             value={item}
-                            /* `py-[3px]!`：项的内边距上下各 3px（库基类 `py-1.5` 是 6px —— 共减 3px）。
-                               ⚠️ 别写成 `py-0.75!`：这个版本不认小数步进，类名在、**规则不生成**，等于没改。 */
-                            className={`py-[3px]! ${item === original ? "text-[#a0a0a0]" : ""}`}
+                            /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
+                               ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
+                            className={`py-1! ${item === original ? "text-[#a0a0a0]" : ""}`}
                         >
                             {item}
                         </ComboboxItem>

@@ -78,15 +78,17 @@ function clickItem(text: string) {
 }
 
 describe("动作表 · 选值格（controlTypeHash_）", () => {
-    it("格子里是那个值 + 一个下拉箭头（不为箭头多挂任何节点）", async () => {
+    it("格子里是那个值 + `ui/combobox` 自带的箭头", async () => {
         setRows([pickRow("1000", "4087152117")])
         const container = await renderTable()
 
         const cell = cellAt(container, 0, PICK_COL)
         expect(cell.textContent).toBe("4087152117")
-        // 箭头是纯 CSS（`::after` + mask）—— 类在触发器那层，DOM 里没有额外元素。
-        expect(cell.querySelector(".cell-pick-mark")).not.toBeNull()
-        expect(cell.querySelectorAll("svg")).toHaveLength(0)
+        // 箭头 = 库触发器自带的 `ChevronDownIcon`（一个格子里只有一个）。
+        const mark = cell.querySelector(".cell-pick-mark")!
+        const arrow = mark.querySelector("svg")!
+        expect(arrow.getAttribute("class")).toContain("pointer-events-none")
+        expect(mark.querySelectorAll("svg")).toHaveLength(1)
         /*
             **默认什么都没有**：这一格照旧带 `cell-focus`（与别的可编辑格同一个类 —— 环由
             `td:focus-within` 决定），但**不挂任何"常亮"的开关**：没有 `data-popup-open`

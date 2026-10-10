@@ -119,24 +119,16 @@ export const FONT = "text-base md:text-sm"
  * ⚠️ 这一层**不能用** `truncate`：它是 flex 容器，`truncate` 那三条属性会落到容器上，
  * 长文本照样溢出去 —— 所以里面的文本自己带 `truncate`（见 `PICK_TEXT`）。
  */
-export const PICK_CELL = `${CELL_TEXT} relative justify-between`
+export const PICK_CELL = `${CELL_TEXT} justify-between`
 
-/**
- * 选值格右端那个**下拉箭头**（见 style.css 的 `.cell-pick-mark`）。
- *
- * 用**类**不用内联 SVG 元素：它是纯装饰，用 `mask-image` 画在 `::after` 上 —— 一个字符的
- * DOM 都不多，`ControlTypeHash_` 那一列上千个格子也不多一个节点。`pointer-events` 由样式表关掉。
- */
+/** 选值格的标记类（**不是**箭头样式）—— `style.css` 那句"列表开着时画一圈环"与测试/探针都靠它。 */
 export const PICK_MARK = "cell-pick-mark"
 
 /**
- * 选值格里那串文本（触发器里的 `<span>`）。
- *
- * `truncate` 必须在这一层（`PICK_CELL` 是 flex 容器，写在它身上不生效）；`pr-[28px]` 是给箭头
- * 让位：箭头宽 12px、离格子右沿 12px（style.css 的 `right: 12px`），合起来占离右沿 12~24px 那一段，
- * 再留 4px 空隙。少了它，数字会伸到箭头底下。
+ * 选值格里那串文本。`truncate` 必须在这一层（`PICK_CELL` 是 flex 容器，写容器上不生效）；
+ * `min-w-0` 也必须有 —— flex item 默认 `min-width: auto`，长值会把右边的箭头挤出格子。
  */
-export const PICK_TEXT = "truncate pr-[28px]"
+export const PICK_TEXT = "truncate min-w-0"
 
 /**
  * 行号格的内层：高度、内边距、字号都照 `CellText` 抄 —— 格子高度、数字基线与数据格才齐平。
