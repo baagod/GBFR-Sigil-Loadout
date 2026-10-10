@@ -710,3 +710,15 @@ td.cell-selected.cell-active {
         border-top: 0;
     }
 }
+
+/*
+    base-ui 给每个 Checkbox / Combobox 挂的隐藏 `<input>` 自带行内 `position: fixed`
+    （不可见靠 `clip-path` 裁掉）。`fixed` 在可滚动容器里**每个元素各成一个图层**：
+    本页 435 个 → 367 个图层，拖选时每次移动都重建图层树（trace：`Layerize` 1345ms / 整次 2647ms）。
+    `absolute` 一样脱离文档流、一样被裁掉，但不带那条 fixed 合成理由 —— 实测拖选 2647 → 1294ms。
+
+    ⚠️ 只匹配"行内写了 `position: fixed` 的隐藏输入"，别扩大成所有 `input[id^=base-ui-]`。
+*/
+input[aria-hidden="true"][style*="position: fixed"] {
+    position: absolute !important;
+}
