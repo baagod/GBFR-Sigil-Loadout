@@ -21,6 +21,7 @@ export const t = {
     // 与 messages.ts 的 zh 同一句（用例要断言它上屏）
     multiAreaCopy: "请选择同一行或同一列中的单元格。",
     multiAreaCopyTitle: "无法复制选中区域",
+    actionBranchSearch: "搜索",
     ok: "确定",
 } as unknown as Messages
 

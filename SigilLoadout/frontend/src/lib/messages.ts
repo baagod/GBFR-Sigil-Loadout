@@ -59,6 +59,8 @@ const zh = {
     charEmpty: "解包目录里没有别的角色动作表",
     /** 清单上的记录这张表里一条都没有：不是错误，是 ids 与表不匹配（见后端 LoadActions）。 */
     actionsEmpty: "无搜索动作",
+    /** 动作表里"分支"选值格（`branchXAtk_`）：下拉搜索框的提示（项本身只显示值，`-1` 就显示 `-1`）。 */
+    actionBranchSearch: "搜索",
     cancel: "取消",
     configTrigger: "触发",
     configContinuous: "持续",
@@ -145,6 +147,7 @@ export const messages: Record<Lang, Messages> = {
         idsHint: "Search id_ or a mot number (partial match), space-separated.",
         charEmpty: "No other character action tables extracted",
         actionsEmpty: "No matching actions",
+        actionBranchSearch: "Search",
         cancel: "Cancel",
         configTrigger: "Trigger",
         configContinuous: "Continuous",
@@ -215,6 +218,7 @@ export const messages: Record<Lang, Messages> = {
         idsHint: "id_ または mot 番号を検索（部分一致）、空白区切り。",
         charEmpty: "解包先に他のキャラクターのアクション表がありません",
         actionsEmpty: "該当するアクションがありません",
+        actionBranchSearch: "検索",
         cancel: "キャンセル",
         configTrigger: "トリガー",
         configContinuous: "持続",
@@ -285,6 +289,7 @@ export const messages: Record<Lang, Messages> = {
         idsHint: "id_ 또는 mot 번호 검색 (부분 일치), 공백 구분.",
         charEmpty: "다른 캐릭터의 액션 표가 없습니다",
         actionsEmpty: "일치하는 액션이 없습니다",
+        actionBranchSearch: "검색",
         cancel: "취소",
         configTrigger: "트리거",
         configContinuous: "지속",

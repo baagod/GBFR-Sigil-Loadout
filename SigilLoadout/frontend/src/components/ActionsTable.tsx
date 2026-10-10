@@ -66,7 +66,7 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {READ_ONLY_KEYS, acceptPaste, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
 
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
@@ -108,6 +108,14 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     rowsRef.current = rows
     /** 字段顺序（= 表头顺序）：后端保证同一份表里每条记录的键序列一致，取第一条即可。 */
     const [keys, setKeys] = useState<string[]>([])
+    /**
+     * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
+     * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
+     */
+    const branchPick = useMemo(
+        () => ({ids: new Set(rows.map((row) => row.id)), searchPlaceholder: t.actionBranchSearch}),
+        [rows, t],
+    )
     /** 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `PINNED_COUNT` 个字段）。 */
     const [pinning, setPinning] = useState<{start: string[]; end: string[]}>({start: [], end: []})
     /** 每列多宽（**取整后的整数**）：量出来写进库的 sizing state，渲染按它给 `width`。 */
@@ -600,11 +608,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         if (!plan.range) return
 
         /*
-            **选值格（`controlTypeHash_`）的粘贴校验**：值不在册的这一格**不写**（当前值原样留着）。
+            **选值格的粘贴校验**：值不在清单里的这一格**不写**（当前值原样留着）。清单有两份 ——
+            `controlTypeHash_` 用固定的 53 项，`branchXAtk_` 用当前表的 `id_` 集合（`branchPick.ids`）。
             用户的口径是"不通过就当没粘过"——**不提示、也不占一步撤销**：过滤后一条都不剩时整次粘贴就是个
             空操作（连撤销栈都不入）。其余列一律放行（见 model 的 `acceptPaste`）。
         */
-        const writes = plan.writes.filter((write) => acceptPaste(write.columnId, write.value))
+        const writes = plan.writes.filter((write) => acceptPaste(write.columnId, write.value, branchPick.ids))
         if (writes.length === 0) return
 
         batchingRef.current = true
@@ -976,6 +985,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                         那等于每行都问一次库，51 行就是 51 次多余调用，而拖拽选区时每次 mousemove 都要
                         重跑这一整段（用户反馈"选择有点卡顿"就是这类每行重复调用堆出来的）。
                     */}
+                    {/* 分支列的清单与搜索提示 —— 那一格自己来取（见 `BranchPickContext`）。 */}
+                    <BranchPickContext.Provider value={branchPick}>
                     {modelRows.map((row, rowIndex) => {
                         /*
                             ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
@@ -1011,6 +1022,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                             />
                         )
                     })}
+                    </BranchPickContext.Provider>
                 </tbody>
             </table>
             </div>

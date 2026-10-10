@@ -6,7 +6,7 @@ import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
 import type {Cell, CellSelectionBounds, CellSelectionState, Row, Table} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
-import {PICKER_KEYS} from "./model"
+import {PICKER_KEYS, isPickerColumn} from "./model"
 import {
     CELL_BASE,
     EDITABLE_BG,
@@ -151,9 +151,9 @@ export const ActionRowView = memo(function ActionRowView({
                     手算左右边），那正是两套模型并存留下的补丁 —— 统一之后删掉了。
                 */
                 const edges = selectionClass(cell)
-                /* 选值格（`controlTypeHash_`）与别的格子走同一条路，这里不为它开岔路 —— 唯一的差别是
-                   点它会展开列表（见 CellContent 的 `picker` 分支）。 */
-                const picker = !readOnly && PICKER_KEYS.has(key)
+                /* 选值格（`controlTypeHash_` / `branchXAtk_`）与别的格子走同一条路，这里不为它开岔路 ——
+                   唯一的差别是点它会展开列表（见 CellContent 的 `picker` 分支）。 */
+                const picker = !readOnly && isPickerColumn(key)
                 return (
                     <td
                         key={cell.id}

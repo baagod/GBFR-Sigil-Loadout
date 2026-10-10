@@ -2,11 +2,12 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
+import {memo, useContext, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
 
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
-import {displayText, type PressFacts, snapshotKey} from "./model"
+import {BRANCH_KEYS, BranchPickContext, UNSET, displayText, type PressFacts, snapshotKey} from "./model"
+import {CELL_CHOICES} from "@/lib/controltypes"
 
 /**
  * 一格的**内容**（只读文本 / 可编辑格）—— **`memo` 就是这一层存在的理由**。
@@ -62,6 +63,8 @@ export const CellContent = memo(function CellContent({
     /** 进入编辑态时喊一声（复制源那圈虚线要撤，见 `CopySource` 那段规则②）。 */
     onEnterEdit: () => void
 }) {
+    // 分支列选值格的清单与搜索提示（见 `BranchPickContext`）—— 只读列用不到，但 hook 必须无条件调用。
+    const branchPick = useContext(BranchPickContext)
     if (readOnly) {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
@@ -74,7 +77,11 @@ export const CellContent = memo(function CellContent({
             "什么时候换成输入框"，而这里根本没有输入框 —— 点一下就展开列表，与别的表的选值格一致。
             改一格 = 在列表里挑一项 → `onCommit` → 与别的格子同一条 `edit`（撤销栈、复制源规则都照旧）。
         */
-        return <CellPick value={raw} original={original} unchanged={raw === ""} onCommit={(value) => edit(rowId, fieldKey, value)} />
+        // 清单给**稳定的 Set 引用**（`CELL_CHOICES` / `branchPick.ids`）：CellPick 里那份重排才挂得住 memo。
+        const pick = BRANCH_KEYS.has(fieldKey)
+            ? {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
+            : {choices: CELL_CHOICES}
+        return <CellPick value={raw} original={original} unchanged={raw === ""} onCommit={(value) => edit(rowId, fieldKey, value)} {...pick} />
     }
     return (
         <Cell

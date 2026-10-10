@@ -12,6 +12,7 @@ import {
     sortFn_alphanumeric,
     tableFeatures,
 } from "@tanstack/react-table"
+import {createContext} from "react"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -29,29 +30,53 @@ import {CELL_CHOICES} from "@/lib/controltypes"
 export const READ_ONLY_KEYS = new Set(["id_", "abilityTag_"])
 
 /**
- * **选值格**的列：这些格子只能从一份固定的值表里挑，不能手打（现在只有 `controlTypeHash_` 一列）。
+ * **选值格**的列：只能从下拉里挑、不能手打。两类，清单来源不同：
  *
- * 为什么这一列要上锁：它拿的是**哈希**，游戏按整数比；填成十六进制（`4582EE4A`）解析不出整数 →
- * 技能直接放不出来（docs/action/动作表字段文档.md 记着这个坑，"编辑器应加防护"）。
- * 于是这一列：格子里挂一个下拉、粘贴进来时校验（见 `acceptPaste`），别处照旧当普通格子使。
+ *   · `PICKER_KEYS` —— 全局固定的一份（`lib/controltypes.ts`）。`controlTypeHash_` 拿的是**哈希**，
+ *     游戏按整数比；填成十六进制（`4582EE4A`）解析不出整数 → 技能直接放不出来
+ *     （docs/action/动作表字段文档.md 记着这个坑）。
+ *   · `BRANCH_KEYS` —— 值是**另一个动作的 id**，清单是**当前这张表里所有 `id_`**，所以得由数据算
+ *     （见 `ActionsTable` 的 `branchPick`）。
  *
- * ⚠️ 表外的值**一个都不删**：列表只有那 53 项，格子里的值不在其中时列表里没有任何一项被选中，
- * 打开看一眼关掉什么都不动（见 `CellPick` 那段）。
+ * ⚠️ 清单外的值**一个都不删**：格子里的值不在其中时列表里没有任何一项被选中，打开看一眼关掉什么都不动。
  */
 export const PICKER_KEYS = new Set(["controlTypeHash_"])
+export const BRANCH_KEYS = new Set(["branchXAtk_"])
+
+/** 分支列里表示**空**的那一项（用户口径：`-1`）。 */
+export const UNSET = "-1"
+
+/** 这一列是不是**选值格**（两类都算）。 */
+export const isPickerColumn = (key: string) => PICKER_KEYS.has(key) || BRANCH_KEYS.has(key)
+
+/**
+ * 分支列选值格要的两样东西 —— **走 context 下发**：`ActionRowView` / `CellContent` 靠 `memo` 挡住
+ * 无谓重渲，多一个 prop 就多穿两层；而消费者只有 `CellPick` 那一层。
+ */
+export type BranchPickConfig = {
+    /** 清单：当前这张表里所有 `id_`。 */
+    ids: ReadonlySet<string>
+    /** 下拉搜索框的提示文案（i18n）。 */
+    searchPlaceholder: string
+}
+
+export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: ""})
 
 /**
  * 粘贴进来的这一格值，**收不收**。
  *
- * 只对选值格设闸：不在册的值**原样保留当前值**（这一格不写、也不算一步撤销），并且**不给任何提示**
+ * 选值格设闸：不在清单里的值**原样保留当前值**（这一格不写、也不算一步撤销），并且**不给任何提示**
  * —— 用户的口径是"不通过就当没粘过"。别的列一律放行（它们本来就是自由文本/数值）。
  *
  * 空串也**不收**：用户的口径是"只能从列表里选、不能输入"，而空串不是列表项。所以往这一列粘一格空的
- * 等于什么都没发生（与"粘了十六进制"同一条路：不写、不提示、不占撤销步）。
+ * 等于什么都没发生（与"粘了怪值"同一条路：不写、不提示、不占撤销步）。
+ *
+ * `branchIds` 是分支列那份清单（当前表的 `id_` 集合）；不做分支列时传空集即可。
  */
-export function acceptPaste(columnId: string, value: string): boolean {
-    if (!PICKER_KEYS.has(columnId)) return true
-    return CELL_CHOICES.has(value)
+export function acceptPaste(columnId: string, value: string, branchIds: ReadonlySet<string>): boolean {
+    if (PICKER_KEYS.has(columnId)) return CELL_CHOICES.has(value)
+    if (BRANCH_KEYS.has(columnId)) return value === UNSET || branchIds.has(value)
+    return true
 }
 
 /**

@@ -6,7 +6,7 @@
     它们那些按下标定位的断言全顶偏（实测顶掉 6 条）。这里自己的 `KEYS` 只是把第 5 列换成真字段名。
 */
 import {describe, expect, it, vi} from "vitest"
-import {fireEvent, waitFor} from "@testing-library/react"
+import {fireEvent, render, waitFor} from "@testing-library/react"
 
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -14,23 +14,35 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     SaveActionFields: vi.fn(),
 }))
 
-import {acceptPaste} from "@/components/actions-table/model"
+import {acceptPaste, UNSET} from "@/components/actions-table/model"
+import {CellPick} from "@/components/actions-table/CellPick"
 import {cellAt, clipboardStub, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
 const PICK_FIELD = "controlTypeHash_"
 const PICK_COL = 4
-const KEYS = ["id_", "abilityTag_", "actionFreeWork0_", "actionFreeWork1_", PICK_FIELD, ...Array.from({length: 82}, (_, i) => `actionFreeWork${i + 2}_`)]
+/** 分支列：放在选值格后面一格（数据列下标 5），清单是**当前表的 `id_`**。 */
+const BRANCH_FIELD = "branchXAtk_"
+const BRANCH_COL = 5
+const KEYS = ["id_", "abilityTag_", "actionFreeWork0_", "actionFreeWork1_", PICK_FIELD, BRANCH_FIELD, ...Array.from({length: 81}, (_, i) => `actionFreeWork${i + 2}_`)]
+
+/** 没有清单（`controlTypeHash_` 那边用不到 id 清单）。 */
+const NO_IDS: ReadonlySet<string> = new Set()
 
 /** 一条记录：`id_` 用真记录号，选值格那一列给指定的原值 / 改动，其余凑数。 */
-function pickRow(id: string, original: string, changed?: string) {
+function pickRow(id: string, original: string, changed?: string, branch?: {original: string; changed?: string}) {
     return {
         id,
         fields: KEYS.map((key) => ({
             key,
-            original: key === "id_" ? id : key === PICK_FIELD ? original : `${key}-原值`,
-            value: key === PICK_FIELD && changed !== undefined ? changed : (null as string | null),
+            original: key === "id_" ? id : key === PICK_FIELD ? original : key === BRANCH_FIELD ? (branch?.original ?? "-1") : `${key}-原值`,
+            value:
+                key === PICK_FIELD && changed !== undefined
+                    ? changed
+                    : key === BRANCH_FIELD && branch?.changed !== undefined
+                      ? branch.changed
+                      : (null as string | null),
         })),
     }
 }
@@ -221,16 +233,27 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
 
 describe("动作表 · 选值格的粘贴校验", () => {
     it("校验口径：选值格只收表里那 53 个值，别的列一律放行", () => {
-        for (const item of CONTROL_TYPES) expect(acceptPaste(PICK_FIELD, item.decimal)).toBe(true)
+        for (const item of CONTROL_TYPES) expect(acceptPaste(PICK_FIELD, item.decimal, NO_IDS)).toBe(true)
         // 十六进制（文档记着的最常见错误）、别的数、空串 —— 一律不收（用户的口径：只能选表里的值）。
-        expect(acceptPaste(PICK_FIELD, "44DFF94D")).toBe(false)
-        expect(acceptPaste(PICK_FIELD, "0x44DFF94D")).toBe(false)
-        expect(acceptPaste(PICK_FIELD, "1")).toBe(false)
-        expect(acceptPaste(PICK_FIELD, "-1")).toBe(false)
-        expect(acceptPaste(PICK_FIELD, "")).toBe(false)
+        expect(acceptPaste(PICK_FIELD, "44DFF94D", NO_IDS)).toBe(false)
+        expect(acceptPaste(PICK_FIELD, "0x44DFF94D", NO_IDS)).toBe(false)
+        expect(acceptPaste(PICK_FIELD, "1", NO_IDS)).toBe(false)
+        expect(acceptPaste(PICK_FIELD, "-1", NO_IDS)).toBe(false)
+        expect(acceptPaste(PICK_FIELD, "", NO_IDS)).toBe(false)
         // 别的列（自由文本/数值）照旧。
-        expect(acceptPaste("actionFreeWork01_", "随便写点什么")).toBe(true)
-        expect(acceptPaste("saveMotId01_", "-1")).toBe(true)
+        expect(acceptPaste("actionFreeWork01_", "随便写点什么", NO_IDS)).toBe(true)
+        expect(acceptPaste("saveMotId01_", "-1", NO_IDS)).toBe(true)
+    })
+
+    it("分支列（branchXAtk_）：只收当前表的 id 与 -1", () => {
+        const ids = new Set(["100", "101", "150"])
+        expect(acceptPaste("branchXAtk_", "101", ids)).toBe(true)
+        expect(acceptPaste("branchXAtk_", UNSET, ids)).toBe(true)
+        // 表里没有这个 id、空串 —— 不收。
+        expect(acceptPaste("branchXAtk_", "999", ids)).toBe(false)
+        expect(acceptPaste("branchXAtk_", "", ids)).toBe(false)
+        // 没给清单时只放行 -1（其余一律挡）。
+        expect(acceptPaste("branchXAtk_", "101", NO_IDS)).toBe(false)
     })
 
     it("粘贴一列：在册的值照写，不在册的那一格**不写**（当前值原样留着）", async () => {
@@ -260,5 +283,124 @@ describe("动作表 · 选值格的粘贴校验", () => {
         fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t44DFF94D")})
 
         expect(cellAt(container, 0, PICK_COL).textContent).toBe("4087152117")
+    })
+})
+
+/*
+    分支列（`branchXAtk_`）：值与 `controlTypeHash_` 那一列**同一套外观**，差别只在清单与搜索框 ——
+    清单是**当前这张表里所有 `id_`**（用户口径），外加 `-1`（空）。
+*/
+describe("动作表 · 分支列（branchXAtk_）", () => {
+    /** 三个 id 的三种情形：改过（当前值在表里）、没改过、原值是 `-1`。 */
+    const rows = () => [
+        pickRow("100", "4087152117", undefined, {original: "-1", changed: "102"}),
+        pickRow("101", "4087152117", undefined, {original: "-1"}),
+        pickRow("102", "4087152117", undefined, {original: "-1", changed: "-1"}),
+    ]
+
+    it("格子长相与选值格一致（一层文本 + 箭头，没有搜索框）", async () => {
+        setRows(rows())
+        const container = await renderTable()
+
+        const cell = cellAt(container, 0, BRANCH_COL)
+        expect(cell.textContent).toBe("102") // 改过 → 显示改动值
+        expect(cell.querySelector(".cell-pick-mark")).not.toBeNull()
+        // 搜索框在**弹层**里，不在格子里（格子里只有那个触发器）。
+        expect(cell.querySelector('[data-slot="input-group"]')).toBeNull()
+        expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("-1") // 没改过 → 显示原值
+    })
+
+    it("列表 = 当前表所有 id + -1；并且带搜索框", async () => {
+        setRows(rows())
+        const container = await renderTable()
+
+        openPick(cellAt(container, 0, BRANCH_COL))
+        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+
+        const text = items().map((el) => el.textContent)
+        // 三个 id 都在，`-1` 也有一项 —— **项上显示的就是值本身**（`-1`）。
+        expect(text).toEqual(expect.arrayContaining(["100", "101", "102"]))
+        expect(text).toContain("-1")
+        // 当前值排在最前，`-1` 紧跟其后（不能埋在最后 —— 见下一条用例）。
+        expect(text.slice(0, 2)).toEqual(["102", "-1"])
+
+        // 搜索框在弹层里（不是格子里），提示文案走 i18n。
+        const input = document.querySelector<HTMLInputElement>('[data-slot="combobox-content"] input')
+        expect(input).not.toBeNull()
+        expect(input!.placeholder).toBe("搜索")
+    })
+
+    it("搜索框输入 → 列表按输入过滤", async () => {
+        setRows(rows())
+        const container = await renderTable()
+
+        openPick(cellAt(container, 0, BRANCH_COL))
+        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+
+        const input = document.querySelector<HTMLInputElement>('[data-slot="combobox-content"] input')!
+        fireEvent.change(input, {target: {value: "101"}})
+
+        await waitFor(() => {
+            const text = items().map((el) => el.textContent)
+            expect(text).toContain("101")
+            expect(text).not.toContain("102")
+        })
+    })
+
+    it("挑一个 id → 写进格子；挑 `-1` → 写 -1（不是清空）", async () => {
+        setRows(rows())
+        const container = await renderTable()
+
+        // 挑 `101`
+        openPick(cellAt(container, 1, BRANCH_COL))
+        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        clickItem("101")
+        await waitFor(() => expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("101"))
+
+        // 再挑 `-1` → 值就是 `-1`（提交的也是它，不是 null）
+        openPick(cellAt(container, 1, BRANCH_COL))
+        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        clickItem("-1")
+        await waitFor(() => expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("-1"))
+    })
+
+    it("`-1` 只出现一次（当前值**就是** `-1` 时三处来源撞车，必须去重）", async () => {
+        // 三项来源：当前值 / 原值 / `optional`。当前值是 `-1` 时它们同值 —— 不去重列表里就有两个 `-1`。
+        const {container} = render(
+            <table>
+                <tbody>
+                    <tr>
+                        <CellPick value={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} />
+                    </tr>
+                </tbody>
+            </table>,
+        )
+        fireEvent.pointerDown(container.querySelector(".cell-pick-mark")!, {button: 0, pointerType: "mouse"})
+        fireEvent.mouseDown(container.querySelector(".cell-pick-mark")!, {button: 0})
+        fireEvent.click(container.querySelector(".cell-pick-mark")!)
+        await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
+        const texts = [...document.querySelectorAll('[data-slot="combobox-item"]')].map((el) => el.textContent)
+        expect(texts.filter((t) => t === "-1")).toHaveLength(1)
+    })
+
+    it("原值 `-1` 的格子：默认显示 `-1`，且它是清单里被选中的那一项", async () => {
+        const {container} = render(
+            <table>
+                <tbody>
+                    <tr>
+                        <CellPick value="" original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} />
+                    </tr>
+                </tbody>
+            </table>,
+        )
+        const mark = container.querySelector(".cell-pick-mark")!
+        expect(mark.textContent).toBe(UNSET)
+
+        fireEvent.pointerDown(mark, {button: 0, pointerType: "mouse"})
+        fireEvent.mouseDown(mark, {button: 0})
+        fireEvent.click(mark)
+        await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
+        const selected = [...document.querySelectorAll('[data-slot="combobox-item"]')].find((el) => el.getAttribute("aria-selected") === "true")
+        expect(selected?.textContent).toBe(UNSET)
     })
 })

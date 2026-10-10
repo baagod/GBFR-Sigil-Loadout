@@ -1,18 +1,18 @@
 import {useEffect, useMemo, useRef, useState} from "react"
 import {Combobox as ComboboxPrimitive} from "@base-ui/react"
-import {Combobox, ComboboxContent, ComboboxItem, ComboboxList} from "@/components/ui/combobox"
+import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
-import {CONTROL_TYPES, CELL_CHOICES} from "@/lib/controltypes"
 
 /*
-    动作表里的**选值格**（现在只有 `controlTypeHash_` 一列）：格子里是那个值 + 一个小箭头，
-    点一下在格子下面挂出列表，从 53 个控制类型里挑一个。
+    动作表里的**选值格**：格子里是那个值 + 一个小箭头，点一下在格子下面挂出列表挑一个。
 
-    列表就是 `ui/combobox` 那套（与轨迹表的 FlagCell 同一个做法）—— 样式、悬停高亮、选中勾都不自己写，
-    只有两处是这一列特有的：
-      · **单选**（FlagCell 是掩码多选）⇒ 必须 `filter={null}`：单选形态默认按"选中值"过滤列表，
-        挑完一项再展开就只剩那一项（实测 53 → 1）；
-      · **列表顺序**（当前值 → 原值 → 其余）与**原值灰字** —— 这一列的业务口径。
+      · `choices` —— 清单（Set，稳定引用）。`controlTypeHash_` 用 `CELL_CHOICES`；`branchXAtk_`
+        用**当前表里所有 `id_`**（用户口径：值是"转到哪个动作"）。
+      · `searchPlaceholder` —— 给了就挂搜索框（`branchXAtk_` 项多；53 项那一列不挂）。
+      · `optional` —— 额外可选项（分支列的 `-1`）。**项上就显示值本身**（`-1` 就显示 `-1`）。
+
+    列表本体就是 `ui/combobox` 那套（与轨迹表的 FlagCell 同一个做法）：样式、悬停高亮、选中勾都不自己写。
+    只有三处是这一列特有的：**搜索框**、**列表顺序**（当前值 → 原值 → 其余）、**原值灰字**。
 
     ## 触发器的盒子 & 格线（都别再去动）
 
@@ -28,19 +28,19 @@ import {CONTROL_TYPES, CELL_CHOICES} from "@/lib/controltypes"
       列表的内边距**用组件的默认值**（`p-1` = 上下左右各 4px），这一列不再覆盖它。
 */
 
-/** 列表项：就是那些值（`CONTROL_TYPES` 的十进制），顺序也照它（按用量降序）。 */
-const ITEMS: string[] = CONTROL_TYPES.map((item) => item.decimal)
-
-/** 当前值在表里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
-const inTable = (value: string) => CELL_CHOICES.has(value)
-
-export function CellPick({value, original, unchanged, onCommit}: {
+export function CellPick({value, original, unchanged, choices, optional, searchPlaceholder, onCommit}: {
     /** 这一格的**改动值**（空串 = 没改过）；列表的选中态看的是"实际显示的那个值"。 */
     value: string
     /** 这一格的**原值**（只读那一份）：值清空时显示它，也是"改回原样"的判据。 */
     original: string
     /** 这一格**还等于原值**（没动过）→ 灰字，与别的格子同一套。 */
     unchanged: boolean
+    /** 可选的值清单（`controlTypeHash_` = `CELL_CHOICES`；`branchXAtk_` = 当前表的 `id_` 集合）。 */
+    choices: ReadonlySet<string>
+    /** 额外可选项（分支列的 `-1`）；挑中它会照原样提交，不折算成"回到原值"。 */
+    optional?: string
+    /** 给了就挂搜索框（项多时才需要；`branchXAtk_` 用，53 项那一列不挂）。 */
+    searchPlaceholder?: string
     /** 提交这一格；`null` = 回到原值（与别的格子同一条口径）。 */
     onCommit: (next: string | null) => void
 }) {
@@ -55,16 +55,20 @@ export function CellPick({value, original, unchanged, onCommit}: {
     /** 关列表时要不要把焦点还回这一格（用户点到别处时不还，免得顶掉他刚点开的那一格）。 */
     const focusBackRef = useRef(true)
 
-    /** 格子里显示的那份文本：没改过就是原值（`-` / `-1` 照原样，不归一化）。 */
+    /** 格子里显示的那份文本：没改过就是原值（`-1` 照原样，不归一化）。 */
     const shown = value === "" ? original : value
+    /** 这个值在清单里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
+    const inChoices = (item: string) => choices.has(item) || item === optional
     /**
-     * 这一格的列表顺序：**当前值 → 原值 → 其余**（其余照基础表那套：用量降序）。
-     * 前两项是**这一格自己的事实**，所以按格算；53 项重排一次的开销可忽略。
+     * 列表顺序：**当前值 → 原值 → `-1` → 其余**（其余照清单原序）。
+     *
+     * `new Set` 一次做完两件事：去重（格子的当前值**就是** `-1` 时，当前值与 `optional` 是同一个值 ——
+     * 不去重就出现两个 `-1`）与保序（先出现的排前面）。`-1` 不能沉到最后：分支列上百项，滚到看不见的地方就点不到。
      */
-    const items = useMemo(() => {
-        const head = [shown, original].filter((item, index, all) => inTable(item) && all.indexOf(item) === index)
-        return [...head, ...ITEMS.filter((item) => !head.includes(item))]
-    }, [shown, original])
+    const items = useMemo(
+        () => [...new Set([shown, original, ...(optional ? [optional] : []), ...choices])].filter(inChoices),
+        [shown, original, choices, optional],
+    )
 
     // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
     useEffect(() => {
@@ -96,9 +100,14 @@ export function CellPick({value, original, unchanged, onCommit}: {
     return (
         <Combobox
             items={items}
-            filter={null}
-            value={inTable(shown) ? shown : null}
-            onValueChange={(next: string | null) => next && onCommit(next === original ? null : next)}
+            /*
+                ‼️ 不挂搜索框时 `filter={null}` = **列表不随任何东西过滤**（默认会按"选中值"过滤：挑完一项
+                再展开，列表里就只剩那一项 —— 实测 53 → 1）。
+            */
+            filter={searchPlaceholder ? undefined : null}
+            value={inChoices(shown) ? shown : null}
+            /* `-1` 是清单里的一项，**照原样提交**；其余挑回原值就把改动清掉（交 `null`）。 */
+            onValueChange={(next: string | null) => next && onCommit(next === original && next !== optional ? null : next)}
             open={open}
             onOpenChange={(next) => {
                 if (next) setInstantClose(false) // 开：复位"立刻消失"（弹层这时才重新挂载）
@@ -127,6 +136,9 @@ export function CellPick({value, original, unchanged, onCommit}: {
                 // 关列表时焦点回**这一格**（默认会去找文档里第一个可聚焦元素）；点到别处时返回 false。
                 finalFocus={() => (focusBackRef.current ? (cellRef.current ?? false) : false)}
             >
+                {/* 搜索框放**弹层里**（格子里那层是触发器，塞输入框就变"可打字"了）、放列表**外面**
+                    （滚的是列表，搜索框不动）。零 className —— 与官方示例 `ComboboxInPopup` 一致。 */}
+                {searchPlaceholder && <ComboboxInput placeholder={searchPlaceholder} showTrigger={false} />}
                 <ComboboxList>
                     {(item: string) => (
                         /*
