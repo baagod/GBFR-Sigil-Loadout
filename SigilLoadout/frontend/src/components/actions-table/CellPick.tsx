@@ -197,6 +197,12 @@ export function CellPick({
             <ComboboxTrigger
                 render={<div ref={cellRef} className={`${PICK_CELL} ${PICK_MARK}`} tabIndex={0} />}
                 nativeButton={false}
+                /*
+                    ‼️ 列表开着时给方向键挂个旗 —— 上下键归列表（base-ui 自己导航），表格**不许**
+                    顺手移动单元格选区：选区一动，上面那条"一滚就收"就会把列表关掉。
+                    （见 `ActionsTable` 的 `handleArrowKey` 闸门。）
+                */
+                data-pick-open={open || undefined}
                 // 这一格自己收下 Ctrl/Cmd+C 与 Esc（见 App 里那两条白名单）——别让表格/窗口接走。
                 data-copy-own=""
                 data-esc-own=""

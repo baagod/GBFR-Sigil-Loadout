@@ -78,6 +78,7 @@ const RowCell = memo(function RowCell({
     pressRef,
     draggedRef,
     dragRowRef,
+    cellRef,
     getSelectionBounds,
     edit,
     startCellSelection,
@@ -105,6 +106,11 @@ const RowCell = memo(function RowCell({
     pressRef: RefObject<PressFacts | null>
     draggedRef: RefObject<boolean>
     dragRowRef: RefObject<string | null>
+    /**
+     * 把这一格滚进视野的回调 ref —— **只有活动格拿到它**（别的格是 `undefined`，React 因此不绑）。
+     * 每格都传同一个稳定函数（由行那层按 `activeCellKey` 决定给不给），所以 memo 不受影响。
+     */
+    cellRef?: (el: HTMLTableCellElement | null) => void
     /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
     getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
@@ -113,6 +119,7 @@ const RowCell = memo(function RowCell({
 }) {
     return (
         <td
+            ref={cellRef}
             /* 列身份写在 DOM 上：量列宽那一趟按 `th[data-col-id]` 挑列，少了它会悄悄退化成量全部列。 */
             data-col-id={fieldKey}
             style={{width: width ?? undefined, left: left ?? undefined}}
@@ -179,6 +186,8 @@ export const ActionRowView = memo(function ActionRowView({
     pressRef,
     copySource,
     draggedRef,
+    activeCellKey,
+    scrollActiveIntoView,
     getSelectionBounds,
     edit,
     dragRowRef,
@@ -206,6 +215,10 @@ export const ActionRowView = memo(function ActionRowView({
     copySource: CopySource | null
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
     draggedRef: RefObject<boolean>
+    /** **活动格**的键（`snapshotKey` 格式，`""` = 没有）—— 决定哪一格绑滚动 ref。 */
+    activeCellKey: string
+    /** 把活动格滚进视野（稳定引用，只在活动格上绑）。 */
+    scrollActiveIntoView: (el: HTMLTableCellElement | null) => void
     /** 表格实例：按下时要问一句"现在的选区是不是收缩成了一格"（见 `PressFacts.wasOnlyCell`）。 */
     /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
     getSelectionBounds: () => CellSelectionBounds[]
@@ -275,6 +288,8 @@ export const ActionRowView = memo(function ActionRowView({
                             `getStart("start")` 是从 0 算的；不加偏移，`id_` 的 `left:0` 会和行号格撞在一起。
                         */
                         left={measured && pinned ? HANDLE_WIDTH + cell.column.getStart("start") : null}
+                        /* 只有活动格拿到滚动 ref（`undefined` = React 不绑）—— 判据在行那层算好。 */
+                        cellRef={activeCellKey === snapshotKey(row.id, key) ? scrollActiveIntoView : undefined}
                         abilityNames={abilityNames}
                         pressRef={pressRef}
                         draggedRef={draggedRef}

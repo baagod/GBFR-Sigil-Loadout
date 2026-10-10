@@ -35,6 +35,7 @@ import {
     flexRender,
     useTable,
     type Cell,
+    type CellSelectionDirection,
     type CellSelectionState,
     type CellSelectionBounds,
     type ColumnDef,
@@ -71,6 +72,22 @@ import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, features, type ActionRow
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
 import type {Messages} from "@/lib/messages"
+
+/*
+    ========================== 方向键（见 `handleArrowKey`） ==========================
+
+    `e.key` 用**方向名**判（`ArrowUp` 这种），不用 `keyCode`：后者在键盘布局/输入法下不可靠。
+    `ARROW_KEYS` 同时当"是不是方向键"的判据与"往哪走"的查找表 —— 一张表一件事，不用再写一遍 `if`。
+*/
+const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+}
+/** 修饰键按位组合：`SHIFT` 扩选、`CTRL` 跳边，两者都不按就是走一步。 */
+const SHIFT = 1
+const CTRL = 2
 
 /**
  * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
@@ -681,6 +698,39 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const lastColumnId = sheetColumns[sheetColumns.length - 1] ?? ""
     const lastColumnIndex = sheetColumns.length - 1
 
+    /**
+     * **活动格**（`cell-active` = 选区最新那片的锚点）的键 —— 与 `snapshotKey` 同格式，给
+     * "把活动格滚进视野"那个回调 ref 当判据（只有它那一格会拿到 ref）。
+     *
+     * ‼️ 从**受控 state** 算，不读 `table.getFocusedCell()`：库那个原子要等下一次渲染才跟上
+     * （同一个事件里读到的还是上一次的位置）。
+     *
+     * 也在**这里**算好、当字符串传下去，不让行/格自己读 `cell.getIsFocused()`：那是 `RowCell` 的
+     * memo 铁律（在子组件里读选区，memo 看不见变化）。
+     */
+    const activeCellKey = (() => {
+        const active = cellSelection[cellSelection.length - 1]
+        return active ? snapshotKey(active.anchorRowId, active.anchorColumnId) : ""
+    })()
+    /**
+     * 把活动格滚进视野（稳定引用，只挂在活动格上）。
+     *
+     * ‼️ **不自己算滚动量**：第一版那么写的，真机证明是错的 —— 读数只在布局落定时才可信，而且
+     * **冻结列永远"看起来在视野里"**（`getBoundingClientRect().left` 被 sticky 钉在容器左边），
+     * "该往左滚"的判据恒假，横向就再也回不到第一列。
+     *
+     * 所以这里只做一件事：让浏览器把这一格露出来（它懂 sticky 与吸顶表头）。
+     * "滚动条走到那一头"归 `Ctrl+方向键`（见 `handleArrowKey`）—— 那是"跳到边缘"才有的口径。
+     */
+    const scrollActiveIntoView = useCallback((el: HTMLTableCellElement | null) => {
+        const box = el?.closest<HTMLElement>(".overflow-auto")
+        if (!el || !box) return
+        /* 等一帧：这一帧里活动格可能已经换人（重渲），所以**重新查一次**，别抓着旧引用。 */
+        requestAnimationFrame(() => {
+            box.querySelector<HTMLElement>("tbody td.cell-active")?.scrollIntoView({block: "nearest", inline: "nearest"})
+        })
+    }, [])
+
     /*
         ========================== 选中：**一套模型** ==========================
 
@@ -715,6 +765,119 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
 
     /** 选区边界（`PressFacts` 与行号减选要用）—— 走 `tableRef`，于是对外也是稳定引用。 */
     const getSelectionBounds = useCallback(() => tableInstanceRef.current.getCellSelectionBounds(), [])
+
+    /**
+     * 方向键 → **活动格在数据格里走一格**（Excel 手感）。
+     *
+     * ‼️ 范围天然钳在数据格里：库只按可见列（按钉住重排）与行模型走，**行号列与表头根本不在候选里**
+     * —— 所以"不要选到行号列 / 表头"不用自己写判据，到边就停。
+     *
+     * 三条路（Shift / Ctrl 两条库只管一步或按旧值算，所以自己走）：
+     *   · 不带修饰 —— `moveCellSelection` 走一步。它内部就是 `setFocusedCell`（`mode:"replace"`），
+     *     **选区因此收成单格**，多片选区 / 整行块一并清掉，正是用户要的"从活动格移动 + 清除全部选区"。
+     *   · **Shift** —— 扩选：锚点不动、焦点角沿行列序走一步（只改最后一个区的 focus）。
+     *   · **Ctrl/Cmd** —— 一步跳到该方向最远能落的那一格。
+     *
+     * 闸门（谁该拿走这一次按键）：
+     *   · **本表有选区**（`cellSelection` 非空）—— 唯一的总开关。点过格子 = 用户刚在这张表上选过东西，
+     *     方向键归它；没选区就什么都不做，不抢别处的键。
+     *     ⚠️ 判据**不用"焦点在不在表里"**：那张表自己会 `blur` 交焦点（见下面那段），方向键要能
+     *     接在 `blur` 之后接着走；而"有选区"既够用、又不会把工具栏/别的表的键抢走。
+     *   · 焦点在编辑框里（普通格的 `input` / 选值格的 `role=combobox`）→ 让给它们；
+     *   · 选值格列表开着（触发器带 `data-pick-open`）→ 让给 base-ui 的列表导航
+     *     （**绝不能动选区**：选区一变，`CellPick` 那条"一滚就收"的逻辑会把列表关掉）。
+     *
+     * 挂**文档捕获阶段**（在下面那个 effect 里）：键事件跟着**焦点**走，而焦点可能在 `<body>` 上
+     * （点了格子再 blur、或刚部署完页面还没点过）—— 挂在容器上的 React `onKeyDown` 那时收不到。
+     */
+    const handleArrowKey = (e: KeyboardEvent) => {
+        const direction = ARROW_KEYS[e.key]
+        if (!direction || e.defaultPrevented) return
+        // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
+        const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
+        const shift = mods === SHIFT
+        if (mods !== 0 && !shift && mods !== CTRL) return
+
+        /*
+            ‼️ "活动格是哪一格"从**受控 state** 读，不读 `table.getFocusedCell()`：库那个原子要等下一次
+            渲染才跟上（本次事件里还是上一次的位置）—— Ctrl / Shift 两条要按它算落点，读原子就会算错。
+        */
+        const anchor = cellSelection[cellSelection.length - 1]
+        if (!anchor) return
+
+        // 编辑框 / 列表导航优先：方向键在它们手里是"移光标 / 选下一项"。
+        if ((e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [role=combobox], [data-pick-open]"))
+            return
+
+        e.preventDefault() // 表格在 `.overflow-auto` 里，不拦住方向键会顺手滚容器
+
+        /*
+            ‼️ 把**上一个格子那层焦点交出去**：鼠标点过的格子会真的拿到焦点（那层 `tabIndex=0` 的 DIV），
+            而灰圈 `cell-focus` 画在 `td:focus-within` 上 —— 不交出去，方向键把活动格挪走之后，
+            **旧格子上会留一圈灰线**（用户报的"先前点击的单元格灰框没消失"）。
+            这里只交出"焦点在某个数据格里"的那一种；编辑框内的焦点在上面那道闸门已经让路了。
+        */
+        const focusedCell = (document.activeElement as HTMLElement | null)?.closest?.("td")
+        if (focusedCell && tableRef.current?.contains(focusedCell)) (document.activeElement as HTMLElement).blur()
+
+        const current = tableInstanceRef.current
+        if (shift) {
+            /*
+                ‼️ Shift 扩选**也**自己算焦点角的新落点、自己写 state —— 不能用库的
+                `extendCellSelection`：它按**上一拍渲染时**的选区找"焦点角"（库的原子要下一次渲染才跟上），
+                连着按两下就会把焦点角按旧值算（实测：第二下把焦点挪回了起点那一行）。
+                这里从受控 state 的焦点角出发、沿着我们自己的行列序走一步。
+            */
+            const focusRow = modelRows.findIndex((row) => row.id === anchor.focusRowId)
+            const focusColumn = sheetColumns.indexOf(anchor.focusColumnId)
+            if (focusRow < 0 || focusColumn < 0) return // 角落解析不出（数据整体换过）：不动
+            const rowStep = direction === "up" ? -1 : direction === "down" ? 1 : 0
+            const columnStep = direction === "left" ? -1 : direction === "right" ? 1 : 0
+            const nextRow = modelRows[focusRow + rowStep]
+            const nextColumn = sheetColumns[focusColumn + columnStep]
+            if (!nextRow || !nextColumn) return // 到边 = 停住（数据格里，走不到行号列/表头）
+            current.setCellSelection((old) => [
+                ...old.slice(0, -1),
+                {...old[old.length - 1], focusRowId: nextRow.id, focusColumnId: nextColumn},
+            ])
+            return
+        }
+        if (mods === CTRL) {
+            /*
+                ‼️ 这里**不能**用"循环 `moveCellSelection` 直到不动"：库的选区原子在同一个事件里
+                不往前推（实测：连调两次，第二次读到的焦点还是第一拍之前那一格）—— 循环会当场退出，
+                只走一步。所以自己**一次算出落点**，再 `setFocusedCell` 一步到位。
+
+                落到哪一格：该方向那一行/列**最远的那一格**（没有合并单元格的表里，列块与行块可分离，
+                所以"行取最远 + 列取最远"就是那个角）。
+            */
+            const rowIndex = modelRows.findIndex((row) => row.id === anchor.anchorRowId)
+            const columnIndex = sheetColumns.indexOf(anchor.anchorColumnId)
+            if (rowIndex < 0 || columnIndex < 0) return
+            const forward = direction === "down" || direction === "right"
+            const targetRow =
+                direction === "up" || direction === "down"
+                    ? modelRows[forward ? modelRows.length - 1 : 0]
+                    : modelRows[rowIndex]
+            const targetColumn =
+                direction === "left" || direction === "right"
+                    ? sheetColumns[forward ? sheetColumns.length - 1 : 0]
+                    : sheetColumns[columnIndex]
+            current.setFocusedCell(targetRow.id, targetColumn)
+            /*
+                这一跳是"到边缘"，所以**顺手把那根滚动条挪到那一头**（不量任何东西）：
+                垂直跳 → `scrollTop` 归零 / 到底；水平跳 → `scrollLeft` 归零 / 到底。
+                裸方向键一步一格时**不碰**滚动条 —— 那种情况"露出来就行"（见 `scrollActiveIntoView`）。
+            */
+            const box = tableRef.current?.parentElement
+            if (box && (direction === "up" || direction === "down"))
+                box.scrollTop = direction === "up" ? 0 : box.scrollHeight
+            if (box && (direction === "left" || direction === "right"))
+                box.scrollLeft = direction === "left" ? 0 : box.scrollWidth
+            return
+        }
+        current.moveCellSelection(direction)
+    }
 
     /**
      * 把单元格选区**直接设成这一片**（左上角 + 右下角两个角给库）。
@@ -931,12 +1094,19 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         window.addEventListener("focus", verify)
         document.addEventListener("paste", verify)
         document.addEventListener("keydown", onKeyDown)
+        /*
+            方向键同理挂 `document`，而且是**捕获阶段**：真机上焦点常在 `<body>`（见 `handleArrowKey` 的
+            闸门那段），挂在容器上的 React `onKeyDown` 收不到。捕获阶段还能先于 base-ui 的列表导航决定
+            "这一次按键归谁" —— 判断在 `handleArrowKey` 内部，别的表选过东西时也不会被这张表抢走。
+        */
+        document.addEventListener("keydown", handleArrowKey, true)
         return () => {
             document.removeEventListener("copy", handleCopy)
             document.removeEventListener("paste", handlePaste)
             window.removeEventListener("focus", verify)
             document.removeEventListener("paste", verify)
             document.removeEventListener("keydown", onKeyDown)
+            document.removeEventListener("keydown", handleArrowKey, true)
         }
     })
 
@@ -1089,6 +1259,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
                                 copySource={copySource}
                                 draggedRef={draggedRef}
+                                activeCellKey={activeCellKey}
+                                scrollActiveIntoView={scrollActiveIntoView}
                                 getSelectionBounds={getSelectionBounds}
                                 edit={edit}
                                 dragRowRef={dragRowRef}
