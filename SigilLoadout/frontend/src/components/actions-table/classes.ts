@@ -178,12 +178,21 @@ export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
  *     行号选行也走这一条：行手势把区的锚点列设成第一格**数据列**（`id_`，序号列不在列模型里），
  *     于是"开始拖的那一行第一格"就是活动格 —— 与拖选单元格同一套逻辑，没有第二种规则。
  *
+ * **行末那一格不画右边**：最右一列的格线已被表格去掉，而轮廓 `inset: -1px` 会外扩 1px ——
+ * 留着它就是一条悬在表格外沿的线。所以在这里去掉 `right`，不在样式表里覆盖。
+ *
  * 没选中时**提前返回**：`getSelectionEdges()` 会再解析一遍位置，只为发现"没选中"不值当
  * （大表里绝大多数格子都没选中）。
  */
 export function selectionClass(cell: Cell<typeof features, ActionRow>): string {
     if (!cell.getIsSelected()) return ""
-    return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(cell.getSelectionEdges(), "cell-edge")]
+    const edges = cell.getSelectionEdges()
+    const isRowEnd = cell.row.getAllCells().at(-1)?.id === cell.id
+    return [
+        "cell-selected",
+        cell.getIsFocused() && "cell-active",
+        ringClasses({...edges, right: edges.right && !isRowEnd}, "cell-edge"),
+    ]
         .filter(Boolean)
         .join(" ")
 }
