@@ -281,6 +281,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         onCellSelectionChange: setCellSelection,
     })
 
+
+
     /*
         列宽：**测量 → 取整 → 交给库的 sizing state**。
 
@@ -685,11 +687,26 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         也没有"动一边清另一边"那种互斥逻辑。
     */
 
+    /*
+        ‼️ 下面三个回调**必须是稳定引用** —— `ActionRowView` 与 `RowCell` 的 `memo` 靠它们把关。
+
+        为什么 `table` 不能直接传下去：`useTable` 返回的是
+        `useMemo(() => ({...table, options: tableOptions, state}), [table, tableOptions, state])`，
+        而我们的 options 是内联对象、`state` 里还带着每次移动都变的 `cellSelection` —— 于是**每渲染一次
+        `table` 就是新对象**，行组件的 memo 恒失效（实测：一次拖选 51 行 × 15 次提交全量重渲）。
+        所以行/格只在**事件处理器里**通过 `tableRef` 取它，渲染期一个字节都不碰。
+    */
+    const tableInstanceRef = useRef(table)
+    tableInstanceRef.current = table
+
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
-    const startCellSelection = (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
+    const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
         dragRowRef.current = null // 行号那边的拖动就此收手（两套手势不能同时进行）
         cell.getSelectionStartHandler()(e)
-    }
+    }, [])
+
+    /** 选区边界（`PressFacts` 与行号减选要用）—— 走 `tableRef`，于是对外也是稳定引用。 */
+    const getSelectionBounds = useCallback(() => tableInstanceRef.current.getCellSelectionBounds(), [])
 
     /**
      * 把单元格选区**直接设成这一片**（左上角 + 右下角两个角给库）。
@@ -731,7 +748,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      *   · **Shift** —— 把**当前那个区**改成"锚点行 → 这一行"的整行宽一段（其他区保留，与单元格 Shift 一致）；
      *   · 按住拖动（上面 `extendRowSpanTo`）—— 把它拉成一段。
      */
-    const clickRowHandle = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
+    const clickRowHandleImpl = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
         const id = row.id
         if (mods.ctrlKey || mods.metaKey) {
             // 这一行本来就整行选中了 → 减选；否则追加一段
@@ -750,6 +767,15 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         selectRowSpan(id, id, "replace")
         rowAnchorRef.current = id
     }
+
+    /* 实现每帧刷新，但对外暴露的 `clickRowHandle` 是稳定引用（理由见上面 `startCellSelection` 那段）。 */
+    const clickRowHandleRef = useRef(clickRowHandleImpl)
+    clickRowHandleRef.current = clickRowHandleImpl
+    const clickRowHandle = useCallback(
+        (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) =>
+            clickRowHandleRef.current(row, mods),
+        [],
+    )
 
     /**
      * 光标底下是**哪一行**（没有就是 `null`）：按各行的 y 区间判断。
@@ -1013,7 +1039,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
                                 copySource={copySource}
                                 draggedRef={draggedRef}
-                                table={table}
+                                getSelectionBounds={getSelectionBounds}
                                 edit={edit}
                                 dragRowRef={dragRowRef}
                                 clickRowHandle={clickRowHandle}

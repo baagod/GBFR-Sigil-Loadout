@@ -3,7 +3,7 @@
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
 import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
-import type {Cell, CellSelectionBounds, CellSelectionState, Row, Table} from "@tanstack/react-table"
+import type {Cell, CellSelectionBounds, CellSelectionState, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
 import {PICKER_KEYS, isPickerColumn} from "./model"
@@ -49,6 +49,118 @@ export function rowSelectionKey(
 }
 
 /**
+ * 一格里那层 `<td>` —— **第二道 memo 命门**（第一道是外面的 `ActionRowView`）。
+ *
+ * 拖选时矩形一横向变宽，**夹在它竖向范围里的每一行**都要重渲（那些行的左右边界格换了类）：实测一次
+ * 移动约 19 行 × 42 格 ≈ 800 个 `<td>`，而外观真变了的只有几十个 —— 剩下的不该进 render。
+ *
+ * ‼️ 两条铁律，破任一条都静默出错：
+ *   · 选择相关的**结果**（`className` / `selected` / `preSelected`）必须在行那层算好再传进来。让这一层
+ *     自己调 `cell.getSelectionEdges()`，memo 就看不见变化 —— 轮廓会留在上一个位置。
+ *   · 传进来的必须全是原始值或稳定引用：`style` 拆成 `width` / `left` 两个数就是这个原因。
+ */
+const RowCell = memo(function RowCell({
+    cell,
+    row,
+    fieldKey,
+    readOnly,
+    picker,
+    raw,
+    original,
+    shown,
+    selected,
+    preSelected,
+    className,
+    width,
+    left,
+    abilityNames,
+    pressRef,
+    draggedRef,
+    dragRowRef,
+    getSelectionBounds,
+    edit,
+    startCellSelection,
+    onEnterEdit,
+}: {
+    cell: Cell<typeof features, ActionRow>
+    row: Row<typeof features, ActionRow>
+    fieldKey: string
+    readOnly: boolean
+    picker: boolean
+    /** **改动值**（空串 = 没改过）。 */
+    raw: string
+    /** **原值**（只读那一份）：值清空时显示它。 */
+    original: string
+    /** 显示值（`accessorFn` 给的，与排序同口径）。 */
+    shown: string
+    /** 按下**之前**这一格选没选中 —— `PressFacts` 要用。 */
+    selected: boolean
+    /** 上一次 mousedown 之前这一格选没选中（`Cell` 的 focus 闸门读它）。 */
+    preSelected: boolean
+    className: string
+    width: number | null
+    left: number | null
+    abilityNames: Record<string, string>
+    pressRef: RefObject<PressFacts | null>
+    draggedRef: RefObject<boolean>
+    dragRowRef: RefObject<string | null>
+    /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
+    getSelectionBounds: () => CellSelectionBounds[]
+    edit: (rowId: string, key: string, value: string | null) => void
+    startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
+    onEnterEdit: () => void
+}) {
+    return (
+        <td
+            /* 列身份写在 DOM 上：量列宽那一趟按 `th[data-col-id]` 挑列，少了它会悄悄退化成量全部列。 */
+            data-col-id={fieldKey}
+            style={{width: width ?? undefined, left: left ?? undefined}}
+            /*
+                **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减），走库的开始处理器。
+                ⚠️ 先整体记下"按下之前这一格"的选区事实（`PressFacts`）：库的 handler 会**立刻**改掉选
+                中状态，等 click / focus 时再读就读到改后的了。
+            */
+            onMouseDown={(e) => {
+                const bounds = getSelectionBounds()
+                pressRef.current = {
+                    cellKey: snapshotKey(row.id, fieldKey),
+                    wasSelected: selected,
+                    wasOnlyCell:
+                        bounds.length === 1 &&
+                        bounds[0].minRowIndex === bounds[0].maxRowIndex &&
+                        bounds[0].minColumnIndex === bounds[0].maxColumnIndex,
+                }
+                startCellSelection(cell, e)
+            }}
+            /*
+                按住划过来 → 选区另一端拉到这一格（没按住时库内部 no-op）。
+                ⚠️ **行号拖动期间让位**：那时指针正在数据格上划过，让库把 focus 挪到"光标底下那一格"会把
+                整行选区拉成"到中间某列为止"的格区（行就不整了）。
+            */
+            onMouseEnter={(e) => {
+                if (dragRowRef.current === null) cell.getSelectionExtendHandler()(e)
+            }}
+            className={className}
+        >
+            <CellContent
+                rowId={row.id}
+                fieldKey={fieldKey}
+                readOnly={readOnly}
+                picker={picker}
+                raw={raw}
+                original={original}
+                shown={shown}
+                abilityNames={abilityNames}
+                pressRef={pressRef}
+                preSelected={preSelected}
+                draggedRef={draggedRef}
+                edit={edit}
+                onEnterEdit={onEnterEdit}
+            />
+        </td>
+    )
+})
+/**
  * 表体的一行 —— **`memo` 是这里的性能命门**。
  *
  * 拖拽选区时每穿过一格就写一次选中 state，而一次写入会让 `ActionsTable` 整个重渲。没有这层
@@ -66,7 +178,7 @@ export const ActionRowView = memo(function ActionRowView({
     pressRef,
     copySource,
     draggedRef,
-    table,
+    getSelectionBounds,
     edit,
     dragRowRef,
     clickRowHandle,
@@ -94,7 +206,8 @@ export const ActionRowView = memo(function ActionRowView({
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
     draggedRef: RefObject<boolean>
     /** 表格实例：按下时要问一句"现在的选区是不是收缩成了一格"（见 `PressFacts.wasOnlyCell`）。 */
-    table: Table<typeof features, ActionRow>
+    /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
+    getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
     /** 拖选起点（按下哪一行）：`null` = 没在拖。 */
     dragRowRef: RefObject<string | null>
@@ -136,114 +249,40 @@ export const ActionRowView = memo(function ActionRowView({
             </td>
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
-                const pinned = cell.column.getIsPinned()
                 const key = cell.column.id
+                const pinned = cell.column.getIsPinned()
                 const readOnly = READ_ONLY_KEYS.has(key)
-                /** **改动值**（空串 = 没改过）：`Cell` 靠它决定"灰不灰"、以及提交什么。 */
-                const raw = row.original.values[key] ?? ""
-                const original = row.original.originals[key] ?? ""
-                /** 显示值直接用库给的：`accessorFn` 就是 `shownValue`，与排序同一口径。 */
-                const shown = String(cell.getValue() ?? "")
-                const selected = cell.getIsSelected()
-                /*
-                    ‼️ 边框只走**库那一套**（`cell.getSelectionEdges()`）：整行选区就是一条普通的区，
-                    行块的上/下/左/右边界库自己算得出来。以前这里是"行选中另画一遍"（`rowEdges` +
-                    手算左右边），那正是两套模型并存留下的补丁 —— 统一之后删掉了。
-                */
-                const edges = selectionClass(cell)
-                /* 选值格（`controlTypeHash_` / `branchXAtk_`）与别的格子走同一条路，这里不为它开岔路 ——
-                   唯一的差别是点它会展开列表（见 CellContent 的 `picker` 分支）。 */
-                const picker = !readOnly && isPickerColumn(key)
                 return (
-                    <td
+                    <RowCell
                         key={cell.id}
+                        cell={cell}
+                        row={row}
+                        fieldKey={key}
+                        readOnly={readOnly}
+                        /* 选值格与别的格子走同一条路，差别只是点它展开列表（见 `CellContent` 的 `picker` 分支）。 */
+                        picker={!readOnly && isPickerColumn(key)}
+                        raw={row.original.values[key] ?? ""}
+                        original={row.original.originals[key] ?? ""}
+                        shown={String(cell.getValue() ?? "")}
+                        selected={cell.getIsSelected()}
+                        preSelected={pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected}
+                        /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)}`}
+                        width={measured ? cell.column.getSize() : null}
                         /*
-                            列身份写在 DOM 上：量列宽那一趟按 `th[data-col-id]` 挑列。**少了它会悄悄退化**
-                            （量宽退化成量到全部列）。
+                            ‼️ 钉住列的 `left` **必须自己加上行号那 40px**：行号列不在库的列模型里，所以
+                            `getStart("start")` 是从 0 算的；不加偏移，`id_` 的 `left:0` 会和行号格撞在一起。
                         */
-                        data-col-id={cell.column.id}
-                        // 宽度与表头**同一套**来源（库的 sizing state，整数）；钉住的列用
-                        // `getStart('start')` 拿偏移，与表头算出来的是同一个值，两边不会偏。
-                        style={{
-                            width: measured ? cell.column.getSize() : undefined,
-                            /*
-                                ‼️ 钉住列的 `left` **必须自己加上行号那 40px**。
-
-                                行号列不在库的列模型里（见 HANDLE_WIDTH 那段），所以库算"钉住区里的偏移"
-                                是**从 0 开始**的 —— `getStart('start')` 给第一列 `id_` 的就是 `0`。
-                                不加这个偏移的话，`id_` 的 `left:0` 与行号格的 `left:0` 撞在一起，
-                                横向滚动时 `id_`（DOM 在后）整个盖住行号列，看着就是**行号列没冻结**
-                                （实测：滚 3000px 后左侧显示的是 `101`，不是行号）。
-                                表头那一侧本来就加了（见 HEAD_OFFSET），表体这边以前漏了。
-                            */
-                            left: measured && pinned ? HANDLE_WIDTH + cell.column.getStart("start") : undefined,
-                        }}
-                        /*
-                            **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减）。
-                            走 `startCellSelection`：交给库的开始处理器（与行号那套同一个选区模型）。
-                            ⚠️ mousedown 里**先**把"按下之前这一格"的选区事实整体记下（`PressFacts`）：
-                            库的 handler 会立刻改掉选中状态，等 click / focus 时再读就读到改后的了。
-                        */
-                        onMouseDown={(e) => {
-                            /*
-                                "按下之前的选区是不是**就只有这一格**" —— 那时库还没被这一次按下改动。
-                                ‼️ 判据要**整份**看（不是只看第一片）：多片选区的第一片可能正好是一格，
-                                只看 `[0]` 会把"多片选中"误判成"单选一格"。
-                            */
-                            const bounds = table.getCellSelectionBounds()
-                            pressRef.current = {
-                                cellKey: snapshotKey(row.id, cell.column.id),
-                                wasSelected: selected,
-                                wasOnlyCell:
-                                    bounds.length === 1 &&
-                                    bounds[0].minRowIndex === bounds[0].maxRowIndex &&
-                                    bounds[0].minColumnIndex === bounds[0].maxColumnIndex,
-                            }
-                            startCellSelection(cell, e)
-                        }}
-                        /*
-                            按住划过来 → 选区另一端拉到这一格（没按住时库内部 no-op）。
-                            ⚠️ **行号拖动期间让位**：那时指针正在数据格上划过，若让库把 focus 挪到
-                            "光标底下那一格"，整行选区会被拉成"到中间某列为止"的格区（行就不整了）。
-                        */
-                        onMouseEnter={(e) => {
-                            if (dragRowRef.current === null) cell.getSelectionExtendHandler()(e)
-                        }}
-                        /*
-                            复制区那圈虚线：**这一格在复制区外圈的那几条边**（`copyRingEdge`，
-                            与库的 `cell.getSelectionEdges()` 同一个思路）。样式在 style.css 的
-                            `.cell-copy-*` —— 用**伪元素**画，`inset: 0` 正好压在格线上，不参与布局。
-                        */
-                        className={`${CELL_BASE} ${
-                            // 非钉住的格子要 `relative`：选区轮廓是**伪元素**画的（`inset: -1px`，
-                            // 为了盖住那 1px 格线），绝对定位得有定位祖先。钉住的格子本身就是
-                            // `sticky`（也是定位元素），再写 `relative` 会跟它抢同一个属性。
-                            pinned ? PINNED_CELL : "relative"
-                        } ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${edges} ${cellCopyRing(copySource, row.id, cell.column.id)}`}
-                    >
-                        <CellContent
-                            rowId={row.id}
-                            fieldKey={key}
-                            readOnly={readOnly}
-                            picker={picker}
-                            raw={raw}
-                            original={original}
-                            shown={shown}
-                            abilityNames={abilityNames}
-                            pressRef={pressRef}
-                            /*
-                                "这一格在**上一次 mousedown 之前**选没选中" —— `td` 的 handler 在那一下里
-                                已经把它写进 ref 了（连同格子身份），这里渲染时取出来往下传，给 `Cell` 的
-                                focus 闸门用。别在这里再写一遍 ref（那会把它盖成"按下之后"的答案）。
-                            */
-                            preSelected={
-                                pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected
-                            }
-                            draggedRef={draggedRef}
-                            edit={edit}
-                            onEnterEdit={onEnterEdit}
-                        />
-                    </td>
+                        left={measured && pinned ? HANDLE_WIDTH + cell.column.getStart("start") : null}
+                        abilityNames={abilityNames}
+                        pressRef={pressRef}
+                        draggedRef={draggedRef}
+                        dragRowRef={dragRowRef}
+                        getSelectionBounds={getSelectionBounds}
+                        edit={edit}
+                        startCellSelection={startCellSelection}
+                        onEnterEdit={onEnterEdit}
+                    />
                 )
             })}
         </tr>
