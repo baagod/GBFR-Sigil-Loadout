@@ -134,7 +134,13 @@ export function CellPick({value, original, unchanged, onCommit}: {
                             不管改没改过都灰（原值是只读资产里那一份，与格子空着时的占位符同一个值）。
                             ⚠️ **不加 `!`**：`data-highlighted:*` 那类变体得能盖过它（划过时跟着高亮走）。
                         */
-                        <ComboboxItem key={item} value={item} className={item === original ? "text-[#a0a0a0]" : undefined}>
+                        <ComboboxItem
+                            key={item}
+                            value={item}
+                            /* `py-[3px]!`：项的内边距上下各 3px（库基类 `py-1.5` 是 6px —— 共减 3px）。
+                               ⚠️ 别写成 `py-0.75!`：这个版本不认小数步进，类名在、**规则不生成**，等于没改。 */
+                            className={`py-[3px]! ${item === original ? "text-[#a0a0a0]" : ""}`}
+                        >
                             {item}
                         </ComboboxItem>
                     )}
