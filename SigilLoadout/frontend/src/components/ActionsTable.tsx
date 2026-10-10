@@ -57,7 +57,7 @@ import {ActionRowView, rowSelectionKey} from "@/components/actions-table/ActionR
 import {
     rowFullySelected,
     HANDLE_CELL,
-    HANDLE_HEAD_BG,
+    HEAD_BG,
     HANDLE_HEAD_CURSOR,
     HANDLE_INNER,
     HANDLE_WIDTH,
@@ -1017,7 +1017,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                 不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
                                 宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
                             */}
-                            <th className={`${HANDLE_CELL} ${HANDLE_HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
+                            <th className={`${HANDLE_CELL} ${HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
                                 <div className={HANDLE_INNER}>#</div>
                             </th>
                             {headerGroup.headers.map((header) => {
@@ -1042,7 +1042,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                                         }}
                                         // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
                                         data-col-id={header.column.id}
-                                        className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} bg-[#1f1f1f]` : ""}`}
+                                        className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} ${HEAD_BG}` : ""}`}
                                     >
                                         <div className="truncate">
                                             {header.isPlaceholder

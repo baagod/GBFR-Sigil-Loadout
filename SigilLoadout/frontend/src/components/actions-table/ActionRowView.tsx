@@ -11,6 +11,7 @@ import {
     CELL_BASE,
     EDITABLE_BG,
     HANDLE_CELL,
+    HEAD_BG,
     HANDLE_CURSOR,
     HANDLE_INNER,
     HANDLE_WIDTH,
@@ -238,7 +239,7 @@ export const ActionRowView = memo(function ActionRowView({
                 ⚠️ 这只格子不在列模型里，所以 `cell.getSelectionStartHandler()` 那套与它无关，两者不打架。
             */}
             <td
-                className={`${READ_ONLY_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
+                className={`${HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
                 style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id

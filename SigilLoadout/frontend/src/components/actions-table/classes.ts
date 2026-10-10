@@ -47,13 +47,20 @@ export const HANDLE_WIDTH = 40
  * （实测），和行选中那层浅色叠在一起，看着像"选中了数字"。禁掉之后拖拽只改选中、不选文字。
  * 数据格不用管：它们带 `cell-selectable`，那份样式里已经有 `user-select: none`。
  *
- * 底色**不写在这里**：表头那一格要与别的表头同色，表体那几格要与页面同色 —— 两边不一样，所以
- * 拆成"表体用 `READ_ONLY_BG`（与只读列同一份）、表头用 `HANDLE_HEAD_BG`"。
+ * 底色**不写在这里**：见 `HEAD_BG` —— 行号列整列（表头那格 + 表体那几格）与表头**同一档灰**。
  */
 export const HANDLE_CELL = "cell-handle cell-pinned sticky left-0 border-r border-b p-0 text-center select-none"
 
-/** 表头行号格的底色：**与别的表头一致**（用户要求）。与 `HEAD_CELL` 同一档灰，改要一起改。 */
-export const HANDLE_HEAD_BG = "bg-[#1f1f1f]"
+/**
+ * **表头与行号列**的底色 —— 三处共用一份：数据列表头、行号列表头、行号列的表体格。
+ *
+ * 取主题里比 `--muted` 更深的那档面 `--popover`（用户口径先要 `#2e2e2e`，看过之后要更深一档）。
+ * 三处本来就是同一档灰，改要一起改 —— 共用一份即为此。
+ *
+ * ⚠️ 行号列**选中时**那格由 style.css 的 `.cell-handle.cell-row-selected` 盖成**不透明实色**：
+ * 它是 sticky 的，透明会把横向滚过来的列透出来。
+ */
+export const HEAD_BG = "bg-popover"
 
 /**
  * 行号格的光标：**和 `➡` 一模一样的箭头**（Excel / WPS 行号上就是它）。
@@ -155,7 +162,7 @@ export const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${CE
 export const PINNED_CELL = "cell-pinned sticky"
 
 /** 表头单元格的公共类（钉住的列由 `PINNED_CELL` 把层高顶上去）。 */
-export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b bg-[#1f1f1f] ${HEAD_PADDING} font-medium whitespace-nowrap ${FONT}`
+export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b ${HEAD_BG} ${HEAD_PADDING} font-medium whitespace-nowrap ${FONT}`
 
 /**
  * 表体每一格都带的类（格线 + 选中那套的**基底**）。
