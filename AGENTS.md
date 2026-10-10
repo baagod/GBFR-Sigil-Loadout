@@ -9,7 +9,7 @@
 ## Git 禁令
 
 1. **严禁 Git 提交**：只有当用户明确说出 “提交 / 提交代码” 时才能执行 `git add / git commit` 命令。
-2. 执行 `git add . & git diff --cached`，确认忽略项后调用 `/git-commit`（非 MCP）提交 ( 别管是不是你改的 )；
+2. 执行 `git add . & git diff --cached`，确认忽略项后调用 `/git-commit`（非 MCP）提交 (别管是不是你改的 )；
 
 ## 快速上手
 
@@ -21,42 +21,8 @@
 - **始终保持中文回复**，即使调用的 **Skill** 说明是英文。
 - **必须读** `skill:i-have-adhd`，并始终以此方式对话。
 - 当用户一次提出多个问题时，必须逐条回答，若问题之间有关联，先说明关系。
-- 每次 **精确修改 ( 字符串替换 )** 文件，禁止 **覆盖重建**。
+- 每次 **精确修改 (字符串替换 )** 文件，禁止 **覆盖重建**。
 - **改完即部署**：`pwsh -File tools\build-release.ps1` → `pwsh -File tools\deploy.ps1`。
-
-## 编码原则
-
-**权衡：** 这些原则偏向谨慎而非速度。
-
-1. 编码前思考：**不要假设。不要隐藏困惑。呈现权衡。**
-
-   - 明确说明假设。如果不确定，询问而非猜测。
-   - 存在歧义时呈现多种解释，不要默默选择。
-   - 如果有更简单的方法，说出来。适时提出异议。
-   - 如果某件事不清楚，停下来，指出来并要求澄清。
-
-2. 简洁优先：**用最少代码解决问题。不要过度推测。**
-
-   - 不添加要求之外的功能。
-   - 不为一次性代码创建抽象。
-   - 不添加未要求的 “灵活性” 或 “可配置性”。
-   - 不对不可能发生的场景做错误处理。
-   - 如果 200 行能写成 50 行，重写它。
-   - 检验标准：资深工程师会觉得这过于复杂吗？如果是，简化。
-
-3. 精准修改：**只碰必须碰的。只清理自己造成的混乱。**
-
-   - 不要 “改进” 相邻代码、注释或格式。
-   - 不要重构没坏的东西。
-   - 匹配现有风格，即使你更倾向不同写法。
-   - 删除因你的改动而变得无用的导入、变量和函数。
-   - 每一行修改都应该能直接追溯到用户的请求。
-
-4. 目标驱动执行：**定义成功标准。循环验证直到达成。( 忽略简单问题 )**
-
-   - **添加验证：** 为无效输入写测试，然后让它们通过。
-   - **修复 bug：** 写复现它的测试，然后让它通过。
-   - **多步骤任务先列计划：** 1.[步骤] → 验证:[检查]；2.[步骤] → 验证:[检查]..。
 
 ## 编码哲学
 
@@ -66,19 +32,27 @@
 
 - **直达本质**
 
-  拒绝 “打补丁式” 的缝缝补补。面对任何实现，主动审视：“这是否已足够简洁优雅？是否仅是临时遮丑？是否有语言原生机制或成熟库方法能直接降维替代？” 凡能以正交抽象与清晰意图一行表达的逻辑，绝不堆砌层叠样板代码。
+  拒绝 “打补丁式” 的缝缝补补。面对任何实现，主动审视：“这是否已足够简洁优雅？是否仅是临时遮丑？是否有语言原生机制或成熟库方法能直接降维替代？”
+
+  1. **克制抽象**：凡能以正交抽象与清晰意图一行表达的逻辑，绝不堆砌样板代码；严格恪守 YAGNI，严禁为一次性场景设计提前抽象与虚假灵活性；
+  2. **精准防御**：只针对真实业务边界做防御，严禁为物理上绝不可能发生的假想场景编写防御分支与幽灵测例。
 
 - **懂因方破**
 
-  打破旧方案的前提是洞察其历史上下文。拆除任何 “栅栏” 前，必须搞清前人为何如此设计，识别潜在的隐性边界与并发陷阱。所有破坏性优化必须建立在确定性验证之上（补齐关键单测或基准测试），严禁以牺牲系统隐性鲁棒性为代价换取表面的代码整洁。
+  打破旧方案的前提是洞察其历史上下文。拆除任何 “栅栏” 前，必须搞清前人为何如此设计（或妥协），识别潜在的隐性边界与并发陷阱。所有改动必须以客观验证为底线：
 
-- **功能重构**
+  1. **修复 Bug 前，必须先编写能够稳定复现该问题的测例（由红转绿方能证明真伪）**；
+  2. 严禁无凭据的臆想重构，必须通过单测或基准测试守住底线，不以牺牲系统隐性鲁棒性为代价换取表面的整洁。
 
-  允许在定位根因阶段进行快速试错与权宜修补，但 “功能跑通” 仅为中间态。一旦验证确认根因，必须立即启动收敛闭环：
+- **形成归真**
 
-    1. **拆除脚手架**：彻底清理试错阶段遗留的探测代码、临时日志、盲猜引入的冗余防御分支及废弃字段，保持数据结构与配置表格绝对纯净；
-    2. **权宜转本质**：严禁保留 “仅为了让测试通过而硬塞的临时补丁”。确认更优、更简洁的实现路径后，果断推倒脏修补，换上最精炼正交的本质解，完成最终交付。
+  允许在定位根因阶段进行快速试错与权宜修补，但 “功能跑通” 仅为中间态。
   
+  多步骤复杂任务必须按 “1.[步骤] → 验证:[检查]” 闭环推进，一旦验证确认根因，立即启动收敛闭环：
+  
+  1. **拆除脚手架**：彻底清理试错阶段遗留的探测代码、临时日志、盲猜引入的冗余防御分支及废弃字段；**坚决删除仅在字面复述代码逻辑的低信噪比废话注释（注释只解释 Why，而非 What）**，保持数据结构与上下文绝对纯净；
+  2. **权宜转本质**：严禁保留 “仅为了让测试通过而硬塞的临时补丁”。确认更优、更简洁的实现路径后，果断推倒脏修补，换上最精炼正交的本质解，完成最终交付。
+
 ## 审查流程
 
 **只有当明确收到用户发出审查指令时才进入，否则切勿擅自执行。**
@@ -87,7 +61,7 @@
 2. 执行 **复检** + `code-review-and-quality`，将两次审查结果合并。
 3. 调用 `receiving-code-review` 验证（而非只复述审查或子代理消息），接受即执行。
 4. 调用 `ponytail-review`，对结果执行 `receiving-code-review`（同上）。
-5. 注意 **审查结果** 是否与本 `AGENTS.md` 声明的 `"2. 简洁优先"` 冲突，如有需权衡执行。 
+5. 注意 **审查结果** 是否与本 `AGENTS.md` 声明的 `"2. 简洁优先"` 冲突，如有需权衡执行。
 6. 检测到冗余、死代码和文件等，直接清理。精简代码注释。
 
 ## 技能：按需调用
@@ -101,8 +75,10 @@
 
 This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
 
-- Do not enumerate, preload, or search wikis at task start. Use retrieval when the user asks for it, when unfamiliar architecture or dependency behavior materially affects the task, or when source inspection leaves an important uncertainty. Stop once the question is grounded.
-- When those conditions apply and OpenWiki retrieval tools are available, use `openwiki_search` for just-in-time context and `openwiki_read` for the relevant complete sections. If search returns `workspace_required`, ask which listed workspace to use and retry with its ID.
+- Do not enumerate, preload, or search wikis at task start. Use retrieval when the user asks for it, when unfamiliar architecture or dependency behavior materially affects the task, or when source inspection leaves an important uncertainty.
+  Stop once the question is grounded.
+- When those conditions apply and OpenWiki retrieval tools are available, use `openwiki_search` for just-in-time context and `openwiki_read` for the relevant complete sections. If search returns `workspace_required`, ask which listed
+  workspace to use and retry with its ID.
 - Use `openwiki_list_workspaces` or `openwiki_list_wikis` when workspace membership itself needs to be discovered.
 - If the retrieval tools are unavailable, read `openwiki/quickstart.md` and follow its links to the relevant pages.
 - Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
