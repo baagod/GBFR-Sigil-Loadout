@@ -6,7 +6,7 @@ import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
 import type {Cell, CellSelectionBounds, CellSelectionState, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
-import {PICKER_KEYS, isPickerColumn} from "./model"
+import {isPickerColumn} from "./model"
 import {
     CELL_BASE,
     EDITABLE_BG,
@@ -20,7 +20,7 @@ import {
     cellCopyRing,
     selectionClass,
 } from "./classes"
-import {READ_ONLY_KEYS, features, type ActionRow, type CopySource, type PressFacts, snapshotKey, shownValue} from "./model"
+import {READ_ONLY_KEYS, features, type ActionRow, type CopySource, type PressFacts, snapshotKey} from "./model"
 
 /**
  * 一行外观的**指纹** —— `ActionRowView` 的 `memo` 靠它决定跳不跳。
