@@ -22,11 +22,10 @@ import {CONTROL_TYPES, CELL_CHOICES} from "@/lib/controltypes"
     绝对定位 / 透明命中垫都试过），而把 border 换成 `box-shadow` 三次都把整列格线弄花
     （比别的格子靠里 1px / 被右邻格背景盖掉 / 选中时被选区环压住）。格线优先，别动它。
 
-    ## 两点细节（都是实测出来的）
+    ## 一点细节（实测出来的）
 
-      · `sideOffset={1}`：列表让出格子下沿那条格线，别压在它上面；
-      · `ComboboxList` 的 `p-0!`：去掉列表自己的 4px 内边距 —— 否则列表开头那几像素是"外壳内边距"，
-        点它既不是格子（不切换）也不是列表项（不选中），什么都不发生（用户报的"再往下一点点没反应"）。
+      · `sideOffset={1}`：列表让出格子下沿那条格线，别压在它上面。
+      列表的内边距**用组件的默认值**（`p-1` = 上下左右各 4px），这一列不再覆盖它。
 */
 
 /** 列表项：就是那些值（`CONTROL_TYPES` 的十进制），顺序也照它（按用量降序）。 */
@@ -128,7 +127,7 @@ export function CellPick({value, original, unchanged, onCommit}: {
                 // 关列表时焦点回**这一格**（默认会去找文档里第一个可聚焦元素）；点到别处时返回 false。
                 finalFocus={() => (focusBackRef.current ? (cellRef.current ?? false) : false)}
             >
-                <ComboboxList className="p-0!">
+                <ComboboxList>
                     {(item: string) => (
                         /*
                             **原值那一项灰字**：与 FlagCell 的"原值就置着的位给灰字"同一个约定 ——
