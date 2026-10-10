@@ -384,7 +384,7 @@ table th.cell-pinned {
         但焦点环（`::after`）与选区的 `z-index` 关系仍要靠这里定死。
     */
     border-style: solid;
-    border-color: #007a55;
+    border-color: var(--cell-select);
     border-width: 0;
     /*
         ⚠️ 要盖在**焦点环**（`cell-focus` 的 `::after`）之上：拖拽的 mousedown 会把焦点落到起始格，
@@ -575,7 +575,7 @@ td.cell-copy-left::after {
     position: absolute;
     inset: 0;
     border-style: dashed;
-    border-color: #007a55;
+    border-color: var(--cell-select);
     border-width: var(--copy-top) var(--copy-right) var(--copy-bottom) var(--copy-left);
     pointer-events: none;
 }
@@ -616,11 +616,13 @@ td.cell-selected:focus-within::after {
 */
 /*
     选区那层**填充色**：边框那个绿**掺灰去饱和**（配比见下面变量）—— 用户口径：纯饱和绿在满屏
-    中性灰里太跳，也像"成功 / 通过"那类语义。**边框**仍用原色 `#007a55`（见上面画边框那两处），
+    中性灰里太跳，也像"成功 / 通过"那类语义。**边框**仍用原色（见下面的 `--cell-select`），
     只有填充降饱和。浓度单独一个变量：两处用法（半透明叠色 / 行号格的实色）必须同一档。
 */
 :root {
-    --cell-fill: color-mix(in oklab, #007a55 50%, #8a8a8a);
+    /* 选区那套色 —— 轮廓 / 复制区虚线 / 行号列选中文字 / 填充的基色都用它，改一处即可。 */
+    --cell-select: #007a55;
+    --cell-fill: color-mix(in oklab, var(--cell-select) 50%, #8a8a8a);
     --cell-fill-alpha: 8%;
 }
 
@@ -638,7 +640,7 @@ td.cell-selected:focus-within::after {
     background-color: color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
     box-shadow: none;
     /* 选中的行号**文字色 = 选区边框那个绿**（用户口径）：一眼看出"这几行被选中了"。 */
-    color: #007a55;
+    color: var(--cell-select);
 }
 
 /*
