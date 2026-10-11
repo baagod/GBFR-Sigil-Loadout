@@ -437,13 +437,6 @@ table th.cell-pinned {
 */
 .overflow-auto:has(> table .cell-handle) {
     background-color: #0a0a0a;
-    /*
-        ‼️ **给滚动条留位**：不留的话，`getBoundingClientRect().right` 把滚动条占的那条槽也算进"视口"，
-        而滚动条画在内容之上 —— 活动格滚到右沿附近时，它的**右边框正好被滚动条压住**（真机实测：
-        格右距视口右 2px 时右边框 0 像素，距 15px 时正常）。
-        留位后布局自己会把可视区收窄，"格子可见"与"边框可见"就一致了。
-    */
-    scrollbar-gutter: stable;
 }
 
 /*
