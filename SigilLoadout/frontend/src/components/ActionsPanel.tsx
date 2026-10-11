@@ -115,6 +115,8 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
      * 选中是**用户已经做完的决定**，弹层该当场收掉，剩下的读取在后台进行。
      */
     const [open, setOpen] = useState(false)
+    /** 这次关闭是**选完一项**引起的（不是点外面收起的）。 */
+    const [pickedClose, setPickedClose] = useState(false)
 
     return (
         <Combobox
@@ -126,7 +128,8 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
             onOpenChange={setOpen}
             onValueChange={(item) => {
                 if (!item || item.value === value) return
-                setOpen(false) // 先收弹层，再让外面去读数据（读取期间这一格显示旧名字，见下面 disabled 那段）
+                setPickedClose(true) // 这一次关闭不走淡出（见下面弹层的类名）
+                setOpen(false) // 先收弹层，再让外面去读数据（读取期间这一格显示旧名字，见上面 disabled 那段）
                 onSelect(item.value)
             }}
         >
@@ -142,7 +145,21 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                     </Button>
                 }
             />
-            <ComboboxContent>
+            <ComboboxContent
+                className={
+                    /*
+                        ‼️ **选完一项时不做淡出**（`duration-0` + 去掉 `animate-out`）。
+                        库里那套 `data-closed:animate-out fade-out-0 zoom-out-95` 让收尾拖一拍 —— 点外面收起时
+                        那点淡出好看，但"选完角色"是**用户已经做完的决定**，那一刻弹层该**当场消失**。
+                        默认类名带变体、权重比调用点高，所以这里用 `duration-0` + `data-closed:animate-none` 顶掉它。
+
+                        ⚠️ 实测注记：本机量到"弹层不可见"在**两种写法下都是 ~100ms**（那是 DOM 摘除的时机），
+                        所以这一条**没有**单独改变可观测时间 —— 它只是让意图明确（选中即关，不等动画）。
+                        真正的病根是上面那条：关闭原先跟着 `value` 走、要等异步读取回来。
+                    */
+                    pickedClose ? "duration-0 data-closed:animate-none" : undefined
+                }
+            >
                 <ComboboxEmpty>{t.charEmpty}</ComboboxEmpty>
                 {/* 官方列表的高度是 CSS 定的（252px，约 8 行），Base UI 也没有"显示条数"这类属性，
                     所以要让 15 行（15 × 32px + 内边距 8px = 488px）露出来，只能在这里给一个高度；
