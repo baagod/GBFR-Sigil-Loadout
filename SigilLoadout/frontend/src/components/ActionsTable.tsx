@@ -111,15 +111,30 @@ const CTRL = 2
  *   · 滚动、拖选区、点别的地方。
  */
 
-/** 动作表。加载、列定义、编辑都收在这里；保存由外面那排按钮触发（见 ActionsPanel）。 */
-export function ActionsTable({t, abilityNames, onSaveReady}: {
+/**
+ * 动作表。列定义、编辑、选区都收在这里；保存由外面那排按钮触发（见 ActionsPanel）。
+ *
+ * ‼️ **数据可以从外面给**（`rows` / `keys`，见下）：那样这一层就**不再自己去读**
+ * `LoadActions`，父组件成为唯一的数据来源。不给就退回"挂载时自己读一次"（既有测试台架走这条路）。
+ * 两条路只差"谁去读"，读到的形状完全一样 —— 所以 `ActionsPanel` 用前者，测试用后者，
+ * 不必让测试去模拟父组件。
+ */
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
+    /**
+     * **外部给的数据**（受控）。给了就跳过自己那次 `LoadActions`。
+     * ⚠️ 它是**初始值**：父组件换角色时用 `key` 整个重新挂载（见 ActionsPanel），所以不需要在这里
+     * 跟着 prop 变化去同步 state —— 那会与"每格草稿、撤销栈、选区"的归属打架。
+     */
+    rows?: ActionRow[]
+    /** 字段顺序（= 表头顺序），与 `rows` 配套。 */
+    keys?: string[]
     /** 数据到位后把"保存"这个动作交出来 —— 这个组件自己没有工具条（与 GlobalParamPanel 同一个约定）。 */
     onSaveReady?: (save: () => Promise<void>) => void
 }) {
-    const [rows, setRows] = useState<ActionRow[]>([])
+    const [rows, setRows] = useState<ActionRow[]>(rowsProp ?? [])
     /**
      * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
      * 稳定，见下）、读不到最新的 `rows`；走 `setRows` 的 updater 里读则会踩 React 重跑 updater 那个坑。
@@ -127,7 +142,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const rowsRef = useRef<ActionRow[]>([])
     rowsRef.current = rows
     /** 字段顺序（= 表头顺序）：后端保证同一份表里每条记录的键序列一致，取第一条即可。 */
-    const [keys, setKeys] = useState<string[]>([])
+    const [keys, setKeys] = useState<string[]>(keysProp ?? [])
     /**
      * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
@@ -136,8 +151,16 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         () => ({ids: new Set(rows.map((row) => row.id)), searchPlaceholder: t.actionBranchSearch}),
         [rows, t],
     )
-    /** 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `PINNED_COUNT` 个字段）。 */
-    const [pinning, setPinning] = useState<{start: string[]; end: string[]}>({start: [], end: []})
+    /**
+     * 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `PINNED_COUNT` 个字段）。
+     *
+     * ⚠️ 初值要跟着 `keysProp` 给：列宽那一趟 `useLayoutEffect` 依赖 `pinning` 已就位，
+     * 若等下面那个 effect 去置，外部给数据这条路上会先按"一列都没钉"量一遍。
+     */
+    const [pinning, setPinning] = useState<{start: string[]; end: string[]}>(() => ({
+        start: (keysProp ?? []).slice(0, PINNED_COUNT),
+        end: [],
+    }))
     /** 每列多宽（**取整后的整数**）：量出来写进库的 sizing state，渲染按它给 `width`。 */
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
     /** 量过了没有 —— 没量之前用 `table-auto`（要量出**自然宽度**），量完切 `table-fixed`。 */
@@ -208,7 +231,14 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     /* 剪贴板 / 撤销 / `edit` 那一套统一在 `useClipboardHistory` 里 —— 它的入参要用到下面的
        `tableInstanceRef`，所以调用点放在那之后（见文件中部）。 */
 
+    /*
+        ‼️ **数据要么外面给、要么这里读一次 —— 不并行**（`rowsProp` 给了就整段跳过）。
+        两条路都进来会得到"同一份数据两个来源"，而"谁先回来"就成了隐式依赖（换角色时尤其明显）。
+
+        不给 prop 的那条路（测试台架走它）与以前一字不差：读回来 → 建 rows/keys → 重置量宽。
+    */
     useEffect(() => {
+        if (rowsProp) return
         void (async () => {
             try {
                 const loaded = (await LoadActions()) ?? []
@@ -234,7 +264,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 setLoadError(String(e))
             }
         })()
-    }, [])
+    }, [rowsProp])
 
     // 一列一个字段。`accessorFn` 就是 `shownValue` —— 排序与筛选都按显示值走，见那个函数的说明。
     const columns = useMemo<ColumnDef<typeof features, ActionRow>[]>(

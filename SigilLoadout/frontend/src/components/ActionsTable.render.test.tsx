@@ -14,13 +14,13 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {ActionsTable} from "@/components/ActionsTable"
 import {ROW_HEIGHT} from "@/components/actions-table/classes"
 
-import {KEYS, abilityNames, cellAt, clickToEdit, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
+import {KEYS, abilityNames, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
 describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
     it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
-        const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} />)
+        const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
         // 第一格是 `#`，而且**没有** `data-col-id` —— 量自然宽度那一趟按这个属性挑列，
         // 带上它就会被当成一个数据列量进去（列数就变了）。
@@ -84,7 +84,7 @@ describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排
         它会把整列撑宽 —— 那正是"看着像一列特别宽的空白列"。截断让列宽只跟内容走。
     */
     it("表头列名截断：内层带 truncate，且**不挂** title 提示", async () => {
-        const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} />)
+        const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
 
         const head = container.querySelectorAll("thead th")[1]

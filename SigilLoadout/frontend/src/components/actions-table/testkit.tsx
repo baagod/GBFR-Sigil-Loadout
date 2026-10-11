@@ -9,12 +9,13 @@
     不生效。所以四个测试文件各自写那三行 mock，本模块只负责"装实现"（`installServiceMocks`）。
 */
 import {cleanup, fireEvent, render, waitFor} from "@testing-library/react"
+import type {ReactElement} from "react"
 import {afterEach, beforeEach, expect, vi} from "vitest"
 
 import {LoadActions, SaveActionFields} from "../../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
-import type {ActionsTableMessages} from "@/components/actions-table/model"
+import {columnsOf, toActionRow, type ActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
 
 /**
  * 组件要的那一份文案：**只写这 5 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
@@ -73,6 +74,26 @@ const defaultRows = () => [makeRow("1000"), makeRow("1001", {actionFreeWork0_: "
 type Rows = ReturnType<typeof defaultRows>
 
 /**
+ * 夹具（后端的 `fields` 形状）→ 表要的 `ActionRow`。
+ *
+ * ‼️ **转换口径只有一份**（`model.toActionRow`，生产里 `ActionsPanel` 也用它），这里只是"逐个套用"
+ * —— 两处各写一遍的话，"空值怎么算"就会有两个版本，而那是**保存语义**的一部分。
+ * 夹具保持后端形状是因为用例要按 `key` 找/改原值（`rows()[0].fields.find(…)`）。
+ */
+const toActionRows = (rows: Rows): ActionRow[] => rows.map(toActionRow)
+
+/**
+ * 喂给 `<ActionsTable {...tableProps(rows)} />` 的那两样（数据 + 表头）。
+ *
+ * 给**直接 render 这张表**的用例用（台架内部也走它）：表是受控的，直接渲染时必须自己把数据递进去，
+ * 否则它会退回"自己读一次"那条路 —— 那与生产的走法不一致，测出来的东西也就不一样。
+ */
+export const tableProps = (rows: Rows) => {
+    const actionRows = toActionRows(rows)
+    return {rows: actionRows, keys: columnsOf(actionRows)}
+}
+
+/**
  * **一整套台架**：持有数据 + 每个用例重置 + 装 mock + 收尾清理 + 渲染助手。
  *
  * 四个测试文件各自抄一遍那 10 行（`let table` / `makeHarness` / `beforeEach` / `afterEach`）没有意义 ——
@@ -87,14 +108,19 @@ type Rows = ReturnType<typeof defaultRows>
 export function useTableHarness() {
     let rows = defaultRows()
     const getRows = () => rows
-    const {renderTable, renderWithSave} = makeHarness(getRows)
+    const {renderTable, renderWithSave, push, reset} = makeHarness(getRows)
 
     beforeEach(() => {
         rows = defaultRows()
-        installServiceMocks(getRows)
+        installServiceMocks()
     })
     afterEach(() => {
         cleanup()
+        /*
+            ‼️ 必须清掉"上一次渲染的 rerender"：那个 root 已经被 `cleanup()` 卸掉，再调它会抛
+            `Cannot update an unmounted root` —— 而且症状是**下一个用例**失败（实测踩过）。
+        */
+        reset()
     })
 
     return {
@@ -102,13 +128,20 @@ export function useTableHarness() {
         renderWithSave,
         /** 当前那一份数据（用例要取原值/字段清单时用）。 */
         rows: getRows,
-        /** 整张换掉数据（用例要造特殊数据集时用）。 */
+        /**
+         * 整张换掉数据（用例要造特殊数据集时用）。
+         *
+         * ‼️ 表是**受控**的（数据当 prop 给），所以换完必须重渲才上屏 —— 受控组件不会因为闭包
+         * 变量变了就自己刷新。渲染前调它不会重渲（那时没有可重渲的东西），`renderTable` 会读到新数据。
+         */
         setRows: (next: Rows) => {
             rows = next
+            push()
         },
         /** 追加一行（默认那两行不够用时）。 */
         addRow: (row: Rows[number]) => {
             rows = [...rows, row]
+            push()
         },
     }
 }
@@ -119,17 +152,57 @@ export function useTableHarness() {
  * ⚠️ 必须每个用例开头调一次（`resetAllMocks` 会把上一次留下的实现也清掉），而且"重置"与"装实现"
  * 要挨着写 —— 分一半到 `afterEach` 的话，从第二个用例起就没有实现了。
  */
-function installServiceMocks(getRows: () => Rows) {
+/**
+ * 装上服务 mock。
+ *
+ * ⚠️ 每个用例开头调一次（`resetAllMocks` 会把上一次留下的实现也清掉），所以"重置"与"装实现"要挨着写。
+ * ⚠️ 它**不再拿数据去喂 `LoadActions`** —— 表是受控的，数据由 `tableProps` 递进去（见上面那段说明）。
+ */
+function installServiceMocks() {
     vi.resetAllMocks()
-    vi.mocked(LoadActions).mockImplementation(async () => getRows())
     vi.mocked(SaveActionFields).mockResolvedValue(undefined)
+    /*
+        ‼️ `LoadActions` 在这里**故意是"一调就炸"**，不是拿它喂数据。
+        台架走的是生产那条路：数据由外面当 prop 递给表（`tableProps`），表**不该**再去读一次。
+        所以这个 mock 的作用是**守这条契约** —— 一旦表（或台架）又自己读起来，用例立刻报错，
+        而不是悄悄多读一份、把"同一份数据两个来源"那类顺序问题重新引回来。
+    */
+    vi.mocked(LoadActions).mockImplementation(async () => {
+        throw new Error("动作表是受控的：数据该由外面传进来，它自己不该再调 LoadActions")
+    })
 }
 
-/** 渲染与定位用的那几个助手：全部只依赖"当前那一份数据"。 */
+/**
+ * 渲染与定位用的那几个助手：全部只依赖"当前那一份数据"。
+ *
+ * ‼️ 数据是**当 prop 喂进去的**（`rows` / 表头从第一条记录的键取），不是让表自己去 `LoadActions`
+ * —— 生产里数据归 `ActionsPanel`，表是受控的；台架照同一条路走，就不必去模拟父组件。
+ *
+ * ⚠️ 因此 `setRows`/`addRow` 必须**重渲**（见 `useTableHarness`）：受控组件不会因为闭包变量变了
+ * 就自己刷新。渲染前调它们照样有效（那时还没渲染，重渲没事发生）。
+ */
 function makeHarness(getRows: () => Rows) {
+    /** 当前这次渲染的 `rerender`（`setRows` 用它把新数据推给表）。渲染前是 null。 */
+    let rerender: ((ui: ReactElement) => void) | null = null
+
+    const tableEl = (onSaveReady?: (save: () => Promise<void>) => void) => (
+        <ActionsTable t={t} abilityNames={abilityNames} {...tableProps(getRows())} onSaveReady={onSaveReady} />
+    )
+
+    /** 把"当前那一份数据"推给已挂载的表（还没渲染、或已卸载就什么都不做）。 */
+    const push = () => rerender?.(tableEl())
+
+    /** 一个用例结束后由台架调用：丢掉那个已卸载 root 的 `rerender`。 */
+    const reset = () => {
+        rerender = null
+    }
+
     /** 渲染并把数据等出来。 */
     const renderTable = async (onSaveReady?: (save: () => Promise<void>) => void) => {
-        const out = render(<ActionsTable t={t} abilityNames={abilityNames} onSaveReady={onSaveReady} />)
+        const out = render(tableEl(onSaveReady))
+        rerender = (ui) => out.rerender(ui)
+        /* ⚠️ `setRows` 可能是在**渲染前**调的（那时 `rerender` 还是 null）—— 这里补推一次，
+           让"先 setRows 再 renderTable"与"先 renderTable 再 setRows"两条写法都对。 */
         await waitFor(() => expect(out.container.querySelectorAll("tbody tr")).toHaveLength(getRows().length))
         return out.container
     }
@@ -140,8 +213,6 @@ function makeHarness(getRows: () => Rows) {
      * ⚠️ 返回的 `save` 每次调用都去取**最新的那个闭包**，不是渲染时那一份快照：组件在 rows/keys 一变
      * 就会重新交一次（见它的 useEffect），而测试常常"先渲染 → 再改一格 → 才保存"——
      * 存快照的话保存的是**改之前**的数据（实测：删空的用例交回了改之前的旧值）。
-     *
-     * 同样地，必须等**数据到位之后**才算拿到：只等表格出现时，手上那份可能还是"空 rows"的闭包。
      */
     const renderWithSave = async (): Promise<{container: HTMLElement; save: () => Promise<void>}> => {
         let latest: (() => Promise<void>) | null = null
@@ -152,7 +223,7 @@ function makeHarness(getRows: () => Rows) {
         return {container, save: () => (latest as () => Promise<void>)()}
     }
 
-    return {renderTable, renderWithSave}
+    return {renderTable, renderWithSave, push, reset}
 }
 
 /**

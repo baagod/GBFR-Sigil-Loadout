@@ -302,6 +302,25 @@ export const shownValue = (row: ActionRow, key: string): string => {
     return raw === "" ? original : raw
 }
 
+/**
+ * **后端给的一条记录 → `ActionRow`**（`.fields` 摊平成 `values` / `originals` 两栏）。
+ *
+ * ‼️ 只此一处：`ActionsPanel`（生产里唯一的读取方）与测试台架都用它。两处各写一遍的话，
+ * "哪些字段进 values、空值怎么算"就会有两个版本 —— 而那是**保存语义**的一部分
+ * （空串 = 没改过，见下面那段口径）。
+ */
+export const toActionRow = (action: {
+    id: string
+    fields: {key: string; original: string; value: string | null}[]
+}): ActionRow => ({
+    id: action.id,
+    values: Object.fromEntries(action.fields.map((field) => [field.key, field.value ?? ""])),
+    originals: Object.fromEntries(action.fields.map((field) => [field.key, field.original])),
+})
+
+/** 表头顺序 = **第一条记录**的键序（后端保证同一份表里每条记录的键序列一致）。 */
+export const columnsOf = (rows: ActionRow[]): string[] => (rows[0] ? Object.keys(rows[0].originals) : [])
+
 /*
     取值与提交的口径（与后端 actionedits.go、现有表 EditableCell 对齐）：
 

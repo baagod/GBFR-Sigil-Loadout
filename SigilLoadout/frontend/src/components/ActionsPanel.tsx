@@ -39,6 +39,8 @@ import {
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
+import type {ActionRow} from "@/components/actions-table/model"
+import {columnsOf, toActionRow} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
@@ -157,20 +159,25 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     playable: string[]
 }) {
     /**
-     * **这一页有没有可显示的记录**（`LoadActions` 返回的条数）。
+     * **动作表的记录 + 字段顺序** —— 这一页唯一的数据来源。
      *
-     * ⚠️ 只留**条数**，不留那一份数据 —— 记录本身与草稿全归 `ActionsTable`（它自己读、自己存）。
-     * 这里以前存的是整份 `actions`，用途却只有"非空就挂表"这一个判据；而那份数据与表**各自读一次**
-     * `LoadActions`，于是"载入顺序"成了隐式依赖：换角色时 `SetCharacter` 之后两边同时重读，
-     * 父组件这份若先回来，就会用**上一个角色**的数据去放行挂载（详见下面渲染处那段）。
+     * ‼️ 数据归**这里**，表只负责显示与编辑（受控）。以前两边**各读一次** `LoadActions`：
+     * 同一份数据两个来源，而"谁先回来"就成了隐式依赖 —— 换角色时 `switchCharacter` 先
+     * `SetCharacter` 再 `loadAll`，而表的重新挂载与这里重读是并发的，那份先回来的数据会被用来
+     * 放行挂载（用上一个角色的数据）。现在只有一处读，顺序问题从结构上消失。
+     *
+     * 形状与表里 `ActionRow` 一致（`values` = 改动、`originals` = 只读原值，两栏必须分开：
+     * 混成一栏就分不出"没改过"与"改成了空"，见 `service/actionedits.go`）。
      */
-    const [actionsCount, setActionsCount] = useState(0)
+    const [rows, setRows] = useState<ActionRow[]>([])
+    /** 字段顺序（= 表头顺序），见 `columnsOf`。 */
+    const keys = useMemo(() => columnsOf(rows), [rows])
     /**
-     * 首次读取回来了没有。
+     * 首次读取回来了没有（读的是上面那份 `LoadActions`）。
      *
-     * ‼️ 这个显式开关是**替代**原来那条 `keys.length === 0` 判据的：那条靠"keys 是从数据派生出来的"
-     * 来间接表达"还没读到"，于是"数据为空"与"还没读"共用同一个值（而且那条分支其实不可达 ——
-     * keys 与 actions 同一次 setState 落地）。显式记下来之后两件事分得开，也不用再派生那份数据。
+     * ‼️ 它替代的是原来那条 `keys.length === 0` 判据 —— 那条靠"keys 从数据派生"来间接表达
+     * "还没读到"，把"数据为空"与"还没读"挤进同一个值（而且那条分支其实不可达：keys 与数据
+     * 同一次 setState 落地）。分开之后渲染那三态才说得清。
      */
     const [loaded, setLoaded] = useState(false)
     // charCode 是当前角色（从动作表路径上取），characters 是下拉的候选（解包目录里有的那些）。
@@ -225,13 +232,13 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
 
     /**
      * 一次把这一页的几份数据读回来：当前角色码（从动作表路径上取）、FSM 名单、角色候选（下拉用）、
-     * 以及**动作表有没有记录**。换角色之后要整页重来一遍，所以单独成一个函数，挂载与切换共用。
+     * 以及**动作表本身**。换角色之后要整页重来一遍，所以单独成一个函数，挂载与切换共用。
      *
      * ⚠️ **顺序是有意的**：前三份先落地，动作表最后读。动作表读不出来是常事（清单上的记录不在这张表里），
      * 那时若把它们一起带没，整页就看着"全没了"——连角色下拉都是空的，切都切不回去。
      *
-     * ‼️ 这里只要**条数**，记录本身归 `ActionsTable`（它自己读、自己持草稿）。以前这里存整份数据、
-     * 表里再读一次：同一份数据两个来源，而"谁先回来"决定了渲染（见下面渲染处那段）。
+     * ‼️ 这里是**唯一**读 `LoadActions` 的地方（表不再自己读），所以下面那份数据的角色一定是当前角色：
+     * `switchCharacter` 先 `await SetCharacter` 再调本函数。
      */
     const loadAll = async () => {
         const [path, codes, ids] = await Promise.all([Path(), ListCharacters(), ActionIDs()])
@@ -242,7 +249,8 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         setIdsApplied(ids ?? "")
 
         // 这一步失败就抛给调用方（上面几份不受影响）。
-        setActionsCount(((await LoadActions()) ?? []).length)
+        const loaded = (await LoadActions()) ?? []
+        setRows(loaded.map(toActionRow))
         setLoaded(true)
     }
 
@@ -440,35 +448,36 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                     }`}
                 >
                     /*
-                        ‼️ 这里**不再有"数据到位才挂表"的加载门**（原来那两条：`actions.length === 0`
-                        给空态、`keys.length === 0` 给 loading）。门是架在**父组件那份数据**上的，
-                        而表自己也读一次 `LoadActions` —— 同一份数据两个来源，于是"谁先回来"
-                        成了隐式依赖：换角色时两边同时重读，父组件那份若先回来，就会用**上一个
-                        角色的**数据放行挂载。而 `keys.length === 0` 那条其实**不可达**（`keys`
-                        与 `actions` 同一次 `setState` 落地，`actions` 非空则 `keys` 必非空）。
-                        现在只判"有没有记录"这一个已知事实，loading 与错误由表自己显示。
+                        ‼️ 数据**从这里下去**（`rows` / `keys`），表不再自己读 —— 这一页只剩一处
+                        `LoadActions`。以前是"父组件拿一份做加载门 + 表内部再读一份"：同一份数据两个
+                        来源，"谁先回来"成了隐式依赖（换角色时尤其明显），而 `keys.length === 0`
+                        那条判据其实**不可达**（keys 与数据同一次 setState 落地）。
+
+                        现在三态说得清：`!loaded` = 还没读到；`rows.length === 0` = 读到了但一条都没有
+                        （不是错误，是 ids 与表不匹配，见后端 LoadActions）；否则挂表。
                     */
                     {!loaded ? (
                         <div className="pb-1 text-xs text-muted-foreground">{t.loading}</div>
-                    ) : actionsCount === 0 ? (
-                        // 清单上的记录这张表里一条都没有：不是错误，是 ids 与表不匹配（见后端 LoadActions）。
+                    ) : rows.length === 0 ? (
                         // 就地显示、不居中也不撑高：一行 14px 的灰字。
                         <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
                     ) : (
                         // ⚠️ 新表（TanStack）**已转正**：它就是动作表本身，旧的 TrackTable 那套连同切换开关一起删了。
-                        // 它自己读数据、自己持草稿（见 ActionsTable.tsx）；保存走 ttSaveRef（见 handleSaveAndDeploy）。
+                        // 保存走 ttSaveRef（见 handleSaveAndDeploy）—— 这个组件自己没有工具条。
                         <ActionsTable
                             /*
                                 换角色 = 换**一整份**数据（`switchCharacter` 先 `SetCharacter`，`LoadActions`
-                                之后读到的才是新角色那一份）。而这张表是自己挂载时读一次、没人告诉它角色变了，
-                                所以要用 `key` 把它**整个重新挂载**。
+                                之后读到的才是新角色那一份）。表把 `rows`/`keys` 当**初始值**收，所以换角色
+                                要用 `key` 把它**整个重新挂载**。
 
-                                为什么用 `key` 而不是传一个 `charaCode` 进去在 `useEffect` 里重读：换角色要清的
-                                不只是数据 —— 还有 `rows`/`keys`/`pinning`/量出来的 `left`/每格草稿。逐个清
-                                迟早漏一个（比如草稿没清，旧角色的改动会挂到新角色的行上）。`key` 是 React
-                                官方的"重置状态"手法，重新挂载即全清，漏不掉。
+                                为什么用 `key` 而不是让表跟着 prop 变化去同步 state：换角色要清的不只是数据
+                                —— 还有 `pinning`/量出来的 `left`/每格草稿/撤销栈/选区。逐个清迟早漏一个
+                                （比如草稿没清，旧角色的改动会挂到新角色的行上）。`key` 是 React 官方的
+                                "重置状态"手法，重新挂载即全清，漏不掉。
                             */
                             key={charCode}
+                            rows={rows}
+                            keys={keys}
                             t={t}
                             // 技能键 → 名字：它把 `abilityTag_` 那一列显示成技能名（与现有表同一个来路）。
                             abilityNames={abilityNames}
