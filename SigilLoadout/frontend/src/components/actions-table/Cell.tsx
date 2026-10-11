@@ -2,11 +2,12 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
+import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
 
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
-import {BRANCH_KEYS, BranchPickContext, EnterEditContext, RevealContext, UNSET, displayText, type PressFacts, snapshotKey} from "./model"
+import {BranchPickContext, RevealContext, UNSET, useEnterEditHandler, type ColumnKind, type PressFacts, snapshotKey} from "./model"
+import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
 /**
@@ -23,24 +24,21 @@ import {CELL_CHOICES} from "@/lib/controltypes"
 export const CellContent = memo(function CellContent({
     rowId,
     fieldKey,
-    readOnly,
-    picker,
+    kind,
     raw,
     original,
     shown,
     abilityNames,
     pressRef,
     preSelected,
-    active,
     draggedRef,
     edit,
     onEnterEdit,
 }: {
     rowId: string
     fieldKey: string
-    readOnly: boolean
-    /** 选值格（`controlTypeHash_`）：只能从下拉里挑，见 model 的 PICKER_KEYS 与 CellPick。 */
-    picker: boolean
+    /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
+    kind: ColumnKind
     /** 改动值（空串 = 没改过）。 */
     raw: string
     /** 原值（只读时显示它；可编辑时当灰色占位符）。 */
@@ -60,20 +58,16 @@ export const CellContent = memo(function CellContent({
     preSelected: boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 是"拖出去拉选区"，不该进编辑。 */
     draggedRef: RefObject<boolean>
-    /** 这一格是不是活动格 —— 只有它才登记进编辑句柄（见 `ActivityContext` 那条 ‼️）。 */
-    active: boolean
     edit: (rowId: string, key: string, value: string | null) => void
     /** 进入编辑态时喊一声（复制源那圈虚线要撤，见 `CopySource` 那段规则②）。 */
     onEnterEdit: () => void
 }) {
     // 分支列选值格的清单与搜索提示（见 `BranchPickContext`）—— 只读列用不到，但 hook 必须无条件调用。
     const branchPick = useContext(BranchPickContext)
-    /** 活动格的"进编辑"登记口（见 `EnterEditContext`）：**只有活动格写**，见 `model.ts` 那条 ‼️。 */
-    const enterEditRef = useContext(EnterEditContext)
-    if (readOnly) {
+    if (kind === "readonly") {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
-        return <CellText text={displayText(fieldKey, shown, abilityNames)} />
+        return <CellText text={fieldKey === "abilityTag_" ? abilityName(abilityNames, shown) : shown} />
     }
     /*
         ‼️ "先选后编"的**唯一**判据：按下之前这一格是唯一选中格，这一次点击才算"进编辑"。
@@ -86,41 +80,41 @@ export const CellContent = memo(function CellContent({
         const press = pressRef.current
         return press !== null && press.cellKey === snapshotKey(rowId, fieldKey) && press.wasSelected && press.wasOnlyCell
     }
-    if (picker) {
+    if (kind === "pick" || kind === "branch") {
         /*
             选值格：格子里那层文本就是下拉的触发器（见 `CellPick`）；"进编辑"= **展开列表**，同样走
             上面那道闸门，`dragged` 一并交下去（拖过 = 拉选区，不展开）。
         */
         // 清单给**稳定的 Set 引用**（`CELL_CHOICES` / `branchPick.ids`）：CellPick 里那份重排才挂得住 memo。
-        const pick = BRANCH_KEYS.has(fieldKey)
-            ? {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
-            : {choices: CELL_CHOICES}
+        const pick =
+            kind === "branch"
+                ? {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
+                : {choices: CELL_CHOICES}
         return (
             <CellPick
-                value={raw}
+                cellKey={snapshotKey(rowId, fieldKey)}
+                shown={shown}
                 original={original}
                 unchanged={raw === ""}
                 onCommit={(value) => edit(rowId, fieldKey, value)}
                 shouldEditOnClick={shouldEditOnClick}
                 dragged={draggedRef}
-                active={active}
-                enterEditRef={enterEditRef}
                 {...pick}
             />
         )
     }
     return (
         <Cell
+            rowId={rowId}
+            fieldKey={fieldKey}
             value={raw}
             original={original}
-            fieldKey={fieldKey}
+            shown={shown}
             onCommit={(value) => edit(rowId, fieldKey, value)}
             shouldEditOnClick={shouldEditOnClick}
             preSelected={preSelected}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
-            active={active}
-            enterEditRef={enterEditRef}
         />
     )
 })
@@ -175,13 +169,17 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-export function Cell({value, original, onCommit, shouldEditOnClick, preSelected, dragged, onEnterEdit, active, enterEditRef}: {
+export function Cell({rowId, fieldKey, value, original, shown, onCommit, shouldEditOnClick, preSelected, dragged, onEnterEdit}: {
+    /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
+    rowId: string
+    /** 这一格的列名（同上）。 */
+    fieldKey: string
     /** 这一格的**改动**（空串 = 没改过）。 */
     value: string
     /** 这一格的**原值**：没改过时显示它当占位符。 */
     original: string
-    /** 列名（只为调试日志与将来的定位用） */
-    fieldKey: string
+    /** **显示值**（父层给：`accessorFn` 那份，与排序同口径）。 */
+    shown: string
     /** 提交这一格；`null` = 回到原值（没改过）。 */
     onCommit: (value: string | null) => void
     /**
@@ -205,22 +203,21 @@ export function Cell({value, original, onCommit, shouldEditOnClick, preSelected,
     preSelected: boolean
     /** **这一次按下之后鼠标有没有真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不进编辑。 */
     dragged: RefObject<boolean>
-    /** 这一格是不是活动格：只有它登记（见 `CellContent` 的 `active`）。 */
-    active: boolean
-    /** 活动格的"进编辑"登记口（`EnterEditContext`）。 */
-    enterEditRef: RefObject<(() => void) | null> | null
 }) {
     const [editing, setEditing] = useState(false)
-    /** 显示值：没改过就是原值。 */
-    const shown = value === "" ? original : value
-
+    /**
+     * 显示值**由父层给**（`accessorFn` 那份，与排序同口径）。
+     *
+     * ‼️ 不在这里自己算 `value === "" ? original : value`：同一件事在 `model.shownValue`、父层的
+     * `cell.getValue()`、`Cell/`CellPick` 里已经各写过一遍，四处推导迟早漂（改一处忘三处）。
+     */
     const [draft, setDraft] = useState(shown)
     /** 是不是"没改过"那一态（只决定灰不灰；用 `value` 判，因为原值本身可能就是空串）。 */
     const placeholder = value === ""
     /** 显示态那一层：Esc 退出编辑时焦点要交回它（焦点环因此不闪）。 */
     const textRef = useRef<HTMLDivElement>(null)
     /** "跟随可视"：进编辑时喊一声（见 `enterEdit`）。走 context 下发，省掉穿三层的 prop。 */
-    const reveal = useContext(RevealContext)
+    const {reveal} = useContext(RevealContext)
     /**
      * Esc 之后焦点还给文本层，而文本层的 `onFocus` 是"进来就编辑" —— 不给个开关就会**自己把自己
      * 弹回编辑态**，Esc 看起来完全没反应。
@@ -248,24 +245,20 @@ export function Cell({value, original, onCommit, shouldEditOnClick, preSelected,
      * ‼️ `reveal()` **必须在这条路上喊**：滚动原本只挂在"活动格换人"的 ref 回调上，而"点已选中的
      * 格子"选区没变、活动格没换人 —— 那个回调不跑，于是进了编辑却不跟随可视（用户报的）。
      */
-    const enterEdit = () => {
+    const enterEdit = useCallback(() => {
         if (enteredRef.current) return
         enteredRef.current = true
         onEnterEdit()
         reveal()
         setEditing(true)
-    }
+    }, [onEnterEdit, reveal])
     /* 退出编辑（Esc / 提交 / 外部改动）后把闸放开，否则这一格第二次点击进不了编辑。 */
     useEffect(() => {
         if (!editing) enteredRef.current = false
     }, [editing])
 
-    /**
-     * ‼️ **只有活动格登记**（`active` 那道条件是必须的）：CellContent` / `Cell` 都是 `memo`，
-     * 活动格换人时别的行/格也会重渲 —— 无条件登记的话，最后渲染的那一格会把登记口覆盖成它自己
-     * （实测：方向键走到第 3 列，Enter 打开了最后一列）。
-     */
-    if (active && enterEditRef) enterEditRef.current = enterEdit
+    /** 登记"这一格的进编辑"（见 `useEnterEditHandler`）：Enter 据此切输入框。 */
+    useEnterEditHandler(snapshotKey(rowId, fieldKey), enterEdit)
 
     // 没在编辑时跟着显示值走：别处保存完、重读回来的新值要上屏，草稿也跟着回正。
     if (!editing && draft !== shown) setDraft(shown)

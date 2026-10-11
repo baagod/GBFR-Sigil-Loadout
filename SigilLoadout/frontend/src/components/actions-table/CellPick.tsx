@@ -1,8 +1,7 @@
-import {type RefObject, useContext, useEffect, useMemo, useRef, useState} from "react"
+import {useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject} from "react"
 import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
-import {EnterEditContext, RevealContext, isRevealScrolling} from "@/components/actions-table/model"
-
+import {RevealContext, useEnterEditHandler} from "@/components/actions-table/model"
 /*
     动作表里的**选值格**：格子里是那个值 + 一个小箭头，**先选中、再点一下**才在格子下面挂出列表挑一个
     （与普通格子"先进编辑态"同一道闸门，见下面 `shouldEditOnClick`）。
@@ -30,7 +29,8 @@ import {EnterEditContext, RevealContext, isRevealScrolling} from "@/components/a
 */
 
 export function CellPick({
-    value,
+    cellKey,
+    shown,
     original,
     unchanged,
     choices,
@@ -39,11 +39,11 @@ export function CellPick({
     onCommit,
     shouldEditOnClick,
     dragged,
-    active,
-    enterEditRef,
 }: {
-    /** 这一格的**改动值**（空串 = 没改过）；列表的选中态看的是"实际显示的那个值"。 */
-    value: string
+    /** 这一格的键（`snapshotKey`）：登记"进编辑"句柄用。 */
+    cellKey: string
+    /** 格子里显示的那份文本**由父层给**（`accessorFn` 那份，与排序同口径）。 */
+    shown: string
     /** 这一格的**原值**（只读那一份）：值清空时显示它，也是"改回原样"的判据。 */
     original: string
     /** 这一格**还等于原值**（没动过）→ 灰字，与别的格子同一套。 */
@@ -63,10 +63,6 @@ export function CellPick({
     shouldEditOnClick: () => boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不展开。 */
     dragged: RefObject<boolean>
-    /** 这一格是不是活动格：只有它登记（见 `CellContent` 的 `active`）。 */
-    active: boolean
-    /** 活动格的"进编辑"登记口（`EnterEditContext`）。 */
-    enterEditRef: RefObject<(() => void) | null> | null
 }) {
     const [open, setOpen] = useState(false)
     /**
@@ -78,7 +74,7 @@ export function CellPick({
      * "跟随可视"：展开列表（= 选值格的"进编辑"）时喊一声 —— 与普通格子的输入框同一条口径。
      * 走 context 下发，不从 `CellContent` 穿 prop。
      */
-    const reveal = useContext(RevealContext)
+    const {reveal, isSelfScroll} = useContext(RevealContext)
     /* `enterEditRef` 由 `CellContent` 以 prop 传下来（那边已经读过 context，不必读两遍）。 */
 
     /** 这一轮关闭要**立刻消失**（滚动带出来的关闭用它：别让列表在原地淡出一百毫秒）。 */
@@ -96,8 +92,6 @@ export function CellPick({
     /** 有一次展开请求是"按着的时候到的"，押后到松开那一刻再按闸门裁决。 */
     const pendingOpenRef = useRef(false)
 
-    /** 格子里显示的那份文本：没改过就是原值（`-1` 照原样，不归一化）。 */
-    const shown = value === "" ? original : value
     /** 这个值在清单里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
     const inChoices = (item: string) => choices.has(item) || item === optional
     /**
@@ -120,7 +114,7 @@ export function CellPick({
      * **展开列表**（= 选值格的"进编辑"）：先跟随可视、再开。点击与 Enter 两条路都走它 ——
      * 与普通格子的 `enterEdit` 一一对应（那边切输入框、这边开列表，别在这里另立一套）。
      */
-    const openForEdit = () => {
+    const openForEdit = useCallback(() => {
         /*
             ‼️ 这里**不报名**（报名由真正会滚的那一方发，见 `ActionsTable.revealActiveCell`）：
             格子本来就完整可见时"跟随可视"不会滚，那条"一滚就收起"的规则也就不该被让路 ——
@@ -129,7 +123,7 @@ export function CellPick({
         reveal()
         setInstantClose(false)
         setOpen(true)
-    }
+    }, [reveal])
     useEffect(() => {
         const onDown = (e: PointerEvent) => {
             if (cellRef.current?.contains(e.target as Node)) pointerDownRef.current = true
@@ -154,11 +148,8 @@ export function CellPick({
         }
     }, [])
 
-    /**
-     * ‼️ **只有活动格登记**（与普通格同一条口径，见 `Cell.enterEdit`）：否则最后渲染的那一格
-     * 会把登记口覆盖成它自己，Enter 就会打开别的格。
-     */
-    if (active && enterEditRef) enterEditRef.current = openForEdit
+    /** 登记"这一格的进编辑"（= 展开列表），与普通格子的 `Cell.enterEdit` 一一对应。 */
+    useEnterEditHandler(cellKey, openForEdit)
 
     /**
      * ‼️ **上下方向键不许打开列表**（用户口径）：列表只由"点一下 / Enter"打开。
@@ -208,8 +199,8 @@ export function CellPick({
     useEffect(() => {
         if (!open) return
         const onScroll = (e: Event) => {
-            /* 自己那一次"跟随可视"的滚动不算用户滚动（见 `model.ts` 那条契约；这次报名在此消费掉）。 */
-            if (isRevealScrolling()) return
+            /* 自己那一次"跟随可视"的滚动不算用户滚动（见 `RevealSession`；这次报名在此消费掉）。 */
+            if (isSelfScroll()) return
             if ((e.target as HTMLElement | null)?.closest?.('[data-slot="combobox-content"]')) return
             setInstantClose(true)
             setOpen(false)

@@ -3,7 +3,7 @@
 
     纯字符串与纯函数，不碰 React —— 渲染那两层（`ActionRowView` / `Cell`）从这里取类名。
 */
-import type {Cell, CellSelectionBounds} from "@tanstack/react-table"
+import type {Cell} from "@tanstack/react-table"
 
 import {CELL_TEXT} from "@/components/EditableCell"
 import {features, type ActionRow, type CopySource} from "./model"
@@ -211,22 +211,6 @@ const ringClasses = (edges: RingEdges, prefix: "cell-edge" | "cell-copy") =>
         .filter((side) => edges[side])
         .map((side) => `${prefix}-${side}`)
         .join(" ")
-
-/**
- * 这一行是不是被**某个"整行宽"的区**盖住。
- *
- * 用途两处：行号格自己的选中态；Ctrl 点行号时判"该增还是该减"（已经整行选中 → `exclude`）。
- * 判据：存在一个正面区域，行范围覆盖这一行、**列范围覆盖全部列**（`0 .. 最后一列`）。
- */
-export const rowFullySelected = (bounds: CellSelectionBounds[], rowIndex: number, lastColumnIndex: number) =>
-    lastColumnIndex >= 0 &&
-    bounds.some(
-        (b) =>
-            b.minRowIndex <= rowIndex &&
-            rowIndex <= b.maxRowIndex &&
-            b.minColumnIndex === 0 &&
-            b.maxColumnIndex === lastColumnIndex,
-    )
 
 /**
  * 一格在**复制区外圈**的哪几条边上（不在任何一片里 → `null`）。

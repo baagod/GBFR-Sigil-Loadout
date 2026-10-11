@@ -54,9 +54,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {ActionRowView, rowSelectionKey} from "@/components/actions-table/ActionRowView"
+import {ActionRowView} from "@/components/actions-table/ActionRowView"
 import {
-    rowFullySelected,
     HANDLE_CELL,
     HEAD_BG,
     HANDLE_HEAD_CURSOR,
@@ -67,7 +66,8 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, EnterEditContext, RevealContext, markRevealScroll, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {acceptPaste, BranchPickContext, columnKind, EnterEditContext, type EnterEditRegistry, RevealContext, features, parseSnapshotKey, type ActionRow, type CopyArea, type CopySource, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
 
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
@@ -229,17 +229,22 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const batchingRef = useRef(false)
     /**
      * **复制源**（剪贴板里那份是从哪儿复制的）—— 画那圈虚线用；`null` = 没有（复制过又被撤掉了）。
-     * 归 ref：它不直接渲染，渲染用的是下面那份 `copySource` 快照。
-     */
-    const copySourceRef = useRef<CopySource | null>(null)
-    /**
-     * 复制源的**渲染快照**（`copySourceRef` 的可渲染副本）。
      *
-     * 为什么要两份：`ref` 改了不会触发重渲，而"虚线该撤了"这件事必须**马上**上屏。用 `version` 当依赖、
-     * 从 ref 现算一份 —— 比"把整个 Map 塞进 state"省事，也不会跟 `edit` 的 `[]` 依赖打架。
+     * ‼️ 它是**真的 state**（渲染直接读它），`copySourceRef` 只是它的同步镜像 —— 与上面 `rows/rowsRef`
+     * 同一套做法。以前这里是一个"只写不读的 `version` 计数器 + 改 ref 后手工 bump"：正确性依赖
+     * "4 处改动点都记得 bump"这条**人工不变式**，漏一处就静默不重渲（虚线该撤却还挂着）。
+     * 用 state 之后这件事归类型系统管，bump 与 ref 各少 4 处。
+     *
+     * 镜像仍然需要：`edit` 的依赖必须是 `[]`（引用稳定，见那段），读 state 会读到首帧那份。
      */
-    const [copySourceVersion, setCopySourceVersion] = useState(0)
-    const copySource = copySourceRef.current
+    const [copySource, setCopySource] = useState<CopySource | null>(null)
+    const copySourceRef = useRef<CopySource | null>(null)
+    copySourceRef.current = copySource
+    /** 改复制源：镜像与 state 一起动（**唯一入口**，别再单独写 ref）。 */
+    const changeCopySource = useCallback((next: CopySource | null) => {
+        copySourceRef.current = next
+        setCopySource(next)
+    }, [])
 
     useEffect(() => {
         void (async () => {
@@ -370,6 +375,17 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     }, [measured, keys, shownTick])
 
     /**
+     * 清除复制源（那圈虚线跟着消失）。
+     *
+     * 四个入口都走它：进编辑（`onEnterEdit`）、Esc、切窗口回来核对发现源区变了、以及 `edit` 里
+     * 那条"动到源区"的分支。
+     */
+    const clearCopySource = useCallback(() => {
+        if (!copySourceRef.current) return
+        changeCopySource(null)
+    }, [])
+
+    /**
      * 改一格：只换那一行的对象（TanStack 靠引用变才知道要重算），别的行原样留着。
      *
      * `useCallback` 不是为了省这点开销 —— 是为了让**引用稳定**：它会作为 prop 传给 `memo` 化的
@@ -387,27 +403,14 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         /*
             动到复制源那一片 → 那圈虚线撤掉（规则②，见上面 `CopySource` 那段）。
             判据是"**动过**"而不是"值跟复制时不一样"：往源区里粘一个跟原来一模一样的值，虚线照样撤。
-            这里直接写 ref + bump，不走 `clearCopySource()` —— `edit` 的依赖必须是 `[]`（引用稳定，
-            见上面那段），调外面那个每次渲染都新建的函数会把它钉死在首帧那一份上。
+            调 `clearCopySource()` 是安全的：它和 `changeCopySource` 都是 `useCallback([])`，
+            不会把 `edit` 的依赖钉在首帧（见上面那段为什么 `edit` 必须是稳定引用）。
         */
         const source = copySourceRef.current
         if (source && source.snapshot.has(snapshotKey(rowId, key))) {
-            copySourceRef.current = null
-            setCopySourceVersion((v) => v + 1)
+            clearCopySource()
         }
         setRows((prev) => prev.map((row) => (row.id === rowId ? {...row, values: {...row.values, [key]: next}} : row)))
-    }, [])
-
-    /**
-     * 清除复制源（那圈虚线跟着消失）。
-     *
-     * 三个入口都走它：进编辑（`onEnterEdit`）、Esc、切窗口回来核对发现源区变了。另外**动到源区的写入**
-     * 走 `edit` 里那条内联分支（那里不能用这个函数，原因见 `edit`）。
-     */
-    const clearCopySource = useCallback(() => {
-        if (!copySourceRef.current) return
-        copySourceRef.current = null
-        setCopySourceVersion((v) => v + 1)
     }, [])
 
     /**
@@ -580,8 +583,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
             ⚠️ **按片存**（不是外接矩形）：多片时虚线要每片各画一圈。
         */
-        copySourceRef.current = {areas, snapshot}
-        setCopySourceVersion((v) => v + 1)
+        changeCopySource({areas, snapshot})
         /*
             ‼️ **复制不再收掉选区**（用户要求：按 Ctrl+C 那一刻选区底色留着）。
 
@@ -632,7 +634,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             rows: modelRows.map((row) => ({
                 rowId: row.id,
                 cells: row.getAllCells().map((cell) =>
-                    READ_ONLY_KEYS.has(cell.column.id)
+                    columnKind(cell.column.id) === "readonly"
                         ? null
                         : {columnId: cell.column.id, current: row.original.values[cell.column.id] ?? ""},
                 ),
@@ -660,12 +662,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         // 一整次粘贴 = **一步撤销**：清单是 `[行, 列, 改前值]`（被校验挡掉的那几格不在里面）。
         undoRef.current.push(writes)
         // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
-        selectRange(
-            modelRows[plan.range.firstRow].id,
-            modelRows[plan.range.firstRow].getAllCells()[plan.range.firstCol].column.id,
-            modelRows[plan.range.lastRow].id,
-            modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
-        )
+        table.selectCellRange({
+            anchorRowId: modelRows[plan.range.firstRow].id,
+            anchorColumnId: modelRows[plan.range.firstRow].getAllCells()[plan.range.firstCol].column.id,
+            focusRowId: modelRows[plan.range.lastRow].id,
+            focusColumnId: modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
+        })
     }
 
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
@@ -726,10 +728,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */
     const lastRevealedRef = useRef<HTMLElement | null>(null)
     /**
-     * **当前活动格的"进编辑"句柄**（见 `EnterEditContext`）：**只有活动格会写它**（判据是
-     * `RowCell` 给的 `active`，见 `model.ts` 那条 ‼️）—— 别的格重渲不会把它覆盖掉。
+     * **活动格的"进编辑"句柄登记表**（见 `EnterEditRegistry`）：每格按**自己的格键**登记，
+     * Enter 按当前活动格的键来取 —— 覆盖结构上不可能，"只有活动格才登记"那条前提也就不需要了。
+     * 引用恒定（`useRef`），要经 context 下到 `memo` 的格子里。
      */
-    const enterEditRef = useRef<(() => void) | null>(null)
+    const enterEditRegistryRef = useRef<EnterEditRegistry>(new Map())
+    const enterEditRegistry = enterEditRegistryRef.current
 
     /**
      * **"跟随可视"的唯一实现**：把当前活动格摆进真正看得见的矩形里。
@@ -847,11 +851,32 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             目标.top = 夹(目标.top, box.scrollHeight - box.clientHeight)
             目标.left = 夹(目标.left, box.scrollWidth - box.clientWidth)
             if (Math.abs(目标.top - box.scrollTop) < 1 && Math.abs(目标.left - box.scrollLeft) < 1) return
-            /* 报名"下一次滚动是我们自己发的"，再滚（契约见 `model.ts`）。 */
-            markRevealScroll()
+            /* 报名"下一次滚动是我们自己发的"，再滚（契约见 `RevealSession`）。 */
+            selfScrollRef.current = true
             box.scrollTo({top: 目标.top, left: 目标.left})
         })
     }, [])
+    /**
+     * **"跟随可视"这一套的实例**（见 `RevealSession`）：一张表一份，经 context 下发。
+     *
+     * ‼️ "下一次滚动是我自己发的"这一位（`selfScrollRef`）**必须按表持有**，不能放模块级 ——
+     * 放模块级就是全页共享：同页两张表会互相让路（A 表跟随可视那一下把 B 表"一滚就收"的规则一起
+     * 放过），而且模块级可变状态会让测试按执行顺序时红时绿（脏的那一份漏给下一个测试文件）。
+     *
+     * 用 `useRef` 让**引用恒定**：它要经 context 下到 `memo` 的格子里，每次渲染换新对象等于把 memo 废掉。
+     * `revealActiveCell` 本身是 `useCallback([])`，所以首个渲染期闭包里抓到的那个就是最终那份实现。
+     */
+    const selfScrollRef = useRef(false)
+    const revealRef = useRef<RevealSession | null>(null)
+    revealRef.current ??= {
+        reveal: revealActiveCell,
+        isSelfScroll: () => {
+            if (!selfScrollRef.current) return false
+            selfScrollRef.current = false // 一次性：消费掉这次报名
+            return true
+        },
+    }
+    const reveal = revealRef.current
     /**
      * "活动格挂上来了"的 ref 回调（`RowCell` 只把它挂给活动格那一格）—— 只是 `revealActiveCell`
      * 的一个**触发源**（另一个是进编辑，见 `RevealContext`）。
@@ -973,11 +998,9 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             /*
                 ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
                 那是另一个功能），整行块同理 —— 不做比做错好。
-                判据与 `ActionRowView` 那道 `wasOnlyCell` 闸门同一个：只有一个正面区域、且行列都收在一格。
+                判据与 `ActionRowView` 那道 `wasOnlyCell` 闸门**同一条**（同一个函数，见 `selection.ts`）。
             */
-            const bounds = getSelectionBounds()
-            const 单格 = bounds.length === 1 && bounds[0].minRowIndex === bounds[0].maxRowIndex && bounds[0].minColumnIndex === bounds[0].maxColumnIndex
-            if (!单格) return
+            if (!isSingleCellBounds(getSelectionBounds())) return
             /*
                 ‼️ **喊活动格自己的进编辑句柄**（`EnterEditContext` 登记的那一个）：普通格切输入框、
                 选值格展开列表 —— 两边实现不同，本层不该知道细节。只读列不登记 → 这里什么都不做。
@@ -987,7 +1010,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 "按下那一刻"的事实，而**方向键换格后直接按 Enter 根本没有 mousedown** —— 闸门判 false，
                 Enter 点不开（实测）。登记那套没有这个前提。
             */
-            enterEditRef.current?.()
+            enterEditRegistry.get(activeCellKey)?.()
             return
         }
 
@@ -1067,17 +1090,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     }
 
     /**
-     * 把单元格选区**直接设成这一片**（左上角 + 右下角两个角给库）。
-     *
-     * 走库的 `table.selectCellRange`：它内部就是 `mode: "replace"` → `setCellSelection([range])`，
-     * 与我们手写那一行等价 —— 顺带白拿库的归一化（`operation` / `additive` 那些），
-     * 也少一份"自己维护选区形状"的责任。前提（`onCellSelectionChange` 已接）见上面 `cellSelection` 那段。
-     */
-    const selectRange = (anchorRowId: string, anchorColumnId: string, focusRowId: string, focusColumnId: string) => {
-        table.selectCellRange({anchorRowId, anchorColumnId, focusRowId, focusColumnId})
-    }
-
-    /**
      * 按行号把**一整行**写成一个"整行宽"的区（Excel 的模型：行块本身就是个区，跟单元格区同住一处）。
      *
      * `mode`：`replace`（直接拖 / 单击）· `include`（Ctrl 追加）· `exclude`（Ctrl 点在已整行选中的行上 = 减选）。
@@ -1103,12 +1115,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             if (next.focusRowId === last.focusRowId && next.focusColumnId === last.focusColumnId) return old
             return [...old.slice(0, -1), next]
         })
-    }
-
-    /** 行号拖：列角保持**整行宽**，只挪行。 */
-    const extendRowSpanTo = (focusRowId: string) => {
-        if (!lastColumnId) return
-        extendFocusTo(focusRowId, lastColumnId)
     }
 
     /**
@@ -1202,7 +1208,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             */
             if (dragRowRef.current !== null) {
                 const id = rowIdAtY(e.clientY)
-                if (id !== null) extendRowSpanTo(id)
+                // 行号拖：列角保持**整行宽**，只挪行（鼠标移出行号那一列也接着拖）。
+                if (id !== null && lastColumnId) extendFocusTo(id, lastColumnId)
                 return
             }
             if (!dragCellRef.current) return
@@ -1249,12 +1256,11 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             const source = copySourceRef.current
             if (!source) return
             for (const [key, original] of source.snapshot) {
-                const separator = key.indexOf("\u0000")
-                const row = rowsRef.current.find((r) => r.id === key.slice(0, separator))
+                const {rowId, columnId} = parseSnapshotKey(key)
+                const row = rowsRef.current.find((r) => r.id === rowId)
                 // 源区那一格现在显示的值（没改过就是原值）与复制那一刻对不上 → 源区过期，撤虚线。
-                if (!row || shownValue(row, key.slice(separator + 1)) !== original) {
-                    copySourceRef.current = null
-                    setCopySourceVersion((v) => v + 1)
+                if (!row || shownValue(row, columnId) !== original) {
+                    changeCopySource(null)
                     return
                 }
             }
@@ -1424,8 +1430,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                         · `RevealContext`：进编辑时"跟随可视"。
 
                     */}
-                    <RevealContext.Provider value={revealActiveCell}>
-                    <EnterEditContext.Provider value={enterEditRef}>
+                    <RevealContext.Provider value={reveal}>
+                    <EnterEditContext.Provider value={enterEditRegistry}>
                     <BranchPickContext.Provider value={branchPick}>
                     {modelRows.map((row, rowIndex) => {
                         /*

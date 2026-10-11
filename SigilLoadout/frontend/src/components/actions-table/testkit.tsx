@@ -13,6 +13,7 @@ import {afterEach, beforeEach, expect, vi} from "vitest"
 
 import {LoadActions, SaveActionFields} from "../../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
+import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
 import type {Messages} from "@/lib/messages"
 
 /** 组件要的那一份文案；用例真正调到的都在这里，其余给空串撑住类型。 */
@@ -63,7 +64,7 @@ export function makeRow(id: string, changed: Record<string, string> = {}) {
 }
 
 /** 每个用例开头的默认两行（第 2 行有一处改动，用来测"改过的格子显示改动本身"）。 */
-export const defaultRows = () => [makeRow("1000"), makeRow("1001", {actionFreeWork0_: "actionFreeWork0_-改过"})]
+const defaultRows = () => [makeRow("1000"), makeRow("1001", {actionFreeWork0_: "actionFreeWork0_-改过"})]
 
 type Rows = ReturnType<typeof defaultRows>
 
@@ -114,14 +115,14 @@ export function useTableHarness() {
  * ⚠️ 必须每个用例开头调一次（`resetAllMocks` 会把上一次留下的实现也清掉），而且"重置"与"装实现"
  * 要挨着写 —— 分一半到 `afterEach` 的话，从第二个用例起就没有实现了。
  */
-export function installServiceMocks(getRows: () => Rows) {
+function installServiceMocks(getRows: () => Rows) {
     vi.resetAllMocks()
     vi.mocked(LoadActions).mockImplementation(async () => getRows() as never)
     vi.mocked(SaveActionFields).mockResolvedValue(undefined as never)
 }
 
 /** 渲染与定位用的那几个助手：全部只依赖"当前那一份数据"。 */
-export function makeHarness(getRows: () => Rows) {
+function makeHarness(getRows: () => Rows) {
     /** 渲染并把数据等出来。 */
     const renderTable = async (onSaveReady?: (save: () => Promise<void>) => void) => {
         const out = render(<ActionsTable t={t} abilityNames={abilityNames} onSaveReady={onSaveReady} />)
@@ -179,6 +180,48 @@ export function stubRowRects(container: HTMLElement, height = 20) {
     return rows
 }
 
+/**
+ * 把容器与**所有**数据格桩成"格子远在可见矩形右下之外" —— 让"跟随可视"**确实要走滚动那一趟**。
+ *
+ * 为什么必须有它：happy-dom 不做布局，所有 rect 都是 0，于是 `revealActiveCell` 会认定"这一格
+ * 本来就看全了"、直接早退 —— 不滚、**也不报名**"下一次滚动是我发的"。要验让路契约的用例少了这一步，
+ * 测的就是"什么都没发生"；更糟的是它可能被别的文件漏下来的原型级 rect 桩救活，
+ * 于是**单跑红、全量绿**（`render.test.tsx` 给 `HTMLElement.prototype.getBoundingClientRect` 打过桩）。
+ *
+ * ⚠️ 必须桩**所有**数据格：活动格换人之后量的是新那一格，只桩一格的话下一次就量到 0。
+ * ⚠️ 返回的恢复函数要放进 `finally`。
+ */
+export function stubRevealGeometry(container: HTMLElement) {
+    const box = container.querySelector<HTMLElement>(".overflow-auto")!
+    const boxRect = box.getBoundingClientRect
+    const boxH = Object.getOwnPropertyDescriptor(box, "clientHeight")
+    const boxW = Object.getOwnPropertyDescriptor(box, "clientWidth")
+    const boxSH = Object.getOwnPropertyDescriptor(box, "scrollHeight")
+    const boxSW = Object.getOwnPropertyDescriptor(box, "scrollWidth")
+    box.getBoundingClientRect = () =>
+        ({top: 0, bottom: 800, left: 0, right: 400, width: 400, height: 800, x: 0, y: 0}) as DOMRect
+    Object.defineProperty(box, "clientHeight", {configurable: true, get: () => 800})
+    Object.defineProperty(box, "clientWidth", {configurable: true, get: () => 400})
+    /* "能滚多远"也得给：目标位置会被夹进这几个值，全 0 的话夹完恒等于当前位置、一次都不滚。 */
+    Object.defineProperty(box, "scrollHeight", {configurable: true, get: () => 100000})
+    Object.defineProperty(box, "scrollWidth", {configurable: true, get: () => 100000})
+
+    const 原 = new Map<HTMLElement, () => DOMRect>()
+    for (const td of container.querySelectorAll<HTMLElement>("tbody td")) {
+        原.set(td, td.getBoundingClientRect)
+        td.getBoundingClientRect = () =>
+            ({top: 2000, bottom: 2020, left: 500, right: 600, width: 100, height: 20, x: 500, y: 2000}) as DOMRect
+    }
+    return () => {
+        box.getBoundingClientRect = boxRect
+        if (boxH) Object.defineProperty(box, "clientHeight", boxH)
+        if (boxW) Object.defineProperty(box, "clientWidth", boxW)
+        if (boxSH) Object.defineProperty(box, "scrollHeight", boxSH)
+        if (boxSW) Object.defineProperty(box, "scrollWidth", boxSW)
+        for (const [td, fn] of 原) td.getBoundingClientRect = fn
+    }
+}
+
 /** happy-dom 没有真剪贴板：给 `fireEvent.copy/paste` 塞一个能读写的替身。 */
 export function clipboardStub(text = "") {
     const data: Record<string, string> = text ? {"text/plain": text} : {}
@@ -215,7 +258,7 @@ export function copyBoxOf(container: HTMLElement): HTMLElement | null {
 
 /** 这一行按行号选中了没有（行号格带上那层浅色叠加 = 选中）。 */
 export const rowSelectedAt = (container: HTMLElement, row: number) =>
-    (handleAt(container, row).className ?? "").includes("cell-row-selected")
+    (handleAt(container, row).className ?? "").includes(HANDLE_SELECTED_BG)
 
 /** 按下行号格：修饰键会进 `nativeEvent`。 */
 export const pressHandle = (container: HTMLElement, row: number, mods: {shiftKey?: boolean; ctrlKey?: boolean} = {}) =>

@@ -16,7 +16,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {cellAt, clipboardStub, selectCell, useTableHarness} from "@/components/actions-table/testkit"
+import {cellAt, clipboardStub, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -210,32 +210,55 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
     })
 
     /*
-        ‼️ **标出"下一次滚动是跟随可视发的"**：`CellPick` 的 `openForEdit` 在开列表前报名一次，那条
-        "谁一滚就收起"的规则会把**第一条**滚动让过去（那一条正是进编辑时跟随可视发的）。
+        ‼️ **"让路"的报名方是真正会滚的那一方**（`ActionsTable.revealActiveCell`），**不是** `CellPick`
+        —— `openForEdit` 明确不报名（见 `CellPick.tsx` 那段说明：格子本来就完整可见时不会滚，
+        早报名会把用户接下来的**第一条**滚动白白放过一次）。
 
-        所以这里如实分两步测：
-          · 第一条滚动 = 我方那一下 → **不许收**（这是用户报的 bug）；
-          · 第二条滚动 = 用户真滚 → **照旧要收**（证明那条规则没被废掉）。
+        所以这条用例的两个前提**必须显式造出来**，否则它什么都没测：
+          ① 把几何桩成"这一格看不见" → "跟随可视"真的滚一趟 → 才会报名；
+          ② 第一条 `scroll` = 我方那一下 → **不许收**（用户报的 bug）；
+          ③ 第二条 `scroll` = 用户真滚 → **照旧要收**（证明规则没被废掉）。
+
+        ⚠️ 少了 ①，`revealActiveCell` 会因 rect 全是 0 而认定"看全了"、直接早退 —— 不滚也不报名。
+        那时第 ② 步之所以看起来能过，靠的是别的文件漏下来的**原型级** rect 桩
+        （`render.test.tsx` 给 `HTMLElement.prototype.getBoundingClientRect` 打过桩），
+        于是**单跑本文件必红、全量跑反而全绿** —— 测的是环境，不是契约。
     */
     it("进编辑时跟随可视造成的滚动：不收起列表；随后用户滚动照旧收起", async () => {
         setRows([pickRow("1000", "4087152117")])
         const container = await renderTable()
 
-        const cell = cellAt(container, 0, PICK_COL)
-        pressPick(cell) // 先选中（"先选后编"的第一下）
-        await tick()
-        pressPick(cell) // 第二下：进编辑，列表展开（同时报名"下一次滚动是跟随可视"）
-        await tick()
-        expect(isPickOpen()).toBe(true)
+        const 恢复几何 = stubRevealGeometry(container)
+        /* 钉前提用：`scrollTo` 被调过就说明"跟随可视"真的走了滚动那一趟。 */
+        const scrolled: HTMLElement[] = []
+        const originalScrollTo = Element.prototype.scrollTo
+        Element.prototype.scrollTo = function (this: HTMLElement) {
+            scrolled.push(this)
+        }
 
-        /* ① 跟随可视那一下（真机上排在展开之后的下一帧）。 */
-        container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
-        await tick()
-        expect(isPickOpen()).toBe(true)
+        try {
+            const cell = cellAt(container, 0, PICK_COL)
+            pressPick(cell) // 先选中（"先选后编"的第一下）
+            await tick()
+            pressPick(cell) // 第二下：进编辑，列表展开
+            await tick()
+            expect(isPickOpen()).toBe(true)
 
-        /* ② 用户真滚：规则照旧生效。 */
-        container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
-        await waitFor(() => expect(isPickOpen()).toBe(false))
+            /* ① 前提：几何生效了、"跟随可视"确实滚过 —— 否则下面两步都是空转。 */
+            expect(scrolled.length).toBeGreaterThan(0)
+
+            /* ② 跟随可视那一下（真机上排在展开之后的下一帧）。 */
+            container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
+            await tick()
+            expect(isPickOpen()).toBe(true)
+
+            /* ③ 用户真滚：规则照旧生效。 */
+            container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
+            await waitFor(() => expect(isPickOpen()).toBe(false))
+        } finally {
+            Element.prototype.scrollTo = originalScrollTo
+            恢复几何()
+        }
     })
 
     /*
@@ -577,7 +600,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
             <table>
                 <tbody>
                     <tr>
-                        <CellPick value={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
                     </tr>
                 </tbody>
             </table>,
@@ -593,7 +616,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
             <table>
                 <tbody>
                     <tr>
-                        <CellPick value="" original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
                     </tr>
                 </tbody>
             </table>,

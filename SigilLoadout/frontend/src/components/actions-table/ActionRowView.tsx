@@ -6,7 +6,6 @@ import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
 import type {Cell, CellSelectionBounds, CellSelectionState, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
-import {isPickerColumn} from "./model"
 import {
     CELL_BASE,
     EDITABLE_BG,
@@ -21,33 +20,8 @@ import {
     cellCopyRing,
     selectionClass,
 } from "./classes"
-import {READ_ONLY_KEYS, features, type ActionRow, type CopySource, type PressFacts, snapshotKey} from "./model"
-
-/**
- * 一行外观的**指纹** —— `ActionRowView` 的 `memo` 靠它决定跳不跳。
- *
- * 收录的是"这一行的长相真正依赖的东西"：**自己**有没有被选中，以及**上下相邻那两行**有没有
- * （轮廓画在选区的**外边界**上，一行的上下边取不取决于它自己，还取决于邻行）。
- * 行里的格子变宽变窄**不算** —— 那种变化本来就会让整个组件重渲、这些行一起重建。
- */
-export function rowSelectionKey(
-    ranges: CellSelectionState,
-    bounds: CellSelectionBounds[],
-    rowIndex: number,
-    rowId: string,
-): string {
-    const active = ranges[ranges.length - 1]
-    let key = ranges.length > 0 && active?.anchorRowId === rowId ? `f${active.anchorColumnId}` : ""
-    for (const bound of bounds) {
-        const self = rowIndex >= bound.minRowIndex && rowIndex <= bound.maxRowIndex
-        const above = rowIndex - 1 >= bound.minRowIndex && rowIndex - 1 <= bound.maxRowIndex
-        const below = rowIndex + 1 >= bound.minRowIndex && rowIndex + 1 <= bound.maxRowIndex
-        if (self || above || below) {
-            key += `|${self ? 1 : 0}${above ? 1 : 0}${below ? 1 : 0}:${bound.minColumnIndex}-${bound.maxColumnIndex}`
-        }
-    }
-    return key
-}
+import {columnKind, features, type ActionRow, type ColumnKind, type CopySource, type PressFacts, snapshotKey} from "./model"
+import {isSingleCellBounds, rowSelectionKey} from "./selection"
 
 /**
  * 一格里那层 `<td>` —— **第二道 memo 命门**（第一道是外面的 `ActionRowView`）。
@@ -64,14 +38,12 @@ const RowCell = memo(function RowCell({
     cell,
     row,
     fieldKey,
-    readOnly,
-    picker,
+    kind,
     raw,
     original,
     shown,
     selected,
     preSelected,
-    active,
     className,
     width,
     left,
@@ -88,8 +60,8 @@ const RowCell = memo(function RowCell({
     cell: Cell<typeof features, ActionRow>
     row: Row<typeof features, ActionRow>
     fieldKey: string
-    readOnly: boolean
-    picker: boolean
+    /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
+    kind: ColumnKind
     /** **改动值**（空串 = 没改过）。 */
     raw: string
     /** **原值**（只读那一份）：值清空时显示它。 */
@@ -112,14 +84,6 @@ const RowCell = memo(function RowCell({
      * 每格都传同一个稳定函数（由行那层按 `activeCellKey` 决定给不给），所以 memo 不受影响。
      */
     cellRef?: (el: HTMLTableCellElement | null) => void
-    /**
-     * **这一格是不是活动格**（`activeCellKey` 在行那层比出来的）。
-     *
-     * ‼️ 只有它才允许把自己登记给 Enter 键（`EnterEditContext`）：CellContent` / `Cell` 都是`memo`，
-     * 活动格换人时别的行/格也会重渲 —— 不设这个条件的话，最后渲染的那一格会把登记口覆盖成它自己
-     * （实测：方向键走到第 3 列，Enter 打开了最后一列）。
-     */
-    active: boolean
     /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
     getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
@@ -138,14 +102,10 @@ const RowCell = memo(function RowCell({
                 中状态，等 click / focus 时再读就读到改后的了。
             */
             onMouseDown={(e) => {
-                const bounds = getSelectionBounds()
                 pressRef.current = {
                     cellKey: snapshotKey(row.id, fieldKey),
                     wasSelected: selected,
-                    wasOnlyCell:
-                        bounds.length === 1 &&
-                        bounds[0].minRowIndex === bounds[0].maxRowIndex &&
-                        bounds[0].minColumnIndex === bounds[0].maxColumnIndex,
+                    wasOnlyCell: isSingleCellBounds(getSelectionBounds()),
                 }
                 startCellSelection(cell, e)
             }}
@@ -162,22 +122,22 @@ const RowCell = memo(function RowCell({
             <CellContent
                 rowId={row.id}
                 fieldKey={fieldKey}
-                readOnly={readOnly}
-                picker={picker}
+                kind={kind}
                 raw={raw}
                 original={original}
                 shown={shown}
                 abilityNames={abilityNames}
                 pressRef={pressRef}
                 preSelected={preSelected}
-                active={active}
                 draggedRef={draggedRef}
                 edit={edit}
                 onEnterEdit={onEnterEdit}
             />
         </td>
     )
-})/**
+})
+
+/**
  * 表体的一行 —— **`memo` 是这里的性能命门**。
  *
  * 拖拽选区时每穿过一格就写一次选中 state，而一次写入会让 `ActionsTable` 整个重渲。没有这层
@@ -274,23 +234,22 @@ export const ActionRowView = memo(function ActionRowView({
             {rowCells.map((cell) => {
                 const key = cell.column.id
                 const pinned = cell.column.getIsPinned()
-                const readOnly = READ_ONLY_KEYS.has(key)
+                const kind = columnKind(key)
+                const readOnly = kind === "readonly"
+                /* 这一格的键（`snapshotKey`）算**一次**给下面两处共用，别每处再拼一遍。 */
+                const isActiveCell = activeCellKey === snapshotKey(row.id, key)
                 return (
                     <RowCell
                         key={cell.id}
                         cell={cell}
                         row={row}
                         fieldKey={key}
-                        readOnly={readOnly}
-                        /* 选值格与别的格子走同一条路，差别只是点它展开列表（见 `CellContent` 的 `picker` 分支）。 */
-                        picker={!readOnly && isPickerColumn(key)}
+                        kind={kind}
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={String(cell.getValue() ?? "")}
                         selected={cell.getIsSelected()}
                         preSelected={pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected}
-                        /* 判据与 cellRef 同一个：只有活动格才登记进编辑句柄（见 RowCell 的 ctive）。 */
-                        active={activeCellKey === snapshotKey(row.id, key)}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
                         className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)}`}
                         width={measured ? cell.column.getSize() : null}
@@ -300,7 +259,7 @@ export const ActionRowView = memo(function ActionRowView({
                         */
                         left={measured && pinned ? HANDLE_WIDTH + cell.column.getStart("start") : null}
                         /* 只有活动格拿到滚动 ref（`undefined` = React 不绑）—— 判据在行那层算好。 */
-                        cellRef={activeCellKey === snapshotKey(row.id, key) ? scrollActiveIntoView : undefined}
+                        cellRef={isActiveCell ? scrollActiveIntoView : undefined}
                         abilityNames={abilityNames}
                         pressRef={pressRef}
                         draggedRef={draggedRef}

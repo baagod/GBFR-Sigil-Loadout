@@ -12,8 +12,7 @@ import {
     sortFn_alphanumeric,
     tableFeatures,
 } from "@tanstack/react-table"
-import {createContext, type RefObject} from "react"
-import {abilityName} from "@/lib/ability"
+import {createContext, useContext, useEffect, type RefObject} from "react"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
 /**
@@ -27,27 +26,36 @@ import {CELL_CHOICES} from "@/lib/controltypes"
  *
  * 只读列改不了、也就**不可能产生改动**，所以显示与保存都只看原值（见 `shownValue` 与保存那两处）。
  */
-export const READ_ONLY_KEYS = new Set(["id_", "abilityTag_"])
+const READ_ONLY_KEYS = new Set(["id_", "abilityTag_"])
 
 /**
  * **选值格**的列：只能从下拉里挑、不能手打。两类，清单来源不同：
  *
- *   · `PICKER_KEYS` —— 全局固定的一份（`lib/controltypes.ts`）。`controlTypeHash_` 拿的是**哈希**，
+ *   · `"pick"`   —— 全局固定的一份（`lib/controltypes.ts`）。`controlTypeHash_` 拿的是**哈希**，
  *     游戏按整数比；填成十六进制（`4582EE4A`）解析不出整数 → 技能直接放不出来
  *     （docs/action/动作表字段文档.md 记着这个坑）。
- *   · `BRANCH_KEYS` —— 值是**另一个动作的 id**，清单是**当前这张表里所有 `id_`**，所以得由数据算
+ *   · `"branch"` —— 值是**另一个动作的 id**，清单是**当前这张表里所有 `id_`**，所以得由数据算
  *     （见 `ActionsTable` 的 `branchPick`）。
  *
  * ⚠️ 清单外的值**一个都不删**：格子里的值不在其中时列表里没有任何一项被选中，打开看一眼关掉什么都不动。
  */
-export const PICKER_KEYS = new Set(["controlTypeHash_"])
-export const BRANCH_KEYS = new Set(["branchXAtk_"])
+const PICKER_KEYS = new Set(["controlTypeHash_"])
+const BRANCH_KEYS = new Set(["branchXAtk_"])
 
 /** 分支列里表示**空**的那一项（用户口径：`-1`）。 */
 export const UNSET = "-1"
 
-/** 这一列是不是**选值格**（两类都算）。 */
-export const isPickerColumn = (key: string) => PICKER_KEYS.has(key) || BRANCH_KEYS.has(key)
+/**
+ * **这一列是什么列** —— 列策略的**唯一出处**。
+ *
+ * ‼️ 四态单值，不用几个布尔量拼：三个集合两两不相交，所以"只读 + 选值"这种组合**物理上不存在**。
+ * 拆成 `readOnly` / `picker` 两个布尔量能表示 4 态而真实只有 3 态，于是每个消费点都得自己写一遍
+ * `!readOnly && …` 去挡住那个不可能态（那种防御分支本身就是"模型没表达清楚"的症状）。
+ * 显示层怎么画、粘贴收不收、清单从哪儿来 —— 三个问题现在读同一张表，不会再各自漂移。
+ */
+export type ColumnKind = "text" | "readonly" | "pick" | "branch"
+export const columnKind = (key: string): ColumnKind =>
+    READ_ONLY_KEYS.has(key) ? "readonly" : PICKER_KEYS.has(key) ? "pick" : BRANCH_KEYS.has(key) ? "branch" : "text"
 
 /**
  * 分支列选值格要的两样东西 —— **走 context 下发**：`ActionRowView` / `CellContent` 靠 `memo` 挡住
@@ -64,22 +72,37 @@ export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<s
 
 
 /**
- * **"跟随可视"的下发口**：把当前活动格摆进真正看得见的矩形里。
+ * **"跟随可视"这一套的下发口** —— 一张表一份（`ActionsTable` 用 `useRef` 持有、经 context 下发）。
  *
  * ‼️ 走 context 的理由与 `BranchPickContext` 一模一样（见上）：消费者只有 `Cell` 与 `CellPick` 两个叶子，
- * 而从 `ActionsTable` 到它们要穿 `ActionRowView` → `RowCell` → `CellContent` 三层 —— 为一个"进编辑时
- * 喊一声"的小动作加一个 prop、改四处签名，不划算。
+ * 而从 `ActionsTable` 到它们要穿 `ActionRowView` → `RowCell` → `CellContent` 三层 —— 为两个"进编辑时
+ * 喊一声 / 问一句"的小动作加 prop、改四处签名，不划算。
  *
- * ⚠️ 它**不接收"哪一格"**：实现是去 DOM 里查当前活动格（`td.cell-active`），因为调用点（进编辑）
+ *     · `reveal()`    —— 把当前活动格摆进真正看得见的矩形里；
+ *     · `isSelfScroll()` —— **上一次滚动是我们自己发的吗**（是就消费掉这次报名）。
+ *
+ * ⚠️ `reveal` **不接收"哪一格"**：实现是去 DOM 里查当前活动格（`td.cell-active`），因为调用点（进编辑）
  * 与活动格永远是同一格，传元素只是多一层耦合。
+ *
+ * ‼️ **这两个必须在同一个 session 对象里、且按表各持一份**（原来是 `model.ts` 的模块级 `let`，
+ * 那等于全页共享一个让路位）。三个理由：
+ *   ① 同页两张表会互相让路 —— A 表"跟随可视"那一下会把 B 表的"一滚就收"规则一起放过；
+ *   ② 它是**跨模块的时序契约**，藏在"纯类型与纯助手"模块的顶层可变变量里，读者根本想不到；
+ *   ③ 模块级的可变状态会让测试**按执行顺序时红时绿**（脏的那一份漏给下一个测试文件）。
+ *
+ * 语义与"什么时候报名"的规矩见下面那段（`ActionsTable.revealActiveCell` 是唯一的报名方）。
  */
-export const RevealContext = createContext<() => void>(() => undefined)
+export type RevealSession = {
+    reveal: () => void
+    isSelfScroll: () => boolean
+}
+export const RevealContext = createContext<RevealSession>({reveal: () => undefined, isSelfScroll: () => false})
 
 /*
     ‼️ **"下一次滚动是'跟随可视'自己发的"这条小契约** —— 两个模块之间：
 
       · `ActionsTable.revealActiveCell` 在**确定真的要滚**（目标位置与当前位置差超过 1px）之后报名；
-      · `CellPick` 那条"谁一滚就把展开列表收起来"的规则据此让路（`isRevealScrolling()` 顺手消费掉）。
+      · `CellPick` 那条"谁一滚就把展开列表收起来"的规则据此让路（`isSelfScroll()` 顺手消费掉）。
 
     为什么需要：列表那条规则（浮层钉在这一格上，不收就悬在别的行上面）**要保留**；但"进编辑时跟随
     可视"那一下**不是用户滚动** —— 收掉它等于"程序自己把刚开的列表关掉"，表现就是"选中一个没显示
@@ -93,27 +116,42 @@ export const RevealContext = createContext<() => void>(() => undefined)
     300ms 内用户真滚了"是完全正常的事（滚轮一动就该收起）—— 时间窗会把它一起放过，反而制造新 bug
     （试过，被既有测例当场抓住）。
 */
-let revealScrollPending = false
-/** `ActionsTable` 用：报名"下一次滚动是跟随可视发的"（**只在真要滚时**调）。 */
-export const markRevealScroll = () => {
-    revealScrollPending = true
-}
-/** `CellPick` 用：这次滚动来自"跟随可视"吗（是就消费掉这次报名、别收列表）。 */
-export const isRevealScrolling = () => {
-    if (!revealScrollPending) return false
-    revealScrollPending = false
-    return true
-}
 
 /**
  * **活动格的"进编辑"登记口**：Enter 键据此进编辑，而"怎么进"由那一格自己决定
  * （普通格切输入框、选值格展开列表；只读列不登记 → 按 Enter 什么也不发生）。
  *
- * ‼️ 这里有个**必须守住的前提**：`CellContent` / `Cell` 都是 `memo` 的，而活动格换人时**别的行/格**
- * 也会因各自原因重渲 —— 若每格都无条件登记，最后渲染的那一格会把登记口**覆盖成它自己**
- * （实测：方向键走到第 3 列，Enter 却点开了**最后一列**）。所以登记必须带"我是不是活动格"这个条件。
+ * ‼️ **按格键（`snapshotKey`）存一个 `Map`**，不是一个全表共享的单值 ref。
+ *
+ * 单值那份版本要求每格自己判"我是不是活动格"才敢登记 —— 因为 `CellContent` / `Cell` 都是 `memo` 的，
+ * 活动格换人时**别的行/格**也会因各自原因重渲，无条件登记会让**最后渲染的那一格**把登记口覆盖成它
+ * 自己（实测：方向键走到第 3 列，Enter 却点开了**最后一列**）。于是"只有活动格登记"这条前提、
+ * 以及它那两处重复的 `if (active && …)`，都只是为了绕开覆盖。
+ *
+ * 改成 Map 之后覆盖**结构上不可能**：每格登记自己的那一格键，Enter 按当前活动格的键去取。
+ * 顺带白拿两样：`active` / `enterEditRef` 两个 prop 的穿透可以删掉；活动格卸任或卸载后按 Enter
+ * 打不到幽灵 handler（取不到键就是什么都不做）。
  */
-export const EnterEditContext = createContext<RefObject<(() => void) | null> | null>(null)
+export type EnterEditRegistry = Map<string, () => void>
+export const EnterEditContext = createContext<EnterEditRegistry | null>(null)
+
+/**
+ * 把"这一格的进编辑"登记进表（`cellKey` = `snapshotKey(rowId, columnId)`），卸载时摘掉。
+ *
+ * 两个叶子各调一次：`Cell`（普通格 → 切输入框）与 `CellPick`（选值格 → 展开列表）。两边的实现
+ * 确实不同，所以登记归各自 —— 但**登记这件事本身只有这一份写法**（以前是两边各写一遍
+ * `if (active && enterEditRef) enterEditRef.current = …`，还各自配一段"为什么必须判 active"的注释）。
+ */
+export function useEnterEditHandler(cellKey: string, handler: () => void) {
+    const registry = useContext(EnterEditContext)
+    useEffect(() => {
+        if (!registry) return
+        registry.set(cellKey, handler)
+        return () => {
+            registry.delete(cellKey)
+        }
+    }, [registry, cellKey, handler])
+}
 
 /**
  * 粘贴进来的这一格值，**收不收**。
@@ -127,17 +165,15 @@ export const EnterEditContext = createContext<RefObject<(() => void) | null> | n
  * `branchIds` 是分支列那份清单（当前表的 `id_` 集合）；不做分支列时传空集即可。
  */
 export function acceptPaste(columnId: string, value: string, branchIds: ReadonlySet<string>): boolean {
-    if (PICKER_KEYS.has(columnId)) return CELL_CHOICES.has(value)
-    if (BRANCH_KEYS.has(columnId)) return value === UNSET || branchIds.has(value)
-    return true
+    switch (columnKind(columnId)) {
+        case "pick":
+            return CELL_CHOICES.has(value)
+        case "branch":
+            return value === UNSET || branchIds.has(value)
+        default:
+            return true
+    }
 }
-
-/**
- * 一格的**显示文本**：`abilityTag_` 翻成技能名，其余原样。查不到名字就回落**键名本身**
- *（`abilityName` 的规矩：不编造）。空值原样空着。
- */
-export const displayText = (key: string, raw: string, names: Record<string, string>) =>
-    key === "abilityTag_" ? abilityName(names, raw) : raw
 
 /**
  * 用到的 feature 全在这里显式登记（v9 的规矩：不登记，那一块的 state 与 API 根本不存在）。
@@ -198,6 +234,17 @@ export type CopySource = {
 /** `snapshot` 的键：行 id 与列 id 拼起来。用 `\u0000` 分隔 —— 字段名里不可能出现它（TSV 里也不是分隔符）。 */
 export const snapshotKey = (rowId: string, columnId: string) => `${rowId}\u0000${columnId}`
 
+/**
+ * `snapshotKey` 的**逆运算**：把键拆回行 id 与列 id。
+ *
+ * ‼️ 分隔符的写法必须**只在这一处**。以前 `ActionsTable` 自己 `indexOf("\u0000")` + 两处 `slice`
+ * 手写了一遍逆运算 —— 编码与解码分居两个文件，改分隔符就会静默拆错（不报错，只是每一格都查不到）。
+ */
+export const parseSnapshotKey = (key: string): {rowId: string; columnId: string} => {
+    const separator = key.indexOf("\u0000")
+    return {rowId: key.slice(0, separator), columnId: key.slice(separator + 1)}
+}
+
 /** 一行：一条动作记录。TanStack 要 data 是对象/数组，后端那种 `fields: [{key,...}]` 得先摊平。 */
 export type ActionRow = {
     id: string
@@ -236,7 +283,7 @@ export type PressFacts = {
  */
 export const shownValue = (row: ActionRow, key: string): string => {
     const original = row.originals[key] ?? ""
-    if (READ_ONLY_KEYS.has(key)) return original
+    if (columnKind(key) === "readonly") return original
     const raw = row.values[key] ?? ""
     return raw === "" ? original : raw
 }
