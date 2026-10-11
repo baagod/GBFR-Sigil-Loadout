@@ -106,18 +106,31 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
         )
     }
 
+    /**
+     * **弹层开合由我们自己管**（受控）。
+     *
+     * ‼️ 为什么要受控：选中一项之后 `onSelect` 是**异步**的（`SetCharacter` + 读四份数据 + 建表），
+     * 而此前弹层的关闭是**跟着 `value` 走的** —— `value` 要等那趟异步回来才变，于是下拉会**一直张着**
+     * 直到数据到位（真机实测：点击后 619ms 才收，慢的那次 2408ms）。用户报的就是这个"卡顿一下才收回"。
+     * 选中是**用户已经做完的决定**，弹层该当场收掉，剩下的读取在后台进行。
+     */
+    const [open, setOpen] = useState(false)
+
     return (
         <Combobox
             items={items}
             value={selected}
             autoHighlight
             disabled={disabled}
+            open={open}
+            onOpenChange={setOpen}
             onValueChange={(item) => {
-                if (item && item.value !== value) onSelect(item.value)
+                if (!item || item.value === value) return
+                setOpen(false) // 先收弹层，再让外面去读数据（读取期间这一格显示旧名字，见下面 disabled 那段）
+                onSelect(item.value)
             }}
         >
-            {/* popup 方式：触发器是**按钮**不是输入框，开合由官方触发器自己管 —— 所以"点一下收起/展开"
-                是原生行为，不需要我们再翻 open 状态（之前那套 pointerdown 的折腾也随之删掉）。
+            {/* popup 方式：触发器是**按钮**不是输入框；开合已由上面的 `open` 受控（理由见那段）。
                 弹层里**没有搜索框**，因此也不需要 filter；样式照 SkillPicker 那套：outline 按钮 + 名在左箭头在右。 */}
             <ComboboxTrigger
                 render={
