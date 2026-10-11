@@ -210,6 +210,17 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * 同一次 setState 落地）。分开之后渲染那三态才说得清。
      */
     const [loaded, setLoaded] = useState(false)
+    /**
+     * **每次把这页数据重新读一遍就 +1**，当 `<ActionsTable key>` 用 —— 换角色、以及改记录清单之后的
+     * 重新读取都会 +1，于是表**整个重新挂载**。
+     *
+     * ‼️ 为什么必须是这个计数、而不是角色码：表里有一堆**不该跨数据存活**的东西 —— 量出来的列宽与
+     * `left`、每格的草稿、撤销栈、选区、以及"正停在某一格的编辑态"。而角色码是从 `Path()` 里读的，
+     * **换角色时它不变**（切换前也是 `pl1400`），拿它当 `key` 等于**永远不会重挂**。
+     * 真机实测到的后果：切角色时若正停在编辑态，表**仍停在编辑态**，那格没提交的草稿回车就会写到
+     * **新角色**的格子上。用这个计数，注释里那句"重新挂载即全清"才名副其实。
+     */
+    const [dataVersion, setDataVersion] = useState(0)
     // charCode 是当前角色（从动作表路径上取），characters 是下拉的候选（解包目录里有的那些）。
     const [charCode, setCharCode] = useState("")
     const [characters, setCharacters] = useState<string[]>([])
@@ -282,6 +293,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
         const loaded = (await LoadActions()) ?? []
         setRows(loaded.map(toActionRow))
         setLoaded(true)
+        setDataVersion((v) => v + 1) // 换一份数据 → 让表整个重新挂载（理由见 `dataVersion`）
     }
 
     useEffect(() => {
@@ -500,16 +512,15 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                         // 保存走 ttSaveRef（见 handleSaveAndDeploy）—— 这个组件自己没有工具条。
                         <ActionsTable
                             /*
-                                换角色 = 换**一整份**数据（`switchCharacter` 先 `SetCharacter`，`LoadActions`
-                                之后读到的才是新角色那一份）。表把 `rows`/`keys` 当**初始值**收，所以换角色
-                                要用 `key` 把它**整个重新挂载**。
+                                **换一份数据 = 换一张表**（`key={dataVersion}`，每次重新读取都 +1）：
+                                要清的不只是 `rows`/`keys`，还有量出来的列宽与 `left`、每格草稿、撤销栈、
+                                选区，以及"正停在某一格的编辑态"（不清的话，那格没提交的草稿会落到新角色的
+                                格子上 —— 真机实测过）。逐个清迟早漏一个，重新挂载即全清。
 
-                                为什么用 `key` 而不是让表跟着 prop 变化去同步 state：换角色要清的不只是数据
-                                —— 还有 `pinning`/量出来的 `left`/每格草稿/撤销栈/选区。逐个清迟早漏一个
-                                （比如草稿没清，旧角色的改动会挂到新角色的行上）。`key` 是 React 官方的
-                                "重置状态"手法，重新挂载即全清，漏不掉。
+                                ⚠️ 别把 `key` 换成角色码：那是从 `Path()` 读的，**换角色时它不变** ——
+                                拿它当 key 等于永远不重挂，上面这些就一个都清不掉（踩过）。
                             */
-                            key={charCode}
+                            key={dataVersion}
                             rows={rows}
                             keys={keys}
                             t={t}

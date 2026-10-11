@@ -15,7 +15,7 @@ import {afterEach, beforeEach, expect, vi} from "vitest"
 import {LoadActions, SaveActionFields} from "../../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
-import {columnsOf, toActionRow, type ActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
+import {columnsOf, toActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
 
 /**
  * 组件要的那一份文案：**只写这 5 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
@@ -74,22 +74,16 @@ const defaultRows = () => [makeRow("1000"), makeRow("1001", {actionFreeWork0_: "
 type Rows = ReturnType<typeof defaultRows>
 
 /**
- * 夹具（后端的 `fields` 形状）→ 表要的 `ActionRow`。
- *
- * ‼️ **转换口径只有一份**（`model.toActionRow`，生产里 `ActionsPanel` 也用它），这里只是"逐个套用"
- * —— 两处各写一遍的话，"空值怎么算"就会有两个版本，而那是**保存语义**的一部分。
- * 夹具保持后端形状是因为用例要按 `key` 找/改原值（`rows()[0].fields.find(…)`）。
- */
-const toActionRows = (rows: Rows): ActionRow[] => rows.map(toActionRow)
-
-/**
  * 喂给 `<ActionsTable {...tableProps(rows)} />` 的那两样（数据 + 表头）。
  *
  * 给**直接 render 这张表**的用例用（台架内部也走它）：表是受控的，直接渲染时必须自己把数据递进去，
  * 否则它会退回"自己读一次"那条路 —— 那与生产的走法不一致，测出来的东西也就不一样。
+ *
+ * ‼️ 转换口径只有一份（`model.toActionRow` / `model.columnsOf`，`ActionsPanel` 也用同一对），
+ * 这里只做"逐个套用" —— 两处各写一遍的话，"空值怎么算"就会有两个版本，而那是**保存语义**的一部分。
  */
 export const tableProps = (rows: Rows) => {
-    const actionRows = toActionRows(rows)
+    const actionRows = rows.map(toActionRow)
     return {rows: actionRows, keys: columnsOf(actionRows)}
 }
 
