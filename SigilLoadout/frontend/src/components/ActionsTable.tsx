@@ -14,12 +14,20 @@
       · `getRowId` 的参数是**分离的三个** `(originalRow, index, parent)`，不是 v8 的单对象；
       · `table.getState()` 没了，走 `table.state` / `table.atoms.<slice>`。
 
-    兄弟模块（按职责拆开，别再堆回这个文件）：
-      · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、纯取值助手；
+    兄弟模块（按职责拆开，**别再堆回这个文件**）：
+      · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、列策略（`columnKind`）、纯取值助手；
       · `actions-table/classes.ts`    —— 类名常量、选区与复制区的「哪几条边」；
+      · `actions-table/selection.ts`  —— 选区的谓词与指纹（整行 / 单格 / 行外观指纹）；
+      · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
       · `actions-table/clipboard.ts`  —— TSV 读写 + 粘贴铺块规则；
+      · `actions-table/useClipboardHistory.ts` —— 复制粘贴 / 复制源虚线 / 撤销栈，**以及 `edit`**
+        （撤销栈的记账规则长在 `edit` 里，所以它们必须同居）；
       · `actions-table/ActionRowView.tsx` —— 表体一行（memo 那一层）；
       · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态。
+
+    ‼️ **这个文件里还剩下的**：数据加载、列宽测量、选区手势编排（行号/数据格拖动）、方向键、
+    "跟随可视"的编排（几何在 `reveal.ts`）。这几块与 ref 镜像、DOM 测量、库的选区 API 缠在一起，
+    再往外抽要先搬一堆 ref —— 想动它们时先想清楚这笔账，别只为行数好看。
 */
 import {
     useCallback,
