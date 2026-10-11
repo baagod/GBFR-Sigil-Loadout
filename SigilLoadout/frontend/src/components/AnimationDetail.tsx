@@ -97,7 +97,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])
     // 当前真正载入的动画号：进来那一个（保留成 state 是为了载入与改动都按同一个名字办事）。
-    const [active, setActive] = useState(initialMotion)
+    const [active] = useState(initialMotion)
     // 下面这一整段（到渲染前）都按"当前动画号"办事：把 prop 收进这个名字，改动面最小。
     const motion = active
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。

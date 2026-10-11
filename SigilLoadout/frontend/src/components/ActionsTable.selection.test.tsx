@@ -14,9 +14,9 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {PINNED_COUNT} from "@/components/actions-table/classes"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
-import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, stubRevealGeometry, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, stubRevealGeometry, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell} from "@/components/actions-table/testkit"
 
-const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
+const {renderTable, setRows, addRow} = useTableHarness()
 
 describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 先选后编）", () => {
     /*

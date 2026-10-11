@@ -29,11 +29,11 @@ export type ClipboardEvent = globalThis.ClipboardEvent
  *
  * 另一条必须保留：**前缀是 `=` `+` `@` `-` 时前面垫一个 `'`** —— 那是 Excel/WPS 的公式，
  * 不垫的话粘进表格会被当公式执行（CSV 注入）。
+ *
+ * 参数收成 `string`：唯一调用方 `toTsv` 收的就是 `string[][]`，所以这里不必再挡 null / 非字符串
+ * （原先那几道 `== null` / `String()` 防御，挡的是物理上不会来的值）。
  */
-const escapeTsvValue = (value: unknown): string => {
-    const text = value == null ? "" : String(value)
-    return typeof value === "string" && /^[\t\r ]*[=+@-]/.test(value) ? `'${text}` : text
-}
+const escapeTsvValue = (value: string): string => (/^[\t\r ]*[=+@-]/.test(value) ? `'${value}` : value)
 
 /** 二维值表 → TSV 文本（每行一块）。 */
 export const toTsv = (grid: string[][]): string => grid.map((line) => line.map(escapeTsvValue).join("\t")).join("\n")
@@ -104,7 +104,8 @@ export function planPaste({
     size: {rows: number; cols: number}
 }): PastePlan {
     const blockRows = block.length
-    const blockCols = Math.max(...block.map((line) => line.length))
+    // 不用 `Math.max(...block.map(...))`：块大到几万列时，展开的实参列表会把调用栈撑爆（RangeError）。
+    const blockCols = block.reduce((max, line) => Math.max(max, line.length), 0)
     if (blockRows === 0 || blockCols === 0) return {writes: [], range: null}
 
     // 份数至少 1：选区比块小（比如选一格粘一片）时按一份写，别缩水。

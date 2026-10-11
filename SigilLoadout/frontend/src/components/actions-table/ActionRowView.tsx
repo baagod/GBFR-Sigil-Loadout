@@ -3,7 +3,7 @@
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
 import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
-import type {Cell, CellSelectionBounds, CellSelectionState, Row} from "@tanstack/react-table"
+import type {Cell, CellSelectionBounds, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
 import {
@@ -21,7 +21,7 @@ import {
     selectionClass,
 } from "./classes"
 import {columnKind, features, type ActionRow, type ColumnKind, type CopySource, type PressFacts, snapshotKey} from "./model"
-import {isSingleCellBounds, rowSelectionKey} from "./selection"
+import {isSingleCellBounds} from "./selection"
 
 /**
  * 一格里那层 `<td>` —— **第二道 memo 命门**（第一道是外面的 `ActionRowView`）。

@@ -20,7 +20,7 @@ const {renderTable, renderWithSave, rows} = useTableHarness()
 
 describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位符回落）", () => {
     it("值超长时截断：显示态带 truncate（overflow:hidden + ellipsis + nowrap）", async () => {
-        const container = await renderTable()
+        await renderTable()
         // 往一个**确实存在**的列塞长值（早先写了个超出 87 列的名字，等于没塞）。
         const long = "'10'1325296888,40,30,0,0,1,1,1"
         const field = rows()[0].fields.find((f) => f.key === LongField)!

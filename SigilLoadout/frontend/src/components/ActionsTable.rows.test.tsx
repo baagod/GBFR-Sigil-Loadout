@@ -13,7 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {KEYS, cellAt, clipboardStub, handleAt, stubRowRects, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
 
-const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
+const {renderTable, setRows} = useTableHarness()
 
 describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () => {
     it("行号列：每行第一格是序号（从 1 起），宽度与表头 `#` 一致，且不移位数据列下标", async () => {

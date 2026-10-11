@@ -12,8 +12,22 @@ import {
     sortFn_alphanumeric,
     tableFeatures,
 } from "@tanstack/react-table"
-import {createContext, useContext, useEffect, type RefObject} from "react"
+import {createContext, useContext, useEffect} from "react"
 import {CELL_CHOICES} from "@/lib/controltypes"
+import type {Messages} from "@/lib/messages"
+
+/**
+ * 这张表真正用到的那几条文案。
+ *
+ * ‼️ **故意收窄**，不用整个 `Messages`：表只用得到这 5 条，而接口要求整个（~50 键）的话，
+ * 每个调用点与每份测试夹具都得凑出一个完整的 `Messages` —— 测试侧因此出现
+ * `as unknown as Messages` 这种**绕过全部检查**的双重断言（夹具少一个键、串一个名都测不出来）。
+ * 收窄之后夹具只写这 5 条，类型系统真的在查；全量 `Messages` 天然满足它，所以生产调用点不用改。
+ *
+ * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
+ * import `ActionsTable`，会成环）。
+ */
+export type ActionsTableMessages = Pick<Messages, "loading" | "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch">
 
 /**
  * **只读**的列：这些格子存的是**引用键**，不是可编辑的值。

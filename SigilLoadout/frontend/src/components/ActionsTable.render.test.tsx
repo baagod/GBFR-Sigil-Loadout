@@ -12,11 +12,11 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
-import {PINNED_COUNT, ROW_HEIGHT} from "@/components/actions-table/classes"
+import {ROW_HEIGHT} from "@/components/actions-table/classes"
 
 import {KEYS, abilityNames, cellAt, clickToEdit, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
 
-const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
+const {renderTable, setRows} = useTableHarness()
 
 describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
     it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {

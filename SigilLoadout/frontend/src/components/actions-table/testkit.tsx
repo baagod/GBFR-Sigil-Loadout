@@ -14,17 +14,21 @@ import {afterEach, beforeEach, expect, vi} from "vitest"
 import {LoadActions, SaveActionFields} from "../../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
-import type {Messages} from "@/lib/messages"
+import type {ActionsTableMessages} from "@/components/actions-table/model"
 
-/** 组件要的那一份文案；用例真正调到的都在这里，其余给空串撑住类型。 */
-export const t = {
+/**
+ * 组件要的那一份文案：**只写这 5 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
+ * （见 `model.ts`）—— 接口按真实需求收窄，夹具因此**一条断言都不用加**，而且逐键受检
+ * （键名打错、少一个键都会当场报错）。
+ */
+export const t: ActionsTableMessages = {
     loading: "读取中…",
     // 与 messages.ts 的 zh 同一句（用例要断言它上屏）
     multiAreaCopy: "请选择同一行或同一列中的单元格。",
     multiAreaCopyTitle: "无法复制选中区域",
     actionBranchSearch: "搜索",
     ok: "确定",
-} as unknown as Messages
+}
 
 /**
  * 技能键 → 名字（`ability.lang.json` 的形状）。只放一条真正命中的，其余**故意查不到** ——
@@ -58,7 +62,7 @@ export function makeRow(id: string, changed: Record<string, string> = {}) {
                           ? "AB_PL1000_01"
                           : "AB_PL9999_99"
                       : `${key}-原值`,
-            value: key in changed ? changed[key] : (null as string | null),
+            value: key in changed ? changed[key] : null,
         })),
     }
 }
@@ -117,8 +121,8 @@ export function useTableHarness() {
  */
 function installServiceMocks(getRows: () => Rows) {
     vi.resetAllMocks()
-    vi.mocked(LoadActions).mockImplementation(async () => getRows() as never)
-    vi.mocked(SaveActionFields).mockResolvedValue(undefined as never)
+    vi.mocked(LoadActions).mockImplementation(async () => getRows())
+    vi.mocked(SaveActionFields).mockResolvedValue(undefined)
 }
 
 /** 渲染与定位用的那几个助手：全部只依赖"当前那一份数据"。 */

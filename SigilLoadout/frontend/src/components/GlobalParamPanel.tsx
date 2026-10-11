@@ -3,7 +3,6 @@ import {LoadGlobalParam, SaveGlobalParam} from "../../bindings/sigilloadout/serv
 import type {ActionField} from "../../bindings/sigilloadout/service/models"
 import {LoadConfig} from "../../bindings/sigilloadout/service/loadoutservice"
 import {EditableCell} from "@/components/EditableCell"
-import {Button} from "@/components/ui/button"
 import {messages, type Messages} from "@/lib/messages"
 import {LANGS, initialLang, type Lang} from "@/lib/lang"
 

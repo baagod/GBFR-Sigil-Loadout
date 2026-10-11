@@ -5,7 +5,7 @@
 */
 import type {Cell} from "@tanstack/react-table"
 
-import {CELL_TEXT} from "@/components/EditableCell"
+import {CELL_TEXT} from "@/lib/classnames"
 import {features, type ActionRow, type CopySource} from "./model"
 
 /** 只读格的底色：与页面同色（= 看起来"不上色"）。**必须是不透明的** —— 钉住的列要挡住滚过来的列。 */

@@ -28,7 +28,6 @@ import {
     useMemo,
     useRef,
     useState,
-    type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
 } from "react"
 import {
@@ -37,7 +36,6 @@ import {
     type Cell,
     type CellSelectionDirection,
     type CellSelectionState,
-    type CellSelectionBounds,
     type ColumnDef,
     type ColumnSizingState,
     type Row,
@@ -65,13 +63,10 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {acceptPaste, BranchPickContext, columnKind, EnterEditContext, type EnterEditRegistry, RevealContext, features, parseSnapshotKey, type ActionRow, type CopyArea, type CopySource, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, type ActionsTableMessages, type EnterEditRegistry, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
-
-/** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
-type UndoEntry = {rowId: string; columnId: string; before: string}
-import type {Messages} from "@/lib/messages"
+import {revealScrollTarget} from "@/components/actions-table/reveal"
+import {useClipboardHistory} from "@/components/actions-table/useClipboardHistory"
 
 /*
     ========================== 方向键（见 `handleArrowKey`） ==========================
@@ -88,13 +83,6 @@ const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
 /** 修饰键按位组合：`SHIFT` 扩选、`CTRL` 跳边，两者都不按就是走一步。 */
 const SHIFT = 1
 const CTRL = 2
-
-/**
- * "滚到那一头"的写法：给个大值让浏览器夹到**真极限**。
- * 不能自己算 `scrollWidth - clientWidth` —— 那两个属性都取整，结果比真极限大 1px，
- * 差的正是"滚动条还能再拖一点"。见 `scrollActiveIntoView`。
- */
-const SCROLL_TO_END = Number.MAX_SAFE_INTEGER
 
 /**
  * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
@@ -117,7 +105,7 @@ const SCROLL_TO_END = Number.MAX_SAFE_INTEGER
 
 /** 动作表。加载、列定义、编辑都收在这里；保存由外面那排按钮触发（见 ActionsPanel）。 */
 export function ActionsTable({t, abilityNames, onSaveReady}: {
-    t: Messages
+    t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
     /** 数据到位后把"保存"这个动作交出来 —— 这个组件自己没有工具条（与 GlobalParamPanel 同一个约定）。 */
@@ -209,42 +197,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     const scrollRef = useRef<HTMLDivElement>(null)
     /** 数据读不回来（后端/绑定出错）—— 只装这一件事；粘贴不再有"列对不上"那种拒绝。 */
     const [loadError, setLoadError] = useState("")
-    /** 复制被拒的提示（多片跨行又跨列，见 `planCopy` 那段）；下一次复制/粘贴时清掉。 */
-    const [copyHint, setCopyHint] = useState("")
-    /**
-     * **撤销栈**（Ctrl+Z）。一"步"= 一批改动（粘一次 = 一步）：每项是那一步动过的格子，撤销时把它们
-     * 写回**改前值**即可。之所以存"改前值"而不是"反向操作"：值就地在 `values` 里，写回旧值是唯一需要
-     * 的信息，无需知道它是编辑来的还是粘贴来的。
-     *
-     * ⚠️ 用**命名形状**、不用 `[行, 列, 改前值]` 这种位置元组：`clipboard.ts` 的 `PasteWrite` 结构上
-     * 就能直接塞进来（`plan.writes` 原样 push，不必再 `.map` 转换一次），而位置元组只要把两个字段
-     * 写反就会静默改错值。
-     *
-     * 用 ref 不用 state：它不进渲染，进 state 只会让整张表跟着重渲。
-     */
-    const undoRef = useRef<UndoEntry[][]>([])
-    /** 撤销**正在写回**时立起来 —— 写回本身不许再进栈（否则一次撤销记一条，可以无限撤销）。 */
-    const undoingRef = useRef(false)
-    /** **正在粘贴**：这期间 `edit` 不记账，由粘贴那一处把整片当**一步**记下来。 */
-    const batchingRef = useRef(false)
-    /**
-     * **复制源**（剪贴板里那份是从哪儿复制的）—— 画那圈虚线用；`null` = 没有（复制过又被撤掉了）。
-     *
-     * ‼️ 它是**真的 state**（渲染直接读它），`copySourceRef` 只是它的同步镜像 —— 与上面 `rows/rowsRef`
-     * 同一套做法。以前这里是一个"只写不读的 `version` 计数器 + 改 ref 后手工 bump"：正确性依赖
-     * "4 处改动点都记得 bump"这条**人工不变式**，漏一处就静默不重渲（虚线该撤却还挂着）。
-     * 用 state 之后这件事归类型系统管，bump 与 ref 各少 4 处。
-     *
-     * 镜像仍然需要：`edit` 的依赖必须是 `[]`（引用稳定，见那段），读 state 会读到首帧那份。
-     */
-    const [copySource, setCopySource] = useState<CopySource | null>(null)
-    const copySourceRef = useRef<CopySource | null>(null)
-    copySourceRef.current = copySource
-    /** 改复制源：镜像与 state 一起动（**唯一入口**，别再单独写 ref）。 */
-    const changeCopySource = useCallback((next: CopySource | null) => {
-        copySourceRef.current = next
-        setCopySource(next)
-    }, [])
+    /* 剪贴板 / 撤销 / `edit` 那一套统一在 `useClipboardHistory` 里 —— 它的入参要用到下面的
+       `tableInstanceRef`，所以调用点放在那之后（见文件中部）。 */
 
     useEffect(() => {
         void (async () => {
@@ -374,302 +328,6 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         setMeasured(true)
     }, [measured, keys, shownTick])
 
-    /**
-     * 清除复制源（那圈虚线跟着消失）。
-     *
-     * 四个入口都走它：进编辑（`onEnterEdit`）、Esc、切窗口回来核对发现源区变了、以及 `edit` 里
-     * 那条"动到源区"的分支。
-     */
-    const clearCopySource = useCallback(() => {
-        if (!copySourceRef.current) return
-        changeCopySource(null)
-    }, [])
-
-    /**
-     * 改一格：只换那一行的对象（TanStack 靠引用变才知道要重算），别的行原样留着。
-     *
-     * `useCallback` 不是为了省这点开销 —— 是为了让**引用稳定**：它会作为 prop 传给 `memo` 化的
-     * 行组件，每次渲染换一个新函数的话，`memo` 的比较永远不相等、整片表照旧重渲，那层就白做了。
-     *
-     * ⚠️ 撤销栈的 push **不能**写在 `setRows` 的 updater 里：updater 允许被 React 重跑（StrictMode
-     * 就会），跑一次记一笔 = 一次编辑要按两下 Ctrl+Z。所以"变没变 / 改前值"先用 `rowsRef` 判完、
-     * 记完，再交一个纯映射给 `setRows`。
-     */
-    const edit = useCallback((rowId: string, key: string, value: string | null) => {
-        const next = value ?? ""
-        const before = rowsRef.current.find((row) => row.id === rowId)?.values[key] ?? ""
-        if (before === next) return // 值没变不是一步：不写 state、也不进撤销栈
-        if (!undoingRef.current && !batchingRef.current) undoRef.current.push([{rowId, columnId: key, before}])
-        /*
-            动到复制源那一片 → 那圈虚线撤掉（规则②，见上面 `CopySource` 那段）。
-            判据是"**动过**"而不是"值跟复制时不一样"：往源区里粘一个跟原来一模一样的值，虚线照样撤。
-            调 `clearCopySource()` 是安全的：它和 `changeCopySource` 都是 `useCallback([])`，
-            不会把 `edit` 的依赖钉在首帧（见上面那段为什么 `edit` 必须是稳定引用）。
-        */
-        const source = copySourceRef.current
-        if (source && source.snapshot.has(snapshotKey(rowId, key))) {
-            clearCopySource()
-        }
-        setRows((prev) => prev.map((row) => (row.id === rowId ? {...row, values: {...row.values, [key]: next}} : row)))
-    }, [])
-
-    /**
-     * 撤销一步（Ctrl+Z）：把这一步记下的"改前值"倒着写回去。
-     *
-     * 倒着写是**必须的**：一步里同一个格子被写过两次时（粘贴块自己叠到自己上），只有"后写的那条
-     * 先还原"才回得到原样。
-     */
-    const handleUndo = (e: KeyboardEvent | ReactKeyboardEvent) => {
-        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return
-        // 编辑框里的 Ctrl+Z 归浏览器（撤的是这一次输入），跟表格的历史不是一回事。
-        if ((e.target as HTMLElement).tagName === "INPUT") return
-        const step = undoRef.current.pop()
-        if (!step) return
-        e.preventDefault()
-        undoingRef.current = true
-        setRows((prev) =>
-            prev.map((row) => {
-                let values = row.values
-                for (const {rowId, columnId, before} of step) {
-                    if (row.id !== rowId) continue
-                    values = {...values, [columnId]: before}
-                }
-                return values === row.values ? row : {...row, values}
-            }),
-        )
-        undoingRef.current = false
-    }
-
-    /**
-     * 选中区域里的**原值**（二维）。
-     *
-     * ⚠️ 不能用 `table.getSelectedCellRangesData()`：它走 `accessorFn`，而我们那个算的是**显示值**
-     * （`abilityTag_` 会给技能名）—— 复制出去再粘回来就把中文名写进键的位置了。所以取**数据本身**。
-     *
-     * 列顺序用 `row.getAllCells()` 的 —— 那是**渲染顺序**（钉住列在前），跟
-     * `getCellSelectionBounds()` 给的列下标是同一套坐标系；`getVisibleLeafColumns()` 不带钉住重排，
-     * 拿它取会错位。
-     */
-    /**
-     * 复制的那一刻算三样东西：**剪贴板文本**（值表）、**复制区的形状**（虚线按片画）、**原值快照**
-     * （切窗口回来核对源区在不在）。
-     *
-     * ‼️ **返回 `null` = 这次选区形状不能复制** —— 规则与 Excel / WPS 一致（用户实测 + 反推）：
-     *
-     *   多重选定区域**必须能沿着同一根轴排成一条**：
-     *     · 所有片**共享同一个行范围**（`min/maxRowIndex` 都相同）→ 按列序**左右拼**（同一行上选几段就是这种）；
-     *     · 或所有片**共享同一个列范围** → 按行序**上下拼**（同一列上选几段；两段整行块也属于这种，
-     *       因为整行块的列范围都是"全部列"）；
-     *     · **两者都不满足 → 拒绝**，并给那句提示
-     *       （Excel："这不适用于当前所选内容。请选择同一行或同一列中的单元格。"；
-     *        WPS："不能对多重选定区域使用此命令"）。
-     *
-     *   实测对照：`A1 + C1`（共享行）允许；`A1 + B2`（行、列都不同）拒绝；**两段整行块**允许（列范围都是"全部列"，
-     *   上下拼成一块）；而"两段整行块 + 一小片单元格"必被拒 —— 因为那一片的列范围不是"全部列"了。
-     *
-     * ⚠️ 单个片天然满足（自己和自己共享行范围）→ 走"左右拼"那条就等于原来的矩形，不必特判。
-     */
-    const planCopy = (bounds: CellSelectionBounds[]): {grid: string[][]; areas: CopyArea[]; snapshot: Map<string, string>} | null => {
-        /** `[a, b]` 的下标序列（含两端）。 */
-        const range = (a: number, b: number) => Array.from({length: Math.max(0, b - a + 1)}, (_, i) => a + i)
-        if (bounds.length === 0) return null
-        const modelRows = table.getRowModel().rows
-
-        // 合法性：多片必须能沿同一根轴排成一条（共享同一行范围，或共享同一列范围）。单片天然满足。
-        const first = bounds[0]
-        const sameRowExtent = bounds.every((b) => b.minRowIndex === first.minRowIndex && b.maxRowIndex === first.maxRowIndex)
-        const sameColumnExtent = bounds.every((b) => b.minColumnIndex === first.minColumnIndex && b.maxColumnIndex === first.maxColumnIndex)
-        if (!sameRowExtent && !sameColumnExtent) return null
-
-        /*
-            **一趟收两样**：每片的行/列 id（虚线按片画要用）+ 每一格"复制那一刻的原值"（切窗口回来核对源区）。
-            值的**唯一来源就是这个 snapshot**，值表也从它拼 —— 不再有第二处读原值的地方。
-        */
-        const areas: CopyArea[] = []
-        const snapshot = new Map<string, string>()
-        for (const b of bounds) {
-            // 片内每行的列是同一套，取第一行的就够
-            const cells = modelRows[b.minRowIndex]?.getAllCells() ?? []
-            const columnIds = range(b.minColumnIndex, b.maxColumnIndex)
-                .map((c) => cells[c]?.column.id)
-                .filter((id): id is string => !!id)
-            const rowIds: string[] = []
-            for (const r of range(b.minRowIndex, b.maxRowIndex)) {
-                const row = modelRows[r]
-                if (!row) continue
-                rowIds.push(row.id)
-                for (const columnId of columnIds) snapshot.set(snapshotKey(row.id, columnId), row.original.originals[columnId] ?? "")
-            }
-            areas.push({rowIds, columnIds})
-        }
-        const valueAt = (rowId: string, columnId: string) => snapshot.get(snapshotKey(rowId, columnId)) ?? ""
-
-        /** 各片按 `key` 排序后的下标（左右拼按列序、上下拼按行序）。 */
-        const orderBy = (key: (b: CellSelectionBounds) => number) =>
-            bounds.map((_, i) => i).sort((x, y) => key(bounds[x]) - key(bounds[y]))
-
-        let grid: string[][]
-        if (sameRowExtent) {
-            // 左右拼：每一行里，把各片在这一行的那段按列序接起来
-            const order = orderBy((b) => b.minColumnIndex)
-            grid = range(first.minRowIndex, first.maxRowIndex).map((r) => {
-                const rowId = modelRows[r]?.id ?? ""
-                return order.flatMap((i) => areas[i].columnIds.map((columnId) => valueAt(rowId, columnId)))
-            })
-        } else {
-            // 上下拼：各片按行序接起来（片内可能多列，直接按它自己的行列铺开）
-            grid = orderBy((b) => b.minRowIndex).flatMap((i) =>
-                areas[i].rowIds.map((rowId) => areas[i].columnIds.map((columnId) => valueAt(rowId, columnId))),
-            )
-        }
-        return {grid, areas, snapshot}
-    }
-
-    /** 光标所在的输入框里**选中了文字**没有（编辑框 vs 表格，见 `handleCopy` 那道闸）。 */
-    const hasSelectedText = () => {
-        const el = document.activeElement
-        return el instanceof HTMLInputElement && el.selectionStart !== el.selectionEnd
-    }
-
-    /*
-        ‼️ `useCallback`（依赖全是稳定值）：这两个处理器挂在 `document` 上（见下面那段 `useEffect`），
-        每次渲染换一个新函数就等于"挂一个旧的、摘一个新的"，白白多跑一遍 effect。
-    */
-    const handleCopy = (e: ClipboardEvent) => {
-        const target = e.target as HTMLElement | null
-        /*
-            ‼️ **表头不参与表格复制**（列名归浏览器）：从表头发起的这一记 Ctrl+C 直接让过去 ——
-            列名本来就是可以自由选、自由复制的。顺带把**复制区那圈虚线撤掉**：剪贴板里已经不是那片格子了，
-            再圈着"剪贴板内容来自这里"就是假的（用户要求：复制列名时清空复制区）。
-
-            判据用**事件从哪儿发起**（`closest("thead")`），不用"页面上有没有文字选区"：后者是全局状态，
-            会残留（选过列名再拖选格子时未必被收掉），于是还得额外在每次按下时清一次选区才能保证判据确定。
-            发起方是**这一记事件自己的事实**，没有那个问题。实测：表头选区下 copy 的 target 就在 `thead` 里。
-        */
-        if (target?.closest("thead")) {
-            clearCopySource()
-            return
-        }
-        /*
-            ‼️ 编辑框里**只有选中了文字**才让给浏览器（复制那几个字）；**没选中文字就别静默什么都不做**。
-
-            这里原来是一句 `target.tagName === "INPUT"` 就 `return`：用户在编辑框里按 Ctrl+C（比如只想复制
-            这一格的值），因为框里没有选区，浏览器什么也不复制、表格又直接早退 —— 表现就是**按 Ctrl+C 毫无反应**，
-            而且剪贴板里还留着上一次的内容（用户报的"选区选好了、Ctrl+C 没反应"，探针命中的正是这一条）。
-        */
-        if (target?.tagName === "INPUT" && hasSelectedText()) return
-        /*
-            ⚠️ 这里**必须**把两件事分开（踩过）：
-              · 压根没有单元格选区（比如只选了行）→ **什么都不做**（不写剪贴板、不提示）；
-              · 有选区但形状不能复制（多片跨行又跨列）→ 才给那句提示。
-            混成一个 `null` 的话，**只选行按 Ctrl+C 会弹出"不能对多重选定区域使用此命令"** —— 误报。
-        */
-        const bounds = table.getCellSelectionBounds()
-        if (bounds.length === 0) return
-        const plan = planCopy(bounds)
-        if (!plan) {
-            setCopyHint(t.multiAreaCopy)
-            return
-        }
-        setCopyHint("")
-        const {grid, areas, snapshot} = plan
-        if (grid.length === 0) return
-        e.preventDefault()
-        e.clipboardData?.setData("text/plain", toTsv(grid))
-
-        /*
-            顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
-            新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
-            ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
-            ⚠️ **按片存**（不是外接矩形）：多片时虚线要每片各画一圈。
-        */
-        changeCopySource({areas, snapshot})
-        /*
-            ‼️ **复制不再收掉选区**（用户要求：按 Ctrl+C 那一刻选区底色留着）。
-
-            这里以前连着做两件事：`setCellSelection([])` + 从格子上摘焦点 —— 起因是"收掉选区"会让锚点格
-            不再是 `cell-selected`，于是那圈**焦点环**（`cell-focus`，`:focus-within` 时 2px `--ring`）
-            当场露出来套在复制区左上角（用户当年报的"复制后第一个格子有内边框"）。
-
-            现在选区留着 → 锚点格仍是 `cell-selected` → `td.cell-selected:focus-within::after { content: none }`
-            继续压着焦点环，所以"摘焦点"那一下也一并删了（它本来就是那件事的配套）。
-            剪贴板那圈虚线仍是"哪片在剪贴板里"的标记，与选区底色并存。
-        */
-    }
-
-    /**
-     * 粘贴 —— 规则见文件上方 `toTsv` 后面那段「粘贴规则」（两条式子：`floor(选区 / 块)`、最小 1 份）。
-     * 这里只写实现上的三处要点：
-     *   · `copiesDown/Right` 就是那份数（`Math.max(1, floor(选区尺寸 / 块尺寸))`）；
-     *   · `block[r % blockRows][c % blockCols]` 就是"铺不满一份就丢掉那一格"；
-     *   · 只读列 / 越界都是"这一格不写"，但**位置照占**（不然整块会左移）。
-     */
-    const handlePaste = (e: ClipboardEvent) => {
-        if ((e.target as HTMLElement).tagName === "INPUT") return
-        const text = e.clipboardData?.getData("text/plain") ?? ""
-        /*
-            ‼️ 落点用选区的**外接矩形**（`bounds` 是多片时逐片给的）：本表的铺块规则
-            （`floor(选区 / 块)`、落点 = 左上角）本来就是按一个矩形定义的；多片时取外接矩形是唯一
-            不需要再发明一套"多片怎么铺"的口径。
-            （多片**粘贴**在 Excel/WPS 里的确切行为还没实测过 —— 若实测与这条不符，改这里一处即可。）
-        */
-        const areas = table.getCellSelectionBounds()
-        if (areas.length === 0 || !text) return
-        const bounds = areas.reduce((box, b) => ({
-            minRowIndex: Math.min(box.minRowIndex, b.minRowIndex),
-            maxRowIndex: Math.max(box.maxRowIndex, b.maxRowIndex),
-            minColumnIndex: Math.min(box.minColumnIndex, b.minColumnIndex),
-            maxColumnIndex: Math.max(box.maxColumnIndex, b.maxColumnIndex),
-        }))
-        setCopyHint("")
-        e.preventDefault()
-
-        const modelRows = table.getRowModel().rows
-        const startRow = bounds.minRowIndex
-        const startCol = bounds.minColumnIndex
-        // 只读列在这张映射表里是 `null` —— "跳过只读列、越界丢弃"两件事因此都在这里定死；
-        // 算式本身（铺几份、铺到哪）归 `planPaste`，可以脱离组件单独测。
-        const plan = planPaste({
-            block: parseTsv(text),
-            rows: modelRows.map((row) => ({
-                rowId: row.id,
-                cells: row.getAllCells().map((cell) =>
-                    columnKind(cell.column.id) === "readonly"
-                        ? null
-                        : {columnId: cell.column.id, current: row.original.values[cell.column.id] ?? ""},
-                ),
-            })),
-            start: {row: startRow, col: startCol},
-            size: {rows: bounds.maxRowIndex - startRow + 1, cols: bounds.maxColumnIndex - startCol + 1},
-        })
-        if (!plan.range) return
-
-        /*
-            **选值格的粘贴校验**：值不在清单里的这一格**不写**（当前值原样留着）。清单有两份 ——
-            `controlTypeHash_` 用固定的 53 项，`branchXAtk_` 用当前表的 `id_` 集合（`branchPick.ids`）。
-            用户的口径是"不通过就当没粘过"——**不提示、也不占一步撤销**：过滤后一条都不剩时整次粘贴就是个
-            空操作（连撤销栈都不入）。其余列一律放行（见 model 的 `acceptPaste`）。
-        */
-        const writes = plan.writes.filter((write) => acceptPaste(write.columnId, write.value, branchPick.ids))
-        if (writes.length === 0) return
-
-        batchingRef.current = true
-        try {
-            for (const write of writes) edit(write.rowId, write.columnId, write.value)
-        } finally {
-            batchingRef.current = false
-        }
-        // 一整次粘贴 = **一步撤销**：清单是 `[行, 列, 改前值]`（被校验挡掉的那几格不在里面）。
-        undoRef.current.push(writes)
-        // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
-        table.selectCellRange({
-            anchorRowId: modelRows[plan.range.firstRow].id,
-            anchorColumnId: modelRows[plan.range.firstRow].getAllCells()[plan.range.firstCol].column.id,
-            focusRowId: modelRows[plan.range.lastRow].id,
-            focusColumnId: modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
-        })
-    }
-
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
     useEffect(() => {
         onSaveReady?.(async () => {
@@ -772,88 +430,32 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         /* 等一帧：这一帧里活动格可能已经换人（重渲），所以**重新查一次**，别抓着旧引用。 */
         requestAnimationFrame(() => {
             revealPendingRef.current = null
-            const 落 = box.querySelector<HTMLElement>("tbody td.cell-active")
-            if (!落) return
+            const el = box.querySelector<HTMLElement>("tbody td.cell-active")
+            if (!el) return
             const view = box.getBoundingClientRect()
-            const target = 落.getBoundingClientRect()
             /* 吸顶表头压住上面、冻结列盖住左边：看得见的范围要从它们之外算起。 */
-            const header = box.querySelector("thead")?.getBoundingClientRect().height ?? 0
-            const frozen = [...box.querySelectorAll<HTMLElement>("thead th")].filter(
-                (th) => th.style.left !== "" && th.style.left !== "auto",
-            )
-            const top = view.top + header
-            const left = frozen.reduce((max, th) => Math.max(max, th.getBoundingClientRect().right), view.left)
-            /*
-                ‼️ 下/右边界取**内容盒**（`clientWidth/Height`），不是 `getBoundingClientRect()` 的边框盒：
-                边框盒把**滚动条占的那条槽**也算进去了（真机实测：容器 1240 宽、`clientWidth` 只有 1223，
-                滚动条吃掉 17px），而滚动条画在内容之上 —— 格子滚到那儿时**右边框整条被滚动条压住**
-                （真机实测：格右距边框盒右沿 2px 时右边框 0 像素，距 15px 才正常）。
-            */
-            const right = view.left + box.clientWidth
-            const bottom = view.top + box.clientHeight
-            /** 这一格要摆到哪儿（算出来之后与当前位置比一比，见下面那段）。 */
-            const 目标 = {top: 0, left: 0}
-            /*
-                ⚠️ 钉住的列（`id_` / `abilityTag_`）**横向永远看得见**：量出来的 `left` 是它被钉住的屏幕位置，
-                不是"内容里的位置"，拿它算越界会得出"还在冻结层底下"，于是每走到这两列就把内容整体拉回最左
-                （用户实测）。它们不参与横向滚动。
-            */
-            const pinned = getComputedStyle(落).position === "sticky"
-            /*
-                ‼️ **末行/末列走到真极限**：这两格本来就在可视区内，四边都算不出越界。而"到极限"只能交给
-                浏览器 —— `scrollWidth - clientWidth` 取整后比真极限大 1px，那 1px 就是"滚动条还能再拖一点"
-                （真机实测）。给个大值让它自己夹，永远落在真极限上。
-                ⚠️ 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是 `useCallback([])`，
-                闭包里那份列模型还是首次渲染的空数组，判断会恒假。
-            */
-            const tr = 落.parentElement
-            const isLastRow = tr === tr?.parentElement?.lastElementChild
-            const isLastColumn = 落 === tr?.lastElementChild
-            /*
-                ‼️ **"越界多少就滚多少"**（四条边同一条规则）：
-                  · 贴边/在里面 → 0，**不滚**；
-                  · 被切掉几像素 → 滚动对应那几像素，让边框整条露出来。
-                ⚠️ 判据是"**比边界超出多少**"、不是"比 "边界 + 一点余量" 超出多少"：后者会让**正好贴着**
-                表头下沿/冻结列右沿的格子（真机上很常见）被算成"差 1px"而白滚一次 —— 而白滚一次就会派发
-                `scroll`，把刚展开的选值格列表收掉（用户报的那一类）。贴边本来就不需要动。
-            */
-            const 上越 = target.top < top ? target.top - top : target.bottom > bottom ? target.bottom - bottom : 0
-            const 左越 = pinned ? 0 : target.left < left ? target.left - left : target.right > right ? target.right - right : 0
-            /*
-                ‼️ **本来就在可见矩形里就不滚**（用户报的那一类）：`scrollTo` 即使目标与当前位置相同也会
-                派发 `scroll`，而 `CellPick` 那条"谁一滚就把展开列表收起来"的规则不管"有没有真动" ——
-                白滚一次就会把"格子显示完整时进编辑"开出来的列表也收掉。
-
-                判据直接用**这一格越界没有**，而不是"算出来的目标与当前滚动位置比"：后者在不做布局的
-                环境里完全不可靠（`scrollTop/scrollLeft` 不随设置而变），而"越界了吗"与"要不要滚"本来就是
-                同一件事。
-                ⚠️ **不要再拿"是不是末行/末列"当额外条件**：那两格若已经可见，越界同样是 0、这里自然就
-                返回了；只有它们真的看不见时才往下走，那时下面的 `SCROLL_TO_END` 才用得上。
-            */
-            if (!上越 && !左越) return
-            /*
-                ‼️ **末行/末列走到真极限**：这两格本来就在可视区内，四边都算不出越界。而"到极限"只能交给
-                浏览器 —— `scrollWidth - clientWidth` 取整后比真极限大 1px，那 1px 就是"滚动条还能再拖一点"
-                （真机实测）。给个大值让它自己夹，永远落在真极限上。
-                ⚠️ 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是 `useCallback([])`，
-                闭包里那份列模型还是首次渲染的空数组，判断会恒假。
-            */
-            目标.top = isLastRow ? SCROLL_TO_END : box.scrollTop + 上越
-            目标.left = isLastColumn ? SCROLL_TO_END : box.scrollLeft + 左越
-            /*
-                ‼️ **再把目标夹进真实的滚动范围**，然后才判断"会不会真的动"。
-                为什么必须夹：越界算出来的目标**可能落在滚动范围之外**（典型：格子被冻结列切掉一块、
-                而横向滚动条已经在最左 —— 目标是个负数，浏览器夹到 0、**根本不动**），可那一下 `scrollTo`
-                照样派发 `scroll`、把刚展开的列表收掉（真机实测：`左越 = -23`、`scrollLeft = 0` → 白滚）。
-                夹完与当前一致 = 这一格**已经到它能在的最好位置**（露不全也没办法）→ 什么都不做。
-            */
-            const 夹 = (v: number, max: number) => Math.max(0, Math.min(v, max))
-            目标.top = 夹(目标.top, box.scrollHeight - box.clientHeight)
-            目标.left = 夹(目标.left, box.scrollWidth - box.clientWidth)
-            if (Math.abs(目标.top - box.scrollTop) < 1 && Math.abs(目标.left - box.scrollLeft) < 1) return
+            const headerHeight = box.querySelector("thead")?.getBoundingClientRect().height ?? 0
+            const frozenRight = [...box.querySelectorAll<HTMLElement>("thead th")]
+                .filter((th) => th.style.left !== "" && th.style.left !== "auto")
+                .reduce((max, th) => Math.max(max, th.getBoundingClientRect().right), view.left)
+            const tr = el.parentElement
+            const 目标 = revealScrollTarget({
+                target: el.getBoundingClientRect(),
+                view,
+                headerHeight,
+                frozenRight,
+                pinned: getComputedStyle(el).position === "sticky",
+                /* 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是
+                   `useCallback([])`，闭包里那份列模型还是首次渲染的空数组，判断会恒假。 */
+                isLastRow: tr === tr?.parentElement?.lastElementChild,
+                isLastColumn: el === tr?.lastElementChild,
+                box,
+                scroll: {top: box.scrollTop, left: box.scrollLeft},
+            })
+            if (!目标) return // 本来就看得见 / 已到最好位置 → 一次都不滚
             /* 报名"下一次滚动是我们自己发的"，再滚（契约见 `RevealSession`）。 */
             selfScrollRef.current = true
-            box.scrollTo({top: 目标.top, left: 目标.left})
+            box.scrollTo(目标)
         })
     }, [])
     /**
@@ -921,6 +523,22 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     */
     const tableInstanceRef = useRef(table)
     tableInstanceRef.current = table
+
+    /**
+     * **剪贴板 + 撤销栈 + 改一格** —— Excel 口径的复制粘贴、复制区那圈虚线、Ctrl+Z，全在
+     * `useClipboardHistory` 里（`edit` 也归它：撤销栈的"记不记账"正是 `edit` 里那两条判断，
+     * 记账规则与记账本分在两个地方是这段代码原来最难读的部分）。
+     *
+     * 传进去的都是稳定引用（`setRows` 是 setter、`tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids`
+     * 由 `useMemo` 按数据给），所以它内部那段全局监听**只挂一次**。
+     */
+    const {copyHint, setCopyHint, copySource, clearCopySource, edit, handleUndo} = useClipboardHistory({
+        setRows,
+        rowsRef,
+        tableRef: tableInstanceRef,
+        branchIds: branchPick.ids,
+        multiAreaCopyText: t.multiAreaCopy,
+    })
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
@@ -1244,61 +862,17 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         }
     })
 
-    /**
-     * 复制源那圈虚线的两条**外部**退出路径（规则③④，见 `CopySource` 那段）。
-     *
-     * 为什么挂 `paste` 也得挂一份：在源区**外面**粘一下（copy → paste 到别处）在 Excel 里**不撤**虚线，
-     * 但接着切出去再切回来时它会核对剪贴板与源区是否还一致 —— 我们的等价做法就是"**窗口重新获得焦点**时
-     * 拿 `snapshot` 核一遍当前值"。而粘贴本身会改数据，所以把核对也挂一份在 `paste` 上：粘完立刻核。
-     */
-    useEffect(() => {
-        const verify = () => {
-            const source = copySourceRef.current
-            if (!source) return
-            for (const [key, original] of source.snapshot) {
-                const {rowId, columnId} = parseSnapshotKey(key)
-                const row = rowsRef.current.find((r) => r.id === rowId)
-                // 源区那一格现在显示的值（没改过就是原值）与复制那一刻对不上 → 源区过期，撤虚线。
-                if (!row || shownValue(row, columnId) !== original) {
-                    changeCopySource(null)
-                    return
-                }
-            }
-        }
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return            // 编辑框里按 Esc 是"退出编辑"（`Cell` 自己处理，且它会 stopPropagation 掉；这里再挡一层兜底）。
-            if ((e.target as HTMLElement).tagName === "INPUT") return
-            clearCopySource()
-        }
-        /*
-            ‼️ **复制 / 粘贴必须挂在 `document` 上，不能只挂在表格容器上。**
+    /*
+        方向键挂 `document`，而且是**捕获阶段**：真机上焦点常在 `<body>`（见 `handleArrowKey` 的
+        闸门那段），挂在容器上的 React `onKeyDown` 收不到。捕获阶段还能先于 base-ui 的列表导航决定
+        "这一次按键归谁" —— 判断在 `handleArrowKey` 内部，别的表选过东西时也不会被这张表抢走。
 
-            为什么：`copy` / `paste` 事件的目标是**当前有焦点的那个元素**。表格里没有焦点时（刚点过工具栏、
-            搜索框，或点过表格外的空白），事件在 `body` 上触发、**根本不冒泡到表格容器** —— 表现就是
-            "选区明明选好了，按 Ctrl+C 毫无反应"（用户报的随机失效，实测诊断打出
-            `早退:有选区但选不出网格 | target: BODY`，而 `handleCopy` 一次都没被调用）。
-            挂到 `document` 上就与焦点无关了；两个处理器内部本来就有闸门：
-              · `handleCopy` —— 编辑框里选中了文字就让给浏览器；没有单元格选区就什么都不做；
-              · `handlePaste` —— 没有单元格选区就不拦。
-            所以在别的表（轨迹表 / 全局参数）里按 Ctrl+C 也不会被这张表抢走。
-        */
-        document.addEventListener("copy", handleCopy)
-        document.addEventListener("paste", handlePaste)
-        window.addEventListener("focus", verify)
-        document.addEventListener("paste", verify)
-        document.addEventListener("keydown", onKeyDown)
-        /*
-            方向键同理挂 `document`，而且是**捕获阶段**：真机上焦点常在 `<body>`（见 `handleArrowKey` 的
-            闸门那段），挂在容器上的 React `onKeyDown` 收不到。捕获阶段还能先于 base-ui 的列表导航决定
-            "这一次按键归谁" —— 判断在 `handleArrowKey` 内部，别的表选过东西时也不会被这张表抢走。
-        */
+        （`copy` / `paste` / `focus` / `Esc` 那几条**也是 document 级的**，但已归
+        `useClipboardHistory` —— 它们与剪贴板、复制源虚线是同一件事。）
+    */
+    useEffect(() => {
         document.addEventListener("keydown", handleArrowKey, true)
         return () => {
-            document.removeEventListener("copy", handleCopy)
-            document.removeEventListener("paste", handlePaste)
-            window.removeEventListener("focus", verify)
-            document.removeEventListener("paste", verify)
-            document.removeEventListener("keydown", onKeyDown)
             document.removeEventListener("keydown", handleArrowKey, true)
         }
     })

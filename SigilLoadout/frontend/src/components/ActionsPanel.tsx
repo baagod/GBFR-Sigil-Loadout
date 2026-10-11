@@ -36,7 +36,6 @@ import {
     ComboboxList,
     ComboboxTrigger,
 } from "@/components/ui/combobox"
-import {Input} from "@/components/ui/input"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
@@ -49,12 +48,9 @@ import {charCodeOf} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
-// 共用的可编辑格与其两个类常量（CELL_INPUT / CELL_TEXT）搬去了 @/components/EditableCell ——
-// 它在 ActionsPanel 里时会形成 ActionsPanel ↔ GlobalParamPanel、ActionsPanel → AnimationDetail →
-// TrackGrid → ActionsPanel 两处环形依赖 ✗（两边都只要它这一个符号）。这里不再需要它们。
-
-/* EditableCell 已搬到 @/components/EditableCell（见上面那条注释）。这里不在本地再包一层 ——
-   转发包装只会多一层间接，两个环也照样在。 */
+// 共用的可编辑格是 @/components/EditableCell（它留在这里会形成 ActionsPanel ↔ GlobalParamPanel、
+// ActionsPanel → AnimationDetail → TrackGrid → ActionsPanel 两处环形依赖 ✗）；
+// 纯类名常量 CELL_INPUT / CELL_TEXT 在 @/lib/classnames（组件模块不再被只为取一个字符串而拉进来）。
 
 /**
  * 角色下拉。这一页的三份数据（动作表 / flags / FSM）**全都按角色走**，所以它是整页的选择，不是某一块的。
