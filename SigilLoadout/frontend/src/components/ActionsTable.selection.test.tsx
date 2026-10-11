@@ -44,6 +44,32 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
     })
 
     /*
+        ‼️ **复制不许给值套引号包裹**（用户报的）：值里带引号（如 `["0"]` 这种 JSON 数组）时，
+        复制出来不能变成 `[""0""]`。这条**不只针对某一列** —— 转换只在 `toTsv` 那一处做，
+        所以这里用一个**普通字符串格**造出带引号的值来验，任何列都覆盖到。
+
+        （原先的写法是"含引号就加引号并把内部引号翻倍"，那是 CSV 的口径；而我们读回来时
+        `parseTsv` 不解析引号 —— 加引号不是转义，是把引号写进了值里。）
+    */
+    it("复制带引号的值：原样进剪贴板（不套引号包裹、不翻倍）", async () => {
+        const 带引号 = '["1","4150991022","0","1"]'
+        /*
+            ⚠️ 复制取的是**底层原始值**（`row.original.originals`），不是"改动值"、也不是屏幕上的显示值 ——
+            所以这里要改的是 `original`（造数据时 `changed` 改的是"改动值"那一栏，复制取不到）。
+        */
+        const row = makeRow("1000")
+        row.fields.find((f) => f.key === LongField)!.original = 带引号
+        setRows([row])
+
+        const container = await renderTable()
+        selectCell(cellAt(container, 0, KEYS.indexOf(LongField)))
+        const clipboard = clipboardStub()
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+
+        expect(clipboard.data["text/plain"]).toBe(带引号)
+    })
+
+    /*
         这一条钉住"表头不参与"的**另一面**：表体（格子）发起时照旧归表格 ——
         否则上面那条一旦写成"任何 copy 都让开"，整张表的复制粘贴就静默失效了。
     */

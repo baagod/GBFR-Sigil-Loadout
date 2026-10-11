@@ -15,14 +15,24 @@ export type ClipboardEvent = globalThis.ClipboardEvent
 /**
  * 一个值转成 TSV 里的一个字段。
  *
- * 两条都要有：**含分隔符/换行/引号就加引号并把内部引号翻倍**（否则粘回表格会串列），
- * 以及**前缀是 `=` `+` `@` `-` 时前面垫一个 `'`** —— 那是 Excel/WPS 的公式，不垫的话
- * 粘进表格会被当公式执行（CSV 注入）。
+ * ‼️ **只做防公式注入，不做引号包裹**（用户报的：`supportEffectList_` 那种 JSON 数组值复制出来
+ * 变成了 `[""0""]`）。
+ *
+ * 为什么不能包裹：写出去的是 **TSV**，而读回来那条路（`parseTsv`）与 Excel 一样**不解析引号** ——
+ * 我们自己也明确按"只按 `\t` / `\n` 切"来做（见 `parseTsv` 的规则⑤）。既然读的一侧没有引号语义，
+ * 加引号就不是"转义"，而是**把两个引号写进了值里**：本表内复制回来必然变形。
+ *
+ * 代价（已知且接受）：值里若出现真实的制表符或换行，粘回本表会被切成两格/两行（写出去的就是裸的
+ * `\t` / `\n`）。但这条在"加引号包裹"那版里**也没真的保护住**（读侧不解析引号）；两版都护不住它，
+ * 而新版让"看到什么就复制出什么"这条主路正确 —— 本表往返无损、粘进 Excel 也是原文（Excel 认引号）。
+ * 实际数据里没有制表符：这一列是结构化参数（JSON 数组）。
+ *
+ * 另一条必须保留：**前缀是 `=` `+` `@` `-` 时前面垫一个 `'`** —— 那是 Excel/WPS 的公式，
+ * 不垫的话粘进表格会被当公式执行（CSV 注入）。
  */
 const escapeTsvValue = (value: unknown): string => {
     const text = value == null ? "" : String(value)
-    const safe = typeof value === "string" && /^[\t\r ]*[=+@-]/.test(value) ? `'${text}` : text
-    return /["\t\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+    return typeof value === "string" && /^[\t\r ]*[=+@-]/.test(value) ? `'${text}` : text
 }
 
 /** 二维值表 → TSV 文本（每行一块）。 */
