@@ -566,6 +566,33 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(cell.textContent).toBe("actionFreeWork0_-原值")
     })
 
+    /*
+        ‼️ **焦点不在表格里时 Ctrl+Z 也要生效**（用户报的：回车提交之后按 Ctrl+Z 没反应）。
+
+        根因：`Ctrl+Z` 原先挂在表格容器那个 `<div onKeyDown>` 上（React 合成事件走容器上的根监听），
+        而键盘事件的目标是 `document.activeElement` —— **回车提交后焦点回到 `<body>`，事件冒泡不到那个
+        div**，处理器根本不被调用。方向键 / Ctrl+C / Ctrl+V 早就改挂 `document` 了（同一个坑），
+        只有撤销漏了。这条用例把"焦点在 body"当场钉住：它**不许**依赖任何焦点前提。
+    */
+    it("焦点在 body（回车提交后的状态）：Ctrl+Z 照样退回", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2)
+
+        clickToEdit(cell)
+        const input = cell.querySelector("input")!
+        fireEvent.change(input, {target: {value: "回车提交的值"}})
+        fireEvent.keyDown(input, {key: "Enter"})
+        fireEvent.blur(input)
+        expect(cell.textContent).toBe("回车提交的值")
+
+        // 真实状态：提交后焦点不在表格里（真机实测就是 `BODY`）。
+        ;(document.activeElement as HTMLElement | null)?.blur?.()
+        expect(document.activeElement === document.body || document.activeElement === null).toBe(true)
+
+        fireEvent.keyDown(document, {key: "z", ctrlKey: true})
+        expect(cell.textContent).toBe("actionFreeWork0_-原值")
+    })
+
     /* 编辑框里的 Ctrl+Z 归浏览器（撤这一次输入），不许被表格的历史接管。 */
     it("编辑框里按 Ctrl+Z：不动表格的历史", async () => {
         const container = await renderTable()

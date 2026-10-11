@@ -146,12 +146,21 @@ export function useClipboardHistory({
      *
      * 倒着写是**必须的**：一步里同一个格子被写过两次时（粘贴块自己叠到自己上），只有"后写的那条
      * 先还原"才回得到原样。
+     *
+     * ‼️ 它**挂 `document`**（见下面那段 effect），不是挂在表格容器上。原因与 copy/paste 一模一样：
+     * 键盘事件的目标是 `document.activeElement`，而**回车提交编辑之后焦点会回到 `<body>`** ——
+     * 那一刻挂在容器上的 `onKeyDown` 根本收不到，表现就是"提交完按 Ctrl+Z 没反应"（用户报的）。
      */
     const handleUndo = useCallback(
         (e: KeyboardEvent | React.KeyboardEvent) => {
             if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return
-            // 编辑框里的 Ctrl+Z 归浏览器（撤的是这一次输入），跟表格的历史不是一回事。
-            if ((e.target as HTMLElement).tagName === "INPUT") return
+            /*
+                编辑框里的 Ctrl+Z 归浏览器（撤的是这一次输入），跟表格的历史不是一回事。
+                判据用**当前焦点**而不是 `e.target`：键盘事件两个通常一致，但焦点在别的输入框
+                （工具栏搜索框那种）时，"谁该拿走这次按键"问的是焦点，不是事件从哪儿来。
+            */
+            const el = document.activeElement as HTMLElement | null
+            if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return
             const step = undoRef.current.pop()
             if (!step) return
             e.preventDefault()
@@ -454,14 +463,17 @@ export function useClipboardHistory({
         window.addEventListener("focus", verifyCopySource)
         document.addEventListener("paste", verifyCopySource)
         document.addEventListener("keydown", handleEscape)
+        /* 撤销也挂这儿 —— 理由见 `handleUndo` 那段（回车提交后焦点在 body，容器上的监听收不到）。 */
+        document.addEventListener("keydown", handleUndo)
         return () => {
             document.removeEventListener("copy", handleCopy)
             document.removeEventListener("paste", handlePaste)
             window.removeEventListener("focus", verifyCopySource)
             document.removeEventListener("paste", verifyCopySource)
             document.removeEventListener("keydown", handleEscape)
+            document.removeEventListener("keydown", handleUndo)
         }
-    }, [handleCopy, handlePaste, verifyCopySource, handleEscape])
+    }, [handleCopy, handlePaste, verifyCopySource, handleEscape, handleUndo])
 
     return {copyHint, setCopyHint, copySource, clearCopySource, edit, handleUndo}
 }

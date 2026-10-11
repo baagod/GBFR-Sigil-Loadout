@@ -552,7 +552,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 传进去的都是稳定引用（`setRows` 是 setter、`tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids`
      * 由 `useMemo` 按数据给），所以它内部那段全局监听**只挂一次**。
      */
-    const {copyHint, setCopyHint, copySource, clearCopySource, edit, handleUndo} = useClipboardHistory({
+    const {copyHint, setCopyHint, copySource, clearCopySource, edit} = useClipboardHistory({
         setRows,
         rowsRef,
         tableRef: tableInstanceRef,
@@ -910,7 +910,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             `border-separate border-spacing-0`：格线是每格自己的 `border-r/border-b`，不是 collapse 共享的。
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
-        <div className="flex min-h-0 flex-1 flex-col" onKeyDown={handleUndo}>
+        <div className="flex min-h-0 flex-1 flex-col">
             {/*
                 复制被拒：**用对话框**（Excel / WPS 也是弹框说这句话），不是表格上方一行小字。
                 只在"多片跨行又跨列"时开（见 `planCopy`）；`copyHint` 非空即开，关掉就清空。
