@@ -1,7 +1,7 @@
 import {type RefObject, useContext, useEffect, useMemo, useRef, useState} from "react"
 import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
-import {EnterEditContext, RevealContext, isRevealScrolling, markRevealScroll} from "@/components/actions-table/model"
+import {EnterEditContext, RevealContext, isRevealScrolling} from "@/components/actions-table/model"
 
 /*
     动作表里的**选值格**：格子里是那个值 + 一个小箭头，**先选中、再点一下**才在格子下面挂出列表挑一个
@@ -121,15 +121,13 @@ export function CellPick({
      * 与普通格子的 `enterEdit` 一一对应（那边切输入框、这边开列表，别在这里另立一套）。
      */
     const openForEdit = () => {
+        /*
+            ‼️ 这里**不报名**（报名由真正会滚的那一方发，见 `ActionsTable.revealActiveCell`）：
+            格子本来就完整可见时"跟随可视"不会滚，那条"一滚就收起"的规则也就不该被让路 ——
+            在这一方无条件报名，会把用户接下来的第一条滚动白白放过一次（测过，是个多余的代价）。
+        */
         reveal()
         setInstantClose(false)
-        /*
-            ‼️ **先报名"接下来那一下滚动是跟随可视发的"**，再开列表（契约见 `model.ts`）。
-            为什么由这一方报名、而不是在 `ActionsTable` 真正 `scrollTo` 的那一刻：那个滚动排在**下一帧**，
-            而且"跟随可视"只在格子真的没显示完整时才会滚。在"开列表"这一方报名，才能保证无论那一帧
-            滚没滚，下面那条"一滚就收起"的规则都不会被误导（滚了就让路，没滚更无所谓）。
-        */
-        markRevealScroll()
         setOpen(true)
     }
     useEffect(() => {

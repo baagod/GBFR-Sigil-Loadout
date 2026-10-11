@@ -836,6 +836,48 @@ const colIdAt = (container: HTMLElement, row: number, col: number) => cellAt(con
 const arrowOn = (cell: HTMLElement, key: string, mods: {shiftKey?: boolean; ctrlKey?: boolean} = {}) =>
     fireEvent.keyDown(cell, {key, ...mods})
 
+/**
+ * 给出**让"跟随可视"必然要滚**的几何，返回恢复函数。
+ *
+ * 为什么需要：happy-dom 不做布局（所有 rect 都是 0），而"跟随可视"有一条**本来就看全了就不滚**的
+ * 判据（见组件里 `revealActiveCell`）—— 假几何下每格都被当成"已在视口里"，于是 `scrollTo` 一次都不发，
+ * 靠 `scrollTo` 记录来验"跟随可视"的用例就全落空。
+ *
+ * 桩法：容器视口 400×800；每个数据格放在 `left: 500 / top: 2000`（**远超右下边界**，必然越界）。
+ * ⚠️ 必须桩**所有**数据格：活动格换人之后量的是新那一格，只桩一格的话下一次就量到 0 了。
+ */
+function stubCellsOutOfView(container: HTMLElement) {
+    const box = container.querySelector<HTMLElement>(".overflow-auto")!
+    const boxRect = box.getBoundingClientRect
+    const boxH = Object.getOwnPropertyDescriptor(box, "clientHeight")
+    const boxW = Object.getOwnPropertyDescriptor(box, "clientWidth")
+    const boxSH = Object.getOwnPropertyDescriptor(box, "scrollHeight")
+    const boxSW = Object.getOwnPropertyDescriptor(box, "scrollWidth")
+    box.getBoundingClientRect = () => ({top: 0, bottom: 800, left: 0, right: 400, width: 400, height: 800, x: 0, y: 0}) as DOMRect
+    Object.defineProperty(box, "clientHeight", {configurable: true, get: () => 800})
+    Object.defineProperty(box, "clientWidth", {configurable: true, get: () => 400})
+    /*
+        ⚠️ 还得给"**能滚多远**"：`revealActiveCell` 会把目标位置夹进 `scrollHeight/Width - client*`
+        再判断会不会真的动 —— happy-dom 下那两个都是 0，夹完就恒等于当前位置，于是一次都不滚。
+    */
+    Object.defineProperty(box, "scrollHeight", {configurable: true, get: () => 100000})
+    Object.defineProperty(box, "scrollWidth", {configurable: true, get: () => 100000})
+
+    const 原 = new Map<HTMLElement, () => DOMRect>()
+    for (const td of container.querySelectorAll<HTMLElement>("tbody td")) {
+        原.set(td, td.getBoundingClientRect)
+        td.getBoundingClientRect = () => ({top: 2000, bottom: 2020, left: 500, right: 600, width: 100, height: 20, x: 500, y: 2000}) as DOMRect
+    }
+    return () => {
+        box.getBoundingClientRect = boxRect
+        if (boxH) Object.defineProperty(box, "clientHeight", boxH)
+        if (boxW) Object.defineProperty(box, "clientWidth", boxW)
+        if (boxSH) Object.defineProperty(box, "scrollHeight", boxSH)
+        if (boxSW) Object.defineProperty(box, "scrollWidth", boxSW)
+        for (const [td, fn] of 原) td.getBoundingClientRect = fn
+    }
+}
+
 /** 一格是不是在选区里（`cell-selected` 是**整个选区**那层填色；活动格只是少画底色，仍在选区里）。 */
 const isPainted = (cell: HTMLElement) => cell.className.includes("cell-selected")
 
@@ -1012,6 +1054,7 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("换格后滚动：滚的是新活动格（排在一帧之后）", async () => {
         const container = await renderTable()
+        const 恢复几何 = stubCellsOutOfView(container) // 让"跟随可视"确实要滚（见那个助手的说明）
         /* 钉"排在一帧之后"用 `scrollTo` 的调用记录（`this` 就是滚动容器）。 */
         const scrolled: HTMLElement[] = []
         const original = Element.prototype.scrollTo
@@ -1038,6 +1081,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(container.querySelector("td.cell-active")?.getAttribute("data-col-id")).toBe(colIdAt(container, 0, 1))
         } finally {
             Element.prototype.scrollTo = original
+            恢复几何()
         }
     })
 
@@ -1052,6 +1096,7 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("点已选中的格子进编辑：也要跟随可视（滚动一次）", async () => {
         const container = await renderTable()
+        const 恢复几何 = stubCellsOutOfView(container)
         const scrolled: HTMLElement[] = []
         const original = Element.prototype.scrollTo
         Element.prototype.scrollTo = function (this: HTMLElement) {
@@ -1085,6 +1130,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
         } finally {
             Element.prototype.scrollTo = original
+            恢复几何()
         }
     })
 
@@ -1096,6 +1142,7 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("Enter 进编辑：并且跟随可视", async () => {
         const container = await renderTable()
+        const 恢复几何 = stubCellsOutOfView(container)
         const scrolled: HTMLElement[] = []
         const original = Element.prototype.scrollTo
         Element.prototype.scrollTo = function (this: HTMLElement) {
@@ -1121,6 +1168,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(scrolled).toHaveLength(1) // 且跟随可视
         } finally {
             Element.prototype.scrollTo = original
+            恢复几何()
         }
     })
 

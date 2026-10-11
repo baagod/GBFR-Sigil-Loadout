@@ -67,7 +67,7 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, EnterEditContext, RevealContext, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, EnterEditContext, RevealContext, markRevealScroll, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
 
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
@@ -89,11 +89,6 @@ const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
 const SHIFT = 1
 const CTRL = 2
 
-/**
- * 把格子滚进视野时**统一让出的 1px**：量到的是单元格**内容盒**，外面还画着格线与容器边框 ——
- * 不留这 1px，贴边那格的边框就被切掉一条。见 `scrollActiveIntoView`。
- */
-const EDGE_PX = 1
 /**
  * "滚到那一头"的写法：给个大值让浏览器夹到**真极限**。
  * 不能自己算 `scrollWidth - clientWidth` —— 那两个属性都取整，结果比真极限大 1px，
@@ -752,7 +747,9 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      *     可视上沿 = 容器顶 + 吸顶表头高      可视下沿 = 容器内容盒底
      *     可视左沿 = 冻结列右沿               可视右沿 = 容器内容盒右
      *
-     * 四条边同一条规则（`越界`：越界多少补多少），各让 `EDGE_PX`。
+     * 四条边同一条规则：**越界多少就补多少**（贴边/在里面 → 0，不动）。
+     * 所以"这一格本来就看全了"这件事**天然什么都不做** —— 也就不会派发 `scroll` 去惊动别的东西
+     * （选值格的下拉列表靠 `scroll` 收起，见 `CellPick` 与 `model.ts` 那条契约）。
      *
      * ‼️ 稳定引用（`useCallback([])`）：它既要挂在活动格的 ref 上，又要经 context 下发到 `memo` 的格子，
      * 所以里面**只用 ref 与 DOM**、不读任何渲染期的值。
@@ -790,7 +787,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             */
             const right = view.left + box.clientWidth
             const bottom = view.top + box.clientHeight
-            const 越界 = (near: number, far: number, min: number, max: number) => (near < min ? near - min : far > max ? far - max : 0)
+            /** 这一格要摆到哪儿（算出来之后与当前位置比一比，见下面那段）。 */
+            const 目标 = {top: 0, left: 0}
             /*
                 ⚠️ 钉住的列（`id_` / `abilityTag_`）**横向永远看得见**：量出来的 `left` 是它被钉住的屏幕位置，
                 不是"内容里的位置"，拿它算越界会得出"还在冻结层底下"，于是每走到这两列就把内容整体拉回最左
@@ -807,13 +805,51 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             const tr = 落.parentElement
             const isLastRow = tr === tr?.parentElement?.lastElementChild
             const isLastColumn = 落 === tr?.lastElementChild
-            const scrollTop = isLastRow ? SCROLL_TO_END : box.scrollTop + 越界(target.top, target.bottom, top + EDGE_PX, bottom + EDGE_PX)
-            let scrollLeft = box.scrollLeft
-            if (!pinned) {
-                if (isLastColumn) scrollLeft = SCROLL_TO_END
-                else scrollLeft += 越界(target.left, target.right, left, right + EDGE_PX)
-            }
-            box.scrollTo({top: scrollTop, left: scrollLeft})
+            /*
+                ‼️ **"越界多少就滚多少"**（四条边同一条规则）：
+                  · 贴边/在里面 → 0，**不滚**；
+                  · 被切掉几像素 → 滚动对应那几像素，让边框整条露出来。
+                ⚠️ 判据是"**比边界超出多少**"、不是"比 "边界 + 一点余量" 超出多少"：后者会让**正好贴着**
+                表头下沿/冻结列右沿的格子（真机上很常见）被算成"差 1px"而白滚一次 —— 而白滚一次就会派发
+                `scroll`，把刚展开的选值格列表收掉（用户报的那一类）。贴边本来就不需要动。
+            */
+            const 上越 = target.top < top ? target.top - top : target.bottom > bottom ? target.bottom - bottom : 0
+            const 左越 = pinned ? 0 : target.left < left ? target.left - left : target.right > right ? target.right - right : 0
+            /*
+                ‼️ **本来就在可见矩形里就不滚**（用户报的那一类）：`scrollTo` 即使目标与当前位置相同也会
+                派发 `scroll`，而 `CellPick` 那条"谁一滚就把展开列表收起来"的规则不管"有没有真动" ——
+                白滚一次就会把"格子显示完整时进编辑"开出来的列表也收掉。
+
+                判据直接用**这一格越界没有**，而不是"算出来的目标与当前滚动位置比"：后者在不做布局的
+                环境里完全不可靠（`scrollTop/scrollLeft` 不随设置而变），而"越界了吗"与"要不要滚"本来就是
+                同一件事。
+                ⚠️ **不要再拿"是不是末行/末列"当额外条件**：那两格若已经可见，越界同样是 0、这里自然就
+                返回了；只有它们真的看不见时才往下走，那时下面的 `SCROLL_TO_END` 才用得上。
+            */
+            if (!上越 && !左越) return
+            /*
+                ‼️ **末行/末列走到真极限**：这两格本来就在可视区内，四边都算不出越界。而"到极限"只能交给
+                浏览器 —— `scrollWidth - clientWidth` 取整后比真极限大 1px，那 1px 就是"滚动条还能再拖一点"
+                （真机实测）。给个大值让它自己夹，永远落在真极限上。
+                ⚠️ 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是 `useCallback([])`，
+                闭包里那份列模型还是首次渲染的空数组，判断会恒假。
+            */
+            目标.top = isLastRow ? SCROLL_TO_END : box.scrollTop + 上越
+            目标.left = isLastColumn ? SCROLL_TO_END : box.scrollLeft + 左越
+            /*
+                ‼️ **再把目标夹进真实的滚动范围**，然后才判断"会不会真的动"。
+                为什么必须夹：越界算出来的目标**可能落在滚动范围之外**（典型：格子被冻结列切掉一块、
+                而横向滚动条已经在最左 —— 目标是个负数，浏览器夹到 0、**根本不动**），可那一下 `scrollTo`
+                照样派发 `scroll`、把刚展开的列表收掉（真机实测：`左越 = -23`、`scrollLeft = 0` → 白滚）。
+                夹完与当前一致 = 这一格**已经到它能在的最好位置**（露不全也没办法）→ 什么都不做。
+            */
+            const 夹 = (v: number, max: number) => Math.max(0, Math.min(v, max))
+            目标.top = 夹(目标.top, box.scrollHeight - box.clientHeight)
+            目标.left = 夹(目标.left, box.scrollWidth - box.clientWidth)
+            if (Math.abs(目标.top - box.scrollTop) < 1 && Math.abs(目标.left - box.scrollLeft) < 1) return
+            /* 报名"下一次滚动是我们自己发的"，再滚（契约见 `model.ts`）。 */
+            markRevealScroll()
+            box.scrollTo({top: 目标.top, left: 目标.left})
         })
     }, [])
     /**

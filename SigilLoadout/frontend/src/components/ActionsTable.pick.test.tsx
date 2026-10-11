@@ -16,7 +16,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {cellAt, clipboardStub, useTableHarness} from "@/components/actions-table/testkit"
+import {cellAt, clipboardStub, selectCell, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -56,16 +56,13 @@ const {renderTable, setRows} = useTableHarness()
 const isPickOpen = () => items().length > 0
 
 /**
- * 用户**真的滚了一下**（滚轮滚数据区）。
+ * 派发一次滚动（滚轮滚数据区那一类）。
  *
- * ⚠️ 为什么要派发**两次**：`openForEdit` 会为"进编辑时跟随可视"那一下滚动报一次名，那条"谁一滚
- * 就收起"的规则把**第一条**滚动让过去（契约见 `model.ts` 的 `isRevealScrolling`）。所以在测试里
- * "用户滚动"必须比那一条多一次 —— 否则测的是"被我方那次让掉的"，不是用户滚动。
+ * ⚠️ 注意"哪一次算用户滚的"：进编辑时"跟随可视"也会派发一次滚动，而那条"谁一滚就收起"的规则会
+ * 把**我方那一次**让过去（契约见 `model.ts` 的 `isRevealScrolling`）。所以要测"用户滚动照旧收起"，
+ * 得先把那一次让掉 —— 有的用例显式派发两次，就是这么来的。
  */
-const 用户滚动 = () => {
-    fireEvent.scroll(document)
-    fireEvent.scroll(document)
-}
+const 滚动一次 = () => fireEvent.scroll(document)
 
 /** 让浮层有机会挂上 —— base-ui 是**异步**挂弹层的，所以"没打开"必须等过这一拍才算数。 */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
@@ -237,8 +234,46 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         expect(isPickOpen()).toBe(true)
 
         /* ② 用户真滚：规则照旧生效。 */
-        用户滚动()
+        container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
         await waitFor(() => expect(isPickOpen()).toBe(false))
+    })
+
+    /*
+        ‼️ **格子本来就完整可见时，连 `scrollTo` 都不该调**（用户指出的那条"代价"其实是实现带出来的）：
+        "跟随可视"发现它本来就在可见矩形里就**根本不滚**，那也不该报名 —— 否则用户开完列表马上滚一下
+        会被当成"我方那次滚动"放过，等于"偶尔要滚两下才收起"。
+
+        怎么造"可见"：happy-dom 不做布局（rect 全是 0），所以把**这一格与容器**的几何都桩成"在里面"。
+        这里钉的是不变量本身（不滚 = 不报名 = 列表不受影响），比用整条点击流程去凑场景更稳
+        （真机上"完整可见且在冻结列右侧"那种格子不好稳定造出来）。
+    */
+    it("格子本来就完整可见：不调用 scrollTo（因此也不会报名、不会影响列表）", async () => {
+        setRows([pickRow("1000", "4087152117")])
+        const container = await renderTable()
+
+        const cell = cellAt(container, 0, PICK_COL)
+        /* 格子在可视矩形**里面**（容器视口 0,0–400,800；格子 10,10–110,30）。 */
+        cell.getBoundingClientRect = () =>
+            ({top: 10, bottom: 30, height: 20, left: 10, right: 110, width: 100, x: 10, y: 10}) as DOMRect
+        const box = container.querySelector<HTMLElement>(".overflow-auto")!
+        box.getBoundingClientRect = () =>
+            ({top: 0, bottom: 800, left: 0, right: 400, width: 400, height: 800, x: 0, y: 0}) as DOMRect
+        Object.defineProperty(box, "clientHeight", {configurable: true, get: () => 800})
+        Object.defineProperty(box, "clientWidth", {configurable: true, get: () => 400})
+
+        const scrolled: HTMLElement[] = []
+        const original = Element.prototype.scrollTo
+        Element.prototype.scrollTo = function (this: HTMLElement) {
+            scrolled.push(this)
+        }
+
+        try {
+            selectCell(cell)
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+            expect(scrolled).toHaveLength(0) // 看全了就不滚
+        } finally {
+            Element.prototype.scrollTo = original
+        }
     })
 
     it("拖过选值格只算拉选区，不展开（与普通格子同一条 dragged 闸门）", async () => {
@@ -355,7 +390,8 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
 
         // 表格一滚：CellPick 自己把列表收掉（滚轮滚数据区就是这个场景）。
-        用户滚动()
+        滚动一次() // 先让掉"进编辑时跟随可视"那一次
+        滚动一次() // 这一下才是用户滚的
         await waitFor(() => expect(items()).toHaveLength(0))
         expect(cell.querySelector(".cell-pick-mark")!.hasAttribute("data-popup-open")).toBe(false)
 
