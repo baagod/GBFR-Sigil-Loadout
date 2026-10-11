@@ -33,7 +33,29 @@ export type ClipboardEvent = globalThis.ClipboardEvent
  * 参数收成 `string`：唯一调用方 `toTsv` 收的就是 `string[][]`，所以这里不必再挡 null / 非字符串
  * （原先那几道 `== null` / `String()` 防御，挡的是物理上不会来的值）。
  */
-const escapeTsvValue = (value: string): string => (/^[\t\r ]*[=+@-]/.test(value) ? `'${value}` : value)
+/**
+ * **公式前缀的判据**：`=` `+` `@` `-`（允许前面有空白）。
+ *
+ * 写与读**共用这一条**：`escapeTsvValue` 按它决定要不要垫 `'`，`unescapeTsvValue` 按它决定要不要拆。
+ * 两边各写一遍的话，判据一旦漂移就会出现"垫了不拆"或"拆了没垫"——用户报的 `-` 变 `'-` 正是前者。
+ */
+const FORMULA_PREFIX = /^([\t\r ]*)([=+@-])/
+
+/** 写出时的转义：公式前缀垫一个 `'`（Excel/WPS 的标记，防 CSV 注入）。 */
+const escapeTsvValue = (value: string): string => (FORMULA_PREFIX.test(value) ? `'${value}` : value)
+
+/**
+ * 读入时的**逆运算**：把写出时垫的那个 `'` 拆掉。
+ *
+ * ‼️ 必须有这一步（用户报的 bug：格值是 `-`，复制再粘贴变成 `'-`）。`'` 是**给 Excel/WPS 看的标记**，
+ * 不是值的一部分；只垫不拆的话，本表自己往返一圈就多出一个字符。
+ *
+ * ⚠️ 只拆**紧跟在引号后、且确实是那四个公式前缀**的那一个 —— 值里本来就有的 `'`（`'abc`、`a'b`）不动。
+ * ⚠️ 代价：`' -1` 这种"真以引号开头"的写法会被吃掉引号（判据要跳过前导空白才与写出侧对称）。
+ * 真机上这类值不会出现，而跳不过空白会让 ` -1` 粘回来仍带引号 —— 取前者并在测试里钉住。
+ */
+const unescapeTsvValue = (value: string): string =>
+    value.startsWith("'") && FORMULA_PREFIX.test(value.slice(1)) ? value.slice(1) : value
 
 /** 二维值表 → TSV 文本（每行一块）。 */
 export const toTsv = (grid: string[][]): string => grid.map((line) => line.map(escapeTsvValue).join("\t")).join("\n")
@@ -62,13 +84,16 @@ export const toTsv = (grid: string[][]): string => grid.map((line) => line.map(e
  *   ⑦ 一整次粘贴 = **一步撤销**，Ctrl+Z 一次退回（逐格记的话得按十几次）。
  */
 
-/** TSV 文本 → 值表（每行一块）。行尾空行丢掉；**不裁空格、不解析引号**（与 Excel 一致，见规则⑤）。 */
+/**
+ * TSV 文本 → 值表（每行一块）。行尾空行丢掉；**不裁空格、不解析引号**（与 Excel 一致，见规则⑤）——
+ * 只拆写出侧垫的那个公式 `'`（见 `unescapeTsvValue`）。
+ */
 export const parseTsv = (text: string): string[][] =>
     text
         .replace(/\r\n?/g, "\n")
         .replace(/\n$/, "")
         .split("\n")
-        .map((line) => line.split("\t"))
+        .map((line) => line.split("\t").map(unescapeTsvValue))
 
 /** 表体里的一格：列 id 与**当前改动值**（空串 = 没改过）—— 后者是撤销要记的"改前值"。 */
 export type PasteCell = {columnId: string; current: string}
