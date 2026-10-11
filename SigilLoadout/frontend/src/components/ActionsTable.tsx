@@ -67,7 +67,7 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "@/components/actions-table/clipboard"
-import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {READ_ONLY_KEYS, acceptPaste, BranchPickContext, EnterEditContext, RevealContext, features, type ActionRow, type CopyArea, type CopySource, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
 
 /** 撤销栈里的一格：**只需要"恢复到什么"**（`clipboard.ts` 的 `PasteWrite` 比它多一个 `value`，可直接赋进来）。 */
 type UndoEntry = {rowId: string; columnId: string; before: string}
@@ -210,6 +210,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
+    /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
+    const scrollRef = useRef<HTMLDivElement>(null)
     /** 数据读不回来（后端/绑定出错）—— 只装这一件事；粘贴不再有"列对不上"那种拒绝。 */
     const [loadError, setLoadError] = useState("")
     /** 复制被拒的提示（多片跨行又跨列，见 `planCopy` 那段）；下一次复制/粘贴时清掉。 */
@@ -724,8 +726,25 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         const active = cellSelection[cellSelection.length - 1]
         return active ? snapshotKey(active.anchorRowId, active.anchorColumnId) : ""
     })()
+    /** 已经为哪一格排了一帧"跟随可视"（`revealActiveCell` 的幂等闸：同一帧重复喊只滚一次）。 */
+    const revealPendingRef = useRef<HTMLElement | null>(null)
+    /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */
+    const lastRevealedRef = useRef<HTMLElement | null>(null)
     /**
-     * 把活动格滚进视野（稳定引用，只挂在活动格上）。
+     * **当前活动格的"进编辑"句柄**（见 `EnterEditContext`）：**只有活动格会写它**（判据是
+     * `RowCell` 给的 `active`，见 `model.ts` 那条 ‼️）—— 别的格重渲不会把它覆盖掉。
+     */
+    const enterEditRef = useRef<(() => void) | null>(null)
+
+    /**
+     * **"跟随可视"的唯一实现**：把当前活动格摆进真正看得见的矩形里。
+     *
+     * 谁来喊它不改变算法，只是**触发源不同** —— 这一点是这条逻辑的关键（用户报过漏掉第二条）：
+     *   · 活动格**换人**时（`scrollActiveIntoView`，那个 ref 回调只挂在活动格上）；
+     *   · **进编辑**时（活动格没换人、选区也没变，ref 根本不会跑，必须显式喊一次，见 `RevealContext`）。
+     *
+     * ‼️ **不收"哪一格"这个参数**：两种触发源下"要摆的那一格"**永远就是当前活动格**，所以实现直接去
+     * DOM 里查它（`td.cell-active`）。这也让调用点不需要任何 DOM 引用 —— 传元素只是白加一层耦合。
      *
      * **算一次、滚一次**：位置完全由"真正看得见的四边"决定，不使用浏览器自己的 `scrollIntoView`
      * （它只认容器边缘，不知道表头正吸在上面、冻结列盖在左边，格子被盖住时它当"可见"、**点了毫无滚动**）。
@@ -734,16 +753,28 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      *     可视左沿 = 冻结列右沿               可视右沿 = 容器内容盒右
      *
      * 四条边同一条规则（`越界`：越界多少补多少），各让 `EDGE_PX`。
+     *
+     * ‼️ 稳定引用（`useCallback([])`）：它既要挂在活动格的 ref 上，又要经 context 下发到 `memo` 的格子，
+     * 所以里面**只用 ref 与 DOM**、不读任何渲染期的值。
      */
-    const scrollActiveIntoView = useCallback((el: HTMLTableCellElement | null) => {
-        const box = el?.closest<HTMLElement>(".overflow-auto")
-        if (!el || !box) return
+    const revealActiveCell = useCallback(() => {
+        const box = scrollRef.current
+        if (!box) return
+        /*
+            ‼️ **同一帧里重复喊只滚一次**（幂等做在这里而不是各个调用点）：
+            一次点击会先后走 `onFocus` 与 `onClick` 两条进编辑的路，两边都会喊 —— 不去重就滚两趟。
+            判据是"已经为**这一格**排了一帧"：活动格换了人就不算重复（那一格确实需要重新摆）。
+        */
+        const cell = box.querySelector<HTMLElement>("tbody td.cell-active")
+        if (!cell || revealPendingRef.current === cell) return
+        revealPendingRef.current = cell
         /* 等一帧：这一帧里活动格可能已经换人（重渲），所以**重新查一次**，别抓着旧引用。 */
         requestAnimationFrame(() => {
-            const cell = box.querySelector<HTMLElement>("tbody td.cell-active")
-            if (!cell) return
+            revealPendingRef.current = null
+            const 落 = box.querySelector<HTMLElement>("tbody td.cell-active")
+            if (!落) return
             const view = box.getBoundingClientRect()
-            const target = cell.getBoundingClientRect()
+            const target = 落.getBoundingClientRect()
             /* 吸顶表头压住上面、冻结列盖住左边：看得见的范围要从它们之外算起。 */
             const header = box.querySelector("thead")?.getBoundingClientRect().height ?? 0
             const frozen = [...box.querySelectorAll<HTMLElement>("thead th")].filter(
@@ -765,7 +796,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 不是"内容里的位置"，拿它算越界会得出"还在冻结层底下"，于是每走到这两列就把内容整体拉回最左
                 （用户实测）。它们不参与横向滚动。
             */
-            const pinned = getComputedStyle(cell).position === "sticky"
+            const pinned = getComputedStyle(落).position === "sticky"
             /*
                 ‼️ **末行/末列走到真极限**：这两格本来就在可视区内，四边都算不出越界。而"到极限"只能交给
                 浏览器 —— `scrollWidth - clientWidth` 取整后比真极限大 1px，那 1px 就是"滚动条还能再拖一点"
@@ -773,9 +804,9 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 ⚠️ 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是 `useCallback([])`，
                 闭包里那份列模型还是首次渲染的空数组，判断会恒假。
             */
-            const tr = cell.parentElement
+            const tr = 落.parentElement
             const isLastRow = tr === tr?.parentElement?.lastElementChild
-            const isLastColumn = cell === tr?.lastElementChild
+            const isLastColumn = 落 === tr?.lastElementChild
             const scrollTop = isLastRow ? SCROLL_TO_END : box.scrollTop + 越界(target.top, target.bottom, top + EDGE_PX, bottom + EDGE_PX)
             let scrollLeft = box.scrollLeft
             if (!pinned) {
@@ -785,6 +816,25 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             box.scrollTo({top: scrollTop, left: scrollLeft})
         })
     }, [])
+    /**
+     * "活动格挂上来了"的 ref 回调（`RowCell` 只把它挂给活动格那一格）—— 只是 `revealActiveCell`
+     * 的一个**触发源**（另一个是进编辑，见 `RevealContext`）。
+     *
+     * ⚠️ 与 `revealActiveCell` 分开只为**去重**（实测：去掉它就是两次 `scrollTo`）：React 在同一节点上
+     * 重挂 ref 时会先传 `null` 再传节点，而进编辑也会喊一次 —— 同一格连喊两次是白滚。
+     */
+    const scrollActiveIntoView = useCallback(
+        (el: HTMLTableCellElement | null) => {
+            if (!el) {
+                lastRevealedRef.current = null
+                return
+            }
+            if (lastRevealedRef.current === el) return
+            lastRevealedRef.current = el
+            revealActiveCell()
+        },
+        [revealActiveCell],
+    )
 
     /*
         ========================== 选中：**一套模型** ==========================
@@ -847,12 +897,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      */
     const handleArrowKey = (e: KeyboardEvent) => {
         const direction = ARROW_KEYS[e.key]
-        if (!direction || e.defaultPrevented) return
+        const isEnter = e.key === "Enter"
+        if ((!direction && !isEnter) || e.defaultPrevented) return
         // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
         const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
         const shift = mods === SHIFT
         if (mods !== 0 && !shift && mods !== CTRL) return
-
         /*
             ‼️ "活动格是哪一格"从**受控 state** 读，不读 `table.getFocusedCell()`：库那个原子要等下一次
             渲染才跟上（本次事件里还是上一次的位置）—— Ctrl / Shift 两条要按它算落点，读原子就会算错。
@@ -860,9 +910,32 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         const anchor = cellSelection[cellSelection.length - 1]
         if (!anchor) return
 
-        // 编辑框 / 列表导航优先：方向键在它们手里是"移光标 / 选下一项"。
+        // 编辑框 / 列表导航优先：方向键在它们手里是"移光标 / 选下一项"，Enter 是"提交 / 选中那一项"。
         if ((e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [role=combobox], [data-pick-open]"))
             return
+
+        if (!direction) {
+            // ---- Enter：进编辑（与"点已选中的格子"同一条口径）----
+            /*
+                ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
+                那是另一个功能），整行块同理 —— 不做比做错好。
+                判据与 `ActionRowView` 那道 `wasOnlyCell` 闸门同一个：只有一个正面区域、且行列都收在一格。
+            */
+            const bounds = getSelectionBounds()
+            const 单格 = bounds.length === 1 && bounds[0].minRowIndex === bounds[0].maxRowIndex && bounds[0].minColumnIndex === bounds[0].maxColumnIndex
+            if (!单格) return
+            /*
+                ‼️ **喊活动格自己的进编辑句柄**（`EnterEditContext` 登记的那一个）：普通格切输入框、
+                选值格展开列表 —— 两边实现不同，本层不该知道细节。只读列不登记 → 这里什么都不做。
+                "跟随可视"不在这里补：`Cell.enterEdit` / `CellPick` 展开时自己会喊 `reveal()`（与点击同一条口径）。
+
+                ⚠️ 别改成"派发一次真实 click"：那条路上 `Cell` 的 `shouldEditOnClick` 要 `pressRef` 里那份
+                "按下那一刻"的事实，而**方向键换格后直接按 Enter 根本没有 mousedown** —— 闸门判 false，
+                Enter 点不开（实测）。登记那套没有这个前提。
+            */
+            enterEditRef.current?.()
+            return
+        }
 
         e.preventDefault() // 表格在 `.overflow-auto` 里，不拦住方向键会顺手滚容器
 
@@ -1198,8 +1271,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            {/* 滚动容器：吸顶表头与格子里的伪元素都按它定位。 */}
-            <div className="min-h-0 flex-1 overflow-auto border table-border">
+            {/* 滚动容器：吸顶表头、格子里的伪元素、以及"跟随可视"都按它定位/测量。 */}
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto border table-border">
             <table
                 ref={tableRef}
                 /*
@@ -1287,6 +1360,13 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                         重跑这一整段（用户反馈"选择有点卡顿"就是这类每行重复调用堆出来的）。
                     */}
                     {/* 分支列的清单与搜索提示 —— 那一格自己来取（见 `BranchPickContext`）。 */}
+                    {/*
+                        ‼️ 下面两个 context 都是**为了省掉穿三层的 prop**（见 `model.ts`）：
+                        · `RevealContext`：进编辑时"跟随可视"。
+
+                    */}
+                    <RevealContext.Provider value={revealActiveCell}>
+                    <EnterEditContext.Provider value={enterEditRef}>
                     <BranchPickContext.Provider value={branchPick}>
                     {modelRows.map((row, rowIndex) => {
                         /*
@@ -1326,6 +1406,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                         )
                     })}
                     </BranchPickContext.Provider>
+                    </EnterEditContext.Provider>
+                    </RevealContext.Provider>
                 </tbody>
             </table>
             </div>

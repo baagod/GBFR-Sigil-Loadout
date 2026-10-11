@@ -1,6 +1,7 @@
-import {type RefObject, useEffect, useMemo, useRef, useState} from "react"
+import {type RefObject, useContext, useEffect, useMemo, useRef, useState} from "react"
 import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
+import {EnterEditContext, RevealContext} from "@/components/actions-table/model"
 
 /*
     动作表里的**选值格**：格子里是那个值 + 一个小箭头，**先选中、再点一下**才在格子下面挂出列表挑一个
@@ -38,6 +39,8 @@ export function CellPick({
     onCommit,
     shouldEditOnClick,
     dragged,
+    active,
+    enterEditRef,
 }: {
     /** 这一格的**改动值**（空串 = 没改过）；列表的选中态看的是"实际显示的那个值"。 */
     value: string
@@ -60,6 +63,10 @@ export function CellPick({
     shouldEditOnClick: () => boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不展开。 */
     dragged: RefObject<boolean>
+    /** 这一格是不是活动格：只有它登记（见 `CellContent` 的 `active`）。 */
+    active: boolean
+    /** 活动格的"进编辑"登记口（`EnterEditContext`）。 */
+    enterEditRef: RefObject<(() => void) | null> | null
 }) {
     const [open, setOpen] = useState(false)
     /**
@@ -67,6 +74,13 @@ export function CellPick({
      * "点到外面去了没有"的判据、关列表时把关列表的焦点还给它。
      */
     const cellRef = useRef<HTMLDivElement>(null)
+    /**
+     * "跟随可视"：展开列表（= 选值格的"进编辑"）时喊一声 —— 与普通格子的输入框同一条口径。
+     * 走 context 下发，不从 `CellContent` 穿 prop。
+     */
+    const reveal = useContext(RevealContext)
+    /* `enterEditRef` 由 `CellContent` 以 prop 传下来（那边已经读过 context，不必读两遍）。 */
+
     /** 这一轮关闭要**立刻消失**（滚动带出来的关闭用它：别让列表在原地淡出一百毫秒）。 */
     const [instantClose, setInstantClose] = useState(false)
     /** 关列表时要不要把焦点还回这一格（用户点到别处时不还，免得顶掉他刚点开的那一格）。 */
@@ -102,6 +116,15 @@ export function CellPick({
         `[]` 依赖：用到的 `dragged` 是 ref、`shouldEditOnClick` 对一个格子实例恒定（只读 `pressRef`），
         所以不会读到过期的值。
     */
+    /**
+     * **展开列表**（= 选值格的"进编辑"）：先跟随可视、再开。点击与 Enter 两条路都走它 ——
+     * 与普通格子的 `enterEdit` 一一对应（那边切输入框、这边开列表，别在这里另立一套）。
+     */
+    const openForEdit = () => {
+        reveal()
+        setInstantClose(false)
+        setOpen(true)
+    }
     useEffect(() => {
         const onDown = (e: PointerEvent) => {
             if (cellRef.current?.contains(e.target as Node)) pointerDownRef.current = true
@@ -114,10 +137,7 @@ export function CellPick({
             pointerDownRef.current = false
             if (!pendingOpenRef.current) return
             pendingOpenRef.current = false
-            if (!dragged.current && shouldEditOnClick()) {
-                setInstantClose(false)
-                setOpen(true)
-            }
+            if (!dragged.current && shouldEditOnClick()) openForEdit()
         }
         document.addEventListener("pointerdown", onDown, true)
         document.addEventListener("pointerup", release, true)
@@ -128,6 +148,12 @@ export function CellPick({
             document.removeEventListener("pointercancel", release, true)
         }
     }, [])
+
+    /**
+     * ‼️ **只有活动格登记**（与普通格同一条口径，见 `Cell.enterEdit`）：否则最后渲染的那一格
+     * 会把登记口覆盖成它自己，Enter 就会打开别的格。
+     */
+    if (active && enterEditRef) enterEditRef.current = openForEdit
 
     // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
     useEffect(() => {
@@ -189,8 +215,7 @@ export function CellPick({
                     eventDetails.cancel()
                     return
                 }
-                setInstantClose(false) // 开：复位"立刻消失"（弹层这时才重新挂载）
-                setOpen(true)
+                openForEdit() // 开：复位"立刻消失"（弹层这时才重新挂载）
             }}
         >
             {/* 触发器用库的（自带箭头）—— 别换回原始 `Trigger` 自己画一个。 */}

@@ -2,11 +2,11 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useContext, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
+import {memo, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
 
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
-import {BRANCH_KEYS, BranchPickContext, UNSET, displayText, type PressFacts, snapshotKey} from "./model"
+import {BRANCH_KEYS, BranchPickContext, EnterEditContext, RevealContext, UNSET, displayText, type PressFacts, snapshotKey} from "./model"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
 /**
@@ -31,6 +31,7 @@ export const CellContent = memo(function CellContent({
     abilityNames,
     pressRef,
     preSelected,
+    active,
     draggedRef,
     edit,
     onEnterEdit,
@@ -59,12 +60,16 @@ export const CellContent = memo(function CellContent({
     preSelected: boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 是"拖出去拉选区"，不该进编辑。 */
     draggedRef: RefObject<boolean>
+    /** 这一格是不是活动格 —— 只有它才登记进编辑句柄（见 `ActivityContext` 那条 ‼️）。 */
+    active: boolean
     edit: (rowId: string, key: string, value: string | null) => void
     /** 进入编辑态时喊一声（复制源那圈虚线要撤，见 `CopySource` 那段规则②）。 */
     onEnterEdit: () => void
 }) {
     // 分支列选值格的清单与搜索提示（见 `BranchPickContext`）—— 只读列用不到，但 hook 必须无条件调用。
     const branchPick = useContext(BranchPickContext)
+    /** 活动格的"进编辑"登记口（见 `EnterEditContext`）：**只有活动格写**，见 `model.ts` 那条 ‼️。 */
+    const enterEditRef = useContext(EnterEditContext)
     if (readOnly) {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
@@ -98,6 +103,8 @@ export const CellContent = memo(function CellContent({
                 onCommit={(value) => edit(rowId, fieldKey, value)}
                 shouldEditOnClick={shouldEditOnClick}
                 dragged={draggedRef}
+                active={active}
+                enterEditRef={enterEditRef}
                 {...pick}
             />
         )
@@ -106,11 +113,14 @@ export const CellContent = memo(function CellContent({
         <Cell
             value={raw}
             original={original}
+            fieldKey={fieldKey}
             onCommit={(value) => edit(rowId, fieldKey, value)}
             shouldEditOnClick={shouldEditOnClick}
             preSelected={preSelected}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
+            active={active}
+            enterEditRef={enterEditRef}
         />
     )
 })
@@ -165,11 +175,13 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-export function Cell({value, original, onCommit, shouldEditOnClick, preSelected, dragged, onEnterEdit}: {
+export function Cell({value, original, onCommit, shouldEditOnClick, preSelected, dragged, onEnterEdit, active, enterEditRef}: {
     /** 这一格的**改动**（空串 = 没改过）。 */
     value: string
     /** 这一格的**原值**：没改过时显示它当占位符。 */
     original: string
+    /** 列名（只为调试日志与将来的定位用） */
+    fieldKey: string
     /** 提交这一格；`null` = 回到原值（没改过）。 */
     onCommit: (value: string | null) => void
     /**
@@ -185,6 +197,7 @@ export function Cell({value, original, onCommit, shouldEditOnClick, preSelected,
      * 而是"进入编辑"就算动了源区）。`onClick` 与 `onFocus` 两条进编辑的路都得喊。
      */
     onEnterEdit: () => void
+
     /**
      * **这一格在这下 mousedown 之前选没选中**（由 `td` 在它自己的 handler 里取好、渲染时传下来；
      * 在下面那个 mousedown 里读 ref 是读不到的 —— 那时已经被改成"按下之后"了）。
@@ -192,6 +205,10 @@ export function Cell({value, original, onCommit, shouldEditOnClick, preSelected,
     preSelected: boolean
     /** **这一次按下之后鼠标有没有真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不进编辑。 */
     dragged: RefObject<boolean>
+    /** 这一格是不是活动格：只有它登记（见 `CellContent` 的 `active`）。 */
+    active: boolean
+    /** 活动格的"进编辑"登记口（`EnterEditContext`）。 */
+    enterEditRef: RefObject<(() => void) | null> | null
 }) {
     const [editing, setEditing] = useState(false)
     /** 显示值：没改过就是原值。 */
@@ -202,6 +219,8 @@ export function Cell({value, original, onCommit, shouldEditOnClick, preSelected,
     const placeholder = value === ""
     /** 显示态那一层：Esc 退出编辑时焦点要交回它（焦点环因此不闪）。 */
     const textRef = useRef<HTMLDivElement>(null)
+    /** "跟随可视"：进编辑时喊一声（见 `enterEdit`）。走 context 下发，省掉穿三层的 prop。 */
+    const reveal = useContext(RevealContext)
     /**
      * Esc 之后焦点还给文本层，而文本层的 `onFocus` 是"进来就编辑" —— 不给个开关就会**自己把自己
      * 弹回编辑态**，Esc 看起来完全没反应。
@@ -216,13 +235,37 @@ export function Cell({value, original, onCommit, shouldEditOnClick, preSelected,
      */
     const skipFocusEditRef = useRef(false)
     /**
-     * 进编辑的唯一入口：先把"进编辑"这件事播出去（复制区那圈虚线要撤，见 `CopySource` 规则②），
+     * ‼️ **一次点击只进一次编辑**：真机上一下点击会**先后**走 `onFocus` 与 `onClick` 两条路
+     * （两条都得进编辑，见下面那个 `onFocus`），而这里要做的三件事（播报、跟随可视、切状态）重复做
+     * 都是白费 —— 尤其"跟随可视"会为同一格排第二帧几何计算。用 ref 而不是 state 闸：同一事件里两次
+     * 调用读到的 `editing` 都还是旧值，闸不住。
+     */
+    const enteredRef = useRef(false)
+    /**
+     * 进编辑的唯一入口：把"进编辑"这件事播出去（复制区那圈虚线要撤，见 `CopySource` 规则②），
      * 再改自己的状态。**两条进编辑的路都得走它**，否则"从焦点进来"那条会漏掉播报。
+     *
+     * ‼️ `reveal()` **必须在这条路上喊**：滚动原本只挂在"活动格换人"的 ref 回调上，而"点已选中的
+     * 格子"选区没变、活动格没换人 —— 那个回调不跑，于是进了编辑却不跟随可视（用户报的）。
      */
     const enterEdit = () => {
+        if (enteredRef.current) return
+        enteredRef.current = true
         onEnterEdit()
+        reveal()
         setEditing(true)
     }
+    /* 退出编辑（Esc / 提交 / 外部改动）后把闸放开，否则这一格第二次点击进不了编辑。 */
+    useEffect(() => {
+        if (!editing) enteredRef.current = false
+    }, [editing])
+
+    /**
+     * ‼️ **只有活动格登记**（`active` 那道条件是必须的）：CellContent` / `Cell` 都是 `memo`，
+     * 活动格换人时别的行/格也会重渲 —— 无条件登记的话，最后渲染的那一格会把登记口覆盖成它自己
+     * （实测：方向键走到第 3 列，Enter 打开了最后一列）。
+     */
+    if (active && enterEditRef) enterEditRef.current = enterEdit
 
     // 没在编辑时跟着显示值走：别处保存完、重读回来的新值要上屏，草稿也跟着回正。
     if (!editing && draft !== shown) setDraft(shown)

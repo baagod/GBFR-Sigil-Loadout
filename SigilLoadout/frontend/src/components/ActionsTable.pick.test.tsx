@@ -86,7 +86,7 @@ function pressTrigger(trigger: Element) {
 }
 
 /** 单独渲染 `CellPick`（没有 `<td>`、也就没有 `PressFacts`）时用的闸门：永远"该进编辑"、没拖过。 */
-const openGate = {shouldEditOnClick: () => true, dragged: {current: false}}
+const openGate = {shouldEditOnClick: () => true, dragged: {current: false}, active: false, enterEditRef: null}
 
 /** 列表项（浮层挂在 body 上，所以从 `document` 找）。 */
 const items = () => [...document.querySelectorAll<HTMLElement>('[data-slot="combobox-item"]')]

@@ -1016,6 +1016,113 @@ describe("动作表 · 方向键移动活动格", () => {
     })
 
     /*
+        ‼️ **进编辑也要跟随可视**（用户报的场景）。
+
+        复现路径：选中一格 → 滚动位置让它只露一半 → 再点它一次 → 进入编辑态，但那一下**没有**滚动。
+
+        根因：滚动原本只挂在"活动格换人"上（`cellRef` 那个 ref 回调只给活动格）。
+        第二次点击时选区没变、活动格没换人 → ref 不跑 → 不滚；而进入编辑走的是另一条路
+        （`Cell.enterEdit`），它当时不接手滚动。
+    */
+    it("点已选中的格子进编辑：也要跟随可视（滚动一次）", async () => {
+        const container = await renderTable()
+        const scrolled: HTMLElement[] = []
+        const original = Element.prototype.scrollTo
+        Element.prototype.scrollTo = function (this: HTMLElement) {
+            scrolled.push(this)
+        }
+
+        try {
+            /* ① 选中它：这一下会滚（活动格换了人）。 */
+            const col = KEYS.indexOf(LongField) // 可编辑列（`id_` 那两列只读，点了不进编辑）
+            selectCell(cellAt(container, 0, col))
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+            expect(scrolled).toHaveLength(1)
+            scrolled.length = 0
+
+            /* ② 把可视位置挪走，模拟"它现在只露一半"（这一步不点任何东西，所以不该触发滚动）。 */
+            const box = container.querySelector<HTMLElement>(".overflow-auto")!
+            box.scrollTop = 300
+            box.scrollLeft = 999
+            expect(scrolled).toHaveLength(0)
+
+            /* ③ 再点它一次：进编辑，同时**必须**再跟随可视一次。 */
+            const cell = cellAt(container, 0, col)
+            const textLayer = cell.firstElementChild!
+            fireEvent.mouseDown(cell, {button: 0})
+            fireEvent.focus(textLayer)
+            fireEvent.click(textLayer)
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+
+            expect(cell.querySelector("input")).not.toBeNull() // 确实进了编辑态
+            expect(scrolled).toHaveLength(1)
+            expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
+        } finally {
+            Element.prototype.scrollTo = original
+        }
+    })
+
+    /*
+        ‼️ **Enter 进编辑**（用户口径）：与"点已选中的格子"同一条路 —— 进编辑**并且跟随可视**。
+
+        实现上不是"Enter 另写一套"：活动格把自己的"进编辑"句柄登记给 `ActionsTable`（`EnterEditContext`），
+        所以普通格切输入框、选值格展开列表都由那一格自己决定。
+    */
+    it("Enter 进编辑：并且跟随可视", async () => {
+        const container = await renderTable()
+        const scrolled: HTMLElement[] = []
+        const original = Element.prototype.scrollTo
+        Element.prototype.scrollTo = function (this: HTMLElement) {
+            scrolled.push(this)
+        }
+
+        try {
+            const col = KEYS.indexOf(LongField) // 可编辑列
+            /*
+                ⚠️ 先用**方向键**选中（真实用法就是"方向键走过去、再按 Enter"）：只 `selectCell`
+                的话 `pressRef` 是空的，`Cell.enterEdit` 里那道"这一下算不算用户要编辑"的闸会挡住。
+            */
+            selectCell(cellAt(container, 0, col - 1))
+            arrowOn(cellAt(container, 0, col - 1), "ArrowRight")
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+            const cell = cellAt(container, 0, col)
+            scrolled.length = 0
+
+            arrowOn(cell, "Enter")
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+
+            expect(cell.querySelector("input")).not.toBeNull() // 进了编辑
+            expect(scrolled).toHaveLength(1) // 且跟随可视
+        } finally {
+            Element.prototype.scrollTo = original
+        }
+    })
+
+    /*
+        ‼️ Enter 要**守住闸门**：只读列没有编辑态，按 Enter 什么都不该发生。
+        别的键（比如字母）也不该被这张表吞掉。
+    */
+    it("Enter 在只读列上不进编辑；多格选中时也不进", async () => {
+        const container = await renderTable()
+        const readonly = cellAt(container, 0, KEYS.indexOf("id_"))
+        selectCell(readonly)
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+        arrowOn(readonly, "Enter")
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+        expect(readonly.querySelector("input")).toBeNull()
+
+        /* 多格选中：Enter 语义不明（Excel 是"填满选区"），这里不做 —— 也不该进编辑。 */
+        selectCell(cellAt(container, 0, KEYS.indexOf(LongField)))
+        fireEvent.mouseDown(cellAt(container, 1, KEYS.indexOf(LongField)), {shiftKey: true})
+        fireEvent.mouseUp(document)
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+        const first = cellAt(container, 0, KEYS.indexOf(LongField))
+        arrowOn(first, "Enter")
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+        expect(first.querySelector("input")).toBeNull()
+    })
+
+    /*
         ‼️ 真机钉住这一条：**焦点不在表格里也要响应**。
 
         实测：库的选中处理器把 mousedown `preventDefault` 掉了（不让浏览器选文字），于是点完格子

@@ -12,7 +12,7 @@ import {
     sortFn_alphanumeric,
     tableFeatures,
 } from "@tanstack/react-table"
-import {createContext} from "react"
+import {createContext, type RefObject} from "react"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -61,6 +61,29 @@ export type BranchPickConfig = {
 }
 
 export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: ""})
+
+
+/**
+ * **"跟随可视"的下发口**：把当前活动格摆进真正看得见的矩形里。
+ *
+ * ‼️ 走 context 的理由与 `BranchPickContext` 一模一样（见上）：消费者只有 `Cell` 与 `CellPick` 两个叶子，
+ * 而从 `ActionsTable` 到它们要穿 `ActionRowView` → `RowCell` → `CellContent` 三层 —— 为一个"进编辑时
+ * 喊一声"的小动作加一个 prop、改四处签名，不划算。
+ *
+ * ⚠️ 它**不接收"哪一格"**：实现是去 DOM 里查当前活动格（`td.cell-active`），因为调用点（进编辑）
+ * 与活动格永远是同一格，传元素只是多一层耦合。
+ */
+export const RevealContext = createContext<() => void>(() => undefined)
+
+/**
+ * **活动格的"进编辑"登记口**：Enter 键据此进编辑，而"怎么进"由那一格自己决定
+ * （普通格切输入框、选值格展开列表；只读列不登记 → 按 Enter 什么也不发生）。
+ *
+ * ‼️ 这里有个**必须守住的前提**：`CellContent` / `Cell` 都是 `memo` 的，而活动格换人时**别的行/格**
+ * 也会因各自原因重渲 —— 若每格都无条件登记，最后渲染的那一格会把登记口**覆盖成它自己**
+ * （实测：方向键走到第 3 列，Enter 却点开了**最后一列**）。所以登记必须带"我是不是活动格"这个条件。
+ */
+export const EnterEditContext = createContext<RefObject<(() => void) | null> | null>(null)
 
 /**
  * 粘贴进来的这一格值，**收不收**。

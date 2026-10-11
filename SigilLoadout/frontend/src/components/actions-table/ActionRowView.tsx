@@ -71,6 +71,7 @@ const RowCell = memo(function RowCell({
     shown,
     selected,
     preSelected,
+    active,
     className,
     width,
     left,
@@ -111,6 +112,14 @@ const RowCell = memo(function RowCell({
      * 每格都传同一个稳定函数（由行那层按 `activeCellKey` 决定给不给），所以 memo 不受影响。
      */
     cellRef?: (el: HTMLTableCellElement | null) => void
+    /**
+     * **这一格是不是活动格**（`activeCellKey` 在行那层比出来的）。
+     *
+     * ‼️ 只有它才允许把自己登记给 Enter 键（`EnterEditContext`）：CellContent` / `Cell` 都是`memo`，
+     * 活动格换人时别的行/格也会重渲 —— 不设这个条件的话，最后渲染的那一格会把登记口覆盖成它自己
+     * （实测：方向键走到第 3 列，Enter 打开了最后一列）。
+     */
+    active: boolean
     /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
     getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
@@ -161,14 +170,14 @@ const RowCell = memo(function RowCell({
                 abilityNames={abilityNames}
                 pressRef={pressRef}
                 preSelected={preSelected}
+                active={active}
                 draggedRef={draggedRef}
                 edit={edit}
                 onEnterEdit={onEnterEdit}
             />
         </td>
     )
-})
-/**
+})/**
  * 表体的一行 —— **`memo` 是这里的性能命门**。
  *
  * 拖拽选区时每穿过一格就写一次选中 state，而一次写入会让 `ActionsTable` 整个重渲。没有这层
@@ -280,6 +289,8 @@ export const ActionRowView = memo(function ActionRowView({
                         shown={String(cell.getValue() ?? "")}
                         selected={cell.getIsSelected()}
                         preSelected={pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected}
+                        /* 判据与 cellRef 同一个：只有活动格才登记进编辑句柄（见 RowCell 的 ctive）。 */
+                        active={activeCellKey === snapshotKey(row.id, key)}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
                         className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)}`}
                         width={measured ? cell.column.getSize() : null}
@@ -298,7 +309,7 @@ export const ActionRowView = memo(function ActionRowView({
                         edit={edit}
                         startCellSelection={startCellSelection}
                         onEnterEdit={onEnterEdit}
-                    />
+                            />
                 )
             })}
         </tr>
