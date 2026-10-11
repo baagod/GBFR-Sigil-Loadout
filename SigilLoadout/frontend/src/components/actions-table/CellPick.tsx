@@ -1,7 +1,7 @@
 import {type RefObject, useContext, useEffect, useMemo, useRef, useState} from "react"
 import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
-import {EnterEditContext, RevealContext} from "@/components/actions-table/model"
+import {EnterEditContext, RevealContext, isRevealScrolling, markRevealScroll} from "@/components/actions-table/model"
 
 /*
     动作表里的**选值格**：格子里是那个值 + 一个小箭头，**先选中、再点一下**才在格子下面挂出列表挑一个
@@ -123,6 +123,13 @@ export function CellPick({
     const openForEdit = () => {
         reveal()
         setInstantClose(false)
+        /*
+            ‼️ **先报名"接下来那一下滚动是跟随可视发的"**，再开列表（契约见 `model.ts`）。
+            为什么由这一方报名、而不是在 `ActionsTable` 真正 `scrollTo` 的那一刻：那个滚动排在**下一帧**，
+            而且"跟随可视"只在格子真的没显示完整时才会滚。在"开列表"这一方报名，才能保证无论那一帧
+            滚没滚，下面那条"一滚就收起"的规则都不会被误导（滚了就让路，没滚更无所谓）。
+        */
+        markRevealScroll()
         setOpen(true)
     }
     useEffect(() => {
@@ -193,10 +200,18 @@ export function CellPick({
         return () => document.removeEventListener("pointerdown", onDown, true)
     }, [open])
 
-    /** 列表开着时，**谁一滚就把它收起来**（浮层钉在这一格上，不收就悬在别的行上面）。 */
+    /**
+     * 列表开着时，**谁一滚就把它收起来**（浮层钉在这一格上，不收就悬在别的行上面）。
+     *
+     * ‼️ **只让"用户滚动"触发它**：`ActionsTable` 的"跟随可视"自己那一下滚动不收 —— 那一类是程序
+     * 为了把活动格摆进可见区发的，收掉等于"自己把刚开的列表关掉"（用户报的：选中一个没显示完整的
+     * 选值格进编辑，列表刚展开就收起）。判据见 `model.ts` 里那条 `isRevealScrolling` 契约。
+     */
     useEffect(() => {
         if (!open) return
         const onScroll = (e: Event) => {
+            /* 自己那一次"跟随可视"的滚动不算用户滚动（见 `model.ts` 那条契约；这次报名在此消费掉）。 */
+            if (isRevealScrolling()) return
             if ((e.target as HTMLElement | null)?.closest?.('[data-slot="combobox-content"]')) return
             setInstantClose(true)
             setOpen(false)

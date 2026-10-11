@@ -55,6 +55,18 @@ const {renderTable, setRows} = useTableHarness()
  */
 const isPickOpen = () => items().length > 0
 
+/**
+ * 用户**真的滚了一下**（滚轮滚数据区）。
+ *
+ * ⚠️ 为什么要派发**两次**：`openForEdit` 会为"进编辑时跟随可视"那一下滚动报一次名，那条"谁一滚
+ * 就收起"的规则把**第一条**滚动让过去（契约见 `model.ts` 的 `isRevealScrolling`）。所以在测试里
+ * "用户滚动"必须比那一条多一次 —— 否则测的是"被我方那次让掉的"，不是用户滚动。
+ */
+const 用户滚动 = () => {
+    fireEvent.scroll(document)
+    fireEvent.scroll(document)
+}
+
 /** 让浮层有机会挂上 —— base-ui 是**异步**挂弹层的，所以"没打开"必须等过这一拍才算数。 */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
 
@@ -200,7 +212,37 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         expect(isPickOpen()).toBe(true)
     })
 
-    it("拖过选值格只算拉选区，不展开（与普通格子同一条 dragged 闸门）", async () => {        setRows([pickRow("1000", "4087152117"), pickRow("1001", "4087152117")])
+    /*
+        ‼️ **标出"下一次滚动是跟随可视发的"**：`CellPick` 的 `openForEdit` 在开列表前报名一次，那条
+        "谁一滚就收起"的规则会把**第一条**滚动让过去（那一条正是进编辑时跟随可视发的）。
+
+        所以这里如实分两步测：
+          · 第一条滚动 = 我方那一下 → **不许收**（这是用户报的 bug）；
+          · 第二条滚动 = 用户真滚 → **照旧要收**（证明那条规则没被废掉）。
+    */
+    it("进编辑时跟随可视造成的滚动：不收起列表；随后用户滚动照旧收起", async () => {
+        setRows([pickRow("1000", "4087152117")])
+        const container = await renderTable()
+
+        const cell = cellAt(container, 0, PICK_COL)
+        pressPick(cell) // 先选中（"先选后编"的第一下）
+        await tick()
+        pressPick(cell) // 第二下：进编辑，列表展开（同时报名"下一次滚动是跟随可视"）
+        await tick()
+        expect(isPickOpen()).toBe(true)
+
+        /* ① 跟随可视那一下（真机上排在展开之后的下一帧）。 */
+        container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
+        await tick()
+        expect(isPickOpen()).toBe(true)
+
+        /* ② 用户真滚：规则照旧生效。 */
+        用户滚动()
+        await waitFor(() => expect(isPickOpen()).toBe(false))
+    })
+
+    it("拖过选值格只算拉选区，不展开（与普通格子同一条 dragged 闸门）", async () => {
+        setRows([pickRow("1000", "4087152117"), pickRow("1001", "4087152117")])
         const container = await renderTable()
 
         const cell = cellAt(container, 0, PICK_COL)
@@ -313,7 +355,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
 
         // 表格一滚：CellPick 自己把列表收掉（滚轮滚数据区就是这个场景）。
-        fireEvent.scroll(document)
+        用户滚动()
         await waitFor(() => expect(items()).toHaveLength(0))
         expect(cell.querySelector(".cell-pick-mark")!.hasAttribute("data-popup-open")).toBe(false)
 

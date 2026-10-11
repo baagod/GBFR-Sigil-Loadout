@@ -75,6 +75,32 @@ export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<s
  */
 export const RevealContext = createContext<() => void>(() => undefined)
 
+/*
+    ‼️ **"下一次滚动是'跟随可视'自己发的"这条小契约** —— 两个模块之间：
+
+      · `CellPick.openForEdit` 在**开列表之前**报名（`markRevealScroll()`）；
+      · `CellPick` 那条"谁一滚就把展开列表收起来"的规则据此让路（`isRevealScrolling()` 顺手消费掉）。
+
+    为什么需要：列表那条规则（浮层钉在这一格上，不收就悬在别的行上面）**要保留**；但"进编辑时跟随
+    可视"那一下**不是用户滚动** —— 收掉它等于"程序自己把刚开的列表关掉"，表现就是"选中一个没显示
+    完整的选值格进编辑，列表刚展开就收起"（用户报的）。
+
+    ⚠️ 是**一次性**的、且**不设时间窗**：那个滚动排在下一帧，物理上用户不可能抢在它前面滚；
+    而"开列表后 300ms 内用户真滚了"是完全正常的事（滚轮一动就该收起）—— 用时间窗会把它一起放过，
+    反而制造新 bug（测过）。所以：报名一次、被第一条滚动消费掉，之后一切照旧。
+*/
+let revealScrollPending = false
+/** `CellPick.openForEdit` 用：报名"下一次滚动是跟随可视发的"。 */
+export const markRevealScroll = () => {
+    revealScrollPending = true
+}
+/** `CellPick` 用：这次滚动来自"跟随可视"吗（是就消费掉这次报名、别收列表）。 */
+export const isRevealScrolling = () => {
+    if (!revealScrollPending) return false
+    revealScrollPending = false
+    return true
+}
+
 /**
  * **活动格的"进编辑"登记口**：Enter 键据此进编辑，而"怎么进"由那一格自己决定
  * （普通格切输入框、选值格展开列表；只读列不登记 → 按 Enter 什么也不发生）。
