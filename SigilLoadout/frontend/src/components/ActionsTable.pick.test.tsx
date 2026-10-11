@@ -149,8 +149,58 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await waitFor(() => expect(items().length).toBeGreaterThan(0))
     })
 
-    it("拖过选值格只算拉选区，不展开（与普通格子同一条 dragged 闸门）", async () => {
+    /*
+        ‼️ **上下方向键不许打开列表，而要移动单元格**（用户口径）。
+
+        为什么这条会坏（真机实测两处原因，都留个记号）：
+          · base-ui 的触发器对上下键就是 `setOpen(true)`，绕过"先选后编"那道点击闸门 ——
+            所以要在 `onOpenChange` 里按 reason=`list-navigation` 取消；
+          · 表格那道"编辑框/列表优先"的闸门原先写的是 `[role=combobox]`，而**触发器本身就是
+            `role=combobox`** —— 焦点一落在选值格上（鼠标点过就会），方向键被整体让路、单元格不动。
+    */
+    it("选值格上按上下键：移动单元格，且不打开列表", async () => {
         setRows([pickRow("1000", "4087152117"), pickRow("1001", "4087152117")])
+        const container = await renderTable()
+
+        const cell = cellAt(container, 0, PICK_COL)
+        pressPick(cell)
+        await tick()
+        expect(cell.classList.contains("cell-active")).toBe(true) // 先选中（此时列表不该开）
+        expect(isPickOpen()).toBe(false)
+
+        /* 焦点停在触发器上（鼠标点过就会）—— 这是坏掉时的那条路径。 */
+        const trigger = cell.querySelector<HTMLElement>(".cell-pick-mark")!
+        trigger.focus()
+        fireEvent.keyDown(trigger, {key: "ArrowDown"})
+        await tick()
+
+        expect(isPickOpen()).toBe(false) // 没有凭空展开
+        expect(container.querySelector("td.cell-active")).toBe(cellAt(container, 1, PICK_COL)) // 选区跟着走
+    })
+
+    /*
+        ‼️ **Enter 仍然开列表**（回归用）：`ActionsTable` 那道"让路闸门"只该管方向键 —— Enter 必须
+        穿过去拿到 `preventDefault()`，否则"Enter 落在按钮型触发器上会再产生一次自己的 click"会把刚开的
+        列表又关掉（实测：`openForEdit` → `enterEdit` → `onOpenChange(next=false, reason=trigger-press)`）。
+    */
+    it("选值格上按 Enter：展开列表", async () => {
+        setRows([pickRow("1000", "4087152117")])
+        const container = await renderTable()
+
+        const cell = cellAt(container, 0, PICK_COL)
+        pressPick(cell)
+        await tick()
+        expect(isPickOpen()).toBe(false)
+
+        const trigger = cell.querySelector<HTMLElement>(".cell-pick-mark")!
+        trigger.focus()
+        fireEvent.keyDown(trigger, {key: "Enter"})
+        await tick()
+
+        expect(isPickOpen()).toBe(true)
+    })
+
+    it("拖过选值格只算拉选区，不展开（与普通格子同一条 dragged 闸门）", async () => {        setRows([pickRow("1000", "4087152117"), pickRow("1001", "4087152117")])
         const container = await renderTable()
 
         const cell = cellAt(container, 0, PICK_COL)
@@ -219,8 +269,8 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         expect(text).toHaveLength(CONTROL_TYPES.length) // 一项不多、一项不少
 
         // 原值那一项灰字；当前值那一项不灰。
-        expect(items()[1].className).toContain("text-[#a0a0a0]")
-        expect(items()[0].className).not.toContain("text-[#a0a0a0]")
+        expect(items()[1].className).toContain("text-[#a0a0a0]!")
+        expect(items()[0].className).not.toContain("text-[#a0a0a0]!")
     })
 
     it("**没改过**也标原值：原值就是最初那张表里的值（与占位符同一个）", async () => {
@@ -233,7 +283,25 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         // 当前值 == 原值 ⇒ 只有一项，那一项既带勾、又是灰的。
         expect(items()[0].textContent).toBe("4087152117")
         expect(items()[0].getAttribute("aria-selected")).toBe("true")
-        expect(items()[0].className).toContain("text-[#a0a0a0]")
+        expect(items()[0].className).toContain("text-[#a0a0a0]!")
+    })
+
+    /*
+        ‼️ **原值的灰字必须带 `!`**（用户报的）：库里那条 `.data-highlighted:text-accent-foreground`
+        特异性 (0,2,0)，高过灰字的 (0,1,0) —— 不带 `!` 时，指针划过原值那一项（或键盘走到它上）灰就被
+        高亮色吃掉，看着就是"原值那一项并不灰"。这里钉住类名带 `!`（= 赢得了层叠），
+        "高亮时确实仍灰"由真机探针验（happy-dom 里 pointer 悬停驱动的 `data-highlighted` 不可靠）。
+    */
+    it("原值那一项的灰字带 `!`（压得过库的高亮色）", async () => {
+        setRows([pickRow("1000", "4087152117", "1253898414")]) // 当前值 ≠ 原值，原值那一项才有灰
+        const container = await renderTable()
+
+        await openPick(cellAt(container, 0, PICK_COL))
+        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        const 原值项 = items().find((el) => el.textContent === "4087152117")!
+        expect(原值项.className).toContain("text-[#a0a0a0]!")
+        // 而当前值那一项不灰（灰 = "这是我改之前的原值"）
+        expect(items()[0].className).not.toContain("text-[#a0a0a0]")
     })
 
     it("滚出来的关闭之后再点：列表照旧开得出来", async () => {

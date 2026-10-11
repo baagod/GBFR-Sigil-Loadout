@@ -155,6 +155,31 @@ export function CellPick({
      */
     if (active && enterEditRef) enterEditRef.current = openForEdit
 
+    /**
+     * ‼️ **上下方向键不许打开列表**（用户口径）：列表只由"点一下 / Enter"打开。
+     *
+     * 为什么必须拦在**捕获阶段的原生监听**上（这是试了四种写法后唯一有效的）：
+     *   · base-ui 的触发器自己对上下键 `setOpen(true, {reason:'list-navigation'})` **并且**
+     *     `stopEvent()`（= `preventDefault` + `stopPropagation`）。那一下 `preventDefault` 会让表格的
+     *     方向键处理器直接让路 —— **连单元格都不动**；
+     *   · `ComboboxRoot` **不渲染自己的元素**，挂不上 keydown；
+     *   · 给触发器传 React `onKeyDown` 不生效（base-ui 的 props 合并把它盖掉了，实测）；
+     *   · 在 `onOpenChange` 里按 reason 取消会**连自己发起的打开一起取消**
+     *     （受控的 `open` 那时还是旧值，实测"鼠标点得开、Enter 打不开"）。
+     * 捕获监听挂在**触发器自身**、且早于 base-ui 的冒泡处理器 → 就地掐断，谁的处理器都不跑。
+     * ⚠️ 别加 `preventDefault`：表格的处理器要看到 `defaultPrevented === false` 才会移动单元格。
+     * 列表**已经开着**时不拦：那时上下键归 base-ui 的列表导航。
+     */
+    useEffect(() => {
+        const 触发器 = cellRef.current
+        if (!触发器 || open) return
+        const 拦 = (e: globalThis.KeyboardEvent) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") e.stopPropagation()
+        }
+        触发器.addEventListener("keydown", 拦, true)
+        return () => 触发器.removeEventListener("keydown", 拦, true)
+    }, [open])
+
     // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
     useEffect(() => {
         if (!open) return
@@ -255,14 +280,19 @@ export function CellPick({
                         /*
                             **原值那一项灰字**：与 FlagCell 的"原值就置着的位给灰字"同一个约定 ——
                             不管改没改过都灰（原值是只读资产里那一份，与格子空着时的占位符同一个值）。
-                            ⚠️ **不加 `!`**：`data-highlighted:*` 那类变体得能盖过它（划过时跟着高亮走）。
+
+                            ‼️ **必须带 `!`**：库里那条高亮规则是
+                            `.data-highlighted:text-accent-foreground[data-highlighted]`，特异性 (0,2,0)，
+                            高过 `.text-[#a0a0a0]` 的 (0,1,0) —— 不带 `!` 时，指针划过这一项（或键盘走到它上）
+                            灰就被高亮色吃掉，看着就是"原值那一项并不灰"（用户报的）。
+                            高亮底色是 `--accent`（暗色下 `#272727`，近黑），灰字压在上面可读。
                         */
                         <ComboboxItem
                             key={item}
                             value={item}
                             /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
                                ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
-                            className={`py-1! ${item === original ? "text-[#a0a0a0]" : ""}`}
+                            className={`py-1! ${item === original ? "text-[#a0a0a0]!" : ""}`}
                         >
                             {item}
                         </ComboboxItem>

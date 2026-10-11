@@ -888,7 +888,7 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      *     方向键归它；没选区就什么都不做，不抢别处的键。
      *     ⚠️ 判据**不用"焦点在不在表里"**：那张表自己会 `blur` 交焦点（见下面那段），方向键要能
      *     接在 `blur` 之后接着走；而"有选区"既够用、又不会把工具栏/别的表的键抢走。
-     *   · 焦点在编辑框里（普通格的 `input` / 选值格的 `role=combobox`）→ 让给它们；
+     *   · 焦点在编辑框里（`input` / `textarea` / `contenteditable`）→ 让给它们；
      *   · 选值格列表开着（触发器带 `data-pick-open`）→ 让给 base-ui 的列表导航
      *     （**绝不能动选区**：选区一变，`CellPick` 那条"一滚就收"的逻辑会把列表关掉）。
      *
@@ -910,12 +910,30 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
         const anchor = cellSelection[cellSelection.length - 1]
         if (!anchor) return
 
-        // 编辑框 / 列表导航优先：方向键在它们手里是"移光标 / 选下一项"，Enter 是"提交 / 选中那一项"。
-        if ((e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [role=combobox], [data-pick-open]"))
-            return
+        /*
+            ‼️ **让路闸门（只给方向键）**：编辑框 / 列表导航优先 —— 方向键在它们手里是"移光标 / 选下一项"。
+            只认这两类（语义各不相同）：
+              · `input / textarea / [contenteditable]` —— 焦点真的在打字（含列表里的搜索框）；
+              · `[data-pick-open]` —— 选值格列表开着，方向键归 base-ui 的列表导航。
+            ‼️ **不能拿 `[role=combobox]` 当判据**：选值格的触发器（`CellPick` 那层 `div`）**本身就是
+            `role=combobox`**，而鼠标点过格子后焦点就停在它上面 —— 那样写等于"焦点在选值格上时方向键
+            一律失效、单元格不动"（用户报的）。判据只认"**正在打字**"与"**列表开着**"这两种真的该让路的
+            状态；触发器被聚焦属于"就是这一格"，方向键该走格子。
+
+            ⚠️ 这道闸门**只管方向键**，Enter 必须穿过去：穿过去才会走到下面那个 `preventDefault()`，
+            而正是它压住了"Enter 落在按钮型的触发器上会再产生一次自己的 click"—— 那一下 click 会把刚
+            由 Enter 打开的列表又关掉（实测）。
+        */
+        const 在编辑或列表里 = (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [data-pick-open]")
 
         if (!direction) {
             // ---- Enter：进编辑（与"点已选中的格子"同一条口径）----
+            /*
+                ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
+                （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
+            */
+            if (在编辑或列表里 && (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]")) return
+            e.preventDefault()
             /*
                 ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
                 那是另一个功能），整行块同理 —— 不做比做错好。
@@ -937,6 +955,8 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             return
         }
 
+        if (在编辑或列表里) return
+
         e.preventDefault() // 表格在 `.overflow-auto` 里，不拦住方向键会顺手滚容器
 
         /*
@@ -944,6 +964,9 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
             而灰圈 `cell-focus` 画在 `td:focus-within` 上 —— 不交出去，方向键把活动格挪走之后，
             **旧格子上会留一圈灰线**（用户报的"先前点击的单元格灰框没消失"）。
             这里只交出"焦点在某个数据格里"的那一种；编辑框内的焦点在上面那道闸门已经让路了。
+
+            ⚠️ 必须在**移动之前**做（实测）：选值格的触发器是 base-ui 的组件，blur 它会走它自己的
+            focus-out 逻辑；放在移动之后会把这一次移动盖掉 —— 表现就是"焦点在选值格上按上下键，格子不动"。
         */
         const focusedCell = (document.activeElement as HTMLElement | null)?.closest?.("td")
         if (focusedCell && tableRef.current?.contains(focusedCell)) (document.activeElement as HTMLElement).blur()
