@@ -14,7 +14,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 
-import {KEYS, LongField, abilityNames, cellAt, clickToEdit, cleanup, t, useTableHarness} from "@/components/actions-table/testkit"
+import {KEYS, LongField, abilityNames, cellAt, clickToEdit, cleanup, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, rows} = useTableHarness()
 
@@ -240,7 +240,7 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         const errors: unknown[][] = []
         const spy = vi.spyOn(console, "error").mockImplementation((...args) => void errors.push(args))
         try {
-            render(<ActionsTable t={t} abilityNames={abilityNames} />)
+            render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps(rows())} />)
             await waitFor(() => expect(screen).toBeTruthy())
         } finally {
             spy.mockRestore()

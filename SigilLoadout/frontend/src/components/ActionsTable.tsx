@@ -50,7 +50,7 @@ import {
     type SortingState,
 } from "@tanstack/react-table"
 
-import {LoadActions, SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
+import {SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -114,35 +114,33 @@ const CTRL = 2
 /**
  * 动作表。列定义、编辑、选区都收在这里；保存由外面那排按钮触发（见 ActionsPanel）。
  *
- * ‼️ **数据可以从外面给**（`rows` / `keys`，见下）：那样这一层就**不再自己去读**
- * `LoadActions`，父组件成为唯一的数据来源。不给就退回"挂载时自己读一次"（既有测试台架走这条路）。
- * 两条路只差"谁去读"，读到的形状完全一样 —— 所以 `ActionsPanel` 用前者，测试用后者，
- * 不必让测试去模拟父组件。
+ * ‼️ **数据从外面给**（`rows` / `keys`）—— 这一层是**受控视图**，自己不读 `LoadActions`。
+ * 读取归 `ActionsPanel`（这一页数据的所有者）：只有一处读，就不存在"同一份数据两个来源、
+ * 谁先回来谁说了算"那类顺序问题。
+ *
+ * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
+ * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
 export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
-    /**
-     * **外部给的数据**（受控）。给了就跳过自己那次 `LoadActions`。
-     * ⚠️ 它是**初始值**：父组件换角色时用 `key` 整个重新挂载（见 ActionsPanel），所以不需要在这里
-     * 跟着 prop 变化去同步 state —— 那会与"每格草稿、撤销栈、选区"的归属打架。
-     */
-    rows?: ActionRow[]
-    /** 字段顺序（= 表头顺序），与 `rows` 配套。 */
-    keys?: string[]
+    /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
+    rows: ActionRow[]
+    /** 字段顺序（= 表头顺序），与 `rows` 配套（见 `model.columnsOf`）。 */
+    keys: string[]
     /** 数据到位后把"保存"这个动作交出来 —— 这个组件自己没有工具条（与 GlobalParamPanel 同一个约定）。 */
     onSaveReady?: (save: () => Promise<void>) => void
 }) {
-    const [rows, setRows] = useState<ActionRow[]>(rowsProp ?? [])
+    const [rows, setRows] = useState<ActionRow[]>(rowsProp)
     /**
      * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
      * 稳定，见下）、读不到最新的 `rows`；走 `setRows` 的 updater 里读则会踩 React 重跑 updater 那个坑。
      */
     const rowsRef = useRef<ActionRow[]>([])
     rowsRef.current = rows
-    /** 字段顺序（= 表头顺序）：后端保证同一份表里每条记录的键序列一致，取第一条即可。 */
-    const [keys, setKeys] = useState<string[]>(keysProp ?? [])
+    /** 字段顺序（= 表头顺序）：受控，直接来自 prop（见 `model.columnsOf`），本层不自己算也不改。 */
+    const keys = keysProp
     /**
      * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
@@ -226,45 +224,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     const tableRef = useRef<HTMLTableElement>(null)
     /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
     const scrollRef = useRef<HTMLDivElement>(null)
-    /** 数据读不回来（后端/绑定出错）—— 只装这一件事；粘贴不再有"列对不上"那种拒绝。 */
-    const [loadError, setLoadError] = useState("")
     /* 剪贴板 / 撤销 / `edit` 那一套统一在 `useClipboardHistory` 里 —— 它的入参要用到下面的
        `tableInstanceRef`，所以调用点放在那之后（见文件中部）。 */
-
-    /*
-        ‼️ **数据要么外面给、要么这里读一次 —— 不并行**（`rowsProp` 给了就整段跳过）。
-        两条路都进来会得到"同一份数据两个来源"，而"谁先回来"就成了隐式依赖（换角色时尤其明显）。
-
-        不给 prop 的那条路（测试台架走它）与以前一字不差：读回来 → 建 rows/keys → 重置量宽。
-    */
-    useEffect(() => {
-        if (rowsProp) return
-        void (async () => {
-            try {
-                const loaded = (await LoadActions()) ?? []
-                setRows(
-                    loaded.map((action) => ({
-                        id: action.id,
-                        values: Object.fromEntries(action.fields.map((field) => [field.key, field.value ?? ""])),
-                        originals: Object.fromEntries(action.fields.map((field) => [field.key, field.original])),
-                    })),
-                )
-                const loadedKeys = (loaded[0]?.fields ?? []).map((field) => field.key)
-                setKeys(loadedKeys)
-                setPinning({start: loadedKeys.slice(0, PINNED_COUNT), end: []})
-                /*
-                    ⚠️ "重新量列宽"必须挂在这儿（读到新数据的那一刻），**不能**写成
-                    `useEffect(..., [keys])` —— 那种写法每次都在测量**之后**把 `measured` 抹回 false：
-                    同一轮里 `useLayoutEffect` 先跑（量完置 true）、`useEffect` 后跑（又置 false），
-                    于是永远切不到 `table-fixed`、列宽也永远不取整。
-                */
-                setMeasured(false)
-                setColumnSizing({})
-            } catch (e) {
-                setLoadError(String(e))
-            }
-        })()
-    }, [rowsProp])
 
     // 一列一个字段。`accessorFn` 就是 `shownValue` —— 排序与筛选都按显示值走，见那个函数的说明。
     const columns = useMemo<ColumnDef<typeof features, ActionRow>[]>(
@@ -288,9 +249,11 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             ‼️ **关掉"数据一变就清空选区"**。它按 `data` 的引用变来判"数据换了"，而我们每次改一格都会换
             `rows` 数组（`setRows`），于是**粘一次就会把刚设好的选区当场地清掉**（实测：粘完 6 格选中数归 0）。
             粘完选中刚粘的那一片是用户明确要的（Excel 就是这个手感）。
-            代价：真·重读数据（`LoadActions`）之后选区可能指向不存在的行 —— 那条路本来就会把 `keys`/`rows`
-            整体换掉，界面上表都重建了，库对"角落已解析不了"的选区是**跳过**（`getCellSelectionBounds` 会
-            略掉解析不出的范围，不是崩），可以接受。
+
+            代价：真·换一份数据（父组件换角色）时选区会指向不存在的行 —— 但那条路是**整表重新挂载**
+            （`key={charCode}`，见 `ActionsPanel`），根本不会有旧选区留下来。理论上的另一种情况
+            （数据原地换掉而表没重挂）库对"角落解析不了"的选区是**跳过**（`getCellSelectionBounds`
+            略掉解析不出的范围，不是崩），也可以接受。
         */
         autoResetCellSelection: false,
         /*
@@ -915,8 +878,11 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         }
     })
 
-    if (loadError) return <p className="text-xs text-destructive">{loadError}</p>
-    if (keys.length === 0) return <p className="text-xs text-muted-foreground">{t.loading}</p>
+    /*
+        ‼️ 这里**不再有"还没读到 / 读失败"两种早退**：数据是外面给的（受控），读取的失败与"有没有
+        记录"都由 `ActionsPanel` 判（见它渲染处那三态）。表只在"有数据可显示"时才被挂上。
+    */
+    if (keys.length === 0) return null
 
     return (
         /*
