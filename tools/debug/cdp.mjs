@@ -1,8 +1,9 @@
 /*
-    两个探针共用的 **CDP 管道**：连上"正在运行的工具"那个 page target，给出 `send` / `evaluate` / `sleep`。
+    探针共用的 **CDP 管道**：连上"正在运行的工具"那个 page target，给出 `send` / `evaluate` / `sleep`。
 
-    为什么要抽出来：管道（连 target、按 id 配回包、把异常翻成抛错）在两个探针里各写了一遍 ——
-    连错东西时两边表现不一致，改"选哪个 target"这种规则还得改两处。
+    为什么要抽出来：管道（连 target、按 id 配回包、把异常翻成抛错）原本在两个探针里各写了一遍 ——
+    连错东西时两边表现不一致，改"选哪个 target"这种规则还得改两处。现在探针只剩 cdp-probe.mjs 一个，
+    这层留着是为了它别再长回去。
 
     ⚠️ 只能 `Input.dispatchMouseEvent` 发真鼠标：合成事件（`dispatchEvent`）**驱动不了这张表的选区**
     （React 的选区 handler 不认）。

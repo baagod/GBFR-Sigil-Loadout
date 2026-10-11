@@ -46,6 +46,11 @@ function Stop-Tool {
 
 Stop-Tool
 
+# 部署完那次核对（见下）需要一个"这次构建从什么时候开始"的锚点，就在这儿取。
+# 不能拿"现在 - LastWriteTime < 30s"当判据 —— assets\ 那十几兆拷完、或盘慢的时候早过了 30 秒，
+# 明明是成功的部署却报"没生效"（实测踩过）。比时间戳没有这个假设。
+$started = Get-Date
+
 Push-Location $toolDir
 try {
     if (-not $NoTypecheck) {
@@ -63,18 +68,26 @@ try {
 
 # assets\：运行时读的那一份（data.zip / *.json）。exe 换新了而资产没跟上，是"作者本机看不出、别人装上
 # 才发现"的那类毛病，所以这里一并拷 —— 十几兆，不值得为它省这一下。
-Copy-Item -Path (Join-Path $toolDir 'assets\*') -Destination (Join-Path $modDir 'assets') -Recurse -Force
+# 目标目录要先建：mod 目录是别人（deploy.ps1）+ 历史版本留下的，不保证已经有 assets\。
+$assetsDir = Join-Path $modDir 'assets'
+New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
+Copy-Item -Path (Join-Path $toolDir 'assets\*') -Destination $assetsDir -Recurse -Force
 
 # ⚠️ 部署完**必须**核对一次：这个脚本对外只打印一句"快速部署完成"，而前面有一堆可能悄悄不生效的
 # 环节（go build 有没有真写成、工具进程有没有让出文件）—— 光看那句话分不出"换掉了"与"还是旧的那份"。
 # 实测踩过：界面改完怎么刷新都不变，查半天才发现 Mods 里的 exe 是旧的。
 #
-# 判据用"文件是不是刚刚生成的"，而不是跟某个基准哈希对比：`go build -o $exe` 是**直接写到 mod 目录**
-# 的（这一步本身就是部署），没有一个"构建产物"可以拿来比对 —— 第一版跟 `$toolDir\SigilLoadout.exe`
-# 比，那是上一次 build-release 留下的旧文件，于是每次必误报。
-$age = (Get-Date) - (Get-Item -LiteralPath $exe).LastWriteTime
-if ($age.TotalSeconds -gt 30) {
-    throw "$exe 不是刚刚生成的（$([math]::Round($age.TotalSeconds)) 秒前）—— go build 或覆盖没生效，别只看'完成'那两个字。"
+# 判据是"$exe 的写入时间落不落在这次构建的窗口里"，不是跟某个基准哈希对比：`go build -o $exe` 是**直接
+# 写到 mod 目录**的（这一步本身就是部署），没有一个"构建产物"可以拿来比对 —— 第一版跟
+# `$toolDir\SigilLoadout.exe` 比，那是上一次 build-release 留下的旧文件，于是每次必误报；第二版改成
+# "30 秒内算新"，又会在慢盘/大 assets 上误报（见开头）。
+#
+# ⚠️ 窗口下界要比 $started 早 2 秒：NTFS 的时间戳有粒度，而这个脚本自己的构建经常不到 2 秒就写完，
+#    那时 `-o $exe` 拿到的时间戳可能落在 $started 之前一点点 —— 用 `mtime -lt $started` 判会把成功报成失败。
+$postExe = Get-Item -LiteralPath $exe
+$age = (Get-Date) - $postExe.LastWriteTime
+if ($postExe.LastWriteTime -lt $started.AddSeconds(-2)) {
+    throw "$exe 不是这次构建写出来的（最后写入 $([math]::Round($age.TotalSeconds)) 秒前，构建开始于 $($started.ToString('HH:mm:ss'))）—— go build 或覆盖没生效，别只看'完成'那两个字。"
 }
 
 if ($DebugPort -gt 0) {

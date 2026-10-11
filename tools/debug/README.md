@@ -4,9 +4,7 @@
 单元测试跑的 happy-dom **不做真实布局** —— `getBoundingClientRect` 量出来全是 0，像素级的事只有在真浏览器里
 才看得见。这一套就是那条"看得见"的路，别再靠"让人截图 → 猜"。
 
-## 两种用法
-
-### A. 直接量**正在运行的工具**（最常用）
+## 用法
 
 ```powershell
 # 1) 带调试端口起工具（端口是 main.go 的 debugBrowserArgs 读的环境变量）
@@ -16,37 +14,28 @@ pwsh -File tools\deploy-quick.ps1 -DebugPort 9222      # 它会把端口开好�
 node tools/debug/cdp-probe.mjs --page 角色动作 --shot out.png
 node tools/debug/cdp-probe.mjs --expr "document.querySelectorAll('td.cell-selected').length"
 node tools/debug/cdp-probe.mjs --clip 0,140,640,200 --scale 4 --shot zoom.png
-
-# 3) 选区四边的像素体检（真鼠标拖一片，再数四条边各有几个像素是选区色）
-node tools/debug/selection-edges.mjs
-node tools/debug/selection-edges.mjs --row 2 --col 5 --span 4 --shot edges.png
 ```
 
 ⚠️ `deploy.ps1`（正式部署）**不带**调试端口，跑过它之后 CDP 就连不上了 —— 要再量就重新跑一次上面的第 1 步。
 
-### B. 只渲染 `ActionsTable` 的独立调试页（不启整个应用）
+## 为什么没有"独立调试页"
 
-宿主应用要读一堆随包资产（`sigils.chara.json` 等），在没有 Wails 后端的浏览器里全报错、噪音盖过要查的东西。
-`entry.tsx` 只渲染这一张表、只 mock 它用到的四个调用：
+曾经有一个：`entry.tsx` + `index.html` + `serve.mjs` + `build.ps1`，即"只渲染 `ActionsTable`、不启整个应用，
+省得随包资产报错刷屏"。**已整体删除**，因为它从来没真正可用过：
 
-```powershell
-pwsh -File tools\debug\build.ps1 -Watch     # entry.tsx → entry.js（esbuild，产物只落在这个目录）
-node tools/debug/serve.mjs                  # 起 http://127.0.0.1:8792（并把 /wails/runtime mock 掉）
-```
+- `entry.tsx` 里 `<ActionsTable t={t} />` 漏传必填的 `abilityNames` → 一渲染就 TypeError；
+- `entry.tsx` 在导入期就把 `window.fetch` 换掉了，`serve.mjs` 那个 `/wails/runtime` mock 分支**永不执行**；
+- 宿主行为（页签、保存、真实数据）本来就不在里面 —— 查那些还得回真机。
 
-它复用**生产构建出的那份 CSS**（类名同一套），所以查 Tailwind 类名/几何时和真机一致；但**不含** React 之外的
-宿主行为（页签、保存按钮、真实数据），要验那些请走 A。
+要量就走上面那条路：**让工具带着 `-DebugPort` 起来，直接量它**（自带真后端、真资产，没有第二份 mock 会漂移）。
+需要临时脚本就照 `cdp-probe.mjs` 的写法写一个 `--expr`。
 
 ## 文件一览
 
 | 文件 | 作用 |
 |---|---|
 | `cdp-probe.mjs` | CDP 直连运行中的工具：跑任意 JS、量动作表布局、按 `--clip/--scale` 放大截图 |
-| `selection-edges.mjs` | 用**真鼠标**（`Input.dispatchMouseEvent`）拖出一片选区，逐边数像素，验证轮廓没断 |
-| `entry.tsx` | 独立调试页的入口：只渲染 `ActionsTable`，mock 四个后端调用 |
-| `index.html` | 调试页外壳（资源 URL 由 `serve.mjs` 回填成带 hash 的真实文件名） |
-| `serve.mjs` | 静态服务器 + `/wails/runtime` mock |
-| `build.ps1` | 用 esbuild 把 `entry.tsx` 打成 `entry.js` |
+| `cdp.mjs` | 探针共用的 CDP 管道：连 page target，给 `send` / `evaluate` / `sleep` |
 
 > 合成事件（`dispatchEvent`）**驱动不了这张表的选区** —— React 的选区 handler 不认。要动鼠标就用
-> `Input.dispatchMouseEvent`（`selection-edges.mjs` 里就是这么写的）。
+> `Input.dispatchMouseEvent` 发真鼠标（协议细节见 `cdp.mjs` 头部注释）。

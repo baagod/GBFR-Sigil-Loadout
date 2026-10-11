@@ -24,7 +24,6 @@ const MEASURE = `JSON.stringify((() => {
   const tt = [...document.querySelectorAll("table")].find(t => t.querySelectorAll("thead th").length > 20)
   if (!tt) return {错误: "没找到宽表（动作表没打开？先切到「角色动作」页签）", 页面表格数: document.querySelectorAll("table").length}
   const th = [...tt.querySelectorAll("thead th")]
-  const td = [...tt.querySelectorAll("tbody tr:first-child td")]
   const inner = th.map(h => h.firstElementChild).filter(Boolean)
   const cellInners = [...tt.querySelectorAll("tbody td")].map(c => c.firstElementChild).filter(Boolean)
   const cs = el => getComputedStyle(el)
