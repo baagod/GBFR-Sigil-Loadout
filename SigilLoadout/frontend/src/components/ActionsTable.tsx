@@ -90,6 +90,12 @@ const SHIFT = 1
 const CTRL = 2
 
 /**
+ * 把格子滚进视野时**统一让出的 1px**：量到的是单元格**内容盒**，外面还画着格线与容器边框 ——
+ * 不留这 1px，贴边那格的边框就被切掉一条。见 `scrollActiveIntoView`。
+ */
+const EDGE_PX = 1
+
+/**
  * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
  *
  * **会消失**
@@ -715,19 +721,62 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
     /**
      * 把活动格滚进视野（稳定引用，只挂在活动格上）。
      *
-     * ‼️ **不自己算滚动量**：第一版那么写的，真机证明是错的 —— 读数只在布局落定时才可信，而且
-     * **冻结列永远"看起来在视野里"**（`getBoundingClientRect().left` 被 sticky 钉在容器左边），
-     * "该往左滚"的判据恒假，横向就再也回不到第一列。
+     * **算一次、滚一次**：位置完全由"真正看得见的四边"决定，不使用浏览器自己的 `scrollIntoView`
+     * （它只认容器边缘，不知道表头正吸在上面、冻结列盖在左边，格子被盖住时它当"可见"、**点了毫无滚动**；
+     * 而且它把位置落在小数上，让后续判断不可靠）。
      *
-     * 所以这里只做一件事：让浏览器把这一格露出来（它懂 sticky 与吸顶表头）。
-     * "滚动条走到那一头"归 `Ctrl+方向键`（见 `handleArrowKey`）—— 那是"跳到边缘"才有的口径。
+     *     可视上沿 = 容器顶 + 吸顶表头高      可视下沿 = 容器内容盒底
+     *     可视左沿 = 冻结列右沿               可视右沿 = 容器内容盒右
+     *
+     * 四条边用同一条规则（`越界`：越界多少补多少），`EDGE_PX` 是统一的 1px 余量：量到的是单元格
+     * **内容盒**，外面还画着格线与容器边框 —— 不留这 1px，贴边那格的边框就被切掉一条。
+     *
+     * ⚠️ 横向**只对非钉住的格子生效**：`id_` / `abilityTag_` 的 `left` 是它被钉住的屏幕位置，不是内容
+     * 位置，拿它算越界会得出"还在冻结层底下"，于是每走到这两列就把内容整体拉回最左（用户实测）。
      */
     const scrollActiveIntoView = useCallback((el: HTMLTableCellElement | null) => {
         const box = el?.closest<HTMLElement>(".overflow-auto")
         if (!el || !box) return
         /* 等一帧：这一帧里活动格可能已经换人（重渲），所以**重新查一次**，别抓着旧引用。 */
         requestAnimationFrame(() => {
-            box.querySelector<HTMLElement>("tbody td.cell-active")?.scrollIntoView({block: "nearest", inline: "nearest"})
+            const cell = box.querySelector<HTMLElement>("tbody td.cell-active")
+            if (!cell) return
+            const view = box.getBoundingClientRect()
+            const target = cell.getBoundingClientRect()
+            /* 吸顶表头压住上面、冻结列盖住左边：看得见的范围要从它们之外算起。 */
+            const header = box.querySelector("thead")?.getBoundingClientRect().height ?? 0
+            const frozen = [...box.querySelectorAll<HTMLElement>("thead th")].filter(
+                (th) => th.style.left !== "" && th.style.left !== "auto",
+            )
+            const top = view.top + header
+            const left = frozen.reduce((max, th) => Math.max(max, th.getBoundingClientRect().right), view.left)
+            /*
+                ‼️ 下/右边界取**内容盒**（`clientWidth/Height`），不是 `getBoundingClientRect()` 的边框盒：
+                边框盒把**滚动条占的那条槽**也算进去了（真机实测：容器 1240 宽、`clientWidth` 只有 1223，
+                滚动条吃掉 17px），而滚动条画在内容之上 —— 格子滚到那儿时**右边框整条被滚动条压住**
+                （真机实测：格右距边框盒右沿 2px 时右边框 0 像素，距 15px 才正常）。
+                内容盒正好扣掉边框与滚动条，也就是"真正看得见"的那块。
+            */
+            const right = view.left + box.clientWidth
+            const bottom = view.top + box.clientHeight
+            const 钉住 = getComputedStyle(cell).position === "sticky"
+            const 越界 = (near: number, far: number, min: number, max: number) => (near < min ? near - min : far > max ? far - max : 0)
+            const 横越界 = 钉住 ? 0 : 越界(target.left, target.right, left, right + EDGE_PX)
+            const scrollTop = box.scrollTop + 越界(target.top, target.bottom, top + EDGE_PX, bottom + EDGE_PX)
+            const scrollLeft = box.scrollLeft + 横越界
+            box.scrollTo({top: scrollTop, left: scrollLeft})
+            /*
+                ‼️ **末行/末列：直接给大值**，让浏览器自己夹到真极限。不去算 `scrollWidth - clientWidth`：
+                那两个属性都取整（见 MDN），整数相减可能比真实极限（小数）差不到 1px —— 那 1px 就是
+                "滚动条还能再拖一点"（用户实测）。写个大值由浏览器夹，永远落在真极限上。
+                ⚠️ 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是 `useCallback([])`，
+                闭包里那份列模型还是首次渲染的空数组，判断会恒假。
+            */
+            const tr = cell.parentElement
+            const 末行 = tr === tr?.parentElement?.lastElementChild
+            const 末列 = cell === tr?.lastElementChild
+            if (末行) box.scrollTop = Number.MAX_SAFE_INTEGER
+            if (末列 && !钉住) box.scrollLeft = Number.MAX_SAFE_INTEGER
         })
     }, [])
 

@@ -437,6 +437,13 @@ table th.cell-pinned {
 */
 .overflow-auto:has(> table .cell-handle) {
     background-color: #0a0a0a;
+    /*
+        ‼️ **给滚动条留位**：不留的话，`getBoundingClientRect().right` 把滚动条占的那条槽也算进"视口"，
+        而滚动条画在内容之上 —— 活动格滚到右沿附近时，它的**右边框正好被滚动条压住**（真机实测：
+        格右距视口右 2px 时右边框 0 像素，距 15px 时正常）。
+        留位后布局自己会把可视区收窄，"格子可见"与"边框可见"就一致了。
+    */
+    scrollbar-gutter: stable;
 }
 
 /*
@@ -511,6 +518,20 @@ td.cell-edge-left {
 */
 tbody tr:first-child > td.cell-edge-top {
     z-index: 41;
+}
+
+/*
+    ‼️ **末列的右边框收回格内**。
+
+    轮廓的右边框整条画在**格子外面**（`right: -1px` + 2px 宽），而表格用
+    `[&_tr>*:last-child]:border-r-0` 去掉了末列的格线 —— 撑出去的那 1px 会悬在表格外沿。
+    历史解法是"干脆不画"（`selectionClass` 摘掉 `right` 类），代价是**末列选中时右边框整条消失**
+    （真机逐像素实测：`border-right-width: 0px`，用户报的"没看到右边框"）。
+
+    这里把右边框收回格内：2px 完整可见、也不悬在表外。与上面「第一行上边框 `top: 0`」同一个手法。
+*/
+tbody tr > td:last-child.cell-edge-right::before {
+    right: 0;
 }
 
 /* ======================== 选区轮廓的几何（完） ======================== */

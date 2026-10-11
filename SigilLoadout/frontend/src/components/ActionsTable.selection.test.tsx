@@ -986,22 +986,32 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("换格后滚动：滚的是新活动格（排在一帧之后）", async () => {
         const container = await renderTable()
+        /* 钉"排在一帧之后"用 `scrollTo` 的调用记录（`this` 就是滚动容器）。 */
         const scrolled: HTMLElement[] = []
-        const original = Element.prototype.scrollIntoView
-        Element.prototype.scrollIntoView = function (this: HTMLElement) {
+        const original = Element.prototype.scrollTo
+        Element.prototype.scrollTo = function (this: HTMLElement) {
             scrolled.push(this)
         }
 
         try {
             selectCell(cellAt(container, 0, 0))
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+            scrolled.length = 0 // 只看方向键那一次
+
             arrowOn(cellAt(container, 0, 0), "ArrowRight")
             expect(scrolled).toHaveLength(0) // 排在一帧之后，不在事件里同步滚
 
             await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
-            // ⚠️ 比 `data-col-id`：重渲之后 DOM 节点是新的，节点同一性比不了
-            expect(scrolled.at(-1)?.getAttribute("data-col-id")).toBe(colIdAt(container, 0, 1))
+            /*
+                ⚠️ 落定后**只有一次** `scrollTo`：位置是我们自己按四边算的，不靠浏览器的 `scrollIntoView`
+                再摆一次（那会多一步冗余滚动，而且它不知道表头/冻结列的遮挡）。
+            */
+            expect(scrolled).toHaveLength(1)
+            expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
+            // 滚完之后活动格是**新**那一格
+            expect(container.querySelector("td.cell-active")?.getAttribute("data-col-id")).toBe(colIdAt(container, 0, 1))
         } finally {
-            Element.prototype.scrollIntoView = original
+            Element.prototype.scrollTo = original
         }
     })
 

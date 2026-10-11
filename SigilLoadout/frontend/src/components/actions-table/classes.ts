@@ -184,8 +184,10 @@ export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
  *     行号选行也走这一条：行手势把区的锚点列设成第一格**数据列**（`id_`，序号列不在列模型里），
  *     于是"开始拖的那一行第一格"就是活动格 —— 与拖选单元格同一套逻辑，没有第二种规则。
  *
- * **行末那一格不画右边**：最右一列的格线已被表格去掉，而轮廓 `inset: -1px` 会外扩 1px ——
- * 留着它就是一条悬在表格外沿的线。所以在这里去掉 `right`，不在样式表里覆盖。
+ * **行末那一格照画右边**：轮廓 `inset: -1px` 会外扩 1px，而表格用 `[&_tr>*:last-child]:border-r-0`
+ * 去掉了末列的格线 —— 撑出去的那 1px 会悬在表格外沿。这个几何问题**由样式表把右边框收回格内**解决
+ * （见 `style.css` 的 `tbody tr > td:last-child.cell-edge-right`），不再在这里摘掉 `right` 类：
+ * 摘掉的后果是"末列选中时右边框整条消失"（真机逐像素实测 `border-right-width: 0px`）。
  *
  * 没选中时**提前返回**：`getSelectionEdges()` 会再解析一遍位置，只为发现"没选中"不值当
  * （大表里绝大多数格子都没选中）。
@@ -193,14 +195,7 @@ export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
 export function selectionClass(cell: Cell<typeof features, ActionRow>): string {
     if (!cell.getIsSelected()) return ""
     const edges = cell.getSelectionEdges()
-    const isRowEnd = cell.row.getAllCells().at(-1)?.id === cell.id
-    return [
-        "cell-selected",
-        cell.getIsFocused() && "cell-active",
-        ringClasses({...edges, right: edges.right && !isRowEnd}, "cell-edge"),
-    ]
-        .filter(Boolean)
-        .join(" ")
+    return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(edges, "cell-edge")].filter(Boolean).join(" ")
 }
 
 /** 一格在外圈的哪几条边上 —— 两条来路（库的选区 / 我们自己的复制区）都归成这个形状。 */

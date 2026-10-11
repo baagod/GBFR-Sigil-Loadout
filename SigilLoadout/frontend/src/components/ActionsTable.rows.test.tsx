@@ -246,10 +246,11 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         // 段首那行的第一格：上 + 左
         expect(edges(1, 0)).toBe("cell-edge-left cell-edge-top")
         /*
-            段首那行的最后一格：**只有上** —— 行末那一格的右边被 `selectionClass` 去掉了
-            （最右一列的格线已被表格去掉，轮廓外扩 1px 就成了悬在表外的一条线）。
+            段首那行的最后一格：**上 + 右**。右边线照挂 —— 以前 `selectionClass` 会摘掉它（怕轮廓外扩
+            1px 悬到表外），但那样末列选中时右边框**整条消失**；现在由样式表把这一侧的环**收回格内**
+            （见 style.css 的 `tbody tr > td:last-child.cell-edge-right`）。
         */
-        expect(edges(1, lastCol)).toBe("cell-edge-top")
+        expect(edges(1, lastCol)).toBe("cell-edge-right cell-edge-top")
         // 段尾那行的第一格：下 + 左
         expect(edges(2, 0)).toBe("cell-edge-bottom cell-edge-left")
         // 段首整行都带上边、段尾整行都带下边（行选中是"整行算一个块"，与单元格选区按格算不同）
