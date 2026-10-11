@@ -36,7 +36,9 @@ import {
     useMemo,
     useRef,
     useState,
+    type Dispatch,
     type MouseEvent as ReactMouseEvent,
+    type SetStateAction,
 } from "react"
 import {
     flexRender,
@@ -132,7 +134,24 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     /** 数据到位后把"保存"这个动作交出来 —— 这个组件自己没有工具条（与 GlobalParamPanel 同一个约定）。 */
     onSaveReady?: (save: () => Promise<void>) => void
 }) {
-    const [rows, setRows] = useState<ActionRow[]>(rowsProp)
+    /**
+     * **当前要显示的那份数据** = 父组件给的 prop，外加本层的"编辑覆盖"。
+     *
+     * ‼️ 这里**必须直接读 prop**，不能 `useState(rowsProp)` 把 prop 当初始值。踩过的坑（真机复现）：
+     * 换角色时父组件换的是 prop，而 `useState` 的初值**只在挂载那一次**生效 —— 表若不重新挂载，
+     * 就会一直显示**上一次**那个角色的数据。而"重新挂载"依赖的 `key` 当时是角色码，
+     * 可角色码是从**路径**里读的、换角色时**根本不变**（每次都是 `pl1400`）→ 表永远不重挂 →
+     * 内容永远慢一拍（真机：切菲莉后显示娜露梅、切回娜露梅后显示菲莉）。
+     */
+    const [edited, setEdited] = useState<ActionRow[] | null>(null)
+    const rows = edited ?? rowsProp
+    /**
+     * 改一格：记进本地覆盖（**不写回父组件** —— 草稿归这张表，保存时才由 `onSaveReady` 交出去，
+     * 这条口径与改动前一致）。用 updater 形式，因为它要在上一份覆盖的基础上叠加。
+     */
+    const setRows = useCallback<Dispatch<SetStateAction<ActionRow[]>>>((next) => {
+        setEdited((prev) => (typeof next === "function" ? next(prev ?? rowsProp) : next))
+    }, [rowsProp])
     /**
      * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
      * 稳定，见下）、读不到最新的 `rows`；走 `setRows` 的 updater 里读则会踩 React 重跑 updater 那个坑。

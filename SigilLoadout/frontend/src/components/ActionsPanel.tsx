@@ -447,7 +447,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                         section === "actions" ? "flex-1" : "h-0 overflow-hidden -mt-4"
                     }`}
                 >
-                    /*
+                    {/*
                         ‼️ 数据**从这里下去**（`rows` / `keys`），表不再自己读 —— 这一页只剩一处
                         `LoadActions`。以前是"父组件拿一份做加载门 + 表内部再读一份"：同一份数据两个
                         来源，"谁先回来"成了隐式依赖（换角色时尤其明显），而 `keys.length === 0`
@@ -455,7 +455,11 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
 
                         现在三态说得清：`!loaded` = 还没读到；`rows.length === 0` = 读到了但一条都没有
                         （不是错误，是 ids 与表不匹配，见后端 LoadActions）；否则挂表。
-                    */
+
+                        ⚠️ JSX 里的块注释**必须包在大括号里**（写成"大括号 + 块注释"那个形状），
+                        不能只写裸的块注释 —— 裸的会被当成**文本节点**直接渲染到界面上
+                        （踩过：界面上顶着整整一大段源码注释）。
+                    */}
                     {!loaded ? (
                         <div className="pb-1 text-xs text-muted-foreground">{t.loading}</div>
                     ) : rows.length === 0 ? (
