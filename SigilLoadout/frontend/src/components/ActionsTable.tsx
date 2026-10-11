@@ -94,6 +94,12 @@ const CTRL = 2
  * 不留这 1px，贴边那格的边框就被切掉一条。见 `scrollActiveIntoView`。
  */
 const EDGE_PX = 1
+/**
+ * "滚到那一头"的写法：给个大值让浏览器夹到**真极限**。
+ * 不能自己算 `scrollWidth - clientWidth` —— 那两个属性都取整，结果比真极限大 1px，
+ * 差的正是"滚动条还能再拖一点"。见 `scrollActiveIntoView`。
+ */
+const SCROLL_TO_END = Number.MAX_SAFE_INTEGER
 
 /**
  * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
@@ -722,17 +728,12 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
      * 把活动格滚进视野（稳定引用，只挂在活动格上）。
      *
      * **算一次、滚一次**：位置完全由"真正看得见的四边"决定，不使用浏览器自己的 `scrollIntoView`
-     * （它只认容器边缘，不知道表头正吸在上面、冻结列盖在左边，格子被盖住时它当"可见"、**点了毫无滚动**；
-     * 而且它把位置落在小数上，让后续判断不可靠）。
+     * （它只认容器边缘，不知道表头正吸在上面、冻结列盖在左边，格子被盖住时它当"可见"、**点了毫无滚动**）。
      *
      *     可视上沿 = 容器顶 + 吸顶表头高      可视下沿 = 容器内容盒底
      *     可视左沿 = 冻结列右沿               可视右沿 = 容器内容盒右
      *
-     * 四条边用同一条规则（`越界`：越界多少补多少），`EDGE_PX` 是统一的 1px 余量：量到的是单元格
-     * **内容盒**，外面还画着格线与容器边框 —— 不留这 1px，贴边那格的边框就被切掉一条。
-     *
-     * ⚠️ 横向**只对非钉住的格子生效**：`id_` / `abilityTag_` 的 `left` 是它被钉住的屏幕位置，不是内容
-     * 位置，拿它算越界会得出"还在冻结层底下"，于是每走到这两列就把内容整体拉回最左（用户实测）。
+     * 四条边同一条规则（`越界`：越界多少补多少），各让 `EDGE_PX`。
      */
     const scrollActiveIntoView = useCallback((el: HTMLTableCellElement | null) => {
         const box = el?.closest<HTMLElement>(".overflow-auto")
@@ -755,28 +756,33 @@ export function ActionsTable({t, abilityNames, onSaveReady}: {
                 边框盒把**滚动条占的那条槽**也算进去了（真机实测：容器 1240 宽、`clientWidth` 只有 1223，
                 滚动条吃掉 17px），而滚动条画在内容之上 —— 格子滚到那儿时**右边框整条被滚动条压住**
                 （真机实测：格右距边框盒右沿 2px 时右边框 0 像素，距 15px 才正常）。
-                内容盒正好扣掉边框与滚动条，也就是"真正看得见"的那块。
             */
             const right = view.left + box.clientWidth
             const bottom = view.top + box.clientHeight
-            const 钉住 = getComputedStyle(cell).position === "sticky"
             const 越界 = (near: number, far: number, min: number, max: number) => (near < min ? near - min : far > max ? far - max : 0)
-            const 横越界 = 钉住 ? 0 : 越界(target.left, target.right, left, right + EDGE_PX)
-            const scrollTop = box.scrollTop + 越界(target.top, target.bottom, top + EDGE_PX, bottom + EDGE_PX)
-            const scrollLeft = box.scrollLeft + 横越界
-            box.scrollTo({top: scrollTop, left: scrollLeft})
             /*
-                ‼️ **末行/末列：直接给大值**，让浏览器自己夹到真极限。不去算 `scrollWidth - clientWidth`：
-                那两个属性都取整（见 MDN），整数相减可能比真实极限（小数）差不到 1px —— 那 1px 就是
-                "滚动条还能再拖一点"（用户实测）。写个大值由浏览器夹，永远落在真极限上。
+                ⚠️ 钉住的列（`id_` / `abilityTag_`）**横向永远看得见**：量出来的 `left` 是它被钉住的屏幕位置，
+                不是"内容里的位置"，拿它算越界会得出"还在冻结层底下"，于是每走到这两列就把内容整体拉回最左
+                （用户实测）。它们不参与横向滚动。
+            */
+            const pinned = getComputedStyle(cell).position === "sticky"
+            /*
+                ‼️ **末行/末列走到真极限**：这两格本来就在可视区内，四边都算不出越界。而"到极限"只能交给
+                浏览器 —— `scrollWidth - clientWidth` 取整后比真极限大 1px，那 1px 就是"滚动条还能再拖一点"
+                （真机实测）。给个大值让它自己夹，永远落在真极限上。
                 ⚠️ 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是 `useCallback([])`，
                 闭包里那份列模型还是首次渲染的空数组，判断会恒假。
             */
             const tr = cell.parentElement
-            const 末行 = tr === tr?.parentElement?.lastElementChild
-            const 末列 = cell === tr?.lastElementChild
-            if (末行) box.scrollTop = Number.MAX_SAFE_INTEGER
-            if (末列 && !钉住) box.scrollLeft = Number.MAX_SAFE_INTEGER
+            const isLastRow = tr === tr?.parentElement?.lastElementChild
+            const isLastColumn = cell === tr?.lastElementChild
+            const scrollTop = isLastRow ? SCROLL_TO_END : box.scrollTop + 越界(target.top, target.bottom, top + EDGE_PX, bottom + EDGE_PX)
+            let scrollLeft = box.scrollLeft
+            if (!pinned) {
+                if (isLastColumn) scrollLeft = SCROLL_TO_END
+                else scrollLeft += 越界(target.left, target.right, left, right + EDGE_PX)
+            }
+            box.scrollTo({top: scrollTop, left: scrollLeft})
         })
     }, [])
 
