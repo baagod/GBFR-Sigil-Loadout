@@ -252,9 +252,14 @@
     最后一行 / 最后一列那两条边没有格线（表格上有 `[&_tr>*:last-child]:border-r-0`），`inset: -1px`
     会越过表格边缘 1px（点一下最后一列，容器就平白冒出一条横向滚动条），所以右 / 下各收回 1px。
 
-    `[data-picker-open]`：下拉弹出时焦点**跑进了 portal**（弹层挂在 body 上，不在这一格里面），
-    `:focus-within` 便不成立、环会消失 —— 那一格自己挂上这个属性，环照画；z-index 与环两处都要带，
-    否则环会被吸顶列盖住。
+    ‼️ **环出现的三种情形合成一条**（`环要画` 与 `末列/末行收起 1px` 是同一件事的两半，拆成两组写就会漏）：
+      · `:focus-within` —— 焦点就在这一格；
+      · `[data-picker-open]` —— 这一格自己声明"我的列表开着"；
+      · `:has(.cell-pick-mark[data-popup-open])` —— **列表真的开着**（base-ui 给触发器挂的属性）：
+        那时焦点跑进了 portal（弹层不在这一格里面），`:focus-within` 不成立，只能靠它。
+      原来后一种单独写了一组、**没带上末行/末列的收回** —— 末行的值格一点开，环的下边框就撑出格底
+      1px，轨表那个"高度刚好等于内容"的滚动盒于是冒出纵向滚动条（用户截图）。
+      z-index 与环两处都要带，否则环会被吸顶列盖住。
 
     ⚠️ **聚焦环必须排在冻结层之下**（`--z-focus` < `--z-pinned`，整条阶梯见下面那份唯一的表）：否则一聚焦，
     那格的内容就画到吸顶列上面（实测穿过动作表第一列 `id_`）。
@@ -262,11 +267,11 @@
 @utility cell-focus {
     position: relative;
 
-    &:is(:focus-within, [data-picker-open]) {
+    &:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open])) {
         z-index: var(--z-focus);
     }
 
-    &:is(:focus-within, [data-picker-open])::after {
+    &:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open]))::after {
         content: "";
         position: absolute;
         inset: -1px;
@@ -274,29 +279,12 @@
         pointer-events: none;
     }
 
-    &:last-child:is(:focus-within, [data-picker-open])::after {
+    &:last-child:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open]))::after {
         right: 0;
     }
 
-    tr:last-child > &:is(:focus-within, [data-picker-open])::after {
+    tr:last-child > &:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open]))::after {
         bottom: 0;
-    }
-
-    /*
-        选值格（`controlTypeHash_`）：它的触发器是**原始 Trigger**（见 CellPick），base-ui 在列表打开时
-        会给触发器挂 `data-popup-open`。列表一开焦点就进了 portal，`:focus-within` 当场不成立 ——
-        这一条把环续上（**只有列表真的开着时**属性才在，所以不会变成"每格常亮一圈"）。
-    */
-    &:has(.cell-pick-mark[data-popup-open]) {
-        z-index: var(--z-focus);
-    }
-
-    &:has(.cell-pick-mark[data-popup-open])::after {
-        content: "";
-        position: absolute;
-        inset: -1px;
-        border: 2px solid var(--ring);
-        pointer-events: none;
     }
 }
 
