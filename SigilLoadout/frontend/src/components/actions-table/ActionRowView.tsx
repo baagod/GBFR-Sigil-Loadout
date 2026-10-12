@@ -11,18 +11,16 @@ import {
     CELL_BASE,
     EDITABLE_BG,
     GRIP_WIDTH,
-    HANDLE_CELL,
-    HEAD_BG,
     HANDLE_CURSOR,
     HANDLE_INNER,
     HANDLE_WIDTH,
     PINNED_CELL,
     READ_ONLY_BG,
-    HANDLE_SELECTED_BG,
     cellCopyRing,
+    handleCellClass,
     selectionClass,
 } from "./classes"
-import {columnKind, features, type ActionRow, type ColumnKind, type CopySource, type PressFacts, snapshotKey} from "./model"
+import {columnKind, features, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, type PressFacts, snapshotKey} from "./model"
 import {isSingleCellBounds} from "./selection"
 
 /**
@@ -41,6 +39,7 @@ const RowCell = memo(function RowCell({
     row,
     fieldKey,
     kind,
+    readOnly,
     raw,
     original,
     shown,
@@ -64,6 +63,8 @@ const RowCell = memo(function RowCell({
     fieldKey: string
     /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
     kind: ColumnKind
+    /** 这一列**不许写**（只读列，或调用方标了 `readonly`）：只显示文本、不进编辑。 */
+    readOnly: boolean
     /** **改动值**（空串 = 没改过）。 */
     raw: string
     /** **原值**（只读那一份）：值清空时显示它。 */
@@ -127,6 +128,7 @@ const RowCell = memo(function RowCell({
                 rowId={row.id}
                 fieldKey={fieldKey}
                 kind={kind}
+                readOnly={readOnly}
                 raw={raw}
                 original={original}
                 shown={shown}
@@ -169,6 +171,7 @@ export const ActionRowView = memo(function ActionRowView({
     startCellSelection,
     onEnterEdit,
     sortable,
+    columnOf,
 }: {
     row: Row<typeof features, ActionRow>
     /** 这一行外观的指纹：只参与 `memo` 比较，渲染不用。 */
@@ -210,6 +213,8 @@ export const ActionRowView = memo(function ActionRowView({
     onEnterEdit: () => void
     /** **行序能拖**（轨表）：给了才在行号格里多出那半截 `⠿`，也只有它接拖动。 */
     sortable?: boolean
+    /** 一列的补充说明（见 `ColumnSpec`）—— 这里只用它的 `readonly`（决定这一格进不进编辑）。 */
+    columnOf?: (key: string) => ColumnSpec | undefined
 }) {
     /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
     const rowCells = row.getAllCells()
@@ -256,7 +261,7 @@ export const ActionRowView = memo(function ActionRowView({
                 （按下先 `stopPropagation`，这一下只搬行、不选行）。
             */}
             <td
-                className={`${removed ? "bg-[#542526]" : HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
+                className={handleCellClass(removed, rowSelected)}
                 style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
@@ -275,10 +280,14 @@ export const ActionRowView = memo(function ActionRowView({
             {sortable && (
                 <td
                     ref={drag.setActivatorNodeRef}
+                    /*
+                        ⚠️ **只铺 `listeners`，不铺 `drag.attributes`**：那包里是 `role="button"` + `tabIndex=0`
+                        （键盘拖拽用的），而基座只注册了 `PointerSensor` —— 铺上去就是个"Tab 能停、回车空格
+                        什么都不干"的假按钮。真要支持键盘拖拽，得连 `KeyboardSensor` 与它的文案一起做。
+                    */
                     aria-label="拖动排序"
-                    {...drag.attributes}
                     {...drag.listeners}
-                    className={`${removed ? "bg-[#542526]" : HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""} touch-none cursor-grab active:cursor-grabbing ${
+                    className={`${handleCellClass(removed, rowSelected)} touch-none cursor-grab active:cursor-grabbing ${
                         drag.isDragging ? "opacity-40" : ""
                     }`}
                     style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}}
@@ -291,7 +300,16 @@ export const ActionRowView = memo(function ActionRowView({
                 const key = cell.column.id
                 const pinned = cell.column.getIsPinned()
                 const kind = columnKind(key)
-                const readOnly = kind === "readonly"
+                /*
+                    两件事分开（别合成一个布尔）：
+                      · `底色只读` —— 动作表那两列（`id_` / `abilityTag_`）：整列看起来"不上色"。底色跟它走；
+                      · `不许写`   —— 上面那种 + 调用方标了 `readonly` 的列（轨表的 `config` / 帧列：显示翻译过，
+                        一旦可编辑就会把"触发"写回数据）。它决定能不能编辑、要不要焦点环。
+                */
+                const 底色只读 = kind === "readonly"
+                const 不许写 = 底色只读 || columnOf?.(key)?.readonly === true
+                /* 列自带的格类（见 `ColumnSpec.cell`：对齐那类"只改长相"的东西放这里，不必穿 prop）。 */
+                const 列格类 = columnOf?.(key)?.cell ?? ""
                 /* 这一格的键（`snapshotKey`）算**一次**给下面两处共用，别每处再拼一遍。 */
                 const isActiveCell = activeCellKey === snapshotKey(row.id, key)
                 return (
@@ -301,13 +319,14 @@ export const ActionRowView = memo(function ActionRowView({
                         row={row}
                         fieldKey={key}
                         kind={kind}
+                        readOnly={不许写}
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={String(cell.getValue() ?? "")}
                         selected={cell.getIsSelected()}
                         preSelected={pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
-                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)}`}
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${底色只读 ? READ_ONLY_BG : EDITABLE_BG} ${不许写 ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)} ${列格类}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}
                         /*

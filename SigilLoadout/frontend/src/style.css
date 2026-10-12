@@ -252,9 +252,8 @@
     最后一行 / 最后一列那两条边没有格线（表格上有 `[&_tr>*:last-child]:border-r-0`），`inset: -1px`
     会越过表格边缘 1px（点一下最后一列，容器就平白冒出一条横向滚动条），所以右 / 下各收回 1px。
 
-    ‼️ **环出现的三种情形合成一条**（`环要画` 与 `末列/末行收起 1px` 是同一件事的两半，拆成两组写就会漏）：
-      · `:focus-within` —— 焦点就在这一格；
-      · `[data-picker-open]` —— 这一格自己声明"我的列表开着"；
+    ‼️ **环出现的两种情形合成一条**（`环要画` 与 `末列/末行收起 1px` 是同一件事的两半，拆成两组写就会漏）：
+      · `:focus-within` —— 焦点就在这一格（显示态 / 编辑框）；
       · `:has(.cell-pick-mark[data-popup-open])` —— **列表真的开着**（base-ui 给触发器挂的属性）：
         那时焦点跑进了 portal（弹层不在这一格里面），`:focus-within` 不成立，只能靠它。
       原来后一种单独写了一组、**没带上末行/末列的收回** —— 末行的值格一点开，环的下边框就撑出格底
@@ -267,24 +266,29 @@
 @utility cell-focus {
     position: relative;
 
-    &:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open])) {
+    /*
+        ‼️ **环出现的两种情形只在这里写一遍**（判据见上）：环本身与"末列/末行收起 1px"全吃这一份 ——
+        拆开写就会漏（漏过一次：第三种情形单独成组、没带上收起，末行值格一点开就冒出纵向滚动条）。
+    */
+    &:is(:focus-within, :has(.cell-pick-mark[data-popup-open])) {
         z-index: var(--z-focus);
-    }
 
-    &:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open]))::after {
-        content: "";
-        position: absolute;
-        inset: -1px;
-        border: 2px solid var(--ring);
-        pointer-events: none;
-    }
+        &::after {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border: 2px solid var(--ring);
+            pointer-events: none;
+        }
 
-    &:last-child:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open]))::after {
-        right: 0;
-    }
+        /* 末列 / 末行那两条边没有格线，`inset: -1px` 会越过表格边缘 1px（末行那 1px 还会撑出滚动条）。 */
+        &:last-child::after {
+            right: 0;
+        }
 
-    tr:last-child > &:is(:focus-within, [data-picker-open], :has(.cell-pick-mark[data-popup-open]))::after {
-        bottom: 0;
+        tr:last-child > &::after {
+            bottom: 0;
+        }
     }
 }
 

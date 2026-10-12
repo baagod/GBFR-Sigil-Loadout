@@ -52,10 +52,4 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
         const lastCell = tbody.lastElementChild!.querySelector("td")!
         expect(lastCell.matches("tbody tr:last-child > td")).toBe(true)
     })
-
-    it("`reorder` 没给（动作表）：末行本来就命中，这条是为了说明差异只在 DndContext", () => {
-        const container = renderTable()
-        const lastCell = container.querySelector("tbody")!.lastElementChild!.querySelector("td")!
-        expect(lastCell.matches("tbody tr:last-child > td")).toBe(true)
-    })
 })

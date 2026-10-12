@@ -18,12 +18,11 @@ import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
 import {columnsOf, toActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
 
 /**
- * 组件要的那一份文案：**只写这 5 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
+ * 组件要的那一份文案：**只写这 4 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
  * （见 `model.ts`）—— 接口按真实需求收窄，夹具因此**一条断言都不用加**，而且逐键受检
  * （键名打错、少一个键都会当场报错）。
  */
 export const t: ActionsTableMessages = {
-    loading: "读取中…",
     // 与 messages.ts 的 zh 同一句（用例要断言它上屏）
     multiAreaCopy: "请选择同一行或同一列中的单元格。",
     multiAreaCopyTitle: "无法复制选中区域",

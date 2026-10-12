@@ -6,9 +6,22 @@ import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEv
 
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
-import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type ColumnKind, type PressFacts, snapshotKey} from "./model"
+import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, type PressFacts, snapshotKey} from "./model"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
+
+/**
+ * **内置列策略 → 值格参数**（`text` / `readonly` 不是值格 → `undefined`）。
+ *
+ * 只服务下面那一处归一，所以留在本文件、不做成 `model` 的公共 API。
+ * 分支列的清单给的是**那个稳定的 Set 引用**（`branchPick.ids`）：`CellPick` 里那份重排才挂得住 memo。
+ */
+const 内置值格 = (kind: ColumnKind, branch: BranchPickConfig) =>
+    kind === "branch"
+        ? {choices: branch.ids, optional: UNSET, searchPlaceholder: branch.searchPlaceholder}
+        : kind === "pick"
+          ? {choices: CELL_CHOICES}
+          : undefined
 
 /**
  * 一格的**内容**（只读文本 / 可编辑格）—— **`memo` 就是这一层存在的理由**。
@@ -25,6 +38,7 @@ export const CellContent = memo(function CellContent({
     rowId,
     fieldKey,
     kind,
+    readOnly,
     raw,
     original,
     shown,
@@ -39,6 +53,8 @@ export const CellContent = memo(function CellContent({
     fieldKey: string
     /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
     kind: ColumnKind
+    /** 这一列**不许写**（只读列，或调用方标了 `readonly`）—— 只显示文本，没有编辑态。 */
+    readOnly?: boolean
     /** 改动值（空串 = 没改过）。 */
     raw: string
     /** 原值（只读时显示它；可编辑时当灰色占位符）。 */
@@ -66,7 +82,7 @@ export const CellContent = memo(function CellContent({
     const branchPick = useContext(BranchPickContext)
     /* 这一列的值格参数（多选 / 位名表）—— 由各表自己给（见 `PickerOfContext`），基座不写死哪张表。 */
     const pickerOf = useContext(PickerOfContext)
-    if (kind === "readonly") {
+    if (readOnly || kind === "readonly") {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
         return <CellText text={fieldKey === "abilityTag_" ? abilityName(abilityNames, shown) : shown} />
@@ -85,21 +101,13 @@ export const CellContent = memo(function CellContent({
     /*
         **值格只有一个入口**：两种来路在这里归一 ——
           · 调用方按列给的值格参数（`pickerOf`：轨表的 `flag0` / `flag1` 走这条，多选 + 位名表）；
-          · 内置列策略（`kind` 认 `controlTypeHash_` / `branchXAtk_` 那几个字段名）。
-        字段名与 `CellPick` 的入参同形，所以这里是**直接展开**、没有中间映射层 —— 多选 / 单选、
-        挂不挂搜索框的差别全在参数里，实现只有 `CellPick` 那一套（见 `PickerConfig`）。
+          · 内置列策略（`kind` 认 `controlTypeHash_` / `branchXAtk_` 那几个字段名，见 `model.columnKind`）。
+        多选 / 单选、挂不挂搜索框的差别全在参数里，实现只有 `CellPick` 那一套（见 `PickerConfig`）。
 
         ⚠️ 判据是"这一列是不是值格"，不是"是不是多选"：以前这里是 `picker?.multiple` → `FlagCell`，
         于是多选那档另有一套触发器，样式就漂了（多选那格没有下拉箭头）。
     */
-    const pick =
-        pickerOf(fieldKey) ??
-        (kind === "branch"
-            ? // 清单给**稳定的 Set 引用**（`branchPick.ids`）：CellPick 里那份重排才挂得住 memo。
-              {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
-            : kind === "pick"
-              ? {choices: CELL_CHOICES}
-              : undefined)
+    const pick = pickerOf(fieldKey) ?? 内置值格(kind, branchPick)
     if (pick) {
         // "进编辑"= **展开列表**（见 `CellPick`），与普通格子同一道闸门；`dragged` 一并交下去（拖过 = 拉选区，不展开）。
         return (

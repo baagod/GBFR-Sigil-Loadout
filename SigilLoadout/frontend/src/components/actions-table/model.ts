@@ -22,12 +22,12 @@ import type {Messages} from "@/lib/messages"
  * ‼️ **故意收窄**，不用整个 `Messages`：表只用得到这 5 条，而接口要求整个（~50 键）的话，
  * 每个调用点与每份测试夹具都得凑出一个完整的 `Messages` —— 测试侧因此出现
  * `as unknown as Messages` 这种**绕过全部检查**的双重断言（夹具少一个键、串一个名都测不出来）。
- * 收窄之后夹具只写这 5 条，类型系统真的在查；全量 `Messages` 天然满足它，所以生产调用点不用改。
+ * 收窄之后夹具只写这 4 条，类型系统真的在查；全量 `Messages` 天然满足它，所以生产调用点不用改。
  *
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "loading" | "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch">
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch">
 
 /**
  * **只读**的列：这些格子存的是**引用键**，不是可编辑的值。
@@ -67,28 +67,37 @@ export const UNSET = "-1"
  * `!readOnly && …` 去挡住那个不可能态（那种防御分支本身就是"模型没表达清楚"的症状）。
  * 显示层怎么画、粘贴收不收、清单从哪儿来 —— 三个问题现在读同一张表，不会再各自漂移。
  */
-export type ColumnKind = "text" | "readonly" | "pick" | "branch" | "flags"
+export type ColumnKind = "text" | "readonly" | "pick" | "branch"
 export const columnKind = (key: string): ColumnKind =>
     READ_ONLY_KEYS.has(key) ? "readonly" : PICKER_KEYS.has(key) ? "pick" : BRANCH_KEYS.has(key) ? "branch" : "text"
 
 /**
- * **一列的策略** —— 由调用方按列给（`ActionsTable` 的 `columnOf`），不给就按 `columnKind` 那张内置表。
+ * **一列的补充说明**（列 id → 这份规格）—— 由调用方按列给（`ActionsTable` 的 `columnOf`）。
  *
- * 为什么要有这个口子：`columnKind` 认的是**动作表那几个字段名**（`controlTypeHash_` / `branchXAtk_`…），
- * 别的表的列（轨迹表的 `flag0` / `flag1`）有自己的策略。而"这一列是什么列"必须仍然只有**一个**出处 ——
- * 让调用方从外面把整张表的策略换掉，比在基座里按表名写死分支干净（写死等于把"有哪些表"抄进基座）。
+ * 为什么要有这个口子：`keys` 只是"字段名清单"，而轨道表还有两种列光靠名字表达不了 ——
+ *   · **同一份数据看两眼**：帧列（`endTime × 60`）的数据键还是 `endTime`，列 id 得另起一个（`frame`）；
+ *   · **给人看的写法与数据不同**：`config` 的 `1` / `0` 要显示成"触发 / 持续"（而值本身不能动 ——
+ *     它是写回 XML 的那份数据）；表头也要换成中文（`startTime` → "开始"）。
+ *
+ * ‼️ **值翻译只能出现在"只读列"上**（`readonly: true`）：一旦那一格能编辑，`shown` 就会被当成草稿
+ * 提交回去（把"触发"写进数据）。旧实现同理 —— 翻译过的列都是 `kind: "text"`（只读文本）。
+ *
+ * 不传这份规格的列一切照旧（列 id = 数据键 = 表头、显示原值、可编辑）。
  */
 export type ColumnSpec = {
-    kind?: ColumnKind
-    /** `kind: "flags"` 的位名表：**下标即位号**（空串 = 还没弄清含义的那一位）。 */
-    names?: readonly string[]
-    /** 多选值格（与 `kind: "flags"` 是同一件事的两种说法，任一为真即是）。 */
-    multiple?: boolean
+    /** **数据键**（不给 = 列 id 自己）。帧列那种"同一份数据看两眼"就靠它。 */
+    key?: string
+    /** 表头文案（不给 = 列 id）。 */
+    label?: string
+    /** 显示值怎么从数据值翻（不给 = 原样）。**只读列才允许**（见上）。 */
+    text?: (value: string) => string
+    /** 这一列不许写（不参与编辑，也不收粘贴）—— 底色仍跟它的 `kind` 走，所以不会忽然变暗。 */
+    readonly?: boolean
     /**
-     * 值格挂不挂搜索框。**只对单选值格有意义** —— 多选那版（`flags`）项短、天生不挂搜索框。
-     * 不给就按默认（分支列挂、固定清单那一列不挂）。
+     * **这一列的格子上再挂的类名**（原样拼进 `<td>` 的 class）。
+     * 例如"值水平居中"：内容那层是 flex 容器，所以给 `[&>div]:justify-center`（`text-center` 对它无效）。
      */
-    search?: boolean
+    cell?: string
 }
 
 /**
@@ -108,19 +117,14 @@ export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<s
  * **值格参数**（哪一列是哪种值格、带不带搜索框、位名表）—— 由**各表自己给**。
  *
  * ‼️ 这是"列数据"，不是基座上的开关布尔：基座只有**一套**值格实现（先选后编 / 跟随可视 /
- * 焦点环 / 列表排序 `[当前] → [原值] → [其他]` / Ctrl+C 全是同一份），单选还是多选、挂不挂搜索框
- * 只差下面这几个字段 —— 字段名与 `CellPick` 的入参**同形**，调用点直接展开，中间不需要映射层。
- * 于是"以后要值格"的表**不需要再写任何自定义**。
+ * 焦点环 / 列表排序 `[当前] → [原值] → [其他]` / Ctrl+C 全是同一份）。它只描述**参数能表达的差别**
+ * （多选、位名表、挂不挂搜索框）；单选那份清单仍归列策略（`controlTypeHash_` / `branchXAtk_` 那张内置表）。
  */
 export type PickerConfig = {
     /** 多选（按位开关；提交时把勾中的位权相加写回那一格）。不给 = 单选。 */
     multiple?: boolean
     /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位）。 */
     names?: readonly string[]
-    /** **单选**的清单（不给 = 按列策略那套：`controlTypeHash_` 用内置那 53 项）。 */
-    choices?: ReadonlySet<string>
-    /** 分支列那种额外可选项（`-1`）：挑中它照原样提交，不折算成"回到原值"。 */
-    optional?: string
     /** 给了就挂搜索框（值就是提示文案）。多选那档不给：位就那么几位，搜索框是噪音。 */
     searchPlaceholder?: string
 }

@@ -311,21 +311,22 @@ export default function App() {
          */
         const hasOverlay = () =>
             !!document.querySelector(
-                '[data-slot="combobox-content"], [data-picker-open], [role="dialog"], [role="alertdialog"]'
+                '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"]'
             )
         const isInOverlay = (e: KeyboardEvent) =>
             !!((e.target as HTMLElement | null)?.closest?.(
                 // Esc 归谁：打开的浮层，以及把 Esc 定义成"放开这个框"的数值框（SlotInput，
                 // 见它的 onKeyDown）——那里不该同时把整个窗口藏到托盘去。
                 //
-                // ⚠️ `[data-picker-open]` 必须留着：flag 单元格的下拉开着时，焦点在**我们自己的 input** 上，
-                // 而它在 `<td>` 里、**不在 portal 的弹层里** ✗ —— 只按 combobox-content 判会把这次 Esc
-                // 误判成"不在浮层"，于是连窗口一起藏掉 ✗（用户报的"按 esc 把主窗口也隐藏了"）。
+                // ⚠️ `[data-esc-own]` 是 SlotInput 与**值格**自己带的（跟着框走）：值格的下拉开着时
+                // 焦点可能就在格子那层 div 上（它在 `<td>` 里、不在 portal 的弹层里），只按
+                // combobox-content 判会把这次 Esc 误判成"不在浮层"，于是连窗口一起藏掉。
+                // 弹层本身也在 `[data-slot="combobox-content"]` 里，两处都覆盖到。
                 //
-                // ⚠️ `[data-esc-own]` 是 SlotInput 自己带的（跟着框走）。`.skill-rows` / `.ability-rows`
-                // 那两条是按页给的类名，专精技能页当初漏了 → 那一页按 Esc 会连窗口一起藏掉（实测过）；
-                // 留着它们只是不改既有行为，新页面用 SlotInput 一律靠标记生效。
-                '[data-slot="combobox-content"], [data-picker-open], [role="dialog"], [role="alertdialog"], [data-esc-own], .skill-rows input, .ability-rows input'
+                // ⚠️ `.skill-rows` / `.ability-rows` 那两条是按页给的类名，专精技能页当初漏了 →
+                // 那一页按 Esc 会连窗口一起藏掉（实测过）；留着它们只是不改既有行为，新页面用
+                // SlotInput 一律靠标记生效。
+                '[data-slot="combobox-content"], [role="dialog"], [role="alertdialog"], [data-esc-own], .skill-rows input, .ability-rows input'
             ) || hasOverlay())
         // 捕获阶段：Base UI 在 React 处理这一记 keydown 时就卸载弹层，冒泡阶段的监听器会看到一个
         // 已经摘下来的 target，从而错判成"不在浮层"，把窗口藏掉。捕获阶段弹层还活着，这一刻的

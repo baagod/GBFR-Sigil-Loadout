@@ -111,16 +111,21 @@ export function CellPick({
         () => (names ?? []).map((name, bit) => ({label: name === "" ? `bit${bit}` : name, bit, value: String(2 ** bit)})),
         [names],
     )
-    /** 项（位权）→ 位号 / 标签。 */
-    const bitOf = useMemo(() => new Map(bits.map(({bit, value: item}) => [item, bit])), [bits])
+    /** 项（位权）→ 标签。 */
     const labelOf = useMemo(() => new Map(bits.map(({label, value: item}) => [item, label])), [bits])
     /** 当前值 / 原值的掩码（多选那档用）。 */
     const mask = flagMask(shown)
     const originalMask = flagMask(original ?? "")
     /** 勾中的那几位（项的值 = 位权）。 */
     const selected = useMemo(() => bits.filter(({bit}) => flagHasBit(mask, bit)).map(({value: item}) => item), [bits, mask])
-    /** 这一位在原值里吗（列表里给 `#a0a0a0` 的那批：勾是"现在在不在"、灰是"原来在不在"）。 */
-    const wasOriginal = (item: string) => flagHasBit(originalMask, bitOf.get(item) ?? -1)
+    /**
+     * **原值里就置着的那些项**（列表里给 `#a0a0a0` 的那批）：勾是"现在在不在"、灰是"原来在不在"，两件事分开看。
+     * 直接算成集合 —— 判"这一项灰不灰"因此是一次 `has`，不需要"项 → 位号"的反查表。
+     */
+    const 原值项 = useMemo(
+        () => new Set(bits.filter(({bit}) => flagHasBit(originalMask, bit)).map(({value: item}) => item)),
+        [bits, originalMask],
+    )
     /** 这个值在清单里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
     const inChoices = (item: string) => choices?.has(item) === true || item === optional
     /**
@@ -136,12 +141,10 @@ export function CellPick({
         const all = bits.map(({value: item}) => item)
         return [
             ...selected,
-            ...all.filter((item) => !selected.includes(item) && wasOriginal(item)),
-            ...all.filter((item) => !selected.includes(item) && !wasOriginal(item)),
+            ...all.filter((item) => !selected.includes(item) && 原值项.has(item)),
+            ...all.filter((item) => !selected.includes(item) && !原值项.has(item)),
         ]
-        // `wasOriginal` 只读 `bitOf` / `originalMask`（都在依赖里），不必进依赖表。
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [multiple, bits, bitOf, selected, mask, originalMask, shown, original, choices, optional])
+    }, [multiple, bits, selected, mask, 原值项, shown, original, choices, optional])
 
     /*
         按下 / 松开都挂 document：拖出这一格时松开不落在触发器上。
@@ -279,12 +282,16 @@ export function CellPick({
             value={multiple ? selected : inChoices(shown) ? shown : null}
             /* 多选：勾中的位权相加写回格子；单选：`-1` 是清单里的一项照原样提交，其余挑回原值就把改动清掉（交 `null`）。 */
             onValueChange={(next) => {
-                if (multiple) {
-                    onCommit(String((next as string[]).reduce((sum, item) => sum + Number(item), 0)))
+                /*
+                    形状判一次（不 `as`）：`multiple` 是**运行期**开关，base-ui 的类型收窄帮不上忙 ——
+                    与其把类型"喊"回来（形状不符时是 `undefined.reduce` 直接抛），不如就地认形状：
+                    数组 = 多选那一档，其余走单选。
+                */
+                if (Array.isArray(next)) {
+                    onCommit(String(next.reduce((sum, item) => sum + Number(item), 0)))
                     return
                 }
-                const 单值 = next as string | null
-                if (单值) onCommit(单值 === original && 单值 !== optional ? null : 单值)
+                if (next) onCommit(next === original && next !== optional ? null : next)
             }}
             open={open}
             onOpenChange={(next, eventDetails) => {
@@ -361,7 +368,7 @@ export function CellPick({
                             value={item}
                             /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
                                ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
-                            className={`py-1! ${(multiple ? wasOriginal(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
+                            className={`py-1! ${(multiple ? 原值项.has(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
                         >
                             {multiple ? labelOf.get(item) : item}
                         </ComboboxItem>

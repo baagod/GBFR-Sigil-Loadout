@@ -19,27 +19,26 @@
       · `actions-table/classes.ts`    —— 类名常量、选区与复制区的「哪几条边」；
       · `actions-table/selection.ts`  —— 选区的谓词与指纹（整行 / 单格 / 行外观指纹）；
       · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
+      · `actions-table/drag.ts`       —— 「行序拖动」的夹取几何（最多能拖到哪儿，与 `reveal.ts` 对称）；
+      · `actions-table/ReorderDnd.tsx` —— dnd-kit 的装配（**必须包在 `<table>` 之外**，理由在那个文件里）；
+      · `actions-table/useColumnMeasure.ts` —— 列宽测量（DOM 测量 + sizing / measured / 重试计数三个 state）；
       · `actions-table/clipboard.ts`  —— TSV 读写 + 粘贴铺块规则；
       · `actions-table/useClipboardHistory.ts` —— 复制粘贴 / 复制源虚线 / 撤销栈，**以及 `edit`**
         （撤销栈的记账规则长在 `edit` 里，所以它们必须同居）；
       · `actions-table/ActionRowView.tsx` —— 表体一行（memo 那一层）；
       · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态。
 
-    ‼️ **这个文件里还剩下的**：数据加载、列宽测量、选区手势编排（行号/数据格拖动）、方向键、
-    "跟随可视"的编排（几何在 `reveal.ts`）。这几块与 ref 镜像、DOM 测量、库的选区 API 缠在一起，
-    再往外抽要先搬一堆 ref —— 想动它们时先想清楚这笔账，别只为行数好看。
+    ‼️ **这个文件里还剩下的**：数据读取的接线、选区手势编排（行号/数据格拖动）、方向键、
+    "跟随可视"的编排（几何在 `reveal.ts`）、以及"整行选中"上报给调用方。这几块与 ref 镜像、
+    库的选区 API 缠在一起，再往外抽要先搬一堆 ref —— 想动它们时先想清楚这笔账，别只为行数好看。
 */
 import {
     useCallback,
     useEffect,
-    useLayoutEffect,
     useMemo,
     useRef,
     useState,
-    type Dispatch,
     type MouseEvent as ReactMouseEvent,
-    type ReactNode,
-    type SetStateAction,
 } from "react"
 import {
     flexRender,
@@ -48,7 +47,7 @@ import {
     type CellSelectionDirection,
     type CellSelectionState,
     type ColumnDef,
-    type ColumnSizingState,
+
     type Row,
     type SortingState,
 } from "@tanstack/react-table"
@@ -75,13 +74,15 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, type EnterEditRegistry, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
-import {DndContext, PointerSensor, closestCenter, useSensor, useSensors, type Modifier} from "@dnd-kit/core"
-import {restrictToVerticalAxis} from "@dnd-kit/modifiers"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
 import {revealScrollTarget} from "@/components/actions-table/reveal"
+import {clampDragY} from "@/components/actions-table/drag"
+import {ReorderDnd} from "@/components/actions-table/ReorderDnd"
 import {useClipboardHistory} from "@/components/actions-table/useClipboardHistory"
+import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
 
 /*
     ========================== 方向键（见 `handleArrowKey`） ==========================
@@ -128,55 +129,20 @@ const CTRL = 2
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-/**
- * **行序能拖**时才挂 `DndContext`（不能拖的表原样透传）。
- *
- * ‼️ 它必须包在 **`<table>` 之外**（这里是整个组件的根）。dnd-kit 会**就地**渲染两个辅助 `<div>`
- * （可访问性的 live region 与 hidden text，都带 `DndContext` 的 id）—— 包在 `<tbody>` 里时它们就成了
- * `tbody` 的子元素（React 自己都会报 `tbody cannot contain a nested div`），而 `style.css` 里**所有**
- * "末行"规则都按 `tr:last-child` 写：
- *
- *   · `tbody tr:last-child > td.cell-edge-bottom::before { bottom: 0 }` —— 末行选区下边框收回格内；
- *   · `cell-focus` 的 `tr:last-child > &::after { bottom: 0 }` —— 末行焦点环收回格内。
- *
- * 末行一旦不是 `:last-child`，这两条整条失配：末行选中时选区轮廓照旧向下外扩 2px，而轨表那个
- * "高度刚好等于内容高"的滚动盒于是多出 1px 可滚动溢出 —— **冒出一条纵向滚动条**（还把内容挤窄 15px）。
- * 动作表看不出这毛病，只因为它不传 `reorder`（压根没有 `DndContext`），末行本来就是 `tr:last-child`。
- * 结构由 `ActionsTable.reorder.test.tsx` 守着。
- *
- * 回调交出去的是**下标**（`from` / `to`）：`active.id` 是行 id，而"第几行"才是调用方（轨表）的口径。
- */
-function ReorderDnd({reorder, rows, bound, children}: {reorder?: (from: number, to: number) => void; rows: {id: string}[]; bound?: Modifier; children: ReactNode}) {
-    const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
-    const ids = rows.map((row) => row.id)
-    /* 限定位移的 modifier 由调用方给（它得看得到表格那个滚动盒）—— 数组本身要稳定引用。 */
-    const modifiers = useMemo(() => (bound ? [restrictToVerticalAxis, bound] : [restrictToVerticalAxis]), [bound])
-    if (!reorder) return children
-    return (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={modifiers}
-            onDragEnd={({active, over}) => {
-                if (!over || active.id === over.id) return
-                const from = ids.indexOf(String(active.id))
-                const to = ids.indexOf(String(over.id))
-                if (from >= 0 && to >= 0) reorder(from, to)
-            }}
-        >
-            {children}
-        </DndContext>
-    )
-}
-
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, pinnedCount = PINNED_COUNT, sorting: sortingProp, onEdit}: {
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, columnOf}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
-    /** 字段顺序（= 表头顺序），与 `rows` 配套（见 `model.columnsOf`）。 */
-    keys: string[]
+    /**
+     * 字段顺序（= 表头顺序），与 `rows` 配套（见 `model.columnsOf`）。
+     *
+     * ⚠️ **引用必须稳**（模块常量或 `useMemo`）：列宽测量是"按内容重来一遍"的（见 `useColumnMeasure`），
+     * 每次渲染新建数组 = 每渲染重量一遍。`readonly` 就是为它写的 —— 调用方直接把自己那份常量给过来，
+     * 不必为了类型摊一份拷贝。
+     */
+    keys: readonly string[]
     /** 数据到位后把"保存"这个动作交出来 —— 这个组件自己没有工具条（与 GlobalParamPanel 同一个约定）。 */
     onSaveReady?: (save: () => Promise<void>) => void
     /**
@@ -187,23 +153,36 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 所以"哪张表要值格"不需要再写任何自定义 —— 给参数就行。
      */
     pickerOf?: (key: string) => PickerConfig | undefined
+    /**
+     * **一列的补充说明**（表头文案 / 数据键 / 显示翻译 / 只读）—— 由调用方按列给（见 `ColumnSpec`）。
+     * 不给 = 列 id 就是数据键与表头、显示原值、可编辑。
+     */
+    columnOf?: (key: string) => ColumnSpec | undefined
     /** **行序能拖**：给了才有行号列右边那条握把列、才接 dnd-kit（动作表的行是记录、没有行序，不传）。 */
     reorder?: (from: number, to: number) => void
     /**
      * **钉住前几列**（默认 `PINNED_COUNT` = 2）。轨表传 `0`：它已经有行号列与握把列两条固定列，
      * 数据列再冻两条等于把半张表钉死。
      *
-     * ⚠️ 与 `keys` 一样是**初始值**：列一旦钉住就是库的 state，换值不会重算 —— 换一份数据要靠
-     * `key` 整表重挂载（与 ActionPanel 那边同一条约定）。
+     * ⚠️ 名字里带 `initial`：它是**初值**，列一旦钉住就是库的 state，换值不会重算 —— 换一份数据要靠
+     * `key` 整表重挂载（与 `ActionPanel` 那边同一条约定）。
      */
-    pinnedCount?: number
-    /** 排序状态（默认按 `id_` 升序）；轨表没有 `id_` 那一列，传 `[]` = 行序严格等于数组顺序。 */
-    sorting?: SortingState
+    initialPinnedCount?: number
+    /** 排序状态（默认按 `id_` 升序）；轨表没有 `id_` 那一列，传 `[]` = 行序严格等于数组顺序。**同样是初值**。 */
+    initialSorting?: SortingState
     /**
      * **改了一格**（`null` = 回到原值）。它同时是**数据所有权开关**（见下面 `外部持有数据`）：
      * 给了 = 改动归调用方（它写进自己的 state 再回传），没给 = 草稿住在这张表里。
      */
     onEdit?: (rowId: string, key: string, value: string | null) => void
+    /**
+     * **整行选中的那些行变了**（行 id，按显示顺序；空数组 = 一行都没整行选中）。
+     *
+     * 基座只有"单元格选区"一个模型 —— 整行就是"一个整行宽的区"（见 `selectRowSpan`）。调用方
+     * （轨表弹层）的工具条要按"选中了哪几行"决定按钮亮不亮、Ctrl+C/X 复制的又是哪几行，
+     * 所以这里把那个判断**算好上报**，别让调用方自己去啃 `cellSelection` 的几何。
+     */
+    onSelectionChange?: (rowIds: string[]) => void
 }) {
     /**
      * **当前要显示的那份数据** = 父组件给的 prop，外加本层的"编辑覆盖"。
@@ -226,24 +205,37 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     const 外部持有数据 = onEdit !== undefined
     const rows = 外部持有数据 ? rowsProp : (edited ?? rowsProp)
     /**
-     * 数据层：没有 `onEdit` 时才落到本地草稿上（用 updater 形式，要在上一份覆盖的基础上叠加）。
-     * 有 `onEdit` 的表，改动由 `useClipboardHistory` 的 `apply` 直接通知调用方（见那里的 `onWrite`）。
+     * **写一格** —— 表里**唯一**的数据出口（编辑 / 粘贴 / 撤销三条路都经它，见 `useClipboardHistory`）。
+     *
+     * "数据归谁"只在这一处判：给了 `onEdit` 就通知调用方（本地**不留**草稿），否则落到本地草稿上。
+     * 空串翻成 `null` 交出去 = 回到原值（与 `Cell` 提交的口径一致）。
      */
-    const setRows = useCallback<Dispatch<SetStateAction<ActionRow[]>>>(
-        (next) => {
-            if (外部持有数据) return
-            setEdited((prev) => (typeof next === "function" ? next(prev ?? rowsProp) : next))
+    const write = useCallback(
+        (rowId: string, columnId: string, next: string) => {
+            if (onEdit) {
+                onEdit(rowId, columnId, next === "" ? null : next)
+                return
+            }
+            setEdited((prev) =>
+                (prev ?? rowsProp).map((row) => (row.id === rowId ? {...row, values: {...row.values, [columnId]: next}} : row)),
+            )
         },
-        [外部持有数据, rowsProp],
+        [onEdit, rowsProp],
     )
     /**
      * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
-     * 稳定，见下）、读不到最新的 `rows`；走 `setRows` 的 updater 里读则会踩 React 重跑 updater 那个坑。
+     * 稳定，见下）、读不到最新的 `rows`；走 `write` 的 updater 里读则会踩 React 重跑 updater 那个坑。
      */
     const rowsRef = useRef<ActionRow[]>([])
     rowsRef.current = rows
     /** 字段顺序（= 表头顺序）：受控，直接来自 prop（见 `model.columnsOf`），本层不自己算也不改。 */
     const keys = keysProp
+    /**
+     * **不许写的列**（`columnOf` 标了 `readonly` 的那些）—— 只用来挡粘贴：往它们上面粘会写一个
+     * **没人认的键**（帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。编辑那边由渲染层挡
+     * （`ActionRowView` 的"不许写"）。
+     */
+    const readonlyColumns = useMemo(() => new Set(keys.filter((key) => columnOf?.(key)?.readonly)), [keys, columnOf])
     /**
      * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
@@ -253,33 +245,22 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         [rows, t],
     )
     /**
-     * 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `pinnedCount` 个字段，默认 2；轨表传 0）。
+     * 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `initialPinnedCount` 个字段，默认 2；轨表传 0）。
      *
-     * ⚠️ 初值要跟着 `keysProp` 给：列宽那一趟 `useLayoutEffect` 依赖 `pinning` 已就位，
+     * ⚠️ 初值要跟着 `keysProp` 给：列宽那一趟测量（`useColumnMeasure`）依赖 `pinning` 已就位，
      * 若等下面那个 effect 去置，外部给数据这条路上会先按"一列都没钉"量一遍。
      */
     const [pinning, setPinning] = useState<{start: string[]; end: string[]}>(() => ({
-        start: (keysProp ?? []).slice(0, pinnedCount),
+        start: (keysProp ?? []).slice(0, initialPinnedCount),
         end: [],
     }))
-    /** 每列多宽（**取整后的整数**）：量出来写进库的 sizing state，渲染按它给 `width`。 */
-    const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
-    /** 量过了没有 —— 没量之前用 `table-auto`（要量出**自然宽度**），量完切 `table-fixed`。 */
-    const [measured, setMeasured] = useState(false)
-    /**
-     * "这块被显示出来之后再来一遍"的开关（量列宽那趟的重试计数）。
-     *
-     * 这张表常挂载在分块里，启动时它那份容器是 `display:none` —— 隐藏着量什么都是 0，
-     * 所以量不到就**先不置 `measured`**，靠这个计数在下一帧重跑（见那段 `useLayoutEffect`）。
-     */
-    const [shownTick, setShownTick] = useState(0)
     /**
      * 排序：**默认按 `id_` 升序**（记录号从小到大，扫起来才有顺序感）。
      *
      * 用库的 sorting state 而不是自己在 `rows` 上 `.sort()`：数据本身没有"顺序"这回事，
      * 排序该发生在**渲染那一层**；另外等以后做"点表头排序"，这里换个初始值就能接上。
      */
-    const [sorting, setSorting] = useState<SortingState>(sortingProp ?? [{id: "id_", desc: false}])
+    const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [{id: "id_", desc: false}])
     /**
      * **按下那一刻这一格的选区事实**（形状与理由见 `PressFacts`）—— 整张表共享一条记录，
      * 由数据格的 `onMouseDown` 在库改掉选中状态**之前**写进去，`click` / `focus` 那两条进编辑的路读它。
@@ -325,43 +306,42 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
+    /**
+     * **每列多宽**（取整后的整数）与"量过了没有" —— 整趟测量（含历次真机的证据）在
+     * `useColumnMeasure` 里：它是"DOM 测量 + 三个自洽 state"，与表的交互逻辑一刀两断。
+     */
+    const {columnSizing, measured} = useColumnMeasure(tableRef, keys)
     /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
     const scrollRef = useRef<HTMLDivElement>(null)
     /**
      * **拖动行的位移只许落在表格的可视框里**（传给 `ReorderDnd` 的 modifier）。
-     *
-     * ‼️ 为什么非有它不可（真机复现的完整链条）：拖拽行是靠 `translate3d` 跟着指针走的，往下一拖就把
-     * 滚动盒的**可滚动区域**一起撑大（实测：盒子 324/324 → 拖出去后 324/**935**）→ 盒里冒出纵向
-     * 滚动条；而 dnd-kit 的 autoScroll 一见"能滚"就往下滚（`scrollTop` 560），滚动又让这一行相对内容
-     * 更靠下、溢出更大 —— **正反馈**：能一直往下拉、表格整体被推上去、上面露出一大片空白，松手才恢复。
-     * 夹在可视框里之后溢出根本不存在，autoScroll 也就无从下手。
-     *
-     * 上边界取的是**表头下沿**、不是滚动盒顶：表头是吸顶的，夹到盒顶等于让这一行钻到表头底下去
-     * （用户截图：行压在表头下沿、上半截被切掉）。下边界就是滚动盒底。
-     * 各留 1px 余量：rect 是浮点、浏览器判"溢出"却按布局盒算，贴到边那一下正好多出 1px 可滚动区域
-     * （真机实测：夹到 250 时 324/**325**，滚动条照旧冒出来）。
+     * 几何（为什么要夹、上边界为什么是表头下沿、那 1px 余量的来路）都在 `drag.ts` —— 与 `reveal.ts`
+     * 的"跟随可视"对称；这里只负责把**这个表的滚动盒**交出去。
      */
-    const 限制在可视框内 = useCallback<Modifier>(({transform, draggingNodeRect}) => {
-        const box = scrollRef.current
-        if (!box || !draggingNodeRect) return transform
-        const view = box.getBoundingClientRect()
-        const 顶 = box.querySelector("thead")?.getBoundingClientRect().bottom ?? view.top
-        const 上限 = view.bottom - draggingNodeRect.bottom - 1
-        const 下限 = 顶 - draggingNodeRect.top + 1
-        return {...transform, y: Math.min(Math.max(transform.y, 下限), 上限)}
-    }, [])
+    const 限制在可视框内 = useCallback<Modifier>((args) => clampDragY(scrollRef.current, args), [])
     /* 剪贴板 / 撤销 / `edit` 那一套统一在 `useClipboardHistory` 里 —— 它的入参要用到下面的
        `tableInstanceRef`，所以调用点放在那之后（见文件中部）。 */
 
-    // 一列一个字段。`accessorFn` 就是 `shownValue` —— 排序与筛选都按显示值走，见那个函数的说明。
+    /*
+        一列一个字段。`accessorFn` 就是 `shownValue`（**这一列的数据键**）—— 排序、筛选、显示都按它走；
+        调用方给了 `columnOf` 就把那份规格叠上去：表头换文案、显示值过一次 `text`、以及"列 id ≠ 数据键"
+        （帧列看的是 `endTime`）。没给规格的列一切照旧。
+    */
     const columns = useMemo<ColumnDef<typeof features, ActionRow>[]>(
         () =>
-            keys.map((key) => ({
-                id: key,
-                accessorFn: (row) => shownValue(row, key),
-                header: key,
-            })),
-        [keys],
+            keys.map((id) => {
+                const spec = columnOf?.(id)
+                const 数据键 = spec?.key ?? id
+                return {
+                    id,
+                    accessorFn: (row) => {
+                        const value = shownValue(row, 数据键)
+                        return spec?.text ? spec.text(value) : value
+                    },
+                    header: spec?.label ?? id,
+                }
+            }),
+        [keys, columnOf],
     )
 
     const table = useTable({
@@ -373,7 +353,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         enableCellSelection: true,
         /*
             ‼️ **关掉"数据一变就清空选区"**。它按 `data` 的引用变来判"数据换了"，而我们每次改一格都会换
-            `rows` 数组（`setRows`），于是**粘一次就会把刚设好的选区当场地清掉**（实测：粘完 6 格选中数归 0）。
+            `rows` 数组（`write`），于是**粘一次就会把刚设好的选区当场地清掉**（实测：粘完 6 格选中数归 0）。
             粘完选中刚粘的那一片是用户明确要的（Excel 就是这个手感）。
 
             代价：真·换一份数据（父组件换角色）时选区会指向不存在的行 —— 但那条路是**整表重新挂载**
@@ -391,159 +371,17 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             不能拼就**不复制 + 给一行提示**，绝不自己发明一种"多片怎么拼"的口径。
         */
         enableMultiCellRangeSelection: true,
-        // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪几行 / 选了哪一片格：都是**受控状态** —— 值由我们给，
+        // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪一片格：都是**受控状态** —— 值由我们给，
         // 库通过 onChange 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态）。
+        // ⚠️ 列宽**没有** onChange：没注册 `columnResizingFeature`，列宽只由测量那一趟写（见 `useColumnMeasure`）。
         state: {columnPinning: pinning, columnSizing, sorting, cellSelection},
         onColumnPinningChange: setPinning,
-        onColumnSizingChange: setColumnSizing,
         onSortingChange: setSorting,
         onCellSelectionChange: setCellSelection,
     })
 
 
 
-    /*
-        列宽：**测量 → 取整 → 交给库的 sizing state**。
-
-        为什么要自己接手宽度（原来是 `table-auto` 让浏览器算）：浏览器的"按内容分配"给出的是
-        `83.47px`、`124.09px` 这种**小数**，列边界于是落在半像素上 —— 格线与选区轮廓的**端点**
-        全被抗锯齿削淡，看着就是"每个连接处都断一点"。取整之后边界落在整像素上，线才是实心的。
-
-        流程是"先按 auto 排一遍、量完再切 fixed"：
-          ① 未测量时不给 width、用 `table-auto` —— 让浏览器先按内容算出**自然宽度**
-             （这一步是量的前提：固定布局下量到的只会是我们自己写进去的宽度）；
-          ② 这里量每列、取整、写进 `columnSizing`，置 `measured`；
-          ③ 之后用 `table-fixed` + `column.getSize()`，列宽从此由 state 说了算、与内容脱钩
-             （代价：**编辑内容后列宽不再自动跟随** —— 这是换掉亚像素的必然代价）。
-
-        ‼️ **必须等这块真的被显示出来再量**（`hasSize` 那道闸 + `shownTick` 重试）。
-        原因是踩过的坑：这张表在「通用配装 / 角色动作」这类分块里是**常挂载**的，启动时它那份
-        容器是 `display:none` —— **不在可视树里，量什么都是 0**。以前默认落在旧表上、新表是切过去
-        才挂载（那时已可见）所以量得对；新表转正之后它一开始就挂在那儿，于是启动必量出 0，列宽被
-        锁成库里的默认 20px，切过去看到的表头一行一个字母（用户报的"你自己部署后打开变成这样"）。
-        修法就是"量不到就**先不置 `measured`**、等它出来再来一遍"——**不改任何交互行为**，
-        只是把这趟测量挪到"可见"那一刻。
-    */
-    useLayoutEffect(() => {
-        /*
-            ‼️ **不能"量过一次就不再量"**（原来这里是 `if (measured || …) return`，是本次真机的根因）。
-
-            那一行让测量**只发生在第一次可见的那一刻**，此后无论内容/字体/容器怎么变都不再量 ——
-            动作表第一次就在宽容器里、字体也已加载，所以一直没事；轨表第一次可见是在**弹窗刚展开**那一瞬
-            （容器还窄、字体还是回退字体），量出来的宽度被永久锁死 → 表头截成 `StartTi…`，怎么重开都不变。
-
-            改成"每次都按内容重量"之后，两张表走的是**同一条**路：`keys` 变（换轨）会重量、
-            字体加载完会重量（见下面那个 `document.fonts` 的 effect）、隐藏时也会按帧重试。
-            重量是安全的：下面先把表放开成 `max-content` + `table-layout: auto` 并清掉旧宽度，
-            所以量到的永远是**内容**的自然宽度；重量的结果若与上次相同，`setState` 会被 React 挡掉。
-        */
-        if (keys.length === 0) return
-        const el = tableRef.current
-        if (!el) return
-        /*
-            ‼️ **可见性判据是"这个 `<table>` 自己没有尺寸"**，不能去看它的祖先 —— 祖先里有一层是
-            `flex-1` 的滚动容器，纵向永远是 0（这工具的表靠外层滚动），拿它当判据会**永远**重试。
-            隐藏时 `<table>` 的 rect 是 0×0，显示出来才有宽高，这个判据干净且足够。
-        */
-        const rect = el.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) {
-            // 还没显示：等下一帧再看（`shownTick` 是重跑本 effect 的开关）。
-            const raf = requestAnimationFrame(() => setShownTick((v) => v + 1))
-            return () => cancelAnimationFrame(raf)
-        }
-        /*
-            ‼️ 量之前把表**放开成"按内容自然排"**：`width: max-content` + `table-layout: auto`。
-
-            为什么两样都要：
-              · `max-content` —— `table-auto` 在容器比内容窄时会把列**压扁**，那时量到的是"被挤过的宽度"；
-              · `table-layout: auto` —— 更要紧的一条：一旦量过一次，表就是 `table-fixed` + 显式宽度，
-                **再量只会量回它自己那套宽度**（内容已经不起作用了）→ 第一次在窄容器里量到的结果会被
-                **永久锁住**（真机症状：轨表在折叠面板里首次测量时被挤扁 → 表头截成 `StartTi…`，
-                之后再怎么展开都救不回来；动作表首次测量就在宽容器里，所以一直没事）。
-            量完两样都还原，交给下面按测量结果锁布局。
-        */
-        const 原宽 = el.style.width
-        const 原布局 = el.style.tableLayout
-        el.style.width = "max-content"
-        el.style.tableLayout = "auto"
-        const ths = [...el.querySelectorAll<HTMLElement>("thead th[data-col-id]")]
-        /*
-            ‼️ **还要先把每一列上一次写下的宽度清掉**。
-
-            格子里的文本带 `truncate`（`overflow: hidden`），在 `auto` 布局下它的 **min-content 是 0** ——
-            旧的显式宽度留着时，表只会照着旧宽度排，**重测读到的是自己**（真机：轨表第一次量到 74px 的
-            `StartTime`，此后无论重测多少次都还是 74，而那里实际需要 ~78 → 表头永远截成 `StartTi…`）。
-            动作表从没踩到，是因为它的宽度从来不需要变。清了才是"按内容重排"，两张表同一条路。
-            React 会在下次渲染时按 `columnSizing` 重新写回宽度，所以清掉是安全的。
-        */
-        const 原列宽 = ths.map((th) => th.style.width)
-        for (const th of ths) th.style.width = ""
-        /*
-            ‼️ 另备一把**尺子**：把表头文字放进一个离屏 `<span>` 里独立量它的真实宽度。
-
-            为什么不直接用那层 `truncate` 的 `scrollWidth`：`truncate` 是 `overflow: hidden`，
-            它的 `clientWidth` 会随列宽变，同一帧里"清了旧宽度"之后未必已经反映真实文本宽 ——
-            真机就是这样留下几像素的误差（`PartsNo` / `ReactionType` / `ElementType` 仍截成 `Parts...`）。
-            离屏 span 与列宽彻底无关，量出来的是文字本身的宽度，两张表走同一条路。
-            类名照抄表头那层（字体/字号/字重都跟它一致），所以量出来的就是它需要的宽度。
-        */
-        const 尺 = document.createElement("span")
-        尺.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;white-space:nowrap"
-        document.body.appendChild(尺)
-
-        const sizes: ColumnSizingState = {}
-        for (const th of ths) {
-            const id = th.dataset.colId
-            if (!id) continue
-            const 自然 = th.getBoundingClientRect().width
-            const 内层 = th.firstElementChild as HTMLElement | null
-            let 需要 = 自然
-            if (内层) {
-                // 内边距 + 边框 = 外框 − 内层可见宽（把"文字宽"换算成"列宽"要加回它）。
-                const 边距 = Math.max(0, 自然 - 内层.clientWidth)
-                尺.className = 内层.className
-                尺.textContent = th.textContent
-                const 文字宽 = 尺.getBoundingClientRect().width
-                // 量不到（比如 happy-dom 没有真实布局，一律 0）就不采信这把尺子，照旧用自然宽。
-                if (文字宽 > 0) 需要 = Math.max(自然, 文字宽 + 边距 + 1)
-            }
-            /*
-                ⚠️ 用 `ceil` **向上**取整，不能 `round`。
-
-                自然宽度是 `124.09px` 这种小数，`round` 会把它取成 `124` —— **比自然宽度还窄**，
-                表头文字就正好放不下、列名末尾被截成 `…`。向上取整最多比自然宽度宽 1px，永不截断。
-                另外 `Math.max(1, …)` 兜住宽度 0 的列（`table-fixed` 下会被挤成一条线）。
-            */
-            sizes[id] = Math.max(1, Math.ceil(需要))
-        }
-        尺.remove()
-        /* 清掉的那些宽度原样写回：DOM 不留中间态（React 下次渲染本来也会写回，但别指望它）。 */
-        ths.forEach((th, i) => {
-            th.style.width = 原列宽[i] ?? ""
-        })
-        el.style.width = 原宽
-        el.style.tableLayout = 原布局
-        setColumnSizing(sizes)
-        setMeasured(true)
-    }, [measured, keys, shownTick])
-
-    /*
-        ‼️ **字体加载完再量一次**。
-
-        首帧量到的是**回退字体**的宽度，真字体上屏后同样的文字更宽，列就短了那么几像素 —— 表头末尾被截成
-        `…`（真机实测：轨表 `StartTime` 量到 74px，它实际需要 ~78px）。动作表看不出来，是因为它的自然宽度
-        来自**数据**（数据比表头宽得多），几像素的差被淹没了；轨表那几列的自然宽度**就是表头文字**，
-        一差就露。重测是安全的：测量那一段会把表放开成 `max-content` + `table-layout: auto`，每次都按内容重算。
-    */
-    useEffect(() => {
-        let 还在 = true
-        void document.fonts?.ready.then(() => {
-            if (还在) setShownTick((v) => v + 1)
-        })
-        return () => {
-            还在 = false
-        }
-    }, [])
 
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
     useEffect(() => {
@@ -591,6 +429,22 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     const firstColumnId = sheetColumns[0] ?? ""
     const lastColumnId = sheetColumns[sheetColumns.length - 1] ?? ""
     const lastColumnIndex = sheetColumns.length - 1
+
+    /**
+     * **把"整行选中的那几行"上报给调用方**（见 `onSelectionChange`）。
+     *
+     * ⚠️ 指纹去重（用 id 串比，不靠依赖数组的引用）：`modelRows` / `selectionBounds` 每次渲染都可能是
+     * 新对象，没有这道闸就会渲染一次报一次 → 调用方 setState → 再渲染 → **打转**。
+     */
+    const 上次整行选中 = useRef("")
+    useEffect(() => {
+        if (!onSelectionChange) return
+        const ids = modelRows.filter((_, index) => rowFullySelected(selectionBounds, index, lastColumnIndex)).map((row) => row.id)
+        const 指纹 = ids.join(",")
+        if (指纹 === 上次整行选中.current) return
+        上次整行选中.current = 指纹
+        onSelectionChange(ids)
+    }, [onSelectionChange, modelRows, selectionBounds, lastColumnIndex])
 
     /**
      * **活动格**（`cell-active` = 选区最新那片的锚点）的键 —— 与 `snapshotKey` 同格式，给
@@ -754,20 +608,17 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * `useClipboardHistory` 里（`edit` 也归它：撤销栈的"记不记账"正是 `edit` 里那两条判断，
      * 记账规则与记账本分在两个地方是这段代码原来最难读的部分）。
      *
-     * 传进去的都是稳定引用（`setRows` 是 setter、`tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids`
-     * 由 `useMemo` 按数据给），所以它内部那段全局监听**只挂一次**。
-     *
-     * `onWrite` = 把"改了哪一格"通知给持有数据的调用方（就是 `onEdit`）：**编辑 / 粘贴 / 撤销三条路
-     * 都经它内部的 `apply`**，所以挂在这一处就够 —— 以前只有"点格子改值"那一条会通知，
-     * 粘贴与撤销对轨表是静默的。它也没必要包一层：`edit` 本身就是"改一格"的入口。
+     * 传进去的都是稳定引用（`write` 由 `useCallback` 按 `onEdit`/`rowsProp` 给、
+     * `tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids` 由 `useMemo` 按数据给），
+     * 所以它内部那段全局监听**只挂一次**。
      */
     const {copyHint, setCopyHint, copySource, clearCopySource, edit} = useClipboardHistory({
-        setRows,
+        write,
         rowsRef,
         tableRef: tableInstanceRef,
         branchIds: branchPick.ids,
+        readonlyColumns,
         multiAreaCopyText: t.multiAreaCopy,
-        onWrite: onEdit,
     })
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
@@ -1288,6 +1139,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                 getSelectionBounds={getSelectionBounds}
                                 edit={edit}
                                 sortable={reorder !== undefined}
+                                columnOf={columnOf}
                                 dragRowRef={dragRowRef}
                                 clickRowHandle={clickRowHandle}
                                 startCellSelection={startCellSelection}

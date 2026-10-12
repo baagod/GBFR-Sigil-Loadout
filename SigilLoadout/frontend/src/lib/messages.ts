@@ -85,7 +85,7 @@ const zh = {
     fsmScope: "FSM（本角色可用，与当前动画无关）",
     badMotion: (motion: string) => `motion 要是四位十六进制小写（例如 3400），这里是「${motion}」`,
     saveFailedText: (detail: string) => `保存失败：${detail}`,
-    colConfig: "类型",
+    colConfig: "配置",
     colStart: "开始",
     colEnd: "结束",
     colFrame: "帧",

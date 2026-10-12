@@ -102,9 +102,6 @@ export function flagMask(value: string): number {
 /** 这一位在这个掩码里吗。 */
 export const flagHasBit = (mask: number, bit: number): boolean => Math.floor(mask / 2 ** bit) % 2 === 1
 
-/** motion 的写法：**四位十六进制小写**（与后端 isMotion 同一套判据，值是拼进文件名的）。 */
-export const isMotion = (motion: string): boolean => /^[0-9a-f]{4}$/.test(motion)
-
 /** 角色码（pl1000）：从动作表的所在目录取，与后端 charCode 一样。 */
 export function charCodeOf(path: string): string {
     const parts = path.split(/[\\/]/)
@@ -145,60 +142,3 @@ export function withNewRow<T extends {
     ]
 }
 
-/** 选中区间的两端。两边都为 null 就是一行都没选；哪一头大哪一头小不管，取 min/max。 */
-export type RowRange = {anchor: number | null; focus: number | null}
-
-/**
- * 选中：一段区间（anchor 是 shift 的起点、focus 是终点）+ **Ctrl 逐个点中的那些**。
- *
- * ⚠️ Ctrl 点过之后区间要**收起来**（focus = null），只留 anchor 当下一次的起点：不收的话"区间里那行"
- * 永远落在选中集合里，Ctrl 再点它取消不掉 ✗。
- */
-export type RowSelection = RowRange & {picked?: ReadonlySet<number>}
-
-/**
- * 点一行之后的新选中：
- *   · **Ctrl** —— 把"当前选中的整批"收进 picked，再在这一行上增删（所以区间里那行也取消得掉）；
- *   · **Shift** —— 从 anchor 拉到这一行（替换整批，和资源管理器一样）；
- *   · 什么都不按 —— 只选这一行。
- */
-export function clickRow(
-    sel: RowSelection | null,
-    index: number,
-    mods: {shift?: boolean; ctrl?: boolean},
-): RowSelection {
-    if (mods.ctrl) {
-        const picked = new Set(sel ? selectedRows(sel) : [])
-        if (picked.has(index)) picked.delete(index)
-        else picked.add(index)
-        return {anchor: index, focus: null, picked}
-    }
-    if (mods.shift && sel?.anchor !== null && sel?.anchor !== undefined) {
-        return {anchor: sel.anchor, focus: index, picked: new Set()}
-    }
-    return {anchor: index, focus: index, picked: new Set()}
-}
-
-/** 按住行号划到这一行：把区间另一端拉到这儿（Ctrl 点中的那些留着）。一行都没选时从这一行起一段。 */
-export function extendRow(sel: RowSelection | null, index: number): RowSelection {
-    return sel ? {...sel, focus: index} : {anchor: index, focus: index, picked: new Set()}
-}
-
-/** 选中的行下标，升序去重（区间 ∪ picked）。**不夹到表长**：调用方手上有数组，自己过滤。 */
-export function selectedRows(sel: RowSelection | null): number[] {
-    if (!sel) return []
-    const out = new Set<number>(sel.picked ?? [])
-    const {anchor, focus} = sel
-    if (anchor !== null && focus !== null) {
-        for (let index = Math.min(anchor, focus); index <= Math.max(anchor, focus); index++) out.add(index)
-    }
-    return [...out].sort((a, b) => a - b)
-}
-
-/** 这一行选没选中。渲染每一行时用（比每次算整批便宜）。 */
-export function isSelected(sel: RowSelection | null, index: number): boolean {
-    if (!sel) return false
-    if (sel.picked?.has(index)) return true
-    const {anchor, focus} = sel
-    return anchor !== null && focus !== null && index >= Math.min(anchor, focus) && index <= Math.max(anchor, focus)
-}

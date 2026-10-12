@@ -14,7 +14,7 @@
       ② 多片选区**必须能沿同一根轴排成一条**才允许复制，否则拒绝并提示（见 `planCopy`）；
       ③ 一次粘贴 = **一步撤销**（见 `batchingRef`）。
 */
-import {useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction} from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 import type {CellSelectionBounds} from "@tanstack/react-table"
 
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "./clipboard"
@@ -48,31 +48,31 @@ export type ClipboardTable = {
 type UndoEntry = {rowId: string; columnId: string; before: string}
 
 export function useClipboardHistory({
-    setRows,
+    write,
     rowsRef,
     tableRef,
     branchIds,
+    readonlyColumns,
     multiAreaCopyText,
-    onWrite,
 }: {
-    /** 写回数据（`useState` 的 setter：引用天然稳定）。 */
-    setRows: Dispatch<SetStateAction<ActionRow[]>>
+    /**
+     * **写成一格**（数据层）—— 编辑 / 粘贴 / 撤销三条路都只经它。
+     *
+     * ‼️ 它是**唯一**的数据出口：数据归谁（本表自持的草稿、还是调用方自己那份）由表那层在实现里分，
+     * 这里不关心 —— 所以不需要"写本地"与"通知调用方"两个并列的口子（那会逼读者同时持有两套出口
+     * 才能推出现行为）。
+     */
+    write: (rowId: string, columnId: string, next: string) => void
     /** `rows` 的镜像：判重与撤销栈都要"改之前的值"，而它们读不到别处的 state（见组件里 `rowsRef` 那段）。 */
     rowsRef: {current: ActionRow[]}
     /** 表实例的镜像（渲染期不碰它，只在事件处理器里用）。 */
     tableRef: {current: ClipboardTable}
     /** 分支列那份清单（粘贴校验用）；空集即可。 */
     branchIds: ReadonlySet<string>
+    /** **不许写的列**（调用方标了 `readonly` 的那些，见 `ColumnSpec`）：粘贴不收（见下面那段）。 */
+    readonlyColumns?: ReadonlySet<string>
     /** 多片跨行又跨列时那句提示（i18n）。 */
     multiAreaCopyText: string
-    /**
-     * **写成一格之后通知调用方**（= 表那层的 `onEdit`；没给就是自持数据的表，不必通知）。
-     *
-     * ‼️ 挂在 `apply` 这一处，因为**每一条写数据的路都经过它**：编辑、粘贴、撤销。挂在各个调用点上
-     * （原来是"点格子改值"才通知）会漏掉粘贴与撤销 —— 那两条对持有数据的调用方就是静默的
-     * （真机症状：轨表里粘完、撤销完，调用方那份数据还是旧的，随后任何"它换数据"的操作都被旧数据压回去）。
-     */
-    onWrite?: (rowId: string, columnId: string, value: string | null) => void
 }) {
     const [copyHint, setCopyHint] = useState("")
     /**
@@ -113,20 +113,8 @@ export function useClipboardHistory({
     /** **正在粘贴**：这期间不记账，由粘贴那一处把整片当**一步**记下来。 */
     const batchingRef = useRef(false)
 
-    /** 数据层：真正落到 `rows` 上的一笔。不记账、不判重（那些在上面的 `edit` 里）。 */
-    const apply = useCallback(
-        (rowId: string, columnId: string, next: string) => {
-            setRows((prev) =>
-                prev.map((row) => (row.id === rowId ? {...row, values: {...row.values, [columnId]: next}} : row)),
-            )
-            /* 空串 = 回原值（与 `Cell` 提交的口径一致）：通知调用方时把它翻成 `null`。 */
-            onWrite?.(rowId, columnId, next === "" ? null : next)
-        },
-        [setRows, onWrite],
-    )
-
     /**
-     * 改一格：判重、记账、撤虚线，然后交给数据层。
+     * 改一格：判重、记账、撤虚线，然后交给数据层（`write`）。
      *
      * ⚠️ 撤销栈的 push **不能**写在数据层的 updater 里：updater 允许被 React 重跑（StrictMode 就会），
      * 跑一次记一笔 = 一次编辑要按两下 Ctrl+Z。所以"变没变 / 改前值"先用 `rowsRef` 判完、记完，再交。
@@ -147,9 +135,9 @@ export function useClipboardHistory({
             */
             const source = copySourceRef.current
             if (source?.snapshot.has(snapshotKey(rowId, columnId))) clearCopySource()
-            apply(rowId, columnId, next)
+            write(rowId, columnId, next)
         },
-        [apply, clearCopySource, rowsRef],
+        [write, clearCopySource, rowsRef],
     )
 
     /**
@@ -397,8 +385,11 @@ export function useClipboardHistory({
                 `controlTypeHash_` 用固定的 53 项，`branchXAtk_` 用当前表的 `id_` 集合。
                 用户的口径是"不通过就当没粘过"——**不提示、也不占一步撤销**：过滤后一条都不剩时整次粘贴就是个
                 空操作（连撤销栈都不入）。其余列一律放行（见 model 的 `acceptPaste`）。
+
+                `readonlyColumns` 是"不许写的列"（轨表的 `config` / 帧列）：往它们上面粘等于写一个**没人认的键**
+                （帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里），所以同一条路挡掉。
             */
-            const writes = plan.writes.filter((w) => acceptPaste(w.columnId, w.value, branchIds))
+            const writes = plan.writes.filter((w) => acceptPaste(w.columnId, w.value, branchIds) && !readonlyColumns?.has(w.columnId))
             if (writes.length === 0) return
 
             /*

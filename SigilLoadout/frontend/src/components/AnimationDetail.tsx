@@ -18,8 +18,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
 import {FlagsGrid, TrackGrid} from "@/components/TrackGrid"
 import {TrackToolbar} from "@/components/TrackToolbar"
-import {selectedRows, withNewRow} from "@/lib/actionflags"
-import {useRowSelection} from "@/lib/useRowSelection"
+import {withNewRow} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
@@ -77,11 +76,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
     const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
     /**
-     * 当前分区里选中的行：一套区间 + Ctrl 逐个点中的（语义见 lib/actionflags 的 clickRow）。
-     * `key` 是分区身份 —— **一次只认一个分区**，切到别的分区就等于换了个选区。
-     * 这套状态与拖选开关在 lib/useRowSelection 里，与动作表同一份实现。
+     * 当前分区里选中的行（**下标**，升序）。`key` 是分区身份 —— **一次只认一个分区**，切到别的分区就等于换了个选区。
+     *
+     * ‼️ 这份状态**由基座上报**（`onSelectionChange`，见 `ActionsTable`）：行号点 / Shift 拖 / Ctrl 加选
+     * 那套手势现在只有基座那一份实现（tanstack 的 cellSelection），这里只留"哪几行被整行选中"这一个事实。
+     * （以前这里自己养了一套 `useRowSelection` 状态机，但改基座之后它的两个入口再没人调用 —— 那套已经删了。）
      */
-    const {sel, setSel} = useRowSelection()
+    const [sel, setSel] = useState<{key: string; rows: number[]} | null>(null)
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
@@ -189,7 +190,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
 
     /** 这个分区里选中了哪几行（升序下标）。**一次只认一个分区**，所以 key 不对时就是"一行都没选"。 */
-    const selectedIn = (key: string): number[] => (sel?.key === key ? selectedRows(sel) : [])
+    const selectedIn = (key: string): number[] => (sel?.key === key ? sel.rows : [])
 
     /**
      * 键盘：Ctrl+C / Ctrl+V 复制插入（能在动画之间用，剪贴板在模块级）；**Del = 删除 / 恢复**选中行
@@ -334,7 +335,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         }
         markDirty(key)
         // 选中落到刚插进去的那几行上（粘贴出来的就是它们）。
-        setSel({key, anchor: at, focus: at + copies - 1, picked: new Set()})
+        setSel({key, rows: Array.from({length: copies}, (_, i) => at + i)})
     }
 
     /**
@@ -489,6 +490,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 originals={baseline?.flags}
                                 onEdit={(rowId, field, value) => editFlag(Number(rowId), field as keyof FlagRow, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
+                                /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
+                                onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
                             />
                         ) : (
                             <TrackGrid
@@ -497,6 +500,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 originals={baseline?.tables[key]?.rows}
                                 onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
+                                onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
                             />
                         )}
                     </div>

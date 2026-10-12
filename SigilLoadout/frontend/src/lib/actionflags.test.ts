@@ -9,14 +9,9 @@ import {
     FLAG0_NAMES,
     FLAG1_NAMES,
     charCodeOf,
-    clickRow,
     flagHasBit,
     flagMask,
-    isMotion,
-    isSelected,
-    selectedRows,
     withNewRow,
-    type RowSelection,
 } from "@/lib/actionflags"
 
 describe("掩码的位", () => {
@@ -52,16 +47,6 @@ describe("掩码的位", () => {
     })
 })
 
-describe("motion 的写法", () => {
-    it("四位十六进制小写才算", () => {
-        for (const motion of ["3400", "3451", "ffff", "0000"]) expect(isMotion(motion)).toBe(true)
-        // 这几种后端也一概不收（它会被拼进文件名）。
-        for (const motion of ["", "340", "34000", "340A", "../x", "pl\\1000"]) {
-            expect(isMotion(motion)).toBe(false)
-        }
-    })
-})
-
 describe("角色码", () => {
     it("角色码从动作表的所在目录取", () => {
         expect(charCodeOf("D:\\Games\\Relink\\gen\\extracted\\system\\player\\data\\pl1000\\pl1000_action.msg")).toBe("pl1000")
@@ -93,46 +78,5 @@ describe("加一行", () => {
 
     it("一行都没有时时间给 0", () => {
         expect(withNewRow([], blank)[0]).toMatchObject({ startTime: "0", endTime: "0" })
-    })
-})
-
-describe("选中：点 / Shift / Ctrl", () => {
-    it("什么都不按：只选这一行", () => {
-        const sel = clickRow(clickRow(null, 3, {}), 5, {})
-        expect(selectedRows(sel)).toEqual([5])
-        expect(isSelected(sel, 5)).toBe(true)
-        expect(isSelected(sel, 3)).toBe(false)
-    })
-
-    it("Shift：从 anchor 拉到这一行（闭区间，替换整批）", () => {
-        expect(selectedRows(clickRow(clickRow(null, 3, {}), 6, {shift: true}))).toEqual([3, 4, 5, 6])
-        // 往回拉也一样。
-        expect(selectedRows(clickRow(clickRow(null, 3, {}), 1, {shift: true}))).toEqual([1, 2, 3])
-    })
-
-    it("Ctrl：逐个增删，保留原来选中的整批", () => {
-        let sel: RowSelection | null = clickRow(null, 2, {})
-        sel = clickRow(sel, 7, {ctrl: true})
-        expect(selectedRows(sel)).toEqual([2, 7])
-        sel = clickRow(sel, 7, {ctrl: true}) // 再点一次 = 取消
-        expect(selectedRows(sel)).toEqual([2])
-    })
-
-    it("Ctrl 也要能取消掉“区间选出来的”那一行（所以 Ctrl 点过之后区间要收起来）", () => {
-        const sel = clickRow(clickRow(null, 4, {}), 4, {ctrl: true})
-        expect(selectedRows(sel)).toEqual([])
-        expect(isSelected(sel, 4)).toBe(false)
-    })
-
-    it("一行都没选给空", () => {
-        expect(selectedRows(null)).toEqual([])
-        expect(isSelected(null, 0)).toBe(false)
-    })
-
-    it("Ctrl 点中的那些也要取到（且按上下顺序）", () => {
-        let sel: RowSelection | null = clickRow(null, 1, {})
-        sel = clickRow(sel, 4, {ctrl: true})
-        sel = clickRow(sel, 2, {ctrl: true})
-        expect(selectedRows(sel)).toEqual([1, 2, 4])
     })
 })
