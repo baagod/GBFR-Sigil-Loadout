@@ -128,20 +128,27 @@ const CTRL = 2
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
 /**
- * **行序能拖**时才挂 `DndContext`（不能拖的表原样透传）；`SortableContext` **无条件**挂 ——
- * 这样行组件里那个 `useSortable` 永远在上下文里（hook 不能条件调用）。
+ * **行序能拖**时才挂 `DndContext`（不能拖的表原样透传）。
+ *
+ * ‼️ 它必须包在 **`<table>` 之外**（这里是整个组件的根）。dnd-kit 会**就地**渲染两个辅助 `<div>`
+ * （可访问性的 live region 与 hidden text，都带 `DndContext` 的 id）—— 包在 `<tbody>` 里时它们就成了
+ * `tbody` 的子元素（React 自己都会报 `tbody cannot contain a nested div`），而 `style.css` 里**所有**
+ * "末行"规则都按 `tr:last-child` 写：
+ *
+ *   · `tbody tr:last-child > td.cell-edge-bottom::before { bottom: 0 }` —— 末行选区下边框收回格内；
+ *   · `cell-focus` 的 `tr:last-child > &::after { bottom: 0 }` —— 末行焦点环收回格内。
+ *
+ * 末行一旦不是 `:last-child`，这两条整条失配：末行选中时选区轮廓照旧向下外扩 2px，而轨表那个
+ * "高度刚好等于内容高"的滚动盒于是多出 1px 可滚动溢出 —— **冒出一条纵向滚动条**（还把内容挤窄 15px）。
+ * 动作表看不出这毛病，只因为它不传 `reorder`（压根没有 `DndContext`），末行本来就是 `tr:last-child`。
+ * 结构由 `ActionsTable.reorder.test.tsx` 守着。
  *
  * 回调交出去的是**下标**（`from` / `to`）：`active.id` 是行 id，而"第几行"才是调用方（轨表）的口径。
  */
-function RowDnd({reorder, rows, children}: {reorder?: (from: number, to: number) => void; rows: {id: string}[]; children: ReactNode}) {
+function ReorderDnd({reorder, rows, children}: {reorder?: (from: number, to: number) => void; rows: {id: string}[]; children: ReactNode}) {
     const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
     const ids = rows.map((row) => row.id)
-    const tree = (
-        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-            {children}
-        </SortableContext>
-    )
-    if (!reorder) return tree
+    if (!reorder) return children
     return (
         <DndContext
             sensors={sensors}
@@ -154,7 +161,7 @@ function RowDnd({reorder, rows, children}: {reorder?: (from: number, to: number)
                 if (from >= 0 && to >= 0) reorder(from, to)
             }}
         >
-            {tree}
+            {children}
         </DndContext>
     )
 }
@@ -1067,6 +1074,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             `border-separate border-spacing-0`：格线是每格自己的 `border-r/border-b`，不是 collapse 共享的。
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
+        /* `DndContext` 包在最外面：它的辅助 `<div>` 绝不能落进 `<tbody>`（见 `ReorderDnd` 那段）。 */
+        <ReorderDnd reorder={reorder} rows={modelRows}>
         <div className="flex min-h-0 flex-1 flex-col">
             {/*
                 复制被拒：**用对话框**（Excel / WPS 也是弹框说这句话），不是表格上方一行小字。
@@ -1189,8 +1198,9 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     <BranchPickContext.Provider value={branchPick}>
                     {/* 值格参数（多选 / 位名表 / 挂不挂搜索框）：各表自己给；不给 = 这一列不是值格。 */}
                     <PickerOfContext.Provider value={pickerOf ?? NO_PICKER}>
-                    {/* 行序能拖时才挂 DndContext（见 `RowDnd`；`SortableContext` 无条件挂）。 */}
-                    <RowDnd reorder={reorder} rows={modelRows}>
+                    {/* `SortableContext` **无条件**挂（行组件里那个 `useSortable` 不能条件调用）——
+                        它是纯 context，不产生 DOM，留在 `tbody` 里没关系；挂 `DndContext` 的那层在最外面。 */}
+                    <SortableContext items={modelRows.map((row) => row.id)} strategy={verticalListSortingStrategy}>
                     {modelRows.map((row, rowIndex) => {
                         /*
                             ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
@@ -1229,7 +1239,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                             />
                         )
                     })}
-                    </RowDnd>
+                    </SortableContext>
                     </PickerOfContext.Provider>
                     </BranchPickContext.Provider>
                     </EnterEditContext.Provider>
@@ -1238,5 +1248,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             </table>
             </div>
         </div>
+        </ReorderDnd>
     )
 }
