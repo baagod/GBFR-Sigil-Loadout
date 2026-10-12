@@ -72,12 +72,20 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
  * 没选中（或不在唯一选中态）时第一下只算选中，第二下才展开；已经选中的话第一下就开了。
  */
 async function openPick(cell: HTMLElement) {
+    /*
+        ‼️ **按几下由闸门的输入决定，不去"观察弹层开没开"** —— 那是竞态：弹层异步挂，
+        第一下其实开了、只是挂得慢，再按一下反而把它**关掉**（实测：3 份全量并行时这条必红）。
+
+        闸门是"先选后编"（`press.wasSelected && press.wasOnlyCell`）：格子**已经是唯一选中**时，
+        第一下就展开；否则第一下只算选中、要按第二下。后者中间那一拍是给 React 落"选中"状态。
+    */
+    const 已是唯一选中 = cell.classList.contains("cell-selected") && document.querySelectorAll("td.cell-selected").length === 1
     pressPick(cell)
-    await tick()
-    if (!isPickOpen()) {
-        pressPick(cell)
+    if (!已是唯一选中) {
         await tick()
+        pressPick(cell)
     }
+    await waitFor(() => expect(isPickOpen()).toBe(true))
 }
 
 /** 按一下这一格（`td` 的 mousedown 会顺手记下 `PressFacts`）。 */
@@ -206,7 +214,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         fireEvent.keyDown(trigger, {key: "Enter"})
         await tick()
 
-        expect(isPickOpen()).toBe(true)
+        await waitFor(() => expect(isPickOpen()).toBe(true))
     })
 
     /*
@@ -241,16 +249,15 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
             pressPick(cell) // 先选中（"先选后编"的第一下）
             await tick()
             pressPick(cell) // 第二下：进编辑，列表展开
-            await tick()
-            expect(isPickOpen()).toBe(true)
+            /* ⚠️ 弹层是**异步**挂的：这里必须轮询到开，别用"等一拍 + 裸断言"（负载下必红）。 */
+            await waitFor(() => expect(isPickOpen()).toBe(true))
 
             /* ① 前提：几何生效了、"跟随可视"确实滚过 —— 否则下面两步都是空转。 */
             expect(scrolled.length).toBeGreaterThan(0)
 
             /* ② 跟随可视那一下（真机上排在展开之后的下一帧）。 */
             container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
-            await tick()
-            expect(isPickOpen()).toBe(true)
+            await waitFor(() => expect(isPickOpen()).toBe(true))
 
             /* ③ 用户真滚：规则照旧生效。 */
             container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
