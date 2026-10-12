@@ -53,6 +53,7 @@ export function useClipboardHistory({
     tableRef,
     branchIds,
     multiAreaCopyText,
+    onWrite,
 }: {
     /** 写回数据（`useState` 的 setter：引用天然稳定）。 */
     setRows: Dispatch<SetStateAction<ActionRow[]>>
@@ -64,6 +65,14 @@ export function useClipboardHistory({
     branchIds: ReadonlySet<string>
     /** 多片跨行又跨列时那句提示（i18n）。 */
     multiAreaCopyText: string
+    /**
+     * **写成一格之后通知调用方**（= 表那层的 `onEdit`；没给就是自持数据的表，不必通知）。
+     *
+     * ‼️ 挂在 `apply` 这一处，因为**每一条写数据的路都经过它**：编辑、粘贴、撤销。挂在各个调用点上
+     * （原来是"点格子改值"才通知）会漏掉粘贴与撤销 —— 那两条对持有数据的调用方就是静默的
+     * （真机症状：轨表里粘完、撤销完，调用方那份数据还是旧的，随后任何"它换数据"的操作都被旧数据压回去）。
+     */
+    onWrite?: (rowId: string, columnId: string, value: string | null) => void
 }) {
     const [copyHint, setCopyHint] = useState("")
     /**
@@ -110,8 +119,10 @@ export function useClipboardHistory({
             setRows((prev) =>
                 prev.map((row) => (row.id === rowId ? {...row, values: {...row.values, [columnId]: next}} : row)),
             )
+            /* 空串 = 回原值（与 `Cell` 提交的口径一致）：通知调用方时把它翻成 `null`。 */
+            onWrite?.(rowId, columnId, next === "" ? null : next)
         },
-        [setRows],
+        [setRows, onWrite],
     )
 
     /**

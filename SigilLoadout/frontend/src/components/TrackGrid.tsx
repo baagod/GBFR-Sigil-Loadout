@@ -10,10 +10,11 @@ import type {ActionRow, PickerConfig} from "@/components/actions-table/model"
     ‼️ 行为、样式、选区、拖选、复制粘贴、边框、高亮……**全部来自基座**（`ActionsTable`），
     这里一行都不重复 —— 重复就是"两张表各有一套实现"的老毛病（用户口径：与动作表一个都不准改）。
 
-    与动作表的差异**只有三处**，全部由参数表达：
-      ① 行号列多一个拖动排序 → `reorder`
+    与动作表的差异**只有四处**，全部由参数表达：
+      ① 行号列右边多一条**握把列**（拖动排序） → `reorder`
       ② `flag0` / `flag1` 的值格是**多选、不带搜索框** → `pickerOf`
       ③ 假删除行的暗红样式 → 行数据上的 `removed`
+      ④ **不钉数据列**（只留行号列与握把列） → `pinnedCount={0}`
 */
 
 /** 行身份（后端给，见 Go 侧 `actionrowmarks.go`）：`orig` = 对应原版第几行（新行没有）；`removed` = 假删除。 */
@@ -72,6 +73,8 @@ export function TrackGrid({table, t, originals, onEdit, onReorder}: {
             keys={table.columns}
             // 行序严格等于数组顺序：这张表没有排序（动作表那档默认按 `id_` 排）。
             sorting={[]}
+            // **不钉数据列**：这张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
+            pinnedCount={0}
             onEdit={onEdit}
             reorder={onReorder}
         />
@@ -114,6 +117,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder}: {
             )}
             keys={FLAG_KEYS}
             sorting={[]}
+            pinnedCount={0}
             onEdit={onEdit}
             reorder={onReorder}
             pickerOf={pickerOf}

@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {ActionRowView} from "@/components/actions-table/ActionRowView"
 import {
+    GRIP_WIDTH,
     HANDLE_CELL,
     HEAD_BG,
     HANDLE_HEAD_CURSOR,
@@ -166,7 +167,7 @@ function ReorderDnd({reorder, rows, children}: {reorder?: (from: number, to: num
     )
 }
 
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, sorting: sortingProp, onEdit}: {
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, pinnedCount = PINNED_COUNT, sorting: sortingProp, onEdit}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
@@ -184,15 +185,21 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 所以"哪张表要值格"不需要再写任何自定义 —— 给参数就行。
      */
     pickerOf?: (key: string) => PickerConfig | undefined
-    /** **行序能拖**：给了才有行号列里那半截 `⠿`、才接 dnd-kit（动作表的行是记录、没有行序，不传）。 */
+    /** **行序能拖**：给了才有行号列右边那条握把列、才接 dnd-kit（动作表的行是记录、没有行序，不传）。 */
     reorder?: (from: number, to: number) => void
+    /**
+     * **钉住前几列**（默认 `PINNED_COUNT` = 2）。轨表传 `0`：它已经有行号列与握把列两条固定列，
+     * 数据列再冻两条等于把半张表钉死。
+     *
+     * ⚠️ 与 `keys` 一样是**初始值**：列一旦钉住就是库的 state，换值不会重算 —— 换一份数据要靠
+     * `key` 整表重挂载（与 ActionPanel 那边同一条约定）。
+     */
+    pinnedCount?: number
     /** 排序状态（默认按 `id_` 升序）；轨表没有 `id_` 那一列，传 `[]` = 行序严格等于数组顺序。 */
     sorting?: SortingState
     /**
-     * **改了一格**（`null` = 回到原值）—— 草稿仍住在这张表里（见 `edited`），这里是**顺带通知**调用方，
-     * 好让"持有数据的那一层"（轨表页面）跟着更新、它的工具条与保存照旧可用。
-     *
-     * 行 id 是基座那套（轨表用数组下标做 id，见其适配层）。
+     * **改了一格**（`null` = 回到原值）。它同时是**数据所有权开关**（见下面 `外部持有数据`）：
+     * 给了 = 改动归调用方（它写进自己的 state 再回传），没给 = 草稿住在这张表里。
      */
     onEdit?: (rowId: string, key: string, value: string | null) => void
 }) {
@@ -206,14 +213,27 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 内容永远慢一拍（真机：切菲莉后显示娜露梅、切回娜露梅后显示菲莉）。
      */
     const [edited, setEdited] = useState<ActionRow[] | null>(null)
-    const rows = edited ?? rowsProp
     /**
-     * 改一格：记进本地覆盖（**不写回父组件** —— 草稿归这张表，保存时才由 `onSaveReady` 交出去，
-     * 这条口径与改动前一致）。用 updater 形式，因为它要在上一份覆盖的基础上叠加。
+     * **数据归谁** —— `onEdit` 就是那个开关：
+     *
+     *   · **给了**（轨表）：改动交给调用方，它写进自己的 state 再回传。本地**不留草稿** ——
+     *     留了就会把调用方那份数据整份遮蔽住，它的**行序重排 / 撤销 / 换数据**一个都进不来。
+     *     真机踩过：拖完行序、调用方也确实重排了，屏幕上纹丝不动（看着就像"拖动没实现"）。
+     *   · **没给**（动作表）：草稿归这张表，保存时才由 `onSaveReady` 交出去；换数据靠 `key` 整表重挂载。
      */
-    const setRows = useCallback<Dispatch<SetStateAction<ActionRow[]>>>((next) => {
-        setEdited((prev) => (typeof next === "function" ? next(prev ?? rowsProp) : next))
-    }, [rowsProp])
+    const 外部持有数据 = onEdit !== undefined
+    const rows = 外部持有数据 ? rowsProp : (edited ?? rowsProp)
+    /**
+     * 数据层：没有 `onEdit` 时才落到本地草稿上（用 updater 形式，要在上一份覆盖的基础上叠加）。
+     * 有 `onEdit` 的表，改动由 `useClipboardHistory` 的 `apply` 直接通知调用方（见那里的 `onWrite`）。
+     */
+    const setRows = useCallback<Dispatch<SetStateAction<ActionRow[]>>>(
+        (next) => {
+            if (外部持有数据) return
+            setEdited((prev) => (typeof next === "function" ? next(prev ?? rowsProp) : next))
+        },
+        [外部持有数据, rowsProp],
+    )
     /**
      * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
      * 稳定，见下）、读不到最新的 `rows`；走 `setRows` 的 updater 里读则会踩 React 重跑 updater 那个坑。
@@ -231,13 +251,13 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         [rows, t],
     )
     /**
-     * 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `PINNED_COUNT` 个字段）。
+     * 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `pinnedCount` 个字段，默认 2；轨表传 0）。
      *
      * ⚠️ 初值要跟着 `keysProp` 给：列宽那一趟 `useLayoutEffect` 依赖 `pinning` 已就位，
      * 若等下面那个 effect 去置，外部给数据这条路上会先按"一列都没钉"量一遍。
      */
     const [pinning, setPinning] = useState<{start: string[]; end: string[]}>(() => ({
-        start: (keysProp ?? []).slice(0, PINNED_COUNT),
+        start: (keysProp ?? []).slice(0, pinnedCount),
         end: [],
     }))
     /** 每列多宽（**取整后的整数**）：量出来写进库的 sizing state，渲染按它给 `width`。 */
@@ -522,6 +542,14 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     const selectionBounds = table.getCellSelectionBounds()
 
     /**
+     * **行头那几格的总宽**：行号列恒定 `HANDLE_WIDTH`，行序能拖的表再跟一条**握把列**（`GRIP_WIDTH`）。
+     *
+     * 它是"行号列之后从哪儿开始"的**唯一**出处：表格总宽、表头那两格、钉住列的 `left`（表头与表体）
+     * 全用这一个数 —— 以前这里是三处各写一遍 `HANDLE_WIDTH`，而握把那 32px 谁都没算进去。
+     */
+    const rowHeadWidth = HANDLE_WIDTH + (reorder !== undefined ? GRIP_WIDTH : 0)
+
+    /**
      * 显示顺序的行（= 渲染顺序）。取**一次**给下面几处共用：
      *   · 行号格判定"这一行是不是整行选中"（按行下标）；
      *   · 行号拖动时按光标所在的行找 row id。
@@ -703,6 +731,10 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      *
      * 传进去的都是稳定引用（`setRows` 是 setter、`tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids`
      * 由 `useMemo` 按数据给），所以它内部那段全局监听**只挂一次**。
+     *
+     * `onWrite` = 把"改了哪一格"通知给持有数据的调用方（就是 `onEdit`）：**编辑 / 粘贴 / 撤销三条路
+     * 都经它内部的 `apply`**，所以挂在这一处就够 —— 以前只有"点格子改值"那一条会通知，
+     * 粘贴与撤销对轨表是静默的。它也没必要包一层：`edit` 本身就是"改一格"的入口。
      */
     const {copyHint, setCopyHint, copySource, clearCopySource, edit} = useClipboardHistory({
         setRows,
@@ -710,19 +742,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         tableRef: tableInstanceRef,
         branchIds: branchPick.ids,
         multiAreaCopyText: t.multiAreaCopy,
+        onWrite: onEdit,
     })
-
-    /**
-     * 改一格：草稿仍写进本层（见 `edited`），**顺带通知调用方**（见 `onEdit` 的说明）。
-     * 包一层而不是去改每个调用点 —— 格子、选值格、粘贴都走同一个 `edit`。
-     */
-    const editCell = useCallback(
-        (rowId: string, key: string, value: string | null) => {
-            edit(rowId, key, value)
-            onEdit?.(rowId, key, value)
-        },
-        [edit, onEdit],
-    )
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
@@ -1121,11 +1142,12 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     （整数，边界落在整像素上）。没量之前保持 `table-auto` —— 那时得让浏览器先按内容
                     排一遍，我们才知道每列该多宽。
                 */
-                style={measured ? {width: table.getTotalSize() + HANDLE_WIDTH} : undefined}
+                style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
                 /*
-                    ⚠️ 表宽必须**自己把行号那 40px 加上**：`getTotalSize()` 只算数据列（行号不入列模型）。
-                    漏了它，`table-fixed` 下浏览器会把这 40px 从各数据列里摊走 —— 每列比量出来的整数
-                    窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil` 的那件事，换个入口再来一遍）。
+                    ⚠️ 表宽必须**自己把行头那几格加上**（见 `rowHeadWidth`）：`getTotalSize()` 只算数据列
+                    （行号列与握把列都不入列模型）。漏了它，`table-fixed` 下浏览器会把这点宽度从各数据列里
+                    摊走 —— 每列比量出来的整数窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil`
+                    的那件事，换个入口再来一遍）。
                 */
                 className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
             >
@@ -1146,6 +1168,14 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                             <th className={`${HANDLE_CELL} ${HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
                                 <div className={HANDLE_INNER}>#</div>
                             </th>
+                            {/*
+                                **握把列的占位表头**：表体那一格有它，表头必须有对应的一格 —— 否则
+                                `table-fixed` 的列宽还是按表头算，握把那 32px 又要被摊到别的列上去。
+                                留空：这一列没有"名字"可言（拖动是手势，不是数据）。
+                            */}
+                            {reorder !== undefined && (
+                                <th aria-hidden className={`${HANDLE_CELL} ${HEAD_BG} top-0`} style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}} />
+                            )}
                             {headerGroup.headers.map((header) => {
                                 const pinned = header.column.getIsPinned()
                                 return (
@@ -1162,9 +1192,9 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                             width: measured ? header.getSize() : undefined,
                                             /*
                                                 ‼️ 同上（表体那一格）：库给钉住列的 `left` 是从 0 起算的，
-                                                行号那 40px 得自己加 —— 否则 `id_` 的表头会盖住 `#` 表头。
+                                                行头那几格得自己加 —— 否则 `id_` 的表头会盖住 `#` 表头。
                                             */
-                                            left: measured && pinned ? HANDLE_WIDTH + header.column.getStart("start") : undefined,
+                                            left: measured && pinned ? rowHeadWidth + header.column.getStart("start") : undefined,
                                         }}
                                         // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
                                         data-col-id={header.column.id}
@@ -1222,6 +1252,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                 /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）。 */
                                 rowNumber={rowIndex + 1}
                                 measured={measured}
+                                rowHeadWidth={rowHeadWidth}
                                 abilityNames={abilityNames}
                                 pressRef={pressRef}
                                 /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
@@ -1230,7 +1261,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                 activeCellKey={activeCellKey}
                                 scrollActiveIntoView={scrollActiveIntoView}
                                 getSelectionBounds={getSelectionBounds}
-                                edit={editCell}
+                                edit={edit}
                                 sortable={reorder !== undefined}
                                 dragRowRef={dragRowRef}
                                 clickRowHandle={clickRowHandle}

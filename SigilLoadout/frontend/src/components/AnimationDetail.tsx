@@ -440,12 +440,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             return (
                 <Fragment key={key}>
                     {/* 标题与工具条包在**同一个 sticky 容器**里：工具条是绝对定位叠上去的，不参与这行排版，
-                        所以只钉标题会把按钮留在地上。z-[60] **必须高过表格里所有吸顶格**（表头 "#" 是 50、
-                        表体 "#" 是 40、焦点框是 30）—— 给 30 时表体会画到标题上面（实测把标题整个盖住）。
+                        所以只钉标题会把按钮留在地上。
+                        ‼️ z-[70] **必须高过表格里最高那一层** —— 表头整行是 60（冻结列 50、焦点框 30）。
+                        这里原来跟表头一样写 60：同层里**谁在 DOM 后面谁画在上面**，而表格排在本标题之后，
+                        于是滚动时表头把标题穿透（用户截图）。标题是"表之外"的一层，单独立高一级。
                         ⚠️ 分区之间**不画分隔线**（原来这里是 `not-last:border-b`）：用户要求全去掉。 */}
                     {/* 吸顶的轨标题：底色用 **bg-popover**（= 弹层自己的 #171717），不是 bg-background
                         (#0a0a0a) —— 后者会在 dialog 里显出一条比周围更深的色带（用户要求移除 #0a0a0a）。 */}
-                    <div className="sticky top-0 z-[60] bg-popover">
+                    <div className="sticky top-0 z-[70] bg-popover">
                         <div className="flex w-full items-start py-2 text-left text-sm font-medium">
                             <span className="flex w-full items-baseline gap-1.5">
                                 <span>{trackLabel(info.kind)}</span>
@@ -504,8 +506,9 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
         {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。
             标题与内容**不包一层 div**（同上面几条轨）：包起来 sticky 就只能在那一块里吸顶、离场时露半截。 */}
-        {/* 吸顶的 FSM 标题：底色同上面几条轨，走 bg-popover（弹层自己的底色），不铺 #0a0a0a。 */}
-        <div className="sticky top-0 z-[60] bg-popover">
+        {/* 吸顶的 FSM 标题：底色同上面几条轨，走 bg-popover（弹层自己的底色），不铺 #0a0a0a。
+            层级同上面那条轨标题（70）：它同样是"表之外"的一层，要盖过表头的 60。 */}
+        <div className="sticky top-0 z-[70] bg-popover">
                 <div className="flex w-full items-start py-2 text-sm font-medium">{t.fsmScope}</div>
             </div>
             <div className="pt-1 pb-0">

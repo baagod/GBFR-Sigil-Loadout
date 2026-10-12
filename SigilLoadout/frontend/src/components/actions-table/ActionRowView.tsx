@@ -10,6 +10,7 @@ import {useSortable} from "@dnd-kit/sortable"
 import {
     CELL_BASE,
     EDITABLE_BG,
+    GRIP_WIDTH,
     HANDLE_CELL,
     HEAD_BG,
     HANDLE_CURSOR,
@@ -76,6 +77,8 @@ const RowCell = memo(function RowCell({
     className: string
     width: number | null
     left: number | null
+    /** **行头那几格的总宽**（行号列，能拖的表再加握把列）—— 钉住列的 `left` 要从它之后起算。 */
+    rowHeadWidth: number
     abilityNames: Record<string, string>
     pressRef: RefObject<PressFacts | null>
     draggedRef: RefObject<boolean>
@@ -152,6 +155,7 @@ export const ActionRowView = memo(function ActionRowView({
     rowSelected,
     rowNumber,
     measured,
+    rowHeadWidth,
     abilityNames,
     pressRef,
     copySource,
@@ -179,6 +183,8 @@ export const ActionRowView = memo(function ActionRowView({
     rowSelected: boolean
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */
     measured: boolean
+    /** **行头那几格的总宽**（行号列 40，能拖的表再加握把列 32）—— 钉住列的 `left` 从它之后起算。 */
+    rowHeadWidth: number
     abilityNames: Record<string, string>
     /** 按下那一刻这一格的选区事实（见 `PressFacts`）：`onMouseDown` 写、渲染与 click/focus 读。 */
     pressRef: RefObject<PressFacts | null>
@@ -251,37 +257,35 @@ export const ActionRowView = memo(function ActionRowView({
             */}
             <td
                 className={`${removed ? "bg-[#542526]" : HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
-                style={{width: sortable ? HANDLE_WIDTH + 32 : HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
+                style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
                     clickRowHandle(row, e)
                 }}
             >
-                {sortable ? (
-                    <div className="flex h-full items-stretch">
-                        <div className={HANDLE_INNER} style={{width: HANDLE_WIDTH}}>
-                            {rowNumber}
-                        </div>
-                        <div
-                            ref={drag.setActivatorNodeRef}
-                            aria-label="拖动排序"
-                            {...drag.attributes}
-                            {...drag.listeners}
-                            onPointerDown={(e) => {
-                                e.stopPropagation()
-                                drag.listeners?.onPointerDown?.(e)
-                            }}
-                            className={`flex w-8 shrink-0 cursor-default touch-none items-center justify-center text-base leading-none text-muted-foreground/60 select-none md:text-sm ${
-                                drag.isDragging ? "opacity-40" : ""
-                            }`}
-                        >
-                            ⠿
-                        </div>
-                    </div>
-                ) : (
-                    <div className={HANDLE_INNER}>{rowNumber}</div>
-                )}
+                <div className={HANDLE_INNER}>{rowNumber}</div>
             </td>
+            {/*
+                **拖动握把自成一条**（行号列右边）。为什么不塞在行号格里：那一格要同时装序号与握把，而
+                `table-fixed` 的列宽只认**表头那格** —— 塞在一起时表体写下的宽度不算数（真机：序号被 flex
+                压到 ~20px、握把右侧 10px 被钉住的 `config` 列盖住、表头 `#` 与序号不共中线）。
+                拆开之后每一格的宽度各归各的，"点行号 = 选行 / 按握把 = 搬行"也从**结构**上分开了
+                （不再靠 `stopPropagation` 拦）。
+            */}
+            {sortable && (
+                <td
+                    ref={drag.setActivatorNodeRef}
+                    aria-label="拖动排序"
+                    {...drag.attributes}
+                    {...drag.listeners}
+                    className={`${removed ? "bg-[#542526]" : HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""} touch-none cursor-grab active:cursor-grabbing ${
+                        drag.isDragging ? "opacity-40" : ""
+                    }`}
+                    style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}}
+                >
+                    <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
+                </td>
+            )}
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
                 const key = cell.column.id
@@ -305,11 +309,12 @@ export const ActionRowView = memo(function ActionRowView({
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
                         className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readOnly ? READ_ONLY_BG : EDITABLE_BG} ${readOnly ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)}`}
                         width={measured ? cell.column.getSize() : null}
+                        rowHeadWidth={rowHeadWidth}
                         /*
                             ‼️ 钉住列的 `left` **必须自己加上行号那 40px**：行号列不在库的列模型里，所以
                             `getStart("start")` 是从 0 算的；不加偏移，`id_` 的 `left:0` 会和行号格撞在一起。
                         */
-                        left={measured && pinned ? HANDLE_WIDTH + cell.column.getStart("start") : null}
+                        left={measured && pinned ? rowHeadWidth + cell.column.getStart("start") : null}
                         /* 只有活动格拿到滚动 ref（`undefined` = React 不绑）—— 判据在行那层算好。 */
                         cellRef={isActiveCell ? scrollActiveIntoView : undefined}
                         abilityNames={abilityNames}
