@@ -38,6 +38,7 @@ import {
     useState,
     type Dispatch,
     type MouseEvent as ReactMouseEvent,
+    type ReactNode,
     type SetStateAction,
 } from "react"
 import {
@@ -73,7 +74,10 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, type ActionsTableMessages, type EnterEditRegistry, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, type EnterEditRegistry, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {DndContext, PointerSensor, closestCenter, useSensor, useSensors} from "@dnd-kit/core"
+import {restrictToVerticalAxis} from "@dnd-kit/modifiers"
+import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
 import {revealScrollTarget} from "@/components/actions-table/reveal"
 import {useClipboardHistory} from "@/components/actions-table/useClipboardHistory"
@@ -123,7 +127,39 @@ const CTRL = 2
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady}: {
+/**
+ * **行序能拖**时才挂 `DndContext`（不能拖的表原样透传）；`SortableContext` **无条件**挂 ——
+ * 这样行组件里那个 `useSortable` 永远在上下文里（hook 不能条件调用）。
+ *
+ * 回调交出去的是**下标**（`from` / `to`）：`active.id` 是行 id，而"第几行"才是调用方（轨表）的口径。
+ */
+function RowDnd({reorder, rows, children}: {reorder?: (from: number, to: number) => void; rows: {id: string}[]; children: ReactNode}) {
+    const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
+    const ids = rows.map((row) => row.id)
+    const tree = (
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+            {children}
+        </SortableContext>
+    )
+    if (!reorder) return tree
+    return (
+        <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={({active, over}) => {
+                if (!over || active.id === over.id) return
+                const from = ids.indexOf(String(active.id))
+                const to = ids.indexOf(String(over.id))
+                if (from >= 0 && to >= 0) reorder(from, to)
+            }}
+        >
+            {tree}
+        </DndContext>
+    )
+}
+
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, sorting: sortingProp, onEdit}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
@@ -133,6 +169,25 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     keys: string[]
     /** 数据到位后把"保存"这个动作交出来 —— 这个组件自己没有工具条（与 GlobalParamPanel 同一个约定）。 */
     onSaveReady?: (save: () => Promise<void>) => void
+    /**
+     * **这一列的值格参数**（多选 / 位名表 / 挂不挂搜索框）—— 由调用方给（见 `PickerConfig`）。
+     *
+     * ‼️ 值格只有**一套**实现：先选后编那一道闸门、跟随可视、焦点环、列表排序
+     * `[当前] → [原值] → [其他]` 全是同一份；单选还是多选、挂不挂搜索框只差这几个字段。
+     * 所以"哪张表要值格"不需要再写任何自定义 —— 给参数就行。
+     */
+    pickerOf?: (key: string) => PickerConfig | undefined
+    /** **行序能拖**：给了才有行号列里那半截 `⠿`、才接 dnd-kit（动作表的行是记录、没有行序，不传）。 */
+    reorder?: (from: number, to: number) => void
+    /** 排序状态（默认按 `id_` 升序）；轨表没有 `id_` 那一列，传 `[]` = 行序严格等于数组顺序。 */
+    sorting?: SortingState
+    /**
+     * **改了一格**（`null` = 回到原值）—— 草稿仍住在这张表里（见 `edited`），这里是**顺带通知**调用方，
+     * 好让"持有数据的那一层"（轨表页面）跟着更新、它的工具条与保存照旧可用。
+     *
+     * 行 id 是基座那套（轨表用数组下标做 id，见其适配层）。
+     */
+    onEdit?: (rowId: string, key: string, value: string | null) => void
 }) {
     /**
      * **当前要显示的那份数据** = 父组件给的 prop，外加本层的"编辑覆盖"。
@@ -195,7 +250,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 用库的 sorting state 而不是自己在 `rows` 上 `.sort()`：数据本身没有"顺序"这回事，
      * 排序该发生在**渲染那一层**；另外等以后做"点表头排序"，这里换个初始值就能接上。
      */
-    const [sorting, setSorting] = useState<SortingState>([{id: "id_", desc: false}])
+    const [sorting, setSorting] = useState<SortingState>(sortingProp ?? [{id: "id_", desc: false}])
     /**
      * **按下那一刻这一格的选区事实**（形状与理由见 `PressFacts`）—— 整张表共享一条记录，
      * 由数据格的 `onMouseDown` 在库改掉选中状态**之前**写进去，`click` / `focus` 那两条进编辑的路读它。
@@ -318,7 +373,19 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         只是把这趟测量挪到"可见"那一刻。
     */
     useLayoutEffect(() => {
-        if (measured || keys.length === 0) return
+        /*
+            ‼️ **不能"量过一次就不再量"**（原来这里是 `if (measured || …) return`，是本次真机的根因）。
+
+            那一行让测量**只发生在第一次可见的那一刻**，此后无论内容/字体/容器怎么变都不再量 ——
+            动作表第一次就在宽容器里、字体也已加载，所以一直没事；轨表第一次可见是在**弹窗刚展开**那一瞬
+            （容器还窄、字体还是回退字体），量出来的宽度被永久锁死 → 表头截成 `StartTi…`，怎么重开都不变。
+
+            改成"每次都按内容重量"之后，两张表走的是**同一条**路：`keys` 变（换轨）会重量、
+            字体加载完会重量（见下面那个 `document.fonts` 的 effect）、隐藏时也会按帧重试。
+            重量是安全的：下面先把表放开成 `max-content` + `table-layout: auto` 并清掉旧宽度，
+            所以量到的永远是**内容**的自然宽度；重量的结果若与上次相同，`setState` 会被 React 挡掉。
+        */
+        if (keys.length === 0) return
         const el = tableRef.current
         if (!el) return
         /*
@@ -332,9 +399,62 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             const raf = requestAnimationFrame(() => setShownTick((v) => v + 1))
             return () => cancelAnimationFrame(raf)
         }
+        /*
+            ‼️ 量之前把表**放开成"按内容自然排"**：`width: max-content` + `table-layout: auto`。
+
+            为什么两样都要：
+              · `max-content` —— `table-auto` 在容器比内容窄时会把列**压扁**，那时量到的是"被挤过的宽度"；
+              · `table-layout: auto` —— 更要紧的一条：一旦量过一次，表就是 `table-fixed` + 显式宽度，
+                **再量只会量回它自己那套宽度**（内容已经不起作用了）→ 第一次在窄容器里量到的结果会被
+                **永久锁住**（真机症状：轨表在折叠面板里首次测量时被挤扁 → 表头截成 `StartTi…`，
+                之后再怎么展开都救不回来；动作表首次测量就在宽容器里，所以一直没事）。
+            量完两样都还原，交给下面按测量结果锁布局。
+        */
+        const 原宽 = el.style.width
+        const 原布局 = el.style.tableLayout
+        el.style.width = "max-content"
+        el.style.tableLayout = "auto"
+        const ths = [...el.querySelectorAll<HTMLElement>("thead th[data-col-id]")]
+        /*
+            ‼️ **还要先把每一列上一次写下的宽度清掉**。
+
+            格子里的文本带 `truncate`（`overflow: hidden`），在 `auto` 布局下它的 **min-content 是 0** ——
+            旧的显式宽度留着时，表只会照着旧宽度排，**重测读到的是自己**（真机：轨表第一次量到 74px 的
+            `StartTime`，此后无论重测多少次都还是 74，而那里实际需要 ~78 → 表头永远截成 `StartTi…`）。
+            动作表从没踩到，是因为它的宽度从来不需要变。清了才是"按内容重排"，两张表同一条路。
+            React 会在下次渲染时按 `columnSizing` 重新写回宽度，所以清掉是安全的。
+        */
+        const 原列宽 = ths.map((th) => th.style.width)
+        for (const th of ths) th.style.width = ""
+        /*
+            ‼️ 另备一把**尺子**：把表头文字放进一个离屏 `<span>` 里独立量它的真实宽度。
+
+            为什么不直接用那层 `truncate` 的 `scrollWidth`：`truncate` 是 `overflow: hidden`，
+            它的 `clientWidth` 会随列宽变，同一帧里"清了旧宽度"之后未必已经反映真实文本宽 ——
+            真机就是这样留下几像素的误差（`PartsNo` / `ReactionType` / `ElementType` 仍截成 `Parts...`）。
+            离屏 span 与列宽彻底无关，量出来的是文字本身的宽度，两张表走同一条路。
+            类名照抄表头那层（字体/字号/字重都跟它一致），所以量出来的就是它需要的宽度。
+        */
+        const 尺 = document.createElement("span")
+        尺.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;white-space:nowrap"
+        document.body.appendChild(尺)
+
         const sizes: ColumnSizingState = {}
-        for (const th of el.querySelectorAll<HTMLElement>("thead th[data-col-id]")) {
+        for (const th of ths) {
             const id = th.dataset.colId
+            if (!id) continue
+            const 自然 = th.getBoundingClientRect().width
+            const 内层 = th.firstElementChild as HTMLElement | null
+            let 需要 = 自然
+            if (内层) {
+                // 内边距 + 边框 = 外框 − 内层可见宽（把"文字宽"换算成"列宽"要加回它）。
+                const 边距 = Math.max(0, 自然 - 内层.clientWidth)
+                尺.className = 内层.className
+                尺.textContent = th.textContent
+                const 文字宽 = 尺.getBoundingClientRect().width
+                // 量不到（比如 happy-dom 没有真实布局，一律 0）就不采信这把尺子，照旧用自然宽。
+                if (文字宽 > 0) 需要 = Math.max(自然, 文字宽 + 边距 + 1)
+            }
             /*
                 ⚠️ 用 `ceil` **向上**取整，不能 `round`。
 
@@ -342,11 +462,36 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                 表头文字就正好放不下、列名末尾被截成 `…`。向上取整最多比自然宽度宽 1px，永不截断。
                 另外 `Math.max(1, …)` 兜住宽度 0 的列（`table-fixed` 下会被挤成一条线）。
             */
-            if (id) sizes[id] = Math.max(1, Math.ceil(th.getBoundingClientRect().width))
+            sizes[id] = Math.max(1, Math.ceil(需要))
         }
+        尺.remove()
+        /* 清掉的那些宽度原样写回：DOM 不留中间态（React 下次渲染本来也会写回，但别指望它）。 */
+        ths.forEach((th, i) => {
+            th.style.width = 原列宽[i] ?? ""
+        })
+        el.style.width = 原宽
+        el.style.tableLayout = 原布局
         setColumnSizing(sizes)
         setMeasured(true)
     }, [measured, keys, shownTick])
+
+    /*
+        ‼️ **字体加载完再量一次**。
+
+        首帧量到的是**回退字体**的宽度，真字体上屏后同样的文字更宽，列就短了那么几像素 —— 表头末尾被截成
+        `…`（真机实测：轨表 `StartTime` 量到 74px，它实际需要 ~78px）。动作表看不出来，是因为它的自然宽度
+        来自**数据**（数据比表头宽得多），几像素的差被淹没了；轨表那几列的自然宽度**就是表头文字**，
+        一差就露。重测是安全的：测量那一段会把表放开成 `max-content` + `table-layout: auto`，每次都按内容重算。
+    */
+    useEffect(() => {
+        let 还在 = true
+        void document.fonts?.ready.then(() => {
+            if (还在) setShownTick((v) => v + 1)
+        })
+        return () => {
+            还在 = false
+        }
+    }, [])
 
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
     useEffect(() => {
@@ -559,6 +704,18 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         branchIds: branchPick.ids,
         multiAreaCopyText: t.multiAreaCopy,
     })
+
+    /**
+     * 改一格：草稿仍写进本层（见 `edited`），**顺带通知调用方**（见 `onEdit` 的说明）。
+     * 包一层而不是去改每个调用点 —— 格子、选值格、粘贴都走同一个 `edit`。
+     */
+    const editCell = useCallback(
+        (rowId: string, key: string, value: string | null) => {
+            edit(rowId, key, value)
+            onEdit?.(rowId, key, value)
+        },
+        [edit, onEdit],
+    )
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
@@ -961,7 +1118,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     漏了它，`table-fixed` 下浏览器会把这 40px 从各数据列里摊走 —— 每列比量出来的整数
                     窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil` 的那件事，换个入口再来一遍）。
                 */
-                className={`${measured ? "table-fixed " : ""}border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
+                className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
             >
                 <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
@@ -1030,6 +1187,10 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     <RevealContext.Provider value={reveal}>
                     <EnterEditContext.Provider value={enterEditRegistry}>
                     <BranchPickContext.Provider value={branchPick}>
+                    {/* 值格参数（多选 / 位名表 / 挂不挂搜索框）：各表自己给；不给 = 这一列不是值格。 */}
+                    <PickerOfContext.Provider value={pickerOf ?? NO_PICKER}>
+                    {/* 行序能拖时才挂 DndContext（见 `RowDnd`；`SortableContext` 无条件挂）。 */}
+                    <RowDnd reorder={reorder} rows={modelRows}>
                     {modelRows.map((row, rowIndex) => {
                         /*
                             ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
@@ -1059,7 +1220,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                 activeCellKey={activeCellKey}
                                 scrollActiveIntoView={scrollActiveIntoView}
                                 getSelectionBounds={getSelectionBounds}
-                                edit={edit}
+                                edit={editCell}
+                                sortable={reorder !== undefined}
                                 dragRowRef={dragRowRef}
                                 clickRowHandle={clickRowHandle}
                                 startCellSelection={startCellSelection}
@@ -1067,6 +1229,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                             />
                         )
                     })}
+                    </RowDnd>
+                    </PickerOfContext.Provider>
                     </BranchPickContext.Provider>
                     </EnterEditContext.Provider>
                     </RevealContext.Provider>

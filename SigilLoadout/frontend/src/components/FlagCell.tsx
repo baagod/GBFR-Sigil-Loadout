@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react"
 import {Combobox as ComboboxPrimitive} from "@base-ui/react"
 import {Combobox, ComboboxContent, ComboboxItem, ComboboxList} from "@/components/ui/combobox"
-import {CELL_TEXT} from "@/components/EditableCell"
+import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {flagHasBit, flagMask} from "@/lib/actionflags"
 
 /*
@@ -17,13 +17,12 @@ import {flagHasBit, flagMask} from "@/lib/actionflags"
     "值 → 文字"的翻译（值写坏了、位表更新了都会不同步），现在这一格只认数值，和别的格子一样。
 */
 
-export function FlagCell({value, names, unchanged, tdClassName, original, onCommit}: {
+export function FlagCell({value, names, unchanged, original, onCommit, beforeOpen}: {
     value: string
     /** 位定义表：**下标就是位号**；名字为空的那一位显示成 `bit<号>`。 */
     names: readonly string[]
     /** 这一格**还等于打开时的原值**（没动过）→ 显示成 muted 灰，与 EditableCell 同义。 */
     unchanged: boolean
-    tdClassName: string
     /**
      * **原值**（原表这一格的那个掩码）。列表里"原值就置着的位"用 `#a0a0a0` 标出来 —— 改过之后还认得出
      * 原来开的是哪几位。勾是这个位**现在**在不在、灰是它**原来**在不在，两件事分开看。不传（新行 /
@@ -31,9 +30,17 @@ export function FlagCell({value, names, unchanged, tdClassName, original, onComm
      */
     original?: string
     onCommit: (value: string) => void
+    /**
+     * 要展开之前先问一句；返回 `false` 就别开（也**别**写 `open`）。
+     *
+     * ‼️ "先选后编"的闸门挂在这里（与单选那支 `CellPick` **同一个判据**）：第一次点只是选中这一格，
+     * 第二下才展开列表。放在 `onOpenChange` 这一层是因为**触发器就是这一格自己**，点哪儿进来都经过它。
+     */
+    beforeOpen?: () => boolean
 }) {
     const [open, setOpen] = useState(false)
-    const cellRef = useRef<HTMLTableCellElement>(null)
+    /** 触发器那一层。原来是 `<td>`，现在只是**格子的内容** —— 格子（td）由基座统一渲染。 */
+    const cellRef = useRef<HTMLDivElement>(null)
     /** 触发那层：关列表时焦点回它（不配 finalFocus 的话，组件会去 focus 文档里第一个可聚焦元素 ✗）。 */
     const btnRef = useRef<HTMLDivElement>(null)
     /**
@@ -92,7 +99,7 @@ export function FlagCell({value, names, unchanged, tdClassName, original, onComm
     }, [open])
     const mask = flagMask(value)
     const originalMask = flagMask(original ?? "")
-    const cellClass = `${CELL_TEXT} cursor-default tabular-nums ${unchanged ? "text-muted-foreground" : ""}`
+    const cellClass = `${PICK_CELL} ${PICK_MARK} cursor-default tabular-nums ${unchanged ? "text-muted-foreground" : ""}`
     // 列表项就是**每一位**（32 位都在，名字表没定义到的显示 `bit<号>`）：漏掉谁，那一位在界面上就成了
     // "看不见的位"——勾不动也取消不掉，而掩码里它还占着。
     // 项的 `value` 是这一位的**权**（"16"），而掩码判位要的是**位号**（4）—— 两者别混：
@@ -124,7 +131,7 @@ export function FlagCell({value, names, unchanged, tdClassName, original, onComm
     return (
         // data-picker-open：列表开着、或正在淡出（收尾动画）时，焦点在 portal 里、不在这一格内，
         // 靠这个属性让 cell-focus 继续画环 —— 见 closing 上面那段。
-        <td ref={cellRef} className={tdClassName} data-picker-open={open || closing ? "" : undefined}>
+        <div ref={cellRef} className="h-full" data-picker-open={open || closing ? "" : undefined}>
             <Combobox
                 multiple
                 items={items}
@@ -137,6 +144,8 @@ export function FlagCell({value, names, unchanged, tdClassName, original, onComm
                 onOpenChange={(next) => {
                     // 开：把"立刻消失"复位（弹层这时才重新挂载，入场动画照旧）。
                     if (next) setInstantClose(false)
+                    // ‼️ "先选后编"：第一次点只是选中这一格，第二下才展开列表 —— 与单选那支同一道闸门。
+                    if (next && beforeOpen && !beforeOpen()) return
                     setOpen(next)
                     setClosing(!next) // 关：进入收尾动画期（环继续画）；开：收尾结束
                 }}
@@ -197,6 +206,6 @@ export function FlagCell({value, names, unchanged, tdClassName, original, onComm
                     </ComboboxList>
                 </ComboboxContent>
             </Combobox>
-        </td>
+        </div>
     )
 }

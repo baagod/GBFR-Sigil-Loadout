@@ -6,6 +6,7 @@ import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
 import type {Cell, CellSelectionBounds, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
+import {useSortable} from "@dnd-kit/sortable"
 import {
     CELL_BASE,
     EDITABLE_BG,
@@ -163,6 +164,7 @@ export const ActionRowView = memo(function ActionRowView({
     clickRowHandle,
     startCellSelection,
     onEnterEdit,
+    sortable,
 }: {
     row: Row<typeof features, ActionRow>
     /** 这一行外观的指纹：只参与 `memo` 比较，渲染不用。 */
@@ -200,13 +202,37 @@ export const ActionRowView = memo(function ActionRowView({
     startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
     /** 某一格**进入编辑**了：复制源那圈虚线要撤（规则②的口径是"动过源区"，进编辑就算动）。 */
     onEnterEdit: () => void
+    /** **行序能拖**（轨表）：给了才在行号格里多出那半截 `⠿`，也只有它接拖动。 */
+    sortable?: boolean
 }) {
     /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
     const rowCells = row.getAllCells()
+    /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
+    const removed = row.original.removed === true
+    /**
+     * 行序拖动（dnd-kit）。**无条件调用**（hook 不能条件调）—— `SortableContext` 由基座无条件提供，
+     * 不拖的表只是永远不触发；`disabled` 让不拖的表连监听都不挂。
+     */
+    const drag = useSortable({id: row.id, disabled: !sortable})
     return (
         /* `data-row-id`：行拖拽时要按"光标在哪一行"找 row id（见 `ActionsTable.rowIdAtY`）—— */
         /* DOM 拿得到，不用再往库那边问一遍。 */
-        <tr data-row-id={row.id}>
+        <tr
+            data-row-id={row.id}
+            ref={drag.setNodeRef}
+            style={{
+                transform: drag.transform ? `translate3d(${drag.transform.x}px, ${drag.transform.y}px, 0)` : undefined,
+                transition: drag.transition,
+            }}
+            className={
+                removed
+                    ? // 假删除：底色刷在行上，格子自己的底色让开（吸顶那几格不让，见下面 RowCell）。
+                      "bg-[#542526] [&>td:not(.sticky)]:bg-transparent!"
+                    : drag.isDragging
+                      ? "relative z-10 opacity-50"
+                      : undefined
+            }
+        >
             {/*
                 行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与**单元格**选区。
 
@@ -219,16 +245,42 @@ export const ActionRowView = memo(function ActionRowView({
                   · 划过 —— 只有"正按着"时才把区间拉到这一行；
                   · 松手 —— 在 window 上收尾（鼠标常会跑出行号那一列）。
                 ⚠️ 这只格子不在列模型里，所以 `cell.getSelectionStartHandler()` 那套与它无关，两者不打架。
+
+                给了 `sortable` 时右边多出**握把**那半截：序号照旧管选行，**只有握把接拖动**
+                （按下先 `stopPropagation`，这一下只搬行、不选行）。
             */}
             <td
-                className={`${HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
-                style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
+                className={`${removed ? "bg-[#542526]" : HEAD_BG} ${HANDLE_CELL} ${rowSelected ? HANDLE_SELECTED_BG : ""}`}
+                style={{width: sortable ? HANDLE_WIDTH + 32 : HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
                     clickRowHandle(row, e)
                 }}
             >
-                <div className={HANDLE_INNER}>{rowNumber}</div>
+                {sortable ? (
+                    <div className="flex h-full items-stretch">
+                        <div className={HANDLE_INNER} style={{width: HANDLE_WIDTH}}>
+                            {rowNumber}
+                        </div>
+                        <div
+                            ref={drag.setActivatorNodeRef}
+                            aria-label="拖动排序"
+                            {...drag.attributes}
+                            {...drag.listeners}
+                            onPointerDown={(e) => {
+                                e.stopPropagation()
+                                drag.listeners?.onPointerDown?.(e)
+                            }}
+                            className={`flex w-8 shrink-0 cursor-default touch-none items-center justify-center text-base leading-none text-muted-foreground/60 select-none md:text-sm ${
+                                drag.isDragging ? "opacity-40" : ""
+                            }`}
+                        >
+                            ⠿
+                        </div>
+                    </div>
+                ) : (
+                    <div className={HANDLE_INNER}>{rowNumber}</div>
+                )}
             </td>
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {

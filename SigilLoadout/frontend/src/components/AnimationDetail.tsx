@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useMemo, useState} from "react"
+import {Fragment, useEffect, useState} from "react"
 import {arrayMove} from "@dnd-kit/sortable"
 import {
     DeployMissingTracks,
@@ -23,16 +23,6 @@ import {useRowSelection} from "@/lib/useRowSelection"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
-const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = [
-    "config",
-    "startTime",
-    "endTime",
-    "layerFlag",
-    "flag0",
-    "flag1",
-    "sysFlag",
-    "freeArg",
-]
 
 /**
  * 这一行在原版里有没有对应行（有才是"原行"：删除只做假删除）。
@@ -44,29 +34,6 @@ const FLAG_DIFF_COLS: readonly (keyof FlagRow)[] = [
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
 
 /**
- * 每行与原表**对应那行**的差异列（null = 这一行与原表一致）。
- *
- * 配对是**记录下来的**（行上的 `orig`：它对应原版第几行），不是靠值猜 —— 原行只会被"假删除"、
- * 永远不会真的从表里消失，原版又是只读的，所以拖到哪、前后插了多少行都不影响配对。
- * 没有编号的行（新增 / 粘贴出来的）本来就不在原版里 → 整行都算改动。
- */
-function diffRows<T, C extends PropertyKey>(
-    cols: readonly C[],
-    current: (T & {orig?: number})[],
-    original: T[],
-    get: (row: T, col: C) => string,
-): (Set<string> | null)[] {
-    const wholeRow = new Set(cols.map(String))
-    return current.map((row) => {
-        const mate = isOriginal(row) ? original[row.orig as number] : undefined
-        if (!mate) return wholeRow
-        const miss = new Set<string>()
-        for (const col of cols) {
-            if (get(row, col) !== get(mate, col)) miss.add(String(col))
-        }
-        return miss.size > 0 ? miss : null
-    })
-}
 
 /*
 动画详情页：点动作表里的动画号弹出来的那一层。
@@ -114,7 +81,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * `key` 是分区身份 —— **一次只认一个分区**，切到别的分区就等于换了个选区。
      * 这套状态与拖选开关在 lib/useRowSelection 里，与动作表同一份实现。
      */
-    const {sel, setSel, select, extendTo} = useRowSelection()
+    const {sel, setSel} = useRowSelection()
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
@@ -128,20 +95,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * 保存成功后把这份刷成刚写下去的那份（于是全部回到"没动过"）。
      */
     const [baseline, setBaseline] = useState<{tables: Record<string, TrackTable>; flags: FlagRow[]} | null>(null)
-
-    /**
-     * 每个分区里、每行与原表的差异列（下标与当前行一一对应）。
-     * 只在数据变了时重算 —— 与顺序无关，所以增删插入重排之后依然是对的。
-     */
-    const diffs = useMemo(() => {
-        if (!baseline) return null
-        const out: Record<string, (Set<string> | null)[]> = {}
-        for (const [key, table] of Object.entries(tables)) {
-            out[key] = diffRows<TrackRow, string>(table.columns, table.rows, baseline.tables[key]?.rows ?? [], (row, col) => row.values[col] ?? "")
-        }
-        out[flagsKey] = diffRows(FLAG_DIFF_COLS, flags, baseline.flags, (row, col) => String(row[col] ?? ""))
-        return out
-    }, [baseline, tables, flags])
 
     useEffect(() => {
         // 隐藏 mot 模式：一行都还没展开时没有动画号可载 —— 清单本身不需要这份数据。
@@ -526,27 +479,21 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                     </div>
                     <div className="pt-1 pb-4">
                         {info.kind === "flags" ? (
+                            // 两张轨表 = 基座表 + 数据：选中 / 复制粘贴 / 边框全部由基座负责；
+                            // 这里给数据、给"行序能拖"，编辑再收回来更新本层（工具条与保存照旧）。
                             <FlagsGrid
                                 rows={flags}
-                                sel={sel?.key === key ? sel : null}
                                 t={t}
-                                diffs={diffs?.[key]}
                                 originals={baseline?.flags}
-                                onSelect={(index, shift, ctrl) => select(key, index, shift, ctrl)}
-                                onExtend={(index) => extendTo(key, index)}
-                                onEdit={editFlag}
+                                onEdit={(rowId, field, value) => editFlag(Number(rowId), field as keyof FlagRow, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
                             />
                         ) : (
                             <TrackGrid
                                 table={tables[key]}
-                                sel={sel?.key === key ? sel : null}
                                 t={t}
-                                diffs={diffs?.[key]}
                                 originals={baseline?.tables[key]?.rows}
-                                onSelect={(index, shift, ctrl) => select(key, index, shift, ctrl)}
-                                onExtend={(index) => extendTo(key, index)}
-                                onEdit={(index, column, value) => editValue(key, index, column, value)}
+                                onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
                             />
                         )}

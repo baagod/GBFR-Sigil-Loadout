@@ -67,9 +67,29 @@ export const UNSET = "-1"
  * `!readOnly && …` 去挡住那个不可能态（那种防御分支本身就是"模型没表达清楚"的症状）。
  * 显示层怎么画、粘贴收不收、清单从哪儿来 —— 三个问题现在读同一张表，不会再各自漂移。
  */
-export type ColumnKind = "text" | "readonly" | "pick" | "branch"
+export type ColumnKind = "text" | "readonly" | "pick" | "branch" | "flags"
 export const columnKind = (key: string): ColumnKind =>
     READ_ONLY_KEYS.has(key) ? "readonly" : PICKER_KEYS.has(key) ? "pick" : BRANCH_KEYS.has(key) ? "branch" : "text"
+
+/**
+ * **一列的策略** —— 由调用方按列给（`ActionsTable` 的 `columnOf`），不给就按 `columnKind` 那张内置表。
+ *
+ * 为什么要有这个口子：`columnKind` 认的是**动作表那几个字段名**（`controlTypeHash_` / `branchXAtk_`…），
+ * 别的表的列（轨迹表的 `flag0` / `flag1`）有自己的策略。而"这一列是什么列"必须仍然只有**一个**出处 ——
+ * 让调用方从外面把整张表的策略换掉，比在基座里按表名写死分支干净（写死等于把"有哪些表"抄进基座）。
+ */
+export type ColumnSpec = {
+    kind?: ColumnKind
+    /** `kind: "flags"` 的位名表：**下标即位号**（空串 = 还没弄清含义的那一位）。 */
+    names?: readonly string[]
+    /** 多选值格（与 `kind: "flags"` 是同一件事的两种说法，任一为真即是）。 */
+    multiple?: boolean
+    /**
+     * 值格挂不挂搜索框。**只对单选值格有意义** —— 多选那版（`flags`）项短、天生不挂搜索框。
+     * 不给就按默认（分支列挂、固定清单那一列不挂）。
+     */
+    search?: boolean
+}
 
 /**
  * 分支列选值格要的两样东西 —— **走 context 下发**：`ActionRowView` / `CellContent` 靠 `memo` 挡住
@@ -83,6 +103,27 @@ export type BranchPickConfig = {
 }
 
 export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: ""})
+
+/**
+ * **值格参数**（哪一列是哪种值格、带不带搜索框、位名表）—— 由**各表自己给**。
+ *
+ * ‼️ 这是"列数据"，不是基座上的开关布尔：基座只有**一套**值格实现（先选后编 / 跟随可视 /
+ * 焦点环 / 列表排序 `[当前] → [原值] → [其他]` 全是同一份），单选还是多选、挂不挂搜索框
+ * 只差下面这几个字段。于是"以后要值格"的表**不需要再写任何自定义**。
+ */
+export type PickerConfig = {
+    /** 多选（按位开关；提交时把勾中的位权相加写回那一格）。不给 = 单选。 */
+    multiple?: boolean
+    /** 挂不挂搜索框（多选那档默认不挂：位就那么几位，搜索框是噪音）。 */
+    search?: boolean
+    /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位）。 */
+    names?: readonly string[]
+}
+
+/** 不给值格参数时用它（导出是为了让基座在 provider 里当默认值用 —— 常量引用才不会让 memo 失效）。 */
+export const NO_PICKER = (): PickerConfig | undefined => undefined
+/** 列键 → 值格参数；不给 = 这一列不是值格（按列策略那套走）。 */
+export const PickerOfContext = createContext<(key: string) => PickerConfig | undefined>(NO_PICKER)
 
 
 /**
@@ -266,6 +307,13 @@ export type ActionRow = {
     values: Record<string, string>
     /** 字段名 → **原值**（只读）：没改过时显示它当灰色占位符。 */
     originals: Record<string, string>
+    /**
+     * 这一行被**假删除**了（轨表用；动作表不传 = 没有这一态）。
+     *
+     * ‼️ 它是**行数据**、不是基座上的一个开关布尔：这一行"现在长什么样"本来就是数据的一部分，
+     * 基座只管照着画（暗红底），不需要知道谁为什么把它标上。
+     */
+    removed?: boolean
 }
 
 /**

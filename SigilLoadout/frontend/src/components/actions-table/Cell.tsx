@@ -6,7 +6,8 @@ import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEv
 
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
-import {BranchPickContext, RevealContext, UNSET, useEnterEditHandler, type ColumnKind, type PressFacts, snapshotKey} from "./model"
+import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type ColumnKind, type PressFacts, snapshotKey} from "./model"
+import {FlagCell} from "@/components/FlagCell"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -64,6 +65,8 @@ export const CellContent = memo(function CellContent({
 }) {
     // 分支列选值格的清单与搜索提示（见 `BranchPickContext`）—— 只读列用不到，但 hook 必须无条件调用。
     const branchPick = useContext(BranchPickContext)
+    /* 这一列的值格参数（多选 / 位名表）—— 由各表自己给（见 `PickerOfContext`），基座不写死哪张表。 */
+    const pickerOf = useContext(PickerOfContext)
     if (kind === "readonly") {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
@@ -79,6 +82,24 @@ export const CellContent = memo(function CellContent({
     const shouldEditOnClick = () => {
         const press = pressRef.current
         return press !== null && press.cellKey === snapshotKey(rowId, fieldKey) && press.wasSelected && press.wasOnlyCell
+    }
+    /*
+        多选值格：**与单选那支共用一切** —— 同一道"先选后编"闸门（`shouldEditOnClick`）、同一份列表长相、
+        同一个提交口径（交回一个值字符串）；只差"按位多选 + 不挂搜索框"，由**列参数**说了算
+        （见 `PickerConfig`）。所以基座只有**一套**值格实现，两张表都走它 —— 表那边零自定义。
+    */
+    const picker = pickerOf(fieldKey)
+    if (picker?.multiple) {
+        return (
+            <FlagCell
+                value={shown}
+                names={picker.names ?? []}
+                unchanged={raw === ""}
+                original={original}
+                onCommit={(value) => edit(rowId, fieldKey, value)}
+                beforeOpen={shouldEditOnClick}
+            />
+        )
     }
     if (kind === "pick" || kind === "branch") {
         /*
