@@ -138,7 +138,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         /*
             **默认什么都没有**：这一格照旧带 `cell-focus`（与别的可编辑格同一个类 —— 环由
             `td:focus-within` 决定），但**不挂任何"常亮"的开关**：没有 `data-popup-open`
-            （base-ui 只在列表打开时给触发器挂），也没有 FlagCell 那个 `data-picker-open`。
+            （base-ui 只在列表打开时给触发器挂），也没有 `data-picker-open` 那个属性。
             所以还没点它的时候，格子上只有单元格自己的格线。
         */
         expect(cell.className).toContain("cell-focus")

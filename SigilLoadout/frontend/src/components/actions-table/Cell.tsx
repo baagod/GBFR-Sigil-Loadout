@@ -7,7 +7,6 @@ import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEv
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
 import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type ColumnKind, type PressFacts, snapshotKey} from "./model"
-import {FlagCell} from "@/components/FlagCell"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -84,33 +83,25 @@ export const CellContent = memo(function CellContent({
         return press !== null && press.cellKey === snapshotKey(rowId, fieldKey) && press.wasSelected && press.wasOnlyCell
     }
     /*
-        多选值格：**与单选那支共用一切** —— 同一道"先选后编"闸门（`shouldEditOnClick`）、同一份列表长相、
-        同一个提交口径（交回一个值字符串）；只差"按位多选 + 不挂搜索框"，由**列参数**说了算
-        （见 `PickerConfig`）。所以基座只有**一套**值格实现，两张表都走它 —— 表那边零自定义。
+        **值格只有一个入口**：两种来路在这里归一 ——
+          · 调用方按列给的值格参数（`pickerOf`：轨表的 `flag0` / `flag1` 走这条，多选 + 位名表）；
+          · 内置列策略（`kind` 认 `controlTypeHash_` / `branchXAtk_` 那几个字段名）。
+        字段名与 `CellPick` 的入参同形，所以这里是**直接展开**、没有中间映射层 —— 多选 / 单选、
+        挂不挂搜索框的差别全在参数里，实现只有 `CellPick` 那一套（见 `PickerConfig`）。
+
+        ⚠️ 判据是"这一列是不是值格"，不是"是不是多选"：以前这里是 `picker?.multiple` → `FlagCell`，
+        于是多选那档另有一套触发器，样式就漂了（多选那格没有下拉箭头）。
     */
-    const picker = pickerOf(fieldKey)
-    if (picker?.multiple) {
-        return (
-            <FlagCell
-                value={shown}
-                names={picker.names ?? []}
-                unchanged={raw === ""}
-                original={original}
-                onCommit={(value) => edit(rowId, fieldKey, value)}
-                beforeOpen={shouldEditOnClick}
-            />
-        )
-    }
-    if (kind === "pick" || kind === "branch") {
-        /*
-            选值格：格子里那层文本就是下拉的触发器（见 `CellPick`）；"进编辑"= **展开列表**，同样走
-            上面那道闸门，`dragged` 一并交下去（拖过 = 拉选区，不展开）。
-        */
-        // 清单给**稳定的 Set 引用**（`CELL_CHOICES` / `branchPick.ids`）：CellPick 里那份重排才挂得住 memo。
-        const pick =
-            kind === "branch"
-                ? {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
-                : {choices: CELL_CHOICES}
+    const pick =
+        pickerOf(fieldKey) ??
+        (kind === "branch"
+            ? // 清单给**稳定的 Set 引用**（`branchPick.ids`）：CellPick 里那份重排才挂得住 memo。
+              {choices: branchPick.ids, optional: UNSET, searchPlaceholder: branchPick.searchPlaceholder}
+            : kind === "pick"
+              ? {choices: CELL_CHOICES}
+              : undefined)
+    if (pick) {
+        // "进编辑"= **展开列表**（见 `CellPick`），与普通格子同一道闸门；`dragged` 一并交下去（拖过 = 拉选区，不展开）。
         return (
             <CellPick
                 cellKey={snapshotKey(rowId, fieldKey)}

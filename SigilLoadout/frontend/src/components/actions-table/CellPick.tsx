@@ -2,16 +2,21 @@ import {useCallback, useContext, useEffect, useMemo, useRef, useState, type RefO
 import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
 import {RevealContext, useEnterEditHandler} from "@/components/actions-table/model"
+import {flagHasBit, flagMask} from "@/lib/actionflags"
 /*
-    动作表里的**选值格**：格子里是那个值 + 一个小箭头，**先选中、再点一下**才在格子下面挂出列表挑一个
-    （与普通格子"先进编辑态"同一道闸门，见下面 `shouldEditOnClick`）。
+    表里的**值格**（唯一一套实现）：格子里是那个值 + 右边一个小箭头，**先选中、再点一下**才在格子下面
+    挂出列表挑（与普通格子"先进编辑态"同一道闸门，见下面 `shouldEditOnClick`）。
 
       · `choices` —— 清单（Set，稳定引用）。`controlTypeHash_` 用 `CELL_CHOICES`；`branchXAtk_`
         用**当前表里所有 `id_`**（用户口径：值是"转到哪个动作"）。
       · `searchPlaceholder` —— 给了就挂搜索框（`branchXAtk_` 项多；53 项那一列不挂）。
       · `optional` —— 额外可选项（分支列的 `-1`）。**项上就显示值本身**（`-1` 就显示 `-1`）。
+      · `multiple` + `names` —— **多选**那一档（轨表的 `flag0` / `flag1`，按位开关的掩码）：列表项是
+        **每一位**，勾中的位权相加写回格子。这是它与单选**唯一**的差别，全部由参数表达 ——
+        触发器、箭头、先选后编、跟随可视、焦点环、一滚就收、Ctrl+C 是同一份。
+        （原来多选那档另有一个 `FlagCell`：两套触发器，于是样式漂了 —— 多选那格没有下拉箭头。）
 
-    列表本体就是 `ui/combobox` 那套（与轨迹表的 FlagCell 同一个做法）：样式、悬停高亮、选中勾都不自己写。
+    列表本体就是 `ui/combobox` 那套：样式、悬停高亮、选中勾都不自己写。
     只有三处是这一列特有的：**搜索框**、**列表顺序**（当前值 → 原值 → 其余）、**原值灰字**。
 
     ## 触发器的盒子 & 格线（都别再去动）
@@ -36,6 +41,8 @@ export function CellPick({
     choices,
     optional,
     searchPlaceholder,
+    multiple,
+    names,
     onCommit,
     shouldEditOnClick,
     dragged,
@@ -48,12 +55,16 @@ export function CellPick({
     original: string
     /** 这一格**还等于原值**（没动过）→ 灰字，与别的格子同一套。 */
     unchanged: boolean
-    /** 可选的值清单（`controlTypeHash_` = `CELL_CHOICES`；`branchXAtk_` = 当前表的 `id_` 集合）。 */
-    choices: ReadonlySet<string>
+    /** **单选**的值清单（`controlTypeHash_` = `CELL_CHOICES`；`branchXAtk_` = 当前表的 `id_` 集合）。 */
+    choices?: ReadonlySet<string>
     /** 额外可选项（分支列的 `-1`）；挑中它会照原样提交，不折算成"回到原值"。 */
     optional?: string
     /** 给了就挂搜索框（项多时才需要；`branchXAtk_` 用，53 项那一列不挂）。 */
     searchPlaceholder?: string
+    /** **多选**（按位开关的掩码）：列表项是**每一位**，勾中的位权相加写回那一格。不给 = 单选。 */
+    multiple?: boolean
+    /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位，显示成 `bit<号>`）。 */
+    names?: readonly string[]
     /** 提交这一格；`null` = 回到原值（与别的格子同一条口径）。 */
     onCommit: (next: string | null) => void
     /**
@@ -92,18 +103,45 @@ export function CellPick({
     /** 有一次展开请求是"按着的时候到的"，押后到松开那一刻再按闸门裁决。 */
     const pendingOpenRef = useRef(false)
 
-    /** 这个值在清单里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
-    const inChoices = (item: string) => choices.has(item) || item === optional
     /**
-     * 列表顺序：**当前值 → 原值 → `-1` → 其余**（其余照清单原序）。
+     * **多选那档的位表**（下标即位号）。项的值给的是**位权**的字符串（base-ui 的项 value 只能是字符串），
+     * 而"这一位置没置着"要按**位号**判 —— 两者别混（早先传权进去判位，值 `16` 勾到了第 3 行 ✗）。
+     */
+    const bits = useMemo(
+        () => (names ?? []).map((name, bit) => ({label: name === "" ? `bit${bit}` : name, bit, value: String(2 ** bit)})),
+        [names],
+    )
+    /** 项（位权）→ 位号 / 标签。 */
+    const bitOf = useMemo(() => new Map(bits.map(({bit, value: item}) => [item, bit])), [bits])
+    const labelOf = useMemo(() => new Map(bits.map(({label, value: item}) => [item, label])), [bits])
+    /** 当前值 / 原值的掩码（多选那档用）。 */
+    const mask = flagMask(shown)
+    const originalMask = flagMask(original ?? "")
+    /** 勾中的那几位（项的值 = 位权）。 */
+    const selected = useMemo(() => bits.filter(({bit}) => flagHasBit(mask, bit)).map(({value: item}) => item), [bits, mask])
+    /** 这一位在原值里吗（列表里给 `#a0a0a0` 的那批：勾是"现在在不在"、灰是"原来在不在"）。 */
+    const wasOriginal = (item: string) => flagHasBit(originalMask, bitOf.get(item) ?? -1)
+    /** 这个值在清单里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
+    const inChoices = (item: string) => choices?.has(item) === true || item === optional
+    /**
+     * 列表顺序。单选：**当前值 → 原值 → `-1` → 其余**（其余照清单原序）；多选：**勾中的 → 原值就置着的 → 其余**。
      *
      * `new Set` 一次做完两件事：去重（格子的当前值**就是** `-1` 时，当前值与 `optional` 是同一个值 ——
      * 不去重就出现两个 `-1`）与保序（先出现的排前面）。`-1` 不能沉到最后：分支列上百项，滚到看不见的地方就点不到。
      */
-    const items = useMemo(
-        () => [...new Set([shown, original, ...(optional ? [optional] : []), ...choices])].filter(inChoices),
-        [shown, original, choices, optional],
-    )
+    const items = useMemo(() => {
+        if (!multiple) {
+            return [...new Set([shown, original, ...(optional ? [optional] : []), ...(choices ?? [])])].filter(inChoices)
+        }
+        const all = bits.map(({value: item}) => item)
+        return [
+            ...selected,
+            ...all.filter((item) => !selected.includes(item) && wasOriginal(item)),
+            ...all.filter((item) => !selected.includes(item) && !wasOriginal(item)),
+        ]
+        // `wasOriginal` 只读 `bitOf` / `originalMask`（都在依赖里），不必进依赖表。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [multiple, bits, bitOf, selected, mask, originalMask, shown, original, choices, optional])
 
     /*
         按下 / 松开都挂 document：拖出这一格时松开不落在触发器上。
@@ -150,6 +188,17 @@ export function CellPick({
 
     /** 登记"这一格的进编辑"（= 展开列表），与普通格子的 `Cell.enterEdit` 一一对应。 */
     useEnterEditHandler(cellKey, openForEdit)
+
+    /**
+     * Ctrl / Cmd+C：**直接复制这一格的值**，不用先划选（与 `EditableCell` 同一套手感）。
+     * 有选区时交给浏览器（那是在复制划中的那段），空值也没什么可拷的。
+     */
+    const onCopyKey = (e: {ctrlKey: boolean; metaKey: boolean; key: string; preventDefault: () => void}) => {
+        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return
+        if (window.getSelection()?.toString() || shown === "") return
+        e.preventDefault()
+        void navigator.clipboard?.writeText(shown).catch(console.error)
+    }
 
     /**
      * ‼️ **上下方向键不许打开列表**（用户口径）：列表只由"点一下 / Enter"打开。
@@ -212,16 +261,31 @@ export function CellPick({
     }, [open])
 
     return (
-        <Combobox
+        /*
+            ‼️ 泛型显式给 `<string, boolean>`：`multiple` / `value` / `onValueChange` 三者的类型在 base-ui
+            里是**由 `multiple` 字面量收窄的可辨识联合**，而这里"多选还是单选"是运行期参数 —— 收窄到
+            `false` 那一支的话，多选那份 `string[]` 就赋不进来。给 `boolean` 让两边都合法
+            （比把整棵子树按两态抄两遍省事得多）。
+        */
+        <Combobox<string, boolean>
+            multiple={multiple}
             items={items}
             /*
                 ‼️ 不挂搜索框时 `filter={null}` = **列表不随任何东西过滤**（默认会按"选中值"过滤：挑完一项
                 再展开，列表里就只剩那一项 —— 实测 53 → 1）。
             */
             filter={searchPlaceholder ? undefined : null}
-            value={inChoices(shown) ? shown : null}
-            /* `-1` 是清单里的一项，**照原样提交**；其余挑回原值就把改动清掉（交 `null`）。 */
-            onValueChange={(next: string | null) => next && onCommit(next === original && next !== optional ? null : next)}
+            /* 多选：值是"勾中的那几位"（数组）；单选：值就是格子里的那个值。 */
+            value={multiple ? selected : inChoices(shown) ? shown : null}
+            /* 多选：勾中的位权相加写回格子；单选：`-1` 是清单里的一项照原样提交，其余挑回原值就把改动清掉（交 `null`）。 */
+            onValueChange={(next) => {
+                if (multiple) {
+                    onCommit(String((next as string[]).reduce((sum, item) => sum + Number(item), 0)))
+                    return
+                }
+                const 单值 = next as string | null
+                if (单值) onCommit(单值 === original && 单值 !== optional ? null : 单值)
+            }}
             open={open}
             onOpenChange={(next, eventDetails) => {
                 if (!next) {
@@ -260,6 +324,7 @@ export function CellPick({
                 // 这一格自己收下 Ctrl/Cmd+C 与 Esc（见 App 里那两条白名单）——别让表格/窗口接走。
                 data-copy-own=""
                 data-esc-own=""
+                onKeyDown={onCopyKey}
                 // 自己点开的：关列表时焦点就还回这一格（见 finalFocus）。
                 onClick={() => {
                     focusBackRef.current = true
@@ -282,8 +347,8 @@ export function CellPick({
                 <ComboboxList>
                     {(item: string) => (
                         /*
-                            **原值那一项灰字**：与 FlagCell 的"原值就置着的位给灰字"同一个约定 ——
-                            不管改没改过都灰（原值是只读资产里那一份，与格子空着时的占位符同一个值）。
+                            **原值那一项灰字**：单选看"这一项就是原值"、多选看"这一位在原值里就置着"——
+                            两者同一个约定：不管改没改过都灰（原值是只读资产里那一份，与格子空着时的占位符同一个值）。
 
                             ‼️ **必须带 `!`**：库里那条高亮规则是
                             `.data-highlighted:text-accent-foreground[data-highlighted]`，特异性 (0,2,0)，
@@ -296,9 +361,9 @@ export function CellPick({
                             value={item}
                             /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
                                ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
-                            className={`py-1! ${item === original ? "text-[#a0a0a0]!" : ""}`}
+                            className={`py-1! ${(multiple ? wasOriginal(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
                         >
-                            {item}
+                            {multiple ? labelOf.get(item) : item}
                         </ComboboxItem>
                     )}
                 </ComboboxList>

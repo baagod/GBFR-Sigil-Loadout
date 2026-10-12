@@ -200,7 +200,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.altKey) return
-            // 输入框里打字时不抢按键；`[data-copy-own]` 是**格子自己收下 Ctrl+C** 的意思（FlagCell 那一格
+            // 输入框里打字时不抢按键；`[data-copy-own]` 是**格子自己收下 Ctrl+C** 的意思（值格那一格
             // 复制的是自己的值，不是选中的行）—— 与 App.tsx 那记"Esc 收托盘"用的 `data-esc-own` 同一套约定。
             if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable], [data-copy-own]")) return
             const key = sel?.key

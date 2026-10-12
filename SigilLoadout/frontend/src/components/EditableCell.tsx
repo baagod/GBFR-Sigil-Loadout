@@ -10,12 +10,6 @@ import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
 */
 
 /**
- * `CELL_TEXT` 仍从这里转出去：`FlagCell` 是照 `@/components/EditableCell` 取它的。
- * 新代码请直接取 `@/lib/classnames` —— 两个类名常量已经搬去那儿（理由见那个文件开头）。
- */
-export {CELL_TEXT}
-
-/**
  * 一个可编辑的格：**平时是文本，点一下才变输入框**，回车或失焦提交。值没变就什么都不做——
  * 免得把"点了一下"记成改动。
  *
