@@ -94,6 +94,26 @@ describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排
         expect(head.getAttribute("title")).toBeNull()
     })
 
+    it("`startTime` / `endTime` 的表头译文由**基座兜底**（任何表都有，不必自己写列说明）", async () => {
+        // 故意**不传** `columnOf`、也**不**走动作表那套夹具：这两列的表头该是中文 —— 它不属于某一张表
+        // （见 `model.columnLabel`），换一张表（比如轨表）只要列名叫这个就有。
+        const 行 = {id: "1000", values: {}, originals: {startTime: "0.5", endTime: "1.5", someField_: "x"}}
+        const {container} = render(
+            <ActionsTable t={t} abilityNames={{}} rows={[行]} keys={["startTime", "endTime", "someField_"]} />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(4))
+        expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
+    })
+
+    it("只读格的上下内间距是 4px（`py-1!` 压过 `CELL_PADDING` 的 `py-0.5`，高度交给内容撑）", async () => {
+        const container = await renderTable()
+        const 只读格 = cellAt(container, 0, 0) // 第 0 列 = `id_`（只读）
+        const 内 = 只读格.firstElementChild!
+        expect(内.className).toContain("py-1!")
+        // 不再是固定 `h-6`：内边距要靠内容把行撑开（否则 4px 上下会把文字压扁）。
+        expect(内.className).toContain("min-h-6")
+    })
+
     it("没改过的格子显示**灰色原值**（占位符）", async () => {
         const container = await renderTable()
         // 第 3 列（下标 2）= actionFreeWork0_，第一条记录没改过它

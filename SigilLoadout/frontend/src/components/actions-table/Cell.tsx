@@ -5,7 +5,7 @@
 import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
 
 import {CellPick} from "./CellPick"
-import {CELL_PADDING, FONT, INPUT_PADDING, ROW_HEIGHT} from "./classes"
+import {CELL_PADDING, FONT, INPUT_PADDING} from "./classes"
 import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, type PressFacts, snapshotKey} from "./model"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
@@ -173,7 +173,7 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
             // `truncate` = overflow:hidden + text-overflow:ellipsis + white-space:nowrap（一个类给全）。
             // 光标**不在这里指定**：显示态统一用格子（td）给的十字光标（`cell-selectable` 里的
             // `cursor: cell`）；进了编辑态才是输入框那根 I 形光标（见下面 input 的 `cursor-text`）。
-            className={`${ROW_HEIGHT} flex w-full items-center truncate ${CELL_PADDING} ${FONT} tabular-nums ${
+            className={`min-h-6 flex w-full items-center truncate ${CELL_PADDING} py-1! ${FONT} tabular-nums ${
                 muted ? "text-muted-foreground" : ""
             } ${hidden ? "opacity-0" : ""}`}
             onClick={onClick}

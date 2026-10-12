@@ -2,7 +2,7 @@
     表体的一行：行号格 + 88 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
-import {memo, type MouseEvent as ReactMouseEvent, type RefObject} from "react"
+import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
 import type {Cell, CellSelectionBounds, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
@@ -57,6 +57,7 @@ const RowCell = memo(function RowCell({
     edit,
     startCellSelection,
     onEnterEdit,
+    children,
 }: {
     cell: Cell<typeof features, ActionRow>
     row: Row<typeof features, ActionRow>
@@ -94,6 +95,8 @@ const RowCell = memo(function RowCell({
     edit: (rowId: string, key: string, value: string | null) => void
     startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
     onEnterEdit: () => void
+    /** 自定义内容（调用方用 `ColumnSpec.render` 给了就用它，否则渲染 `CellContent`）。 */
+    children?: ReactNode
 }) {
     return (
         <td
@@ -124,21 +127,23 @@ const RowCell = memo(function RowCell({
             }}
             className={className}
         >
-            <CellContent
-                rowId={row.id}
-                fieldKey={fieldKey}
-                kind={kind}
-                readOnly={readOnly}
-                raw={raw}
-                original={original}
-                shown={shown}
-                abilityNames={abilityNames}
-                pressRef={pressRef}
-                preSelected={preSelected}
-                draggedRef={draggedRef}
-                edit={edit}
-                onEnterEdit={onEnterEdit}
-            />
+            {children ?? (
+                <CellContent
+                    rowId={row.id}
+                    fieldKey={fieldKey}
+                    kind={kind}
+                    readOnly={readOnly}
+                    raw={raw}
+                    original={original}
+                    shown={shown}
+                    abilityNames={abilityNames}
+                    pressRef={pressRef}
+                    preSelected={preSelected}
+                    draggedRef={draggedRef}
+                    edit={edit}
+                    onEnterEdit={onEnterEdit}
+                />
+            )}
         </td>
     )
 })
@@ -344,7 +349,10 @@ export const ActionRowView = memo(function ActionRowView({
                         edit={edit}
                         startCellSelection={startCellSelection}
                         onEnterEdit={onEnterEdit}
-                            />
+                    >
+                        {/* 列自带渲染（`ColumnSpec.render`，只读列专用）—— 不给就照旧渲染格子内容。 */}
+                        {columnOf?.(key)?.render?.(row.original)}
+                    </RowCell>
                 )
             })}
         </tr>

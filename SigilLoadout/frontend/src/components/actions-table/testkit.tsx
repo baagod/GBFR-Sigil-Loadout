@@ -18,7 +18,7 @@ import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
 import {columnsOf, toActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
 
 /**
- * 组件要的那一份文案：**只写这 4 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
+ * 组件要的那一份文案：**只写这 6 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
  * （见 `model.ts`）—— 接口按真实需求收窄，夹具因此**一条断言都不用加**，而且逐键受检
  * （键名打错、少一个键都会当场报错）。
  */
@@ -28,6 +28,9 @@ export const t: ActionsTableMessages = {
     multiAreaCopyTitle: "无法复制选中区域",
     actionBranchSearch: "搜索",
     ok: "确定",
+    // 表头兜底（`model.columnLabel`）：所有表通用那两列。
+    colStart: "开始",
+    colEnd: "结束",
 }
 
 /**

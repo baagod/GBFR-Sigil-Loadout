@@ -1,10 +1,11 @@
 import {useMemo} from "react"
 
 import type {FlagRow, TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
-import {FLAG0_NAMES, FLAG1_NAMES} from "@/lib/actionflags"
+import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 import {ActionsTable} from "@/components/ActionsTable"
-import type {ActionRow, ColumnSpec, PickerConfig} from "@/components/actions-table/model"
+import {Badge} from "@/components/ui/badge"
+import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/components/actions-table/model"
 
 /*
     两张轨表 = **基座表 + 数据**。
@@ -65,15 +66,25 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     /** 整行选中的行变了（工具条按它决定按钮亮不亮、Ctrl+C/X 复制哪几行）—— 由基座算好上报。 */
     onSelectionChange?: (rowIds: string[]) => void
 }) {
+    /*
+        ‼️ **行的引用要稳**（按数据 `useMemo`，别在 JSX 里现 map）：基座把 `rows` 当"换数据了没有"的
+        判据（列宽要按新内容重量、`useTable` 的 data 变了要重建 row model）—— 每次渲染都新建数组的话，
+        选中/拖动/滚动每一帧都会重跑一趟测量。
+    */
+    const 行 = useMemo(
+        () =>
+            (table?.rows ?? []).map((row, index) =>
+                toRow(index, row.values, row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined, row),
+            ),
+        [table, originals],
+    )
     if (!table) return null
     return (
         <ActionsTable
             t={t}
             // 轨表没有 `abilityTag_` 那一列，名字表用不上。
             abilityNames={{}}
-            rows={table.rows.map((row, index) =>
-                toRow(index, row.values, row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined, row),
-            )}
+            rows={行}
             keys={table.columns}
             // 行序严格等于数组顺序：这张表没有排序（动作表那档默认按 `id_` 排）。
             initialSorting={[]}
@@ -93,15 +104,47 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
 const FLAG_KEYS = ["config", "startTime", "endTime", "layerFlag", "flag0", "flag1", "sysFlag", "freeArg"] as const
 
 /**
- * **上屏的列**：数据键之外多一列 `frame`（帧 = 结束时间 × 60）——它是"同一份数据看两眼"，
- * 所以列 id 另起一个、数据键由下面的 `columnOf` 说（见 `ColumnSpec`）。
+ * **上屏的列**：数据键之外多两列 —— `frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0 / flag1 的效果一览）。
+ * 它们都是"同一份数据看第二眼"，所以列 id 另起一个、数据键/内容由下面的 `columnOf` 说（见 `ColumnSpec`）。
  */
-const FLAG_COLUMNS = ["config", "startTime", "endTime", "frame", "layerFlag", "flag0", "flag1", "sysFlag", "freeArg"]
+const FLAG_COLUMNS = ["config", "startTime", "endTime", "frame", "layerFlag", "flag0", "flag1", "flagEffects", "sysFlag", "freeArg"]
 
 /** 帧 = 结束时间 × 60（和主面板那一列同一算法）。 */
 const frameOf = (endTime: string): string => {
     const end = Number(endTime)
     return Number.isFinite(end) ? String(Math.round(end * 60)) : ""
+}
+
+/**
+ * 「效果」列：把这一行 `flag0` / `flag1` **置着的位**各列成一枚 Badge（只看不改）。
+ *
+ * ‼️ 取的是 `shownValue`（= 改动值，没有才是原值）—— 这一格的意图就是"这一行现在会触发什么"，
+ * 所以必须跟着改动走，不能读原表。
+ * 名字为空的那几位显示成 `bit<号>`（与选值列表同一个口径：漏掉谁，那一位就成了"看不见的位"）。
+ */
+function FlagEffects({row}: {row: ActionRow}) {
+    const 位 = [
+        ...FLAG0_NAMES.map((name, bit) => ({name, bit, mask: shownValue(row, "flag0")})),
+        ...FLAG1_NAMES.map((name, bit) => ({name, bit, mask: shownValue(row, "flag1")})),
+    ].filter(({mask, bit}) => flagHasBit(flagMask(mask), bit))
+    if (位.length === 0) return null
+    return (
+        /*
+            宽度已经由 `ColumnSpec.width` 钉死（400），所以这里只管**在这个宽度里换行**：
+            效果多到 400 装不下才折行（代价是这一行会变高 —— `td` 的 `h-6` 只是最小高度）。
+            字号 12（与 Badge 自身那档一致）。
+            `cursor-default` = 系统箭头（不然会继承格子的十字光标）；`select-text` = 里面的字**可以划选**
+            （格子自己那份 `user-select: none` 是拖拽选区要的，这里显式还回来）。
+            `py-1` = 与别的只读格一致的上下 4px（这一列走的是自定义渲染，拿不到 `CellText` 那份内边距）。
+        */
+        <div className="flex w-full cursor-default flex-wrap items-center gap-1 py-1 pl-1 text-xs select-text">
+            {位.map(({name, bit}) => (
+                <Badge key={bit} variant="secondary" className="shrink-0">
+                    {name === "" ? `bit${bit}` : name}
+                </Badge>
+            ))}
+        </div>
+    )
 }
 
 /**
@@ -119,9 +162,14 @@ const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
         // ⚠️ 别当位域：数据里还有 `32769` 这种意外值 —— 除了 0/1 一律**把原值显示出来**，
         // 既不猜"触发"也不猜"持续"（一眼看出是怪值）。
         return {label: t.colConfig, readonly: true, cell: "[&>div]:justify-center", text: (v) => (v === "1" ? t.configTrigger : v === "0" ? t.configContinuous : v)}
-    if (key === "startTime") return {label: t.colStart}
-    if (key === "endTime") return {label: t.colEnd}
-    if (key === "frame") return {key: "endTime", label: t.colFrame, readonly: true, text: frameOf}
+    if (key === "frame")
+        // 帧 = 结束时间 × 60，看的是**同一份 `endTime`**。
+        return {key: "endTime", label: t.colFrame, readonly: true, text: frameOf}
+    if (key === "flagEffects")
+        // 宽度**钉死**（`ColumnSpec.width`）：不钉的话，列宽会按"换行之后最长那一行"量 —— 而那正是
+        // 这一列自己换出来的结果，看着就是"还没到上限就换行了"。钉成 400 之后内容才在 400 里换。
+        return {label: t.colEffects, readonly: true, width: 400, render: (row) => <FlagEffects row={row} />}
+    // `startTime` / `endTime` 的表头文案不在这里 —— 那是**所有表通用**的一条，基座兜底（`model.columnLabel`）。
     return undefined
 }
 
@@ -155,13 +203,19 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
 }) {
     /* 列说明依赖文案表：`t` 一换（换语言）就得重算 —— `useMemo` 让引用稳住（列宽测量按 `keys` 重跑）。 */
     const 列说明 = useMemo(() => columnOf(t), [t])
+    /* 同上：行的引用要稳（基座拿它当"换数据了没有"的判据）。 */
+    const 行 = useMemo(
+        () =>
+            rows.map((row, index) =>
+                toRow(index, cells(row), row.orig != null ? cells(originals?.[row.orig]) : undefined, row),
+            ),
+        [rows, originals],
+    )
     return (
         <ActionsTable
             t={t}
             abilityNames={{}}
-            rows={rows.map((row, index) =>
-                toRow(index, cells(row), row.orig != null ? cells(originals?.[row.orig]) : undefined, row),
-            )}
+            rows={行}
             keys={FLAG_COLUMNS}
             columnOf={列说明}
             initialSorting={[]}

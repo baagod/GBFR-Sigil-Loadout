@@ -12,7 +12,7 @@ import {
     sortFn_alphanumeric,
     tableFeatures,
 } from "@tanstack/react-table"
-import {createContext, useContext, useEffect} from "react"
+import {createContext, useContext, useEffect, type ReactNode} from "react"
 import {CELL_CHOICES} from "@/lib/controltypes"
 import type {Messages} from "@/lib/messages"
 
@@ -22,12 +22,12 @@ import type {Messages} from "@/lib/messages"
  * ‼️ **故意收窄**，不用整个 `Messages`：表只用得到这 5 条，而接口要求整个（~50 键）的话，
  * 每个调用点与每份测试夹具都得凑出一个完整的 `Messages` —— 测试侧因此出现
  * `as unknown as Messages` 这种**绕过全部检查**的双重断言（夹具少一个键、串一个名都测不出来）。
- * 收窄之后夹具只写这 4 条，类型系统真的在查；全量 `Messages` 天然满足它，所以生产调用点不用改。
+ * 收窄之后夹具只写这 6 条，类型系统真的在查；全量 `Messages` 天然满足它，所以生产调用点不用改。
  *
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch">
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd">
 
 /**
  * **只读**的列：这些格子存的是**引用键**，不是可编辑的值。
@@ -72,6 +72,16 @@ export const columnKind = (key: string): ColumnKind =>
     READ_ONLY_KEYS.has(key) ? "readonly" : PICKER_KEYS.has(key) ? "pick" : BRANCH_KEYS.has(key) ? "branch" : "text"
 
 /**
+ * **列 id → 表头文案**：所有表通用的那几条（不传 `ColumnSpec.label` 时用它兜底）。
+ *
+ * 为什么要有：`startTime` / `endTime` 是后端字段名，但它们是给人看的两个时间列 —— 谁有这两列都该显示
+ * "开始 / 结束"（轨表、flags 表都在用；调用方自己的 `label` 优先级更高）。放在这里而不是某一张表的
+ * 列说明里，是因为它**与"哪张表"无关**：新加一张轨表就自动有了。
+ */
+export const columnLabel = (id: string, t: {colStart: string; colEnd: string}): string =>
+    id === "startTime" ? t.colStart : id === "endTime" ? t.colEnd : id
+
+/**
  * **一列的补充说明**（列 id → 这份规格）—— 由调用方按列给（`ActionsTable` 的 `columnOf`）。
  *
  * 为什么要有这个口子：`keys` 只是"字段名清单"，而轨道表还有两种列光靠名字表达不了 ——
@@ -98,6 +108,20 @@ export type ColumnSpec = {
      * 例如"值水平居中"：内容那层是 flex 容器，所以给 `[&>div]:justify-center`（`text-center` 对它无效）。
      */
     cell?: string
+    /**
+     * **这一格自己渲染**（整行 → 节点）—— 给"不是一段文本"的内容用（如把若干位名排成一串 Badge）。
+     *
+     * ‼️ 只允许出现在**只读列**上（`readonly: true`）：一个自定义节点没有"编辑态"，也没有能写回的值。
+     * 给了它之后这一格的显示不再走 `text`（那边只服务"一段文本"）。
+     */
+    render?: (row: ActionRow) => ReactNode
+    /**
+     * **这一列固定多宽**（不给 = 按内容量）。
+     *
+     * 为什么需要它：按内容量出来的是"**换行之后**最长那一行"的宽度 —— 对"内容自己会换行"的列（一排 Badge），
+     * 那等于永远压着最长行排，看着就是"还没到上限就换行"。钉死宽度之后，内容在那个宽度里换行。
+     */
+    width?: number
 }
 
 /**

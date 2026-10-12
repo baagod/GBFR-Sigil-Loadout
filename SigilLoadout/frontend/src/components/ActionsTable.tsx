@@ -74,7 +74,7 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -306,11 +306,20 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
+    /** 调用方钉死宽度的列（`ColumnSpec.width`）—— 测量跳过它们（见那个字段的说明）。 */
+    const 固定列宽 = useMemo(() => {
+        const out: Record<string, number> = {}
+        for (const id of keys) {
+            const w = columnOf?.(id)?.width
+            if (w) out[id] = w
+        }
+        return out
+    }, [keys, columnOf])
     /**
      * **每列多宽**（取整后的整数）与"量过了没有" —— 整趟测量（含历次真机的证据）在
      * `useColumnMeasure` 里：它是"DOM 测量 + 三个自洽 state"，与表的交互逻辑一刀两断。
      */
-    const {columnSizing, measured} = useColumnMeasure(tableRef, keys)
+    const {columnSizing, measured} = useColumnMeasure(tableRef, keys, rows, 固定列宽)
     /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
     const scrollRef = useRef<HTMLDivElement>(null)
     /**
@@ -338,10 +347,10 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                         const value = shownValue(row, 数据键)
                         return spec?.text ? spec.text(value) : value
                     },
-                    header: spec?.label ?? id,
+                    header: spec?.label ?? columnLabel(id, t),
                 }
             }),
-        [keys, columnOf],
+        [keys, columnOf, t],
     )
 
     const table = useTable({
