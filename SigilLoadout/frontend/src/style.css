@@ -256,16 +256,14 @@
     `:focus-within` 便不成立、环会消失 —— 那一格自己挂上这个属性，环照画；z-index 与环两处都要带，
     否则环会被吸顶列盖住。
 
-    ⚠️ z 顺序别调：**吸顶列必须排在 30 之上**，否则一聚焦，那格的内容就画到吸顶列上面（实测穿过动作
-    表第一列 `id_`）。分区标题 60 > 吸顶表头 50（`#` / `id_`）、吸顶表头 40（`abilityTag_`）> 吸顶表体
-    40（`#` / `id_` / `abilityTag_`，三列互不重叠，同层安全）> 聚焦格 30 > 普通表头 10 —— 分区标题又
-    必须压在所有吸顶格之上（给 30 时表体第一列会盖住标题）。
+    ⚠️ **聚焦环必须排在冻结层之下**（`--z-focus` < `--z-pinned`，整条阶梯见下面那份唯一的表）：否则一聚焦，
+    那格的内容就画到吸顶列上面（实测穿过动作表第一列 `id_`）。
 */
 @utility cell-focus {
     position: relative;
 
     &:is(:focus-within, [data-picker-open]) {
-        z-index: 30;
+        z-index: var(--z-focus);
     }
 
     &:is(:focus-within, [data-picker-open])::after {
@@ -290,7 +288,7 @@
         这一条把环续上（**只有列表真的开着时**属性才在，所以不会变成"每格常亮一圈"）。
     */
     &:has(.cell-pick-mark[data-popup-open]) {
-        z-index: 30;
+        z-index: var(--z-focus);
     }
 
     &:has(.cell-pick-mark[data-popup-open])::after {
@@ -314,32 +312,57 @@
 }
 
 /*
-    ============ 冻结列 / 行号列的"层高"（一个类定死，别再拿工具类改） ============
-    这一格永远压在横向滚动的内容之上，所以它的 z 必须高过**它所在那一行里**所有会滚动的东西：
+    ============ 提层阶梯：**唯一的一份**（别处只引用，不再写裸数字） ============
+    层高全部走下面几个 token，关系用 `calc()` 表达 —— 改基础值即整体跟着走：
 
-      聚焦/编辑中的格子 30（`cell-focus`）
-        <  选区 / 复制区的提层 41（`td.cell-edge-left` 等）
-        <  **冻结层 50（本类）**
-        <  吸顶表头行 60（渲染那层给）
+      焦点环 30  <  滚动区：轮廓 41 · 复制 42  <  冻结层 50  <  冻结区：轮廓 51 · 复制 52  <  吸顶表头行 60
+
+    · **虚线压住实线只靠格内顺序**：本格 `::before`（实线，z-index: 1）< 本格 `::after`（虚线，z-index: 2）。
+      ‼️ **复制区整格不许提层**：一提就压过邻格的选区边框，把人家 3px 咬掉 2px（1:1 同坐标差分实测：
+      相邻场景丢 96 个绿像素；不提层则为 0，而"虚线压实线"的效果**逐像素不变**）。
+    · 冻结区 = 滚动区 + 9：冻结列必须压过横滚过来的内容 —— 掉下去连点击都会被抢走（见下）；
+    · 冻结区再各提一级（51 / 52）：冻结列的**邻格也在冻结层**，实线"格外那 1px"落在邻格身上、
+      而邻格 DOM 在后 → 会被盖掉，表现为"冻结格上实线的右边、下边各少 1px"（1:1 截图像素实测）。
+    · 吸顶表头行那个 60 在渲染层（`ActionsTable.tsx` 的 `<tr className="sticky top-0 z-60">`）——
+      表头是整张表体之上的独立一层，不参与上面这条链。
 
     ‼️ **`th` 与 `td` 都要覆盖**（踩过，别再漏）：这条规则一开始只写了 `table td.cell-pinned`，
-    于是**表头**的冻结格拿不到 50、只剩 `HEAD_CELL` 里的 `z-20` —— 与滚动过来的表头格**同为 20**，
-    谁后画谁在上面，横滚之后冻结的那几列表头就被盖住、看着像"表头没冻结"（表体有 50 所以正常，
-    于是症状是"表体 0-2 列冻住了、表头 0-2 列没冻"）。实测：表头 z=20、表体 z=50。
+    于是**表头**的冻结格拿不到冻结层、只剩 `HEAD_CELL` 里的 `z-20` —— 与滚动过来的表头格**同为 20**，
+    谁后画谁在上面，横滚之后冻结的那几列表头被盖住，看着像"表头没冻结"。实测：表头 z=20、表体 z=50。
 
     ‼️ **为什么不能写 Tailwind 的 `z-50`，也不能只写 `td.cell-pinned`**：
-      · `.z-50` 特异性 (0,1,0) —— 工具类，压不过下面那几条提层规则；
-      · `td.cell-pinned` 是 (0,1,1)，与 `td.cell-edge-left { z-index: 41 }` **完全相同**，只能靠"谁写在
-        后面"决定胜负（edge 那几条写在下面，于是又赢回去，实测 z 依旧是 41）；
-      · `table td.cell-pinned` / `table th.cell-pinned` 是 (0,1,2) —— **确切地高过那几条提层规则**，不依赖源序。
-    冻结列一旦掉到 41（或表头的 20），横滚过来的那一列就盖在它上面、**连点击都抢走**
-    （用户报的"拖冻结列却选中了别的列"，实测就是这个：按下时库收到的格是底下那一列）。
+      · `.z-50` 特异性 (0,1,0) —— 工具类，压不过提层那几条；
+      · `td.cell-pinned` 是 (0,1,1)，与 `td.cell-edge-left` 那几条**完全相同**，只能靠"谁写在后面"决定胜负；
+      · `table td.cell-pinned` / `table th.cell-pinned` 是 (0,1,2) —— **确切地高过提层那几条**，不依赖源序。
+    冻结列一旦掉到轮廓那一档（或表头的 20），横滚过来的列就盖在它上面、**连点击都抢走**
+    （用户报的"拖冻结列却选中了别的列"：按下时库收到的格是底下那一列）。
 
     `sticky` 与 `left` 由渲染那层给，这里只管层高。
 */
+table {
+    /* 可编辑列的底色（`classes.ts` 的 `EDITABLE_BG` 引用它）—— 垫底层也要用同一份，别再各写一个 hex。 */
+    --cell-editable: #1a1a1a;
+    /*
+        选区实线的线宽 + 四条边的默认宽度。⚠️ 必须落在**格子也能看到**的地方（`table`）：`cell-edge-*`
+        是在 **td** 上赋值 `var(--edge-w)` 的，若把它写在 `::before` 里，td 取不到 → guaranteed-invalid →
+        整条 `border-width` 失效、回落 `medium`(3px) → 每个边界格四条边全亮（实测 `[3,3,3,3]`）。
+    */
+    --edge-w: 3px;
+    --edge-top: 0px;
+    --edge-right: 0px;
+    --edge-bottom: 0px;
+    --edge-left: 0px;
+    --z-focus: 30;
+    --z-edge: 41;
+
+    --z-pinned: 50;
+    --z-pinned-edge: calc(var(--z-pinned) + 1);
+
+}
+
 table td.cell-pinned,
 table th.cell-pinned {
-    z-index: 50;
+    z-index: var(--z-pinned);
 }
 
 /*
@@ -394,8 +417,12 @@ table th.cell-pinned {
 .cell-selectable::before {
     content: "";
     position: absolute;
-    /* 四边各超出 1px 盖住格线（上/左两条另有提层规则，见下面那段）。 */
-    inset: -1px;
+    /*
+        向外撑 **2px**（= `--edge-w` − 1）：配 3px 边宽 → 正好是「格内 1px + 与格线重合 1px + 格外 1px」
+        （用户口径；上/左两条另有提层规则，见下面那段）。
+    */
+    inset: -2px;
+
     pointer-events: none;
     /*
         ⚠️ 只用**长写**、不写 `border:` 简写：简写会把同一个伪元素上别的属性一起重写，
@@ -404,7 +431,8 @@ table th.cell-pinned {
     */
     border-style: solid;
     border-color: var(--cell-select);
-    border-width: 0;
+    /* 四条边一次定完（与复制区同一套机制）：挂哪个 `cell-edge-*` 类，哪条边就有宽度。 */
+    border-width: var(--edge-top) var(--edge-right) var(--edge-bottom) var(--edge-left);
     /*
         ⚠️ 要盖在**焦点环**（`cell-focus` 的 `::after`）之上：拖拽的 mousedown 会把焦点落到起始格，
         而可编辑格带着 `cell-focus`，两个伪元素于是在同一格上打架 —— `::after` 后画，不压住的话灰环
@@ -417,21 +445,16 @@ table th.cell-pinned {
     z-index: 1;
 }
 
-.cell-edge-top::before {
-    border-top-width: 2px;
-}
-
-.cell-edge-right::before {
-    border-right-width: 2px;
-}
-
-.cell-edge-bottom::before {
-    border-bottom-width: 2px;
-}
-
-.cell-edge-left::before {
-    border-left-width: 2px;
-}
+/*
+    ‼️ 四条边各由**一个类给一个变量**（不是四条 `border-*-width` 规则）：角上的格子会同时挂两个类，
+    变量各管一条、互不覆盖；而基础规则里那条 `border-width` 只有**一处**，不存在"谁后写谁覆盖"的问题。
+    ⚠️ 别合并成 `:is(.cell-edge-top, …)::before { border-width: … }` —— 那会给**四条边一起**上色，
+    内部格只要挂了一个类就会长出一整圈实线。
+*/
+.cell-edge-top { --edge-top: var(--edge-w); }
+.cell-edge-right { --edge-right: var(--edge-w); }
+.cell-edge-bottom { --edge-bottom: var(--edge-w); }
+.cell-edge-left { --edge-left: var(--edge-w); }
 
 /*
     ============ 表格右沿与滚动条之间那 1px（横向滚到头时的一条黑线） ============
@@ -461,31 +484,31 @@ table th.cell-pinned {
 /*
     ============================ 选区轮廓的几何 ============================
 
-    规则只有一句：**每条边的选区框，都要正好落在"那条格子线"上，并且完整 2px。**
+    规则只有一句：**每条边的选区框，都要正好落在"那条格子线"上，并且完整一条 `--edge-w`。**
     难点全在"这条格线是谁画的、谁后画"，所以先把两句事实钉在这里（都是逐像素量出来的，别再靠猜）：
 
       事实 ①：本格的格线只画在**右和下**两处（渲染那层给的是 `border-r border-b`，`border-t/l` 是 0）。
               所以"右上角那一格"的左格线，其实是**它左邻的右格线**；上格线是**上一行的下格线**。
       事实 ②：**后画的盖先画的**。邻格在 DOM 里排在本格后面 —— 它的格线与**不透明底色**都压在本格之上；
-              吸顶表头（`thead tr` 是 `sticky z-50`）更是在整张表体之上。
+              吸顶表头（渲染层给的 `z-60`）更是在整张表体之上。
 
     由这两句推出来的四条边（一条规则，不再逐个打补丁）：
 
-      · 右、下：格线是**自己的**。把轮廓向外撑 1px（`inset: -1px`）就正好盖住它 —— 自己画自己，顺序无碍。
+      · 右、下：格线是**自己的**。把轮廓向外撑 2px（`inset: -2px`）就正好连同它一起盖住 —— 自己画自己，顺序无碍。
       · 左：格线是**邻格**的（事实 ①），会被邻格后画盖掉（事实 ②）。
-        对策：把带 `cell-edge-left` 的格子**提层到 41**（冻结列是 40），让轮廓压过邻格那一像素。
-      · 上：格线是**上一行**的 —— 提层到 41 即可。
-        ⚠️ **第一行上面是吸顶表头**（`sticky z-50`，且必须吸顶），提层压不过、也不能压 ——
+        对策：把带 `cell-edge-left` 的格子提到**轮廓那一档**（`--z-edge`；冻结列的边界格再高一档 `--z-pinned-edge`），压过邻格那一像素。
+      · 上：格线是**上一行**的 —— 提到同样的档即可。
+        ⚠️ **第一行上面是吸顶表头**（渲染层 `z-60`，且必须吸顶），提层压不过、也不能压 ——
         它撑出去的那 1px 会被表头吃掉，**就让它被吃**：和"冻结列右边那一列的左边框"同一个口径，
         贴住时只剩 1px 是可接受的，不为一条边框给这一格开特例（不为它改 `top`、也不为它单独提层）。
 
-    于是"向外撑多少"**四边一律 1px**（不再有例外）：
+    于是"向外撑多少"**四边一律 2px**（不再有例外）：
 */
 
 /*
     ‼️ **右边也要提层**（与左边同一个原因，别再只提左边）。
 
-    轮廓的 `::before` 是 `inset: -1px`：右边那一条**撑出本格 1px**，正好落在右邻格的地盘上。
+    轮廓的 `::before` 是 `inset: -2px`：右边那一条**最外 1px** 正好落在右邻格的地盘上。
     而右邻格在 DOM 里排在本格**后面**（事实 ②），它的 `border-right` 与**不透明底色**会先画在那 1px 上
     —— 于是选区的右边框缺一截（用户截图圈的就是它：**只要选区落在复制区里就必然看得见**，
     因为复制区的格子背景层更多、盖得更实）。
@@ -497,27 +520,24 @@ table th.cell-pinned {
     底下滚过来的列于是接管点击（用户报的"拖冻结列却选中了别的列"，根子就在这里）。
 */
 td.cell-edge-right {
-    z-index: 41;
+    z-index: var(--z-edge);
 }
 
 /*
-    ⚠️ **提层（`z-index: 41`）是把左边框做成完整 2px 的代价，别再想别的招了 —— 试过的都写在下面。**
+    ⚠️ **提层（`--z-edge`）是把左边框做成完整的代价**：左边外面那道格线属于**邻格**，而邻格在 DOM 里排在本格后面（事实 ②）。
 
-    为什么非得提层：左边外面那道格线属于**邻格**，而邻格在 DOM 里排在本格后面（事实 ②）—— 它的
-    `border-right` 与**不透明底色**会先盖在本格撑出去的那 1px 上，左边框只剩 1px。试过并且**失败**的替代：
-      · `left: 0`（收回格内）：不占邻格了，但 2px 全落在**内容区**上，选中格的文字看起来会右移 2px；
-      · `:has(+ td.cell-edge-left)` 让邻格把右边界让开：`border-color: transparent` 有效，但邻格**底色**
-        照样盖住那 1px；再给邻格挂 `::after` 补一条 —— 实测那个伪元素的盒子算出来在正确位置，像素上却
-        没有画出来（换来换去不稳定），放弃；
-      · 把表头/邻格降 z：会毁掉吸顶与冻结列本来的遮挡关系。
+    为什么非得提层：邻格的 `border-right` 与**不透明底色**会先画在本格撑出去的那 1px 上，左边框就缺一截。
+    试过的替代都不行：`left: 0` 收回格内（那一条全落在**内容区**上，选中格的文字会平移）、让邻格把边界
+    让开（`border-color: transparent` 有效、但邻格**底色**照样盖住）、把表头或邻格降 z（毁掉吸顶与冻结
+    列本来的遮挡关系）—— 只剩提层这一条路。
 
-    代价（**已知且接受**）：横向滚动时，撑到冻结列底下的那 1px 选区框会画在冻结列上。这是"选区框要压过
-    格线"的必然结果 —— 见上面「左」那条。只在滚动经过时可见，静止时不出现。
+    代价（**已知且接受**）：**滚动区**的边界格，那 1px 撑到冻结列底下时会被冻结列盖住（冻结区自己的边界格
+    另有更高一档，不受此限）。这是"选区框要压过格线"的必然结果 —— 见上面「左」那条。只在滚动经过时可见。
     但**冻结列本身的遮挡关系不能被破坏**（它要一直压住滚过来的列）：所以本格只提 `z-index`，不动
-    `position`（见 `td.cell-edge-right` 那段），冻结列的层高由 `table td.cell-pinned` 定在 50。
+    `position`（见 `td.cell-edge-right` 那段），冻结列的层高由 `--z-pinned` 定。
 */
 td.cell-edge-left {
-    z-index: 41;
+    z-index: var(--z-edge);
 }
 
 /*
@@ -563,10 +583,11 @@ tbody tr:last-child > td.cell-edge-bottom::before {
       1. **画在 `::after` 上**：`::before` 归选区轮廓（见上面那张归属表）。两者挤同一个伪元素时
          优先级相同、后写的把先写的 `border-*` 整段清掉 —— 选区的边会被复制区清成 0。
 
-      2. **四条边由一条规则一次定完**（`--copy-*` 变量 + 一个 `border-width`）。写成"单边四条规则"
-         （`td.cell-copy-right::after { border-width: 0 2px 0 0 }` 这种）时，它们**优先级完全相同**、
-         靠"谁后写"决定，于是 `cell-copy-left` 必然覆盖 `cell-copy-right`：只挂 `right+left` 的行
-         **右边永远是 0**（实测 `getComputedStyle(td,"::after").borderRightWidth === "0px"`）。
+      2. **每格只由 `--copy-*` 变量声明"自己那几条边"**，边框宽度与垫底渐变带的尺寸同吃这一份
+         （`border-width` / `background-size` 各读一次）—— 所以它不能退化成"单边四条 `border-*-width` 规则"。
+         注意当年踩的坑是**简写**：`border-width: 0 2px 0 0` 会整条覆盖别的类，四个类优先级相同、靠源序
+         决定，于是 `cell-copy-left` 必然盖掉 `cell-copy-right`（只挂 `right+left` 的行右边永远是 0，
+         实测 `borderRightWidth === "0px"`）。长写本身不冲突 —— 但长写喂不了垫底带，所以仍用变量。
 
       3. **`inset: 0`**（正好是格子的 border box）：虚线因此与格线重合，不需要算任何高度；
          且伪元素的边框**不参与布局**（不像 `border` 会撑大格子），也不像 `outline` 那样四边一起画
@@ -585,6 +606,10 @@ td.cell-copy-left {
     --copy-right: 0px;
     --copy-bottom: 0px;
     --copy-left: 0px;
+}
+
+table td.cell-pinned:is(.cell-edge-top, .cell-edge-right, .cell-edge-bottom, .cell-edge-left) {
+    z-index: var(--z-pinned-edge);
 }
 
 td.cell-copy-top {
@@ -609,11 +634,31 @@ td.cell-copy-bottom::after,
 td.cell-copy-left::after {
     content: "";
     position: absolute;
-    inset: 0;
+    /* 超出 1px：配 2px 边宽 → 「与格线重合 1px + 格内 1px」（= 实线靠内那 2px，用户口径）。 */
+    inset: -1px;
     border-style: dashed;
     border-color: var(--cell-select);
     border-width: var(--copy-top) var(--copy-right) var(--copy-bottom) var(--copy-left);
     pointer-events: none;
+    /*
+        ‼️ 必须压在**本格选区实线**（`::before` 的 `z-index: 1`）之上：虚线的线段之间是透明的，
+        底下若压着那条绿实线，缝里透出来的就是实线色 —— 整圈看着仍然是实线（案例里的
+        "同单元格共存防透色"）。
+    */
+    z-index: 2;
+    /*
+        垫底层（案例那道 2px 纯白）：虚线缝是透明的，底下压着实线就会透出来 —— 先铺一层**该格自己的底色**
+        （`--cell-under`，由底色那几个类给出，见 `classes.ts`；拿不到才退回表格底色）。写死 `--background`
+        会在可编辑列上露一条更暗的 2px 槽（像素实测：缝里 10,10,10、格内 26,26,26）。四条边各一条渐变带，
+        宽度吃 `--copy-*` —— 没挂那条边的格子宽度为 0，带子自然不存在。
+    */
+    --copy-under: var(--cell-under, var(--background));
+    background-image: linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under));
+    background-repeat: no-repeat;
+    background-size: 100% var(--copy-top), var(--copy-right) 100%, 100% var(--copy-bottom), var(--copy-left) 100%;
+    background-position: top left, top right, bottom left, bottom left;
+    /* ‼️ 原点必须是 **border-box**：垫底要盖住的正是那圈 2px 边框（默认 `padding-box` 会落进格内、白垫）。 */
+    background-origin: border-box;
 }
 
 /* ======================== 复制源边框（完） ======================== */
@@ -628,7 +673,12 @@ td.cell-copy-left::after {
     `td` 前缀凑到 (0,2,1)，**别改成 `.cell-selected::after`**，也别指望样式表顺序 —— utility 层和
     普通 CSS 谁在后并不由我们写的位置决定。
 */
-td.cell-selected:focus-within::after {
+/*
+    ‼️ 但**复制区格子要豁免**：它的虚线也画在 `::after` 上，被这条 `content: none` 抹掉的话，
+    虚线整圈会消失（实测：注入洋红诊断，聚焦那格一条洋红都看不到，下一格就有）。
+    用户口径：虚线必须永远可见 —— 所以在复制区里焦点环让位（那一圈由选区实线 + 复制虚线表达）。
+*/
+td.cell-selected:not(:is(.cell-copy-top, .cell-copy-right, .cell-copy-bottom, .cell-copy-left)):focus-within::after {
     content: none;
 }
 
@@ -742,7 +792,7 @@ td.cell-selected.cell-active {
     .skillboard-row {
         position: sticky;
         top: 0;
-        z-index: 30; /* 高于类型名那一级：角色名永远压在类型名之上 */
+        z-index: var(--z-focus); /* 高于类型名那一级：角色名永远压在类型名之上 */
         background-color: var(--background);
     }
 

@@ -64,4 +64,3 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy-quick.ps1 -DebugPor
 
 `-DebugPort` 会把 WebView2 的调试端口打开；配合 [`tools/debug/`](tools/debug/README.md) 那套台架（CDP 量真实
 DOM、真鼠标量选区像素、只渲染动作表的独立调试页），布局类问题不必靠截图猜。
-

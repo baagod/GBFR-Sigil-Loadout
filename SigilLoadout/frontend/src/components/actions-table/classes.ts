@@ -11,7 +11,7 @@ import {features, type ActionRow, type CopySource} from "./model"
 /** 只读格的底色：与页面同色（= 看起来"不上色"）。**必须是不透明的** —— 钉住的列要挡住滚过来的列。 */
 export const READ_ONLY_BG = "bg-background"
 /** 可编辑格的底色：比页面亮一档，一眼看出"这一格能改"。 */
-export const EDITABLE_BG = "bg-[#1a1a1a]"
+export const EDITABLE_BG = "bg-[var(--cell-editable)] [--cell-under:var(--cell-editable)]"
 
 /**
  * 整行选中时**行号格**要叠的底纹类。
