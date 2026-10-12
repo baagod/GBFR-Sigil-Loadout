@@ -76,7 +76,7 @@ import {
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
 import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, type EnterEditRegistry, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
-import {DndContext, PointerSensor, closestCenter, useSensor, useSensors} from "@dnd-kit/core"
+import {DndContext, PointerSensor, closestCenter, useSensor, useSensors, type Modifier} from "@dnd-kit/core"
 import {restrictToVerticalAxis} from "@dnd-kit/modifiers"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -146,15 +146,17 @@ const CTRL = 2
  *
  * 回调交出去的是**下标**（`from` / `to`）：`active.id` 是行 id，而"第几行"才是调用方（轨表）的口径。
  */
-function ReorderDnd({reorder, rows, children}: {reorder?: (from: number, to: number) => void; rows: {id: string}[]; children: ReactNode}) {
+function ReorderDnd({reorder, rows, bound, children}: {reorder?: (from: number, to: number) => void; rows: {id: string}[]; bound?: Modifier; children: ReactNode}) {
     const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
     const ids = rows.map((row) => row.id)
+    /* 限定位移的 modifier 由调用方给（它得看得到表格那个滚动盒）—— 数组本身要稳定引用。 */
+    const modifiers = useMemo(() => (bound ? [restrictToVerticalAxis, bound] : [restrictToVerticalAxis]), [bound])
     if (!reorder) return children
     return (
         <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
+            modifiers={modifiers}
             onDragEnd={({active, over}) => {
                 if (!over || active.id === over.id) return
                 const from = ids.indexOf(String(active.id))
@@ -325,6 +327,29 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     const tableRef = useRef<HTMLTableElement>(null)
     /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
     const scrollRef = useRef<HTMLDivElement>(null)
+    /**
+     * **拖动行的位移只许落在表格的可视框里**（传给 `ReorderDnd` 的 modifier）。
+     *
+     * ‼️ 为什么非有它不可（真机复现的完整链条）：拖拽行是靠 `translate3d` 跟着指针走的，往下一拖就把
+     * 滚动盒的**可滚动区域**一起撑大（实测：盒子 324/324 → 拖出去后 324/**935**）→ 盒里冒出纵向
+     * 滚动条；而 dnd-kit 的 autoScroll 一见"能滚"就往下滚（`scrollTop` 560），滚动又让这一行相对内容
+     * 更靠下、溢出更大 —— **正反馈**：能一直往下拉、表格整体被推上去、上面露出一大片空白，松手才恢复。
+     * 夹在可视框里之后溢出根本不存在，autoScroll 也就无从下手。
+     *
+     * 上边界取的是**表头下沿**、不是滚动盒顶：表头是吸顶的，夹到盒顶等于让这一行钻到表头底下去
+     * （用户截图：行压在表头下沿、上半截被切掉）。下边界就是滚动盒底。
+     * 各留 1px 余量：rect 是浮点、浏览器判"溢出"却按布局盒算，贴到边那一下正好多出 1px 可滚动区域
+     * （真机实测：夹到 250 时 324/**325**，滚动条照旧冒出来）。
+     */
+    const 限制在可视框内 = useCallback<Modifier>(({transform, draggingNodeRect}) => {
+        const box = scrollRef.current
+        if (!box || !draggingNodeRect) return transform
+        const view = box.getBoundingClientRect()
+        const 顶 = box.querySelector("thead")?.getBoundingClientRect().bottom ?? view.top
+        const 上限 = view.bottom - draggingNodeRect.bottom - 1
+        const 下限 = 顶 - draggingNodeRect.top + 1
+        return {...transform, y: Math.min(Math.max(transform.y, 下限), 上限)}
+    }, [])
     /* 剪贴板 / 撤销 / `edit` 那一套统一在 `useClipboardHistory` 里 —— 它的入参要用到下面的
        `tableInstanceRef`，所以调用点放在那之后（见文件中部）。 */
 
@@ -1096,7 +1121,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
         /* `DndContext` 包在最外面：它的辅助 `<div>` 绝不能落进 `<tbody>`（见 `ReorderDnd` 那段）。 */
-        <ReorderDnd reorder={reorder} rows={modelRows}>
+        <ReorderDnd reorder={reorder} rows={modelRows} bound={限制在可视框内}>
         <div className="flex min-h-0 flex-1 flex-col">
             {/*
                 复制被拒：**用对话框**（Excel / WPS 也是弹框说这句话），不是表格上方一行小字。
