@@ -344,7 +344,8 @@ export function CellPick({
             </ComboboxTrigger>
             <ComboboxContent
                 anchor={cellRef}
-                sideOffset={1}
+                // 与格子再拉开 1px（用户口径：列表上间距 = 2px）。
+                sideOffset={2}
                 className={`w-max cell-pick-list ${instantClose ? "hidden!" : ""}`}
                 data-copy-own=""
                 data-esc-own=""
