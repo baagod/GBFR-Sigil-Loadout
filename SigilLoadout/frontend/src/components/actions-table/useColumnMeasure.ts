@@ -250,6 +250,12 @@ export function useColumnMeasure(
                 return () => cancelAnimationFrame(raf)
             }
         }
+        /*
+            ‼️ **收敛了就归零**：上面那个 20 是"这一轮还能补几次"，不是组件整个生命周期的总额。
+            不归零的话，一个长命表格累计用满 20 次之后，指纹补测就**永久失效**（真机表现：
+            此后换动作、换数据都不再补测，列宽停在旧值上）。
+        */
+        extraPasses.current = 0
     }, [tableRef, keys, data, fixedWidths, shownTick])
 
     /*
