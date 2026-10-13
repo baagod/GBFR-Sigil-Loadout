@@ -208,7 +208,6 @@ const flagPickers: Record<string, PickerConfig> = {
     flag0: {multiple: true, names: FLAG0_NAMES},
     flag1: {multiple: true, names: FLAG1_NAMES},
 }
-const pickerOf = (key: string): PickerConfig | undefined => flagPickers[key]
 
 export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
     rows: FlagRow[]
@@ -253,7 +252,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
             onCopyReady={onCopyReady}
             onRowsReady={onRowsReady}
             onRowsChange={onRowsChange}
-            pickerOf={pickerOf}
+            pickerOf={(key) => flagPickers[key]}
         />
     )
 }
