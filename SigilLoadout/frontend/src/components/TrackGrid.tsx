@@ -63,6 +63,49 @@ const toRow = (
     carry: {orig: row.orig ?? null, children: row.children ?? []},
 })
 
+/**
+ * **两张轨表共用的外壳**：行已经由各自的适配函数变成基座要的形状，这里只负责"上屏"。
+ *
+ * ‼️ 原先两个网格各写一遍 `<ActionsTable>`（连 JSDoc 都是抄的），差异只有 `keys` / `columnOf` / `pickerOf`
+ * —— 参数化掉这三样，`abilityNames`、`initialSorting`、`initialPinnedCount` 与七个回调的接线就只有一处。
+ * 行值与行身份的换算留在各自那层（`TrackRow` 与 `FlagRow` 形状不同，见上面的 `toRow`）。
+ */
+function TrackShell({rows, t, keys, columnOf, pickerOf, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
+    rows: ActionRow[]
+    t: Messages
+    keys: readonly string[]
+    columnOf?: (key: string) => ColumnSpec | undefined
+    pickerOf?: (key: string) => PickerConfig | undefined
+    onEdit?: (rowId: string, column: string, value: string | null) => void
+    onReorder: (from: number, to: number) => void
+    onSelectionChange?: (rowIds: string[]) => void
+    onCopyReady?: (copy: () => void) => void
+    onRowsReady?: (commands: RowCommands) => void
+    onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
+}) {
+    return (
+        <ActionsTable
+            t={t}
+            // 轨表没有 `abilityTag_` 那一列，名字表用不上。
+            abilityNames={{}}
+            rows={rows}
+            keys={keys}
+            columnOf={columnOf}
+            pickerOf={pickerOf}
+            // 行序严格等于数组顺序：这两张表都没有排序（动作表那档默认按 `id_` 排）。
+            initialSorting={[]}
+            // **不钉数据列**：这两张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
+            initialPinnedCount={0}
+            onEdit={onEdit}
+            reorder={onReorder}
+            onSelectionChange={onSelectionChange}
+            onCopyReady={onCopyReady}
+            onRowsReady={onRowsReady}
+            onRowsChange={onRowsChange}
+        />
+    )
+}
+
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
 export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
     table: TrackTableData | undefined
@@ -74,7 +117,6 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     onReorder: (from: number, to: number) => void
     /** 整行选中的行变了（工具条按它决定按钮亮不亮、Ctrl+C/X 复制哪几行）—— 由基座算好上报。 */
     onSelectionChange?: (rowIds: string[]) => void
-    /** 活动格换到哪一行了（
     /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
     onCopyReady?: (copy: () => void) => void
     /** 基座那份**行级命令**（添加/复制/剪切/粘贴/删除）：接给工具条，见 `useRowCommands`。 */
@@ -96,18 +138,12 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     )
     if (!table) return null
     return (
-        <ActionsTable
+        <TrackShell
             t={t}
-            // 轨表没有 `abilityTag_` 那一列，名字表用不上。
-            abilityNames={{}}
             rows={rowItems}
             keys={table.columns}
-            // 行序严格等于数组顺序：这张表没有排序（动作表那档默认按 `id_` 排）。
-            initialSorting={[]}
-            // **不钉数据列**：这张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
-            initialPinnedCount={0}
             onEdit={onEdit}
-            reorder={onReorder}
+            onReorder={onReorder}
             onSelectionChange={onSelectionChange}
             onCopyReady={onCopyReady}
             onRowsReady={onRowsReady}
@@ -219,7 +255,6 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
     onReorder: (from: number, to: number) => void
     /** 整行选中的行变了（工具条按它决定按钮亮不亮、Ctrl+C/X 复制哪几行）—— 由基座算好上报。 */
     onSelectionChange?: (rowIds: string[]) => void
-    /** 活动格换到哪一行了（
     /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
     onCopyReady?: (copy: () => void) => void
     /** 基座那份**行级命令**（添加/复制/剪切/粘贴/删除）：接给工具条，见 `useRowCommands`。 */
@@ -238,21 +273,18 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
         [rows, originals],
     )
     return (
-        <ActionsTable
+        <TrackShell
             t={t}
-            abilityNames={{}}
             rows={rowItems}
             keys={FLAG_COLUMNS}
             columnOf={columnSpec}
-            initialSorting={[]}
-            initialPinnedCount={0}
+            pickerOf={(key) => flagPickers[key]}
             onEdit={onEdit}
-            reorder={onReorder}
+            onReorder={onReorder}
             onSelectionChange={onSelectionChange}
             onCopyReady={onCopyReady}
             onRowsReady={onRowsReady}
             onRowsChange={onRowsChange}
-            pickerOf={(key) => flagPickers[key]}
         />
     )
 }
