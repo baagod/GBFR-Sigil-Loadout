@@ -130,7 +130,7 @@ const CTRL = 2
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onActiveRowChange, onCopyReady, onRowsReady, onRowsChange, columnOf}: {
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onCopyReady, onRowsReady, onRowsChange, columnOf}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
@@ -185,11 +185,9 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      */
     onSelectionChange?: (rowIds: string[]) => void
     /**
-     * **活动格换到哪一行了**（行 id；
-ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行之后**
-     * 插一行；一行没选时放到行末（见 AnimationDetail 的 ddRow）。
+     * **活动格换到哪一行了**（行 id；`null` = 一段选区都没有）—— 轨表的「添加」按它在**活动行之后**
+     * 插一行；一行没选时放到行末（见 AnimationDetail 的 `addRow`）。
      */
-    onActiveRowChange?: (rowId: string | null) => void
     /**
      * **把"复制当前选区"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮用它 ——
      * 按钮手里没有 Ctrl+C 那个事件对象，但"进剪贴板的是哪片、虚线画在哪儿"必须与键盘那条完全一致。
@@ -491,21 +489,8 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
         return active ? snapshotKey(active.anchorRowId, active.anchorColumnId) : ""
     })()
 
-    /**
-     * **把"活动格所在的行"上报给调用方**（见 `onActiveRowChange`）—— 轨表的"添加"要靠它决定插在谁后面。
-     *
-     * 与"整行选中"那条同一个套路：**指纹去重**，否则每次渲染都报一次 → 调用方 setState → 再渲染 → 打转。
-     * 一段选区都没有时（刚打开弹窗）报 `null` —— 调用方据此把新行放到行末。
-     */
     /* 活动格所在的行 id（null = 一段选区都没有）—— 上报给调用方，也给行级命令定位「活动行」。 */
     const activeRowId = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
-    const lastActiveRow = useRef("")
-    useEffect(() => {
-        if (!onActiveRowChange) return
-        if ((activeRowId ?? "") === lastActiveRow.current) return
-        lastActiveRow.current = activeRowId ?? ""
-        onActiveRowChange(activeRowId)
-    }, [onActiveRowChange, activeRowId])
     /** 已经为哪一格排了一帧"跟随可视"（`revealActiveCell` 的幂等闸：同一帧重复喊只滚一次）。 */
     const revealPendingRef = useRef<HTMLElement | null>(null)
     /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */

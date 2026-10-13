@@ -83,7 +83,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * 那套手势现在只有基座那一份实现（tanstack 的 cellSelection），这里只留"哪几行被整行选中"这一个事实。
      * （以前这里自己养了一套 `useRowSelection` 状态机，但改基座之后它的两个入口再没人调用 —— 那套已经删了。）
      */
-    const [sel, setSel] = useState<{key: string; rows: number[]} | null>(null)
+    const [sel, setSel] = useState<string | null>(null)
     /**
      * **活动格在哪一行**（也是基座上报的）：工具条的「添加」按它决定插在谁后面 —— 一行没选时是 `null`，
      * 那就插到行末。与 `sel` 分开存，因为"选中了哪几行"和"光标压在哪一行"是两件事
@@ -214,7 +214,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             // 输入框里打字时不抢按键；`[data-copy-own]` 是**格子自己收下 Ctrl+C** 的意思（值格那一格
             // 复制的是自己的值，不是选中的行）—— 与 App.tsx 那记"Esc 收托盘"用的 `data-esc-own` 同一套约定。
             if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable], [data-copy-own]")) return
-            const key = sel?.key
+            const key = sel
             const info = infos.find((one) => trackKey(one) === key)
             if (event.key === "Delete" && !event.ctrlKey && !event.metaKey) {
                 if (!key || !info) return
@@ -396,9 +396,9 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                             <TrackToolbar
                                 t={t}
                                 canCopy={count > 0}
-                                canCut={sel?.key === key}
+                                canCut={sel === key}
                                 canPaste={sel !== null}
-                                canRemove={sel?.key === key}
+                                canRemove={sel === key}
                                 onAdd={() => rowCommands.current[key]?.add()}
                                 onCopy={() => {
                                     // 两条路：行剪贴板（跨表粘行）+ 基座那条区域复制（画虚线）。
@@ -422,7 +422,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 onEdit={(rowId, field, value) => editFlag(Number(rowId), field as keyof FlagRow, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
                                 /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
-                                onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
+                                onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
                                 onCopyReady={(copy) => {
                                     copyEntry.current[key] = copy
                                 }}
@@ -438,7 +438,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 originals={baseline?.tables[key]?.rows}
                                 onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
-                                onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
+                                onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
                                 onCopyReady={(copy) => {
                                     copyEntry.current[key] = copy
                                 }}
@@ -583,13 +583,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
 const flagsKey = "0flags"
 
-/**
- * 剪贴板放在**模块级**，不是弹层的 state：弹层是"一套动画一个" ✗，而要做到
- * "复制 A 动画的 flags 行、贴到 B 动画的 flags 行" ✓，它就必须活得比弹层久 ✗。
- * 只存"轨种类 + 行内容"：种类用来拦住把 flags 行贴进 attack 这种荒唐事 ✓
- * （同一张表里，key 还带着 sub，跨动画不一定对得上，所以判等用 kind ✓）。
- */
-
 function trackKey(info: {sub: string; kind: string}): string {
     return info.sub + info.kind
 }
@@ -598,47 +591,3 @@ function trackKey(info: {sub: string; kind: string}): string {
 function trackLabel(kind: string): string {
     return kind.charAt(0).toUpperCase() + kind.slice(1)
 }
-
-/*
-    ==================== 行级增删改的几条公共零件 ====================
-
-    「添加」与「粘贴」要的是同一件事：**按目标表的列造一行新行**，差别只在源行从哪儿来
-    （活动行/末行 vs 剪贴板）。所以下面这几条都按"任意形状的源行 → 目标表认的那一行"来写 ——
-    flags 的行是**平铺字段**、通用轨收在 `values` 里，这层差异只在这里抹平一次。
-*/
-
-/** 从**任意形状**的一行里取一个字段值：`FlagRow` 是平铺字段，`TrackRow` 收在 `values` 里。 */
-export const readValue = (row: unknown, key: string): string => {
-    const r = row as {values?: Record<string, string>} & Record<string, unknown>
-    return r?.values?.[key] ?? (typeof r?.[key] === "string" ? (r[key] as string) : "")
-}
-
-/** 在 `after` 那一行**之后**插一行（`after < 0` 或越界 = 行末）；抄哪一行由 `造` 定（没有源行也要能造出空行）。 */
-export const insertAfter = <T,>(after: number, rows: T[], 造: (source: T | undefined) => T): T[] => {
-    const at = after >= 0 && after < rows.length ? after + 1 : rows.length
-    return [...rows.slice(0, at), 造(rows[after >= 0 ? after : rows.length - 1]), ...rows.slice(at)]
-}
-
-/**
- * 照目标表的列**抄一行 flags**（多出来的列丢掉）。
- *
- * ‼️ `orig` / `removed` 必须显式清掉：抄来的行是**新行** —— `orig` 留着会被当成原行去"假删除"、
- * 也会拿源行的原值去比；`removed` 留着会让新行一出生就是红的。`index` 由 `reindex` 统一补。
- */
-export const copyFlagRow = (source?: FlagRow | TrackRow): FlagRow =>
-    ({...Object.fromEntries(FLAG_KEYS.map((key) => [key, readValue(source, key)])), index: 0, orig: null, removed: undefined}) as FlagRow
-
-/** 照目标表的列**抄一行通用轨**：`children` 要深拷（attack 行的 `<AilmentNN>` 就在里面）。 */
-export const copyTrackRow = (columns: readonly string[]) => (source?: FlagRow | TrackRow): TrackRow => {
-    const r = source as TrackRow | undefined
-    return {
-        index: 0,
-        values: Object.fromEntries(columns.map((key) => [key, readValue(source, key)])),
-        children: (r?.children ?? []).map((child) => ({...child, values: {...child.values}})),
-        orig: null,
-        removed: undefined,
-    }
-}
-
-/** 重排每行的 `index`：插入/粘贴之后行号才是连的。 */
-export const reindex = <T extends {index?: number}>(rows: T[]): T[] => rows.map((row, index) => ({...row, index}))

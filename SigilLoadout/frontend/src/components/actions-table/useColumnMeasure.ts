@@ -214,9 +214,8 @@ export function useColumnMeasure(
                 另外 `Math.max(1, …)` 兜住宽度 0 的列（`table-fixed` 下会被挤成一条线）。
             */
             /*
-                ‼️ **末尾这 + 1 是边框，不是留白**：sizes 写进 	d 是 order-box（含右边框 1px），
-                所以「内容可用宽 = 列宽 − 1」。而上面算出来的 
-eeded 是「内容 + 内边距」，不含那 1px ——
+                ‼️ **末尾这 + 1 是边框，不是留白**：`sizes` 写进 `td` 是 `border-box`（含右边框 1px），
+                所以「内容可用宽 = 列宽 − 1」。而上面算出来的 `needed` 是「内容 + 内边距」，不含那 1px ——
                 不加就每列正好少一个字（真机：startTime 列宽 74 而文本可用 73/需要 74，末尾被吃掉）。
             */
             sizes[id] = Math.max(1, Math.ceil(needed) + 1)
