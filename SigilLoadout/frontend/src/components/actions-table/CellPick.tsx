@@ -29,7 +29,7 @@ import {flagHasBit, flagMask} from "@/lib/actionflags"
 
     ## 一点细节（实测出来的）
 
-      · `sideOffset={1}`：列表让出格子下沿那条格线，别压在它上面。
+      · `sideOffset={3}`：列表与格子之间留 3px —— 让开格子下沿那条格线，别压在它上面。
       列表的内边距**用组件的默认值**（`p-1` = 上下左右各 4px），这一列不再覆盖它。
 */
 
@@ -86,7 +86,6 @@ export function CellPick({
      * 走 context 下发，不从 `CellContent` 穿 prop。
      */
     const {reveal, isSelfScroll} = useContext(RevealContext)
-    /* `enterEditRef` 由 `CellContent` 以 prop 传下来（那边已经读过 context，不必读两遍）。 */
 
     /** 这一轮关闭要**立刻消失**（滚动带出来的关闭用它：别让列表在原地淡出一百毫秒）。 */
     const [instantClose, setInstantClose] = useState(false)
@@ -189,8 +188,7 @@ export function CellPick({
         }
     }, [])
 
-    /** 登记"这一格的进编辑"（= 展开列表），与普通格子的 `Cell.enterEdit` 一一对应。 */
-    /** 列表容器：**挂上来的那一刻**把焦点交给它（弹层是异步挂的，见下面 `<ComboboxList ref>`）。 */
+    /** 登记"这一格的进编辑"（= 展开列表）：与普通格子的 `Cell.enterEdit` 一一对应。 */
     useEnterEditHandler(cellKey, openForEdit)
 
 
@@ -230,7 +228,7 @@ export function CellPick({
         return () => trigger.removeEventListener("keydown", blockArrows, true)
     }, [open])
 
-    // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
+    // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（弹层的关闭归它自己）。
     useEffect(() => {
         if (!open) return
         const onDown = (e: PointerEvent) => {
@@ -248,7 +246,7 @@ export function CellPick({
      *
      * ‼️ **只让"用户滚动"触发它**：`ActionsTable` 的"跟随可视"自己那一下滚动不收 —— 那一类是程序
      * 为了把活动格摆进可见区发的，收掉等于"自己把刚开的列表关掉"（用户报的：选中一个没显示完整的
-     * 选值格进编辑，列表刚展开就收起）。判据见 `model.ts` 里那条 `isRevealScrolling` 契约。
+     * 选值格进编辑，列表刚展开就收起）。判据见 `model.ts` 里的 `RevealSession` 契约。
      */
     useEffect(() => {
         if (!open) return

@@ -1,9 +1,9 @@
 /*
     角色动作页的**动作表**（TanStack Table v9）—— 这张表本体。
 
-    这一版有的：读数据 / 87 列（列名 = 字段名）/ 点格子编辑 + 原值灰字占位符 / 前两列钉住 /
-    表头吸顶 / 列名与长值截断 / 单元格选区 + Excel 口径的复制粘贴 / 行号列选行 / Ctrl+Z /
-    保存交给外面那排按钮。
+    这一版有的：87 列（列名 = 字段名）/ 点格子编辑 + 原值灰字占位符 / 前两列钉住 / 表头吸顶 /
+    列名与长值截断 / 单元格选区 + Excel 口径的复制粘贴 / 行号列选行 / 方向键 / Ctrl+Z /
+    保存交给外面那排按钮。**数据也是外面给的**（受控视图，自己不读，见下面 `rows` 那段）。
 
     数据模型照搬后端（见 service/actionedits.go）：每格两栏 —— `originals` 是随包资产里的只读原值，
     `values` 是玩家的改动（空 = 没改过）。两栏必须分开：混成一栏，保存时就分不出「没改过」与「改成了空」。
@@ -15,22 +15,25 @@
       · `table.getState()` 没了，走 `table.state` / `table.atoms.<slice>`。
 
     兄弟模块（按职责拆开，**别再堆回这个文件**）：
-      · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、列策略（`columnKind`）、纯取值助手；
+      · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、列策略（`columnKind` / `writableColumn`）、纯取值助手；
       · `actions-table/classes.ts`    —— 类名常量、选区与复制区的「哪几条边」；
       · `actions-table/selection.ts`  —— 选区的谓词与指纹（整行 / 单格 / 行外观指纹）；
       · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
+      · `actions-table/useReveal.ts`  —— 「跟随可视」的 DOM 那一层（查活动格 / 排一帧 / 那条"这次滚动是我发的"契约）；
+      · `actions-table/useArrowKeys.ts` —— 方向键与 Enter（三条移动路径 + 四道让路闸门）；
       · `actions-table/drag.ts`       —— 「行序拖动」的夹取几何（最多能拖到哪儿，与 `reveal.ts` 对称）；
       · `actions-table/ReorderDnd.tsx` —— dnd-kit 的装配（**必须包在 `<table>` 之外**，理由在那个文件里）；
       · `actions-table/useColumnMeasure.ts` —— 列宽测量（DOM 测量 + sizing / measured / 重试计数三个 state）；
       · `actions-table/clipboard.ts`  —— TSV 读写 + 粘贴铺块规则；
       · `actions-table/useClipboardHistory.ts` —— 复制粘贴 / 复制源虚线 / 撤销栈，**以及 `edit`**
         （撤销栈的记账规则长在 `edit` 里，所以它们必须同居）；
+      · `actions-table/useRowCommands.ts` —— 行级命令（添加/复制/剪切/粘贴/删除）；
       · `actions-table/ActionRowView.tsx` —— 表体一行（memo 那一层）；
       · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态。
 
-    ‼️ **这个文件里还剩下的**：数据读取的接线、选区手势编排（行号/数据格拖动）、方向键、
-    "跟随可视"的编排（几何在 `reveal.ts`）、以及"整行选中"上报给调用方。这几块与 ref 镜像、
-    库的选区 API 缠在一起，再往外抽要先搬一堆 ref —— 想动它们时先想清楚这笔账，别只为行数好看。
+    ‼️ **这个文件里还剩下的**：数据读取的接线、选区手势编排（行号/数据格拖动）、列与行的清单计算、
+    渲染，以及"整行选中"上报给调用方。手势那块与三个 ref 镜像（`tableInstanceRef` / `pressRef` /
+    `dragRowRef`）缠在一起，再往外抽要先搬一堆 ref —— 想动它时先想清楚这笔账，别只为行数好看。
 */
 import {
     useCallback,
@@ -44,10 +47,8 @@ import {
     flexRender,
     useTable,
     type Cell,
-    type CellSelectionDirection,
     type CellSelectionState,
     type ColumnDef,
-
     type Row,
     type SortingState,
 } from "@tanstack/react-table"
@@ -74,33 +75,22 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnKind, columnLabel, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
-import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
-import {revealScrollTarget} from "@/components/actions-table/reveal"
+import {rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
 import {clampDragY} from "@/components/actions-table/drag"
 import {ReorderDnd} from "@/components/actions-table/ReorderDnd"
+import {useArrowKeys} from "@/components/actions-table/useArrowKeys"
+import {useReveal} from "@/components/actions-table/useReveal"
 import {useClipboardHistory} from "@/components/actions-table/useClipboardHistory"
 import {useRowCommands, type RowCommands} from "@/components/actions-table/useRowCommands"
 import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
 
 /*
-    ========================== 方向键（见 `handleArrowKey`） ==========================
-
-    `e.key` 用**方向名**判（`ArrowUp` 这种），不用 `keyCode`：后者在键盘布局/输入法下不可靠。
-    `ARROW_KEYS` 同时当"是不是方向键"的判据与"往哪走"的查找表 —— 一张表一件事，不用再写一遍 `if`。
+    ‼️ 方向键与 Enter 那一段已搬到 `actions-table/useArrowKeys.ts`（连同 `ARROW_KEYS` / `SHIFT` / `CTRL`
+    与四道让路闸门的说明）。
 */
-const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
-    ArrowUp: "up",
-    ArrowDown: "down",
-    ArrowLeft: "left",
-    ArrowRight: "right",
-}
-/** 修饰键按位组合：`SHIFT` 扩选、`CTRL` 跳边，两者都不按就是走一步。 */
-const SHIFT = 1
-const CTRL = 2
-
 /**
  * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
  *
@@ -185,10 +175,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      */
     onSelectionChange?: (rowIds: string[]) => void
     /**
-     * **活动格换到哪一行了**（行 id；`null` = 一段选区都没有）—— 轨表的「添加」按它在**活动行之后**
-     * 插一行；一行没选时放到行末（见 AnimationDetail 的 `addRow`）。
-     */
-    /**
      * **把"复制当前选区"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮用它 ——
      * 按钮手里没有 Ctrl+C 那个事件对象，但"进剪贴板的是哪片、虚线画在哪儿"必须与键盘那条完全一致。
      */
@@ -250,17 +236,12 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     /** 字段顺序（= 表头顺序）：受控，直接来自 prop（见 `model.columnsOf`），本层不自己算也不改。 */
     const keys = keysProp
     /**
-     * **不许写的列**（`columnOf` 标了 `readonly` 的那些）—— 只用来挡粘贴：往它们上面粘会写一个
-     * **没人认的键**（帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。编辑那边由渲染层挡
-     * （`ActionRowView` 的"不许写"）。
+     * **这一列能不能写**（判据只有 `model.writableColumn` 一份，见那里的说明）。
+     *
+     * 这里只做"把调用方那份 `columnOf` 绑进去"：引用要稳（它要下到 `memo` 化的格子里、
+     * 也要进 `useClipboardHistory` 的依赖），所以 `useCallback` 只认 `columnOf`。
      */
-    /**
-     * **这一列能不能写**：内置只读列（`columnKind`）+ 调用方标的 `readonly` —— 只在这里判一次。
-     * 以前是两条路：粘贴过滤只认 `columnOf`（漏了内置的 `id_` / `abilityTag_`），
-     * 每格的底色又各算一遍 —— 同一个事实三处判，迟早对不上。
-     */
-    const writable = useCallback((key: string) => columnKind(key) !== "readonly" && columnOf?.(key)?.readonly !== true, [columnOf])
-    const readonlyColumns = useMemo(() => new Set(keys.filter((key) => !writable(key))), [keys, writable])
+    const writable = useCallback((key: string) => writableColumn(key, columnOf), [columnOf])
     /**
      * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
@@ -414,9 +395,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         onCellSelectionChange: setCellSelection,
     })
 
-
-
-
     // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
     useEffect(() => {
         onSaveReady?.(async () => {
@@ -497,10 +475,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
 
     /* 活动格所在的行 id（null = 一段选区都没有）—— 上报给调用方，也给行级命令定位「活动行」。 */
     const activeRowId = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
-    /** 已经为哪一格排了一帧"跟随可视"（`revealActiveCell` 的幂等闸：同一帧重复喊只滚一次）。 */
-    const revealPendingRef = useRef<HTMLElement | null>(null)
-    /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */
-    const lastRevealedRef = useRef<HTMLElement | null>(null)
     /**
      * **活动格的"进编辑"句柄登记表**（见 `EnterEditRegistry`）：每格按**自己的格键**登记，
      * Enter 按当前活动格的键来取 —— 覆盖结构上不可能，"只有活动格才登记"那条前提也就不需要了。
@@ -510,110 +484,10 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     const enterEditRegistry = enterEditRegistryRef.current
 
     /**
-     * **"跟随可视"的唯一实现**：把当前活动格摆进真正看得见的矩形里。
-     *
-     * 谁来喊它不改变算法，只是**触发源不同** —— 这一点是这条逻辑的关键（用户报过漏掉第二条）：
-     *   · 活动格**换人**时（`scrollActiveIntoView`，那个 ref 回调只挂在活动格上）；
-     *   · **进编辑**时（活动格没换人、选区也没变，ref 根本不会跑，必须显式喊一次，见 `RevealContext`）。
-     *
-     * ‼️ **不收"哪一格"这个参数**：两种触发源下"要摆的那一格"**永远就是当前活动格**，所以实现直接去
-     * DOM 里查它（`td.cell-active`）。这也让调用点不需要任何 DOM 引用 —— 传元素只是白加一层耦合。
-     *
-     * **算一次、滚一次**：位置完全由"真正看得见的四边"决定，不使用浏览器自己的 `scrollIntoView`
-     * （它只认容器边缘，不知道表头正吸在上面、冻结列盖在左边，格子被盖住时它当"可见"、**点了毫无滚动**）。
-     *
-     *     可视上沿 = 容器顶 + 吸顶表头高      可视下沿 = 容器内容盒底
-     *     可视左沿 = 冻结列右沿               可视右沿 = 容器内容盒右
-     *
-     * 四条边同一条规则：**越界多少就补多少**（贴边/在里面 → 0，不动）。
-     * 所以"这一格本来就看全了"这件事**天然什么都不做** —— 也就不会派发 `scroll` 去惊动别的东西
-     * （选值格的下拉列表靠 `scroll` 收起，见 `CellPick` 与 `model.ts` 那条契约）。
-     *
-     * ‼️ 稳定引用（`useCallback([])`）：它既要挂在活动格的 ref 上，又要经 context 下发到 `memo` 的格子，
-     * 所以里面**只用 ref 与 DOM**、不读任何渲染期的值。
+     * **"跟随可视"那一套**（`reveal` 经 context 下发、`scrollActiveIntoView` 挂给活动格）——
+     * 实现在 `actions-table/useReveal.ts`：DOM 查询 + 排帧 + 那条"这一次滚动是我自己发的"契约。
      */
-    const revealActiveCell = useCallback(() => {
-        const box = scrollRef.current
-        if (!box) return
-        /*
-            ‼️ **同一帧里重复喊只滚一次**（幂等做在这里而不是各个调用点）：
-            一次点击会先后走 `onFocus` 与 `onClick` 两条进编辑的路，两边都会喊 —— 不去重就滚两趟。
-            判据是"已经为**这一格**排了一帧"：活动格换了人就不算重复（那一格确实需要重新摆）。
-        */
-        const cell = box.querySelector<HTMLElement>("tbody td.cell-active")
-        if (!cell || revealPendingRef.current === cell) return
-        revealPendingRef.current = cell
-        /* 等一帧：这一帧里活动格可能已经换人（重渲），所以**重新查一次**，别抓着旧引用。 */
-        requestAnimationFrame(() => {
-            revealPendingRef.current = null
-            const el = box.querySelector<HTMLElement>("tbody td.cell-active")
-            if (!el) return
-            const view = box.getBoundingClientRect()
-            /* 吸顶表头压住上面、冻结列盖住左边：看得见的范围要从它们之外算起。 */
-            const headerHeight = box.querySelector("thead")?.getBoundingClientRect().height ?? 0
-            const frozenRight = [...box.querySelectorAll<HTMLElement>("thead th")]
-                .filter((th) => th.style.left !== "" && th.style.left !== "auto")
-                .reduce((max, th) => Math.max(max, th.getBoundingClientRect().right), view.left)
-            const tr = el.parentElement
-            const target = revealScrollTarget({
-                target: el.getBoundingClientRect(),
-                view,
-                headerHeight,
-                frozenRight,
-                pinned: getComputedStyle(el).position === "sticky",
-                /* 判"是不是末格"只看 **DOM 位置**、不读外面的 `sheetColumns`：本回调是
-                   `useCallback([])`，闭包里那份列模型还是首次渲染的空数组，判断会恒假。 */
-                isLastRow: tr === tr?.parentElement?.lastElementChild,
-                isLastColumn: el === tr?.lastElementChild,
-                box,
-                scroll: {top: box.scrollTop, left: box.scrollLeft},
-            })
-            if (!target) return // 本来就看得见 / 已到最好位置 → 一次都不滚
-            /* 报名"下一次滚动是我们自己发的"，再滚（契约见 `RevealSession`）。 */
-            selfScrollRef.current = true
-            box.scrollTo(target)
-        })
-    }, [])
-    /**
-     * **"跟随可视"这一套的实例**（见 `RevealSession`）：一张表一份，经 context 下发。
-     *
-     * ‼️ "下一次滚动是我自己发的"这一位（`selfScrollRef`）**必须按表持有**，不能放模块级 ——
-     * 放模块级就是全页共享：同页两张表会互相让路（A 表跟随可视那一下把 B 表"一滚就收"的规则一起
-     * 放过），而且模块级可变状态会让测试按执行顺序时红时绿（脏的那一份漏给下一个测试文件）。
-     *
-     * 用 `useRef` 让**引用恒定**：它要经 context 下到 `memo` 的格子里，每次渲染换新对象等于把 memo 废掉。
-     * `revealActiveCell` 本身是 `useCallback([])`，所以首个渲染期闭包里抓到的那个就是最终那份实现。
-     */
-    const selfScrollRef = useRef(false)
-    const revealRef = useRef<RevealSession | null>(null)
-    revealRef.current ??= {
-        reveal: revealActiveCell,
-        isSelfScroll: () => {
-            if (!selfScrollRef.current) return false
-            selfScrollRef.current = false // 一次性：消费掉这次报名
-            return true
-        },
-    }
-    const reveal = revealRef.current
-    /**
-     * "活动格挂上来了"的 ref 回调（`RowCell` 只把它挂给活动格那一格）—— 只是 `revealActiveCell`
-     * 的一个**触发源**（另一个是进编辑，见 `RevealContext`）。
-     *
-     * ⚠️ 与 `revealActiveCell` 分开只为**去重**（实测：去掉它就是两次 `scrollTo`）：React 在同一节点上
-     * 重挂 ref 时会先传 `null` 再传节点，而进编辑也会喊一次 —— 同一格连喊两次是白滚。
-     */
-    const scrollActiveIntoView = useCallback(
-        (el: HTMLTableCellElement | null) => {
-            if (!el) {
-                lastRevealedRef.current = null
-                return
-            }
-            if (lastRevealedRef.current === el) return
-            lastRevealedRef.current = el
-            revealActiveCell()
-        },
-        [revealActiveCell],
-    )
+    const {reveal, scrollActiveIntoView} = useReveal(scrollRef)
 
     /*
         ========================== 选中：**一套模型** ==========================
@@ -641,6 +515,12 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     tableInstanceRef.current = table
 
     /**
+     * **方向键 / Enter**（实现在 `actions-table/useArrowKeys.ts`）：三条移动路径 + 四道让路闸门，
+     * 监听挂在 `document` 的捕获阶段。它要读的都是**渲染期最新值**，在那个 hook 里统一成一份 ref 镜像。
+     */
+    useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey})
+
+    /**
      * **剪贴板 + 撤销栈 + 改一格** —— Excel 口径的复制粘贴、复制区那圈虚线、Ctrl+Z，全在
      * `useClipboardHistory` 里（`edit` 也归它：撤销栈的"记不记账"正是 `edit` 里那两条判断，
      * 记账规则与记账本分在两个地方是这段代码原来最难读的部分）。
@@ -654,7 +534,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         rowsRef,
         tableRef: tableInstanceRef,
         branchIds: branchPick.ids,
-        readonlyColumns,
+        writable,
         multiAreaCopyText: t.multiAreaCopy,
     })
 
@@ -709,182 +589,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
 
     /** 选区边界（`PressFacts` 与行号减选要用）—— 走 `tableRef`，于是对外也是稳定引用。 */
     const getSelectionBounds = useCallback(() => tableInstanceRef.current.getCellSelectionBounds(), [])
-
-    /**
-     * 方向键 → **活动格在数据格里走一格**（Excel 手感）。
-     *
-     * ‼️ 范围天然钳在数据格里：库只按可见列（按钉住重排）与行模型走，**行号列与表头根本不在候选里**
-     * —— 所以"不要选到行号列 / 表头"不用自己写判据，到边就停。
-     *
-     * 三条路（Shift / Ctrl 两条库只管一步或按旧值算，所以自己走）：
-     *   · 不带修饰 —— `moveCellSelection` 走一步。它内部就是 `setFocusedCell`（`mode:"replace"`），
-     *     **选区因此收成单格**，多片选区 / 整行块一并清掉，正是用户要的"从活动格移动 + 清除全部选区"。
-     *   · **Shift** —— 扩选：锚点不动、焦点角沿行列序走一步（只改最后一个区的 focus）。
-     *   · **Ctrl/Cmd** —— 一步跳到该方向最远能落的那一格。
-     *
-     * 闸门（谁该拿走这一次按键）：
-     *   · **本表有选区**（`cellSelection` 非空）—— 唯一的总开关。点过格子 = 用户刚在这张表上选过东西，
-     *     方向键归它；没选区就什么都不做，不抢别处的键。
-     *     ⚠️ 判据**不用"焦点在不在表里"**：那张表自己会 `blur` 交焦点（见下面那段），方向键要能
-     *     接在 `blur` 之后接着走；而"有选区"既够用、又不会把工具栏/别的表的键抢走。
-     *   · 焦点在编辑框里（`input` / `textarea` / `contenteditable`）→ 让给它们；
-     *   · 选值格列表开着（触发器带 `data-pick-open`）→ 让给 base-ui 的列表导航
-     *     （**绝不能动选区**：选区一变，`CellPick` 那条"一滚就收"的逻辑会把列表关掉）。
-     *
-     * 挂**文档捕获阶段**（在下面那个 effect 里）：键事件跟着**焦点**走，而焦点可能在 `<body>` 上
-     * （点了格子再 blur、或刚部署完页面还没点过）—— 挂在容器上的 React `onKeyDown` 那时收不到。
-     */
-    const handleArrowKey = (e: KeyboardEvent) => {
-        const direction = ARROW_KEYS[e.key]
-        const isEnter = e.key === "Enter"
-        if ((!direction && !isEnter) || e.defaultPrevented) return
-        /*
-            ‼️ **同一时刻只有"当前那一层"的表响应用户的按键**。
-
-            每张表都往 `document`（捕获）挂了这一条，而弹窗打开时**底下的表并没有卸载** —— 它们照样收得到
-            事件。以前靠"自己有没有选区"分派，于是"底下那张表刚好选过东西"时按键被它接走（它还
-            `preventDefault` 了）：弹窗里那张表一记都收不到，表现就是"方向键要按两次才动一格"（用户报的）。
-
-            判据用**层的归属**：表在哪个 [role=dialog] 里，就只认那一层是当前层；不在任何弹窗里的表，
-            只在"确实没有弹窗"时响应。与"是哪张表、有几个值格列"无关 —— 所有表同一套。
-        */
-        const myLayer = tableRef.current?.closest("[role=dialog]") ?? null
-        const dialogs = document.querySelectorAll("[role=dialog]")
-        const topLayer = dialogs.length > 0 ? dialogs[dialogs.length - 1] : null
-        if (myLayer !== topLayer) return
-        // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
-        const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
-        const shift = mods === SHIFT
-        if (mods !== 0 && !shift && mods !== CTRL) return
-        /*
-            ‼️ "活动格是哪一格"从**受控 state** 读，不读 `table.getFocusedCell()`：库那个原子要等下一次
-            渲染才跟上（本次事件里还是上一次的位置）—— Ctrl / Shift 两条要按它算落点，读原子就会算错。
-        */
-        const anchor = cellSelection[cellSelection.length - 1]
-        if (!anchor) return
-
-        /*
-            ‼️ **让路闸门（只给方向键）**：编辑框 / 列表导航优先 —— 方向键在它们手里是"移光标 / 选下一项"。
-            只认这两类（语义各不相同）：
-              · `input / textarea / [contenteditable]` —— 焦点真的在打字（含列表里的搜索框）；
-              · `[data-pick-open]` —— 选值格列表开着，方向键归 base-ui 的列表导航。
-            ‼️ **不能拿 `[role=combobox]` 当判据**：选值格的触发器（`CellPick` 那层 `div`）**本身就是
-            `role=combobox`**，而鼠标点过格子后焦点就停在它上面 —— 那样写等于"焦点在选值格上时方向键
-            一律失效、单元格不动"（用户报的）。判据只认"**正在打字**"与"**列表开着**"这两种真的该让路的
-            状态；触发器被聚焦属于"就是这一格"，方向键该走格子。
-
-            ⚠️ 这道闸门**只管方向键**，Enter 必须穿过去：穿过去才会走到下面那个 `preventDefault()`，
-            而正是它压住了"Enter 落在按钮型的触发器上会再产生一次自己的 click"—— 那一下 click 会把刚
-            由 Enter 打开的列表又关掉（实测）。
-        */
-        /*
-            ‼️ 判据要把**列表容器**也算进来：列表开着时焦点在列表里，那时 `[data-pick-open]`（挂在触发器上）已经
-            不在事件路径上了 —— 只认它的话，弹层里的上下键与 Enter 都会被本表抢走（用户报的"列表里选不了"）。
-        */
-        const insideEditorOrList = (e.target as HTMLElement | null)?.closest?.(
-            "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
-        )
-        if (!direction) {
-            // ---- Enter：进编辑（与"点已选中的格子"同一条口径）----
-            /*
-                ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
-                （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
-            */
-            if (insideEditorOrList) return
-            e.preventDefault()
-            /*
-                ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
-                那是另一个功能），整行块同理 —— 不做比做错好。
-                判据与 `ActionRowView` 那道 `wasOnlyCell` 闸门**同一条**（同一个函数，见 `selection.ts`）。
-            */
-            if (!isSingleCellBounds(getSelectionBounds())) return
-            /*
-                ‼️ **喊活动格自己的进编辑句柄**（`EnterEditContext` 登记的那一个）：普通格切输入框、
-                选值格展开列表 —— 两边实现不同，本层不该知道细节。只读列不登记 → 这里什么都不做。
-                "跟随可视"不在这里补：`Cell.enterEdit` / `CellPick` 展开时自己会喊 `reveal()`（与点击同一条口径）。
-
-                ⚠️ 别改成"派发一次真实 click"：那条路上 `Cell` 的 `shouldEditOnClick` 要 `pressRef` 里那份
-                "按下那一刻"的事实，而**方向键换格后直接按 Enter 根本没有 mousedown** —— 闸门判 false，
-                Enter 点不开（实测）。登记那套没有这个前提。
-            */
-            enterEditRegistry.get(activeCellKey)?.()
-            return
-        }
-
-        if (insideEditorOrList) return
-
-        e.preventDefault() // 表格在 `.overflow-auto` 里，不拦住方向键会顺手滚容器
-
-        /*
-            ‼️ 把**上一个格子那层焦点交出去**：鼠标点过的格子会真的拿到焦点（那层 `tabIndex=0` 的 DIV），
-            而灰圈 `cell-focus` 画在 `td:focus-within` 上 —— 不交出去，方向键把活动格挪走之后，
-            **旧格子上会留一圈灰线**（用户报的"先前点击的单元格灰框没消失"）。
-            这里只交出"焦点在某个数据格里"的那一种；编辑框内的焦点在上面那道闸门已经让路了。
-
-            ⚠️ 必须在**移动之前**做（实测）：选值格的触发器是 base-ui 的组件，blur 它会走它自己的
-            focus-out 逻辑；放在移动之后会把这一次移动盖掉 —— 表现就是"焦点在选值格上按上下键，格子不动"。
-        */
-        const focusedCell = (document.activeElement as HTMLElement | null)?.closest?.("td")
-        if (focusedCell && tableRef.current?.contains(focusedCell)) (document.activeElement as HTMLElement).blur()
-
-        const current = tableInstanceRef.current
-        if (shift) {
-            /*
-                ‼️ Shift 扩选**也**自己算焦点角的新落点、自己写 state —— 不能用库的
-                `extendCellSelection`：它按**上一拍渲染时**的选区找"焦点角"（库的原子要下一次渲染才跟上），
-                连着按两下就会把焦点角按旧值算（实测：第二下把焦点挪回了起点那一行）。
-                这里从受控 state 的焦点角出发、沿着我们自己的行列序走一步。
-            */
-            const focusRow = modelRows.findIndex((row) => row.id === anchor.focusRowId)
-            const focusColumn = sheetColumns.indexOf(anchor.focusColumnId)
-            if (focusRow < 0 || focusColumn < 0) return // 角落解析不出（数据整体换过）：不动
-            const rowStep = direction === "up" ? -1 : direction === "down" ? 1 : 0
-            const columnStep = direction === "left" ? -1 : direction === "right" ? 1 : 0
-            const nextRow = modelRows[focusRow + rowStep]
-            const nextColumn = sheetColumns[focusColumn + columnStep]
-            if (!nextRow || !nextColumn) return // 到边 = 停住（数据格里，走不到行号列/表头）
-            current.setCellSelection((old) => [
-                ...old.slice(0, -1),
-                {...old[old.length - 1], focusRowId: nextRow.id, focusColumnId: nextColumn},
-            ])
-            return
-        }
-        if (mods === CTRL) {
-            /*
-                ‼️ 这里**不能**用"循环 `moveCellSelection` 直到不动"：库的选区原子在同一个事件里
-                不往前推（实测：连调两次，第二次读到的焦点还是第一拍之前那一格）—— 循环会当场退出，
-                只走一步。所以自己**一次算出落点**，再 `setFocusedCell` 一步到位。
-
-                落到哪一格：该方向那一行/列**最远的那一格**（没有合并单元格的表里，列块与行块可分离，
-                所以"行取最远 + 列取最远"就是那个角）。
-            */
-            const rowIndex = modelRows.findIndex((row) => row.id === anchor.anchorRowId)
-            const columnIndex = sheetColumns.indexOf(anchor.anchorColumnId)
-            if (rowIndex < 0 || columnIndex < 0) return
-            const forward = direction === "down" || direction === "right"
-            const targetRow =
-                direction === "up" || direction === "down"
-                    ? modelRows[forward ? modelRows.length - 1 : 0]
-                    : modelRows[rowIndex]
-            const targetColumn =
-                direction === "left" || direction === "right"
-                    ? sheetColumns[forward ? sheetColumns.length - 1 : 0]
-                    : sheetColumns[columnIndex]
-            current.setFocusedCell(targetRow.id, targetColumn)
-            /*
-                这一跳是"到边缘"，所以**顺手把那根滚动条挪到那一头**（不量任何东西）：
-                垂直跳 → `scrollTop` 归零 / 到底；水平跳 → `scrollLeft` 归零 / 到底。
-                裸方向键一步一格时**不碰**滚动条 —— 那种情况"露出来就行"（见 `scrollActiveIntoView`）。
-            */
-            const box = tableRef.current?.parentElement
-            if (box && (direction === "up" || direction === "down"))
-                box.scrollTop = direction === "up" ? 0 : box.scrollHeight
-            if (box && (direction === "left" || direction === "right"))
-                box.scrollLeft = direction === "left" ? 0 : box.scrollWidth
-            return
-        }
-        current.moveCellSelection(direction)
-    }
 
     /**
      * 按行号把**一整行**写成一个"整行宽"的区（Excel 的模型：行块本身就是个区，跟单元格区同住一处）。
@@ -987,13 +691,20 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      *     只绑行号格的 `mouseenter` 会在列边缘断掉。
      *
      * 两个监听都只在**真的在拖**（`dragRowRef` 非空）时才干活；不在拖时它们是空转（一次 ref 读）。
+     *
+     * ‼️ 这一段**只挂一次**：`rowIdAtY` / `extendFocusTo` / `lastColumnId` 都是"渲染期最新值"，
+     * 走下面那份 ref 镜像来读 —— 与表里别处（`tableInstanceRef` / `commandsRef` / `clickRowHandleRef`）
+     * 同一个机制。原来这里是无依赖 effect（每渲染摘挂四个全局监听），一个文件里两套机制并存。
      */
+    const gestureRef = useRef({rowIdAtY, extendFocusTo, lastColumnId})
+    gestureRef.current = {rowIdAtY, extendFocusTo, lastColumnId}
     useEffect(() => {
         const stop = () => {
             dragRowRef.current = null
             dragCellRef.current = false
         }
         const follow = (e: MouseEvent) => {
+            const {rowIdAtY, extendFocusTo, lastColumnId} = gestureRef.current
             /*
                 **行号拖**：按光标所在的 Y 算行 —— 鼠标移出行号那一列也接着拖。
                 **格拖**：数据格之间的扩展仍交给库的 `mouseenter`（Shift/Ctrl 的模式语义在它手里），
@@ -1039,22 +750,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
             document.removeEventListener("mousedown", rememberDown, true)
             document.removeEventListener("mousemove", markDragged, true)
         }
-    })
-
-    /*
-        方向键挂 `document`，而且是**捕获阶段**：真机上焦点常在 `<body>`（见 `handleArrowKey` 的
-        闸门那段），挂在容器上的 React `onKeyDown` 收不到。捕获阶段还能先于 base-ui 的列表导航决定
-        "这一次按键归谁" —— 判断在 `handleArrowKey` 内部，别的表选过东西时也不会被这张表抢走。
-
-        （`copy` / `paste` / `focus` / `Esc` 那几条**也是 document 级的**，但已归
-        `useClipboardHistory` —— 它们与剪贴板、复制源虚线是同一件事。）
-    */
-    useEffect(() => {
-        document.addEventListener("keydown", handleArrowKey, true)
-        return () => {
-            document.removeEventListener("keydown", handleArrowKey, true)
-        }
-    })
+    }, [])
 
     /*
         ‼️ 这里**不再有"还没读到 / 读失败"两种早退**：数据是外面给的（受控），读取的失败与"有没有
@@ -1086,7 +782,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     <AlertDialogFooter>
                         {/*
                             `size="sm"` 的页脚是**两列网格**（官方 sm 档如此），只放一个按钮会只占左半格。
-                            这里让它跨两列 → **占满底部**。只在调用点加类，`ui/alert-dialog.tsx` 保持官方原样。
+                            这里让它跨两列 → **占满底部**：是"这一处调用点怎么摆"，所以类加在调用点，
+                            不写进 `ui/alert-dialog.tsx`（那个组件要跟上游保持一致）。
                         */}
                         <AlertDialogAction className="col-span-2" onClick={() => setCopyHint("")}>
                             {t.ok}
@@ -1191,11 +888,9 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                         那等于每行都问一次库，51 行就是 51 次多余调用，而拖拽选区时每次 mousemove 都要
                         重跑这一整段（用户反馈"选择有点卡顿"就是这类每行重复调用堆出来的）。
                     */}
-                    {/* 分支列的清单与搜索提示 —— 那一格自己来取（见 `BranchPickContext`）。 */}
                     {/*
-                        ‼️ 下面两个 context 都是**为了省掉穿三层的 prop**（见 `model.ts`）：
-                        · `RevealContext`：进编辑时"跟随可视"。
-
+                        ‼️ 下面这几个 context 都是**为了省掉穿三层的 prop**（定义与理由见 `model.ts`）：
+                        跟随可视 / Enter 进编辑的登记口 / 分支列清单 / 各列的值格参数 —— 消费者全在叶子那两层。
                     */}
                     <RevealContext.Provider value={reveal}>
                     <EnterEditContext.Provider value={enterEditRegistry}>

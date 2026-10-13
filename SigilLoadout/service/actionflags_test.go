@@ -1,11 +1,11 @@
 package service
 
 import (
-	"reflect"
 	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"testing"
@@ -42,29 +42,11 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 		Values: map[string]string{
 			"config": "1", "startTime": "0.000000", "endTime": "0.016667",
 			"layerFlag": "4294967295", "flag0": "32", "flag1": "0", "sysFlag": "0", "freeArg": "0 0 0 0",
-			"flag0Effects": "允许攻击命中", "flag1Effects": "",
 		},
 	}
 	// ⚠️ `Values` 是 map，不能用 `!=` 比（map 不可比较）—— 用 DeepEqual。
 	if !reflect.DeepEqual(first, want) {
 		t.Fatalf("第一行解成了 %+v，want %+v", first, want)
-	}
-	// 掩码翻译：8192 = bit13、128 = bit7、134217728 = bit27（表里没弄清的那一位）。
-	for _, tc := range []struct {
-		index        int
-		flag0, flag1 string
-	}{
-		{5, "允许释放技能", ""},
-		{3, "", "消耗技能充能"},
-		{4, "", "未知bit27"},
-		{8, "允许移动取消", ""},
-	} {
-		if got := rows[tc.index].Values["flag0Effects"]; got != tc.flag0 {
-			t.Fatalf("第 %d 行的 Flag0Effects = %q，want %q", tc.index+1, got, tc.flag0)
-		}
-		if got := rows[tc.index].Values["flag1Effects"]; got != tc.flag1 {
-			t.Fatalf("第 %d 行的 Flag1Effects = %q，want %q", tc.index+1, got, tc.flag1)
-		}
 	}
 
 	// motion 会被拼进文件名，不认的写法一律挡在外面。
@@ -72,37 +54,6 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 		if _, err := service.LoadFlags(motion); err == nil {
 			t.Fatalf("motion %q 被当成了合法写法", motion)
 		}
-	}
-}
-
-// 位定义表：置起来的位按 bit 号从小到大用 " + " 连；还没弄清含义的位显示成 未知bitN；没有位就是空串。
-func TestFlagEffectsTranslatesTheMask(t *testing.T) {
-	for _, tc := range []struct {
-		mask  string
-		names [32]string
-		want  string
-	}{
-		{"0", flag0Names, ""},
-		{"", flag0Names, ""},
-		{"abc", flag0Names, ""},
-		{"1", flag0Names, "允许移动取消"},
-		{"10", flag0Names, "允许连接动画 + 允许跳跃取消"},
-		{"16", flag0Names, "未知bit4"},
-		{"8192", flag0Names, "允许释放技能"},
-		{"256", flag1Names, "未知bit8"},
-		{"4194304", flag1Names, "允许格挡"},
-		{"134217728", flag1Names, "未知bit27"},
-	} {
-		if got := flagEffects(tc.mask, tc.names); got != tc.want {
-			t.Fatalf("flagEffects(%q) = %q，want %q", tc.mask, got, tc.want)
-		}
-	}
-
-	// 全 1 的 32 位掩码：认得的位给名字、认不得的给 未知bitN，一位都不能漏。
-	const named = 16 // flag0Names 里有名字的位数
-	all := flagEffects("4294967295", flag0Names)
-	if got := strings.Count(all, "未知bit"); got != 32-named {
-		t.Fatalf("全 1 的掩码里有 %d 个 未知bitN，want %d", got, 32-named)
 	}
 }
 

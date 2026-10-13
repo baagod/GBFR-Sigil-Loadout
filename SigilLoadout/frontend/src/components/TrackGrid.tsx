@@ -1,4 +1,5 @@
 import {useMemo} from "react"
+import type {SortingState} from "@tanstack/react-table"
 
 import type {TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
 import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
@@ -67,45 +68,12 @@ const toRow = (
 /**
  * **两张轨表共用的外壳**：行已经由各自的适配函数变成基座要的形状，这里只负责"上屏"。
  *
- * ‼️ 原先两个网格各写一遍 `<ActionsTable>`（连 JSDoc 都是抄的），差异只有 `keys` / `columnOf` / `pickerOf`
- * —— 参数化掉这三样，`abilityNames`、`initialSorting`、`initialPinnedCount` 与七个回调的接线就只有一处。
- * 行值与行身份的换算留在各自那层（`TrackRow` 与 `FlagRow` 形状不同，见上面的 `toRow`）。
+ * ‼️ flags 与普通轨**只有"列怎么上屏"这一处不同**（`keys` / `columnOf` / `pickerOf`），其余
+ * （`abilityNames`、`initialSorting`、`initialPinnedCount` 与七个回调的接线）全在这一处写一次。
+ * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
-function TrackShell({rows, t, keys, columnOf, pickerOf, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
-    rows: ActionRow[]
-    t: Messages
-    keys: readonly string[]
-    columnOf?: (key: string) => ColumnSpec | undefined
-    pickerOf?: (key: string) => PickerConfig | undefined
-    onEdit?: (rowId: string, column: string, value: string | null) => void
-    onReorder: (from: number, to: number) => void
-    onSelectionChange?: (rowIds: string[]) => void
-    onCopyReady?: (copy: () => void) => void
-    onRowsReady?: (commands: RowCommands) => void
-    onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
-}) {
-    return (
-        <ActionsTable
-            t={t}
-            // 轨表没有 `abilityTag_` 那一列，名字表用不上。
-            abilityNames={{}}
-            rows={rows}
-            keys={keys}
-            columnOf={columnOf}
-            pickerOf={pickerOf}
-            // 行序严格等于数组顺序：这两张表都没有排序（动作表那档默认按 `id_` 排）。
-            initialSorting={[]}
-            // **不钉数据列**：这两张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
-            initialPinnedCount={0}
-            onEdit={onEdit}
-            reorder={onReorder}
-            onSelectionChange={onSelectionChange}
-            onCopyReady={onCopyReady}
-            onRowsReady={onRowsReady}
-            onRowsChange={onRowsChange}
-        />
-    )
-}
+/** 轨表没有 `abilityTag_` 那一列，名字表用不上 —— 用**模块常量**而不是 `{}`：`memo` 靠引用比。 */
+const NO_ABILITY_NAMES: Record<string, string> = {}
 
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
 export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
@@ -146,14 +114,19 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     const isFlags = table.kind === "flags"
     const columnSpec = useMemo(() => (isFlags ? columnOf(t) : undefined), [isFlags, t])
     return (
-        <TrackShell
+        <ActionsTable
             t={t}
+            abilityNames={NO_ABILITY_NAMES}
             rows={rowItems}
             keys={isFlags ? FLAG_COLUMNS : table.columns}
             columnOf={columnSpec}
-            pickerOf={isFlags ? (key) => flagPickers[key] : undefined}
+            pickerOf={isFlags ? flagPickerOf : undefined}
+            // 行序严格等于数组顺序：这两张表都没有排序（动作表那档默认按 `id_` 排）。
+            initialSorting={NO_SORTING}
+            // **不钉数据列**：这两张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
+            initialPinnedCount={0}
             onEdit={onEdit}
-            onReorder={onReorder}
+            reorder={onReorder}
             onSelectionChange={onSelectionChange}
             onCopyReady={onCopyReady}
             onRowsReady={onRowsReady}
@@ -162,25 +135,29 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     )
 }
 
+/** 行序严格等于数组顺序（不排序）—— 模块常量：别每次渲染新建一个数组（`keys` 那条约定同理）。 */
+const NO_SORTING: SortingState = []
+
+/**
+ * flags 的**值格参数**（只有 `flag0` / `flag1` 有）—— 模块常量：它经 context 下发，
+ * 每次渲染换个引用等于把消费它的那一整片格子全重渲。
+ */
+const flagPickerOf = (key: string): PickerConfig | undefined => flagPickers[key]
+
 /**
  * flags 的**数据键**：表头就是字段名，值原样上屏，改的就是写回的那个字段。
- * （`index` / `orig` / `removed` 是行身份，不参与取值，见 `cells`。）
+ * （`index` / `orig` / `removed` 是**行身份**，不是数据键，见 `toRow`。）
  */
 export const FLAG_KEYS = ["config", "startTime", "endTime", "layerFlag", "flag0", "flag1", "sysFlag", "freeArg"] as const
 
-/*
-    ‼️ **上屏的列比"数据键"多两列**：`frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0/flag1 的效果一览）
-    都是"同一份数据看第二眼"，不进 XML 也不参与改动比较。后端给的 `columns` 只有那 8 个数据键
-    （实测：删掉这份清单，表头就少了 frame 与 flagEffects 两列），所以这里要从 `FLAG_KEYS` 派生出来。
-*/
+/**
+ * **上屏的列比"数据键"多两列**：`frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0 / flag1 的效果一览）。
+ * 它们都是"同一份数据看第二眼"：列 id 另起一个，数据键与内容交给下面的 `columnOf` 说（见 `ColumnSpec`）——
+ * 不进 XML、不参与改动比较。所以要**从 `FLAG_KEYS` 派生**，不能只拿后端给的那 8 个数据键上屏。
+ */
 const FLAG_COLUMNS = FLAG_KEYS.flatMap((key) => (key === "endTime" ? [key, "frame"] : key === "flag1" ? [key, "flagEffects"] : [key]))
 
-/**
- * **上屏的列**：数据键之外多两列 —— `frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0 / flag1 的效果一览）。
- * 它们都是"同一份数据看第二眼"，所以列 id 另起一个、数据键/内容由下面的 `columnOf` 说（见 `ColumnSpec`）。
- */
-
-/** 帧 = 结束时间 × 60（和主面板那一列同一算法）。 */
+/** 帧 = 结束时间 × 60（整个界面只有这一处换算）。 */
 const frameOf = (endTime: string): string => {
     const end = Number(endTime)
     return Number.isFinite(end) ? String(Math.round(end * 60)) : ""
@@ -244,12 +221,6 @@ const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
     // `startTime` / `endTime` 的表头文案不在这里 —— 那是**所有表通用**的一条，基座兜底（`model.columnLabel`）。
     return undefined
 }
-
-/**
- * 一行的字段值。**按键表逐个取**（不 `as` 成字典）：于是"有哪些列"与"从哪儿取值"是同一份声明，
- * 行上将来多出的字段（`index` / `orig` / `removed` 那些行身份）也不会顺手被当成可编辑的值。
- */
-
 
 /**
  * `flag0` / `flag1` 是**多选、不带搜索框**的值格 —— 与动作表值格唯一的差别就是这两个字段

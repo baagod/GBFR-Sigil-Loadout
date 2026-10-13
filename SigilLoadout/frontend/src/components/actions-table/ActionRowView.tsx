@@ -20,7 +20,7 @@ import {
     handleCellClass,
     selectionClass,
 } from "./classes"
-import {columnKind, features, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, type PressFacts, snapshotKey} from "./model"
+import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, type PressFacts, snapshotKey} from "./model"
 import {isSingleCellBounds} from "./selection"
 
 /**
@@ -204,7 +204,6 @@ export const ActionRowView = memo(function ActionRowView({
     activeCellKey: string
     /** 把活动格滚进视野（稳定引用，只在活动格上绑）。 */
     scrollActiveIntoView: (el: HTMLTableCellElement | null) => void
-    /** 表格实例：按下时要问一句"现在的选区是不是收缩成了一格"（见 `PressFacts.wasOnlyCell`）。 */
     /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
     getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
@@ -312,7 +311,7 @@ export const ActionRowView = memo(function ActionRowView({
                         一旦可编辑就会把"触发"写回数据）。它决定能不能编辑、要不要焦点环。
                 */
                 const readonlyTint = kind === "readonly"
-                const notWritable = readonlyTint || columnOf?.(key)?.readonly === true
+                const notWritable = !writableColumn(key, columnOf)
                 /* 列自带的格类（见 `ColumnSpec.cell`：对齐那类"只改长相"的东西放这里，不必穿 prop）。 */
                 const columnCellClass = columnOf?.(key)?.cell ?? ""
                 /* 这一格的键（`snapshotKey`）算**一次**给下面两处共用，别每处再拼一遍。 */

@@ -15,7 +15,8 @@
 
     ⚠️ 与本文件的关系：`useClipboardHistory` 管**单元格区域**（TSV、系统剪贴板、虚线）；
     这里管**整行**（应用内行剪贴板、插到哪一行后面）。两者共存的唯一约定是
-    "**整行选中时，行级命令说了算**"（见 `ActionsTable` 里那两处 `isWholeRowSelection` 闸门）。
+    "**整行选中时，行级命令说了算**"（基座里那条上报的 `onSelectionChange` 就是这条界线：
+    整行选中 → 工具条那几个行命令接住；只是几格选中 → 归单元格那套）。
 */
 import {useRef} from "react"
 

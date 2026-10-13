@@ -31,10 +31,6 @@ import {charCodeOf} from "@/lib/actionflags"
 import type {CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
-// 共用的可编辑格是 @/components/EditableCell（它留在这里会形成 ActionsPanel ↔ GlobalParamPanel、
-// ActionsPanel → AnimationDetail → TrackGrid → ActionsPanel 两处环形依赖 ✗）；
-// 纯类名常量 CELL_INPUT / CELL_TEXT 在 @/lib/classnames（组件模块不再被只为取一个字符串而拉进来）。
-
 /**
  * 角色下拉。这一页的三份数据（动作表 / flags / FSM）**全都按角色走**，所以它是整页的选择，不是某一块的。
  *

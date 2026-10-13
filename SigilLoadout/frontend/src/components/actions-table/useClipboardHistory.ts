@@ -20,7 +20,6 @@ import type {CellSelectionBounds} from "@tanstack/react-table"
 import {type ClipboardEvent, parseTsv, planPaste, toTsv} from "./clipboard"
 import {
     acceptPaste,
-    columnKind,
     parseSnapshotKey,
     snapshotKey,
     shownValue,
@@ -33,7 +32,7 @@ import {
  * 这里用到的表 API。**故意只声明用得到的那几个**，而不是 import 库的整个表类型：
  * 本模块只消费这一小块（选区边界 / 行模型 / 写回选区），声明宽了反而看不出契约。
  */
-export type ClipboardTable = {
+type ClipboardTable = {
     getRowModel: () => {rows: {id: string; original: ActionRow; getAllCells: () => {column: {id: string}}[]}[]}
     getCellSelectionBounds: () => CellSelectionBounds[]
     selectCellRange: (range: {
@@ -52,7 +51,7 @@ export function useClipboardHistory({
     rowsRef,
     tableRef,
     branchIds,
-    readonlyColumns,
+    writable,
     multiAreaCopyText,
 }: {
     /**
@@ -69,8 +68,11 @@ export function useClipboardHistory({
     tableRef: {current: ClipboardTable}
     /** 分支列那份清单（粘贴校验用）；不做分支列时传空集即可。 */
     branchIds: ReadonlySet<string>
-    /** **不许写的列**（调用方标了 `readonly` 的那些，见 `ColumnSpec`）：粘贴不收（见下面那段）。 */
-    readonlyColumns?: ReadonlySet<string>
+    /**
+     * **这一列能不能写**（判据只有 `model.writableColumn` 一份）—— 不许写的列整列当"没有这一格"：
+     * 往它们上面粘等于写一个**没人认的键**（帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。
+     */
+    writable: (columnId: string) => boolean
     /** 多片跨行又跨列时那句提示（i18n）。 */
     multiAreaCopyText: string
 }) {
@@ -272,7 +274,7 @@ export function useClipboardHistory({
      * 结果基座这条路根本没跑起来，表现就是"复制了却没有虚线、也没法再复制"。
      */
     const copyArea = useCallback(
-        (写: (text: string) => void) => {
+        (emit: (text: string) => void) => {
             /*
                 ⚠️ 这里**必须**把两件事分开（踩过）：
                   · 压根没有单元格选区（比如只选了行）→ **什么都不做**（不写剪贴板、不提示）；
@@ -288,7 +290,7 @@ export function useClipboardHistory({
             }
             setCopyHint("")
             if (plan.grid.length === 0) return
-            写(toTsv(plan.grid))
+            emit(toTsv(plan.grid))
             /*
                 顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
                 新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
@@ -369,16 +371,14 @@ export function useClipboardHistory({
             const modelRows = tableRef.current.getRowModel().rows
             const startRow = bounds.minRowIndex
             const startCol = bounds.minColumnIndex
-            // 只读列在这张映射表里是 `null` —— "跳过只读列、越界丢弃"两件事因此都在这里定死；
+            // 不许写的列在这张映射表里是 `null` —— "跳过不许写的列、越界丢弃"两件事因此都在这里定死；
             // 算式本身（铺几份、铺到哪）归 `planPaste`，可以脱离组件单独测。
             const plan = planPaste({
                 block: parseTsv(text),
                 rows: modelRows.map((row) => ({
                     rowId: row.id,
                     cells: row.getAllCells().map((cell) =>
-                        columnKind(cell.column.id) === "readonly"
-                            ? null
-                            : {columnId: cell.column.id, current: row.original.values[cell.column.id] ?? ""},
+                        writable(cell.column.id) ? {columnId: cell.column.id, current: row.original.values[cell.column.id] ?? ""} : null,
                     ),
                 })),
                 start: {row: startRow, col: startCol},
@@ -387,16 +387,12 @@ export function useClipboardHistory({
             if (!plan.range) return
 
             /*
-                **哪些格收下这次粘贴**，两条独立的规矩：
-                  · **选值格的值要在清单里**（用户口径：对不上就当没粘过 —— 不提示、也不占一步撤销；
-                    清单有两份，`controlTypeHash_` 固定 53 项、`branchXAtk_` 用当前表的 `id_` 集合）；
-                  · **只读列一律跳过**。这条有两条路，合起来刚好全覆盖：`planPaste` 那一侧把
-                    `kind === "readonly"` 的列整列当 `null`（动作表的 `id_` / `abilityTag_`），这里再挡
-                    调用方标的 `readonlyColumns`（轨表的 `config` / 帧列 / 效果列 —— 往它们上面粘等于写一个
-                    没人认的键，帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。
+                **哪些格收下这次粘贴**：选值格的值要**在清单里**（用户口径：对不上就当没粘过 ——
+                不提示、也不占一步撤销；清单有两份，`controlTypeHash_` 固定 53 项、`branchXAtk_` 用当前表的
+                `id_` 集合）。只读列上面那张表已经整列滤掉了，这里不再判第二遍。
                 其余一律放行（用户口径：**粘贴无任何限制**）。
             */
-            const writes = plan.writes.filter((w) => acceptPaste(w.columnId, w.value, branchIds) && !readonlyColumns?.has(w.columnId))
+            const writes = plan.writes.filter((w) => acceptPaste(w.columnId, w.value, branchIds))
             if (writes.length === 0) return
 
             /*
@@ -418,7 +414,7 @@ export function useClipboardHistory({
                 focusColumnId: modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
             })
         },
-        [branchIds, edit, tableRef],
+        [branchIds, edit, tableRef, writable],
     )
 
     /**
@@ -487,14 +483,14 @@ export function useClipboardHistory({
     /*
         `copySelection` 也交出去：调用方那个「复制」按钮要靠它走**同一条路**（否则按钮复制出来的东西
         没有那圈虚线 —— 用户报的轨表问题就是这个）。Ctrl+C 那条走 `handleCopy`（它拿得到事件对象）。
+
+        ‼️ 引用必须**稳**（`useCallback` 按 `copyArea`）：调用方把它塞进 effect 的依赖里
+        （见 `ActionsTable` 交 `onCopyReady` 那一段）—— 每渲染换个新函数就等于每渲染回调一次调用方。
     */
-    return {
-        copyHint,
-        setCopyHint,
-        copySource,
-        clearCopySource,
-        copySelection: () => copyArea((text) => void navigator.clipboard?.writeText(text)),
-        edit,
-        handleUndo,
-    }
+    const copySelection = useCallback(
+        () => copyArea((text) => void navigator.clipboard?.writeText(text)),
+        [copyArea],
+    )
+
+    return {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit}
 }

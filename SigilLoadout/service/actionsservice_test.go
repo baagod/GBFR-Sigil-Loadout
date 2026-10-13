@@ -102,6 +102,31 @@ func sampleFlags(t *testing.T, cfg actionConfig, motion string) {
 	}
 }
 
+/*
+setFlagValue 写 flags 行的某一栏，并**守住这一栏真的存在**。
+
+为什么需要：行数据是 `map[string]string`，键名打错一个字符**不会报错** —— 写进去只是多一个没人读的键，
+而"我改了一个值"这条前提就悄悄变成假的（读那一侧同理：读回空串，比较也就恒成立）。测试照样绿。
+所以取值/写值都经这一对，把"键名"这件事变成会报错的东西。
+*/
+func setFlagValue(t *testing.T, row *FlagRow, key, value string) {
+	t.Helper()
+	if _, ok := row.Values[key]; !ok {
+		t.Fatalf("flags 行里没有 %q 这一栏（键名写错了？Values 是 map，写错只会多一个没人读的键）", key)
+	}
+	row.Values[key] = value
+}
+
+/** flagValue 读 flags 行的某一栏，同样守住"这一栏存在"。 */
+func flagValue(t *testing.T, row FlagRow, key string) string {
+	t.Helper()
+	value, ok := row.Values[key]
+	if !ok {
+		t.Fatalf("flags 行里没有 %q 这一栏（键名写错了？Values 是 map，读错只会读到空串）", key)
+	}
+	return value
+}
+
 // strPtr 造一个"改过的值"：ActionField.Value 是 *string，nil 表示这一格没被编辑过。
 func strPtr(s string) *string { return &s }
 
@@ -598,10 +623,10 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	}
 	// **真改一个值**：只"打开又保存"不算改动（那种情况与原表逐字节相同，同样会被清掉），
 	// 不改成实际不同的值就测不出"只搬碰过的 motion"这一条。
-	if rows[0].Values["flag0"] == "0" {
-		rows[0].Values["flag0"] = "1"
+	if flagValue(t, rows[0], "flag0") == "0" {
+		setFlagValue(t, &rows[0], "flag0", "1")
 	} else {
-		rows[0].Values["flag0"] = "0"
+		setFlagValue(t, &rows[0], "flag0", "0")
 	}
 	if err := service.SaveFlags("3451", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)

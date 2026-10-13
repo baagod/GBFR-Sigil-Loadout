@@ -160,10 +160,9 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
 
         受控是让行为不依赖 Accordion 内部 store；keepMounted 保证收起时面板的 DOM 不被卸载。
 
-        **但这两条都不是"切页回来又展开"的根因**。真正的根因在 ui/accordion.tsx 的 AccordionContent：
-        shadcn 生成的那行用了 `animate-accordion-down/up`，而 Tailwind v4 早已不内置这两个关键帧
-        （style.css 里没有、构建产物 CSS 里也没有），于是收起/展开一直是硬切，被 display:none 藏过
-        之后再显示回来就要重新量一次高度——那才是抖。改成官方文档的 transition-[height] 写法即可。
+        **但这两条都不是"切页回来又展开"的根因**：别再照"Accordion 高度硬切"去改 `ui/accordion.tsx`
+        —— 那个组件现在是**上游原样**（`data-open:animate-accordion-down`），关键帧由 tw-animate-css 提供
+        （构建产物 CSS 里确有 `@keyframes accordion-down/up`），所以当初那条因果链不成立。
     */
     const [expanded, setExpanded] = useState<Set<string>>(new Set())
     const toggleExpanded = (key: string) =>
@@ -195,9 +194,8 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     /*
         这一页自己就是滚动的那个盒子（h-full min-h-0 flex-col，同另外三页）。
 
-        曾经在这里加过一段"用 ResizeObserver 把 scrollTop 放回去"的补救代码，用来绕过切页时滚动
-        被夹到 0 的现象。撤掉了：那是 Accordion 高度硬切（见 ui/accordion.tsx 的说明）造成的连带
-        现象，根因修好之后浏览器自己的滚动锚定就够了，不需要多一层。
+        别再往里加"用 ResizeObserver 把 scrollTop 放回去"那种补救（加过、撤了）：切页时滚动被夹到 0
+        的现象已经不再复现，浏览器自己的滚动锚定就够了 —— 多一层补救只是多一份要维护的状态。
     */
 
     // 挂载时读一次：骨架、当前语言的文案、编辑列表。三者到齐之前不画（更不写盘）。

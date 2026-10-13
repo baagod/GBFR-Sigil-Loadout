@@ -318,7 +318,8 @@ export default function App() {
                 // Esc 归谁：打开的浮层，以及把 Esc 定义成"放开这个框"的数值框（SlotInput，
                 // 见它的 onKeyDown）——那里不该同时把整个窗口藏到托盘去。
                 //
-                // ⚠️ `[data-esc-own]` 是 SlotInput 与**值格**自己带的（跟着框走）：值格的下拉开着时
+                // ⚠️ `[data-esc-own]` 是**每一处"自己管 Esc"的框**自己带的（跟着框走）：`SlotInput`、
+                // 共用可编辑格 `EditableCell`、动作表的 `Cell`、选值格 `CellPick`。值格的下拉开着时
                 // 焦点可能就在格子那层 div 上（它在 `<td>` 里、不在 portal 的弹层里），只按
                 // combobox-content 判会把这次 Esc 误判成"不在浮层"，于是连窗口一起藏掉。
                 // 弹层本身也在 `[data-slot="combobox-content"]` 里，两处都覆盖到。

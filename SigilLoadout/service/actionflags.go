@@ -24,74 +24,13 @@ XML 的形状（对面那个工具的样子，属性顺序也就是写出时的�
 样写出去——"1.46667" 与 "1.466670" 是同一份数值，却不是同一份字节。
 */
 
-// FlagRow 是 flags 轨里的一行 —— 也就是界面上的一行。Index 是它在轨里的位置（0 起）：界面拿它认行，
-// 写回时按**切片自己的顺序**写（删了一行之后剩下的还是原顺序）。
-//
-// Flag0Effects / Flag1Effects 是那两个掩码翻译过来的中文（见 flagEffects），给界面直接显示；
-// 写回时**不看它们**，改掩码要改 Flag0 / Flag1 本身。
+// FlagRow 就是**一条普通的轨行**（`TrackRow`）：flags 不再有自己的形状。
+// 那几栏（config / startTime / … / flag0 / flag1）都放进 `Values`，与别的轨同一套规矩 ——
+// 于是界面不必再为它维护第二种行模型，`carry` 那个搬运身份的信封也可以消失。
 //
 // Orig / Removed 是**界面用的行身份**（见 actionrowmarks.go）：对应原版第几行、是否被"假删除"。
 // 它们只跟着改动存进 track_edits.json，不进 XML。
-// FlagRow 就是**一条普通的轨行**（`TrackRow`）：flags 不再有自己的形状。
-// 那几栏（config / startTime / … / flag0Effects / flag1Effects）都放进 `Values`，与别的轨同一套规矩 ——
-// 于是界面不必再为它维护第二种行模型，`carry` 那个搬运身份的信封也可以消失。
 type FlagRow = TrackRow
-
-// flag0Names / flag1Names 是位定义表：**下标就是 bit 号**，空串 = 还没弄清含义的那一位（给界面时
-// 写成 未知bitN，而不是把这一位藏起来）。两张表都到 bit 31 —— 游戏那两个字段是 32 位。
-var (
-	flag0Names = [32]string{
-		0:  "允许移动取消",
-		1:  "允许连接动画",
-		2:  "允许闪避",
-		3:  "允许跳跃取消",
-		5:  "允许攻击命中",
-		6:  "允许 Y 输入",
-		11: "无敌帧",
-		13: "允许释放技能",
-		16: "重启重力",
-		17: "降低重力",
-		19: "命中后触发 branchAtkHit",
-		22: "拔出武器",
-		24: "允许 X 输入",
-		27: "霸体 / 击退抗性",
-		29: "允许转身",
-		30: "关闭后续攻击窗口",
-	}
-	flag1Names = [32]string{
-		0:  "位移 · 招架互动",
-		2:  "释放 Buff",
-		3:  "SBA 终结 · 允许连锁",
-		4:  "调用 FSM 技能",
-		7:  "消耗技能充能",
-		17: "长按输入窗口",
-		18: "精准输入窗口",
-		19: "精准攻击执行",
-		20: "激活 Vane 格挡",
-		22: "允许格挡",
-		23: "格挡 · 招架判定帧",
-	}
-)
-
-// flagEffects 把掩码翻成含义：置起来的位按 bit 号从小到大用 " + " 连起来，一位都没有就是空串。
-// 认不出来的写法（这几格是文本框，手滑打进去的东西）当 0 处理：翻不出含义，但那一格照原样留着。
-func flagEffects(mask string, names [32]string) string {
-	bits, err := strconv.ParseUint(strings.TrimSpace(mask), 10, 64)
-	if err != nil {
-		return ""
-	}
-	meanings := make([]string, 0, 4)
-	for bit, name := range names {
-		if bits&(1<<uint(bit)) == 0 {
-			continue
-		}
-		if name == "" {
-			name = fmt.Sprintf("未知bit%d", bit)
-		}
-		meanings = append(meanings, name)
-	}
-	return strings.Join(meanings, " + ")
-}
 
 // 读那一步的形状。属性名对上就行，顺序不关读的事（写出才要紧，而那一步是自己拼字符串）。
 type flagsXML struct {
@@ -134,16 +73,14 @@ func parseFlagsXML(raw []byte) ([]FlagRow, error) {
 		rows = append(rows, FlagRow{
 			Index: i,
 			Values: map[string]string{
-				"config":       s.Config,
-				"startTime":    s.StartTime,
-				"endTime":      s.EndTime,
-				"layerFlag":    s.LayerFlag,
-				"flag0":        s.Flag0,
-				"flag1":        s.Flag1,
-				"sysFlag":      s.SysFlag,
-				"freeArg":      s.FreeArg,
-				"flag0Effects": flagEffects(s.Flag0, flag0Names),
-				"flag1Effects": flagEffects(s.Flag1, flag1Names),
+				"config":    s.Config,
+				"startTime": s.StartTime,
+				"endTime":   s.EndTime,
+				"layerFlag": s.LayerFlag,
+				"flag0":     s.Flag0,
+				"flag1":     s.Flag1,
+				"sysFlag":   s.SysFlag,
+				"freeArg":   s.FreeArg,
 			},
 		})
 	}

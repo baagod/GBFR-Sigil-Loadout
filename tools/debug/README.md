@@ -18,6 +18,10 @@ node tools/debug/cdp-probe.mjs --clip 0,140,640,200 --scale 4 --shot zoom.png
 
 ⚠️ `deploy.ps1`（正式部署）**不带**调试端口，跑过它之后 CDP 就连不上了 —— 要再量就重新跑一次上面的第 1 步。
 
+> **两个工具的分工**：通用页面测试走 `agent-browser`（见 `AGENTS.md`：`agent-browser --cdp 9222 …`）；
+> 量**这张表的布局**用上面那个 `cdp-probe.mjs` —— 它是本仓库自己的，多 `--clip/--scale` 放大截图与
+> 固定的 MEASURE JSON。两者连的是同一个 CDP 端口。
+
 ## 为什么没有"独立调试页"
 
 曾经有一个：`entry.tsx` + `index.html` + `serve.mjs` + `build.ps1`，即"只渲染 `ActionsTable`、不启整个应用，

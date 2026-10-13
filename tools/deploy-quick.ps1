@@ -5,7 +5,8 @@ param(
     # 改的只是 .tsx/.css 时用它：跳过 tsc（约 4 秒）。默认仍然跑，宁慢一点也别把类型错误带进去。
     [switch]$NoTypecheck,
     # 带着 CDP 端口启动工具（见 main.go 的 debugBrowserArgs）：布局/渲染出问题时，可以直接连进去
-    # 量真实 DOM（`agent-browser --cdp <port> ...`），不用让人截图、也不用按 F12 报数。
+    # 量真实 DOM —— 通用页面测试走 `agent-browser --cdp <port>`（见 AGENTS.md），量这张表的布局
+    # 走本仓的 `node tools/debug/cdp-probe.mjs`（它多 `--clip/--scale` 放大截图）。
     [int]$DebugPort = 0
 )
 
@@ -46,10 +47,10 @@ function Stop-Tool {
 
 Stop-Tool
 
-# 部署完那次核对（见下）需要一个"这次构建从什么时候开始"的锚点，就在这儿取。
-# 不能拿"现在 - LastWriteTime < 30s"当判据 —— assets\ 那十几兆拷完、或盘慢的时候早过了 30 秒，
-# 明明是成功的部署却报"没生效"（实测踩过）。比时间戳没有这个假设。
-$started = Get-Date
+# 部署完那次核对（见下）要一个"改没改过"的锚点：**构建之前**那一刻的写入时间。就在这里取。
+# 比时间戳窗口（"这次构建从几点开始"）准：那个写法要给 NTFS 的时间粒度留余量，而余量本身就是一个
+# "恰好落在窗口里的旧文件会被当成新的"的口子（见下面的核对那段）。
+$beforeExeMtime = if (Test-Path -LiteralPath $exe) { (Get-Item -LiteralPath $exe).LastWriteTimeUtc } else { $null }
 
 Push-Location $toolDir
 try {
@@ -77,17 +78,14 @@ Copy-Item -Path (Join-Path $toolDir 'assets\*') -Destination $assetsDir -Recurse
 # 环节（go build 有没有真写成、工具进程有没有让出文件）—— 光看那句话分不出"换掉了"与"还是旧的那份"。
 # 实测踩过：界面改完怎么刷新都不变，查半天才发现 Mods 里的 exe 是旧的。
 #
-# 判据是"$exe 的写入时间落不落在这次构建的窗口里"，不是跟某个基准哈希对比：`go build -o $exe` 是**直接
-# 写到 mod 目录**的（这一步本身就是部署），没有一个"构建产物"可以拿来比对 —— 第一版跟
-# `$toolDir\SigilLoadout.exe` 比，那是上一次 build-release 留下的旧文件，于是每次必误报；第二版改成
-# "30 秒内算新"，又会在慢盘/大 assets 上误报（见开头）。
-#
-# ⚠️ 窗口下界要比 $started 早 2 秒：NTFS 的时间戳有粒度，而这个脚本自己的构建经常不到 2 秒就写完，
-#    那时 `-o $exe` 拿到的时间戳可能落在 $started 之前一点点 —— 用 `mtime -lt $started` 判会把成功报成失败。
+# 判据是"**这份 exe 的写入时间，比开工之前那一刻更新**"：`go build -o $exe` 是**直接写到 mod 目录**的
+# （这一步本身就是部署），所以没有第二个"构建产物"可以拿来比对（第一版跟 `$toolDir\SigilLoadout.exe`
+# 比，那是上一次 build-release 留下的旧文件，于是每次必误报）。
+# ⚠️ 不写"落在某个时间窗口里"那种判据：窗口要留余量，而余量就是"旧文件恰好落在里面"的口子。
 $postExe = Get-Item -LiteralPath $exe
 $age = (Get-Date) - $postExe.LastWriteTime
-if ($postExe.LastWriteTime -lt $started.AddSeconds(-2)) {
-    throw "$exe 不是这次构建写出来的（最后写入 $([math]::Round($age.TotalSeconds)) 秒前，构建开始于 $($started.ToString('HH:mm:ss'))）—— go build 或覆盖没生效，别只看'完成'那两个字。"
+if ($beforeExeMtime -and $postExe.LastWriteTimeUtc -le $beforeExeMtime) {
+    throw "$exe 的写入时间没有往前走（还是开工前那一份：$($beforeExeMtime.ToString('HH:mm:ss')) UTC）—— go build 或覆盖没生效，别只看'完成'那两个字。"
 }
 
 if ($DebugPort -gt 0) {
@@ -131,8 +129,11 @@ catch {
     Write-Output '  （窗口没能提到前台，不影响部署）'
 }
 Write-Output "快速部署完成：$exe"
-Write-Output "  exe 刚刚重写（$([math]::Round($age.TotalSeconds)) 秒前），哈希 $((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.Substring(0, 16))"
-if ($DebugPort -gt 0) { Write-Output "  CDP 调试端口已开：http://127.0.0.1:$DebugPort（agent-browser --cdp $DebugPort …）" }
+Write-Output "  exe 刚刚重写（$([math]::Round($age.TotalSeconds)) 秒前）"
+if ($DebugPort -gt 0) {
+    # ⚠️ 这句里**不要用反引号**（PowerShell 双引号串里它是转义符，会把路径吃掉一个字符）。
+    Write-Output "  CDP 调试端口已开：http://127.0.0.1:$DebugPort —— 量布局走 tools\debug\cdp-probe.mjs，通用页面测试走 agent-browser --cdp $DebugPort。"
+}
 # ⚠️ dist\ 里那个 zip 还是上一次 build-release 的：这一条路不碰它。下次跑 tools\deploy.ps1
 # （它取 dist 里最新的 zip）会把这一次的改动**覆盖回去**。要出包/要发版就补一次 build-release.ps1。
 Write-Output "注意：dist\ 里的 zip 未更新（下次 deploy.ps1 会覆盖回去）；要出包请跑 tools\build-release.ps1。"

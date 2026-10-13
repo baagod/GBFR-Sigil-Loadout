@@ -15,8 +15,9 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
+import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {cellAt, clipboardStub, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
+import {cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, pressTrigger, selectCell, stubRevealGeometry, tick, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -50,77 +51,22 @@ function pickRow(id: string, original: string, changed?: string, branch?: {origi
 const {renderTable, setRows} = useTableHarness()
 
 /**
- * 列表开着吗 —— 认**浮层里真实存在的列表项**（`data-popup-open` 那类属性在触发器上并不存在，
- * 拿它当判据会恒假、把用例写成"永远通过"）。
- */
-const isPickOpen = () => items().length > 0
-
-/**
  * 派发一次滚动（滚轮滚数据区那一类）。
  *
  * ⚠️ 注意"哪一次算用户滚的"：进编辑时"跟随可视"也会派发一次滚动，而那条"谁一滚就收起"的规则会
- * 把**我方那一次**让过去（契约见 `model.ts` 的 `isRevealScrolling`）。所以要测"用户滚动照旧收起"，
+ * 把**我方那一次**让过去（契约见 `model.ts` 的 `RevealSession`）。所以要测"用户滚动照旧收起"，
  * 得先把那一次让掉 —— 有的用例显式派发两次，就是这么来的。
  */
 const scrollOnce = () => fireEvent.scroll(document)
 
-/** 让浮层有机会挂上 —— base-ui 是**异步**挂弹层的，所以"没打开"必须等过这一拍才算数。 */
-const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
-
-/**
- * 打开某一格的列表 —— 与普通格子**同一条"先选后编"**，所以**最多按两下**：
- * 没选中（或不在唯一选中态）时第一下只算选中，第二下才展开；已经选中的话第一下就开了。
- */
-async function openPick(cell: HTMLElement) {
-    /*
-        ‼️ **按几下由闸门的输入决定，不去"观察弹层开没开"** —— 那是竞态：弹层异步挂，
-        第一下其实开了、只是挂得慢，再按一下反而把它**关掉**（实测：3 份全量并行时这条必红）。
-
-        闸门是"先选后编"（`press.wasSelected && press.wasOnlyCell`）：格子**已经是唯一选中**时，
-        第一下就展开；否则第一下只算选中、要按第二下。后者中间那一拍是给 React 落"选中"状态。
-    */
-    const isOnlySelected = cell.classList.contains("cell-selected") && document.querySelectorAll("td.cell-selected").length === 1
-    pressPick(cell)
-    if (!isOnlySelected) {
-        await tick()
-        pressPick(cell)
-    }
-    await waitFor(() => expect(isPickOpen()).toBe(true))
-}
-
-/** 按一下这一格（`td` 的 mousedown 会顺手记下 `PressFacts`）。 */
-function pressPick(cell: HTMLElement) {
-    pressTrigger(cell.querySelector(".cell-pick-mark")!)
-}
-
-/** 一下完整的真实点击序列：pointerdown → mousedown → pointerup → mouseup → click（都落在触发器那层）。 */
-function pressTrigger(trigger: Element) {
-    fireEvent.pointerDown(trigger, {button: 0, pointerType: "mouse"})
-    fireEvent.mouseDown(trigger, {button: 0})
-    fireEvent.pointerUp(trigger, {button: 0, pointerType: "mouse"})
-    fireEvent.mouseUp(trigger, {button: 0})
-    fireEvent.click(trigger)
-}
-
 /** 单独渲染 `CellPick`（没有 `<td>`、也就没有 `PressFacts`）时用的闸门：永远"该进编辑"、没拖过。 */
-const openGate = {shouldEditOnClick: () => true, dragged: {current: false}, active: false, enterEditRef: null}
-
-/** 列表项（浮层挂在 body 上，所以从 `document` 找）。 */
-const items = () => [...document.querySelectorAll<HTMLElement>('[data-slot="combobox-item"]')]
+const openGate = {shouldEditOnClick: () => true, dragged: {current: false}}
 
 /** 用 mousedown + mouseEnter 拉一个选区（起点就是第一格）。 */
 function selectRange(container: HTMLElement, from: [number, number], to: [number, number]) {
     fireEvent.mouseDown(cellAt(container, ...from))
     fireEvent.mouseEnter(cellAt(container, ...to))
     fireEvent.mouseUp(document)
-}
-
-/** 点列表里含某段文字的那一项（真实顺序：pointerdown → mouseup → click）。 */
-function clickItem(text: string) {
-    const item = items().find((el) => el.textContent?.includes(text))!
-    fireEvent.pointerDown(item, {button: 0, pointerType: "mouse"})
-    fireEvent.mouseUp(item, {button: 0, pointerType: "mouse"})
-    fireEvent.click(item)
 }
 
 describe("动作表 · 选值格（controlTypeHash_）", () => {
@@ -131,13 +77,12 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const cell = cellAt(container, 0, PICK_COL)
         expect(cell.textContent).toBe("4087152117")
         // 箭头 = 库触发器自带的 `ChevronDownIcon`（一个格子里只有一个）。
-        const mark = cell.querySelector(".cell-pick-mark")!
+        const mark = cell.querySelector(`.${PICK_MARK}`)!
         const arrow = mark.querySelector("svg")!
         expect(arrow.getAttribute("class")).toContain("pointer-events-none")
         expect(mark.querySelectorAll("svg")).toHaveLength(1)
         // 文本与箭头之间至少 4px、箭头距右边 8px（10 位数字一路顶到箭头上就不好看了）。
-        expect(mark.className).toContain("gap-1")
-        expect(mark.className).toContain("pr-2!")
+        expect(mark.className).toContain(PICK_CELL)
         /*
             **默认什么都没有**：这一格照旧带 `cell-focus`（与别的可编辑格同一个类 —— 环由
             `td:focus-within` 与"列表真的开着"两态决定），但**不挂任何"常亮"的开关**：没有
@@ -145,7 +90,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
             所以还没点它的时候，格子上只有单元格自己的格线。
         */
         expect(cell.className).toContain("cell-focus")
-        expect(cell.querySelector(".cell-pick-mark")!.hasAttribute("data-popup-open")).toBe(false)
+        expect(cell.querySelector(`.${PICK_MARK}`)!.hasAttribute("data-popup-open")).toBe(false)
     })
 
     /*
@@ -166,7 +111,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
 
         // 第二下：按下之前这一格是**唯一**选中格 → 展开。
         pressPick(cell)
-        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
     })
 
     /*
@@ -189,7 +134,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         expect(isPickOpen()).toBe(false)
 
         /* 焦点停在触发器上（鼠标点过就会）—— 这是坏掉时的那条路径。 */
-        const trigger = cell.querySelector<HTMLElement>(".cell-pick-mark")!
+        const trigger = cell.querySelector<HTMLElement>(`.${PICK_MARK}`)!
         trigger.focus()
         fireEvent.keyDown(trigger, {key: "ArrowDown"})
         await tick()
@@ -212,7 +157,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await tick()
         expect(isPickOpen()).toBe(false)
 
-        const trigger = cell.querySelector<HTMLElement>(".cell-pick-mark")!
+        const trigger = cell.querySelector<HTMLElement>(`.${PICK_MARK}`)!
         trigger.focus()
         fireEvent.keyDown(trigger, {key: "Enter"})
         await tick()
@@ -258,9 +203,13 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
             /* ① 前提：几何生效了、"跟随可视"确实滚过 —— 否则下面两步都是空转。 */
             expect(scrolled.length).toBeGreaterThan(0)
 
-            /* ② 跟随可视那一下（真机上排在展开之后的下一帧）。 */
+            /* ② 跟随可视那一下（真机上排在展开之后的下一帧）。
+               ‼️ 这一条问的是"**没**被收起"，所以要**确定性地**判：`waitFor` 会在 1 秒里反复轮询，
+               "关掉又重开"也算通过 —— 那是把负向断言写成恒真。给它一拍落地（真关了的话这一拍之后
+               弹层就没了），再同步断言。 */
             container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
-            await waitFor(() => expect(isPickOpen()).toBe(true))
+            await tick()
+            expect(isPickOpen()).toBe(true)
 
             /* ③ 用户真滚：规则照旧生效。 */
             container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
@@ -318,7 +267,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await tick()
         expect(isPickOpen()).toBe(false)
 
-        const trigger = cell.querySelector(".cell-pick-mark")!
+        const trigger = cell.querySelector(`.${PICK_MARK}`)!
         fireEvent.pointerDown(trigger, {button: 0, pointerType: "mouse", clientX: 0, clientY: 0})
         fireEvent.mouseDown(trigger, {button: 0, clientX: 0, clientY: 0})
         fireEvent.mouseMove(document, {clientX: 10, clientY: 0}) // 这一下按下之后挪了 10px = 拖
@@ -334,11 +283,11 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
 
         // 列表项**只有值本身**（含义在 docs/action/ControlType全表.md，界面上不搬）。
-        expect(items()[0].textContent).toBe("4087152117")
-        const selected = items().filter((el) => el.getAttribute("aria-selected") === "true")
+        expect(pickItems()[0].textContent).toBe("4087152117")
+        const selected = pickItems().filter((el) => el.getAttribute("aria-selected") === "true")
         expect(selected).toHaveLength(1)
         expect(selected[0].textContent).toBe("4087152117")
     })
@@ -348,15 +297,15 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
         clickItem("1253898414")
         await waitFor(() => expect(cellAt(container, 0, PICK_COL).textContent).toBe("1253898414"))
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
         // 这一次：当前值 1253898414（第一项）、原值 4087152117（第二项、灰）。
-        expect(items()[0].textContent).toBe("1253898414")
-        expect(items()[1].textContent).toBe("4087152117")
+        expect(pickItems()[0].textContent).toBe("1253898414")
+        expect(pickItems()[1].textContent).toBe("4087152117")
     })
 
     it("列表顺序：当前值 → 原值 → 其余（其余照基础表的用量降序）；原值灰字", async () => {
@@ -365,9 +314,9 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
 
-        const text = items().map((el) => el.textContent)
+        const text = pickItems().map((el) => el.textContent)
         expect(text[0]).toBe("1253898414") // 当前值
         expect(text[1]).toBe("4087152117") // 原值（紧跟其后）
         /*
@@ -379,8 +328,8 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         expect(text).toHaveLength(CONTROL_TYPES.length) // 一项不多、一项不少
 
         // 原值那一项灰字；当前值那一项不灰。
-        expect(items()[1].className).toContain("text-[#a0a0a0]!")
-        expect(items()[0].className).not.toContain("text-[#a0a0a0]!")
+        expect(pickItems()[1].className).toContain("text-[#a0a0a0]!")
+        expect(pickItems()[0].className).not.toContain("text-[#a0a0a0]!")
     })
 
     it("**没改过**也标原值：原值就是最初那张表里的值（与占位符同一个）", async () => {
@@ -388,12 +337,12 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
 
         // 当前值 == 原值 ⇒ 只有一项，那一项既带勾、又是灰的。
-        expect(items()[0].textContent).toBe("4087152117")
-        expect(items()[0].getAttribute("aria-selected")).toBe("true")
-        expect(items()[0].className).toContain("text-[#a0a0a0]!")
+        expect(pickItems()[0].textContent).toBe("4087152117")
+        expect(pickItems()[0].getAttribute("aria-selected")).toBe("true")
+        expect(pickItems()[0].className).toContain("text-[#a0a0a0]!")
     })
 
     /*
@@ -407,11 +356,11 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
-        const originalItems = items().find((el) => el.textContent === "4087152117")!
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
+        const originalItems = pickItems().find((el) => el.textContent === "4087152117")!
         expect(originalItems.className).toContain("text-[#a0a0a0]!")
         // 而当前值那一项不灰（灰 = "这是我改之前的原值"）
-        expect(items()[0].className).not.toContain("text-[#a0a0a0]")
+        expect(pickItems()[0].className).not.toContain("text-[#a0a0a0]")
     })
 
     it("滚出来的关闭之后再点：列表照旧开得出来", async () => {
@@ -420,16 +369,16 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const cell = cellAt(container, 0, PICK_COL)
 
         await openPick(cell)
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
 
         // 表格一滚：CellPick 自己把列表收掉（滚轮滚数据区就是这个场景）。
         scrollOnce() // 先让掉"进编辑时跟随可视"那一次
         scrollOnce() // 这一下才是用户滚的
-        await waitFor(() => expect(items()).toHaveLength(0))
-        expect(cell.querySelector(".cell-pick-mark")!.hasAttribute("data-popup-open")).toBe(false)
+        await waitFor(() => expect(pickItems()).toHaveLength(0))
+        expect(cell.querySelector(`.${PICK_MARK}`)!.hasAttribute("data-popup-open")).toBe(false)
 
         await openPick(cell)
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
     })
 
     it("挑另一项：格子里换成它", async () => {
@@ -437,7 +386,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
         clickItem("1253898414")
 
         await waitFor(() => expect(cellAt(container, 0, PICK_COL).textContent).toBe("1253898414"))
@@ -449,7 +398,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
 
         expect(cellAt(container, 0, PICK_COL).textContent).toBe("1253898414")
         await openPick(cellAt(container, 0, PICK_COL))
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
         clickItem("4087152117")
 
         await waitFor(() => expect(cellAt(container, 0, PICK_COL).textContent).toBe("4087152117"))
@@ -462,9 +411,9 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const cell = cellAt(container, 0, PICK_COL)
         expect(cell.textContent).toBe("-1")
         await openPick(cell)
-        await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
+        await waitFor(() => expect(pickItems()).toHaveLength(CONTROL_TYPES.length))
 
-        expect(items().filter((el) => el.getAttribute("aria-selected") === "true")).toHaveLength(0)
+        expect(pickItems().filter((el) => el.getAttribute("aria-selected") === "true")).toHaveLength(0)
         // 关掉（点别处）：格子还是那个 `-1`。
         fireEvent.pointerDown(document.body, {button: 0, pointerType: "mouse"})
         expect(cellAt(container, 0, PICK_COL).textContent).toBe("-1")
@@ -544,7 +493,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
 
         const cell = cellAt(container, 0, BRANCH_COL)
         expect(cell.textContent).toBe("102") // 改过 → 显示改动值
-        expect(cell.querySelector(".cell-pick-mark")).not.toBeNull()
+        expect(cell.querySelector(`.${PICK_MARK}`)).not.toBeNull()
         // 搜索框在**弹层**里，不在格子里（格子里只有那个触发器）。
         expect(cell.querySelector('[data-slot="input-group"]')).toBeNull()
         expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("-1") // 没改过 → 显示原值
@@ -555,9 +504,9 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, BRANCH_COL))
-        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
 
-        const text = items().map((el) => el.textContent)
+        const text = pickItems().map((el) => el.textContent)
         // 三个 id 都在，`-1` 也有一项 —— **项上显示的就是值本身**（`-1`）。
         expect(text).toEqual(expect.arrayContaining(["100", "101", "102"]))
         expect(text).toContain("-1")
@@ -575,13 +524,13 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         const container = await renderTable()
 
         await openPick(cellAt(container, 0, BRANCH_COL))
-        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
 
         const input = document.querySelector<HTMLInputElement>('[data-slot="combobox-content"] input')!
         fireEvent.change(input, {target: {value: "101"}})
 
         await waitFor(() => {
-            const text = items().map((el) => el.textContent)
+            const text = pickItems().map((el) => el.textContent)
             expect(text).toContain("101")
             expect(text).not.toContain("102")
         })
@@ -593,13 +542,13 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
 
         // 挑 `101`
         await openPick(cellAt(container, 1, BRANCH_COL))
-        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
         clickItem("101")
         await waitFor(() => expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("101"))
 
         // 再挑 `-1` → 值就是 `-1`（提交的也是它，不是 null）
         await openPick(cellAt(container, 1, BRANCH_COL))
-        await waitFor(() => expect(items().length).toBeGreaterThan(0))
+        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
         clickItem("-1")
         await waitFor(() => expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("-1"))
     })
@@ -607,15 +556,20 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
     it("`-1` 只出现一次（当前值**就是** `-1` 时三处来源撞车，必须去重）", async () => {
         // 三项来源：当前值 / 原值 / `optional`。当前值是 `-1` 时它们同值 —— 不去重列表里就有两个 `-1`。
         const {container} = render(
+            /* 夹具要**合法的 DOM**：`CellPick` 那套是 div/span，直接塞进 `<tr>` 会让 React 报
+               "cannot be a child of <tr>" —— 那是真的 console.error，会把这里要看的噪声淹掉。
+               所以照真实结构套一层 `<td>`（与真表里 CellPick 的落点一致）。 */
             <table>
                 <tbody>
                     <tr>
-                        <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        <td>
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        </td>
                     </tr>
                 </tbody>
             </table>,
         )
-        pressTrigger(container.querySelector(".cell-pick-mark") as HTMLElement)
+        pressTrigger(container.querySelector(`.${PICK_MARK}`) as HTMLElement)
         await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
         const texts = [...document.querySelectorAll('[data-slot="combobox-item"]')].map((el) => el.textContent)
         expect(texts.filter((t) => t === "-1")).toHaveLength(1)
@@ -623,15 +577,20 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
 
     it("原值 `-1` 的格子：默认显示 `-1`，且它是清单里被选中的那一项", async () => {
         const {container} = render(
+            /* 夹具要**合法的 DOM**：`CellPick` 那套是 div/span，直接塞进 `<tr>` 会让 React 报
+               "cannot be a child of <tr>" —— 那是真的 console.error，会把这里要看的噪声淹掉。
+               所以照真实结构套一层 `<td>`（与真表里 CellPick 的落点一致）。 */
             <table>
                 <tbody>
                     <tr>
-                        <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        <td>
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        </td>
                     </tr>
                 </tbody>
             </table>,
         )
-        const mark = container.querySelector(".cell-pick-mark")!
+        const mark = container.querySelector(`.${PICK_MARK}`)!
         expect(mark.textContent).toBe(UNSET)
 
         pressTrigger(mark)

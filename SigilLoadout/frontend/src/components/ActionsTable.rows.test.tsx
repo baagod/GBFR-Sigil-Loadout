@@ -11,6 +11,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     SaveActionFields: vi.fn(),
 }))
 
+import {HANDLE_WIDTH} from "@/components/actions-table/classes"
 import {KEYS, cellAt, clipboardStub, handleAt, stubRowRects, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
@@ -28,8 +29,8 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
 
         const handleHead = container.querySelector("thead th") as HTMLElement
         expect(handleHead.textContent).toBe("#")
-        expect(handleHead.style.width).toBe("40px")
-        expect(handleAt(container, 0).style.width).toBe("40px")
+        expect(handleHead.style.width).toBe(`${HANDLE_WIDTH}px`)
+        expect(handleAt(container, 0).style.width).toBe(`${HANDLE_WIDTH}px`)
         // 横向钉住才不会被滚过去的列盖住；纵向吸顶由表头那行自己给。
         expect(handleHead.className).toContain("sticky")
         expect(handleAt(container, 0).className).toContain("sticky")

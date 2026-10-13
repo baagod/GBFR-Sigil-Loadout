@@ -2,8 +2,12 @@
 /*
     动作表测试的**共用台架**。
 
-    为什么要有它：这张表的行为被拆成四个测试文件（渲染与列 / 选区与剪贴板 / 行号与行选中 / 编辑与保存），
-    而"造数据 → 装 mock → 渲染 → 等数据到位"这一段每个文件都要用；抄四份的话，改一处就得改四处。
+    为什么要有它：这张表的行为被拆成六个测试文件（渲染与列 / 选区与剪贴板 / 行号与行选中 / 编辑与保存 /
+    值格 / 行序拖动），而"造数据 → 装 mock → 渲染 → 等数据到位"这一段每个文件都要用；抄六份的话，
+    改一处就得改六处。
+
+    ⚠️ 放这里的门槛是"**两个以上文件要用**"：只有一个文件用的助手留在那个文件里（否则这里会慢慢变成
+    "所有测试的杂物间"，边界一糊就没人敢动）。
 
     ⚠️ `vi.mock(...)` **不能**放这里：它由 vitest 提升到**调用它的那个文件**顶部，写在被 import 的模块里
     不生效。所以四个测试文件各自写那三行 mock，本模块只负责"装实现"（`installServiceMocks`）。
@@ -14,24 +18,17 @@ import {afterEach, beforeEach, expect, vi} from "vitest"
 
 import {LoadActions, SaveActionFields} from "../../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
-import {HANDLE_SELECTED_BG} from "@/components/actions-table/classes"
+import {HANDLE_SELECTED_BG, PICK_MARK} from "@/components/actions-table/classes"
 import {columnsOf, toActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
+import {messages} from "@/lib/messages"
 
 /**
- * 组件要的那一份文案：**只写这 6 条**，因为 `ActionsTable` 的 `t` 就是 `ActionsTableMessages`
- * （见 `model.ts`）—— 接口按真实需求收窄，夹具因此**一条断言都不用加**，而且逐键受检
- * （键名打错、少一个键都会当场报错）。
+ * 组件要的那一份文案：**直接用生产那一份 zh**。
+ *
+ * ⚠️ 别在这里手抄那 6 条：抄一份之后，用例断言的是**夹具自己的副本**（`messages.ts` 改了文案，测试照样绿），
+ * 而断言"这句话上屏"本来就是在断言生产文案。`ActionsTableMessages` 是 `Messages` 的子集，所以直接给。
  */
-export const t: ActionsTableMessages = {
-    // 与 messages.ts 的 zh 同一句（用例要断言它上屏）
-    multiAreaCopy: "请选择同一行或同一列中的单元格。",
-    multiAreaCopyTitle: "无法复制选中区域",
-    actionBranchSearch: "搜索",
-    ok: "确定",
-    // 表头兜底（`model.columnLabel`）：所有表通用那两列。
-    colStart: "开始",
-    colEnd: "结束",
-}
+export const t: ActionsTableMessages = messages.zh
 
 /**
  * 技能键 → 名字（`ability.lang.json` 的形状）。只放一条真正命中的，其余**故意查不到** ——
@@ -92,8 +89,8 @@ export const tableProps = (rows: Rows) => {
 /**
  * **一整套台架**：持有数据 + 每个用例重置 + 装 mock + 收尾清理 + 渲染助手。
  *
- * 四个测试文件各自抄一遍那 10 行（`let table` / `makeHarness` / `beforeEach` / `afterEach`）没有意义 ——
- * 写错一处就是"某个文件忘了重置数据"，而且是四份要同步维护的样板。这里一行给全：
+ * 五个用到它的测试文件各自抄一遍那 10 行（`let table` / `makeHarness` / `beforeEach` / `afterEach`）没有意义 ——
+ * 写错一处就是"某个文件忘了重置数据"，而且是五份要同步维护的样板。这里一行给全：
  *
  * ```ts
  * const {renderTable, renderWithSave, setRows, addRow} = useTableHarness()
@@ -143,25 +140,18 @@ export function useTableHarness() {
 }
 
 /**
- * 装上两个服务 mock 的实现，让它们**惰性**读当前那一份数据。
- *
- * ⚠️ 必须每个用例开头调一次（`resetAllMocks` 会把上一次留下的实现也清掉），而且"重置"与"装实现"
- * 要挨着写 —— 分一半到 `afterEach` 的话，从第二个用例起就没有实现了。
- */
-/**
  * 装上服务 mock。
  *
  * ⚠️ 每个用例开头调一次（`resetAllMocks` 会把上一次留下的实现也清掉），所以"重置"与"装实现"要挨着写。
- * ⚠️ 它**不再拿数据去喂 `LoadActions`** —— 表是受控的，数据由 `tableProps` 递进去（见上面那段说明）。
+ * ⚠️ 它**不拿数据去喂 `LoadActions`** —— 表是受控的，数据由 `tableProps` 当 prop 递进去。
  */
 function installServiceMocks() {
     vi.resetAllMocks()
     vi.mocked(SaveActionFields).mockResolvedValue(undefined)
     /*
-        ‼️ `LoadActions` 在这里**故意是"一调就炸"**，不是拿它喂数据。
-        台架走的是生产那条路：数据由外面当 prop 递给表（`tableProps`），表**不该**再去读一次。
-        所以这个 mock 的作用是**守这条契约** —— 一旦表（或台架）又自己读起来，用例立刻报错，
-        而不是悄悄多读一份、把"同一份数据两个来源"那类顺序问题重新引回来。
+        ‼️ `LoadActions` 是"**一调就炸**"，不是拿它喂数据：表是受控视图，生产里读它的只有 `ActionsPanel`。
+        留着这一条是为了守住"表自己不许再读一次"——那是"同一份数据两个来源"那类顺序问题的来路；
+        真有人把内部读取加回来，用例当场报错，而不是悄悄多读一份。
     */
     vi.mocked(LoadActions).mockImplementation(async () => {
         throw new Error("动作表是受控的：数据该由外面传进来，它自己不该再调 LoadActions")
@@ -354,4 +344,64 @@ export function clickToEdit(cell: HTMLElement) {
     fireEvent.mouseDown(cell)
     fireEvent.focus(cell.firstElementChild!)
     fireEvent.click(cell.firstElementChild!)
+}
+
+/* ==================== 选值格（值格下拉）的交互 ==================== */
+
+/**
+ * 让浮层有机会挂上 —— base-ui 是**异步**挂弹层的，所以"没打开"必须等过这一拍才算数。
+ *
+ * ⚠️ 正向（"该开"）用 `waitFor` 轮询，负向（"不该开"）用这一拍 + 同步断言：
+ * 拿 `waitFor` 去断言"不许变"等于把负向写成恒真（关掉又重开也算通过）。
+ */
+export const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
+
+/** 列表项（浮层挂在 body 上，所以从 `document` 找）。 */
+export const pickItems = () => [...document.querySelectorAll<HTMLElement>('[data-slot="combobox-item"]')]
+
+/**
+ * 列表开着吗 —— 认**浮层里真实存在的列表项**。
+ *
+ * ⚠️ 别改成看触发器上有没有 `data-popup-open`：那个属性只在列表真开着时才挂（值格用例里就断言过它的
+ * 有无），拿它当"开着吗"的判据会恒假 —— 用例会"永远通过"。
+ */
+export const isPickOpen = () => pickItems().length > 0
+
+/** 一下完整的真实点击序列：pointerdown → mousedown → pointerup → mouseup → click（都落在触发器那层）。 */
+export function pressTrigger(trigger: Element) {
+    fireEvent.pointerDown(trigger, {button: 0, pointerType: "mouse"})
+    fireEvent.mouseDown(trigger, {button: 0})
+    fireEvent.pointerUp(trigger, {button: 0, pointerType: "mouse"})
+    fireEvent.mouseUp(trigger, {button: 0})
+    fireEvent.click(trigger)
+}
+
+/** 在某一格的选值格触发器上按一下（`td` 的 mousedown 会顺手记下 `PressFacts`）。 */
+export function pressPick(cell: HTMLElement) {
+    pressTrigger(cell.querySelector(`.${PICK_MARK}`)!)
+}
+
+/** 点列表里含某段文字的那一项（真实顺序：pointerdown → mouseup → click）。 */
+export function clickItem(text: string) {
+    const item = pickItems().find((el) => el.textContent?.includes(text))!
+    fireEvent.pointerDown(item, {button: 0, pointerType: "mouse"})
+    fireEvent.mouseUp(item, {button: 0, pointerType: "mouse"})
+    fireEvent.click(item)
+}
+
+/**
+ * 打开某一格的列表 —— 与普通格子**同一条"先选后编"**，所以**最多按两下**：
+ * 没选中（或不在唯一选中态）时第一下只算选中，第二下才展开；已经选中的话第一下就开了。
+ *
+ * ‼️ **按几下由闸门的输入决定，不去"观察弹层开没开"** —— 那是竞态：弹层异步挂，第一下其实开了、
+ * 只是挂得慢，再按一下反而把它**关掉**（实测：3 份全量并行时那条用例必红）。
+ */
+export async function openPick(cell: HTMLElement) {
+    const isOnlySelected = cell.classList.contains("cell-selected") && document.querySelectorAll("td.cell-selected").length === 1
+    pressPick(cell)
+    if (!isOnlySelected) {
+        await tick()
+        pressPick(cell)
+    }
+    await waitFor(() => expect(isPickOpen()).toBe(true))
 }

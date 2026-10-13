@@ -14,6 +14,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 
+import {CELL_PADDING, INPUT_PADDING} from "@/components/actions-table/classes"
 import {KEYS, LongField, abilityNames, cellAt, clickToEdit, cleanup, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, rows} = useTableHarness()
@@ -74,13 +75,14 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         const container = await renderTable()
         const cell = cellAt(container, 0, 2)
         const shownLayer = cell.firstElementChild!
-        expect(shownLayer.className).toContain("pl-1 ") // 显示态左内边距
+        expect(shownLayer.className).toContain(CELL_PADDING) // 显示态内边距
 
         clickToEdit(cell)
 
         const input = cell.querySelector("input")!
-        expect(input.className).toContain("pr-0") // 右边让给光标
-        expect(input.className).toContain("pl-1 ") // 左边与显示态**同一个值** → 起点不跳
+        expect(input.className).toContain(INPUT_PADDING) // 右边 0（让给光标）、其余与显示态同
+        /* 左边那一份**必须两边同值** —— 不同值进编辑时文字起点就会跳（见这段的说明）。 */
+        expect(INPUT_PADDING.split(" ")[0]).toBe(CELL_PADDING.split(" ")[0])
     })
 
     /*
@@ -240,8 +242,9 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         const errors: unknown[][] = []
         const spy = vi.spyOn(console, "error").mockImplementation((...args) => void errors.push(args))
         try {
-            render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps(rows())} />)
-            await waitFor(() => expect(screen).toBeTruthy())
+            const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps(rows())} />)
+            /* 等表格真的上屏（顺带把 effect / 告警冲干净）—— 别写恒真的断言等：那等于没等。 */
+            await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(rows().length))
         } finally {
             spy.mockRestore()
         }

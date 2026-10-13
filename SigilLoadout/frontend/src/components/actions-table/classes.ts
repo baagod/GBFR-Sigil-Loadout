@@ -19,8 +19,8 @@ export const EDITABLE_BG = "bg-[var(--cell-editable)] [--cell-under:var(--cell-e
  * 只有行号格用得上它：它不在列模型里，拿不到 `.cell-selected`（数据格是"那个整行宽的区"里的一员，
  * 自己就带 `.cell-selected`）。
  *
- * ‼️ 它与 `.cell-selected` **共用同一条 `inset box-shadow`**（7% 白，实测 42,42,42）—— 用户报过
- * "选行的背景色比选区亮"（当时这边走 `bg-linear-to-b from-white/14`，实测 58,58,58）；写在一起才不漂。
+ * ‼️ 它与 `.cell-selected` **共用同一个来路**（`style.css` 里的 `--cell-fill` + `--cell-fill-alpha`）——
+ * 用户报过"选行的背景色比选区亮"（当时两边各写各的：这边一条渐变、那边另一条），写成同一份才不漂。
  */
 export const HANDLE_SELECTED_BG = "cell-row-selected"
 

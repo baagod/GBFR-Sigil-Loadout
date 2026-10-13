@@ -12,7 +12,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
-import {ROW_HEIGHT} from "@/components/actions-table/classes"
+import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
 
 import {KEYS, abilityNames, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
 
@@ -27,7 +27,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const handle = container.querySelector("thead th") as HTMLElement
         expect(handle.textContent).toBe("#")
         expect(handle.getAttribute("data-col-id")).toBeNull()
-        expect(handle.style.width).toBe("40px")
+        expect(handle.style.width).toBe(`${HANDLE_WIDTH}px`)
     })
 
     /*
@@ -116,7 +116,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const container = await renderTable()
         // 第 0 列 = `id_`（只读）：`pr-2` 那 8px 是给编辑框留的"光标余量"，只读格不该有。
         const readonlyLayer = cellAt(container, 0, 0).firstElementChild!
-        expect(readonlyLayer.className).toContain("px-1")
+        expect(readonlyLayer.className).toContain(READONLY_PADDING)
         expect(readonlyLayer.className).toContain("py-[3px]!")
         expect(readonlyLayer.className).not.toContain("pr-2")
         // 高度交给内容撑（固定 `h-6` 会把上下 3px 压扁）。
@@ -260,13 +260,13 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const container = await renderTable()
 
         const pinnedCell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
-        expect(pinnedCell.className).toContain("cell-pinned")
+        expect(pinnedCell.className).toContain(PINNED_CELL)
         // 必须还是 sticky：挂 `relative`（哪怕只是顺手写的 position）会让冻结列跟着横向滚动跑掉
         expect(pinnedCell.className).toContain("sticky")
         expect(pinnedCell.className).not.toContain("z-10")
 
         const pinnedHead = container.querySelectorAll("thead th")[KEYS.indexOf("abilityTag_")]
-        expect(pinnedHead.className).toContain("cell-pinned")
+        expect(pinnedHead.className).toContain(PINNED_CELL)
 
         // 表头行得比冻结列更高：垂直滚动时表体冻结列会滑到表头位置上
         expect(container.querySelector("thead tr")!.className).toContain("z-60")

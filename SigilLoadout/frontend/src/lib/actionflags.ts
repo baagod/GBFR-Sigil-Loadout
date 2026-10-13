@@ -1,14 +1,13 @@
 /*
-    角色动作页的纯逻辑：位掩码表、motion 文本、flags 行的增行、选中区间。
+    角色动作页的纯逻辑：位定义表、掩码判位、角色码。
 
-    行的搬动不在这里：那是 dnd-kit 的 arrayMove 干的（见 ActionsPanel），这一层不再维护「第几行」——
-    FlagRow.Index 只是后端解析时编的顺序号，写回时后端按**数组顺序**写，根本不看它（actionflags.go 的
+    行的搬动不在这里：那是 dnd-kit 的 arrayMove 干的（见 AnimationDetail），这一层不再维护「第几行」——
+    行上的 `Index` 只是解析时编的顺序号，写回时后端按**数组顺序**写、根本不看它（见 actionflags.go 的
     buildFlagsXML），所以界面上直接渲染数组下标就够，重排 / 插入之后什么都不用重编号。
 
-    位定义表是后端 actionflags.go 里那两张的**逐字副本**（下标即 bit 号，空串 = 还没弄清含义的那一位），
-    一个字都不能漏：勾选列表就是按它逐位铺出来的，`bit<号>` 旁边那个名字就是它。
-    后端读出来的 flag0Effects / flag1Effects 现在**不再显示**（格子里只留数值，含义在勾选列表里逐项给），
-    字段还在模型里，只是界面不再用它。
+    位定义表**只有这一份**（下标即 bit 号，空串 = 还没弄清含义的那一位）：勾选列表按它逐位铺出来、
+    「效果」列也按它逐位翻（见 TrackGrid 的 `FlagEffects`）。后端只存数值，掩码翻译是显示那一层的事，
+    不进行数据也不进 track_edits.json。
 */
 export const FLAG0_NAMES = [
     "允许移动取消",

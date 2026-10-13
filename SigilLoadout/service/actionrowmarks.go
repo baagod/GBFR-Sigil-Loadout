@@ -18,6 +18,10 @@ package service
 //
 // Track / Flag 只在**被假删除**的行上带：它存的是这一行的**当前值**（假删除期间照样能编辑）。
 // 不带时（老改动）退回原版那行的值。注意原版数据永远只读 —— 它只提供"原值/占位符"，绝不参与保存。
+//
+// ‼️ Track 与 Flag 现在是**同一个类型**（`FlagRow` = `TrackRow`），看着像重复字段 —— 但两个 JSON 键
+// （`track` / `flag`）是历史上两份账本的名字，已经写进了用户的 track_edits.json。**别合并它们**：
+// 合并之后老账本里那一半的行身份就读不回来了（加载时按各自的键找，见 mergeRows 的 `kept`）。
 type rowMark struct {
 	Orig    int       `json:"orig"`
 	Removed bool      `json:"removed"`
@@ -98,15 +102,18 @@ func marksOf(edits []trackEdit, char string, ref trackRef, count int) []rowMark 
 }
 
 /*
-mergeTrackRows 按标记表把表拼回完整的一份：
+mergeRows 按标记表把表拼回完整的一份 —— 通用轨与 flags 共用这一个（`FlagRow` 就是 `TrackRow`）：
 
   - 没被假删除的行用 current 里的（也就是改动 XML 里那份，值是最新的）；
   - 被假删除的行从原版 prim 取那一行的值 —— 它不在 XML 里，值只能在原版里找。
 
 标记对不上（行数不符）就退回"位置对齐"，并把被假删除的行**接到末尾** —— 无论如何都不能让一行
 被假删除的原行从表里消失（原行必须始终保留在表里，这是硬要求）。
+
+`kept` 取"这一行假删除期间存下来的当前值"：两种轨的账本键是两个（`track` / `flag`，历史原因，
+见 `rowMark` 的说明），所以由调用方挑。
 */
-func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
+func mergeRows(marks []rowMark, current, prim []TrackRow, kept func(rowMark) *TrackRow) []TrackRow {
 	sources, ok := rowSources(marks, len(current))
 	if !ok {
 		for i := range current {
@@ -118,8 +125,8 @@ func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
 				continue
 			}
 			row := prim[mark.Orig]
-			if mark.Track != nil {
-				row = *mark.Track // 有当前值就用当前值（假删除期间可能被改过）
+			if saved := kept(mark); saved != nil {
+				row = *saved // 有当前值就用当前值（假删除期间可能被改过）
 			}
 			row.Orig = origPtr(mark.Orig)
 			row.Removed = true
@@ -137,8 +144,8 @@ func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
 			continue
 		}
 		row := TrackRow{Orig: origPtr(marks[i].Orig), Removed: true, Values: map[string]string{}}
-		if mark := marks[i]; mark.Track != nil {
-			row = *mark.Track // 当前值（假删除期间可能被改过）
+		if saved := kept(marks[i]); saved != nil {
+			row = *saved // 当前值（假删除期间可能被改过）
 		} else if orig := marks[i].Orig; orig >= 0 && orig < len(prim) {
 			row = prim[orig]
 		}
@@ -149,46 +156,12 @@ func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
 	return out
 }
 
-// mergeFlagRows 同 mergeTrackRows，给 flags 表用。
-func mergeFlagRows(marks []rowMark, current, prim []FlagRow) []FlagRow {
-	sources, ok := rowSources(marks, len(current))
-	if !ok {
-		for i := range current {
-			current[i].Orig = origPtr(i)
-			current[i].Removed = false
-		}
-		for _, mark := range marks {
-			if !mark.Removed || mark.Orig < 0 || mark.Orig >= len(prim) {
-				continue
-			}
-			row := prim[mark.Orig]
-			if mark.Flag != nil {
-				row = *mark.Flag
-			}
-			row.Orig = origPtr(mark.Orig)
-			row.Removed = true
-			current = append(current, row)
-		}
-		return current
-	}
-	out := make([]FlagRow, 0, len(marks))
-	for i, src := range sources {
-		if src != noOriginal {
-			row := current[src]
-			row.Orig = origPtr(marks[i].Orig)
-			row.Removed = false
-			out = append(out, row)
-			continue
-		}
-		row := FlagRow{Orig: origPtr(marks[i].Orig), Removed: true}
-		if mark := marks[i]; mark.Flag != nil {
-			row = *mark.Flag
-		} else if orig := marks[i].Orig; orig >= 0 && orig < len(prim) {
-			row = prim[orig]
-		}
-		row.Orig = origPtr(marks[i].Orig)
-		row.Removed = true
-		out = append(out, row)
-	}
-	return out
+// mergeTrackRows 是通用轨那一份（账本键 `track`）。
+func mergeTrackRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
+	return mergeRows(marks, current, prim, func(mark rowMark) *TrackRow { return mark.Track })
+}
+
+// mergeFlagRows 是 flags 那一份（账本键 `flag`）。
+func mergeFlagRows(marks []rowMark, current, prim []TrackRow) []TrackRow {
+	return mergeRows(marks, current, prim, func(mark rowMark) *TrackRow { return mark.Flag })
 }

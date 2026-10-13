@@ -15,14 +15,12 @@ import {
 import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
-// 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
+// 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
 import {FLAG_KEYS, TrackGrid} from "@/components/TrackGrid"
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import type {RowCommands} from "@/components/actions-table/useRowCommands"
 import {TrackToolbar} from "@/components/TrackToolbar"
 import type {Messages} from "@/lib/messages"
-
-/** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
 
 /**
  * 这一行在原版里有没有对应行（有才是"原行"：删除只做假删除）。
@@ -33,12 +31,10 @@ import type {Messages} from "@/lib/messages"
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
 
-/**
-
 /*
 动画详情页：点动作表里的动画号弹出来的那一层。
 
-一屏四块，各管一条轨：Flags（**走专用渲染**，Flag0/Flag1 那两列的位含义解码是它的价值）、
+一屏四块，各管一条轨：Flags（列说明与效果汇总由 `TrackGrid.columnOf` 给）、
 Attack（判定盒，伤害在这）、Effect（特效调用，火柱在这）、Speed（播放速度，多数动画没有）；
 没有这条轨就不显示这一块。每块自带一排按钮（添加 / 复制 / 插入），不用切焦点去找页面顶上的那套。
 
@@ -56,14 +52,13 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
  * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「轨迹表」的清单里点一个号。
  * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨 + FSM。
  */
-export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
+export function AnimationDetail({motion, charCode, t, onClose}: {
     motion: string
     charCode: string
     t: Messages
     onClose: () => void
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])
-    const motion = initialMotion
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。
     const [loaded, setLoaded] = useState(false)
     /*
@@ -89,13 +84,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * （以前这里自己养了一套 `useRowSelection` 状态机，但改基座之后它的两个入口再没人调用 —— 那套已经删了。）
      */
     const [sel, setSel] = useState<string | null>(null)
-    /**
-     * **活动格在哪一行**（也是基座上报的）：工具条的「添加」按它决定插在谁后面 —— 一行没选时是 `null`，
-     * 那就插到行末。与 `sel` 分开存，因为"选中了哪几行"和"光标压在哪一行"是两件事
-     * （多选时用户要的是**活动那一行**）。
-     */
-    /** 基座交回来的"复制当前选区"（工具条的「复制」按钮用它 —— 那样才有那圈虚线，见基座 `onCopyReady`）。 */
-    /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除都是一份实现，见 `useRowCommands`）。 */
     /** 基座交回来的**复制动作**（行剪贴板 + 区域剪贴板 + 虚线，合成一次；见基座的 `onCopyReady`）。 */
     const copyEntry = useRef<Record<string, (() => void) | undefined>>({})
     /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除，一份实现见 `useRowCommands`）。 */
@@ -191,14 +179,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
     // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
 
-    /** 这个分区里选中了哪几行（升序下标）。**一次只认一个分区**，所以 key 不对时就是"一行都没选"。 */
-
     /**
      * 键盘：Del = 删除选中行、Ctrl+X = 剪切、Ctrl+V = 粘贴、Ctrl+C = 复制 —— 都调基座交回来的行命令
      * （`rowCommands`，与工具条那几个按钮同一条路径）。**Ctrl+C 故意不 preventDefault**：复制区那圈虚线
      * 是基座画的（它监听表格的 copy 事件），这里拦下按键基座就永远收不到，虚线也就没了。
      * 在输入框/文本域里打字时不抢按键（`[data-copy-own]` = 格子自己收下 Ctrl+C）；没有选中行就什么都
      * 不做 —— 删哪儿、粘到哪儿必须由人指定，别猜。
+     */
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.altKey) return
@@ -245,7 +232,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     }, [])
 
-    /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     /**
      * 基座交回来的整行 → 轨表的行：值取**完整值**，行身份直接读 `orig` / `children`
      * （基座不解释它，只负责带着走）。
@@ -254,7 +240,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * 加回来标红 —— 那才是轨表的保存语义（原行留着但不部署）。
      */
     const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
-
         const columns: readonly string[] = tables[key]?.columns ?? []
         /*
             ‼️ **flags 与普通轨走的是同一条路**：行形状统一（都是 `TrackRow`，字段收在 `values`），容器也统一
@@ -277,6 +262,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         })
         markDirty(key)
     }
+    /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     const reorder = (key: string, from: number, to: number) => {
         setTables((prev) => {
             const table = prev[key]
@@ -349,7 +335,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         <>
         {infos.map((info) => {
             const key = trackKey(info)
-            const count = info.kind === "flags" ? flags.length : (tables[key]?.rows.length ?? 0)
+            /* flags 也在 `tables` 里（key 就是 `flagsKey`），所以行数与别的轨同一个问法。 */
+            const count = tables[key]?.rows.length ?? 0
             // ⚠️ 标题**不能包在分区那个 div 里**：sticky 只在自己父元素的范围内吸顶 —— 包进去的话，
             // 分区一结束标题就被自己的分区顶着往上走，上半截被滚动容器上沿切掉，露出一行半截字 ✗。
             // 提出来做**滚动容器的直接子元素**（Fragment 不生成节点），标题就永远钉在顶部；下一个标题

@@ -25,9 +25,9 @@ const code = css.replace(/\/\*[\s\S]*?\*\//g, "")
  * ‼️ 值**原样**返回（数字 / `var(--z-*)` / `calc(...)`）：层高已经 token 化，断言要护的是**关系**
  * （谁压在谁之上、复制 = 轮廓 + 1），而不是某个裸数字 —— 只认数字的话，token 一改整份测例就哑了。
  */
-const usesRule = (值: string) =>
+const usesRule = (value: string) =>
     [...code.matchAll(/([^{}]+)\{[^}]*z-index:\s*([^;}]+)/g)]
-        .filter((m) => m[2].trim() === 值)
+        .filter((m) => m[2].trim() === value)
         .map((m) => m[1].trim())
 
 describe("style.css 的选择器约束（happy-dom 量不到的那部分）", () => {
@@ -40,7 +40,9 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
     it("冻结层的提层规则（--z-pinned）同时覆盖 th 与 td", () => {
         const rule = usesRule("var(--z-pinned)")
         expect(rule.length).toBeGreaterThan(0)
-        expect(rule.some((sel) => sel.includes("th.cell-pinned") && sel.includes("td.cell-pinned"))).toBe(true)
+        /* 两个都**要被覆盖到**（写一条规则还是两条等价规则都行 —— 护的是覆盖，不是写法）。 */
+        expect(rule.some((sel) => sel.includes("th.cell-pinned"))).toBe(true)
+        expect(rule.some((sel) => sel.includes("td.cell-pinned"))).toBe(true)
     })
 
     /*
@@ -58,8 +60,13 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
     */
     it("层高阶梯：冻结区轮廓压冻结层一级；虚线靠格内顺序压住实线（复制格不提层）", () => {
         expect(usesRule("var(--z-pinned-edge)").some((sel) => sel.includes("td.cell-pinned") && sel.includes("cell-edge"))).toBe(true)
-        expect(code).toMatch(/--z-edge:\s*41\s*;/)
-        expect(code).toMatch(/--z-pinned:\s*50\s*;/)
+        /*
+            阶梯只断言**关系**（焦点 < 轮廓 < 冻结），不断言那几个裸数字：具体取 41 还是 42 与行为无关，
+            钉死它只会让"调一档层高"变成改测试（与上面 `usesRule` 那段的说明同一个口径）。
+        */
+        const z = (name: string) => Number(code.match(new RegExp(`--${name}:\\s*(\\d+)`))?.[1])
+        expect(z("z-focus")).toBeLessThan(z("z-edge"))
+        expect(z("z-edge")).toBeLessThan(z("z-pinned"))
         expect(code).toMatch(/--z-pinned-edge:\s*calc\(var\(--z-pinned\)\s*\+\s*1\)/)
         // 格内顺序：实线 ::before(1) < 虚线 ::after(2)
         expect(code).toMatch(/\.cell-selectable::before\s*\{[^}]*z-index:\s*1/)

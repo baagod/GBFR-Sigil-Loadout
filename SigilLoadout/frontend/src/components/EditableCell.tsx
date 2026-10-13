@@ -3,10 +3,9 @@ import {Input} from "@/components/ui/input"
 import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
 
 /*
-    共用的可编辑格。**它不属于任何一页** —— 动作表、轨表（TrackGrid）与全局参数表
-    （GlobalParamPanel）都用它；放在某一页里会让别的页反过来 import 那一页，实测形成过两处环形依赖：
-    `ActionsPanel ↔ GlobalParamPanel`、`ActionsPanel → AnimationDetail → TrackGrid → ActionsPanel` ✗。
-    所以它有自己一个文件 ✓（两处环的成因都只是这一个组件）。
+    共用的可编辑格：**平时是文本，点一下才变输入框**。现在只有全局参数表用它（`GlobalParamPanel`），
+    但它是"一格"这件事的完整实现（焦点环 / Esc / 复制 / 右键 / 原值占位），留在自己一个文件里 ——
+    塞进那一页只会让页面文件变成一个"格子 + 表格"的混合体。
 */
 
 /**
@@ -26,28 +25,18 @@ import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono, placeholder, unchanged, override}: {
+export function EditableCell({tdClassName, value, onCommit, placeholder, override}: {
     /** 这个格的 td 类，由调用点给（各表的边框/底色/吸顶不一样）。 */
     tdClassName: string
     value: string
     onCommit: (value: string) => void
-    onDoubleClick?: () => void
-    mono?: boolean
     /** 这一格的**原值**（游戏原版那一份）：清空输入框时显示的灰字就是它，只跟着数据走。 */
     placeholder?: string
     /**
-     * 原值模型（动作表 / 全局参数那套）：`value` 是**改动**，空着就显示 `placeholder`（原值）当灰字，
-     * 草稿提交回原值等于"没改"（提交空串，见下面 onBlur）。轨表不给它 —— 那边的 `value` 就是真值。
+     * 原值模型：`value` 是**改动**，空着就显示 `placeholder`（原值）当灰字，
+     * 草稿提交回原值等于"没改"（提交空串，见下面 onBlur）。
      */
     override?: boolean
-    /**
-     * 这一格**还等于打开时的原值**（没动过）→ 显示成 muted 灰。
-     *
-     * 动作表用"value 为空 + placeholder"表达同一件事（它的原值在后端那套 override 里）；
-     * 轨表的原值就在自己的数据里，所以直接给个标记，值照常传进来 —— 点开时输入框因此是**预填**的，
-     * 改一位数字很方便。
-     */
-    unchanged?: boolean
 }) {
     /**
      * 这一格显示的那份文本：原值模型下**没填过值就是原值**（`placeholder`），轨表就是 `value` 本身。
@@ -88,9 +77,8 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
         void navigator.clipboard?.writeText(shown).catch(console.error)
     }
 
-    // 双击挂在 td 上：它两个状态下都不换（早先是挂在 display:contents 那层上兜住 div↔input 的切换）。
     return (
-        <td className={tdClassName} onClick={() => setEditing(true)} onDoubleClick={onDoubleClick}>
+        <td className={tdClassName} onClick={() => setEditing(true)}>
             {/*
              * 显示态那段文本**两个状态下都留在流里**——它才是列宽的唯一来源。
              *
@@ -117,9 +105,7 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                     setEditing(true)
                 }}
                 onKeyDown={(e) => onCopy(e, false)}
-                className={`${CELL_TEXT} ${mono ? "tabular-nums" : ""} ${
-                    value === "" || unchanged ? "text-muted-foreground" : ""
-                } ${editing ? "opacity-0" : ""}`}
+                className={`${CELL_TEXT} ${value === "" ? "text-muted-foreground" : ""} ${editing ? "opacity-0" : ""}`}
             >
                 {shown}
             </div>
@@ -202,7 +188,7 @@ export function EditableCell({tdClassName, value, onCommit, onDoubleClick, mono,
                     // 列宽是由显示态文本撑出来的，内容区正好等于文本宽度（实测 clientWidth == scrollWidth），
                     // 于是"该列最长的那串文本"一旦进入编辑态，光标就落在最后一个字符的边界上、看着像卡在
                     // 数字里。左侧内边距保持 4px 不动 —— 文字起点与显示态仍然对得齐，只是行尾多出余量。
-                    className={`absolute inset-0 h-auto! ${CELL_INPUT} pr-0 ${mono ? "tabular-nums" : ""}`}
+                    className={`absolute inset-0 h-auto! ${CELL_INPUT} pr-0`}
                 />
             )}
         </td>

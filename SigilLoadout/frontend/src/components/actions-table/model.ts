@@ -19,10 +19,11 @@ import type {Messages} from "@/lib/messages"
 /**
  * 这张表真正用到的那几条文案。
  *
- * ‼️ **故意收窄**，不用整个 `Messages`：表只用得到这 5 条，而接口要求整个（~50 键）的话，
+ * ‼️ **故意收窄**，不用整个 `Messages`：表只用得到这 6 条，而接口要求整个（~50 键）的话，
  * 每个调用点与每份测试夹具都得凑出一个完整的 `Messages` —— 测试侧因此出现
  * `as unknown as Messages` 这种**绕过全部检查**的双重断言（夹具少一个键、串一个名都测不出来）。
- * 收窄之后夹具只写这 6 条，类型系统真的在查；全量 `Messages` 天然满足它，所以生产调用点不用改。
+ * 收窄之后夹具不必凑（测试直接用生产那份 `messages.zh`），而类型系统仍逐键在查；
+ * 全量 `Messages` 天然满足它，所以生产调用点不用改。
  *
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
@@ -70,6 +71,20 @@ export const UNSET = "-1"
 export type ColumnKind = "text" | "readonly" | "pick" | "branch"
 export const columnKind = (key: string): ColumnKind =>
     READ_ONLY_KEYS.has(key) ? "readonly" : PICKER_KEYS.has(key) ? "pick" : BRANCH_KEYS.has(key) ? "branch" : "text"
+
+/**
+ * **这一列能不能写**（= 内置只读列 `columnKind` + 调用方标了 `readonly` 的那些的补集）——
+ * 这条判据**只有这一份**，三个消费点都读它：
+ *
+ *   · 粘贴：不许写的列整列当"没有这一格"（写进去的是一个**没人认的键**：帧列看的是 `endTime`，
+ *     粘出来的 `frame` 只会烂在草稿里）；
+ *   · 每一格的底色（`ActionRowView` 的 `readonlyTint` / `notWritable`）；
+ *   · 要不要挂焦点环（进不进编辑）。
+ *
+ * ‼️ 以前这三处各判一遍（内置只读列还曾被漏掉一处）—— 同一个事实写三遍，迟早对不上。
+ */
+export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSpec | undefined): boolean =>
+    columnKind(key) !== "readonly" && columnOf?.(key)?.readonly !== true
 
 /**
  * **列 id → 表头文案**：所有表通用的那几条（不传 `ColumnSpec.label` 时用它兜底）。
@@ -347,13 +362,6 @@ export type ActionRow = {
      * 基座只管照着画（暗红底），不需要知道谁为什么把它标上。
      */
     removed?: boolean
-    /**
-     * **随行带走的附加数据**：基座不解释它，只在"抄一行 / 复制粘贴一行"时原样带着走。
-     *
-     * 为什么要有：轨表一行还挂着基座不认识的字段（`orig` = 原版第几行、`children` = 子节点），
-     * 而"添加/粘贴"是**在基座里造新行**的 —— 没有这个字段，那些数据会在往返中丢掉
-     * （真丢过：`attack` 行的 `<AilmentNN>` 就在 `children` 里）。调用方自己塞、自己取。
-     */
     /**
      * **行身份**：调用方自己解释的两个槽位。基座不读它们，只保证**原样随行带走**
      * （复制、粘贴、增行、假删除回填都要靠它）。
