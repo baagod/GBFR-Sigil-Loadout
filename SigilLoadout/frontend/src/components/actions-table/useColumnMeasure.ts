@@ -228,9 +228,6 @@ export function useColumnMeasure(
         })
         el.style.width = prevWidth
         el.style.tableLayout = prevLayout
-        /* 量出来与现在一模一样就别换（`rows` 一变就重量，编辑一格不该跟着重渲一遍）。 */
-        setColumnSizing((prev) => (sameWidth(prev, sizes) ? prev : sizes))
-        setMeasured(true)
 
         /*
             ‼️ **量到"稳定"为止**（连着两趟结果一样才收手）—— 不猜弹窗动画有多长。
@@ -241,7 +238,13 @@ export function useColumnMeasure(
             可见"晚一点量就对"；但晚多久没法猜（展开动画、字体就绪时间都不定），
             所以判据用**结果**：这一趟与上一趟不同，就下一帧再来一趟，直到两趟一致（上限 20 帧防打转）。
         */
-        const fingerprint = keys.map((k) => sizes[k]).join(",")
+        /*
+            ‼️ 指纹里**必须带上表格自己的布局宽**（`offsetWidth`，免疫 transform）：
+            只看列宽数值的话，布局还在收尾时相邻两趟可能给出**同一个偏小值**（真机 +16ms 与 +24ms 都是 73），
+            于是提前落定、用户仍会看到 73 → 74 跳一下。布局宽在收尾期间是变化的（实测 1066 → 1122），
+            带上它才真正等到"排完了"。
+        */
+        const fingerprint = `${el.offsetWidth}:${keys.map((k) => sizes[k]).join(",")}`
         if (fingerprint !== lastSizes.current) {
             lastSizes.current = fingerprint
             if (extraPasses.current < 20) {
@@ -255,7 +258,11 @@ export function useColumnMeasure(
             不归零的话，一个长命表格累计用满 20 次之后，指纹补测就**永久失效**（真机表现：
             此后换动作、换数据都不再补测，列宽停在旧值上）。
         */
+        /* 两趟一致：这一份尺寸就是定稿。落定之前表格一直 invisible，所以用户看不到中间那几帧。 */
         extraPasses.current = 0
+        /* 量出来与现在一模一样就别换（`rows` 一变就重量，编辑一格不该跟着重渲一遍）。 */
+        setColumnSizing((prev) => (sameWidth(prev, sizes) ? prev : sizes))
+        setMeasured(true)
     }, [tableRef, keys, data, fixedWidths, shownTick])
 
     /*
@@ -275,13 +282,30 @@ export function useColumnMeasure(
         const box = tableRef.current?.parentElement
         if (!box || typeof ResizeObserver === "undefined") return
         let lastWidth = box.clientWidth
-        const observer = new ResizeObserver(() => {
-            if (box.clientWidth !== lastWidth) {
-                lastWidth = box.clientWidth
-                setShownTick((v) => v + 1)
+        /*
+            ‼️ **也盯表格自己的布局宽**：弹窗展开动画是 `transform`，滚动容器的 `clientWidth` 期间一直不变，
+            但**表格自身的布局宽会变**（实测 1066 → 1122，数据与字体到位后才定）—— 那才是"能不能量准"的信号。
+            "连续两帧列宽相同"会被骗过：布局停在 1066 那段时间里连测两帧都是 73，于是提前落定、用户看到 73 → 74。
+            写列宽会反过来改表格宽，所以同样加一道"宽度真的变了"的闸断掉回环。
+        */
+        const table = tableRef.current
+        let lastTableWidth = table?.offsetWidth ?? 0
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                if (entry.target === table) {
+                    const width = (entry.target as HTMLElement).offsetWidth
+                    if (width !== lastTableWidth) {
+                        lastTableWidth = width
+                        setShownTick((v) => v + 1)
+                    }
+                } else if (box.clientWidth !== lastWidth) {
+                    lastWidth = box.clientWidth
+                    setShownTick((v) => v + 1)
+                }
             }
         })
         observer.observe(box)
+        if (table) observer.observe(table)
         return () => observer.disconnect()
     }, [tableRef])
 
