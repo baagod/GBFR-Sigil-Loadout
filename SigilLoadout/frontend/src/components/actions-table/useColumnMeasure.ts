@@ -64,7 +64,7 @@ export function useColumnMeasure(
             （容器还窄、字体还是回退字体），量出来的宽度被永久锁死 → 表头截成 `StartTi…`，怎么重开都不变。
 
             改成"每次都按内容重量"之后，两张表走的是**同一条**路：`keys` 变（换轨）会重量、
-            字体加载完会重量（见下面那个 `document.fonts` 的 effect）、隐藏时也会按帧重试。
+            字体加载完会重量（见下面那个 `document.fonts` 的 effect）。
             重量是安全的：下面先把表放开成 `max-content` + `table-layout: auto` 并清掉旧宽度，
             所以量到的永远是**内容**的自然宽度；重量的结果若与上次相同，`setState` 会被 React 挡掉。
         */
@@ -300,25 +300,6 @@ export function useColumnMeasure(
      *
      * 代价：每次数据变化最多 5 次 DOM 扫描（每次都只在"还有格子放不下"时才继续），不是每帧。
      */
-    /*
-        ‼️ **动画结束后补测一趟**（不猜时长）。
-
-        上面那道闸门会让"动画期间的测量"直接跳过 —— 那期间表格按内容自然排，不会截断；
-        动画一结束就得有人请它量一趟，否则列宽会一直停在"自然布局"上。
-        所以这里等**这一页正在跑的动画**全部 `finished`，再 `setShownTick` 触发测量：
-        时长由浏览器告诉我们（不用猜 350ms 还是 400ms），也不再出现"先窄后宽"的抖动。
-        ⚠️ 没有动画时 `getAnimations()` 为空 → `Promise.all([])` 立即完成，等于立刻量一次，行为不变。
-    */
-    useEffect(() => {
-        let alive = true
-        const animations = typeof document.getAnimations === "function" ? document.getAnimations() : []
-        void Promise.all(animations.map((animation) => animation.finished.catch(() => undefined))).then(() => {
-            if (alive) setShownTick((v) => v + 1)
-        })
-        return () => {
-            alive = false
-        }
-    }, [])
 
     const patches = useRef<{data: unknown; count: number}>({data: null, count: 0})
     useEffect(() => {
