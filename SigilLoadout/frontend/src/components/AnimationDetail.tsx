@@ -16,7 +16,7 @@ import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigi
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
-import {FLAG_KEYS, FlagsGrid, TrackGrid} from "@/components/TrackGrid"
+import {FLAG_KEYS, TrackGrid} from "@/components/TrackGrid"
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import type {RowCommands} from "@/components/actions-table/useRowCommands"
 import {TrackToolbar} from "@/components/TrackToolbar"
@@ -71,18 +71,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         行形状统一（`FlagRow` = `TrackRow`）之后，它没有任何理由与别的轨分开存；分开的代价是每个操作
         都要写 `key === flagsKey` 的分支，以及原值也要单独存一份。
 
-        `flags` / `setFlags` 这两个名字**保留**，但它们只是这一格容器的视图：前者派生，后者把更新写回去
-        （兼容函数式更新）。这样几十处读写都不用改，容器却只有一份。
+        `flags` 只是这一格容器的视图（派生）；写回去一律走 `setTables`，与别的轨同一条路。
     */
     const [tables, setTables] = useState<Record<string, TrackTable>>({})
     const flags: FlagRow[] = tables[flagsKey]?.rows ?? []
-    const setFlags = (update: FlagRow[] | ((prev: FlagRow[]) => FlagRow[])) =>
-        setTables((prev) => {
-            const table = prev[flagsKey]
-            if (!table) return prev
-            const rows = typeof update === "function" ? update(table.rows) : update
-            return {...prev, [flagsKey]: {...table, rows}}
-        })
+
     const [dirty, setDirty] = useState<string[]>([])
     const [fsmNames, setFsmNames] = useState<string[]>([])
     const [fsmName, setFsmName] = useState<string | null>(null)
@@ -181,26 +174,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     const markDirty = (key: string) =>
         setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]))
 
-    /**
-     * 改 flags 的一格：只在真变了的时候记改动。"改回原值就退回灰"由与原表的比较自动得出；
-     * **清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值，而不是一个空串。
-     */
-    const editFlag = (index: number, key: string, value: string) => {
-        const row = flags[index]
-        const orig = isOriginal(row) ? baseline?.tables[flagsKey]?.rows[row.orig] : undefined
-        const next = value === "" && orig ? (orig.values[key] ?? "") : value
-        setFlags((prev) =>
-            prev.map((r, i) => {
-                if (i !== index || (r.values[key] ?? "") === next) return r
-                // 含义不再写回行里：Flag0 / Flag1 那两格是按当前值现算的（见 TrackGrid 的 flagPickers），
-                // 后端读出来的 flag0Effects / flag1Effects 界面已经不显示了。
-                return {...r, values: {...r.values, [key]: next}}
-            })
-        )
-        markDirty(flagsKey)
-    }
 
-    /** 改通用轨的一格。清空同样 = 回到原值（见 editFlag）；删除态的行照样能改。 */
+    /** 改一格（flags 与普通轨共用）。**清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
         const row = tables[key]?.rows[index]
         const orig = isOriginal(row) ? baseline?.tables[key]?.rows[row.orig] : undefined
@@ -425,42 +400,27 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                         </div>
                     </div>
                     <div className="pt-1 pb-4">
-                        {info.kind === "flags" ? (
-                            // 两张轨表 = 基座表 + 数据：选中 / 复制粘贴 / 边框全部由基座负责；
-                            // 这里给数据、给"行序能拖"，编辑再收回来更新本层（工具条与保存照旧）。
-                            <FlagsGrid
-                                rows={flags}
-                                t={t}
-                                originals={baseline?.tables[flagsKey]?.rows}
-                                onEdit={(rowId, field, value) => editFlag(Number(rowId), field, value ?? "")}
-                                onReorder={(from, to) => reorder(key, from, to)}
-                                /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
-                                onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
-                                onCopyReady={(copy) => {
-                                    copyEntry.current[key] = copy
-                                }}
-                                onRowsReady={(commands) => {
-                                    rowCommands.current[key] = commands
-                                }}
-                                onRowsChange={applyRowChange(key)}
-                            />
-                        ) : (
-                            <TrackGrid
-                                table={tables[key]}
-                                t={t}
-                                originals={baseline?.tables[key]?.rows}
-                                onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
-                                onReorder={(from, to) => reorder(key, from, to)}
-                                onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
-                                onCopyReady={(copy) => {
-                                    copyEntry.current[key] = copy
-                                }}
-                                onRowsReady={(commands) => {
-                                    rowCommands.current[key] = commands
-                                }}
-                                onRowsChange={applyRowChange(key)}
-                            />
-                        )}
+                        {/*
+                            ‼️ **一块表，一张网格**：flags 与普通轨的行形状、容器、路径全统一之后，渲染也只剩这一处 ——
+                            差别（列说明、值格参数）由 `TrackGrid` 按 `table.kind` 自己分辨，调用方不必再分。
+                            两张表都从 `tables[key]` 取数据，编辑走同一个 `editValue`。
+                        */}
+                        <TrackGrid
+                            table={tables[key]}
+                            t={t}
+                            originals={baseline?.tables[key]?.rows}
+                            onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
+                            onReorder={(from, to) => reorder(key, from, to)}
+                            /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
+                            onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
+                            onCopyReady={(copy) => {
+                                copyEntry.current[key] = copy
+                            }}
+                            onRowsReady={(commands) => {
+                                rowCommands.current[key] = commands
+                            }}
+                            onRowsChange={applyRowChange(key)}
+                        />
                     </div>
                 </Fragment>
             )

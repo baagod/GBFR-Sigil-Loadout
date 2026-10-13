@@ -138,11 +138,20 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
         [table, originals],
     )
     if (!table) return null
+    /*
+        ‼️ **flags 与普通轨的差别只剩"列怎么上屏"**：flags 有列说明（`columnOf`）与两个值格参数
+        （`pickerOf`：多选、不带搜索框），别的轨按后端给的列名直接上屏。这两样由 `table.kind` 分辨 ——
+        调用方从此不必再为它挑组件。
+    */
+    const isFlags = table.kind === "flags"
+    const columnSpec = useMemo(() => (isFlags ? columnOf(t) : undefined), [isFlags, t])
     return (
         <TrackShell
             t={t}
             rows={rowItems}
             keys={table.columns}
+            columnOf={columnSpec}
+            pickerOf={isFlags ? (key) => flagPickers[key] : undefined}
             onEdit={onEdit}
             onReorder={onReorder}
             onSelectionChange={onSelectionChange}
