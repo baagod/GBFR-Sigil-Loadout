@@ -730,6 +730,20 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
         const direction = ARROW_KEYS[e.key]
         const isEnter = e.key === "Enter"
         if ((!direction && !isEnter) || e.defaultPrevented) return
+        /*
+            ‼️ **同一时刻只有"当前那一层"的表响应用户的按键**。
+
+            每张表都往 `document`（捕获）挂了这一条，而弹窗打开时**底下的表并没有卸载** —— 它们照样收得到
+            事件。以前靠"自己有没有选区"分派，于是"底下那张表刚好选过东西"时按键被它接走（它还
+            `preventDefault` 了）：弹窗里那张表一记都收不到，表现就是"方向键要按两次才动一格"（用户报的）。
+
+            判据用**层的归属**：表在哪个 [role=dialog] 里，就只认那一层是当前层；不在任何弹窗里的表，
+            只在"确实没有弹窗"时响应。与"是哪张表、有几个值格列"无关 —— 所有表同一套。
+        */
+        const 我的层 = tableRef.current?.closest("[role=dialog]") ?? null
+        const 弹窗们 = document.querySelectorAll("[role=dialog]")
+        const 活动层 = 弹窗们.length > 0 ? 弹窗们[弹窗们.length - 1] : null
+        if (我的层 !== 活动层) return
         // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
         const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
         const shift = mods === SHIFT
