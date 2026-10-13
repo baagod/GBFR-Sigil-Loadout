@@ -190,21 +190,10 @@ export function CellPick({
     }, [])
 
     /** 登记"这一格的进编辑"（= 展开列表），与普通格子的 `Cell.enterEdit` 一一对应。 */
+    /** 列表容器：**挂上来的那一刻**把焦点交给它（弹层是异步挂的，见下面 `<ComboboxList ref>`）。 */
+    const 列表 = useRef<HTMLElement | null>(null)
     useEnterEditHandler(cellKey, openForEdit)
 
-    /**
-     * **列表一打开，就把焦点交给列表**（`ComboboxList` 自带 `tabIndex=-1`，就是为可编程聚焦准备的）。
-     *
-     * ‼️ 方向键的导航在**列表那一层**（floating-ui 的 `useListNavigation` + 复合列表的 roving focus），
-     * 不在输入框上（`ComboboxInput` 的 `onKeyDown` 只管 Home / End / Escape / Enter / Backspace）。
-     * 焦点不进列表，那一层就收不到按键 —— 表现就是"列表展开后上下键不导航"。
-     * 有搜索框的那几档本来就会把焦点带进弹层，所以只有"无搜索框"的轨表值格在踩这个坑。
-     */
-    useEffect(() => {
-        if (!open) return
-        /* 只取"当前开着的那一个"：同页可能有别的值格，但列表同时只会开一个。 */
-        document.querySelector<HTMLElement>('[data-slot="combobox-content"] [role="listbox"]')?.focus()
-    }, [open])
 
     /**
      * Ctrl / Cmd+C：**直接复制这一格的值**，不用先划选（与 `EditableCell` 同一套手感）。
@@ -370,7 +359,18 @@ export function CellPick({
                     （floating-ui 的 `useListNavigation` + 复合列表），焦点进列表就行 —— 见下面那个 effect。
                 */}
                 {searchPlaceholder && <ComboboxInput placeholder={searchPlaceholder} showTrigger={false} />}
-                <ComboboxList>
+                <ComboboxList
+                    ref={(el) => {
+                        /*
+                            ‼️ 弹层是**异步挂载**的：`open` 变 true 那一帧列表还没进 DOM（在 effect 里
+                            querySelector 取不到，等于没聚焦 —— 上一版就是栽在这）。所以在"挂上来"的这一刻聚焦：
+                            焦点进列表，方向键那一层（floating-ui 的 useListNavigation）才收得到。
+                            用户实测：展开后手动点一下列表内部就能导航，差别只在这一个焦点。
+                        */
+                        列表.current = el
+                        if (el && open && document.activeElement !== el) el.focus()
+                    }}
+                >
                     {(item: string) => (
                         /*
                             **原值那一项灰字**：单选看"这一项就是原值"、多选看"这一位在原值里就置着"——
