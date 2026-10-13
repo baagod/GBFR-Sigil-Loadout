@@ -97,7 +97,15 @@ export const CellContent = memo(function CellContent({
     */
     const shouldEditOnClick = () => {
         const press = pressRef.current
-        return press !== null && press.cellKey === snapshotKey(rowId, fieldKey) && press.wasSelected && press.wasOnlyCell
+        return (
+            press !== null &&
+            press.cellKey === snapshotKey(rowId, fieldKey) &&
+            press.wasSelected &&
+            press.wasOnlyCell &&
+            !press.withModifier
+            /* ‼️ 带修饰键的那一下是**改选区**（Ctrl 减选 / Shift 扩选）：减完之后这一格已经不在选中区里，
+               放行就会在一个"没被选中"的格子上打开输入框 / 展开列表（用户报的那个）。 */
+        )
     }
     /*
         **值格只有一个入口**：两种来路在这里归一 ——

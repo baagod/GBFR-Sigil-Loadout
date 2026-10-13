@@ -392,6 +392,14 @@ export type PressFacts = {
     wasSelected: boolean
     /** 按下之前选区**就只有这一格**（多格选着点一格 = 收选区，不进编辑）。 */
     wasOnlyCell: boolean
+    /**
+     * 按下时**按着修饰键**（Shift / Ctrl / Cmd）。
+     *
+     * ‼️ 带修饰键的一下是"改选区"的手势，**永远不进编辑**：Ctrl 点已选中的格子是**减选**，
+     * 而减完之后这一格不再是选中态了 —— 若还按"先选后编"放行，就会在一个**没被选中**的格子上
+     * 打开输入框（用户报的"Ctrl 取消选择之后它进了编辑"）。Shift 同理（扩选是选区手势）。
+     */
+    withModifier: boolean
 }
 
 /**

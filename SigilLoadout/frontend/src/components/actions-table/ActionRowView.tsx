@@ -114,6 +114,8 @@ const RowCell = memo(function RowCell({
                     cellKey: snapshotKey(row.id, fieldKey),
                     wasSelected: selected,
                     wasOnlyCell: isSingleCellBounds(getSelectionBounds()),
+                    /* 带修饰键 = 改选区的手势（Ctrl 减选 / Shift 扩选），那一下不该进编辑（见 `PressFacts`）。 */
+                    withModifier: e.shiftKey || e.ctrlKey || e.metaKey,
                 }
                 startCellSelection(cell, e)
             }}

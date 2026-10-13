@@ -238,6 +238,30 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(cell.firstElementChild!.className).toContain("text-muted-foreground")
     })
 
+    /*
+        ‼️ **带修饰键的那一下是"改选区"的手势，永远不进编辑**（用户报的：Ctrl 取消选择之后它进了编辑）。
+
+        Ctrl 点在已选中的格子上是**减选** —— 减完之后这一格已经不在选中区里了，而"先选后编"的判据
+        （按下之前是唯一选中格）那时仍然成立，于是会在一个**没被选中**的格子上打开输入框。
+        判据因此多带一条"按下时没按修饰键"（见 `PressFacts.withModifier`）。
+    */
+    it("Ctrl 点已选中的格子：只减选，不进编辑", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2)
+        clickToEdit(cell) // 先选中并进编辑
+        const input = cell.querySelector("input")!
+        expect(input).not.toBeNull()
+        fireEvent.blur(input) // 收起输入框，回到"唯一选中格"这一态
+        expect(cell.querySelector("input")).toBeNull()
+
+        fireEvent.mouseDown(cell.firstElementChild!, {button: 0, ctrlKey: true})
+        fireEvent.focus(cell.firstElementChild!)
+        fireEvent.click(cell.firstElementChild!, {ctrlKey: true})
+
+        expect(cell.querySelector("input")).toBeNull() // 没进编辑
+        expect(container.querySelectorAll("td.cell-selected").length).toBe(0) // 而且真的减选了
+    })
+
     it("Cell 在渲染期同步外部值，不触发 React 的警告", async () => {
         const errors: unknown[][] = []
         const spy = vi.spyOn(console, "error").mockImplementation((...args) => void errors.push(args))
