@@ -350,7 +350,17 @@ export function CellPick({
             >
                 {/* 搜索框放**弹层里**（格子里那层是触发器，塞输入框就变"可打字"了）、放列表**外面**
                     （滚的是列表，搜索框不动）。零 className —— 与官方示例 `ComboboxInPopup` 一致。 */}
-                {searchPlaceholder && <ComboboxInput placeholder={searchPlaceholder} showTrigger={false} />}
+                {/*
+                    ‼️ **这个输入框必须始终渲染**：base-ui 的键盘导航（上下键选、Enter 确认、Esc 关）
+                    挂在它身上 —— 没有它时列表打得开却**按不动**（轨表的 `flag0` / `flag1` 没有搜索需求，
+                    一直在踩这个坑："值格展开后上下方向键不导航"）。
+                    没有搜索需求时用 `sr-only` 藏起来：看不见，但仍可聚焦、键盘照走。
+                */}
+                <ComboboxInput
+                    placeholder={searchPlaceholder ?? ""}
+                    showTrigger={false}
+                    className={searchPlaceholder ? undefined : "sr-only"}
+                />
                 <ComboboxList>
                     {(item: string) => (
                         /*
