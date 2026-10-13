@@ -578,8 +578,8 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     )
 }
 
-const flagsKey = "0flags"
-
+/** flags 那条轨的 key：不属于任何 `sub`（`0`），种类是 `flags` —— 由 `trackKey` 派生，别在这里写魔数。 */
+const flagsKey = trackKey({sub: "0", kind: "flags"})
 function trackKey(info: {sub: string; kind: string}): string {
     return info.sub + info.kind
 }
