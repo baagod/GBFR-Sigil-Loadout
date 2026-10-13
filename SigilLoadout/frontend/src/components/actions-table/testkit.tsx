@@ -356,6 +356,16 @@ export function clickToEdit(cell: HTMLElement) {
  */
 export const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
 
+/** `Element.prototype.scrollTo` 的只记账桩（happy-dom 不滚动）：`scrolls` 收 `this`，`restore()` 放 `finally`。 */
+export function captureScrolls() {
+    const scrolls: HTMLElement[] = []
+    const original = Element.prototype.scrollTo
+    Element.prototype.scrollTo = function (this: HTMLElement) {
+        scrolls.push(this)
+    }
+    return {scrolls, restore: () => void (Element.prototype.scrollTo = original)}
+}
+
 /** 列表项（浮层挂在 body 上，所以从 `document` 找）。 */
 export const pickItems = () => [...document.querySelectorAll<HTMLElement>('[data-slot="combobox-item"]')]
 

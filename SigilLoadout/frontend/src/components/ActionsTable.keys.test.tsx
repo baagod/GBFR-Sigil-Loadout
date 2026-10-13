@@ -17,7 +17,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {CONTROL_TYPES} from "@/lib/controltypes"
 import {PICK_MARK} from "@/components/actions-table/classes"
-import {KEYS, LongField, cellAt, clickToEdit, handleAt, openPick, pressHandle, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
+import {KEYS, LongField, captureScrolls, cellAt, clickToEdit, handleAt, openPick, pressHandle, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -220,11 +220,7 @@ describe("动作表 · 方向键移动活动格", () => {
         const container = await renderTable()
         const restoreGeometry = stubRevealGeometry(container) // 让"跟随可视"确实要滚（见那个助手的说明）
         /* 钉"排在一帧之后"用 `scrollTo` 的调用记录（`this` 就是滚动容器）。 */
-        const scrolled: HTMLElement[] = []
-        const original = Element.prototype.scrollTo
-        Element.prototype.scrollTo = function (this: HTMLElement) {
-            scrolled.push(this)
-        }
+        const {scrolls: scrolled, restore} = captureScrolls()
 
         try {
             selectCell(cellAt(container, 0, 0))
@@ -244,7 +240,7 @@ describe("动作表 · 方向键移动活动格", () => {
             // 滚完之后活动格是**新**那一格
             expect(container.querySelector("td.cell-active")?.getAttribute("data-col-id")).toBe(colIdAt(container, 0, 1))
         } finally {
-            Element.prototype.scrollTo = original
+            restore()
             restoreGeometry()
         }
     })
@@ -261,11 +257,7 @@ describe("动作表 · 方向键移动活动格", () => {
     it("点已选中的格子进编辑：也要跟随可视（scrollOnce）", async () => {
         const container = await renderTable()
         const restoreGeometry = stubRevealGeometry(container)
-        const scrolled: HTMLElement[] = []
-        const original = Element.prototype.scrollTo
-        Element.prototype.scrollTo = function (this: HTMLElement) {
-            scrolled.push(this)
-        }
+        const {scrolls: scrolled, restore} = captureScrolls()
 
         try {
             /* ① 选中它：这一下会滚（活动格换了人）。 */
@@ -293,7 +285,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(scrolled).toHaveLength(1)
             expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
         } finally {
-            Element.prototype.scrollTo = original
+            restore()
             restoreGeometry()
         }
     })
@@ -307,11 +299,7 @@ describe("动作表 · 方向键移动活动格", () => {
     it("Enter 进编辑：并且跟随可视", async () => {
         const container = await renderTable()
         const restoreGeometry = stubRevealGeometry(container)
-        const scrolled: HTMLElement[] = []
-        const original = Element.prototype.scrollTo
-        Element.prototype.scrollTo = function (this: HTMLElement) {
-            scrolled.push(this)
-        }
+        const {scrolls: scrolled, restore} = captureScrolls()
 
         try {
             const col = KEYS.indexOf(LongField) // 可编辑列
@@ -331,7 +319,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(cell.querySelector("input")).not.toBeNull() // 进了编辑
             expect(scrolled).toHaveLength(1) // 且跟随可视
         } finally {
-            Element.prototype.scrollTo = original
+            restore()
             restoreGeometry()
         }
     })

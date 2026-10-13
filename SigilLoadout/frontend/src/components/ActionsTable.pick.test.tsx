@@ -17,7 +17,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, pressTrigger, selectCell, stubRevealGeometry, tick, useTableHarness} from "@/components/actions-table/testkit"
+import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, pressTrigger, selectCell, stubRevealGeometry, tick, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -186,11 +186,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
 
         const restoreGeometry = stubRevealGeometry(container)
         /* 钉前提用：`scrollTo` 被调过就说明"跟随可视"真的走了滚动那一趟。 */
-        const scrolled: HTMLElement[] = []
-        const originalScrollTo = Element.prototype.scrollTo
-        Element.prototype.scrollTo = function (this: HTMLElement) {
-            scrolled.push(this)
-        }
+        const {scrolls: scrolled, restore} = captureScrolls()
 
         try {
             const cell = cellAt(container, 0, PICK_COL)
@@ -215,7 +211,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
             container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
             await waitFor(() => expect(isPickOpen()).toBe(false))
         } finally {
-            Element.prototype.scrollTo = originalScrollTo
+            restore()
             restoreGeometry()
         }
     })
@@ -243,18 +239,14 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         Object.defineProperty(box, "clientHeight", {configurable: true, get: () => 800})
         Object.defineProperty(box, "clientWidth", {configurable: true, get: () => 400})
 
-        const scrolled: HTMLElement[] = []
-        const original = Element.prototype.scrollTo
-        Element.prototype.scrollTo = function (this: HTMLElement) {
-            scrolled.push(this)
-        }
+        const {scrolls: scrolled, restore} = captureScrolls()
 
         try {
             selectCell(cell)
             await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
             expect(scrolled).toHaveLength(0) // 看全了就不滚
         } finally {
-            Element.prototype.scrollTo = original
+            restore()
         }
     })
 

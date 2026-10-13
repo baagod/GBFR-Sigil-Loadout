@@ -8,7 +8,7 @@
     ‼️ 返回值里的两个引用都**恒定**：`reveal` 要经 context 下到 `memo` 化的格子里，
     `scrollActiveIntoView` 要挂在活动格那个 ref 上 —— 每渲染换一个新函数等于把 memo 废掉。
 */
-import {useCallback, useRef, type RefObject} from "react"
+import {useCallback, useMemo, useRef, type RefObject} from "react"
 
 import {revealScrollTarget} from "./reveal"
 import type {RevealSession} from "./model"
@@ -91,20 +91,20 @@ export function useReveal(scrollRef: RefObject<HTMLDivElement | null>) {
      * 放模块级就是全页共享：同页两张表会互相让路（A 表跟随可视那一下把 B 表"一滚就收"的规则一起
      * 放过），而且模块级可变状态会让测试按执行顺序时红时绿（脏的那一份漏给下一个测试文件）。
      *
-     * 用 `useRef` 让**引用恒定**：它要经 context 下到 `memo` 的格子里，每次渲染换新对象等于把 memo 废掉。
-     * `revealActiveCell` 本身是 `useCallback([])`，所以首个渲染期闭包里抓到的那个就是最终那份实现。
+     * 用 `useMemo` 让**引用恒定**（它要经 context 下到 `memo` 的格子里）。
      */
     const selfScrollRef = useRef(false)
-    const revealRef = useRef<RevealSession | null>(null)
-    revealRef.current ??= {
-        reveal: revealActiveCell,
-        isSelfScroll: () => {
-            if (!selfScrollRef.current) return false
-            selfScrollRef.current = false // 一次性：消费掉这次报名
-            return true
-        },
-    }
-    const reveal = revealRef.current
+    const reveal = useMemo<RevealSession>(
+        () => ({
+            reveal: revealActiveCell,
+            isSelfScroll: () => {
+                if (!selfScrollRef.current) return false
+                selfScrollRef.current = false // 一次性：消费掉这次报名
+                return true
+            },
+        }),
+        [revealActiveCell],
+    )
     /**
      * "活动格挂上来了"的 ref 回调（`RowCell` 只把它挂给活动格那一格）—— 只是 `revealActiveCell`
      * 的一个**触发源**（另一个是进编辑，见 `RevealContext`）。
