@@ -354,12 +354,15 @@ export function CellPick({
                     ‼️ **这个输入框必须始终渲染**：base-ui 的键盘导航（上下键选、Enter 确认、Esc 关）
                     挂在它身上 —— 没有它时列表打得开却**按不动**（轨表的 `flag0` / `flag1` 没有搜索需求，
                     一直在踩这个坑："值格展开后上下方向键不导航"）。
-                    没有搜索需求时用 `sr-only` 藏起来：看不见，但仍可聚焦、键盘照走。
+
+                    没有搜索需求时**必须让它真正脱离文档流**（`sr-only` 不够：库里输入框外面还有一层容器，
+                    那层照样占高 → 列表顶上多出一段留白）。所以这里用绝对定位 + 零尺寸 + 全透明：
+                    看不见、不占位，但仍可聚焦、键盘照走。
                 */}
                 <ComboboxInput
                     placeholder={searchPlaceholder ?? ""}
                     showTrigger={false}
-                    className={searchPlaceholder ? undefined : "sr-only"}
+                    className={searchPlaceholder ? undefined : "absolute h-px w-px overflow-hidden p-0 opacity-0"}
                 />
                 <ComboboxList>
                     {(item: string) => (
