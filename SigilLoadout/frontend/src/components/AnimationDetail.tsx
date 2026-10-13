@@ -253,14 +253,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
 
     /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     /**
-     * 基座交回来的整行 → 轨表那两种行：值取**完整值**，`orig`/`children` 从行的 `carry` 里拿回来
+     * 基座交回来的整行 → 轨表的行：值取**完整值**，行身份直接读 `orig` / `children`
      * （基座不解释它，只负责带着走）。
      *
      * ‼️ **假删除在这一层做**：基座只会真删（它不认识"原行"），所以"本来有原身份、又被删掉"的那些要
      * 加回来标红 —— 那才是轨表的保存语义（原行留着但不部署）。
      */
     const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
-        const carryOf = (row: ActionRow) => (row.carry ?? {}) as {orig?: number | null; children?: TrackRow["children"]}
+
         const columns: readonly string[] = key === flagsKey ? FLAG_KEYS : (tables[key]?.columns ?? [])
         /*
             ‼️ **两种轨只剩"落进哪个容器"不同**：行形状已经统一（flags 也是 `TrackRow`，那几个字段收在 `values` 里），
@@ -269,11 +269,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         const toRow = (row: ActionRow, index: number): TrackRow => ({
             index,
             values: Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])),
-            children: carryOf(row).children ?? [],
-            orig: carryOf(row).orig ?? null,
+            children: (row.children ?? []) as TrackRow["children"],
+            orig: row.orig ?? null,
             removed: undefined,
         })
-        const restored = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
+        const restored = deleted.filter((row) => row.orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
         const rows = [...next.map(toRow), ...restored]
         if (key === flagsKey) setFlags(rows)
         else

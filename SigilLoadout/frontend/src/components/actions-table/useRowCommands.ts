@@ -67,15 +67,20 @@ export function useRowCommands({
     /**
      * 造一行新行：值照 `source` 抄（按本表的列），行身份是"新"（`originals` 空 = 没有原值可回落）。
      *
-     * ‼️ `carry` **原样带走**：轨表挂在行上的 `orig`（原版第几行）与 `children`（子节点）都在里面，
+     * ‼️ **行身份原样带走**：轨表挂在行上的 `orig`（原版第几行）与 `children`（子节点），
      * 不带就会被基座这次往返抹掉（`attack` 行的 `<AilmentNN>` 就是那样丢的）。
      */
-    const makeRow = (source: RowSnapshot | ActionRow | undefined): ActionRow => ({
-        id: `newRows${nextId.current++}`,
-        values: Object.fromEntries(keys.map((key) => [key, source === undefined ? "" : "id" in source ? shownValue(source as ActionRow, key) : (source[key] ?? "")])),
-        originals: {},
-        carry: source !== undefined && "id" in source ? source.carry : undefined,
-    })
+    const makeRow = (source: RowSnapshot | ActionRow | undefined): ActionRow => {
+        /* `RowSnapshot` 是"列名 → 值"的普通对象，所以 `"id" in source` 收窄不了联合类型 —— 这里断言一次。 */
+        const carried = source !== undefined && "id" in source ? (source as ActionRow) : undefined
+        return {
+            id: `newRows${nextId.current++}`,
+            values: Object.fromEntries(keys.map((key) => [key, source === undefined ? "" : carried ? shownValue(carried, key) : (source[key] ?? "")])),
+            originals: {},
+            orig: carried?.orig,
+            children: carried?.children,
+        }
+    }
 
     /**
      * 把 `newRows` 插到 `after` 那一行之后（`after < 0` 或越界 = 行末）。

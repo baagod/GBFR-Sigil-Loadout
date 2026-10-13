@@ -54,13 +54,14 @@ const toRow = (
     originals: plain(original),
     removed: row.removed === true,
     /*
-        ‼️ **行身份必须随行带走**：基座不解释 `carry`，但复制/粘贴/增行都要原样带着它跑
+        ‼️ **行身份必须随行带走**：基座只原样搬 `orig` / `children`，复制/粘贴/增行都靠它
         （见 `useRowCommands` 的 `makeRow`）。不写它，`AnimationDetail.applyRowChange` 就读不到 `orig`：
         假删除的回填会恒为空（删原行直接消失、不标红），而且所有存活行 `orig` 变 null →
         `plain()` 产出 `{}` → `delta` 把每个非空值都当成"改过"（整表发亮、清空回原值也失效）。
         真机症状就是这么来的 —— `markRow` 是唯一来源，别在半路把它丢掉。
     */
-    carry: {orig: row.orig ?? null, children: row.children ?? []},
+    orig: row.orig ?? null,
+    children: row.children ?? [],
 })
 
 /**
