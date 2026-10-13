@@ -58,8 +58,10 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
             expect(table.style.width).not.toBe("")
             // 数据列看**第二格**（第一格是行号，它给的是固定宽度，不能拿它当"量过了"的证据）。
             expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).not.toBe("")
-            // 向上取整（77.4 → 78）：`round` 会取成 77、比自然宽度还窄，表头末尾就被截成 …
-            expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).toBe("78px")
+            // 向上取整（77.4 → 78）**再 +1px 边框**：`sizes` 写进 `td` 是 border-box（列宽含右边框），
+            // 而测量算的是「内容 + 内边距」—— 不加这 1px 每列就正好少一个字（真机实测过）。
+            // 另外别用 `round`：77.4 会取成 77、比自然宽还窄，表头末尾被截成 `…`。
+            expect((container.querySelectorAll("thead th")[1] as HTMLElement).style.width).toBe("79px")
         } finally {
             vi.restoreAllMocks()
         }

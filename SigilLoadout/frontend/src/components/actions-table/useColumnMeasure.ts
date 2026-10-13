@@ -49,7 +49,6 @@ export function useColumnMeasure(
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
     /** 量过了没有 —— 没量之前用 `table-auto`（要量出**自然宽度**），量完切 `table-fixed`。 */
     const [measured, setMeasured] = useState(false)
-    /** "这块被显示出来之后再来一遍"的重试计数（见文件头那段：隐藏着量什么都是 0）。 */
     const [shownTick, setShownTick] = useState(0)
     /** 上一趟量出来的列宽指纹（"稳定了没有"的判据：两趟一样就收手，见测量末尾那段）。 */
     const lastSizes = useRef("")
@@ -94,6 +93,17 @@ export function useColumnMeasure(
                 之后再怎么展开都救不回来；动作表首次测量就在宽容器里，所以一直没事）。
             量完两样都还原，交给下面按测量结果锁布局。
         */
+
+        /*
+            ‼️ **弹窗展开动画是 `transform: scale`，而 `getBoundingClientRect()` 返回变换后尺寸** ——
+            直接读会被乘上 0.96~0.99（真机：74 量成 69/70/72），这就是"打开瞬间量不准、随后又跳一次"的根因。
+            但 `offsetWidth` / `clientWidth` 是**布局尺寸、不受 transform 影响**，于是：
+              `scale = rect.width / offsetWidth`，几何值一律 `÷ scale` 还原。
+            这样**动画进行中量的就是真值**，表格第一帧即是最终宽度，不必等动画结束、也不必隐藏或延迟出现。
+            （`natural` 用除法而不是直接取 `offsetWidth`：后者是整数，会丢亚像素、少 1px。）
+        */
+        const layoutScale = el.offsetWidth > 0 ? el.getBoundingClientRect().width / el.offsetWidth : 1
+
         const prevWidth = el.style.width
         const prevLayout = el.style.tableLayout
         el.style.width = "max-content"
@@ -131,6 +141,50 @@ export function useColumnMeasure(
         ruler.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;white-space:nowrap"
         document.body.appendChild(ruler)
 
+        /*
+            ‼️ **表体内容也要量**（只靠 `natural` 不够）。
+
+            真机（002c）：`natural` 读到 73，而那一列的文本需要 75 —— 末尾一个字被 `truncate` 吃掉；
+            `flag0` / `flag1` / `endTime` 全是同一回事（列宽总比内容少 2px）。
+            表头那把尺子量的是**表头文字**，数据比表头宽时它帮不上忙，于是全靠那个偏小的 `natural`。
+
+            `truncate` 元素的 `scrollWidth` 是**内容真实宽**（不随列宽变），所以按列取它当第二个来源。
+            ⚠️ 但它**是取整的**：真机 `flag0` 的 `scrollWidth/clientWidth` 是 39/39（看着刚好放下），
+            渲染出来却是 `1229…` —— 少的是那不到 1px 的小数。所以每列还要拿**最长的那段文本**，
+            用表头同一把离屏尺子量一次（表头那条路径一直在用尺子，所以表头从不截断）。
+        */
+        const contentWidths = new Map<string, number>()
+        /** 这一列**已经用尺子量过**的最长文本长度（让"每列只量一次"，不是每格都量）。 */
+        const measuredLongest = new Map<string, number>()
+        /*
+            ⚠️ 尺子**不能照抄表体那层的类**：值格那层是 `flex w-full …`，`w-full` 会把离屏 span 撑到
+            整个窗口宽（实测列宽直接爆到 4563px）。字体照**表头内层**那份（与格子同一套字号/字重，但不含宽度）。
+        */
+        const rulerClassName = (el.querySelector("thead th[data-col-id] > div") as HTMLElement | null)?.className ?? ""
+        for (const td of el.querySelectorAll<HTMLElement>("tbody td[data-col-id]")) {
+            const id = td.dataset.colId
+            const cell = td.firstElementChild as HTMLElement | null
+            if (!id || !cell) continue
+            /*
+                ⚠️ `chrome` 用"外框 − 内层可见宽"**是对的，别改成按 CSS 常量累加**：
+                `cell.scrollWidth` 里**已经含了内边距**，所以这个差值恰好只剩**边框**（实测 1px）；
+                按 CSS 再加一遍 padding/gap/箭头就是重复计算（试过：算出 33，列宽会爆），
+                而且 `columnGap` 在无 gap 时是 `"normal"`、`parseFloat` 得到 NaN。
+            */
+            const chrome = Math.max(0, td.getBoundingClientRect().width / layoutScale - cell.clientWidth)
+            const byScroll = cell.scrollWidth + chrome
+            const text = cell.textContent ?? ""
+            if (text.length > (measuredLongest.get(id) ?? -1)) {
+                measuredLongest.set(id, text.length)
+                ruler.className = rulerClassName
+                ruler.textContent = text
+                const byText = ruler.getBoundingClientRect().width
+                // `+ 1` 是右边框（`sizes` 写进 `td` 是 border-box）。
+                if (byText > 0) contentWidths.set(id, Math.max(contentWidths.get(id) ?? 0, byText + chrome + 2))
+            }
+            contentWidths.set(id, Math.max(contentWidths.get(id) ?? 0, byScroll))
+        }
+
         const sizes: ColumnSizingState = {}
         for (const th of ths) {
             const id = th.dataset.colId
@@ -140,9 +194,9 @@ export function useColumnMeasure(
                 sizes[id] = fixedWidths[id]
                 continue
             }
-            const natural = th.getBoundingClientRect().width
+            const natural = th.getBoundingClientRect().width / layoutScale
             const inner = th.firstElementChild as HTMLElement | null
-            let needed = natural
+            let needed = Math.max(natural, contentWidths.get(id) ?? 0)
             if (inner) {
                 // 内边距 + 边框 = 外框 − 内层可见宽（把"textWidth"换算成"列宽"要加回它）。
                 const padding = Math.max(0, natural - inner.clientWidth)
@@ -150,7 +204,7 @@ export function useColumnMeasure(
                 ruler.textContent = th.textContent
                 const textWidth = ruler.getBoundingClientRect().width
                 // 量不到（比如 happy-dom 没有真实布局，一律 0）就不采信这把尺子，照旧用自然宽。
-                if (textWidth > 0) needed = Math.max(natural, textWidth + padding + 1)
+                if (textWidth > 0) needed = Math.max(needed, textWidth + padding)
             }
             /*
                 ⚠️ 用 `ceil` **向上**取整，不能 `round`。
@@ -159,9 +213,16 @@ export function useColumnMeasure(
                 表头文字就正好放不下、列名末尾被截成 `…`。向上取整最多比自然宽度宽 1px，永不截断。
                 另外 `Math.max(1, …)` 兜住宽度 0 的列（`table-fixed` 下会被挤成一条线）。
             */
-            sizes[id] = Math.max(1, Math.ceil(needed))
+            /*
+                ‼️ **末尾这 + 1 是边框，不是留白**：sizes 写进 	d 是 order-box（含右边框 1px），
+                所以「内容可用宽 = 列宽 − 1」。而上面算出来的 
+eeded 是「内容 + 内边距」，不含那 1px ——
+                不加就每列正好少一个字（真机：startTime 列宽 74 而文本可用 73/需要 74，末尾被吃掉）。
+            */
+            sizes[id] = Math.max(1, Math.ceil(needed) + 1)
         }
         ruler.remove()
+
         /* 清掉的那些宽度原样写回：DOM 不留中间态（React 下次渲染本来也会写回，但别指望它）。 */
         ths.forEach((th, i) => {
             th.style.width = prevColWidths[i] ?? ""
@@ -218,6 +279,59 @@ export function useColumnMeasure(
         observer.observe(box)
         return () => observer.disconnect()
     }, [tableRef])
+
+    /**
+     * 上一份数据补测了几次。
+     *
+     * ‼️ **数据换了之后补测，直到不再溢出**（不猜时机，按结果判）。
+     *
+     * 真机（002c，CDP 量的）：当前列宽普遍少 4px（`startTime` 71/该75、`endTime` 79/该83、`layerFlag` 93/该97
+     * —— 9 列被 `truncate` 吃掉尾巴）；而在页面里**手工把测量重做一遍就得到 75/83/97**。
+     * 可见"算出正确宽度"从来不是问题，缺的是"数据换了之后**真的**再量一趟"。
+     *
+     * ⚠️ 上一版栽在一个很细的地方：这段 effect 的依赖里**没有 `shownTick`** —— 补测那一下（`setShownTick`）
+     * 自己不会让它重跑，于是**只补了一次就收手**，而补测那一趟恰好还太早，偏小的值就留在那儿了
+     * （真机上就是"少 4px"）。现在：依赖补上 `shownTick`，并且允许**补到不再溢出**（上限 5 次防打转）。
+     *
+     * 代价：每次数据变化最多 5 次 DOM 扫描（每次都只在"还有格子放不下"时才继续），不是每帧。
+     */
+    /*
+        ‼️ **动画结束后补测一趟**（不猜时长）。
+
+        上面那道闸门会让"动画期间的测量"直接跳过 —— 那期间表格按内容自然排，不会截断；
+        动画一结束就得有人请它量一趟，否则列宽会一直停在"自然布局"上。
+        所以这里等**这一页正在跑的动画**全部 `finished`，再 `setShownTick` 触发测量：
+        时长由浏览器告诉我们（不用猜 350ms 还是 400ms），也不再出现"先窄后宽"的抖动。
+        ⚠️ 没有动画时 `getAnimations()` 为空 → `Promise.all([])` 立即完成，等于立刻量一次，行为不变。
+    */
+    useEffect(() => {
+        let alive = true
+        const animations = typeof document.getAnimations === "function" ? document.getAnimations() : []
+        void Promise.all(animations.map((animation) => animation.finished.catch(() => undefined))).then(() => {
+            if (alive) setShownTick((v) => v + 1)
+        })
+        return () => {
+            alive = false
+        }
+    }, [])
+
+    const patches = useRef<{data: unknown; count: number}>({data: null, count: 0})
+    useEffect(() => {
+        if (!measured) return
+        const el = tableRef.current
+        if (!el) return
+        const record = patches.current
+        if (record.data !== data) {
+            record.data = data // 换了数据：计数归零，重新给它几次机会
+            record.count = 0
+        }
+        if (record.count >= 30) return
+        /* 还有格子放不下就再量一趟（按结果收敛，不猜时机）。 */
+        const stillOverflowing = [...el.querySelectorAll<HTMLElement>(".truncate")].some((node) => node.scrollWidth > node.clientWidth + 0.5)
+        if (!stillOverflowing) return
+        record.count += 1
+        setShownTick((v) => v + 1)
+    }, [data, measured, tableRef, shownTick])
 
     /*
         ‼️ **字体加载完再量一次**。

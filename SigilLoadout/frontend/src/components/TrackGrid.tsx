@@ -152,7 +152,7 @@ function FlagEffects({row}: {row: ActionRow}) {
             （用户报的"拖选时文本也被选上"）—— Badge 里的名字跟着格子走 `user-select: none` 就好。
             内边距与别的只读格一致（这一列走的是自定义渲染，拿不到 `CellText` 那份）。
         */
-        <div className="flex w-full flex-wrap items-center gap-1 px-1 py-0.75 text-xs">
+        <div className="flex w-full flex-nowrap items-center gap-1 px-1 py-0.75 text-xs">
             {items.map(({name, bit}) => (
                 <Badge key={bit} className="shrink-0 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                     {name === "" ? `bit${bit}` : name}

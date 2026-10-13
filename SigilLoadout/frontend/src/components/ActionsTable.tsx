@@ -1115,7 +1115,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
                     摊走 —— 每列比量出来的整数窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil`
                     的那件事，换个入口再来一遍）。
                 */
-                className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
+                className={`${measured ? "table-fixed " : "invisible "}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
             >
                 <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
