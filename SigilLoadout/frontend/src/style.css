@@ -270,7 +270,14 @@
         ‼️ **环出现的两种情形只在这里写一遍**（判据见上）：环本身与"末列/末行收起 1px"全吃这一份 ——
         拆开写就会漏（漏过一次：第三种情形单独成组、没带上收起，末行值格一点开就冒出纵向滚动条）。
     */
-    &:is(:focus-within, :has(.cell-pick-mark[data-popup-open])) {
+    /*
+        ‼️ **聚焦态那一支必须要求"这一格还在选中区里"**（`.cell-selected`）：Ctrl 点一下是**减选**，
+        浏览器却仍把焦点留在格子上（`focus` 只跟着 `mousedown` 走），于是 `:focus-within` 一直为真、
+        环就留成一道厚边框（用户报的"取消选择后多出厚边框"）。
+        "焦点在格子里"与"这一格被选中"本来就是同一件事（先选后编：点一下同时给两样），
+        所以这条判据不会误伤；选值格开着列表那一支（`:has(...)`）照旧不受影响。
+    */
+    &:is(.cell-selected:focus-within, :has(.cell-pick-mark[data-popup-open])) {
         z-index: var(--z-focus);
 
         &::after {
