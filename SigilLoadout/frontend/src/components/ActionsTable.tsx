@@ -672,9 +672,16 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 工具条那五个按钮由 `onRowsReady` 拿走，键盘那条也走它（见下面那段 keydown）。
      */
     const rowCommands = useRowCommands({rows: modelRows.map((row) => row.original), keys, selectedRowIndexes, activeRowIndex, onChange: onRowsChange})
+    /*
+        ‼️ 命令**用 ref 转发**：`rowCommands` 每渲染都是新对象（它是一包闭包），塞进依赖的话这个 effect
+        就每渲染都跑一次 —— 而调用方拿到命令通常会写自己的 ref 或 setState。ref 里永远是最新那一份，
+        effect 只在回调本身变化时才跑。
+    */
+    const commandsRef = useRef(rowCommands)
+    commandsRef.current = rowCommands
     useEffect(() => {
-        onRowsReady?.(rowCommands)
-    })
+        onRowsReady?.(commandsRef.current)
+    }, [onRowsReady])
 
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
