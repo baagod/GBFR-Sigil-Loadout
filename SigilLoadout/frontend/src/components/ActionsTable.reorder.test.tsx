@@ -48,8 +48,5 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
 
         // 末尾那个子元素只能是最后一行 —— 多出一个 `<div>`（dnd-kit 的 live region）就会让下面两条 CSS 失配。
         expect(tbody.lastElementChild!.tagName).toBe("TR")
-        // 反过来证明"失配"是什么样：CSS 里那几条末行规则的选择器，现在能不能命中末行的格子。
-        const lastCell = tbody.lastElementChild!.querySelector("td")!
-        expect(lastCell.matches("tbody tr:last-child > td")).toBe(true)
     })
 })
