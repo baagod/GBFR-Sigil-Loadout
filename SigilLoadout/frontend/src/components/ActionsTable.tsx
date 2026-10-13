@@ -665,10 +665,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 走了另一条路，**那圈虚线就不会画**（用户报的轨表"复制了却没有虚线、也没法再复制"就是这个）。
      * 有了它，按钮与键盘走的是**同一条**"哪片进剪贴板、虚线画在哪儿"。
      */
-    useEffect(() => {
-        onCopyReady?.(copySelection)
-    }, [onCopyReady, copySelection])
-
     /* 整行选中的那些行**下标**（升序）—— 行级命令读它，与"整行选中"那条上报是同一份判据。 */
     const selectedRowIndexes = modelRows.map((_, index) => index).filter((index) => rowFullySelected(selectionBounds, index, lastColumnIndex))
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
@@ -688,6 +684,20 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     useEffect(() => {
         onRowsReady?.(commandsRef.current)
     }, [onRowsReady])
+
+    /**
+     * **把"复制"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮与键盘 Ctrl+C 都走它。
+     *
+     * ‼️ 交出去的是**一个动作**，不是两个开关：整行选中时要"行进行剪贴板"（供跨表粘行），任何选区又要
+     * "区域进系统剪贴板 + 画那圈虚线"（`copySelection`）。以前调用方得自己把两件事都调一遍、手里还攥着
+     * 一个 `copyEntry` ref —— 漏一个就出问题（用户报的"复制了却没虚线"正是漏了后一件）。这里合成一次。
+     */
+    useEffect(() => {
+        onCopyReady?.(() => {
+            commandsRef.current.copy()
+            copySelection()
+        })
+    }, [onCopyReady, copySelection])
 
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */

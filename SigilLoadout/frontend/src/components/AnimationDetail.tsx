@@ -88,7 +88,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      */
     /** 基座交回来的"复制当前选区"（工具条的「复制」按钮用它 —— 那样才有那圈虚线，见基座 `onCopyReady`）。 */
     /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除都是一份实现，见 `useRowCommands`）。 */
-    /** 基座交回来的**区域复制**（工具条的复制按钮要它才出那圈虚线）。 */
+    /** 基座交回来的**复制动作**（行剪贴板 + 区域剪贴板 + 虚线，合成一次；见基座的 `onCopyReady`）。 */
     const copyEntry = useRef<Record<string, (() => void) | undefined>>({})
     /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除，一份实现见 `useRowCommands`）。 */
     const rowCommands = useRef<Record<string, RowCommands | undefined>>({})
@@ -225,6 +225,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 // ‼️ **不 preventDefault**：这一记 Ctrl+C 还要让**基座**那条路跑 —— 复制区那圈虚线是基座
                 // 画的（它监听表格的 copy 事件）。以前这里拦下按键、自己复制整行，于是基座永远收不到 copy，
                 // 轨表就一直没有虚线，也谈不上"再复制一次把旧区换掉"。
+                // 这里只管"行进行剪贴板"（跨表粘行）；工具条那个按钮走基座的组合动作（行 + 区域 + 虚线）。
                 rowCommands.current[key]?.copy()
             } else if (event.key === "x") {
                 event.preventDefault()
@@ -399,7 +400,6 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 onAdd={() => rowCommands.current[key]?.add()}
                                 onCopy={() => {
                                     // 两条路：行剪贴板（跨表粘行）+ 基座那条区域复制（画虚线）。
-                                    rowCommands.current[key]?.copy()
                                     copyEntry.current[key]?.()
                                 }}
                                 onCut={() => rowCommands.current[key]?.cut()}
