@@ -423,7 +423,7 @@ describe("动作表 · 方向键移动活动格", () => {
         const container = await renderTable()
         const picker = cellAt(container, 0, KEYS.length - 1)
 
-        /* 选值格也是"先选后编"：用台架那套按法（按几下由闸门输入决定，等弹层挂上由它自己轮询）。 */
+        /* 选值格与普通格同一条口径（单击只选、双击才展开）：用台架那套按法（等弹层挂上由它自己轮询）。 */
         selectCell(picker)
         await openPick(picker)
         arrowOn(picker.querySelector<HTMLElement>(`.${PICK_MARK}`)!, "ArrowDown")

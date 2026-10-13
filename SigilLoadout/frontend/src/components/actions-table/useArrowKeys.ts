@@ -145,7 +145,8 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             /*
                 ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
                 那是另一个功能），整行块同理 —— 不做比做错好。
-                判据与 `ActionRowView` 那道 `wasOnlyCell` 闸门**同一条**（同一个函数，见 `selection.ts`）。
+                判据就在下面这一行（`isSingleCellBounds`，见 `selection.ts`）：多格 / 整行选中时按 Enter 的
+                语义不明（Excel 是"填满选区"，那是另一个功能），不做比做错好。
             */
             if (!isSingleCellBounds(getSelectionBounds())) return
             /*

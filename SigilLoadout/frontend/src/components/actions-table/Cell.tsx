@@ -77,8 +77,8 @@ export const CellContent = memo(function CellContent({
         return <CellText padding={READONLY_PADDING} text={fieldKey === "abilityTag_" ? abilityName(abilityNames, shown) : shown} />
     }
     /*
-        ‼️ **双击才进编辑**（Excel / WPS 同一口径）：单击永远只是"选"。所以这里没有"先选后编"那道闸门 ——
-        也就没有"这一次点击算不算编辑"的隐状态（`PressFacts` 那一整条已删）。
+        ‼️ **双击才进编辑**（Excel / WPS 同一口径）：单击永远只是"选"。所以这里没有"这一次点击算不算编辑"
+        那道闸门，也就没有对应的隐状态。
 
         为什么不做成"选中之后再点一下"：那个手势要和**改选区**的手势（Ctrl 减选 / Shift 扩选 / 按住拖）
         抢同一次 mousedown，只能靠"按下那一刻的快照"去猜意图 —— 减选之后格子已经不在选区里，却仍被
