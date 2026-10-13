@@ -244,6 +244,7 @@ export function useColumnMeasure(
             于是提前落定、用户仍会看到 73 → 74 跳一下。布局宽在收尾期间是变化的（实测 1066 → 1122），
             带上它才真正等到"排完了"。
         */
+
         const fingerprint = `${el.offsetWidth}:${keys.map((k) => sizes[k]).join(",")}`
         if (fingerprint !== lastSizes.current) {
             lastSizes.current = fingerprint
