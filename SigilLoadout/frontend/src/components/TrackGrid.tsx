@@ -233,8 +233,7 @@ const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
  * 一行的字段值。**按键表逐个取**（不 `as` 成字典）：于是"有哪些列"与"从哪儿取值"是同一份声明，
  * 行上将来多出的字段（`index` / `orig` / `removed` 那些行身份）也不会顺手被当成可编辑的值。
  */
-const cells = (row: FlagRow): Record<string, string | undefined> =>
-    Object.fromEntries(FLAG_KEYS.map((key) => [key, row[key]]))
+
 
 /**
  * `flag0` / `flag1` 是**多选、不带搜索框**的值格 —— 与动作表值格唯一的差别就是这两个字段
@@ -268,7 +267,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
     const rowItems = useMemo(
         () =>
             rows.map((row, index) =>
-                toRow(index, cells(row), row.orig != null ? cells(originals?.[row.orig]) : undefined, row),
+                toRow(index, row.values, row.orig != null ? originals?.[row.orig]?.values : undefined, row),
             ),
         [rows, originals],
     )

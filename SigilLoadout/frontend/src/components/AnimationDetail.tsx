@@ -166,16 +166,16 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * 改 flags 的一格：只在真变了的时候记改动。"改回原值就退回灰"由与原表的比较自动得出；
      * **清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值，而不是一个空串。
      */
-    const editFlag = (index: number, key: keyof FlagRow, value: string) => {
+    const editFlag = (index: number, key: string, value: string) => {
         const row = flags[index]
         const orig = isOriginal(row) ? baseline?.flags[row.orig] : undefined
-        const next = value === "" && orig ? String(orig[key] ?? "") : value
+        const next = value === "" && orig ? (orig.values[key] ?? "") : value
         setFlags((prev) =>
             prev.map((r, i) => {
-                if (i !== index || String(r[key]) === next) return r
-                // 含义不再写回行里：Flag0 / Flag1 那两格是按当前值现算的（见 TrackGrid 的 FlagPickerCell），
+                if (i !== index || (r.values[key] ?? "") === next) return r
+                // 含义不再写回行里：Flag0 / Flag1 那两格是按当前值现算的（见 TrackGrid 的 flagPickers），
                 // 后端读出来的 flag0Effects / flag1Effects 界面已经不显示了。
-                return {...r, [key]: next}
+                return {...r, values: {...r.values, [key]: next}}
             })
         )
         markDirty(flagsKey)
@@ -262,26 +262,26 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
         const carryOf = (row: ActionRow) => (row.carry ?? {}) as {orig?: number | null; children?: TrackRow["children"]}
         const columns: readonly string[] = key === flagsKey ? FLAG_KEYS : (tables[key]?.columns ?? [])
-        if (key === flagsKey) {
-            const toRow = (row: ActionRow, index: number): FlagRow =>
-                ({...Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])), index, orig: carryOf(row).orig ?? null, removed: undefined}) as FlagRow
-            const restored = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
-            setFlags([...next.map(toRow), ...restored])
-        } else {
+        /*
+            ‼️ **两种轨只剩"落进哪个容器"不同**：行形状已经统一（flags 也是 `TrackRow`，那几个字段收在 `values` 里），
+            所以"造行 + 假删除回填"只写一次。以前这里是两份几乎逐字相同的代码，差别只因为 flags 曾是另一种行形状。
+        */
+        const toRow = (row: ActionRow, index: number): TrackRow => ({
+            index,
+            values: Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])),
+            children: carryOf(row).children ?? [],
+            orig: carryOf(row).orig ?? null,
+            removed: undefined,
+        })
+        const restored = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
+        const rows = [...next.map(toRow), ...restored]
+        if (key === flagsKey) setFlags(rows)
+        else
             setTables((prev) => {
                 const table = prev[key]
                 if (!table) return prev
-                const toRow = (row: ActionRow, index: number): TrackRow => ({
-                    index,
-                    values: Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])),
-                    children: carryOf(row).children ?? [],
-                    orig: carryOf(row).orig ?? null,
-                    removed: undefined,
-                })
-                const restored = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
-                return {...prev, [key]: {...table, rows: [...next.map(toRow), ...restored]}}
+                return {...prev, [key]: {...table, rows}}
             })
-        }
         markDirty(key)
     }
     const reorder = (key: string, from: number, to: number) => {
@@ -416,7 +416,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 rows={flags}
                                 t={t}
                                 originals={baseline?.flags}
-                                onEdit={(rowId, field, value) => editFlag(Number(rowId), field as keyof FlagRow, value ?? "")}
+                                onEdit={(rowId, field, value) => editFlag(Number(rowId), field, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
                                 /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
                                 onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
