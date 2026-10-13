@@ -193,6 +193,20 @@ export function CellPick({
     useEnterEditHandler(cellKey, openForEdit)
 
     /**
+     * **列表一打开，就把焦点交给列表**（`ComboboxList` 自带 `tabIndex=-1`，就是为可编程聚焦准备的）。
+     *
+     * ‼️ 方向键的导航在**列表那一层**（floating-ui 的 `useListNavigation` + 复合列表的 roving focus），
+     * 不在输入框上（`ComboboxInput` 的 `onKeyDown` 只管 Home / End / Escape / Enter / Backspace）。
+     * 焦点不进列表，那一层就收不到按键 —— 表现就是"列表展开后上下键不导航"。
+     * 有搜索框的那几档本来就会把焦点带进弹层，所以只有"无搜索框"的轨表值格在踩这个坑。
+     */
+    useEffect(() => {
+        if (!open) return
+        /* 只取"当前开着的那一个"：同页可能有别的值格，但列表同时只会开一个。 */
+        document.querySelector<HTMLElement>('[data-slot="combobox-content"] [role="listbox"]')?.focus()
+    }, [open])
+
+    /**
      * Ctrl / Cmd+C：**直接复制这一格的值**，不用先划选（与 `EditableCell` 同一套手感）。
      * 有选区时交给浏览器（那是在复制划中的那段），空值也没什么可拷的。
      */
@@ -351,19 +365,11 @@ export function CellPick({
                 {/* 搜索框放**弹层里**（格子里那层是触发器，塞输入框就变"可打字"了）、放列表**外面**
                     （滚的是列表，搜索框不动）。零 className —— 与官方示例 `ComboboxInPopup` 一致。 */}
                 {/*
-                    ‼️ **这个输入框必须始终渲染**：base-ui 的键盘导航（上下键选、Enter 确认、Esc 关）
-                    挂在它身上 —— 没有它时列表打得开却**按不动**（轨表的 `flag0` / `flag1` 没有搜索需求，
-                    一直在踩这个坑："值格展开后上下方向键不导航"）。
-
-                    没有搜索需求时**必须让它真正脱离文档流**（`sr-only` 不够：库里输入框外面还有一层容器，
-                    那层照样占高 → 列表顶上多出一段留白）。所以这里用绝对定位 + 零尺寸 + 全透明：
-                    看不见、不占位，但仍可聚焦、键盘照走。
+                    搜索框**只在这一档需要时才渲染**（`controlTypeHash_` 那类要按输入过滤）。
+                    ⚠️ 它**不是**键盘导航的必要条件：方向键归**列表那一层**
+                    （floating-ui 的 `useListNavigation` + 复合列表），焦点进列表就行 —— 见下面那个 effect。
                 */}
-                <ComboboxInput
-                    placeholder={searchPlaceholder ?? ""}
-                    showTrigger={false}
-                    className={searchPlaceholder ? undefined : "absolute h-px w-px overflow-hidden p-0 opacity-0"}
-                />
+                {searchPlaceholder && <ComboboxInput placeholder={searchPlaceholder} showTrigger={false} />}
                 <ComboboxList>
                     {(item: string) => (
                         /*
