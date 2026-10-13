@@ -74,7 +74,7 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -129,7 +129,7 @@ const CTRL = 2
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, columnOf}: {
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onActiveRowChange, onCopyReady, columnOf}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
@@ -183,6 +183,17 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 所以这里把那个判断**算好上报**，别让调用方自己去啃 `cellSelection` 的几何。
      */
     onSelectionChange?: (rowIds: string[]) => void
+    /**
+     * **活动格换到哪一行了**（行 id；
+ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行之后**
+     * 插一行；一行没选时放到行末（见 AnimationDetail 的 ddRow）。
+     */
+    onActiveRowChange?: (rowId: string | null) => void
+    /**
+     * **把"复制当前选区"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮用它 ——
+     * 按钮手里没有 Ctrl+C 那个事件对象，但"进剪贴板的是哪片、虚线画在哪儿"必须与键盘那条完全一致。
+     */
+    onCopyReady?: (copy: () => void) => void
 }) {
     /**
      * **当前要显示的那份数据** = 父组件给的 prop，外加本层的"编辑覆盖"。
@@ -469,6 +480,21 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         const active = cellSelection[cellSelection.length - 1]
         return active ? snapshotKey(active.anchorRowId, active.anchorColumnId) : ""
     })()
+
+    /**
+     * **把"活动格所在的行"上报给调用方**（见 `onActiveRowChange`）—— 轨表的"添加"要靠它决定插在谁后面。
+     *
+     * 与"整行选中"那条同一个套路：**指纹去重**，否则每次渲染都报一次 → 调用方 setState → 再渲染 → 打转。
+     * 一段选区都没有时（刚打开弹窗）报 `null` —— 调用方据此把新行放到行末。
+     */
+    const 上次活动行 = useRef("")
+    useEffect(() => {
+        if (!onActiveRowChange) return
+        const rowId = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
+        if ((rowId ?? "") === 上次活动行.current) return
+        上次活动行.current = rowId ?? ""
+        onActiveRowChange(rowId)
+    }, [onActiveRowChange, activeCellKey])
     /** 已经为哪一格排了一帧"跟随可视"（`revealActiveCell` 的幂等闸：同一帧重复喊只滚一次）。 */
     const revealPendingRef = useRef<HTMLElement | null>(null)
     /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */
@@ -621,7 +647,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * `tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids` 由 `useMemo` 按数据给），
      * 所以它内部那段全局监听**只挂一次**。
      */
-    const {copyHint, setCopyHint, copySource, clearCopySource, edit} = useClipboardHistory({
+    const {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit} = useClipboardHistory({
         write,
         rowsRef,
         tableRef: tableInstanceRef,
@@ -629,6 +655,17 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         readonlyColumns,
         multiAreaCopyText: t.multiAreaCopy,
     })
+
+    /**
+     * **把"复制当前选区"交给调用方**（与 `onSaveReady` 同一个模式）。
+     *
+     * ‼️ 为什么必须给这个入口：调用方那个「复制」按钮手里没有 Ctrl+C 的事件对象 —— 它自己复制的话，
+     * 走了另一条路，**那圈虚线就不会画**（用户报的轨表"复制了却没有虚线、也没法再复制"就是这个）。
+     * 有了它，按钮与键盘走的是**同一条**"哪片进剪贴板、虚线画在哪儿"。
+     */
+    useEffect(() => {
+        onCopyReady?.(copySelection)
+    }, [onCopyReady, copySelection])
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {

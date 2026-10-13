@@ -67,7 +67,7 @@ export function useClipboardHistory({
     rowsRef: {current: ActionRow[]}
     /** 表实例的镜像（渲染期不碰它，只在事件处理器里用）。 */
     tableRef: {current: ClipboardTable}
-    /** 分支列那份清单（粘贴校验用）；空集即可。 */
+    /** 分支列那份清单（粘贴校验用）；不做分支列时传空集即可。 */
     branchIds: ReadonlySet<string>
     /** **不许写的列**（调用方标了 `readonly` 的那些，见 `ColumnSpec`）：粘贴不收（见下面那段）。 */
     readonlyColumns?: ReadonlySet<string>
@@ -232,7 +232,9 @@ export function useClipboardHistory({
                     if (!row) continue
                     rowIds.push(row.id)
                     for (const columnId of columnIds)
-                        snapshot.set(snapshotKey(row.id, columnId), row.original.originals[columnId] ?? "")
+                        // ‼️ 复制的是**值数据**（`shownValue` = 改动值优先，只读列取原值），不是显示值也不是纯原值：
+                        // 用户口径"复制出去的永远是值本身" —— 格子里翻了人话（`config` 1→触发）也照样复制 1。
+                        snapshot.set(snapshotKey(row.id, columnId), shownValue(row.original, columnId))
                 }
                 areas.push({rowIds, columnIds})
             }
@@ -261,7 +263,46 @@ export function useClipboardHistory({
         [tableRef],
     )
 
-    /** 光标所在的输入框里**选中了文字**没有（编辑框 vs 表格，见 `handleCopy` 那道闸）。 */
+    /**
+     * **复制当前选区**：把文本递出去 + 记下"这片是从哪儿复制的"（那圈虚线靠它画，见 `CopySource` 规则①）。
+     *
+     * ‼️ Ctrl+C 与调用方那个「复制」按钮**共用这一条**：前者手里有事件对象（走 `clipboardData`），
+     * 后者没有（走 `navigator.clipboard`）—— 差别只有"怎么把文本递出去"这一个参数，
+     * 而"哪片进剪贴板、虚线画在哪儿"必须**一模一样**。轨表那边曾经自己拦下 Ctrl+C 去复制整行，
+     * 结果基座这条路根本没跑起来，表现就是"复制了却没有虚线、也没法再复制"。
+     */
+    const 复制选区 = useCallback(
+        (写: (text: string) => void) => {
+            /*
+                ⚠️ 这里**必须**把两件事分开（踩过）：
+                  · 压根没有单元格选区（比如只选了行）→ **什么都不做**（不写剪贴板、不提示）；
+                  · 有选区但形状不能复制（多片跨行又跨列）→ 才给那句提示。
+                混成一个 `null` 的话，**只选行按 Ctrl+C 会弹出"不能对多重选定区域使用此命令"** —— 误报。
+            */
+            const bounds = tableRef.current.getCellSelectionBounds()
+            if (bounds.length === 0) return
+            const plan = planCopy(bounds)
+            if (!plan) {
+                setCopyHint(multiAreaCopyText)
+                return
+            }
+            setCopyHint("")
+            if (plan.grid.length === 0) return
+            写(toTsv(plan.grid))
+            /*
+                顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
+                新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
+                ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
+                ⚠️ **按片存**（不是外接矩形）：多片时虚线要每片各画一圈。
+            */
+            changeCopySource({areas: plan.areas, snapshot: plan.snapshot})
+        },
+        [changeCopySource, multiAreaCopyText, planCopy, tableRef],
+    )
+
+    /**
+     * 光标所在的输入框里**选中了文字**没有（编辑框 vs 表格，见 `handleCopy` 那道闸）。
+     */
     const hasSelectedText = () => {
         const el = document.activeElement
         return el instanceof HTMLInputElement && el.selectionStart !== el.selectionEnd
@@ -291,45 +332,10 @@ export function useClipboardHistory({
                 而且剪贴板里还留着上一次的内容（用户报的"选区选好了、Ctrl+C 没反应"，探针命中的正是这一条）。
             */
             if (target?.tagName === "INPUT" && hasSelectedText()) return
-            /*
-                ⚠️ 这里**必须**把两件事分开（踩过）：
-                  · 压根没有单元格选区（比如只选了行）→ **什么都不做**（不写剪贴板、不提示）；
-                  · 有选区但形状不能复制（多片跨行又跨列）→ 才给那句提示。
-                混成一个 `null` 的话，**只选行按 Ctrl+C 会弹出"不能对多重选定区域使用此命令"** —— 误报。
-            */
-            const bounds = tableRef.current.getCellSelectionBounds()
-            if (bounds.length === 0) return
-            const plan = planCopy(bounds)
-            if (!plan) {
-                setCopyHint(multiAreaCopyText)
-                return
-            }
-            setCopyHint("")
-            const {grid, areas, snapshot} = plan
-            if (grid.length === 0) return
             e.preventDefault()
-            e.clipboardData?.setData("text/plain", toTsv(grid))
-
-            /*
-                顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
-                新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
-                ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
-                ⚠️ **按片存**（不是外接矩形）：多片时虚线要每片各画一圈。
-            */
-            changeCopySource({areas, snapshot})
-            /*
-                ‼️ **复制不再收掉选区**（用户要求：按 Ctrl+C 那一刻选区底色留着）。
-
-                这里以前连着做两件事：`setCellSelection([])` + 从格子上摘焦点 —— 起因是"收掉选区"会让锚点格
-                不再是 `cell-selected`，于是那圈**焦点环**（`cell-focus`，`:focus-within` 时 2px `--ring`）
-                当场露出来套在复制区左上角（用户当年报的"复制后第一个格子有内边框"）。
-
-                现在选区留着 → 锚点格仍是 `cell-selected` → `td.cell-selected:focus-within::after { content: none }`
-                继续压着焦点环，所以"摘焦点"那一下也一并删了（它本来就是那件事的配套）。
-                剪贴板那圈虚线仍是"哪片在剪贴板里"的标记，与选区底色并存。
-            */
+            复制选区((text) => e.clipboardData?.setData("text/plain", text))
         },
-        [changeCopySource, clearCopySource, multiAreaCopyText, planCopy, tableRef],
+        [复制选区],
     )
 
     /**
@@ -381,13 +387,14 @@ export function useClipboardHistory({
             if (!plan.range) return
 
             /*
-                **选值格的粘贴校验**：值不在清单里的这一格**不写**（当前值原样留着）。清单有两份 ——
-                `controlTypeHash_` 用固定的 53 项，`branchXAtk_` 用当前表的 `id_` 集合。
-                用户的口径是"不通过就当没粘过"——**不提示、也不占一步撤销**：过滤后一条都不剩时整次粘贴就是个
-                空操作（连撤销栈都不入）。其余列一律放行（见 model 的 `acceptPaste`）。
-
-                `readonlyColumns` 是"不许写的列"（轨表的 `config` / 帧列）：往它们上面粘等于写一个**没人认的键**
-                （帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里），所以同一条路挡掉。
+                **哪些格收下这次粘贴**，两条独立的规矩：
+                  · **选值格的值要在清单里**（用户口径：对不上就当没粘过 —— 不提示、也不占一步撤销；
+                    清单有两份，`controlTypeHash_` 固定 53 项、`branchXAtk_` 用当前表的 `id_` 集合）；
+                  · **只读列一律跳过**。这条有两条路，合起来刚好全覆盖：`planPaste` 那一侧把
+                    `kind === "readonly"` 的列整列当 `null`（动作表的 `id_` / `abilityTag_`），这里再挡
+                    调用方标的 `readonlyColumns`（轨表的 `config` / 帧列 / 效果列 —— 往它们上面粘等于写一个
+                    没人认的键，帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。
+                其余一律放行（用户口径：**粘贴无任何限制**）。
             */
             const writes = plan.writes.filter((w) => acceptPaste(w.columnId, w.value, branchIds) && !readonlyColumns?.has(w.columnId))
             if (writes.length === 0) return
@@ -477,5 +484,17 @@ export function useClipboardHistory({
         }
     }, [handleCopy, handlePaste, verifyCopySource, handleEscape, handleUndo])
 
-    return {copyHint, setCopyHint, copySource, clearCopySource, edit, handleUndo}
+    /*
+        `copySelection` 也交出去：调用方那个「复制」按钮要靠它走**同一条路**（否则按钮复制出来的东西
+        没有那圈虚线 —— 用户报的轨表问题就是这个）。Ctrl+C 那条走 `handleCopy`（它拿得到事件对象）。
+    */
+    return {
+        copyHint,
+        setCopyHint,
+        copySource,
+        clearCopySource,
+        copySelection: () => 复制选区((text) => void navigator.clipboard?.writeText(text)),
+        edit,
+        handleUndo,
+    }
 }

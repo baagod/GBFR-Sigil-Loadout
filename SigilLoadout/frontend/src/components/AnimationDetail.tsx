@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useState} from "react"
+import {Fragment, useEffect, useRef, useState} from "react"
 import {arrayMove} from "@dnd-kit/sortable"
 import {
     DeployMissingTracks,
@@ -16,9 +16,8 @@ import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigi
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 两个 SortableRow / 两个 Grid）搬到了这里。
-import {FlagsGrid, TrackGrid} from "@/components/TrackGrid"
+import {FLAG_KEYS, FlagsGrid, TrackGrid} from "@/components/TrackGrid"
 import {TrackToolbar} from "@/components/TrackToolbar"
-import {withNewRow} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 
 /** flags 表参与"原值 / 改动"比较的列（类型、时间、掩码；效果那两列是算出来的，不参与）。 */
@@ -83,6 +82,14 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * （以前这里自己养了一套 `useRowSelection` 状态机，但改基座之后它的两个入口再没人调用 —— 那套已经删了。）
      */
     const [sel, setSel] = useState<{key: string; rows: number[]} | null>(null)
+    /**
+     * **活动格在哪一行**（也是基座上报的）：工具条的「添加」按它决定插在谁后面 —— 一行没选时是 `null`，
+     * 那就插到行末。与 `sel` 分开存，因为"选中了哪几行"和"光标压在哪一行"是两件事
+     * （多选时用户要的是**活动那一行**）。
+     */
+    const [活动行, set活动行] = useState<{key: string; rowId: string} | null>(null)
+    /** 基座交回来的"复制当前选区"（工具条的「复制」按钮用它 —— 那样才有那圈虚线，见基座 `onCopyReady`）。 */
+    const 复制入口 = useRef<Record<string, (() => void) | undefined>>({})
     const [clip, setClip] = useState<{kind: string; rows: (FlagRow | TrackRow)[]} | null>(clipboard)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
@@ -215,14 +222,16 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             if (!(event.ctrlKey || event.metaKey)) return
             if (!key || !info) return
             if (event.key === "c") {
-                event.preventDefault()
+                // ‼️ **不 preventDefault**：这一记 Ctrl+C 还要让**基座**那条路跑 —— 复制区那圈虚线是基座
+                // 画的（它监听表格的 copy 事件）。以前这里拦下按键、自己复制整行，于是基座永远收不到 copy，
+                // 轨表就一直没有虚线，也谈不上"再复制一次把旧区换掉"。
                 copySelected(key, info.kind)
             } else if (event.key === "x") {
                 event.preventDefault()
                 cutSelected(key, info.kind)
             } else if (event.key === "v") {
                 event.preventDefault()
-                pasteBelow(key, info.kind)
+                pasteBelow(key)
             }
         }
         window.addEventListener("keydown", onKey)
@@ -255,21 +264,22 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         setSel(null)
     }
 
+    /**
+     * 添加一行：**插在活动格所在行的下面**（一段选区都没有 → 行末），数据**照抄那一行**（没有活动行 → 末行）。
+     *
+     * ‼️ 抄出来的必须是**新行**：`orig` 清成 null（不然它会被当成原行去"假删除"、也会拿源行的原值去比）、
+     * `removed` 清掉（源行可能正是假删除的，新行不该跟着红）；`index` 随后统一重排。
+     */
     const addRow = (key: string) => {
+        // 基座给的 `rowId` 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标；`-1` = 没选区。
+        const after = 活动行?.key === key ? Number(活动行.rowId) : -1
         if (key === flagsKey) {
-            setFlags((prev) => withNewRow(prev, blankFlag(prev)))
+            setFlags((prev) => 排号(插入在(after, prev, (源) => 抄flag行(源))))
         } else {
             setTables((prev) => {
                 const table = prev[key]
                 if (!table) return prev
-                // 新行照抄最后一行的列（空表就只有空值）：这几种轨一行几十个字段，从零填不如改现成的。
-                const last = table.rows[table.rows.length - 1]
-                // orig 必须显式清成 null：新行是 `{...last}` 抄出来的，不然它会被当成原行去"假删除"、
-                // 也会拿最后一行的原值去比。空轨兜底那一行同理（Go 那边 `*int` 收到 null = 没有原行）。
-                const row: TrackRow = last
-                    ? {...last, index: table.rows.length, children: [], orig: null, removed: undefined}
-                    : ({index: 0, values: {}, children: [], orig: null, removed: undefined} as TrackRow)
-                return {...prev, [key]: {...table, rows: [...table.rows, row]}}
+                return {...prev, [key]: {...table, rows: 排号(插入在<TrackRow>(after, table.rows, (源) => 抄轨行(table.columns)(源)))}}
             })
         }
         markDirty(key)
@@ -280,11 +290,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         if (picked.size === 0) return
         const all = key === flagsKey ? flags : (tables[key]?.rows ?? [])
         const rows = all.filter((_, index) => picked.has(index))
-        // 假删除掉的行不参与复制（它们不参与部署，复制出去也没有意义）。
-        const kept = rows.filter((row) => row.removed !== true)
-        if (kept.length === 0) return
+        if (rows.length === 0) return
+        // ‼️ **假删除的行照样复制**（用户口径：与普通行无区别）——"删了"只是保存时不部署，行本身还在表里。
         // 同时写进模块级剪贴板：关掉这个弹层、换一套动画再 Ctrl+V 时，靠它拿到内容。
-        clipboard = {kind, rows: kept}
+        clipboard = {kind, rows}
         setClip(clipboard)
     }
 
@@ -298,39 +307,29 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         removeSelected(key)
     }
 
-    const pasteBelow = (key: string, kind: string) => {
+    /**
+     * 粘贴：插在**选中行的下面**（一行没选就插最前），粘出来的是**新行**。
+     *
+     * ‼️ **不限来源表**（用户口径："粘贴无任何限制"）：按**目标表的列**取值，多出来的列直接丢掉
+     * （`源值` 那层把两种行形状抹平）—— 所以 flags 的一行能贴进通用轨，反过来也行。
+     */
+    const pasteBelow = (key: string) => {
         if (!clip || clip.rows.length === 0) return
-        // 分区之间不能混插：行里有哪些列不一样，混着插会丢字段。所以种类不匹配时**什么都不做**。
-        if (clip.kind !== kind) return
         // 插在**选中那几行的下面**（Ctrl 点散的也照最下面那一行）；一行都没选就插到最前面。
         // selectedIn 是升序的，所以最后那个就是最下面那行。
         const picked = selectedIn(key)
         const at = picked.length === 0 ? 0 : picked[picked.length - 1] + 1
         const copies = clip.rows.length
         if (key === flagsKey) {
-            const rows = clip.rows as FlagRow[]
-            // 粘贴出来的是**新行**：清掉原表标记（否则它会被当成原行去"假删除"）。
-            setFlags((prev) => [
-                ...prev.slice(0, at),
-                ...rows.map((row) => ({...row, orig: null, removed: undefined})),
-                ...prev.slice(at),
-            ])
+            const inserted = clip.rows.map((row) => 抄flag行(row))
+            setFlags((prev) => 排号([...prev.slice(0, at), ...inserted, ...prev.slice(at)]))
         } else {
             setTables((prev) => {
                 const table = prev[key]
                 if (!table) return prev
-                const rows = clip.rows as TrackRow[]
-                // children 要一起深拷一份：attack 行的 <AilmentNN> 就在里面，
-                // 丢了它等于粘贴出来的行少了东西（而且和源行共用对象，改一个动两个）。
-                const inserted = rows.map((row, i) => ({
-                    ...row,
-                    index: at + i,
-                    // 粘贴出来的是**新行**：原版里没有它（orig = null）。
-                    orig: null,
-                    removed: undefined,
-                    children: row.children.map((child) => ({...child, values: {...child.values}})),
-                }))
-                return {...prev, [key]: {...table, rows: [...table.rows.slice(0, at), ...inserted, ...table.rows.slice(at)]}}
+                // `children` 由 `抄轨行` 深拷一份（attack 行的 <AilmentNN> 就在里面）。
+                const inserted = clip.rows.map(抄轨行(table.columns))
+                return {...prev, [key]: {...table, rows: 排号([...table.rows.slice(0, at), ...inserted, ...table.rows.slice(at)])}}
             })
         }
         markDirty(key)
@@ -470,12 +469,16 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 t={t}
                                 canCopy={count > 0}
                                 canCut={sel?.key === key}
-                                canPaste={clip !== null && clip.kind === info.kind && sel?.key === key}
+                                canPaste={clip !== null}
                                 canRemove={sel?.key === key}
                                 onAdd={() => addRow(key)}
-                                onCopy={() => copySelected(key, info.kind)}
+                                onCopy={() => {
+                                    // 两条路都要走：行级剪贴板（跨表粘行用）+ 基座那条（画复制区虚线用）。
+                                    copySelected(key, info.kind)
+                                    复制入口.current[key]?.()
+                                }}
                                 onCut={() => cutSelected(key, info.kind)}
-                                onPaste={() => pasteBelow(key, info.kind)}
+                                onPaste={() => pasteBelow(key)}
                                 onRemove={() => removeSelected(key)}
                             />
                         </div>
@@ -492,6 +495,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 onReorder={(from, to) => reorder(key, from, to)}
                                 /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
                                 onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
+                                onActiveRowChange={(rowId) => set活动行(rowId === null ? null : {key, rowId})}
+                                onCopyReady={(copy) => {
+                                    复制入口.current[key] = copy
+                                }}
                             />
                         ) : (
                             <TrackGrid
@@ -501,6 +508,10 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
                                 onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
+                                onActiveRowChange={(rowId) => set活动行(rowId === null ? null : {key, rowId})}
+                                onCopyReady={(copy) => {
+                                    复制入口.current[key] = copy
+                                }}
                             />
                         )}
                     </div>
@@ -655,23 +666,46 @@ function trackLabel(kind: string): string {
     return kind.charAt(0).toUpperCase() + kind.slice(1)
 }
 
-/** 新 flags 行的默认值：跟前一行同一段时间（用完自己改），掩码与其余字段清零。 */
-function blankFlag(rows: FlagRow[]): FlagRow {
-    const last = rows[rows.length - 1]
+/*
+    ==================== 行级增删改的几条公共零件 ====================
+
+    「添加」与「粘贴」要的是同一件事：**按目标表的列造一行新行**，差别只在源行从哪儿来
+    （活动行/末行 vs 剪贴板）。所以下面这几条都按"任意形状的源行 → 目标表认的那一行"来写 ——
+    flags 的行是**平铺字段**、通用轨收在 `values` 里，这层差异只在这里抹平一次。
+*/
+
+/** 从**任意形状**的一行里取一个字段值：`FlagRow` 是平铺字段，`TrackRow` 收在 `values` 里。 */
+export const 源值 = (row: unknown, key: string): string => {
+    const r = row as {values?: Record<string, string>} & Record<string, unknown>
+    return r?.values?.[key] ?? (typeof r?.[key] === "string" ? (r[key] as string) : "")
+}
+
+/** 在 `after` 那一行**之后**插一行（`after < 0` 或越界 = 行末）；抄哪一行由 `造` 定（没有源行也要能造出空行）。 */
+export const 插入在 = <T,>(after: number, rows: T[], 造: (源: T | undefined) => T): T[] => {
+    const at = after >= 0 && after < rows.length ? after + 1 : rows.length
+    return [...rows.slice(0, at), 造(rows[after >= 0 ? after : rows.length - 1]), ...rows.slice(at)]
+}
+
+/**
+ * 照目标表的列**抄一行 flags**（多出来的列丢掉）。
+ *
+ * ‼️ `orig` / `removed` 必须显式清掉：抄来的行是**新行** —— `orig` 留着会被当成原行去"假删除"、
+ * 也会拿源行的原值去比；`removed` 留着会让新行一出生就是红的。`index` 由 `排号` 统一补。
+ */
+export const 抄flag行 = (源?: FlagRow | TrackRow): FlagRow =>
+    ({...Object.fromEntries(FLAG_KEYS.map((key) => [key, 源值(源, key)])), index: 0, orig: null, removed: undefined}) as FlagRow
+
+/** 照目标表的列**抄一行通用轨**：`children` 要深拷（attack 行的 `<AilmentNN>` 就在里面）。 */
+export const 抄轨行 = (列: readonly string[]) => (源?: FlagRow | TrackRow): TrackRow => {
+    const r = 源 as TrackRow | undefined
     return {
-        index: rows.length,
-        config: "1",
-        startTime: last ? last.endTime : "0",
-        endTime: last ? last.endTime : "0",
-        layerFlag: last ? last.layerFlag : "4294967295",
-        flag0: "0",
-        flag1: "0",
-        sysFlag: "0",
-        freeArg: "0 0 0 0",
-        flag0Effects: "",
-        flag1Effects: "",
-        // 新行必须显式写 null：Go 那边 orig 是 `*int`，null = 原版里没有这一行（不写这一栏）。
+        index: 0,
+        values: Object.fromEntries(列.map((key) => [key, 源值(源, key)])),
+        children: (r?.children ?? []).map((child) => ({...child, values: {...child.values}})),
         orig: null,
         removed: undefined,
-    } as FlagRow
+    }
 }
+
+/** 重排每行的 `index`：插入/粘贴之后行号才是连的。 */
+export const 排号 = <T extends {index?: number}>(rows: T[]): T[] => rows.map((row, index) => ({...row, index}))

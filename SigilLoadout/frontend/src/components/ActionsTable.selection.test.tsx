@@ -381,16 +381,17 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(clipboard.data["text/plain"]).toBe("actionFreeWork0_-原值")
     })
 
-    /* 改过的格子复制出去仍是**原值**：第 2 行（`1001`）那一列显示"…-改过"、原值"…-原值"。 */
-    it("复制：改过的格子也还是原值", async () => {
+    /* 改过的格子复制出去是**改动后的值数据**（不是原值、也不是显示值）：第 2 行（`1001`）那一列
+       显示"…-改过"、原值"…-原值"，复制到的应该是前者。 */
+    it("复制：改过的格子复制的是**改动值**（值数据口径）", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()
 
         selectCell(cellAt(container, 1, KEYS.indexOf(LongField)))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
 
-        expect(clipboard.data["text/plain"]).toBe("actionFreeWork0_-原值")
-        expect(clipboard.data["text/plain"]).not.toBe("actionFreeWork0_-改过")
+        expect(clipboard.data["text/plain"]).toBe("actionFreeWork0_-改过")
+        expect(clipboard.data["text/plain"]).not.toBe("actionFreeWork0_-原值")
     })
 
     it("粘贴：写进改动那一栏，跳过只读列（id_ / abilityTag_ 不写）", async () => {

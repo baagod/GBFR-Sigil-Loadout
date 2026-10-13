@@ -11,7 +11,6 @@ import {
     charCodeOf,
     flagHasBit,
     flagMask,
-    withNewRow,
 } from "@/lib/actionflags"
 
 describe("掩码的位", () => {
@@ -51,32 +50,5 @@ describe("角色码", () => {
     it("角色码从动作表的所在目录取", () => {
         expect(charCodeOf("D:\\Games\\Relink\\gen\\extracted\\system\\player\\data\\pl1000\\pl1000_action.msg")).toBe("pl1000")
         expect(charCodeOf("pl1000_action.msg")).toBe("")
-    })
-})
-
-describe("加一行", () => {
-    const blank = {
-        index: 0, config: "", startTime: "", endTime: "", layerFlag: "",
-        flag0: "", flag1: "", sysFlag: "", freeArg: "", flag0Effects: "", flag1Effects: "",
-    }
-
-    it("LayerFlag 钉死 4294967295，时间抄最后一行，其余给后端认的默认值", () => {
-        const rows = [{ ...blank, index: 0, startTime: "0.5", endTime: "1.25", layerFlag: "1" }]
-        const next = withNewRow(rows, blank)
-        expect(next).toHaveLength(2)
-        expect(next[1]).toMatchObject({
-            config: "1",
-            startTime: "0.5",
-            endTime: "1.25",
-            layerFlag: "4294967295",
-            flag0: "0",
-            flag1: "16",
-            sysFlag: "0",
-            freeArg: "0 0 0 0",
-        })
-    })
-
-    it("一行都没有时时间给 0", () => {
-        expect(withNewRow([], blank)[0]).toMatchObject({ startTime: "0", endTime: "0" })
     })
 })

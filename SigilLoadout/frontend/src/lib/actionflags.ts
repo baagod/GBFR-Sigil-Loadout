@@ -108,37 +108,3 @@ export function charCodeOf(path: string): string {
     return parts.length >= 2 ? parts[parts.length - 2] : ""
 }
 
-/**
- * 加一行：LayerFlag 钉死 4294967295，时间抄最后一行，其余给后端认的默认值（见 actionflags.go 里那份
- * XML 的形状）。时间抄不到（一个空轨）就给 0。行号不用管：那是数组下标算出来的。
- */
-export function withNewRow<T extends {
-    index: number
-    config: string
-    startTime: string
-    endTime: string
-    layerFlag: string
-    flag0: string
-    flag1: string
-    sysFlag: string
-    freeArg: string
-    flag0Effects: string
-    flag1Effects: string
-}>(rows: T[], blank: T): T[] {
-    const last = rows[rows.length - 1]
-    return [
-        ...rows,
-        {
-            ...blank,
-            config: "1",
-            startTime: last ? last.startTime : "0",
-            endTime: last ? last.endTime : "0",
-            layerFlag: "4294967295",
-            flag0: "0",
-            flag1: "16",
-            sysFlag: "0",
-            freeArg: "0 0 0 0",
-        },
-    ]
-}
-
