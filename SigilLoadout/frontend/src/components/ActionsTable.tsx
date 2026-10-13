@@ -781,8 +781,8 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
             /*
                 ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
                 （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
+            */
             if (在编辑或列表里) return
-            if (在编辑或列表里 && (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]")) return
             e.preventDefault()
             /*
                 ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
