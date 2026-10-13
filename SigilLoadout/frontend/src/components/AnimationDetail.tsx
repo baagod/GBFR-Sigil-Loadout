@@ -66,8 +66,23 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     const motion = initialMotion
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。
     const [loaded, setLoaded] = useState(false)
-    const [flags, setFlags] = useState<FlagRow[]>([])
+    /*
+        ‼️ **flags 就是 `tables` 里的一条普通轨**（key 见下面的 `flagsKey`）—— 不再单独占一份 state。
+        行形状统一（`FlagRow` = `TrackRow`）之后，它没有任何理由与别的轨分开存；分开的代价是每个操作
+        都要写 `key === flagsKey` 的分支，以及原值也要单独存一份。
+
+        `flags` / `setFlags` 这两个名字**保留**，但它们只是这一格容器的视图：前者派生，后者把更新写回去
+        （兼容函数式更新）。这样几十处读写都不用改，容器却只有一份。
+    */
     const [tables, setTables] = useState<Record<string, TrackTable>>({})
+    const flags: FlagRow[] = tables[flagsKey]?.rows ?? []
+    const setFlags = (update: FlagRow[] | ((prev: FlagRow[]) => FlagRow[])) =>
+        setTables((prev) => {
+            const table = prev[flagsKey]
+            if (!table) return prev
+            const rows = typeof update === "function" ? update(table.rows) : update
+            return {...prev, [flagsKey]: {...table, rows}}
+        })
     const [dirty, setDirty] = useState<string[]>([])
     const [fsmNames, setFsmNames] = useState<string[]>([])
     const [fsmName, setFsmName] = useState<string | null>(null)
@@ -103,7 +118,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * "改回原值就退回灰"也是比较的自然结果，不必在离开时判断。
      * 保存成功后把这份刷成刚写下去的那份（于是全部回到"没动过"）。
      */
-    const [baseline, setBaseline] = useState<{tables: Record<string, TrackTable>; flags: FlagRow[]} | null>(null)
+    const [baseline, setBaseline] = useState<{tables: Record<string, TrackTable>} | null>(null)
 
     useEffect(() => {
         // 隐藏 mot 模式：一行都还没展开时没有动画号可载 —— 清单本身不需要这份数据。
@@ -142,12 +157,16 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 }
                 if (!alive) return
                 setInfos(list)
+                if (hasFlags) {
+                    const columns = [...FLAG_KEYS]
+                    loaded[flagsKey] = {sub: "0", kind: "flags", columns, rows: flagRows ?? []} as TrackTable
+                    original[flagsKey] = {sub: "0", kind: "flags", columns, rows: primalFlags ?? []} as TrackTable
+                }
                 setTables(loaded)
-                setFlags(flagRows ?? [])
                 setFsmNames(names ?? [])
                 // 原表 = **游戏原版**（后端从随包 data.zip 里读的，只读）：灰/亮全靠拿当前行和它比。
                 // 它不随保存变化 —— "我一直知道原表的值"就是靠这个。
-                setBaseline({tables: original, flags: primalFlags ?? []})
+                setBaseline({tables: original})
                 // 分区现在常开（不再用手风琴包），"默认展开"这件事已经不存在了。
                 setLoaded(true)
             } catch (e) {
@@ -168,7 +187,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      */
     const editFlag = (index: number, key: string, value: string) => {
         const row = flags[index]
-        const orig = isOriginal(row) ? baseline?.flags[row.orig] : undefined
+        const orig = isOriginal(row) ? baseline?.tables[flagsKey]?.rows[row.orig] : undefined
         const next = value === "" && orig ? (orig.values[key] ?? "") : value
         setFlags((prev) =>
             prev.map((r, i) => {
@@ -415,7 +434,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                             <FlagsGrid
                                 rows={flags}
                                 t={t}
-                                originals={baseline?.flags}
+                                originals={baseline?.tables[flagsKey]?.rows}
                                 onEdit={(rowId, field, value) => editFlag(Number(rowId), field, value ?? "")}
                                 onReorder={(from, to) => reorder(key, from, to)}
                                 /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
