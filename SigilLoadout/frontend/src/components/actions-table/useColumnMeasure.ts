@@ -31,6 +31,25 @@ const sameWidth = (a: ColumnSizingState, b: ColumnSizingState) => {
 }
 
 /**
+ * **有没有哪一列的文本被自己的盒子截断了** —— 整趟重量的唯一判据（理由见调用点那段）。
+ *
+ * ⚠️ **不能只看 `firstElementChild`**：选值格那串文本在**里层 `span`** 上（`PICK_TEXT` = `truncate min-w-0`），
+ * 外层那个 flex 容器自己不溢出 —— 只看外层会漏掉"选值格的值变长了"这种最该重量的情形。
+ * 所以按"装了文字的层"扫（显示态 div / 选值格的 span / 表头那层都带 `truncate`）。
+ *
+ * 逐格看 `scrollWidth > clientWidth + 1`（取整余量，别被半像素撩到；量完那一趟留了 ≥1px 余量）。
+ *
+ * ⚠️ **看不到的两种列**（已知且接受）：调用方**钉死宽度**的列（截断是它自己的设计，见 `fixedWidths`）；
+ * 以及"自定义渲染、又没带 `truncate`、又没钉宽度"的列 —— 现在没有这种列（唯一用自定义渲染的是
+ * 轨表「效果」列，它钉了 400）。将来真要加这种列，得让它带上 `truncate`，否则值变长时不会重量。
+ */
+const clippedColumn = (table: HTMLTableElement, fixedWidths: Record<string, number>) =>
+    [...table.querySelectorAll<HTMLElement>("[data-col-id]")].some((cell) => {
+        if (fixedWidths[cell.dataset.colId ?? ""]) return false
+        return [...cell.querySelectorAll<HTMLElement>(".truncate")].some((layer) => layer.scrollWidth > layer.clientWidth + 1)
+    })
+
+/**
  * 量出每列的自然宽度（取整）并交给库的 sizing state。
  *
  * @param tableRef 那张 `<table>`（可见性判据与"放开成 max-content"都改它）
@@ -60,6 +79,8 @@ export function useColumnMeasure(
     }, [])
     /** 上一趟量出来的列宽指纹（"稳定了没有"的判据：两趟一样就收手，见测量末尾那段）。 */
     const lastSizes = useRef("")
+    /** 上一次量的是**哪一份列清单** —— 换轨/换列时旧宽度与新列没有对应关系，必须放行重量。 */
+    const lastKeys = useRef("")
     /** 补量次数（上限，防打转）。 */
     const extraPasses = useRef(0)
 
@@ -89,6 +110,22 @@ export function useColumnMeasure(
             // 还没显示：等下一帧再看。
             return remeasureNextFrame()
         }
+        /*
+            ‼️ **只有"真有格子被截断"才值得跑这一整趟**：整趟要放开布局、量 87 列、再写回并锁上 ——
+            真机实测约 100ms，而**每次提交**都会带着一份新的 `rows` 走进来（改一格 / 粘贴 / 撤销 /
+            行增删…，`data` 在依赖里）。于是"选一个值"那一下的"关闭"被排在它后面，列表要多挂 ~80ms。
+
+            判据就是"有没有格子的文本超出它自己的盒子"（`scrollWidth > clientWidth`）：量完那一趟之后
+            列宽**恰好等于内容自然宽**，所以"被截断"等价于"内容变宽了、该重量了"。逐格读一遍属性
+            （一次强制布局 + N 次读，几毫秒）比整趟便宜两个数量级。
+
+            ⚠️ 两条例外：
+              · **还没量过**（首帧）必须放行 —— 那时是 `table-auto`、谁都不会被截断，跳过就永远量不出来；
+              · 调用方**钉死宽度**的列（`fixedWidths`，如轨表的「效果」列）截断是它自己的设计，不算数。
+        */
+        const keyPrint = keys.join("\u0000")
+        if (measured && lastKeys.current === keyPrint && !clippedColumn(el, fixedWidths)) return
+        lastKeys.current = keyPrint
         /*
             ‼️ 量之前把表**放开成"按内容自然排"**：`width: max-content` + `table-layout: auto`。
 
