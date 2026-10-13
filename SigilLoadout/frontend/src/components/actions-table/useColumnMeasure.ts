@@ -310,40 +310,6 @@ export function useColumnMeasure(
         return () => observer.disconnect()
     }, [tableRef])
 
-    /**
-     * 上一份数据补测了几次。
-     *
-     * ‼️ **数据换了之后补测，直到不再溢出**（不猜时机，按结果判）。
-     *
-     * 真机（002c，CDP 量的）：当前列宽普遍少 4px（`startTime` 71/该75、`endTime` 79/该83、`layerFlag` 93/该97
-     * —— 9 列被 `truncate` 吃掉尾巴）；而在页面里**手工把测量重做一遍就得到 75/83/97**。
-     * 可见"算出正确宽度"从来不是问题，缺的是"数据换了之后**真的**再量一趟"。
-     *
-     * ⚠️ 上一版栽在一个很细的地方：这段 effect 的依赖里**没有 `shownTick`** —— 补测那一下（`setShownTick`）
-     * 自己不会让它重跑，于是**只补了一次就收手**，而补测那一趟恰好还太早，偏小的值就留在那儿了
-     * （真机上就是"少 4px"）。现在：依赖补上 `shownTick`，并且允许**补到不再溢出**（上限 5 次防打转）。
-     *
-     * 代价：每次数据变化最多 5 次 DOM 扫描（每次都只在"还有格子放不下"时才继续），不是每帧。
-     */
-
-    const patches = useRef<{data: unknown; count: number}>({data: null, count: 0})
-    useEffect(() => {
-        if (!measured) return
-        const el = tableRef.current
-        if (!el) return
-        const record = patches.current
-        if (record.data !== data) {
-            record.data = data // 换了数据：计数归零，重新给它几次机会
-            record.count = 0
-        }
-        if (record.count >= 30) return
-        /* 还有格子放不下就再量一趟（按结果收敛，不猜时机）。 */
-        const stillOverflowing = [...el.querySelectorAll<HTMLElement>(".truncate")].some((node) => node.scrollWidth > node.clientWidth + 0.5)
-        if (!stillOverflowing) return
-        record.count += 1
-        setShownTick((v) => v + 1)
-    }, [data, measured, tableRef, shownTick])
-
     /*
         ‼️ **字体加载完再量一次**。
 
