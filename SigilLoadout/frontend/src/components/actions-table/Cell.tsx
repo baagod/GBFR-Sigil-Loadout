@@ -217,7 +217,7 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
             aria-label={drill.label}
             title={drill.label}
             data-drill=""
-            className="-mr-2 flex shrink-0 cursor-pointer items-center self-stretch pr-3 pl-2 text-muted-foreground/50 hover:text-foreground"
+            className="-mr-2 flex shrink-0 cursor-pointer items-center self-stretch px-2 text-muted-foreground/50 hover:text-foreground"
         >
             <MoreHorizontal className="size-4" />
         </button>
@@ -371,5 +371,3 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
         </>
     )
 }
-
-

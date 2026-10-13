@@ -80,6 +80,12 @@ export const HANDLE_CELL = "cell-handle cell-pinned sticky left-0 border-r borde
 export const HEAD_BG = "bg-popover"
 
 /**
+ * **有详情（可下钻）那一列的表头配色** —— 用 `Button` 的 `default` 变体那套 token，与格右端的 `···`
+ * 靶子互相指认。`!` 是必须的：它和 `HEAD_BG` 都是 `bg-*`、特异性相同，谁赢只看样式表顺序。
+ */
+export const HEAD_DRILL = "bg-primary! text-primary-foreground!"
+
+/**
  * 行号格的光标：**和 `➡` 一模一样的箭头**（Excel / WPS 行号上就是它）。
  *
  * 系统光标里**没有**这一支 —— `e-resize` 是"左右双向箭头"（不是它），`default` 是那支斜的指针，

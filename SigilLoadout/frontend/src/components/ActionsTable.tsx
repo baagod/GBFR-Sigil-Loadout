@@ -35,7 +35,7 @@
     渲染，以及"整行选中"上报给调用方。手势那块与两个 ref 镜像（`tableInstanceRef` /
     `dragRowRef`）缠在一起，再往外抽要先搬一堆 ref —— 想动它时先想清楚这笔账，别只为行数好看。
 */
-import {
+import {useContext, 
     useCallback,
     useEffect,
     useMemo,
@@ -73,10 +73,11 @@ import {
     HANDLE_INNER,
     HANDLE_WIDTH,
     HEAD_CELL,
+    HEAD_DRILL,
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, DrillContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -268,6 +269,8 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * 排序该发生在**渲染那一层**；另外等以后做"点表头排序"，这里换个初始值就能接上。
      */
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [{id: "id_", desc: false}])
+    /** 这一列的详情入口（见 DrillContext）—— 表头配色与格右端靶子**同一份判据**，不再各认一次列名。 */
+    const drillOf = useContext(DrillContext)
     /**
      * **这一次按下是不是"拖"**（按下到松开移动超过几个像素）。
      *
@@ -870,7 +873,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                         }}
                                         // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
                                         data-col-id={header.column.id}
-                                        className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} ${HEAD_BG}` : ""}`}
+                                        className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} ${HEAD_BG}` : ""} ${drillOf(header.column.id) ? HEAD_DRILL : ""}`}
                                     >
                                         <div className="truncate">
                                             {header.isPlaceholder
