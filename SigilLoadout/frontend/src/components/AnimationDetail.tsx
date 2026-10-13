@@ -92,9 +92,9 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     /** 基座交回来的"复制当前选区"（工具条的「复制」按钮用它 —— 那样才有那圈虚线，见基座 `onCopyReady`）。 */
     /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除都是一份实现，见 `useRowCommands`）。 */
     /** 基座交回来的**区域复制**（工具条的复制按钮要它才出那圈虚线）。 */
-    const 复制入口 = useRef<Record<string, (() => void) | undefined>>({})
+    const copyEntry = useRef<Record<string, (() => void) | undefined>>({})
     /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除，一份实现见 `useRowCommands`）。 */
-    const 行命令 = useRef<Record<string, RowCommands | undefined>>({})
+    const rowCommands = useRef<Record<string, RowCommands | undefined>>({})
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
     /**
@@ -219,7 +219,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
             if (event.key === "Delete" && !event.ctrlKey && !event.metaKey) {
                 if (!key || !info) return
                 event.preventDefault()
-                行命令.current[key]?.remove()
+                rowCommands.current[key]?.remove()
                 return
             }
             if (!(event.ctrlKey || event.metaKey)) return
@@ -228,13 +228,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 // ‼️ **不 preventDefault**：这一记 Ctrl+C 还要让**基座**那条路跑 —— 复制区那圈虚线是基座
                 // 画的（它监听表格的 copy 事件）。以前这里拦下按键、自己复制整行，于是基座永远收不到 copy，
                 // 轨表就一直没有虚线，也谈不上"再复制一次把旧区换掉"。
-                行命令.current[key]?.copy()
+                rowCommands.current[key]?.copy()
             } else if (event.key === "x") {
                 event.preventDefault()
-                行命令.current[key]?.cut()
+                rowCommands.current[key]?.cut()
             } else if (event.key === "v") {
                 event.preventDefault()
-                行命令.current[key]?.paste()
+                rowCommands.current[key]?.paste()
             }
         }
         window.addEventListener("keydown", onKey)
@@ -261,13 +261,13 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      * ‼️ **假删除在这一层做**：基座只会真删（它不认识"原行"），所以"本来有原身份、又被删掉"的那些要
      * 加回来标红 —— 那才是轨表的保存语义（原行留着但不部署）。
      */
-    const 收行 = (key: string) => (next: ActionRow[], 删掉的: ActionRow[]) => {
-        const 身份 = (row: ActionRow) => (row.carry ?? {}) as {orig?: number | null; children?: TrackRow["children"]}
+    const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
+        const carryOf = (row: ActionRow) => (row.carry ?? {}) as {orig?: number | null; children?: TrackRow["children"]}
         const 列: readonly string[] = key === flagsKey ? FLAG_KEYS : (tables[key]?.columns ?? [])
         if (key === flagsKey) {
             const 转 = (row: ActionRow, index: number): FlagRow =>
-                ({...Object.fromEntries(列.map((k) => [k, shownValue(row, k)])), index, orig: 身份(row).orig ?? null, removed: undefined}) as FlagRow
-            const 回 = 删掉的.filter((row) => 身份(row).orig != null).map((row, i) => ({...转(row, next.length + i), removed: true}))
+                ({...Object.fromEntries(列.map((k) => [k, shownValue(row, k)])), index, orig: carryOf(row).orig ?? null, removed: undefined}) as FlagRow
+            const 回 = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...转(row, next.length + i), removed: true}))
             setFlags([...next.map(转), ...回])
         } else {
             setTables((prev) => {
@@ -276,11 +276,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                 const 转 = (row: ActionRow, index: number): TrackRow => ({
                     index,
                     values: Object.fromEntries(列.map((k) => [k, shownValue(row, k)])),
-                    children: 身份(row).children ?? [],
-                    orig: 身份(row).orig ?? null,
+                    children: carryOf(row).children ?? [],
+                    orig: carryOf(row).orig ?? null,
                     removed: undefined,
                 })
-                const 回 = 删掉的.filter((row) => 身份(row).orig != null).map((row, i) => ({...转(row, next.length + i), removed: true}))
+                const 回 = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...转(row, next.length + i), removed: true}))
                 return {...prev, [key]: {...table, rows: [...next.map(转), ...回]}}
             })
         }
@@ -399,15 +399,15 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 canCut={sel?.key === key}
                                 canPaste={sel !== null}
                                 canRemove={sel?.key === key}
-                                onAdd={() => 行命令.current[key]?.add()}
+                                onAdd={() => rowCommands.current[key]?.add()}
                                 onCopy={() => {
                                     // 两条路：行剪贴板（跨表粘行）+ 基座那条区域复制（画虚线）。
-                                    行命令.current[key]?.copy()
-                                    复制入口.current[key]?.()
+                                    rowCommands.current[key]?.copy()
+                                    copyEntry.current[key]?.()
                                 }}
-                                onCut={() => 行命令.current[key]?.cut()}
-                                onPaste={() => 行命令.current[key]?.paste()}
-                                onRemove={() => 行命令.current[key]?.remove()}
+                                onCut={() => rowCommands.current[key]?.cut()}
+                                onPaste={() => rowCommands.current[key]?.paste()}
+                                onRemove={() => rowCommands.current[key]?.remove()}
                             />
                         </div>
                     </div>
@@ -424,12 +424,12 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
                                 onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
                                 onCopyReady={(copy) => {
-                                    复制入口.current[key] = copy
+                                    copyEntry.current[key] = copy
                                 }}
                                 onRowsReady={(commands) => {
-                                    行命令.current[key] = commands
+                                    rowCommands.current[key] = commands
                                 }}
-                                onRowsChange={收行(key)}
+                                onRowsChange={applyRowChange(key)}
                             />
                         ) : (
                             <TrackGrid
@@ -440,12 +440,12 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
                                 onReorder={(from, to) => reorder(key, from, to)}
                                 onSelectionChange={(rowIds) => setSel(rowIds.length ? {key, rows: rowIds.map(Number)} : null)}
                                 onCopyReady={(copy) => {
-                                    复制入口.current[key] = copy
+                                    copyEntry.current[key] = copy
                                 }}
                                 onRowsReady={(commands) => {
-                                    行命令.current[key] = commands
+                                    rowCommands.current[key] = commands
                                 }}
-                                onRowsChange={收行(key)}
+                                onRowsChange={applyRowChange(key)}
                             />
                         )}
                     </div>
@@ -608,13 +608,13 @@ function trackLabel(kind: string): string {
 */
 
 /** 从**任意形状**的一行里取一个字段值：`FlagRow` 是平铺字段，`TrackRow` 收在 `values` 里。 */
-export const 源值 = (row: unknown, key: string): string => {
+export const readValue = (row: unknown, key: string): string => {
     const r = row as {values?: Record<string, string>} & Record<string, unknown>
     return r?.values?.[key] ?? (typeof r?.[key] === "string" ? (r[key] as string) : "")
 }
 
 /** 在 `after` 那一行**之后**插一行（`after < 0` 或越界 = 行末）；抄哪一行由 `造` 定（没有源行也要能造出空行）。 */
-export const 插入在 = <T,>(after: number, rows: T[], 造: (源: T | undefined) => T): T[] => {
+export const insertAfter = <T,>(after: number, rows: T[], 造: (源: T | undefined) => T): T[] => {
     const at = after >= 0 && after < rows.length ? after + 1 : rows.length
     return [...rows.slice(0, at), 造(rows[after >= 0 ? after : rows.length - 1]), ...rows.slice(at)]
 }
@@ -623,17 +623,17 @@ export const 插入在 = <T,>(after: number, rows: T[], 造: (源: T | undefined
  * 照目标表的列**抄一行 flags**（多出来的列丢掉）。
  *
  * ‼️ `orig` / `removed` 必须显式清掉：抄来的行是**新行** —— `orig` 留着会被当成原行去"假删除"、
- * 也会拿源行的原值去比；`removed` 留着会让新行一出生就是红的。`index` 由 `排号` 统一补。
+ * 也会拿源行的原值去比；`removed` 留着会让新行一出生就是红的。`index` 由 `reindex` 统一补。
  */
-export const 抄flag行 = (源?: FlagRow | TrackRow): FlagRow =>
-    ({...Object.fromEntries(FLAG_KEYS.map((key) => [key, 源值(源, key)])), index: 0, orig: null, removed: undefined}) as FlagRow
+export const copyFlagRow = (源?: FlagRow | TrackRow): FlagRow =>
+    ({...Object.fromEntries(FLAG_KEYS.map((key) => [key, readValue(源, key)])), index: 0, orig: null, removed: undefined}) as FlagRow
 
 /** 照目标表的列**抄一行通用轨**：`children` 要深拷（attack 行的 `<AilmentNN>` 就在里面）。 */
-export const 抄轨行 = (列: readonly string[]) => (源?: FlagRow | TrackRow): TrackRow => {
+export const copyTrackRow = (列: readonly string[]) => (源?: FlagRow | TrackRow): TrackRow => {
     const r = 源 as TrackRow | undefined
     return {
         index: 0,
-        values: Object.fromEntries(列.map((key) => [key, 源值(源, key)])),
+        values: Object.fromEntries(列.map((key) => [key, readValue(源, key)])),
         children: (r?.children ?? []).map((child) => ({...child, values: {...child.values}})),
         orig: null,
         removed: undefined,
@@ -641,4 +641,4 @@ export const 抄轨行 = (列: readonly string[]) => (源?: FlagRow | TrackRow):
 }
 
 /** 重排每行的 `index`：插入/粘贴之后行号才是连的。 */
-export const 排号 = <T extends {index?: number}>(rows: T[]): T[] => rows.map((row, index) => ({...row, index}))
+export const reindex = <T extends {index?: number}>(rows: T[]): T[] => rows.map((row, index) => ({...row, index}))

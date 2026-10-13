@@ -64,7 +64,7 @@ const RowCell = memo(function RowCell({
     fieldKey: string
     /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
     kind: ColumnKind
-    /** 这一列**不许写**（只读列，或调用方标了 `readonly`）：只显示文本、不进编辑。 */
+    /** 这一列**notWritable**（只读列，或调用方标了 `readonly`）：只显示文本、不进编辑。 */
     readOnly: boolean
     /** **改动值**（空串 = 没改过）。 */
     raw: string
@@ -307,14 +307,14 @@ export const ActionRowView = memo(function ActionRowView({
                 const kind = columnKind(key)
                 /*
                     两件事分开（别合成一个布尔）：
-                      · `底色只读` —— 动作表那两列（`id_` / `abilityTag_`）：整列看起来"不上色"。底色跟它走；
-                      · `不许写`   —— 上面那种 + 调用方标了 `readonly` 的列（轨表的 `config` / 帧列：显示翻译过，
+                      · `readonlyTint` —— 动作表那两列（`id_` / `abilityTag_`）：整列看起来"不上色"。底色跟它走；
+                      · `notWritable`   —— 上面那种 + 调用方标了 `readonly` 的列（轨表的 `config` / 帧列：显示翻译过，
                         一旦可编辑就会把"触发"写回数据）。它决定能不能编辑、要不要焦点环。
                 */
-                const 底色只读 = kind === "readonly"
-                const 不许写 = 底色只读 || columnOf?.(key)?.readonly === true
+                const readonlyTint = kind === "readonly"
+                const notWritable = readonlyTint || columnOf?.(key)?.readonly === true
                 /* 列自带的格类（见 `ColumnSpec.cell`：对齐那类"只改长相"的东西放这里，不必穿 prop）。 */
-                const 列格类 = columnOf?.(key)?.cell ?? ""
+                const columnCellClass = columnOf?.(key)?.cell ?? ""
                 /* 这一格的键（`snapshotKey`）算**一次**给下面两处共用，别每处再拼一遍。 */
                 const isActiveCell = activeCellKey === snapshotKey(row.id, key)
                 return (
@@ -324,14 +324,14 @@ export const ActionRowView = memo(function ActionRowView({
                         row={row}
                         fieldKey={key}
                         kind={kind}
-                        readOnly={不许写}
+                        readOnly={notWritable}
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={String(cell.getValue() ?? "")}
                         selected={cell.getIsSelected()}
                         preSelected={pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
-                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${底色只读 ? READ_ONLY_BG : EDITABLE_BG} ${不许写 ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)} ${列格类}`}
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}
                         /*

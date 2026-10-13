@@ -155,7 +155,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      */
     pickerOf?: (key: string) => PickerConfig | undefined
     /**
-     * **一列的补充说明**（表头文案 / 数据键 / 显示翻译 / 只读）—— 由调用方按列给（见 `ColumnSpec`）。
+     * **一列的补充说明**（表头文案 / dataKey / 显示翻译 / 只读）—— 由调用方按列给（见 `ColumnSpec`）。
      * 不给 = 列 id 就是数据键与表头、显示原值、可编辑。
      */
     columnOf?: (key: string) => ColumnSpec | undefined
@@ -172,7 +172,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     /** 排序状态（默认按 `id_` 升序）；轨表没有 `id_` 那一列，传 `[]` = 行序严格等于数组顺序。**同样是初值**。 */
     initialSorting?: SortingState
     /**
-     * **改了一格**（`null` = 回到原值）。它同时是**数据所有权开关**（见下面 `外部持有数据`）：
+     * **改了一格**（`null` = 回到原值）。它同时是**数据所有权开关**（见下面 `externalOwner`）：
      * 给了 = 改动归调用方（它写进自己的 state 再回传），没给 = 草稿住在这张表里。
      */
     onEdit?: (rowId: string, key: string, value: string | null) => void
@@ -223,8 +223,8 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      *     真机踩过：拖完行序、调用方也确实重排了，屏幕上纹丝不动（看着就像"拖动没实现"）。
      *   · **没给**（动作表）：草稿归这张表，保存时才由 `onSaveReady` 交出去；换数据靠 `key` 整表重挂载。
      */
-    const 外部持有数据 = onEdit !== undefined
-    const rows = 外部持有数据 ? rowsProp : (edited ?? rowsProp)
+    const externalOwner = onEdit !== undefined
+    const rows = externalOwner ? rowsProp : (edited ?? rowsProp)
     /**
      * **写一格** —— 表里**唯一**的数据出口（编辑 / 粘贴 / 撤销三条路都经它，见 `useClipboardHistory`）。
      *
@@ -328,7 +328,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
     /** 调用方钉死宽度的列（`ColumnSpec.width`）—— 测量跳过它们（见那个字段的说明）。 */
-    const 固定列宽 = useMemo(() => {
+    const fixedWidths = useMemo(() => {
         const out: Record<string, number> = {}
         for (const id of keys) {
             const w = columnOf?.(id)?.width
@@ -340,7 +340,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      * **每列多宽**（取整后的整数）与"量过了没有" —— 整趟测量（含历次真机的证据）在
      * `useColumnMeasure` 里：它是"DOM 测量 + 三个自洽 state"，与表的交互逻辑一刀两断。
      */
-    const {columnSizing, measured} = useColumnMeasure(tableRef, keys, rows, 固定列宽)
+    const {columnSizing, measured} = useColumnMeasure(tableRef, keys, rows, fixedWidths)
     /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
     const scrollRef = useRef<HTMLDivElement>(null)
     /**
@@ -348,24 +348,24 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      * 几何（为什么要夹、上边界为什么是表头下沿、那 1px 余量的来路）都在 `drag.ts` —— 与 `reveal.ts`
      * 的"跟随可视"对称；这里只负责把**这个表的滚动盒**交出去。
      */
-    const 限制在可视框内 = useCallback<Modifier>((args) => clampDragY(scrollRef.current, args), [])
+    const clampToViewport = useCallback<Modifier>((args) => clampDragY(scrollRef.current, args), [])
     /* 剪贴板 / 撤销 / `edit` 那一套统一在 `useClipboardHistory` 里 —— 它的入参要用到下面的
        `tableInstanceRef`，所以调用点放在那之后（见文件中部）。 */
 
     /*
         一列一个字段。`accessorFn` 就是 `shownValue`（**这一列的数据键**）—— 排序、筛选、显示都按它走；
-        调用方给了 `columnOf` 就把那份规格叠上去：表头换文案、显示值过一次 `text`、以及"列 id ≠ 数据键"
+        调用方给了 `columnOf` 就把那份规格叠上去：表头换文案、显示值过一次 `text`、以及"列 id ≠ dataKey"
         （帧列看的是 `endTime`）。没给规格的列一切照旧。
     */
     const columns = useMemo<ColumnDef<typeof features, ActionRow>[]>(
         () =>
             keys.map((id) => {
                 const spec = columnOf?.(id)
-                const 数据键 = spec?.key ?? id
+                const dataKey = spec?.key ?? id
                 return {
                     id,
                     accessorFn: (row) => {
-                        const value = shownValue(row, 数据键)
+                        const value = shownValue(row, dataKey)
                         return spec?.text ? spec.text(value) : value
                     },
                     header: spec?.label ?? columnLabel(id, t),
@@ -466,13 +466,13 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      * ⚠️ 指纹去重（用 id 串比，不靠依赖数组的引用）：`modelRows` / `selectionBounds` 每次渲染都可能是
      * 新对象，没有这道闸就会渲染一次报一次 → 调用方 setState → 再渲染 → **打转**。
      */
-    const 上次整行选中 = useRef("")
+    const lastFullSelection = useRef("")
     useEffect(() => {
         if (!onSelectionChange) return
         const ids = modelRows.filter((_, index) => rowFullySelected(selectionBounds, index, lastColumnIndex)).map((row) => row.id)
-        const 指纹 = ids.join(",")
-        if (指纹 === 上次整行选中.current) return
-        上次整行选中.current = 指纹
+        const fingerprint = ids.join(",")
+        if (fingerprint === lastFullSelection.current) return
+        lastFullSelection.current = fingerprint
         onSelectionChange(ids)
     }, [onSelectionChange, modelRows, selectionBounds, lastColumnIndex])
 
@@ -498,14 +498,14 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      * 一段选区都没有时（刚打开弹窗）报 `null` —— 调用方据此把新行放到行末。
      */
     /* 活动格所在的行 id（null = 一段选区都没有）—— 上报给调用方，也给行级命令定位「活动行」。 */
-    const 活动行id = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
-    const 上次活动行 = useRef("")
+    const activeRowId = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
+    const lastActiveRow = useRef("")
     useEffect(() => {
         if (!onActiveRowChange) return
-        if ((活动行id ?? "") === 上次活动行.current) return
-        上次活动行.current = 活动行id ?? ""
-        onActiveRowChange(活动行id)
-    }, [onActiveRowChange, 活动行id])
+        if ((activeRowId ?? "") === lastActiveRow.current) return
+        lastActiveRow.current = activeRowId ?? ""
+        onActiveRowChange(activeRowId)
+    }, [onActiveRowChange, activeRowId])
     /** 已经为哪一格排了一帧"跟随可视"（`revealActiveCell` 的幂等闸：同一帧重复喊只滚一次）。 */
     const revealPendingRef = useRef<HTMLElement | null>(null)
     /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */
@@ -564,7 +564,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
                 .filter((th) => th.style.left !== "" && th.style.left !== "auto")
                 .reduce((max, th) => Math.max(max, th.getBoundingClientRect().right), view.left)
             const tr = el.parentElement
-            const 目标 = revealScrollTarget({
+            const target = revealScrollTarget({
                 target: el.getBoundingClientRect(),
                 view,
                 headerHeight,
@@ -577,10 +577,10 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
                 box,
                 scroll: {top: box.scrollTop, left: box.scrollLeft},
             })
-            if (!目标) return // 本来就看得见 / 已到最好位置 → 一次都不滚
+            if (!target) return // 本来就看得见 / 已到最好位置 → 一次都不滚
             /* 报名"下一次滚动是我们自己发的"，再滚（契约见 `RevealSession`）。 */
             selfScrollRef.current = true
-            box.scrollTo(目标)
+            box.scrollTo(target)
         })
     }, [])
     /**
@@ -679,16 +679,16 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
     }, [onCopyReady, copySelection])
 
     /* 整行选中的那些行**下标**（升序）—— 行级命令读它，与"整行选中"那条上报是同一份判据。 */
-    const 选中行下标 = modelRows.map((_, index) => index).filter((index) => rowFullySelected(selectionBounds, index, lastColumnIndex))
+    const selectedRowIndexes = modelRows.map((_, index) => index).filter((index) => rowFullySelected(selectionBounds, index, lastColumnIndex))
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
-    const 活动行下标 = 活动行id === null ? -1 : modelRows.findIndex((row) => row.id === 活动行id)
+    const activeRowIndex = activeRowId === null ? -1 : modelRows.findIndex((row) => row.id === activeRowId)
     /**
      * **行级命令只有这一份**（添加/复制/剪切/粘贴/删除，实现在 `useRowCommands`）——
      * 工具条那五个按钮由 `onRowsReady` 拿走，键盘那条也走它（见下面那段 keydown）。
      */
-    const 行命令 = useRowCommands({rows: modelRows.map((row) => row.original), keys, 选中行下标, 活动行下标, onChange: onRowsChange})
+    const rowCommands = useRowCommands({rows: modelRows.map((row) => row.original), keys, selectedRowIndexes, activeRowIndex, onChange: onRowsChange})
     useEffect(() => {
-        onRowsReady?.(行命令)
+        onRowsReady?.(rowCommands)
     })
 
 
@@ -740,10 +740,10 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
             判据用**层的归属**：表在哪个 [role=dialog] 里，就只认那一层是当前层；不在任何弹窗里的表，
             只在"确实没有弹窗"时响应。与"是哪张表、有几个值格列"无关 —— 所有表同一套。
         */
-        const 我的层 = tableRef.current?.closest("[role=dialog]") ?? null
-        const 弹窗们 = document.querySelectorAll("[role=dialog]")
-        const 活动层 = 弹窗们.length > 0 ? 弹窗们[弹窗们.length - 1] : null
-        if (我的层 !== 活动层) return
+        const myLayer = tableRef.current?.closest("[role=dialog]") ?? null
+        const dialogs = document.querySelectorAll("[role=dialog]")
+        const topLayer = dialogs.length > 0 ? dialogs[dialogs.length - 1] : null
+        if (myLayer !== topLayer) return
         // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
         const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
         const shift = mods === SHIFT
@@ -773,7 +773,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
             ‼️ 判据要把**列表容器**也算进来：列表开着时焦点在列表里，那时 `[data-pick-open]`（挂在触发器上）已经
             不在事件路径上了 —— 只认它的话，弹层里的上下键与 Enter 都会被本表抢走（用户报的"列表里选不了"）。
         */
-        const 在编辑或列表里 = (e.target as HTMLElement | null)?.closest?.(
+        const insideEditorOrList = (e.target as HTMLElement | null)?.closest?.(
             "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
         )
         if (!direction) {
@@ -782,7 +782,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
                 ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
                 （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
             */
-            if (在编辑或列表里) return
+            if (insideEditorOrList) return
             e.preventDefault()
             /*
                 ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
@@ -803,7 +803,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
             return
         }
 
-        if (在编辑或列表里) return
+        if (insideEditorOrList) return
 
         e.preventDefault() // 表格在 `.overflow-auto` 里，不拦住方向键会顺手滚容器
 
@@ -1062,7 +1062,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
             两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
         */
         /* `DndContext` 包在最外面：它的辅助 `<div>` 绝不能落进 `<tbody>`（见 `ReorderDnd` 那段）。 */
-        <ReorderDnd reorder={reorder} rows={modelRows} bound={限制在可视框内}>
+        <ReorderDnd reorder={reorder} rows={modelRows} bound={clampToViewport}>
         <div className="flex min-h-0 flex-1 flex-col">
             {/*
                 复制被拒：**用对话框**（Excel / WPS 也是弹框说这句话），不是表格上方一行小字。
@@ -1211,7 +1211,7 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
                                 row={row}
                                 rowSelected={rowSelected}
                                 /*
-                                    这一行外观的**指纹**：只有它变了才重渲（见 `rowSelectionKey`）。
+                                    这一行外观的**fingerprint**：只有它变了才重渲（见 `rowSelectionKey`）。
                                     没被选中的行它是空串 —— 一次拖拽写入，绝大多数行因此整行跳过。
                                 */
                                 edgeKey={rowSelectionKey(table.state.cellSelection, selectionBounds, rowIndex, row.id)}

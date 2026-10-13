@@ -13,7 +13,7 @@ import {flagHasBit, flagMask} from "@/lib/actionflags"
       · `optional` —— 额外可选项（分支列的 `-1`）。**项上就显示值本身**（`-1` 就显示 `-1`）。
       · `multiple` + `names` —— **多选**那一档（轨表的 `flag0` / `flag1`，按位开关的掩码）：列表项是
         **每一位**，勾中的位权相加写回格子。这是它与单选**唯一**的差别，全部由参数表达 ——
-        触发器、箭头、先选后编、跟随可视、焦点环、一滚就收、Ctrl+C 是同一份。
+        trigger、箭头、先选后编、跟随可视、焦点环、一滚就收、Ctrl+C 是同一份。
         （原来多选那档另有一个 `FlagCell`：两套触发器，于是样式漂了 —— 多选那格没有下拉箭头。）
 
     列表本体就是 `ui/combobox` 那套：样式、悬停高亮、选中勾都不自己写。
@@ -122,7 +122,7 @@ export function CellPick({
      * **原值里就置着的那些项**（列表里给 `#a0a0a0` 的那批）：勾是"现在在不在"、灰是"原来在不在"，两件事分开看。
      * 直接算成集合 —— 判"这一项灰不灰"因此是一次 `has`，不需要"项 → 位号"的反查表。
      */
-    const 原值项 = useMemo(
+    const originalItems = useMemo(
         () => new Set(bits.filter(({bit}) => flagHasBit(originalMask, bit)).map(({value: item}) => item)),
         [bits, originalMask],
     )
@@ -141,10 +141,10 @@ export function CellPick({
         const all = bits.map(({value: item}) => item)
         return [
             ...selected,
-            ...all.filter((item) => !selected.includes(item) && 原值项.has(item)),
-            ...all.filter((item) => !selected.includes(item) && !原值项.has(item)),
+            ...all.filter((item) => !selected.includes(item) && originalItems.has(item)),
+            ...all.filter((item) => !selected.includes(item) && !originalItems.has(item)),
         ]
-    }, [multiple, bits, selected, mask, 原值项, shown, original, choices, optional])
+    }, [multiple, bits, selected, mask, originalItems, shown, original, choices, optional])
 
     /*
         按下 / 松开都挂 document：拖出这一格时松开不落在触发器上。
@@ -222,13 +222,13 @@ export function CellPick({
      * 列表**已经开着**时不拦：那时上下键归 base-ui 的列表导航。
      */
     useEffect(() => {
-        const 触发器 = cellRef.current
-        if (!触发器 || open) return
+        const trigger = cellRef.current
+        if (!trigger || open) return
         const 拦 = (e: globalThis.KeyboardEvent) => {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") e.stopPropagation()
         }
-        触发器.addEventListener("keydown", 拦, true)
-        return () => 触发器.removeEventListener("keydown", 拦, true)
+        trigger.addEventListener("keydown", 拦, true)
+        return () => trigger.removeEventListener("keydown", 拦, true)
     }, [open])
 
     // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
@@ -344,8 +344,7 @@ export function CellPick({
             </ComboboxTrigger>
             <ComboboxContent
                 anchor={cellRef}
-                // 与格子再拉开 1px（用户口径：列表上间距 = 2px）。
-                sideOffset={2}
+                sideOffset={3} // 列表与格子间距
                 className={`w-max cell-pick-list ${instantClose ? "hidden!" : ""}`}
                 data-copy-own=""
                 data-esc-own=""
@@ -388,7 +387,7 @@ export function CellPick({
                             value={item}
                             /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
                                ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
-                            className={`py-1! ${(multiple ? 原值项.has(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
+                            className={`py-1! ${(multiple ? originalItems.has(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
                         >
                             {multiple ? labelOf.get(item) : item}
                         </ComboboxItem>

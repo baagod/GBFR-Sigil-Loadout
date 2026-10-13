@@ -16,7 +16,7 @@ import {CELL_CHOICES} from "@/lib/controltypes"
  * 只服务下面那一处归一，所以留在本文件、不做成 `model` 的公共 API。
  * 分支列的清单给的是**那个稳定的 Set 引用**（`branchPick.ids`）：`CellPick` 里那份重排才挂得住 memo。
  */
-const 内置值格 = (kind: ColumnKind, branch: BranchPickConfig) =>
+const builtinPick = (kind: ColumnKind, branch: BranchPickConfig) =>
     kind === "branch"
         ? {choices: branch.ids, optional: UNSET, searchPlaceholder: branch.searchPlaceholder}
         : kind === "pick"
@@ -53,7 +53,7 @@ export const CellContent = memo(function CellContent({
     fieldKey: string
     /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
     kind: ColumnKind
-    /** 这一列**不许写**（只读列，或调用方标了 `readonly`）—— 只显示文本，没有编辑态。 */
+    /** 这一列**notWritable**（只读列，或调用方标了 `readonly`）—— 只显示文本，没有编辑态。 */
     readOnly?: boolean
     /** 改动值（空串 = 没改过）。 */
     raw: string
@@ -108,7 +108,7 @@ export const CellContent = memo(function CellContent({
         ⚠️ 判据是"这一列是不是值格"，不是"是不是多选"：以前这里是 `picker?.multiple` → `FlagCell`，
         于是多选那档另有一套触发器，样式就漂了（多选那格没有下拉箭头）。
     */
-    const pick = pickerOf(fieldKey) ?? 内置值格(kind, branchPick)
+    const pick = pickerOf(fieldKey) ?? builtinPick(kind, branchPick)
     if (pick) {
         // "进编辑"= **展开列表**（见 `CellPick`），与普通格子同一道闸门；`dragged` 一并交下去（拖过 = 拉选区，不展开）。
         return (

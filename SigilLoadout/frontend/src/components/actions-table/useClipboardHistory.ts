@@ -271,7 +271,7 @@ export function useClipboardHistory({
      * 而"哪片进剪贴板、虚线画在哪儿"必须**一模一样**。轨表那边曾经自己拦下 Ctrl+C 去复制整行，
      * 结果基座这条路根本没跑起来，表现就是"复制了却没有虚线、也没法再复制"。
      */
-    const 复制选区 = useCallback(
+    const copyArea = useCallback(
         (写: (text: string) => void) => {
             /*
                 ⚠️ 这里**必须**把两件事分开（踩过）：
@@ -333,9 +333,9 @@ export function useClipboardHistory({
             */
             if (target?.tagName === "INPUT" && hasSelectedText()) return
             e.preventDefault()
-            复制选区((text) => e.clipboardData?.setData("text/plain", text))
+            copyArea((text) => e.clipboardData?.setData("text/plain", text))
         },
-        [复制选区],
+        [copyArea],
     )
 
     /**
@@ -493,7 +493,7 @@ export function useClipboardHistory({
         setCopyHint,
         copySource,
         clearCopySource,
-        copySelection: () => 复制选区((text) => void navigator.clipboard?.writeText(text)),
+        copySelection: () => copyArea((text) => void navigator.clipboard?.writeText(text)),
         edit,
         handleUndo,
     }

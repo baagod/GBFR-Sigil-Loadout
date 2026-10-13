@@ -163,7 +163,7 @@ function FlagEffects({row}: {row: ActionRow}) {
 }
 
 /**
- * flags 的**列说明**：三列表头换成中文，`config` 与帧列的值翻译成给人看的写法。
+ * flags 的**columnSpec**：三列表头换成中文，`config` 与帧列的值翻译成给人看的写法。
  *
  * ‼️ 这两列都标 `readonly`：翻译过的值一旦能编辑，`shown` 就会被当成草稿提交回去（把"触发"写进数据）。
  * 其余列不在这张表里 —— 走默认（列 id = 数据键 = 表头、显示原值、可编辑）。
@@ -226,7 +226,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
 }) {
     /* 列说明依赖文案表：`t` 一换（换语言）就得重算 —— `useMemo` 让引用稳住（列宽测量按 `keys` 重跑）。 */
-    const 列说明 = useMemo(() => columnOf(t), [t])
+    const columnSpec = useMemo(() => columnOf(t), [t])
     /* 同上：行的引用要稳（基座拿它当"换数据了没有"的判据）。 */
     const 行 = useMemo(
         () =>
@@ -241,7 +241,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
             abilityNames={{}}
             rows={行}
             keys={FLAG_COLUMNS}
-            columnOf={列说明}
+            columnOf={columnSpec}
             initialSorting={[]}
             initialPinnedCount={0}
             onEdit={onEdit}

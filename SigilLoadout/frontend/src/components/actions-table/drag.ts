@@ -29,8 +29,8 @@ export function clampDragY(
 ): ReturnType<Modifier> {
     if (!box || !draggingNodeRect) return transform
     const view = box.getBoundingClientRect()
-    const 顶 = box.querySelector("thead")?.getBoundingClientRect().bottom ?? view.top
-    const 上限 = view.bottom - draggingNodeRect.bottom - 1
-    const 下限 = 顶 - draggingNodeRect.top + 1
-    return {...transform, y: Math.min(Math.max(transform.y, 下限), 上限)}
+    const top = box.querySelector("thead")?.getBoundingClientRect().bottom ?? view.top
+    const maxY = view.bottom - draggingNodeRect.bottom - 1
+    const minY = top - draggingNodeRect.top + 1
+    return {...transform, y: Math.min(Math.max(transform.y, minY), maxY)}
 }
