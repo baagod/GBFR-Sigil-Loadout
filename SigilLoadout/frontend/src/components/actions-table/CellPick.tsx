@@ -5,7 +5,7 @@ import {RevealContext, useEnterEditHandler} from "@/components/actions-table/mod
 import {flagHasBit, flagMask} from "@/lib/actionflags"
 /*
     表里的**值格**（唯一一套实现）：格子里是那个值 + 右边一个小箭头，**先选中、再点一下**才在格子下面
-    挂出列表挑（与普通格子"先进编辑态"同一道闸门，见下面 `shouldEditOnClick`）。
+    挂出列表挑 —— **双击**格子才展开（与普通格子"双击才进编辑"同一条口径）。
 
       · `choices` —— 清单（Set，稳定引用）。`controlTypeHash_` 用 `CELL_CHOICES`；`branchXAtk_`
         用**当前表里所有 `id_`**（用户口径：值是"转到哪个动作"）。
@@ -13,7 +13,7 @@ import {flagHasBit, flagMask} from "@/lib/actionflags"
       · `optional` —— 额外可选项（分支列的 `-1`）。**项上就显示值本身**（`-1` 就显示 `-1`）。
       · `multiple` + `names` —— **多选**那一档（轨表的 `flag0` / `flag1`，按位开关的掩码）：列表项是
         **每一位**，勾中的位权相加写回格子。这是它与单选**唯一**的差别，全部由参数表达 ——
-        trigger、箭头、先选后编、跟随可视、焦点环、一滚就收、Ctrl+C 是同一份。
+        trigger、箭头、双击展开、跟随可视、焦点环、一滚就收、Ctrl+C 是同一份。
         （原来多选那档另有一个 `FlagCell`：两套触发器，于是样式漂了 —— 多选那格没有下拉箭头。）
 
     列表本体就是 `ui/combobox` 那套：样式、悬停高亮、选中勾都不自己写。
@@ -44,7 +44,6 @@ export function CellPick({
     multiple,
     names,
     onCommit,
-    shouldEditOnClick,
     dragged,
 }: {
     /** 这一格的键（`snapshotKey`）：登记"进编辑"句柄用。 */
@@ -67,11 +66,6 @@ export function CellPick({
     names?: readonly string[]
     /** 提交这一格；`null` = 回到原值（与别的格子同一条口径）。 */
     onCommit: (next: string | null) => void
-    /**
-     * 与普通格子**同一道闸门**："按下之前这一格是唯一选中格"才把这次点击算作进编辑（= 展开列表）。
-     * 做成函数而不是布尔值：渲染发生在 mousedown 之前，那一刻还没有答案。
-     */
-    shouldEditOnClick: () => boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不展开。 */
     dragged: RefObject<boolean>
 }) {
@@ -91,17 +85,6 @@ export function CellPick({
     const [instantClose, setInstantClose] = useState(false)
     /** 关列表时要不要把焦点还回这一格（用户点到别处时不还，免得顶掉他刚点开的那一格）。 */
     const focusBackRef = useRef(true)
-    /**
-     * 指针正按在这一格上（`pointerdown` 起、`pointerup`/`pointercancel` 止，都挂 document ——
-     * 拖出这一格时松开不落在触发器上）。
-     *
-     * 为什么要它：库是**在按下那一刻**就请求展开的，而"这一下会不会变成拖"要到第一次 mousemove
-     * 才有答案（`dragged`）—— 所以按下期间到的请求得先押后（见 `pendingOpenRef`）。
-     */
-    const pointerDownRef = useRef(false)
-    /** 有一次展开请求是"按着的时候到的"，押后到松开那一刻再按闸门裁决。 */
-    const pendingOpenRef = useRef(false)
-
     /**
      * **多选那档的位表**（下标即位号）。项的值给的是**位权**的字符串（base-ui 的项 value 只能是字符串），
      * 而"这一位置没置着"要按**位号**判 —— 两者别混（早先传权进去判位，值 `16` 勾到了第 3 行 ✗）。
@@ -145,13 +128,8 @@ export function CellPick({
         ]
     }, [multiple, bits, selected, mask, originalItems, shown, original, choices, optional])
 
-    /*
-        按下 / 松开都挂 document：拖出这一格时松开不落在触发器上。
-        `[]` 依赖：用到的 `dragged` 是 ref、`shouldEditOnClick` 对一个格子实例恒定（只读 `pressRef`），
-        所以不会读到过期的值。
-    */
     /**
-     * **展开列表**（= 选值格的"进编辑"）：先跟随可视、再开。点击与 Enter 两条路都走它 ——
+     * **展开列表**（= 选值格的"进编辑"）：先跟随可视、再开。**双击**与 Enter 两条路都走它 ——
      * 与普通格子的 `enterEdit` 一一对应（那边切输入框、这边开列表，别在这里另立一套）。
      */
     const openForEdit = useCallback(() => {
@@ -164,30 +142,6 @@ export function CellPick({
         setInstantClose(false)
         setOpen(true)
     }, [reveal])
-    useEffect(() => {
-        const onDown = (e: PointerEvent) => {
-            if (cellRef.current?.contains(e.target as Node)) pointerDownRef.current = true
-        }
-        /*
-            **松开那一刻裁决**（`dragged` 此时已成定局）：真机上库的请求在按下时到，就在这里定；
-            请求若晚到（测试环境如此），走 `onOpenChange` 里那条路 —— 两条路用的是同一道闸门。
-        */
-        const release = () => {
-            pointerDownRef.current = false
-            if (!pendingOpenRef.current) return
-            pendingOpenRef.current = false
-            if (!dragged.current && shouldEditOnClick()) openForEdit()
-        }
-        document.addEventListener("pointerdown", onDown, true)
-        document.addEventListener("pointerup", release, true)
-        document.addEventListener("pointercancel", release, true)
-        return () => {
-            document.removeEventListener("pointerdown", onDown, true)
-            document.removeEventListener("pointerup", release, true)
-            document.removeEventListener("pointercancel", release, true)
-        }
-    }, [])
-
     /** 登记"这一格的进编辑"（= 展开列表）：与普通格子的 `Cell.enterEdit` 一一对应。 */
     useEnterEditHandler(cellKey, openForEdit)
 
@@ -296,26 +250,16 @@ export function CellPick({
             open={open}
             onOpenChange={(next, eventDetails) => {
                 if (!next) {
-                    pendingOpenRef.current = false
                     setOpen(false)
                     return
                 }
                 /*
-                    ‼️ 库是**在按下那一刻**就请求展开的，而那时"这一下会不会变成拖"还没有答案
-                    （`dragged` 要等第一次 mousemove）→ 按着时到的请求一律先押后（松开时再定）。
-                    松开之后才到的请求（环境差异）就地判 —— 两条路用**同一道闸门**：
-                    拖过、或按下之前不是唯一选中格，都只算"选中"。
+                    ‼️ **库那次"按下就开"一律取消**：展开只由**双击**（下面那个 `onDoubleClick`）或 Enter 触发
+                    —— 与普通格子"双击才进编辑"同一条口径。
+                    这样单击（含 Ctrl 减选 / Shift 扩选 / 按住拖）就纯粹是选区手势，不需要再靠
+                    "按下时押后、松开再裁决"去猜意图（那套机器已删）。
                 */
-                if (pointerDownRef.current) {
-                    pendingOpenRef.current = true
-                    eventDetails.cancel()
-                    return
-                }
-                if (dragged.current || !shouldEditOnClick()) {
-                    eventDetails.cancel()
-                    return
-                }
-                openForEdit() // 开：复位"立刻消失"（弹层这时才重新挂载）
+                eventDetails.cancel()
             }}
         >
             {/* 触发器用库的（自带箭头）—— 别换回原始 `Trigger` 自己画一个。 */}
@@ -332,6 +276,10 @@ export function CellPick({
                 data-copy-own=""
                 data-esc-own=""
                 onKeyDown={onCopyKey}
+                /* ‼️ **双击**才展开列表（与普通格子"双击才进编辑"同一条口径）；拖出去拉过选区不展开。 */
+                onDoubleClick={() => {
+                    if (!dragged.current) openForEdit()
+                }}
                 // 自己点开的：关列表时焦点就还回这一格（见 finalFocus）。
                 onClick={() => {
                     focusBackRef.current = true

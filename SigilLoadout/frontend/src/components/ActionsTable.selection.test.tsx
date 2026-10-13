@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
-    动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 先选后编）
+    动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 单击/双击口径）
 */
 import {describe, expect, it, vi} from "vitest"
 import {fireEvent, screen} from "@testing-library/react"
@@ -17,7 +17,7 @@ import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCell
 
 const {renderTable, setRows, addRow} = useTableHarness()
 
-describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 先选后编）", () => {
+describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 单击/双击口径）", () => {
     /*
         用户要求：**允许复制列名**，而且复制列名时要**清空表格复制区** ——
         那圈虚线圈的是"剪贴板里就是这片格子"，剪贴板换成列名之后这个说法就不成立了。
@@ -793,7 +793,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         click 那一步的判据根本没机会生效（用户实测："现在点击后还是直接进入编辑"）。
         只派发 click 是测不出来的（happy-dom 不会自动聚焦），必须显式把 focus 派出来。
     */
-    it("先选后编：第一次点（mousedown+focus+click）只选中，不进编辑；第二下才进", async () => {
+    it("单击只选中、再点也不进编辑；**双击**才进编辑", async () => {
         const container = await renderTable()
         const cell = cellAt(container, 0, 2)
         const textLayer = cell.firstElementChild!
@@ -801,13 +801,18 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.mouseDown(cell)
         fireEvent.focus(textLayer)
         fireEvent.click(textLayer)
-        expect(cell.querySelector("input")).toBeNull() // 只选中，没进编辑 ✅
+        expect(cell.querySelector("input")).toBeNull() // 单击只选中，不进编辑 ✅
         expect(cell.className).toContain("cell-selected") // 而且真的选中了
 
+        /* ‼️ 再点一下**仍然不进编辑**（这是与旧口径最大的差别：`focus` 那条路已不再编辑）。 */
         fireEvent.mouseDown(cell)
         fireEvent.focus(textLayer)
         fireEvent.click(textLayer)
-        expect(cell.querySelector("input")).not.toBeNull() // 第二下才进编辑 ✅
+        expect(cell.querySelector("input")).toBeNull()
+
+        /* **双击**才进编辑 ✅ */
+        fireEvent.doubleClick(textLayer)
+        expect(cell.querySelector("input")).not.toBeNull()
     })
 
     it("前两列钉住：表头与格子都带 sticky，且只有它们打了量宽标记", async () => {

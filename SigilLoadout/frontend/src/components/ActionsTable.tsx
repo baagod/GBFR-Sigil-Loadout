@@ -32,7 +32,7 @@
       · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态。
 
     ‼️ **这个文件里还剩下的**：数据读取的接线、选区手势编排（行号/数据格拖动）、列与行的清单计算、
-    渲染，以及"整行选中"上报给调用方。手势那块与三个 ref 镜像（`tableInstanceRef` / `pressRef` /
+    渲染，以及"整行选中"上报给调用方。手势那块与两个 ref 镜像（`tableInstanceRef` /
     `dragRowRef`）缠在一起，再往外抽要先搬一堆 ref —— 想动它时先想清楚这笔账，别只为行数好看。
 */
 import {
@@ -75,7 +75,7 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, type PressFacts, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -139,7 +139,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
     /**
      * **这一列的值格参数**（多选 / 位名表 / 挂不挂搜索框）—— 由调用方给（见 `PickerConfig`）。
      *
-     * ‼️ 值格只有**一套**实现：先选后编那一道闸门、跟随可视、焦点环、列表排序
+     * ‼️ 值格只有**一套**实现：双击展开、跟随可视、焦点环、列表排序
      * `[当前] → [原值] → [其他]` 全是同一份；单选还是多选、挂不挂搜索框只差这几个字段。
      * 所以"哪张表要值格"不需要再写任何自定义 —— 给参数就行。
      */
@@ -268,15 +268,10 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      */
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [{id: "id_", desc: false}])
     /**
-     * **按下那一刻这一格的选区事实**（形状与理由见 `PressFacts`）—— 整张表共享一条记录，
-     * 由数据格的 `onMouseDown` 在库改掉选中状态**之前**写进去，`click` / `focus` 那两条进编辑的路读它。
-     */
-    const pressRef = useRef<PressFacts | null>(null)
-    /**
      * **这一次按下是不是"拖"**（按下到松开移动超过几个像素）。
      *
-     * 与 `pressRef.wasOnlyCell` 互补：多格选中时点一格靠前者拦、单选一格时拖出去靠这条拦。
-     * 它由 document 的**捕获阶段**监听写入（那时还不知道按的是哪一格），所以不并进 `pressRef`。
+     * 它由 document 的**捕获阶段**监听写入（那时还不知道按的是哪一格），只服务"双击才进编辑"里那条
+     * "拖出去拉选区就别进编辑"的例外。
      */
     const draggedRef = useRef(false)
     /** 按下时的坐标（与松开比距离，见 `draggedRef`）。 */
@@ -586,9 +581,6 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         dragCellRef.current = true
         cell.getSelectionStartHandler()(e)
     }, [])
-
-    /** 选区边界（`PressFacts` 与行号减选要用）—— 走 `tableRef`，于是对外也是稳定引用。 */
-    const getSelectionBounds = useCallback(() => tableInstanceRef.current.getCellSelectionBounds(), [])
 
     /**
      * 按行号把**一整行**写成一个"整行宽"的区（Excel 的模型：行块本身就是个区，跟单元格区同住一处）。
@@ -923,13 +915,11 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                 measured={measured}
                                 rowHeadWidth={rowHeadWidth}
                                 abilityNames={abilityNames}
-                                pressRef={pressRef}
                                 /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
                                 copySource={copySource}
                                 draggedRef={draggedRef}
                                 activeCellKey={activeCellKey}
                                 scrollActiveIntoView={scrollActiveIntoView}
-                                getSelectionBounds={getSelectionBounds}
                                 edit={edit}
                                 sortable={reorder !== undefined}
                                 columnOf={columnOf}

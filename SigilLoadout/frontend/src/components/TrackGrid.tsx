@@ -224,7 +224,7 @@ const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
 
 /**
  * `flag0` / `flag1` 是**多选、不带搜索框**的值格 —— 与动作表值格唯一的差别就是这两个字段
- * （值格实现本身只有基座那一套：同一道"先选后编"闸门、同一个触发器与箭头、同一份列表长相与排序口径）。
+ * （值格实现本身只有基座那一套：同一道"双击展开"口径、同一个触发器与箭头、同一份列表长相与排序口径）。
  */
 const flagPickers: Record<string, PickerConfig> = {
     flag0: {multiple: true, names: FLAG0_NAMES},

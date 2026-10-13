@@ -86,7 +86,7 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
     const handleArrowKey = useCallback((e: KeyboardEvent) => {
         const {cellSelection, modelRows, sheetColumns, activeCellKey} = fresh.current
         const direction = ARROW_KEYS[e.key]
-        const isEnter = e.key === "Enter"
+        const isEnter = e.key === "Enter" || e.key === "F2"
         if ((!direction && !isEnter) || e.defaultPrevented) return
         /*
             ‼️ **同一时刻只有"当前那一层"的表响应用户的按键**。
@@ -135,7 +135,7 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
         )
         if (!direction) {
-            // ---- Enter：进编辑（与"点已选中的格子"同一条口径）----
+            // ---- Enter / F2：进编辑（与"双击格子"同一条口径）----
             /*
                 ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
                 （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
@@ -153,7 +153,7 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
                 选值格展开列表 —— 两边实现不同，本层不该知道细节。只读列不登记 → 这里什么都不做。
                 "跟随可视"不在这里补：`Cell.enterEdit` / `CellPick` 展开时自己会喊 `reveal()`（与点击同一条口径）。
 
-                ⚠️ 别改成"派发一次真实 click"：那条路上 `Cell` 的 `shouldEditOnClick` 要 `pressRef` 里那份
+                ⚠️ 别改成"派发一次真实 click"：那条路上没有 `mousedown`（`draggedRef` 是上一格留下的），
                 "按下那一刻"的事实，而**方向键换格后直接按 Enter 根本没有 mousedown** —— 闸门判 false，
                 Enter 点不开（实测）。登记那套没有这个前提。
             */

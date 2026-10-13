@@ -254,7 +254,7 @@ describe("动作表 · 方向键移动活动格", () => {
         第二次点击时选区没变、活动格没换人 → ref 不跑 → 不滚；而进入编辑走的是另一条路
         （`Cell.enterEdit`），它当时不接手滚动。
     */
-    it("点已选中的格子进编辑：也要跟随可视（scrollOnce）", async () => {
+    it("双击格子进编辑：也要跟随可视（scrollOnce）", async () => {
         const container = await renderTable()
         const restoreGeometry = stubRevealGeometry(container)
         const {scrolls: scrolled, restore} = captureScrolls()
@@ -273,12 +273,10 @@ describe("动作表 · 方向键移动活动格", () => {
             box.scrollLeft = 999
             expect(scrolled).toHaveLength(0)
 
-            /* ③ 再点它一次：进编辑，同时**必须**再跟随可视一次。 */
+            /* ③ 再**双击**它：进编辑，同时**必须**再跟随可视一次。 */
             const cell = cellAt(container, 0, col)
             const textLayer = cell.firstElementChild!
-            fireEvent.mouseDown(cell, {button: 0})
-            fireEvent.focus(textLayer)
-            fireEvent.click(textLayer)
+            fireEvent.doubleClick(textLayer)
             await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
 
             expect(cell.querySelector("input")).not.toBeNull() // 确实进了编辑态
@@ -291,7 +289,7 @@ describe("动作表 · 方向键移动活动格", () => {
     })
 
     /*
-        ‼️ **Enter 进编辑**（用户口径）：与"点已选中的格子"同一条路 —— 进编辑**并且跟随可视**。
+        ‼️ **Enter 进编辑**（用户口径）：与"双击格子"同一条路 —— 进编辑**并且跟随可视**。
 
         实现上不是"Enter 另写一套"：活动格把自己的"进编辑"句柄登记给 `ActionsTable`（`EnterEditContext`），
         所以普通格切输入框、选值格展开列表都由那一格自己决定。
@@ -305,7 +303,7 @@ describe("动作表 · 方向键移动活动格", () => {
             const col = KEYS.indexOf(LongField) // 可编辑列
             /*
                 ⚠️ 先用**方向键**选中（真实用法就是"方向键走过去、再按 Enter"）：只 `selectCell`
-                的话 `pressRef` 是空的，`Cell.enterEdit` 里那道"这一下算不算用户要编辑"的闸会挡住。
+                的话那条路压根没跑（编辑只认双击）。
             */
             selectCell(cellAt(container, 0, col - 1))
             arrowOn(cellAt(container, 0, col - 1), "ArrowRight")

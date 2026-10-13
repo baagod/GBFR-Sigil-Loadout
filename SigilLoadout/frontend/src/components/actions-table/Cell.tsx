@@ -2,11 +2,11 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
+import {memo, useCallback, useContext, useEffect, useRef, useState, type Ref, type RefObject} from "react"
 
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, READONLY_PADDING} from "./classes"
-import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, type PressFacts, snapshotKey} from "./model"
+import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, snapshotKey} from "./model"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -43,8 +43,6 @@ export const CellContent = memo(function CellContent({
     original,
     shown,
     abilityNames,
-    pressRef,
-    preSelected,
     draggedRef,
     edit,
     onEnterEdit,
@@ -62,16 +60,6 @@ export const CellContent = memo(function CellContent({
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
     abilityNames: Record<string, string>
-    /** 按下那一刻这一格的选区事实（见 `PressFacts`）—— `shouldEditOnClick` 读它。 */
-    pressRef: RefObject<PressFacts | null>
-    /**
-     * **这一格在这下 mousedown 之前选没选中**。
-     *
-     * 为什么是渲染时取好的布尔值、而不是在这里现读 `pressRef`：`td` 的 mousedown 在**冒泡后**才轮到
-     * 我们这层，那时它已经被改写成"按下之后"了。所以由 `td` 层渲染时取出来传下去，
-     * 用来闸住 focus 那条进编辑的路（见 `Cell` 里的 `skipFocusEditRef`）。
-     */
-    preSelected: boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 是"拖出去拉选区"，不该进编辑。 */
     draggedRef: RefObject<boolean>
     edit: (rowId: string, key: string, value: string | null) => void
@@ -89,36 +77,18 @@ export const CellContent = memo(function CellContent({
         return <CellText padding={READONLY_PADDING} text={fieldKey === "abilityTag_" ? abilityName(abilityNames, shown) : shown} />
     }
     /*
-        ‼️ "先选后编"的**唯一**判据：按下之前这一格是唯一选中格，这一次点击才算"进编辑"。
-        两个条件缺一不可（见 `PressFacts` / `draggedRef`）：多格选着点一格 = 收选区、按住拖 = 拉选区。
+        ‼️ **双击才进编辑**（Excel / WPS 同一口径）：单击永远只是"选"。所以这里没有"先选后编"那道闸门 ——
+        也就没有"这一次点击算不算编辑"的隐状态（`PressFacts` 那一整条已删）。
 
-        **选值格与普通格子共用它**（普通格子 = 换成输入框，选值格 = 展开列表）：选中、拖选、进编辑
-        三条行为两边必须一模一样，别给选值格另开一条"点一下就展开"的路。
-    */
-    const shouldEditOnClick = () => {
-        const press = pressRef.current
-        return (
-            press !== null &&
-            press.cellKey === snapshotKey(rowId, fieldKey) &&
-            press.wasSelected &&
-            press.wasOnlyCell &&
-            !press.withModifier
-            /* ‼️ 带修饰键的那一下是**改选区**（Ctrl 减选 / Shift 扩选）：减完之后这一格已经不在选中区里，
-               放行就会在一个"没被选中"的格子上打开输入框 / 展开列表（用户报的那个）。 */
-        )
-    }
-    /*
-        **值格只有一个入口**：两种来路在这里归一 ——
-          · 调用方按列给的值格参数（`pickerOf`：轨表的 `flag0` / `flag1` 走这条，多选 + 位名表）；
-          · 内置列策略（`kind` 认 `controlTypeHash_` / `branchXAtk_` 那几个字段名，见 `model.columnKind`）。
-        多选 / 单选、挂不挂搜索框的差别全在参数里，实现只有 `CellPick` 那一套（见 `PickerConfig`）。
+        为什么不做成"选中之后再点一下"：那个手势要和**改选区**的手势（Ctrl 减选 / Shift 扩选 / 按住拖）
+        抢同一次 mousedown，只能靠"按下那一刻的快照"去猜意图 —— 减选之后格子已经不在选区里，却仍被
+        判成"可编辑"，于是弹出一个没人要的输入框（用户报过）。双击不占"单击"这个坑，也就没有这个歧义。
 
-        ⚠️ 判据是"这一列是不是值格"，不是"是不是多选"：以前这里是 `picker?.multiple` → `FlagCell`，
-        于是多选那档另有一套触发器，样式就漂了（多选那格没有下拉箭头）。
+        ⚠️ **选值格与普通格子仍共用这一条**（普通格 = 输入框，值格 = 展开列表）：两边只差"打开什么"。
     */
     const pick = pickerOf(fieldKey) ?? builtinPick(kind, branchPick)
     if (pick) {
-        // "进编辑"= **展开列表**（见 `CellPick`），与普通格子同一道闸门；`dragged` 一并交下去（拖过 = 拉选区，不展开）。
+        // "进编辑"= **展开列表**（见 `CellPick`）；`dragged` 一并交下去（拖过 = 拉选区，不展开）。
         return (
             <CellPick
                 cellKey={snapshotKey(rowId, fieldKey)}
@@ -126,7 +96,6 @@ export const CellContent = memo(function CellContent({
                 original={original}
                 unchanged={raw === ""}
                 onCommit={(value) => edit(rowId, fieldKey, value)}
-                shouldEditOnClick={shouldEditOnClick}
                 dragged={draggedRef}
                 {...pick}
             />
@@ -140,8 +109,6 @@ export const CellContent = memo(function CellContent({
             original={original}
             shown={shown}
             onCommit={(value) => edit(rowId, fieldKey, value)}
-            shouldEditOnClick={shouldEditOnClick}
-            preSelected={preSelected}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
         />
@@ -156,21 +123,19 @@ export const CellContent = memo(function CellContent({
  * 只设 `opacity-0`（透明、仍占位、且仍可聚焦 —— Esc 那条路要用），**绝不离开文档流** ——
  * 详见 `Cell` 里那段。
  */
-function CellText({text, padding = CELL_PADDING, muted = false, onClick, hidden = false, tabIndex, onFocus, onMouseDown, ref}: {
+function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, tabIndex, onFocus, ref}: {
     text: string
     /** 这一格的内边距（默认 CELL_PADDING；只读格传 READONLY_PADDING —— 它没有输入框，见那个常量）。 */
     padding?: string
     /** 灰色：这一格显示的是**原值**（还没改过）。 */
     muted?: boolean
-    /** 给了就可点（可编辑列用它进编辑态；只读列不给）。 */
-    onClick?: () => void
+    /** **双击**才进编辑（可编辑列给它；只读列不给）—— 单击永远只是"选"。 */
+    onDoubleClick?: () => void
     /** 编辑态：这一层只透明、仍占位。 */
     hidden?: boolean
     /** 显示态 `0`（可聚焦）、编辑态 `-1`（避开 Tab 序列）—— Esc 退出编辑要把焦点交回这一层。 */
     tabIndex?: number
     onFocus?: () => void
-    /** 按下（可编辑列用它把"这一格之前选没选中"交回外层；见 `Cell` 里那段）。 */
-    onMouseDown?: (e: ReactMouseEvent) => void
     ref?: Ref<HTMLDivElement>
 }) {
     return (
@@ -178,7 +143,6 @@ function CellText({text, padding = CELL_PADDING, muted = false, onClick, hidden 
             ref={ref}
             tabIndex={tabIndex}
             onFocus={onFocus}
-            onMouseDown={onMouseDown}
             // 编辑态这层是透明的：别把同一份文本再塞进无障碍树（那时该读的是上面那个输入框）。
             aria-hidden={hidden || undefined}
             // `truncate` = overflow:hidden + text-overflow:ellipsis + white-space:nowrap（一个类给全）。
@@ -187,7 +151,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onClick, hidden 
             className={`min-h-6 flex w-full items-center truncate ${padding} py-[3px]! ${FONT} tabular-nums ${
                 muted ? "text-muted-foreground" : ""
             } ${hidden ? "opacity-0" : ""}`}
-            onClick={onClick}
+            onDoubleClick={onDoubleClick}
         >
             {text}
         </div>
@@ -200,7 +164,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onClick, hidden 
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-export function Cell({rowId, fieldKey, value, original, shown, onCommit, shouldEditOnClick, preSelected, dragged, onEnterEdit}: {
+export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit}: {
     /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
     rowId: string
     /** 这一格的列名（同上）。 */
@@ -214,24 +178,10 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, shouldE
     /** 提交这一格；`null` = 回到原值（没改过）。 */
     onCommit: (value: string | null) => void
     /**
-     * 点这一格时该不该进编辑 —— "**先选中、再点一次才编辑**"的判据，由外面按
-     * "**按下之前**这一行是否已经在选中区里"给（见 `wasSelectedRef`）。
-     *
-     * 做成**函数**而不是布尔值：渲染发生在 mousedown **之前**，那一刻还没有答案 —— 传布尔值
-     * 只会把"点之前"的旧状态固定下来。
-     */
-    shouldEditOnClick: () => boolean
-    /**
      * **进编辑那一瞬间**喊一声：复制源那圈虚线要撤（用户定的规矩 —— 不是等改完提交，
-     * 而是"进入编辑"就算动了源区）。`onClick` 与 `onFocus` 两条进编辑的路都得喊。
+     * 而是"进入编辑"就算动了源区"）。
      */
     onEnterEdit: () => void
-
-    /**
-     * **这一格在这下 mousedown 之前选没选中**（由 `td` 在它自己的 handler 里取好、渲染时传下来；
-     * 在下面那个 mousedown 里读 ref 是读不到的 —— 那时已经被改成"按下之后"了）。
-     */
-    preSelected: boolean
     /** **这一次按下之后鼠标有没有真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不进编辑。 */
     dragged: RefObject<boolean>
 }) {
@@ -256,12 +206,6 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, shouldE
     const skipFocusRef = useRef(false)
     /** Esc 之后输入框紧接着会失焦：那一次 blur **不许提交**（Esc = 放弃草稿）。 */
     const skipCommitRef = useRef(false)
-    /**
-     * **这一次 focus 不许进编辑**（这一格在这下 mousedown 之前**没**被选中）。
-     * 为什么需要它：`mousedown → focus` 之间隔着重渲，整表共享的"之前选没选中"已经被这次 mousedown
-     * 改写成 true 了 —— 不闸住的话，点一个没选中的格子、或在选区里按下开始拖选，都会**直接进编辑**。
-     */
-    const skipFocusEditRef = useRef(false)
     /**
      * ‼️ **一次点击只进一次编辑**：真机上一下点击会**先后**走 `onFocus` 与 `onClick` 两条路
      * （两条都得进编辑，见下面那个 `onFocus`），而这里要做的三件事（播报、跟随可视、切状态）重复做
@@ -317,31 +261,17 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, shouldE
                     就进编辑，把复制区那圈虚线撤了）。
                     `preSelected` 是渲染时从 `td` 那一刻的快照取下来的 —— 在这里现读 ref 只会读到"按下之后"。
                 */
-                onMouseDown={() => {
-                    if (!preSelected || dragged) skipFocusEditRef.current = true
-                }}
-                /* "先选后编"：只有按下之前这一格已经在选中区里，click 才进编辑（判据见 `shouldEditOnClick`）。 */
-                onClick={() => {
-                    if (!dragged.current && shouldEditOnClick()) enterEdit()
+                /* ‼️ **双击**才进编辑：单击那一下归"选"（含 Ctrl 减选 / Shift 扩选 / 按住拖），
+                   与它的意图不冲突。拖出去拉过选区（`dragged`）也一律不进编辑。 */
+                onDoubleClick={() => {
+                    if (!dragged.current) enterEdit()
                 }}
                 hidden={editing}
                 // 编辑中别让它进 Tab 序列（上面已经压着输入框）；显示态可聚焦，Esc 才有地方落焦点。
                 tabIndex={editing ? -1 : 0}
                 onFocus={() => {
-                    // Esc 刚把焦点还回来：这一次不算"用户要编辑"。
-                    if (skipFocusRef.current) {
-                        skipFocusRef.current = false
-                        return
-                    }
-                    // 这一格在按下之前没被选中 → 这一下只算"选中"，别进编辑（见 `skipFocusEditRef`）。
-                    if (skipFocusEditRef.current) {
-                        skipFocusEditRef.current = false
-                        return
-                    }
-                    // 拖出去扩选（`dragged`）也一律不进编辑：那一下的意图是选一片，不是编辑。
-                    if (dragged.current) return
-                    /* 剩下的情况与 `onClick` 同一个判据：按下之前这一格已经在选中区里 → 进编辑。 */
-                    if (shouldEditOnClick()) enterEdit()
+                    // Esc 刚把焦点还回来：这一次什么都不做（焦点只是回来，不是要编辑）。
+                    skipFocusRef.current = false
                 }}
             />
             {editing && (

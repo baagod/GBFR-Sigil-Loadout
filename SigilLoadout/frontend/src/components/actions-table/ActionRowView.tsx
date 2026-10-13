@@ -3,7 +3,7 @@
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
-import type {Cell, CellSelectionBounds, Row} from "@tanstack/react-table"
+import type {Cell, Row} from "@tanstack/react-table"
 
 import {CellContent} from "./Cell"
 import {useSortable} from "@dnd-kit/sortable"
@@ -20,8 +20,7 @@ import {
     handleCellClass,
     selectionClass,
 } from "./classes"
-import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, type PressFacts, snapshotKey} from "./model"
-import {isSingleCellBounds} from "./selection"
+import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, snapshotKey} from "./model"
 
 /**
  * 一格里那层 `<td>` —— **第二道 memo 命门**（第一道是外面的 `ActionRowView`）。
@@ -43,17 +42,13 @@ const RowCell = memo(function RowCell({
     raw,
     original,
     shown,
-    selected,
-    preSelected,
     className,
     width,
     left,
     abilityNames,
-    pressRef,
     draggedRef,
     dragRowRef,
     cellRef,
-    getSelectionBounds,
     edit,
     startCellSelection,
     onEnterEdit,
@@ -72,17 +67,13 @@ const RowCell = memo(function RowCell({
     original: string
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
-    /** 按下**之前**这一格选没选中 —— `PressFacts` 要用。 */
-    selected: boolean
-    /** 上一次 mousedown 之前这一格选没选中（`Cell` 的 focus 闸门读它）。 */
-    preSelected: boolean
+    /** 这一格选没选中（底色与轮廓都由它推出来）。 */
     className: string
     width: number | null
     left: number | null
     /** **行头那几格的总宽**（行号列，能拖的表再加握把列）—— 钉住列的 `left` 要从它之后起算。 */
     rowHeadWidth: number
     abilityNames: Record<string, string>
-    pressRef: RefObject<PressFacts | null>
     draggedRef: RefObject<boolean>
     dragRowRef: RefObject<string | null>
     /**
@@ -90,8 +81,6 @@ const RowCell = memo(function RowCell({
      * 每格都传同一个稳定函数（由行那层按 `activeCellKey` 决定给不给），所以 memo 不受影响。
      */
     cellRef?: (el: HTMLTableCellElement | null) => void
-    /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
-    getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
     startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
     onEnterEdit: () => void
@@ -106,17 +95,9 @@ const RowCell = memo(function RowCell({
             style={{width: width ?? undefined, left: left ?? undefined}}
             /*
                 **按住拖动**划过一片就选中那一片（Shift 从锚点扩一段、Ctrl 加减），走库的开始处理器。
-                ⚠️ 先整体记下"按下之前这一格"的选区事实（`PressFacts`）：库的 handler 会**立刻**改掉选
-                中状态，等 click / focus 时再读就读到改后的了。
+                单击这一下**只归选区**（双击才进编辑，见 `Cell`）—— 所以这里不再需要记"按下之前是什么"。
             */
             onMouseDown={(e) => {
-                pressRef.current = {
-                    cellKey: snapshotKey(row.id, fieldKey),
-                    wasSelected: selected,
-                    wasOnlyCell: isSingleCellBounds(getSelectionBounds()),
-                    /* 带修饰键 = 改选区的手势（Ctrl 减选 / Shift 扩选），那一下不该进编辑（见 `PressFacts`）。 */
-                    withModifier: e.shiftKey || e.ctrlKey || e.metaKey,
-                }
                 startCellSelection(cell, e)
             }}
             /*
@@ -139,8 +120,6 @@ const RowCell = memo(function RowCell({
                     original={original}
                     shown={shown}
                     abilityNames={abilityNames}
-                    pressRef={pressRef}
-                    preSelected={preSelected}
                     draggedRef={draggedRef}
                     edit={edit}
                     onEnterEdit={onEnterEdit}
@@ -166,12 +145,10 @@ export const ActionRowView = memo(function ActionRowView({
     measured,
     rowHeadWidth,
     abilityNames,
-    pressRef,
     copySource,
     draggedRef,
     activeCellKey,
     scrollActiveIntoView,
-    getSelectionBounds,
     edit,
     dragRowRef,
     clickRowHandle,
@@ -196,8 +173,6 @@ export const ActionRowView = memo(function ActionRowView({
     /** **行头那几格的总宽**（行号列 40，能拖的表再加握把列 32）—— 钉住列的 `left` 从它之后起算。 */
     rowHeadWidth: number
     abilityNames: Record<string, string>
-    /** 按下那一刻这一格的选区事实（见 `PressFacts`）：`onMouseDown` 写、渲染与 click/focus 读。 */
-    pressRef: RefObject<PressFacts | null>
     /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
     copySource: CopySource | null
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
@@ -206,8 +181,6 @@ export const ActionRowView = memo(function ActionRowView({
     activeCellKey: string
     /** 把活动格滚进视野（稳定引用，只在活动格上绑）。 */
     scrollActiveIntoView: (el: HTMLTableCellElement | null) => void
-    /** 选区边界（走 ref，引用稳定）—— 只在 mousedown 里用。 */
-    getSelectionBounds: () => CellSelectionBounds[]
     edit: (rowId: string, key: string, value: string | null) => void
     /** 拖选起点（按下哪一行）：`null` = 没在拖。 */
     dragRowRef: RefObject<string | null>
@@ -329,8 +302,6 @@ export const ActionRowView = memo(function ActionRowView({
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={String(cell.getValue() ?? "")}
-                        selected={cell.getIsSelected()}
-                        preSelected={pressRef.current?.cellKey === snapshotKey(row.id, key) && pressRef.current.wasSelected}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
                         className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
@@ -343,10 +314,8 @@ export const ActionRowView = memo(function ActionRowView({
                         /* 只有活动格拿到滚动 ref（`undefined` = React 不绑）—— 判据在行那层算好。 */
                         cellRef={isActiveCell ? scrollActiveIntoView : undefined}
                         abilityNames={abilityNames}
-                        pressRef={pressRef}
                         draggedRef={draggedRef}
                         dragRowRef={dragRowRef}
-                        getSelectionBounds={getSelectionBounds}
                         edit={edit}
                         startCellSelection={startCellSelection}
                         onEnterEdit={onEnterEdit}

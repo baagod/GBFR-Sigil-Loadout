@@ -334,16 +334,21 @@ export {cleanup}
  *
  * 每一步都照**真实鼠标的顺序**来：`mousedown → focus → click`。
  * ⚠️ `focus` 那一步不能省 —— 真实点击会把焦点落进格子，而 `focus` **比 click 早**；
- * 早先 `onFocus` 是无条件进编辑的，"先选后编"就永远轮不到 click（实测点一下直接进编辑）。
+ * 早先进编辑还挂在 `focus` 上（实测点一下直接进编辑）—— 现在进编辑只认 `dblclick`。
  * happy-dom 的 `fireEvent.click` **不会**自己聚焦，所以只派发 click 是测不出这个 bug 的。
  */
 export function clickToEdit(cell: HTMLElement) {
-    fireEvent.mouseDown(cell)
-    fireEvent.focus(cell.firstElementChild!)
-    fireEvent.click(cell.firstElementChild!)
-    fireEvent.mouseDown(cell)
-    fireEvent.focus(cell.firstElementChild!)
-    fireEvent.click(cell.firstElementChild!)
+    /*
+        照**真实双击**的顺序来：`mousedown → focus → click` 走两遍，最后才是 `dblclick`
+        （选区由 `td` 的 mousedown 给 —— 真机上双击同样会选中这一格，只派发 dblclick 就少了这一步）。
+    */
+    const layer = cell.firstElementChild!
+    fireEvent.mouseDown(cell, {button: 0})
+    fireEvent.focus(layer)
+    fireEvent.click(layer)
+    fireEvent.mouseDown(cell, {button: 0})
+    fireEvent.click(layer)
+    fireEvent.doubleClick(layer)
 }
 
 /* ==================== 选值格（值格下拉）的交互 ==================== */
@@ -386,7 +391,7 @@ export function pressTrigger(trigger: Element) {
     fireEvent.click(trigger)
 }
 
-/** 在某一格的选值格触发器上按一下（`td` 的 mousedown 会顺手记下 `PressFacts`）。 */
+/** 在某一格的选值格触发器上按一下（单击只选中；展开是 `openPick`）。 */
 export function pressPick(cell: HTMLElement) {
     pressTrigger(cell.querySelector(`.${PICK_MARK}`)!)
 }
@@ -400,18 +405,21 @@ export function clickItem(text: string) {
 }
 
 /**
- * 打开某一格的列表 —— 与普通格子**同一条"先选后编"**，所以**最多按两下**：
+ * 打开某一格的列表 —— 与普通格子**同一条"双击"**口径：
  * 没选中（或不在唯一选中态）时第一下只算选中，第二下才展开；已经选中的话第一下就开了。
  *
  * ‼️ **按几下由闸门的输入决定，不去"观察弹层开没开"** —— 那是竞态：弹层异步挂，第一下其实开了、
  * 只是挂得慢，再按一下反而把它**关掉**（实测：3 份全量并行时那条用例必红）。
  */
 export async function openPick(cell: HTMLElement) {
-    const isOnlySelected = cell.classList.contains("cell-selected") && document.querySelectorAll("td.cell-selected").length === 1
-    pressPick(cell)
-    if (!isOnlySelected) {
-        await tick()
-        pressPick(cell)
-    }
+    /*
+        照**真实双击**来：先一下 mousedown（这一格因此被选中 —— "跟随可视"要有活动格可查），
+        再 `dblclick` 展开。只派发 dblclick 时这一格没被选中，"跟随可视"就是空转（用例会假红）。
+    */
+    const trigger = cell.querySelector(`.${PICK_MARK}`)!
+    fireEvent.mouseDown(cell, {button: 0})
+    fireEvent.click(trigger)
+    fireEvent.mouseDown(cell, {button: 0})
+    fireEvent.doubleClick(trigger)
     await waitFor(() => expect(isPickOpen()).toBe(true))
 }

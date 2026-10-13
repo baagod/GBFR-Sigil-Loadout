@@ -17,7 +17,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, pressTrigger, selectCell, stubRevealGeometry, tick, useTableHarness} from "@/components/actions-table/testkit"
+import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, selectCell, stubRevealGeometry, tick, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -59,8 +59,8 @@ const {renderTable, setRows} = useTableHarness()
  */
 const scrollOnce = () => fireEvent.scroll(document)
 
-/** 单独渲染 `CellPick`（没有 `<td>`、也就没有 `PressFacts`）时用的闸门：永远"该进编辑"、没拖过。 */
-const openGate = {shouldEditOnClick: () => true, dragged: {current: false}}
+/** 单独渲染 `CellPick`（没有 `<td>`）时的夹具：**没拖过**（双击那一下要过这条闸）。 */
+const openGate = {dragged: {current: false}}
 
 /** 用 mousedown + mouseEnter 拉一个选区（起点就是第一格）。 */
 function selectRange(container: HTMLElement, from: [number, number], to: [number, number]) {
@@ -94,10 +94,10 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
     })
 
     /*
-        ‼️ 用户口径：选值格与普通格子**同一套**"先选后编" —— 单击只选中，**再点一下**才展开列表；
-        而拖动一律只算拉选区。两边共用 `Cell.tsx` 里同一道闸门（`shouldEditOnClick` + `dragged`）。
+        ‼️ 用户口径：选值格与普通格子**同一套** —— **单击只选中，双击才展开列表**；
+        而拖动一律只算拉选区。两边共用同一条口径（见 `Cell.tsx` / `CellPick.tsx`）。
     */
-    it("先选后编：单击只选中、不展开；再点一下才展开", async () => {
+    it("单击只选中、不展开；双击才展开", async () => {
         setRows([pickRow("1000", "4087152117")])
         const container = await renderTable()
 
@@ -106,19 +106,18 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await tick()
         // 选中态与别的格子同一个类（`cell-selected` 由库给，行号/数据格共用那一套）。
         expect(cell.className).toContain("cell-selected")
-        // 这一下**只算选中**：列表不出现。
+        // 单击这一下**只算选中**：列表不出现。
         expect(isPickOpen()).toBe(false)
 
-        // 第二下：按下之前这一格是**唯一**选中格 → 展开。
-        pressPick(cell)
-        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
+        // 双击：展开列表。
+        await openPick(cell)
     })
 
     /*
         ‼️ **上下方向键不许打开列表，而要移动单元格**（用户口径）。
 
         为什么这条会坏（真机实测两处原因，都留个记号）：
-          · base-ui 的触发器对上下键就是 `setOpen(true)`，绕过"先选后编"那道点击闸门 ——
+          · base-ui 的触发器对上下键就是 `setOpen(true)`，绕过"双击才展开"那道闸门 ——
             所以要在 `onOpenChange` 里按 reason=`list-navigation` 取消；
           · 表格那道"编辑框/列表优先"的闸门原先写的是 `[role=combobox]`，而**触发器本身就是
             `role=combobox`** —— 焦点一落在选值格上（鼠标点过就会），方向键被整体让路、单元格不动。
@@ -190,11 +189,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
 
         try {
             const cell = cellAt(container, 0, PICK_COL)
-            pressPick(cell) // 先选中（"先选后编"的第一下）
-            await tick()
-            pressPick(cell) // 第二下：进编辑，列表展开
-            /* ⚠️ 弹层是**异步**挂的：这里必须轮询到开，别用"等一拍 + 裸断言"（负载下必红）。 */
-            await waitFor(() => expect(isPickOpen()).toBe(true))
+            await openPick(cell) // 双击展开（选中 + 展开一次做完）
 
             /* ① 前提：几何生效了、"跟随可视"确实滚过 —— 否则下面两步都是空转。 */
             expect(scrolled.length).toBeGreaterThan(0)
@@ -561,7 +556,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
                 </tbody>
             </table>,
         )
-        pressTrigger(container.querySelector(`.${PICK_MARK}`) as HTMLElement)
+        fireEvent.doubleClick(container.querySelector(`.${PICK_MARK}`) as HTMLElement)
         await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
         const texts = [...document.querySelectorAll('[data-slot="combobox-item"]')].map((el) => el.textContent)
         expect(texts.filter((t) => t === "-1")).toHaveLength(1)
@@ -585,7 +580,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         const mark = container.querySelector(`.${PICK_MARK}`)!
         expect(mark.textContent).toBe(UNSET)
 
-        pressTrigger(mark)
+        fireEvent.doubleClick(mark)
         await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
         const selected = [...document.querySelectorAll('[data-slot="combobox-item"]')].find((el) => el.getAttribute("aria-selected") === "true")
         expect(selected?.textContent).toBe(UNSET)

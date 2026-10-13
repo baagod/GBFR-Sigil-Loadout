@@ -35,7 +35,7 @@ export const rowFullySelected = (bounds: CellSelectionBounds[], rowIndex: number
  *
  * 两处消费点用的是同一条判据，所以必须只有一份实现：
  *   · Enter 进编辑 —— 多格选中按 Enter 语义不明（Excel 是"填满选区"，那是另一个功能），不做；
- *   · `PressFacts.wasOnlyCell` —— "多格选着点一格 = 收选区，不进编辑"那道闸门。
+ *   · 带修饰键的点击（Ctrl 减选 / Shift 扩选）只改选区 —— 编辑只由**双击**进（见 `Cell`）。
  */
 export const isSingleCellBounds = (bounds: CellSelectionBounds[]) =>
     bounds.length === 1 &&
