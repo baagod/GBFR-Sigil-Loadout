@@ -562,6 +562,32 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         expect(texts.filter((t) => t === "-1")).toHaveLength(1)
     })
 
+    /*
+        ‼️ **带搜索框的列：展开后焦点要在输入框上**（用户报的：展开了却打不了字）。
+
+        根因是"一对半"：为了方向键能进 floating-ui 的 `useListNavigation`，**列表那一层**在挂载时抢焦点
+        （列表是个 `div`）；而带搜索框时焦点本该归输入框 —— 列表后挂上，就把输入框顶掉了。
+        规则统一成一条：**焦点给"收键击的那一层"**（有搜索框 = 输入框，没有 = 列表）。
+    */
+    it("带搜索框的列：展开后焦点在搜索框上（能直接打字）", async () => {
+        render(
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            <CellPick cellKey="1000\u0000branchXAtk_" shown="100" original={UNSET} unchanged choices={new Set(["100", "101"])} optional="-1" searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                        </td>
+                    </tr>
+                </tbody>
+            </table>,
+        )
+        fireEvent.doubleClick(document.querySelector(`.${PICK_MARK}`) as HTMLElement)
+        await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
+        const input = document.querySelector('[data-slot="combobox-content"] input')
+        expect(input).not.toBeNull()
+        expect(document.activeElement).toBe(input) // 焦点在搜索框，不在列表那个 div 上
+    })
+
     it("原值 `-1` 的格子：默认显示 `-1`，且它是清单里被选中的那一项", async () => {
         const {container} = render(
             /* 夹具要**合法的 DOM**：`CellPick` 那套是 div/span，直接塞进 `<tr>` 会让 React 报

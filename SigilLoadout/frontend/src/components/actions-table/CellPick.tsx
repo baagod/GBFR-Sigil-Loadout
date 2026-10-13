@@ -306,19 +306,30 @@ export function CellPick({
                 {/* 搜索框放**弹层里**（格子里那层是触发器，塞输入框就变"可打字"了）、放列表**外面**
                     （滚的是列表，搜索框不动）。零 className —— 与官方示例 `ComboboxInPopup` 一致。 */}
                 {/*
-                    搜索框**只在这一档需要时才渲染**（`controlTypeHash_` 那类要按输入过滤）。
-                    ⚠️ 它**不是**键盘导航的必要条件：方向键归**列表那一层**
-                    （floating-ui 的 `useListNavigation` + 复合列表），焦点进列表就行 —— 见下面那个 effect。
+                    搜索框**只在这一档需要时才渲染**（项多的列要按输入过滤）。
+
+                    ‼️ **展开后焦点给"收键击的那一层"** —— 这条规则只写在下面两处、判据同一份（`searchPlaceholder`）：
+                      · 有搜索框 → **输入框**（展开就能打字）；
+                      · 没搜索框 → **列表本身**（方向键要进 floating-ui 的 `useListNavigation` 才收得到）。
+                    曾经这里只有"列表抢焦点"那一半：列表是个 `div`，它把输入框的焦点顶掉 —— 于是带搜索框的
+                    列展开后打不了字（用户报的）。两半必须成对存在，别再只加一处。
+
+                    ⚠️ 聚焦都放在 **callback ref**（"挂上来"那一刻）：弹层是**异步挂载**的，`open` 变 true 那一帧
+                    还没有 DOM，effect 里 `querySelector` 取不到 = 等于没聚焦（上一版就栽在这）。
                 */}
-                {searchPlaceholder && <ComboboxInput placeholder={searchPlaceholder} showTrigger={false} />}
+                {searchPlaceholder && (
+                    <ComboboxInput
+                        ref={(el) => {
+                            if (el && open && document.activeElement !== el) el.focus()
+                        }}
+                        placeholder={searchPlaceholder}
+                        showTrigger={false}
+                    />
+                )}
                 <ComboboxList
                     ref={(el) => {
-                        /*
-                            ‼️ 弹层是**异步挂载**的：`open` 变 true 那一帧列表还没进 DOM（在 effect 里
-                            querySelector 取不到，等于没聚焦 —— 上一版就是栽在这）。所以在"挂上来"的这一刻聚焦：
-                            焦点进列表，方向键那一层（floating-ui 的 useListNavigation）才收得到。
-                            用户实测：展开后手动点一下列表内部就能导航，差别只在这一个焦点。
-                        */
+                        /* 有搜索框时焦点归**输入框**（上面那一处）—— 列表这一层不许抢，否则打字没人接。 */
+                        if (searchPlaceholder) return
                         if (el && open && document.activeElement !== el) el.focus()
                     }}
                 >
