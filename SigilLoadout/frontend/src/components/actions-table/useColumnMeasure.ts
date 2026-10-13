@@ -326,24 +326,6 @@ export function useColumnMeasure(
      * 代价：每次数据变化最多 5 次 DOM 扫描（每次都只在"还有格子放不下"时才继续），不是每帧。
      */
 
-    const patches = useRef<{data: unknown; count: number}>({data: null, count: 0})
-    useEffect(() => {
-        if (!measured) return
-        const el = tableRef.current
-        if (!el) return
-        const record = patches.current
-        if (record.data !== data) {
-            record.data = data // 换了数据：计数归零，重新给它几次机会
-            record.count = 0
-        }
-        if (record.count >= 30) return
-        /* 还有格子放不下就再量一趟（按结果收敛，不猜时机）。 */
-        const stillOverflowing = [...el.querySelectorAll<HTMLElement>(".truncate")].some((node) => node.scrollWidth > node.clientWidth + 0.5)
-        if (!stillOverflowing) return
-        record.count += 1
-        setShownTick((v) => v + 1)
-    }, [data, measured, tableRef, shownTick])
-
     /*
         ‼️ **字体加载完再量一次**。
 
