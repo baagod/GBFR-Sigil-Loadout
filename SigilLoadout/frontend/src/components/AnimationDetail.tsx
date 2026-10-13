@@ -203,11 +203,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
     /** 这个分区里选中了哪几行（升序下标）。**一次只认一个分区**，所以 key 不对时就是"一行都没选"。 */
 
     /**
-     * 键盘：Ctrl+C / Ctrl+V 复制插入（能在动画之间用，剪贴板在模块级）；**Del = 删除 / 恢复**选中行
-     * （同一个开关，与标题右侧那个按钮等价，见 removeSelected）。
-     * 在输入框/文本域里打字时不抢按键：否则框内自己的文本复制粘贴、退格都会被吃掉 ✗。
-     * 没有选中行就什么都不做 —— 删哪儿、粘到哪儿都必须由人指定，别猜 ✓。
-     */
+     * 键盘：Del = 删除选中行、Ctrl+X = 剪切、Ctrl+V = 粘贴、Ctrl+C = 复制 —— 都调基座交回来的行命令
+     * （`rowCommands`，与工具条那几个按钮同一条路径）。**Ctrl+C 故意不 preventDefault**：复制区那圈虚线
+     * 是基座画的（它监听表格的 copy 事件），这里拦下按键基座就永远收不到，虚线也就没了。
+     * 在输入框/文本域里打字时不抢按键（`[data-copy-own]` = 格子自己收下 Ctrl+C）；没有选中行就什么都
+     * 不做 —— 删哪儿、粘到哪儿必须由人指定，别猜。
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.altKey) return
@@ -239,7 +239,7 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    })
+    }, [sel, infos])
 
     /**
      * 打开弹层时把主窗口那边的焦点收掉。
