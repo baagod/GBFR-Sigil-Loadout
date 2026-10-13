@@ -126,7 +126,7 @@ export const FLAG_KEYS = ["config", "startTime", "endTime", "layerFlag", "flag0"
  * **上屏的列**：数据键之外多两列 —— `frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0 / flag1 的效果一览）。
  * 它们都是"同一份数据看第二眼"，所以列 id 另起一个、数据键/内容由下面的 `columnOf` 说（见 `ColumnSpec`）。
  */
-const FLAG_COLUMNS = ["config", "startTime", "endTime", "frame", "layerFlag", "flag0", "flag1", "flagEffects", "sysFlag", "freeArg"]
+const FLAG_COLUMNS = FLAG_KEYS.flatMap((key) => (key === "endTime" ? [key, "frame"] : key === "flag1" ? [key, "flagEffects"] : [key]))
 
 /** 帧 = 结束时间 × 60（和主面板那一列同一算法）。 */
 const frameOf = (endTime: string): string => {

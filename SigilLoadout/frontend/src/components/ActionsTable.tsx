@@ -74,7 +74,7 @@ import {
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnKind, columnLabel, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, type PressFacts, type RevealSession, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {isSingleCellBounds, rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -254,7 +254,13 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
      * **没人认的键**（帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。编辑那边由渲染层挡
      * （`ActionRowView` 的"不许写"）。
      */
-    const readonlyColumns = useMemo(() => new Set(keys.filter((key) => columnOf?.(key)?.readonly)), [keys, columnOf])
+    /**
+     * **这一列能不能写**：内置只读列（`columnKind`）+ 调用方标的 `readonly` —— 只在这里判一次。
+     * 以前是两条路：粘贴过滤只认 `columnOf`（漏了内置的 `id_` / `abilityTag_`），
+     * 每格的底色又各算一遍 —— 同一个事实三处判，迟早对不上。
+     */
+    const writable = useCallback((key: string) => columnKind(key) !== "readonly" && columnOf?.(key)?.readonly !== true, [columnOf])
+    const readonlyColumns = useMemo(() => new Set(keys.filter((key) => !writable(key))), [keys, writable])
     /**
      * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
