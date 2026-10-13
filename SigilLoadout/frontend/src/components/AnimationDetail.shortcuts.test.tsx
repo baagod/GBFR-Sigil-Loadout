@@ -60,7 +60,8 @@ const removedRows = () => rowsOf().filter((tr) => tr.className.includes("bg-[#54
 describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     afterEach(cleanup)
 
-    it("按行号选中一行后按 Del：那一行被删掉（假删除，界面上标红留着）", async () => {
+    /** 打开弹层、选中第一行、返回那个行号格（键盘那几条都从这里起手）。 */
+    const openAndSelectRow = async () => {
         vi.mocked(ListTracks).mockResolvedValue([{sub: "0", kind: "attack"}])
         vi.mocked(ListFsm).mockResolvedValue([])
         vi.mocked(LoadTrack).mockResolvedValue(track())
@@ -69,20 +70,42 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
         await waitFor(() => expect(rowsOf()).toHaveLength(2))
 
-        // 按第一行的行号格 = "整行选中"。选中之后基座才会上报 `sel`，`Del` 那条路才有落点。
+        // 按第一行的行号格 = "整行选中"。选中之后基座才会上报 `sel`，键盘那几条才有落点。
         const handle = rowsOf()[0].querySelector("td") as HTMLElement
         fireEvent.mouseDown(handle, {button: 0})
         /* ⚠️ 松手发在**格子上**，别发在 `document` 上：base-ui 的弹层在 document 上听"点外面"，
            而 happy-dom 给它的目标没有 `hasAttribute`（当场抛）。 */
         fireEvent.mouseUp(handle)
         await waitFor(() => expect(handle.className).toContain("cell-row-selected"))
+    }
 
-        /* 发在 `body` 上：监听挂在 `window`（事件冒泡上去），而目标要是**元素** —— 真机上按键盘时
-           目标也永远是个元素（`event.target.closest` 那一条闸门就是这么写的）。 */
-        fireEvent.keyDown(document.body, {key: "Delete"})
+    /* 发在 `body` 上：监听挂在 `window`（事件冒泡上去），而目标要是**元素** —— 真机上按键盘时
+       目标也永远是个元素（`event.target.closest` 那一条闸门就是这么写的）。 */
+    const press = (key: string, code: string, vk: number, ctrl = false) =>
+        fireEvent.keyDown(document.body, {key, code, windowsVirtualKeyCode: vk, ...(ctrl ? {ctrlKey: true} : {})})
+
+    it("按行号选中一行后按 Del：那一行被删掉（假删除，界面上标红留着）", async () => {
+        await openAndSelectRow()
+        press("Delete", "Delete", 46)
 
         /* 基座只真删；"原行不部署、标红留着"是这一层的保存语义（见 AnimationDetail 的 applyRowChange）。 */
         await waitFor(() => expect(removedRows()).toHaveLength(1))
         expect(rowsOf()).toHaveLength(2)
+    })
+
+    it("Ctrl+X 剪切：同样把那一行标成假删除（剪切 = 复制 + 删）", async () => {
+        await openAndSelectRow()
+        press("x", "KeyX", 88, true)
+
+        await waitFor(() => expect(removedRows()).toHaveLength(1))
+    })
+
+    it("Ctrl+C 复制 + Ctrl+V 粘贴：多出一行（剪贴板里就是刚复制的那行）", async () => {
+        await openAndSelectRow()
+        press("c", "KeyC", 67, true) // 这一条**故意不 preventDefault**：基座那条 copy 也要跑（画虚线）
+        press("v", "KeyV", 86, true)
+
+        await waitFor(() => expect(rowsOf()).toHaveLength(3))
+        expect(removedRows()).toHaveLength(0) // 粘贴是插新行，不是假删除
     })
 })

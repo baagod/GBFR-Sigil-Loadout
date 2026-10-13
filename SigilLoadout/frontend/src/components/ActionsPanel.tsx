@@ -23,6 +23,8 @@ import {ActionsTable} from "@/components/ActionsTable"
 import type {ActionRow} from "@/components/actions-table/model"
 import {columnsOf, toActionRow} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
+import {PanelFailureDialog} from "@/components/PanelFailureDialog"
+import {usePanelFailure} from "@/hooks/usePanelFailure"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
@@ -198,6 +200,8 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * **新角色**的格子上。用这个计数，注释里那句"重新挂载即全清"才名副其实。
      */
     const [dataVersion, setDataVersion] = useState(0)
+    /** 保存/部署失败的那条通道（与因子页 / 上限页同一个 hook 与对话框，见 `handleSaveAndDeploy`）。 */
+    const {failure: saveFailure, open: saveFailureOpen, setOpen: setSaveFailureOpen, showError: showSaveError} = usePanelFailure(t.writeFailed)
     // charCode 是当前角色（从动作表路径上取），characters 是下拉的候选（解包目录里有的那些）。
     const [charCode, setCharCode] = useState("")
     const [characters, setCharacters] = useState<string[]>([])
@@ -345,7 +349,10 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * 保存即部署：「全局参数」那张表有改动就先保存（它的保存按钮就在这里，用户要求合并）；
      * 动作表由 `ActionsTable` 自己保存（草稿住在它那儿，见 `ttSaveRef`）；最后一律部署一次。
      *
-     * **界面上不报结果**：这一排不要提示（用户明确要求）。失败写 console.error，要查就看 DevTools。
+     * ‼️ **成功不报、失败要弹**（用户口径是"这一排不要提示"，那条说的是状态行 —— 而失败是另一回事）：
+     * 动作表是**逐行写**的，第 N 行失败时前 N−1 行已经落盘，`Deploy()` 又被跳过 → 磁盘上一半是新的、
+     * 游戏里一点没变。这种"半保存 + 没部署"如果只写进 DevTools，用户会以为存好了。
+     * 所以失败走仓库既有的 `PanelFailureDialog`（与因子页 / 上限页同一个对话框、同一个 hook）。
      */
     const handleSaveAndDeploy = async () => {
         setBusy(true)
@@ -358,6 +365,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
             await Deploy()
         } catch (e) {
             console.error(e)
+            showSaveError({title: t.writeFailed, detail: String(e)})
         }
         setBusy(false)
     }
@@ -539,6 +547,10 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                     )}
                 </div>
             </div>
+
+            {/* 保存 / 部署失败：**只有失败才弹**（成功仍然一声不响，见 `handleSaveAndDeploy`）。
+                与因子页 / 上限页共用同一个对话框组件与 hook，不新造一套提示。 */}
+            <PanelFailureDialog failure={saveFailure} open={saveFailureOpen} onOpenChange={setSaveFailureOpen} okLabel={t.ok} cancelLabel={t.cancel} />
 
             {/* 动画详情：主窗口里的 dialog（不再是独立窗口 —— 那扇窗口的第一帧永远是它自己的底色，
                 就是用户实测的"开弹窗闪一下黑框"）。AnimationDetail 自带 <Dialog>，挂上就是弹层。 */}
