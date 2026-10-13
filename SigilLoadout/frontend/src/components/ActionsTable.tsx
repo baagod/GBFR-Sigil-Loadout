@@ -769,14 +769,19 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
             而正是它压住了"Enter 落在按钮型的触发器上会再产生一次自己的 click"—— 那一下 click 会把刚
             由 Enter 打开的列表又关掉（实测）。
         */
-        const 在编辑或列表里 = (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [data-pick-open]")
-
+        /*
+            ‼️ 判据要把**列表容器**也算进来：列表开着时焦点在列表里，那时 `[data-pick-open]`（挂在触发器上）已经
+            不在事件路径上了 —— 只认它的话，弹层里的上下键与 Enter 都会被本表抢走（用户报的"列表里选不了"）。
+        */
+        const 在编辑或列表里 = (e.target as HTMLElement | null)?.closest?.(
+            "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
+        )
         if (!direction) {
             // ---- Enter：进编辑（与"点已选中的格子"同一条口径）----
             /*
                 ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
                 （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
-            */
+            if (在编辑或列表里) return
             if (在编辑或列表里 && (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]")) return
             e.preventDefault()
             /*
