@@ -21,7 +21,7 @@
     修法就是"量不到就**先不置 `measured`**、等它出来再来一遍"——**不改任何交互行为**，
     只是把这趟测量挪到"可见"那一刻。
 */
-import {useEffect, useLayoutEffect, useRef, useState, type RefObject} from "react"
+import {useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject} from "react"
 import type {ColumnSizingState} from "@tanstack/react-table"
 
 /** 两份列宽是不是逐键一样（用来跳过没必要的 setState）。 */
@@ -50,6 +50,14 @@ export function useColumnMeasure(
     /** 量过了没有 —— 没量之前用 `table-auto`（要量出**自然宽度**），量完切 `table-fixed`。 */
     const [measured, setMeasured] = useState(false)
     const [shownTick, setShownTick] = useState(0)
+    /**
+     * **下一帧再量一趟**：改了 DOM（放开成自然排、写回宽度）之后得等浏览器把布局算完才读得准。
+     * `shownTick` 一涨，下面那个测量 effect 就重跑 —— 这里是唯一有"下一帧"语义的入口。
+     */
+    const remeasureNextFrame = useCallback(() => {
+        const raf = requestAnimationFrame(() => setShownTick((v) => v + 1))
+        return () => cancelAnimationFrame(raf)
+    }, [])
     /** 上一趟量出来的列宽指纹（"稳定了没有"的判据：两趟一样就收手，见测量末尾那段）。 */
     const lastSizes = useRef("")
     /** 补量次数（上限，防打转）。 */
@@ -78,9 +86,8 @@ export function useColumnMeasure(
         */
         const rect = el.getBoundingClientRect()
         if (rect.width === 0 || rect.height === 0) {
-            // 还没显示：等下一帧再看（`shownTick` 是重跑本 effect 的开关）。
-            const raf = requestAnimationFrame(() => setShownTick((v) => v + 1))
-            return () => cancelAnimationFrame(raf)
+            // 还没显示：等下一帧再看。
+            return remeasureNextFrame()
         }
         /*
             ‼️ 量之前把表**放开成"按内容自然排"**：`width: max-content` + `table-layout: auto`。
@@ -250,8 +257,7 @@ export function useColumnMeasure(
             lastSizes.current = fingerprint
             if (extraPasses.current < 20) {
                 extraPasses.current += 1
-                const raf = requestAnimationFrame(() => setShownTick((v) => v + 1))
-                return () => cancelAnimationFrame(raf)
+                return remeasureNextFrame()
             }
         }
         /*
@@ -310,21 +316,6 @@ export function useColumnMeasure(
         return () => observer.disconnect()
     }, [tableRef])
 
-    /**
-     * 上一份数据补测了几次。
-     *
-     * ‼️ **数据换了之后补测，直到不再溢出**（不猜时机，按结果判）。
-     *
-     * 真机（002c，CDP 量的）：当前列宽普遍少 4px（`startTime` 71/该75、`endTime` 79/该83、`layerFlag` 93/该97
-     * —— 9 列被 `truncate` 吃掉尾巴）；而在页面里**手工把测量重做一遍就得到 75/83/97**。
-     * 可见"算出正确宽度"从来不是问题，缺的是"数据换了之后**真的**再量一趟"。
-     *
-     * ⚠️ 上一版栽在一个很细的地方：这段 effect 的依赖里**没有 `shownTick`** —— 补测那一下（`setShownTick`）
-     * 自己不会让它重跑，于是**只补了一次就收手**，而补测那一趟恰好还太早，偏小的值就留在那儿了
-     * （真机上就是"少 4px"）。现在：依赖补上 `shownTick`，并且允许**补到不再溢出**（上限 5 次防打转）。
-     *
-     * 代价：每次数据变化最多 5 次 DOM 扫描（每次都只在"还有格子放不下"时才继续），不是每帧。
-     */
 
     /*
         ‼️ **字体加载完再量一次**。
