@@ -280,10 +280,11 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      */
     const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
 
-        const columns: readonly string[] = key === flagsKey ? FLAG_KEYS : (tables[key]?.columns ?? [])
+        const columns: readonly string[] = tables[key]?.columns ?? []
         /*
-            ‼️ **两种轨只剩"落进哪个容器"不同**：行形状已经统一（flags 也是 `TrackRow`，那几个字段收在 `values` 里），
-            所以"造行 + 假删除回填"只写一次。以前这里是两份几乎逐字相同的代码，差别只因为 flags 曾是另一种行形状。
+            ‼️ **flags 与普通轨走的是同一条路**：行形状统一（都是 `TrackRow`，字段收在 `values`），容器也统一
+            （flags 就是 `tables[flagsKey]`）。以前这里既有两份几乎逐字相同的造行代码，末尾还要按 `flagsKey`
+            分开落点 —— 现在两样都没有了。
         */
         const toRow = (row: ActionRow, index: number): TrackRow => ({
             index,
@@ -294,23 +295,19 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
         })
         const restored = deleted.filter((row) => row.orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
         const rows = [...next.map(toRow), ...restored]
-        if (key === flagsKey) setFlags(rows)
-        else
-            setTables((prev) => {
-                const table = prev[key]
-                if (!table) return prev
-                return {...prev, [key]: {...table, rows}}
-            })
+        setTables((prev) => {
+            const table = prev[key]
+            if (!table) return prev
+            return {...prev, [key]: {...table, rows}}
+        })
         markDirty(key)
     }
     const reorder = (key: string, from: number, to: number) => {
-        if (key === flagsKey) setFlags((prev) => arrayMove(prev, from, to))
-        else
-            setTables((prev) => {
-                const table = prev[key]
-                if (!table) return prev
-                return {...prev, [key]: {...table, rows: arrayMove(table.rows, from, to)}}
-            })
+        setTables((prev) => {
+            const table = prev[key]
+            if (!table) return prev
+            return {...prev, [key]: {...table, rows: arrayMove(table.rows, from, to)}}
+        })
         markDirty(key)
         // 行序变了，原来记的号码全错位：清掉重选。
         setSel(null)
