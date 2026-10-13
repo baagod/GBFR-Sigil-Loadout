@@ -598,10 +598,10 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	}
 	// **真改一个值**：只"打开又保存"不算改动（那种情况与原表逐字节相同，同样会被清掉），
 	// 不改成实际不同的值就测不出"只搬碰过的 motion"这一条。
-	if rows[0].Flag0 == "0" {
-		rows[0].Flag0 = "1"
+	if rows[0].Values["flag0"] == "0" {
+		rows[0].Values["flag0"] = "1"
 	} else {
-		rows[0].Flag0 = "0"
+		rows[0].Values["flag0"] = "0"
 	}
 	if err := service.SaveFlags("3451", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"reflect"
 	"bytes"
 	"os"
 	"os/exec"
@@ -37,11 +38,15 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	}
 	first.Orig = nil
 	want := FlagRow{
-		Index: 0, Config: "1", StartTime: "0.000000", EndTime: "0.016667",
-		LayerFlag: "4294967295", Flag0: "32", Flag1: "0", SysFlag: "0", FreeArg: "0 0 0 0",
-		Flag0Effects: "允许攻击命中", Flag1Effects: "",
+		Index: 0,
+		Values: map[string]string{
+			"config": "1", "startTime": "0.000000", "endTime": "0.016667",
+			"layerFlag": "4294967295", "flag0": "32", "flag1": "0", "sysFlag": "0", "freeArg": "0 0 0 0",
+			"flag0Effects": "允许攻击命中", "flag1Effects": "",
+		},
 	}
-	if first != want {
+	// ⚠️ `Values` 是 map，不能用 `!=` 比（map 不可比较）—— 用 DeepEqual。
+	if !reflect.DeepEqual(first, want) {
 		t.Fatalf("第一行解成了 %+v，want %+v", first, want)
 	}
 	// 掩码翻译：8192 = bit13、128 = bit7、134217728 = bit27（表里没弄清的那一位）。
@@ -54,10 +59,10 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 		{4, "", "未知bit27"},
 		{8, "允许移动取消", ""},
 	} {
-		if got := rows[tc.index].Flag0Effects; got != tc.flag0 {
+		if got := rows[tc.index].Values["flag0Effects"]; got != tc.flag0 {
 			t.Fatalf("第 %d 行的 Flag0Effects = %q，want %q", tc.index+1, got, tc.flag0)
 		}
-		if got := rows[tc.index].Flag1Effects; got != tc.flag1 {
+		if got := rows[tc.index].Values["flag1Effects"]; got != tc.flag1 {
 			t.Fatalf("第 %d 行的 Flag1Effects = %q，want %q", tc.index+1, got, tc.flag1)
 		}
 	}
@@ -108,8 +113,8 @@ func TestFlagEffectsTranslatesTheMask(t *testing.T) {
 */
 func TestBuildFlagsXMLMatchesTheSourceFormat(t *testing.T) {
 	rows := []FlagRow{
-		{Index: 0, Config: "0", StartTime: "0", EndTime: "1.46667", LayerFlag: "4294967295", Flag0: "4194816", Flag1: "0", FreeArg: "0 0 0 0"},
-		{Index: 1, Config: "1", StartTime: "0.333333", EndTime: "0.433333", LayerFlag: "4294967295", Flag0: "0", Flag1: "128", SysFlag: "0", FreeArg: "0 0 0 0"},
+		{Index: 0, Values: map[string]string{"config": "0", "startTime": "0", "endTime": "1.46667", "layerFlag": "4294967295", "flag0": "4194816", "flag1": "0", "freeArg": "0 0 0 0"}},
+		{Index: 1, Values: map[string]string{"config": "1", "startTime": "0.333333", "endTime": "0.433333", "layerFlag": "4294967295", "flag0": "0", "flag1": "128", "sysFlag": "0", "freeArg": "0 0 0 0"}},
 	}
 	got, err := buildFlagsXML(rows)
 	if err != nil {
@@ -125,7 +130,7 @@ func TestBuildFlagsXMLMatchesTheSourceFormat(t *testing.T) {
 		t.Fatalf("写出来的 XML 变了:\n got %q\nwant %q", got, want)
 	}
 
-	if _, err := buildFlagsXML([]FlagRow{{StartTime: "abc"}}); err == nil {
+	if _, err := buildFlagsXML([]FlagRow{{Values: map[string]string{"startTime": "abc"}}}); err == nil {
 		t.Fatal("写不出的时间被当成了 0")
 	}
 }
@@ -185,7 +190,7 @@ func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 	}
 	// 先改一行再保存：与原表一致的那种保存**不留产物**了（见 actionprune.go），
 	// 所以下面那把尺子量的是"改过的那份 XML"。
-	rows[0].Flag0 = "8192"
+	rows[0].Values["flag0"] = "8192"
 	if err := service.SaveFlags("3400", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}

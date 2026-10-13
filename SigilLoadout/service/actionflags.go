@@ -32,21 +32,10 @@ XML 的形状（对面那个工具的样子，属性顺序也就是写出时的�
 //
 // Orig / Removed 是**界面用的行身份**（见 actionrowmarks.go）：对应原版第几行、是否被"假删除"。
 // 它们只跟着改动存进 track_edits.json，不进 XML。
-type FlagRow struct {
-	Index        int    `json:"index"`
-	Config       string `json:"config"`
-	StartTime    string `json:"startTime"`
-	EndTime      string `json:"endTime"`
-	LayerFlag    string `json:"layerFlag"`
-	Flag0        string `json:"flag0"`
-	Flag1        string `json:"flag1"`
-	SysFlag      string `json:"sysFlag"`
-	FreeArg      string `json:"freeArg"`
-	Flag0Effects string `json:"flag0Effects"`
-	Flag1Effects string `json:"flag1Effects"`
-	Orig         *int   `json:"orig,omitempty"`
-	Removed      bool   `json:"removed,omitzero"`
-}
+// FlagRow 就是**一条普通的轨行**（`TrackRow`）：flags 不再有自己的形状。
+// 那几栏（config / startTime / … / flag0Effects / flag1Effects）都放进 `Values`，与别的轨同一套规矩 ——
+// 于是界面不必再为它维护第二种行模型，`carry` 那个搬运身份的信封也可以消失。
+type FlagRow = TrackRow
 
 // flag0Names / flag1Names 是位定义表：**下标就是 bit 号**，空串 = 还没弄清含义的那一位（给界面时
 // 写成 未知bitN，而不是把这一位藏起来）。两张表都到 bit 31 —— 游戏那两个字段是 32 位。
@@ -143,17 +132,19 @@ func parseFlagsXML(raw []byte) ([]FlagRow, error) {
 	rows := make([]FlagRow, 0, len(seqs))
 	for i, s := range seqs {
 		rows = append(rows, FlagRow{
-			Index:        i,
-			Config:       s.Config,
-			StartTime:    s.StartTime,
-			EndTime:      s.EndTime,
-			LayerFlag:    s.LayerFlag,
-			Flag0:        s.Flag0,
-			Flag1:        s.Flag1,
-			SysFlag:      s.SysFlag,
-			FreeArg:      s.FreeArg,
-			Flag0Effects: flagEffects(s.Flag0, flag0Names),
-			Flag1Effects: flagEffects(s.Flag1, flag1Names),
+			Index: i,
+			Values: map[string]string{
+				"config":       s.Config,
+				"startTime":    s.StartTime,
+				"endTime":      s.EndTime,
+				"layerFlag":    s.LayerFlag,
+				"flag0":        s.Flag0,
+				"flag1":        s.Flag1,
+				"sysFlag":      s.SysFlag,
+				"freeArg":      s.FreeArg,
+				"flag0Effects": flagEffects(s.Flag0, flag0Names),
+				"flag1Effects": flagEffects(s.Flag1, flag1Names),
+			},
 		})
 	}
 	return rows, nil
@@ -170,23 +161,24 @@ func buildFlagsXML(rows []FlagRow) ([]byte, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "<SeqRoot>\r\n  <FlagsTrack SeqNum=\"%d\">\r\n", len(rows))
 	for i, row := range rows {
-		start, err := flagTime(fmt.Sprintf("第 %d 行的 StartTime", i+1), row.StartTime)
+		col := func(name string) string { return row.Values[name] }
+		start, err := flagTime(fmt.Sprintf("第 %d 行的 StartTime", i+1), col("startTime"))
 		if err != nil {
 			return nil, err
 		}
-		end, err := flagTime(fmt.Sprintf("第 %d 行的 EndTime", i+1), row.EndTime)
+		end, err := flagTime(fmt.Sprintf("第 %d 行的 EndTime", i+1), col("endTime"))
 		if err != nil {
 			return nil, err
 		}
 		fmt.Fprintf(&b, "    <Seq%s%s%s%s%s%s%s%s />\r\n",
-			flagAttrPair("LayerFlag", row.LayerFlag),
+			flagAttrPair("LayerFlag", col("layerFlag")),
 			flagAttrPair("StartTime", start),
 			flagAttrPair("EndTime", end),
-			flagAttrPair("Config", row.Config),
-			flagAttrPair("Flag0", row.Flag0),
-			flagAttrPair("Flag1", row.Flag1),
-			flagAttrPair("SysFlag", row.SysFlag),
-			flagAttrPair("FreeArg", row.FreeArg))
+			flagAttrPair("Config", col("config")),
+			flagAttrPair("Flag0", col("flag0")),
+			flagAttrPair("Flag1", col("flag1")),
+			flagAttrPair("SysFlag", col("sysFlag")),
+			flagAttrPair("FreeArg", col("freeArg")))
 	}
 	b.WriteString("  </FlagsTrack>\r\n</SeqRoot>")
 	return []byte(b.String()), nil

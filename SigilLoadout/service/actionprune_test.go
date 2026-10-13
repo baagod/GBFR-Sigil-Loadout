@@ -84,10 +84,10 @@ func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := rows[0].Flag0
+	original := rows[0].Values["flag0"]
 
 	// 先真的改一个值：产物该在。
-	rows[0].Flag0 = "1"
+	rows[0].Values["flag0"] = "1"
 	if err := service.SaveFlags("3400", rows); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows[0].Flag0 = original
+	rows[0].Values["flag0"] = original
 	if err := service.SaveFlags("3400", rows); err != nil {
 		t.Fatal(err)
 	}

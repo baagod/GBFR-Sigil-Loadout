@@ -40,11 +40,11 @@ func TestTracksReadFromTheAssetAndSaveIntoTheEditStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFlags: %v", err)
 	}
-	if len(rows) != 9 || rows[0].Flag0 != "32" {
-		t.Fatalf("从随包资产读出来的是 %d 行、第一行 Flag0=%q，want 9 行 / 32", len(rows), rows[0].Flag0)
+	if len(rows) != 9 || rows[0].Values["flag0"] != "32" {
+		t.Fatalf("从随包资产读出来的是 %d 行、第一行 Flag0=%q，want 9 行 / 32", len(rows), rows[0].Values["flag0"])
 	}
 
-	rows[0].Flag0 = "1"
+	rows[0].Values["flag0"] = "1"
 	if err := service.SaveFlags("3400", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}
@@ -66,8 +66,8 @@ func TestTracksReadFromTheAssetAndSaveIntoTheEditStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("改动后 LoadFlags: %v", err)
 	}
-	if again[0].Flag0 != "1" {
-		t.Fatalf("改动后读回来第一行 Flag0=%q，want 1", again[0].Flag0)
+	if again[0].Values["flag0"] != "1" {
+		t.Fatalf("改动后读回来第一行 Flag0=%q，want 1", again[0].Values["flag0"])
 	}
 	deployed := readDeployedTrack(t, modDir, "pl1000_3400_0_seq_edit_flags.bxm")
 	tree, err := decodeBXM(deployed)
