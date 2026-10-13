@@ -173,6 +173,15 @@ export const NO_PICKER = (): PickerConfig | undefined => undefined
 /** 列键 → 值格参数；不给 = 这一列不是值格（按列策略那套走）。 */
 export const PickerOfContext = createContext<(key: string) => PickerConfig | undefined>(NO_PICKER)
 
+/**
+ * 一列的"**详情**"入口（格右端那个 `···` 靶子走它）。
+ *
+ * ‼️ 与 `PickerOfContext` 同构：基座只问"**这一列**有没有详情"，**不知道**哪个列是 mot 之类 ——
+ * 领域知识留在调用方（`ActionsPanel`）。`label` 由调用方给（它有 `t`），基座不做文案。
+ */
+export type DrillSpec = {label: string; open: (shown: string) => void}
+export const DrillContext = createContext<(key: string) => DrillSpec | undefined>(() => undefined)
+
 
 /**
  * **"跟随可视"这一套的下发口** —— 一张表一份（`ActionsTable` 用 `useRef` 持有、经 context 下发）。

@@ -1,6 +1,6 @@
 /*
     角色动作页：一张动作表（两条记录 × 87 个字段）。宽表 —— 一列一个字段，自己在横轴上滚、87 列一次铺开不折行。
-    双击 saveMotIdNN_ 那类格子（值是四位十六进制 motion 号）才会去读对应 motion 的详情：上半区只读一次、
+    格右端那个 ··· 靶子（saveMotIdNN_ 那类格子才有：值是四位十六进制 motion 号）会去读对应 motion 的详情：上半区只读一次、
     编辑先记在本地，按「保存动作表」才交给后端。flags / FSM 在 AnimationDetail 那个弹窗里，不在本文件。
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
@@ -21,7 +21,7 @@ import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/inpu
 import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
 import type {ActionRow} from "@/components/actions-table/model"
-import {columnsOf, toActionRow} from "@/components/actions-table/model"
+import {DrillContext, columnsOf, toActionRow} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
@@ -222,6 +222,16 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     // 第一帧永远是它自己的底色（≈黑），就是用户实测的"开弹窗闪一下黑框"。现在是主窗口里的 dialog
     // （AnimationDetail 自己就渲染一个 <Dialog>），没有第二个合成表面。
     const [motTarget, setMotTarget] = useState<{motion: string; charCode: string} | null>(null)
+    /*
+        ‼️ **provider 的 `value` 必须是稳定引用**：`CellContent` 是 `memo` 的，而 **context 一变就绕过 memo**
+        —— 每次面板重渲都新建一个函数的话，整张表（88 列 × 111 行）会跟着全部重渲，正是 `ActionRowView`
+        那套 memo 想避免的事（用户对这表的拖选手感有真机口径）。依赖只有文案与当前角色。
+    */
+    const drillOf = useMemo(
+        () => (key: string) =>
+            /^saveMotId\d{2}_$/.test(key) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined,
+        [t.generalTracks, charCode],
+    )
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -495,8 +505,13 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                     ) : (
                         // ⚠️ 新表（TanStack）**已转正**：它就是动作表本身，旧的 TrackTable 那套连同切换开关一起删了。
                         // 保存走 ttSaveRef（见 handleSaveAndDeploy）—— 这个组件自己没有工具条。
-                        <ActionsTable
-                            /*
+                        /*
+                            **mot 列的"详情"**：格右端那个 `···` 靶子 → 打开这条动作记录的轨表。
+                            ‼️ 领域知识（哪些列有详情、文案是什么）留在这一层：基座只认 `DrillContext` 的形状。
+                            手势不冲突 —— 双击 / Enter / F2 仍是**进编辑**，单击仍是**选**，靶子只吃格右端十几像素。
+                        */
+                        <DrillContext.Provider value={drillOf}>
+                        <ActionsTable                            /*
                                 **换一份数据 = 换一张表**（`key={dataVersion}`，每次重新读取都 +1）：
                                 要清的不只是 `rows`/`keys`，还有量出来的列宽与 `left`、每格草稿、撤销栈、
                                 选区，以及"正停在某一格的编辑态"（不清的话，那格没提交的草稿会落到新角色的
@@ -517,6 +532,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                                 ttSaveRef.current = save
                             }}
                         />
+                        </DrillContext.Provider>
                     )}
                 </div>
                 {/* 「全局参数」：解包目录 system\player\ 下那十几张不分角色的表。

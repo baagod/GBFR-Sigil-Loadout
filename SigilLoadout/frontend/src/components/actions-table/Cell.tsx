@@ -2,11 +2,12 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useCallback, useContext, useEffect, useRef, useState, type Ref, type RefObject} from "react"
+import {memo, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type Ref, type RefObject} from "react"
 
+import {MoreHorizontal} from "lucide-react"
 import {CellPick} from "./CellPick"
 import {CELL_PADDING, FONT, INPUT_PADDING, READONLY_PADDING} from "./classes"
-import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, snapshotKey} from "./model"
+import {BranchPickContext, DrillContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, type DrillSpec, snapshotKey} from "./model"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -70,6 +71,8 @@ export const CellContent = memo(function CellContent({
     const branchPick = useContext(BranchPickContext)
     /* 这一列的值格参数（多选 / 位名表）—— 由各表自己给（见 `PickerOfContext`），基座不写死哪张表。 */
     const pickerOf = useContext(PickerOfContext)
+    /* 这一列的详情入口（没有就是 undefined）—— 基座不问"为什么"，见 `DrillContext`。 */
+    const drillOf = useContext(DrillContext)
     if (readOnly || kind === "readonly") {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
@@ -111,6 +114,7 @@ export const CellContent = memo(function CellContent({
             onCommit={(value) => edit(rowId, fieldKey, value)}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
+            drill={drillOf(fieldKey)}
         />
     )
 })
@@ -123,7 +127,7 @@ export const CellContent = memo(function CellContent({
  * 只设 `opacity-0`（透明、仍占位、且仍可聚焦 —— Esc 那条路要用），**绝不离开文档流** ——
  * 详见 `Cell` 里那段。
  */
-function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, tabIndex, onFocus, ref}: {
+function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, tabIndex, onFocus, trailing, ref}: {
     text: string
     /** 这一格的内边距（默认 CELL_PADDING；只读格传 READONLY_PADDING —— 它没有输入框，见那个常量）。 */
     padding?: string
@@ -136,6 +140,8 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
     /** 显示态 `0`（可聚焦）、编辑态 `-1`（避开 Tab 序列）—— Esc 退出编辑要把焦点交回这一层。 */
     tabIndex?: number
     onFocus?: () => void
+    /** 右端的尾节点（详情靶子那类）：与文字**同一套 flex 布局**，不靠绝对定位 + 补偿内边距。 */
+    trailing?: ReactNode
     ref?: Ref<HTMLDivElement>
 }) {
     return (
@@ -153,7 +159,10 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
             } ${hidden ? "opacity-0" : ""}`}
             onDoubleClick={onDoubleClick}
         >
-            {text}
+            {/* ‼️ 文字自己 `truncate min-w-0 flex-1`（`PICK_CELL` / `PICK_TEXT` 那套：flex 容器的
+                `truncate` 对裸文字节点不生效，得包一层）。尾节点因此自然占它自己那点宽度。 */}
+            <span className="min-w-0 flex-1 truncate">{text}</span>
+            {trailing}
         </div>
     )
 }
@@ -164,7 +173,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit}: {
+export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit, drill}: {
     /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
     rowId: string
     /** 这一格的列名（同上）。 */
@@ -184,7 +193,35 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
     onEnterEdit: () => void
     /** **这一次按下之后鼠标有没有真的挪过**（`draggedRef`）：挪过 = 拖出去拉选区，不进编辑。 */
     dragged: RefObject<boolean>
+    /** 有它就在格右端给一个 `···` 靶子：点它开详情，**不选格、不进编辑**（见 `DrillContext`）。 */
+    drill?: DrillSpec
 }) {
+    /*
+        ‼️ **详情靶子**（`···`）：只吃格右端那十几像素。按下先 `preventDefault` + `stopPropagation`
+        —— 这一下**只开详情**：不选格、不起拖（`td` 的 mousedown 会开始选区），也不让焦点落进来
+        （焦点一进这格就画上聚焦环）。与握把那格同一个先例。
+        ‼️ `shrink-0` 也**别删**：文字那层是 `flex-1 min-w-0`，按钮默认 `shrink: 1` —— 不加就会被压成一条
+        （真机看到的就是那个细条）。内边距按用户口径：右 12px、左 8px、上下**通高**（`self-stretch` 跟行高），
+        于是点击范围是"文字右侧一整块"，虽然看不见方块。
+        ⚠️ `cursor-pointer` **别删**（简化布局那次连它一起删了，手光标就没了）；也**不用 `Button variant="ghost"`**（用户口径）：ghost 自带 hover 底色，在这一格里就是多出一块
+        按钮面；这里只要"图标自己在悬停时亮起来"。位置也不靠绝对定位 + 补偿内边距 —— 走 `trailing` 槽。
+    */
+    const drillTarget = drill ? (
+        <button
+            type="button"
+            onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+            }}
+            onClick={() => drill.open(shown)}
+            aria-label={drill.label}
+            title={drill.label}
+            data-drill=""
+            className="-mr-2 flex shrink-0 cursor-pointer items-center self-stretch pr-3 pl-2 text-muted-foreground/50 hover:text-foreground"
+        >
+            <MoreHorizontal className="size-4" />
+        </button>
+    ) : undefined
     const [editing, setEditing] = useState(false)
     /**
      * 显示值**由父层给**（`accessorFn` 那份，与排序同口径）。
@@ -266,6 +303,7 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                 onDoubleClick={() => {
                     if (!dragged.current) enterEdit()
                 }}
+                trailing={editing ? undefined : drillTarget}
                 hidden={editing}
                 // 编辑中别让它进 Tab 序列（上面已经压着输入框）；显示态可聚焦，Esc 才有地方落焦点。
                 tabIndex={editing ? -1 : 0}
@@ -274,6 +312,7 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                     skipFocusRef.current = false
                 }}
             />
+
             {editing && (
                 <input
                     autoFocus
