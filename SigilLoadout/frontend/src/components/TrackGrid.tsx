@@ -133,13 +133,14 @@ function FlagEffects({row}: {row: ActionRow}) {
             宽度已经由 `ColumnSpec.width` 钉死（400），所以这里只管**在这个宽度里换行**：
             效果多到 400 装不下才折行（代价是这一行会变高 —— `td` 的 `h-6` 只是最小高度）。
             字号 12（与 Badge 自身那档一致）。
-            `cursor-default` = 系统箭头（不然会继承格子的十字光标）；`select-text` = 里面的字**可以划选**
-            （格子自己那份 `user-select: none` 是拖拽选区要的，这里显式还回来）。
-            `py-1` = 与别的只读格一致的上下 4px（这一列走的是自定义渲染，拿不到 `CellText` 那份内边距）。
+            光标**不在这里指定**：跟着格子那份 `cell-selectable` 的十字。
+            ⚠️ **不还 `select-text`**：还回来之后，拖选格子（选一片）会顺带把这一列的文字一起选中
+            （用户报的"拖选时文本也被选上"）—— Badge 里的名字跟着格子走 `user-select: none` 就好。
+            内边距与别的只读格一致（这一列走的是自定义渲染，拿不到 `CellText` 那份）。
         */
-        <div className="flex w-full cursor-default flex-wrap items-center gap-1 py-1 pl-1 text-xs select-text">
+        <div className="flex w-full flex-wrap items-center gap-1 px-1 py-0.75 text-xs">
             {位.map(({name, bit}) => (
-                <Badge key={bit} variant="secondary" className="shrink-0">
+                <Badge key={bit} className="shrink-0 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                     {name === "" ? `bit${bit}` : name}
                 </Badge>
             ))}

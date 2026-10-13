@@ -105,13 +105,20 @@ describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排
         expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
     })
 
-    it("只读格的上下内间距是 4px（`py-1!` 压过 `CELL_PADDING` 的 `py-0.5`，高度交给内容撑）", async () => {
+    it("只读格的内边距**左右对等**、上下 3px；表头文字居中（都没输入框，不继承那份光标余量）", async () => {
         const container = await renderTable()
-        const 只读格 = cellAt(container, 0, 0) // 第 0 列 = `id_`（只读）
-        const 内 = 只读格.firstElementChild!
-        expect(内.className).toContain("py-1!")
-        // 不再是固定 `h-6`：内边距要靠内容把行撑开（否则 4px 上下会把文字压扁）。
-        expect(内.className).toContain("min-h-6")
+        // 第 0 列 = `id_`（只读）：`pr-2` 那 8px 是给编辑框留的"光标余量"，只读格不该有。
+        const 只读层 = cellAt(container, 0, 0).firstElementChild!
+        expect(只读层.className).toContain("px-1")
+        expect(只读层.className).toContain("py-[3px]!")
+        expect(只读层.className).not.toContain("pr-2")
+        // 高度交给内容撑（固定 `h-6` 会把上下 3px 压扁）。
+        expect(只读层.className).toContain("min-h-6")
+
+        // 表头：文字居中，内边距同样对等（不等的话"居中"出来的中心是偏的）。
+        const 表头 = container.querySelectorAll("thead th")[1]
+        expect(表头.className).toContain("text-center")
+        expect(表头.className).not.toContain("pr-2")
     })
 
     it("没改过的格子显示**灰色原值**（占位符）", async () => {

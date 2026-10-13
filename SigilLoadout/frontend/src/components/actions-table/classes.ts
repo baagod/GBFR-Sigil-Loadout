@@ -113,12 +113,22 @@ export const HANDLE_HEAD_CURSOR =
 export const ROW_HEIGHT = "h-6"
 
 /**
- * 格子内边距。**显示态用它、表头也用它** —— 两边同一个左值，表头文字与数据文字才对得齐。
+ * 格子内边距。**可编辑格用它** —— 左边比右边小是有意的：文字更贴格子左边缘，一眼能看出列从哪儿开始；
+ * 右边那点别跟着缩：**光标余量 = 显示态总内边距 − 编辑框总内边距**（见 INPUT_PADDING），右边缩了余量就被吃掉。
  *
- * 左边比右边小是有意的 —— 文字更贴格子左边缘，一眼能看出列从哪儿开始。右边那点别跟着缩：
- * **光标余量 = 显示态总内边距 − 编辑框总内边距**（见 INPUT_PADDING），右边缩了余量就被吃掉。
+ * ‼️ 这份不对称**只对"会变成输入框"的格子成立**。只读格与表头没有输入框、也就没有光标要余量，
+ * 用同一份只会让文字看着偏左（左右留白不等）—— 它们用 `READONLY_PADDING`。
  */
 export const CELL_PADDING = "pl-1 pr-2 py-0.5"
+
+/**
+ * **只读格 / 表头**的内边距：左右**对等**。
+ *
+ * 它们不会变成输入框（一个只显示、一个根本不是数据格），所以既不需要右侧那份光标余量，
+ * 也不该继承那份不对称 —— 左右一样宽，文字才是真的在格子里居中/居左得平整
+ * （`config` 这类自己要居中的列尤其明显：padding 不等时 `justify-center` 也是假居中）。
+ */
+export const READONLY_PADDING = "px-1"
 
 /**
  * 编辑框的内边距：**左边与显示态相同**（文字起点不跳），**右边为 0**。
@@ -129,16 +139,15 @@ export const CELL_PADDING = "pl-1 pr-2 py-0.5"
  */
 export const INPUT_PADDING = "pl-1 pr-0 py-0.5"
 
-/** 表头内边距：左右都与数据格相同。 */
-const HEAD_PADDING = "pl-1 pr-2"
+/** 表头内边距：左右对等（表头没有输入框，不需要数据格那份右侧光标余量）。 */
+const HEAD_PADDING = READONLY_PADDING
 export const FONT = "text-base md:text-sm"
 
 /**
- * **选值格**（`controlTypeHash_`）里那层文本：与 `CELL_TEXT` 同一套（字号、内边距、行高都一样），
- * 只多两件事：
- *   · `justify-between` —— 文本在左、下拉箭头在右；
- *   · `relative` —— 箭头绝对定位在右端（**不占文本的宽度**：这一列大部分格子是 10 位数字，
- *     文本区里再挤进一个箭头就会把数字截掉一截）。
+ * **选值格**（`controlTypeHash_`）里那层文本：与 `CELL_TEXT` 同一套（字号、行高都一样），只多两件事：
+ *   · `justify-between` —— 文本在左、下拉箭头在右（箭头是 `ComboboxTrigger` 自带的，**占宽**，不是绝对定位）；
+ *   · `gap-1` + `pr-2!` —— 箭头与右边留 8px（与别的格子同一份右内边距），文本与箭头之间**至少 4px**：
+ *     这一列大部分格子是 10 位数字，中间不留空隙时数字会一路顶到箭头上（`truncate` 的省略号贴着箭头）。
  *
  * 这一层是**触发器**，盒子到 `<td>` 的内容盒为止（131×24）；格线是 `<td>` 自己的 `border-r/border-b`，
  * 这一列不为此动格线（原因见 `CellPick` 顶部那段，一句话：换画法会把整列格线弄花）。
@@ -150,7 +159,7 @@ export const FONT = "text-base md:text-sm"
  * ⚠️ 这一层**不能用** `truncate`：它是 flex 容器，`truncate` 那三条属性会落到容器上，
  * 长文本照样溢出去 —— 所以里面的文本自己带 `truncate`（见 `PICK_TEXT`）。
  */
-export const PICK_CELL = `${CELL_TEXT} justify-between`
+export const PICK_CELL = `${CELL_TEXT} justify-between gap-1 pr-2!`
 
 /** 选值格的标记类（**不是**箭头样式）—— `style.css` 那句"列表开着时画一圈环"与测试/探针都靠它。 */
 export const PICK_MARK = "cell-pick-mark"
@@ -165,7 +174,7 @@ export const PICK_TEXT = "truncate min-w-0"
  * 行号格的内层：高度、内边距、字号都照 `CellText` 抄 —— 格子高度、数字基线与数据格才齐平。
  * 多了个 `justify-center`：行号居中（表头那个 `#` 也走它，两行才对得齐）。
  */
-export const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${CELL_PADDING} ${FONT} tabular-nums`
+export const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${READONLY_PADDING} ${FONT} tabular-nums`
 
 /**
  * 钉住的列 / 行号格：**只负责"吸顶 + 层高"**（底色由调用点按"只读 / 可编辑"给 —— 两个只读列恰好
@@ -178,8 +187,13 @@ export const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${CE
  */
 export const PINNED_CELL = "cell-pinned sticky"
 
-/** 表头单元格的公共类（钉住的列由 `PINNED_CELL` 把层高顶上去）。 */
-export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b ${HEAD_BG} ${HEAD_PADDING} font-medium whitespace-nowrap ${FONT}`
+/**
+ * 表头单元格的公共类（钉住的列由 `PINNED_CELL` 把层高顶上去）。
+ *
+ * `text-center`：表头**文字居中**（用户要的）—— 数据格左对齐、表头居中，也正好与"左右对等的内边距"
+ * 配套：内边距不等时，居中出来的中心是偏的。
+ */
+export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b ${HEAD_BG} ${HEAD_PADDING} text-center font-medium whitespace-nowrap ${FONT}`
 
 /**
  * 表体每一格都带的类（格线 + 选中那套的**基底**）。

@@ -5,7 +5,7 @@
 import {memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref, type RefObject} from "react"
 
 import {CellPick} from "./CellPick"
-import {CELL_PADDING, FONT, INPUT_PADDING} from "./classes"
+import {CELL_PADDING, FONT, INPUT_PADDING, READONLY_PADDING} from "./classes"
 import {BranchPickContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, type PressFacts, snapshotKey} from "./model"
 import {abilityName} from "@/lib/ability"
 import {CELL_CHOICES} from "@/lib/controltypes"
@@ -85,7 +85,8 @@ export const CellContent = memo(function CellContent({
     if (readOnly || kind === "readonly") {
         // 只读列：没有编辑态。`abilityTag_` 在这一层翻成技能名
         // （**数据没动**，显示归显示，提交给后端的仍然是那个键）。
-        return <CellText text={fieldKey === "abilityTag_" ? abilityName(abilityNames, shown) : shown} />
+        // ‼️ 内边距用**对等**那份：只读格不会变成输入框，不该继承右侧那份光标余量（见 `READONLY_PADDING`）。
+        return <CellText padding={READONLY_PADDING} text={fieldKey === "abilityTag_" ? abilityName(abilityNames, shown) : shown} />
     }
     /*
         ‼️ "先选后编"的**唯一**判据：按下之前这一格是唯一选中格，这一次点击才算"进编辑"。
@@ -147,8 +148,10 @@ export const CellContent = memo(function CellContent({
  * 只设 `opacity-0`（透明、仍占位、且仍可聚焦 —— Esc 那条路要用），**绝不离开文档流** ——
  * 详见 `Cell` 里那段。
  */
-function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFocus, onMouseDown, ref}: {
+function CellText({text, padding = CELL_PADDING, muted = false, onClick, hidden = false, tabIndex, onFocus, onMouseDown, ref}: {
     text: string
+    /** 这一格的内边距（默认 CELL_PADDING；只读格传 READONLY_PADDING —— 它没有输入框，见那个常量）。 */
+    padding?: string
     /** 灰色：这一格显示的是**原值**（还没改过）。 */
     muted?: boolean
     /** 给了就可点（可编辑列用它进编辑态；只读列不给）。 */
@@ -173,7 +176,7 @@ function CellText({text, muted = false, onClick, hidden = false, tabIndex, onFoc
             // `truncate` = overflow:hidden + text-overflow:ellipsis + white-space:nowrap（一个类给全）。
             // 光标**不在这里指定**：显示态统一用格子（td）给的十字光标（`cell-selectable` 里的
             // `cursor: cell`）；进了编辑态才是输入框那根 I 形光标（见下面 input 的 `cursor-text`）。
-            className={`min-h-6 flex w-full items-center truncate ${CELL_PADDING} py-1! ${FONT} tabular-nums ${
+            className={`min-h-6 flex w-full items-center truncate ${padding} py-[3px]! ${FONT} tabular-nums ${
                 muted ? "text-muted-foreground" : ""
             } ${hidden ? "opacity-0" : ""}`}
             onClick={onClick}

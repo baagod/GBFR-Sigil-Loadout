@@ -135,6 +135,9 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const arrow = mark.querySelector("svg")!
         expect(arrow.getAttribute("class")).toContain("pointer-events-none")
         expect(mark.querySelectorAll("svg")).toHaveLength(1)
+        // 文本与箭头之间至少 4px、箭头距右边 8px（10 位数字一路顶到箭头上就不好看了）。
+        expect(mark.className).toContain("gap-1")
+        expect(mark.className).toContain("pr-2!")
         /*
             **默认什么都没有**：这一格照旧带 `cell-focus`（与别的可编辑格同一个类 —— 环由
             `td:focus-within` 与"列表真的开着"两态决定），但**不挂任何"常亮"的开关**：没有
