@@ -54,7 +54,7 @@ export function useRowCommands({
     keys: readonly string[]
     选中行下标: number[]
     活动行下标: number
-    onChange?: (rows: ActionRow[]) => void
+    onChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
 }): RowCommands {
     /** 行剪贴板：模块级会让两张表串味，所以挂在这次挂载上（关掉弹窗就没了，与"行粘贴"的用法一致）。 */
     const 剪贴板 = useRef<行剪贴板 | null>(null)
@@ -77,10 +77,21 @@ export function useRowCommands({
         carry: 源 !== undefined && "id" in 源 ? 源.carry : undefined,
     })
 
-    /** 把 `新行` 插到 `after` 那一行之后（`after < 0` 或越界 = 行末）。 */
+    /**
+     * 把 `新行` 插到 `after` 那一行之后（`after < 0` 或越界 = 行末）。
+     */
     const 插入 = (after: number, 新行: ActionRow[]) => {
         const at = after >= 0 && after < rows.length ? after + 1 : rows.length
-        onChange?.([...rows.slice(0, at), ...新行, ...rows.slice(at)])
+        onChange?.([...rows.slice(0, at), ...新行, ...rows.slice(at)], [])
+    }
+
+    /**
+     * 删掉选中的那几行（**真删**）：第二个参数把"删掉了谁"一并交回去 —— 调用方的「假删除」
+     * 就是靠它把"本来有原身份的行"加回来标红（见 `onChange` 那段）。
+     */
+    const 删除选中 = () => {
+        const 删掉的 = rows.filter((_, index) => 选中行下标.includes(index))
+        onChange?.(rows.filter((_, index) => !选中行下标.includes(index)), 删掉的)
     }
 
     return {
@@ -98,7 +109,7 @@ export function useRowCommands({
         cut: () => {
             if (选中行下标.length === 0) return
             剪贴板.current = {keys: [...keys], rows: 选中行下标.map((index) => 取值(rows[index]))}
-            onChange?.(rows.filter((_, index) => !选中行下标.includes(index)))
+            删除选中()
         },
         /** 粘贴：插在**选中行的下面**（一行没选就插最前），按本表的列裁剪（多出来的列丢掉）。 */
         paste: () => {
@@ -106,12 +117,12 @@ export function useRowCommands({
             if (!剪 || 剪.rows.length === 0) return
             const at = 选中行下标.length === 0 ? 0 : 选中行下标[选中行下标.length - 1] + 1
             const 新行 = 剪.rows.map((row) => 造行(row))
-            onChange?.([...rows.slice(0, at), ...新行, ...rows.slice(at)])
+            onChange?.([...rows.slice(0, at), ...新行, ...rows.slice(at)], [])
         },
         /** 删除：**真删**选中的那几行（"假删除"是调用方在 `onRowsChange` 里的事，见文件头）。 */
         remove: () => {
             if (选中行下标.length === 0) return
-            onChange?.(rows.filter((_, index) => !选中行下标.includes(index)))
+            删除选中()
         },
     }
 }

@@ -6,6 +6,7 @@ import type {Messages} from "@/lib/messages"
 import {ActionsTable} from "@/components/ActionsTable"
 import {Badge} from "@/components/ui/badge"
 import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/components/actions-table/model"
+import type {RowCommands} from "@/components/actions-table/useRowCommands"
 
 /*
     两张轨表 = **基座表 + 数据**。
@@ -55,7 +56,7 @@ const toRow = (
 })
 
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
-export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionChange, onActiveRowChange, onCopyReady}: {
+export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionChange, onActiveRowChange, onCopyReady, onRowsReady, onRowsChange}: {
     table: TrackTableData | undefined
     t: Messages
     /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
@@ -70,6 +71,10 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     onActiveRowChange?: (rowId: string | null) => void
     /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
     onCopyReady?: (copy: () => void) => void
+    /** 基座那份**行级命令**（添加/复制/剪切/粘贴/删除）：接给工具条，见 `useRowCommands`。 */
+    onRowsReady?: (commands: RowCommands) => void
+    /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
+    onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
 }) {
     /*
         ‼️ **行的引用要稳**（按数据 `useMemo`，别在 JSX 里现 map）：基座把 `rows` 当"换数据了没有"的
@@ -100,6 +105,8 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
             onSelectionChange={onSelectionChange}
             onActiveRowChange={onActiveRowChange}
             onCopyReady={onCopyReady}
+            onRowsReady={onRowsReady}
+            onRowsChange={onRowsChange}
         />
     )
 }
@@ -198,7 +205,7 @@ const flagPickers: Record<string, PickerConfig> = {
 }
 const pickerOf = (key: string): PickerConfig | undefined => flagPickers[key]
 
-export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionChange, onActiveRowChange, onCopyReady}: {
+export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionChange, onActiveRowChange, onCopyReady, onRowsReady, onRowsChange}: {
     rows: FlagRow[]
     t: Messages
     /** 原表那些行（后端 `LoadFlagsOriginal`）：选值列表靠它标出"原值就置着的位"。 */
@@ -213,6 +220,10 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
     onActiveRowChange?: (rowId: string | null) => void
     /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
     onCopyReady?: (copy: () => void) => void
+    /** 基座那份**行级命令**（添加/复制/剪切/粘贴/删除）：接给工具条，见 `useRowCommands`。 */
+    onRowsReady?: (commands: RowCommands) => void
+    /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
+    onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
 }) {
     /* 列说明依赖文案表：`t` 一换（换语言）就得重算 —— `useMemo` 让引用稳住（列宽测量按 `keys` 重跑）。 */
     const 列说明 = useMemo(() => columnOf(t), [t])
@@ -238,6 +249,8 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
             onSelectionChange={onSelectionChange}
             onActiveRowChange={onActiveRowChange}
             onCopyReady={onCopyReady}
+            onRowsReady={onRowsReady}
+            onRowsChange={onRowsChange}
             pickerOf={pickerOf}
         />
     )

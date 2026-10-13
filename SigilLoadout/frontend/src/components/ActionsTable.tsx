@@ -82,6 +82,7 @@ import {revealScrollTarget} from "@/components/actions-table/reveal"
 import {clampDragY} from "@/components/actions-table/drag"
 import {ReorderDnd} from "@/components/actions-table/ReorderDnd"
 import {useClipboardHistory} from "@/components/actions-table/useClipboardHistory"
+import {useRowCommands, type RowCommands} from "@/components/actions-table/useRowCommands"
 import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
 
 /*
@@ -129,7 +130,7 @@ const CTRL = 2
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onActiveRowChange, onCopyReady, columnOf}: {
+export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onActiveRowChange, onCopyReady, onRowsReady, onRowsChange, columnOf}: {
     t: ActionsTableMessages
     /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
     abilityNames: Record<string, string>
@@ -194,6 +195,15 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      * 按钮手里没有 Ctrl+C 那个事件对象，但"进剪贴板的是哪片、虚线画在哪儿"必须与键盘那条完全一致。
      */
     onCopyReady?: (copy: () => void) => void
+    /** 行级命令（添加/复制/剪切/粘贴/删除，一份实现在 `useRowCommands`）：交给调用方接到工具条上。 */
+    onRowsReady?: (commands: RowCommands) => void
+    /**
+     * 行数据变了（增/删/插）：**新版的一整份** + **被删掉的那几行**。
+     *
+     * 基座是受控的，所以行级命令只能把结果交回来 —— 由调用方决定怎么落库（轨表的假删除就在这一层：
+     * 把本来有原身份的行加回去标红）。
+     */
+    onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
 }) {
     /**
      * **当前要显示的那份数据** = 父组件给的 prop，外加本层的"编辑覆盖"。
@@ -487,14 +497,15 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
      * 与"整行选中"那条同一个套路：**指纹去重**，否则每次渲染都报一次 → 调用方 setState → 再渲染 → 打转。
      * 一段选区都没有时（刚打开弹窗）报 `null` —— 调用方据此把新行放到行末。
      */
+    /* 活动格所在的行 id（null = 一段选区都没有）—— 上报给调用方，也给行级命令定位「活动行」。 */
+    const 活动行id = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
     const 上次活动行 = useRef("")
     useEffect(() => {
         if (!onActiveRowChange) return
-        const rowId = activeCellKey ? parseSnapshotKey(activeCellKey).rowId : null
-        if ((rowId ?? "") === 上次活动行.current) return
-        上次活动行.current = rowId ?? ""
-        onActiveRowChange(rowId)
-    }, [onActiveRowChange, activeCellKey])
+        if ((活动行id ?? "") === 上次活动行.current) return
+        上次活动行.current = 活动行id ?? ""
+        onActiveRowChange(活动行id)
+    }, [onActiveRowChange, 活动行id])
     /** 已经为哪一格排了一帧"跟随可视"（`revealActiveCell` 的幂等闸：同一帧重复喊只滚一次）。 */
     const revealPendingRef = useRef<HTMLElement | null>(null)
     /** 上一次滚过的那一格：`scrollActiveIntoView`（ref 回调）靠它去重（同一格连续两次不重复滚）。 */
@@ -666,6 +677,20 @@ ull = 一段选区都没有）—— 轨表的「添加」按它在**活动行�
     useEffect(() => {
         onCopyReady?.(copySelection)
     }, [onCopyReady, copySelection])
+
+    /* 整行选中的那些行**下标**（升序）—— 行级命令读它，与"整行选中"那条上报是同一份判据。 */
+    const 选中行下标 = modelRows.map((_, index) => index).filter((index) => rowFullySelected(selectionBounds, index, lastColumnIndex))
+    /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
+    const 活动行下标 = 活动行id === null ? -1 : modelRows.findIndex((row) => row.id === 活动行id)
+    /**
+     * **行级命令只有这一份**（添加/复制/剪切/粘贴/删除，实现在 `useRowCommands`）——
+     * 工具条那五个按钮由 `onRowsReady` 拿走，键盘那条也走它（见下面那段 keydown）。
+     */
+    const 行命令 = useRowCommands({rows: modelRows.map((row) => row.original), keys, 选中行下标, 活动行下标, onChange: onRowsChange})
+    useEffect(() => {
+        onRowsReady?.(行命令)
+    })
+
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
     const startCellSelection = useCallback((cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => {
