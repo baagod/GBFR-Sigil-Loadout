@@ -29,7 +29,7 @@ const base = (over: Partial<RevealInput> = {}): RevealInput => ({
 
 describe("跟随可视 · 该滚到哪儿", () => {
     it("本来就看得见 → 不滚（返回 null）", () => {
-        // 容器 (0,0)-(400,800)、表头 60 高 → 看得见的是 (0,60)-(400,800)；格子 (10,100)-(110,120) 在里面。
+        // 容器 (0,0)-(400,800)、headerCell 60 高 → 看得见的是 (0,60)-(400,800)；格子 (10,100)-(110,120) 在里面。
         expect(revealScrollTarget(base({target: {top: 100, bottom: 120, left: 10, right: 110}}))).toBeNull()
     })
 
@@ -121,7 +121,7 @@ describe("跟随可视 · 该滚到哪儿", () => {
     })
 
     it("吸收表头高度：可视上沿 = 容器顶 + 表头高", () => {
-        // 表头 0 时格子(50,70)还在可视区里（不滚）；表头 60 时它被切掉 10px。
+        // headerCell 0 时格子(50,70)还在可视区里（不滚）；headerCell 60 时它被切掉 10px。
         const target = {top: 50, bottom: 70, left: 10, right: 110}
         expect(revealScrollTarget(base({target, headerHeight: 0}))).toBeNull()
         // 而且要在"还能往上滚"的位置才看得出差别（scrollTop 100 → 目标 90）。

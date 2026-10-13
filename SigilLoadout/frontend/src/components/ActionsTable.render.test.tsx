@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
-    动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）
+    动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）
 */
 import {describe, expect, it, vi} from "vitest"
 import {render, waitFor} from "@testing-library/react"
@@ -18,7 +18,7 @@ import {KEYS, abilityNames, cellAt, clickToEdit, tableProps, useTableHarness, ma
 
 const {renderTable, setRows} = useTableHarness()
 
-describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
+describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
     it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
         const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
@@ -97,9 +97,9 @@ describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排
     it("`startTime` / `endTime` 的表头译文由**基座兜底**（任何表都有，不必自己写列说明）", async () => {
         // 故意**不传** `columnOf`、也**不**走动作表那套夹具：这两列的表头该是中文 —— 它不属于某一张表
         // （见 `model.columnLabel`），换一张表（比如轨表）只要列名叫这个就有。
-        const 行 = {id: "1000", values: {}, originals: {startTime: "0.5", endTime: "1.5", someField_: "x"}}
+        const line = {id: "1000", values: {}, originals: {startTime: "0.5", endTime: "1.5", someField_: "x"}}
         const {container} = render(
-            <ActionsTable t={t} abilityNames={{}} rows={[行]} keys={["startTime", "endTime", "someField_"]} />,
+            <ActionsTable t={t} abilityNames={{}} rows={[line]} keys={["startTime", "endTime", "someField_"]} />,
         )
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(4))
         expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
@@ -108,17 +108,17 @@ describe("动作表 · 渲染与列（表头 / 列宽 / 占位符 / 只读 / 排
     it("只读格的内边距**左右对等**、上下 3px；表头文字居中（都没输入框，不继承那份光标余量）", async () => {
         const container = await renderTable()
         // 第 0 列 = `id_`（只读）：`pr-2` 那 8px 是给编辑框留的"光标余量"，只读格不该有。
-        const 只读层 = cellAt(container, 0, 0).firstElementChild!
-        expect(只读层.className).toContain("px-1")
-        expect(只读层.className).toContain("py-[3px]!")
-        expect(只读层.className).not.toContain("pr-2")
+        const readonlyLayer = cellAt(container, 0, 0).firstElementChild!
+        expect(readonlyLayer.className).toContain("px-1")
+        expect(readonlyLayer.className).toContain("py-[3px]!")
+        expect(readonlyLayer.className).not.toContain("pr-2")
         // 高度交给内容撑（固定 `h-6` 会把上下 3px 压扁）。
-        expect(只读层.className).toContain("min-h-6")
+        expect(readonlyLayer.className).toContain("min-h-6")
 
-        // 表头：文字居中，内边距同样对等（不等的话"居中"出来的中心是偏的）。
-        const 表头 = container.querySelectorAll("thead th")[1]
-        expect(表头.className).toContain("text-center")
-        expect(表头.className).not.toContain("pr-2")
+        // headerCell：文字居中，内边距同样对等（不等的话"居中"出来的中心是偏的）。
+        const headerCell = container.querySelectorAll("thead th")[1]
+        expect(headerCell.className).toContain("text-center")
+        expect(headerCell.className).not.toContain("pr-2")
     })
 
     it("没改过的格子显示**灰色原值**（占位符）", async () => {

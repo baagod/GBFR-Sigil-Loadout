@@ -52,7 +52,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         expect(handle.style.cursor).toContain("4 12") // 热点（落在图形内即可，出界整条声明作废）
         expect(handle.style.cursor).toContain("e-resize") // 不吃图标时的兜底
 
-        // 表头**整行**换成向下那枚（`HANDLE_HEAD_CURSOR`）：写在 `<tr>` 上继承给每个 `<th>`，格子自己不带。
+        // headerCell**整行**换成向下那枚（`HANDLE_HEAD_CURSOR`）：写在 `<tr>` 上继承给每个 `<th>`，格子自己不带。
         const headRow = container.querySelector("thead tr") as HTMLElement
         expect(headRow.style.cursor).toContain("svg+xml")
         expect(headRow.style.cursor).toContain("12 4")
@@ -66,7 +66,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
     /*
         ============ 按行号选行（点 / Shift / Ctrl / 拖）============
 
-        "点 / Shift 连选 / Ctrl 逐个加减"那套语义（行号手势的唯一实现就在 `ActionsTable` 里，行/格共用同一份
+        "点 / Shift 连选 / Ctrl 逐个加减"那套语义（行号手势的唯一实现就在 `ActionsTable` 里，line/格共用同一份
         选区模型）；"按住划过一片"库里没有，由组件的 `extendRowSpanTo` 接。选中的标记 = 行号格上那圈框。
     */
 
@@ -95,9 +95,9 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         fireEvent.mouseUp(window)
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
 
-        const 文本 = String(clipboard.data["text/plain"])
-        expect(文本.split("\t")).toHaveLength(KEYS.length)
-        expect(文本.startsWith("1000\t")).toBe(true) // 第一格是 id_ 原值
+        const text = String(clipboard.data["text/plain"])
+        expect(text.split("\t")).toHaveLength(KEYS.length)
+        expect(text.startsWith("1000\t")).toBe(true) // 第一格是 id_ 原值
         expect(screen.queryByText(/同一行或同一列/)).toBeNull()
     })
 
@@ -132,13 +132,13 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         expect(cellAt(container, 2, KEYS.indexOf("id_")).className).not.toContain("cell-active")
     })
 
-    it("Shift 点行号：从锚点连选一段（第 2 行 → 第 4 行，中间一起选中）", async () => {
+    it("Shift 点行号：从锚点连选一段（第 2 line → 第 4 line，中间一起选中）", async () => {
         setRows([makeRow("1000"), makeRow("1001"), makeRow("1002"), makeRow("1003"), makeRow("1004")])
         const container = await renderTable()
 
-        pressHandle(container, 1) // 锚点 = 第 2 行
+        pressHandle(container, 1) // 锚点 = 第 2 line
         fireEvent.mouseUp(window)
-        pressHandle(container, 3, {shiftKey: true}) // 连选到第 4 行
+        pressHandle(container, 3, {shiftKey: true}) // 连选到第 4 line
         fireEvent.mouseUp(window)
 
         expect([0, 1, 2, 3, 4].map((r) => rowSelectedAt(container, r))).toEqual([false, true, true, true, false])
@@ -176,12 +176,12 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
 
         stubRowRects(container)
 
-        // 先选第 0 行
+        // 先选第 0 line
         pressHandle(container, 0)
         fireEvent.mouseUp(window)
         expect(rowSelectedAt(container, 0)).toBe(true)
 
-        // Ctrl 按在第 2 行，拖到第 3 行
+        // Ctrl 按在第 2 line，拖到第 3 line
         pressHandle(container, 2, {ctrlKey: true})
         fireEvent.mouseMove(cellAt(container, 3, 2), {clientY: 65})
         fireEvent.mouseUp(window)
@@ -210,7 +210,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
 
         stubRowRects(container)
 
-        pressHandle(container, 0) // 起点（显示第 1 行 = id_ 1000）
+        pressHandle(container, 0) // 起点（显示第 1 line = id_ 1000）
         // 鼠标移到**第 3 行的数据格**上（不在行号列里）：y 落在第 3 行那段区间里
         fireEvent.mouseMove(cellAt(container, 2, 2), {clientY: 45})
         fireEvent.mouseUp(window)
@@ -232,7 +232,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
 
         pressHandle(container, 1)
         fireEvent.mouseUp(window)
-        pressHandle(container, 2, {shiftKey: true}) // 连选第 2、3 行
+        pressHandle(container, 2, {shiftKey: true}) // 连选第 2、3 line
         fireEvent.mouseUp(window)
 
         /** 这一格挂了哪些边类。 */
@@ -290,11 +290,11 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
     it("Ctrl 追加一行后，再拖一片单元格：**两者同时选中**", async () => {
         const container = await renderTable()
 
-        pressHandle(container, 0) // 整行选中第 1 行
+        pressHandle(container, 0) // 整行选中第 1 line
         fireEvent.mouseUp(window)
         expect(rowSelectedAt(container, 0)).toBe(true)
 
-        // 再按 Ctrl 拖一片**单元格**（在第 2 行）：追加，不替换
+        // 再按 Ctrl 拖一片**单元格**（在第 2 line）：追加，不替换
         const cell = cellAt(container, 1, 2)
         fireEvent.mouseDown(cell, {ctrlKey: true})
         fireEvent.mouseEnter(cellAt(container, 1, 3), {ctrlKey: true})

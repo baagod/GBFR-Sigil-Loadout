@@ -23,7 +23,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         用户要求：**允许复制列名**，而且复制列名时要**清空表格复制区** ——
         那圈虚线圈的是"剪贴板里就是这片格子"，剪贴板换成列名之后这个说法就不成立了。
 
-        判据是"这一记 Ctrl+C **从哪儿发起**"：表头（`thead`）不参与表格复制。
+        判据是"这一记 Ctrl+C **从哪儿发起**"：headerCell（`thead`）不参与表格复制。
         所以**从表头里**派发 copy（真实情况就是表头那个 DIV 上的选区在复制），表格必须让开。
     */
     it("从表头发起的 Ctrl+C：让给浏览器（不写格子 TSV），并清空复制区那圈虚线", async () => {
@@ -52,13 +52,13 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         `parseTsv` 不解析引号 —— 加引号不是转义，是把引号写进了值里。）
     */
     it("复制带引号的值：原样进剪贴板（不套引号包裹、不翻倍）", async () => {
-        const 带引号 = '["1","4150991022","0","1"]'
+        const quoted = '["1","4150991022","0","1"]'
         /*
             ⚠️ 复制取的是**底层原始值**（`row.original.originals`），不是"改动值"、也不是屏幕上的显示值 ——
             所以这里要改的是 `original`（造数据时 `changed` 改的是"改动值"那一栏，复制取不到）。
         */
         const row = makeRow("1000")
-        row.fields.find((f) => f.key === LongField)!.original = 带引号
+        row.fields.find((f) => f.key === LongField)!.original = quoted
         setRows([row])
 
         const container = await renderTable()
@@ -66,7 +66,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         const clipboard = clipboardStub()
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
 
-        expect(clipboard.data["text/plain"]).toBe(带引号)
+        expect(clipboard.data["text/plain"]).toBe(quoted)
     })
 
     /*
@@ -96,13 +96,13 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
     it("Ctrl **拖选**第二片：第一片必须留着（加选，不是替换）", async () => {
         const container = await renderTable()
 
-        // 第一片：第 0 行 第 2..3 列
+        // 第一片：第 0 line 第 2..3 列
         fireEvent.mouseDown(cellAt(container, 0, 2))
         fireEvent.mouseEnter(cellAt(container, 0, 3))
         fireEvent.mouseUp(document)
         expect(cellAt(container, 0, 2).className).toContain("cell-selected")
 
-        // 第二片：Ctrl 按在第 1 行 第 2 列，拖到第 1 行 第 3 列
+        // 第二片：Ctrl 按在第 1 line 第 2 列，拖到第 1 line 第 3 列
         fireEvent.mouseDown(cellAt(container, 1, 2), {ctrlKey: true})
         fireEvent.mouseEnter(cellAt(container, 1, 3), {ctrlKey: true})
         fireEvent.mouseUp(document)
@@ -132,7 +132,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.mouseMove(handleAt(container, 3), {clientY: 65})
         fireEvent.mouseUp(window)
 
-        // 那一列从第 0 行扩到第 3 行；**没有**变成整行（第 4 列不选中）
+        // 那一列从第 0 行扩到第 3 line；**没有**变成整行（第 4 列不选中）
         expect(cellAt(container, 3, 3).className).toContain("cell-selected")
         expect(cellAt(container, 3, 4).className).not.toContain("cell-selected")
     })
@@ -153,7 +153,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.mouseMove(headAt(4), {clientY: -5}) // 在所有行之上 = 表头带里
         fireEvent.mouseUp(window)
 
-        // 行 0..3 × 列 2..4 整块选中（第 5 列不该被带上）
+        // line 0..3 × 列 2..4 整块选中（第 5 列不该被带上）
         for (const [r, c] of [
             [0, 2],
             [0, 4],
@@ -198,17 +198,17 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
 
-        const 行 = String(clipboard.data["text/plain"]).split("\n")
-        expect(行).toHaveLength(4) // 两段各 2 行 → 上下拼成 4 行
-        expect(行[0].split("\t")[0]).toBe("1000")
-        expect(行[3].split("\t")[0]).toBe("1003")
+        const line = String(clipboard.data["text/plain"]).split("\n")
+        expect(line).toHaveLength(4) // 两段各 2 line → 上下拼成 4 line
+        expect(line[0].split("\t")[0]).toBe("1000")
+        expect(line[3].split("\t")[0]).toBe("1003")
     })
 
     it("两块共享同一行范围（A1:B2 + D1:E2）→ 左右拼（Excel 实测允许）", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()
 
-        // 第一块：第 0..1 行 × 第 0..1 列
+        // 第一块：第 0..1 line × 第 0..1 列
         fireEvent.mouseDown(cellAt(container, 0, 0))
         for (const [r, c] of [
             [0, 1],
@@ -218,7 +218,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
             fireEvent.mouseEnter(cellAt(container, r, c))
         }
         fireEvent.mouseUp(document)
-        // 第二块：Ctrl 加第 0..1 行 × 第 3..4 列
+        // 第二块：Ctrl 加第 0..1 line × 第 3..4 列
         fireEvent.mouseDown(cellAt(container, 0, 3), {ctrlKey: true})
         for (const [r, c] of [
             [0, 4],
@@ -231,10 +231,10 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
 
-        const 行 = String(clipboard.data["text/plain"]).split("\n")
-        expect(行).toHaveLength(2) // 行范围相同 → 还是 2 行
-        expect(行[0].split("\t")).toHaveLength(4) // 两块各 2 列 → 左右拼成 4 列
-        expect(行[0].split("\t").slice(0, 2)).toEqual(["1000", "AB_PL1000_01"])
+        const line = String(clipboard.data["text/plain"]).split("\n")
+        expect(line).toHaveLength(2) // 行范围相同 → 还是 2 line
+        expect(line[0].split("\t")).toHaveLength(4) // 两块各 2 列 → 左右拼成 4 列
+        expect(line[0].split("\t").slice(0, 2)).toEqual(["1000", "AB_PL1000_01"])
     })
 
     /*
@@ -270,7 +270,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         const container = await renderTable()
         const clipboard = clipboardStub()
 
-        // 第 0 列（id_）第 0、1 行：原值就是记录号，拼起来一目了然
+        // 第 0 列（id_）第 0、1 line：原值就是记录号，拼起来一目了然
         selectCell(cellAt(container, 0, 0))
         fireEvent.mouseDown(cellAt(container, 1, 0), {ctrlKey: true})
         fireEvent.mouseUp(document)
@@ -381,7 +381,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(clipboard.data["text/plain"]).toBe("actionFreeWork0_-原值")
     })
 
-    /* 改过的格子复制出去是**改动后的值数据**（不是原值、也不是显示值）：第 2 行（`1001`）那一列
+    /* 改过的格子复制出去是**改动后的值数据**（不是原值、也不是显示值）：第 2 line（`1001`）那一列
        显示"…-改过"、原值"…-原值"，复制到的应该是前者。 */
     it("复制：改过的格子复制的是**改动值**（值数据口径）", async () => {
         const container = await renderTable()
@@ -427,7 +427,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         粘贴规则：**两份数 = `floor(选区 / 块)`，最小 1 份**；结果 = 份数 × 块；只读列占位不写；
         越界直接丢。完整规则在 `ActionsTable.tsx` 文件上方「粘贴规则」那段（用户拿 Excel / WPS 量的）。
     */
-    it("粘贴：1×1 铺满选区（2 行 3 列）", async () => {
+    it("粘贴：1×1 铺满选区（2 line 3 列）", async () => {
         const container = await renderTable()
 
         fireEvent.mouseDown(cellAt(container, 0, 2))
@@ -489,7 +489,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(cellAt(container, 0, 5).textContent).toBe(untouched)
     })
 
-    it("粘贴：2×2 到 3×3 —— 只写 2×2（第 3 行/列凑不满一份）", async () => {
+    it("粘贴：2×2 到 3×3 —— 只写 2×2（第 3 line/列凑不满一份）", async () => {
         addRow(makeRow("1002"))
         const container = await renderTable()
 
@@ -614,7 +614,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         复制区**内部**的格子一个类都不挂。什么时候撤见 `CopySource` 那段。
     */
     it("复制后：只有最外圈挂虚线类，内部与区外都不挂", async () => {
-        addRow(makeRow("1002")) // 3 行，才分得出"内部"
+        addRow(makeRow("1002")) // 3 line，才分得出"内部"
         const container = await renderTable()
         expect(copyCellsOf(container)).toHaveLength(0) // 还没复制：一格都没有
 
@@ -664,7 +664,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(copyBoxOf(container)).not.toBeNull() // 虚线照出
     })
 
-    /* 动到源区 → 虚线撤（规则②：判据是"动过"，不是"值跟复制时不一样"）。 */
+    /* 动到源区 → 虚线撤（rule②：判据是"动过"，不是"值跟复制时不一样"）。 */
     it("复制后：往源区里粘贴 → 虚线撤掉", async () => {
         const container = await renderTable()
 
@@ -693,7 +693,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(copyBoxOf(container)).not.toBeNull()
     })
 
-    /* Esc → 虚线撤（规则③）；滚动 / 点别处**不撤**。 */
+    /* Esc → 虚线撤（rule③）；滚动 / 点别处**不撤**。 */
     it("复制后：按 Esc → 虚线撤掉", async () => {
         const container = await renderTable()
 
@@ -706,7 +706,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(copyBoxOf(container)).toBeNull()
     })
 
-    /* 规则①：再复制一片 → 换成新的那片。 */
+    /* rule①：再复制一片 → 换成新的那片。 */
     it("复制后：再复制别处 → 换成新的一片", async () => {
         const container = await renderTable()
 
@@ -752,7 +752,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(copyBoxOf(container)).not.toBeNull()
     })
 
-    /* 进编辑就撤（规则②：不是等改完提交，进编辑那一瞬间就算"动过源区"）。 */
+    /* 进编辑就撤（rule②：不是等改完提交，进编辑那一瞬间就算"动过源区"）。 */
     it("复制后：点开源区那一格进编辑 → 虚线撤掉（值还没改）", async () => {
         const container = await renderTable()
 
@@ -934,7 +934,7 @@ describe("动作表 · 方向键移动活动格", () => {
     it("多格选中时按方向键：收成单格，别的片全部消失", async () => {
         const container = await renderTable()
 
-        // 从 (0,0) 拖到 (1,3)：一片 2 行 × 4 列（锚点 = 起点 (0,0)）
+        // 从 (0,0) 拖到 (1,3)：一片 2 line × 4 列（锚点 = 起点 (0,0)）
         fireEvent.mouseDown(cellAt(container, 0, 0))
         fireEvent.mouseEnter(cellAt(container, 0, 3))
         fireEvent.mouseEnter(cellAt(container, 1, 3))
@@ -972,7 +972,7 @@ describe("动作表 · 方向键移动活动格", () => {
         // 起点放在**最后一行**：往上扩（往下就出数据区了，那是"到边停住"，另有一条测）
         selectCell(cellAt(container, 1, 0))
         arrowOn(activeCellOf(container)!, "ArrowUp", {shiftKey: true})
-        expect(paintedCount(container)).toBe(2) // 焦点角从第 1 行走到第 0 行 → 两格
+        expect(paintedCount(container)).toBe(2) // 焦点角从第 1 行走到第 0 line → 两格
 
         arrowOn(activeCellOf(container)!, "ArrowUp", {shiftKey: true}) // 再往上没有数据行 → 停住
         expect(paintedCount(container)).toBe(2)
@@ -1040,7 +1040,7 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("换格后滚动：滚的是新活动格（排在一帧之后）", async () => {
         const container = await renderTable()
-        const 恢复几何 = stubRevealGeometry(container) // 让"跟随可视"确实要滚（见那个助手的说明）
+        const restoreGeometry = stubRevealGeometry(container) // 让"跟随可视"确实要滚（见那个助手的说明）
         /* 钉"排在一帧之后"用 `scrollTo` 的调用记录（`this` 就是滚动容器）。 */
         const scrolled: HTMLElement[] = []
         const original = Element.prototype.scrollTo
@@ -1067,7 +1067,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(container.querySelector("td.cell-active")?.getAttribute("data-col-id")).toBe(colIdAt(container, 0, 1))
         } finally {
             Element.prototype.scrollTo = original
-            恢复几何()
+            restoreGeometry()
         }
     })
 
@@ -1080,9 +1080,9 @@ describe("动作表 · 方向键移动活动格", () => {
         第二次点击时选区没变、活动格没换人 → ref 不跑 → 不滚；而进入编辑走的是另一条路
         （`Cell.enterEdit`），它当时不接手滚动。
     */
-    it("点已选中的格子进编辑：也要跟随可视（滚动一次）", async () => {
+    it("点已选中的格子进编辑：也要跟随可视（scrollOnce）", async () => {
         const container = await renderTable()
-        const 恢复几何 = stubRevealGeometry(container)
+        const restoreGeometry = stubRevealGeometry(container)
         const scrolled: HTMLElement[] = []
         const original = Element.prototype.scrollTo
         Element.prototype.scrollTo = function (this: HTMLElement) {
@@ -1116,7 +1116,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
         } finally {
             Element.prototype.scrollTo = original
-            恢复几何()
+            restoreGeometry()
         }
     })
 
@@ -1128,7 +1128,7 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("Enter 进编辑：并且跟随可视", async () => {
         const container = await renderTable()
-        const 恢复几何 = stubRevealGeometry(container)
+        const restoreGeometry = stubRevealGeometry(container)
         const scrolled: HTMLElement[] = []
         const original = Element.prototype.scrollTo
         Element.prototype.scrollTo = function (this: HTMLElement) {
@@ -1154,7 +1154,7 @@ describe("动作表 · 方向键移动活动格", () => {
             expect(scrolled).toHaveLength(1) // 且跟随可视
         } finally {
             Element.prototype.scrollTo = original
-            恢复几何()
+            restoreGeometry()
         }
     })
 

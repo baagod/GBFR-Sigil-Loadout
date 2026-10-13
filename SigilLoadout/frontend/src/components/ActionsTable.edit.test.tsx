@@ -30,7 +30,7 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         cleanup()
         const after = await renderTable()
 
-        // 找到那个长值格（第 1 行 · LongField 那一列）
+        // 找到那个长值格（第 1 line · LongField 那一列）
         const colIndex = KEYS.indexOf(LongField)
         const cell = cellAt(after, 0, colIndex)
         expect(cell.textContent).toBe(long)

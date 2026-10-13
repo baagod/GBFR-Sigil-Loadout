@@ -81,7 +81,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
         判据（列宽要按新内容重量、`useTable` 的 data 变了要重建 row model）—— 每次渲染都新建数组的话，
         选中/拖动/滚动每一帧都会重跑一趟测量。
     */
-    const 行 = useMemo(
+    const rowItems = useMemo(
         () =>
             (table?.rows ?? []).map((row, index) =>
                 toRow(index, row.values, row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined, row),
@@ -94,7 +94,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
             t={t}
             // 轨表没有 `abilityTag_` 那一列，名字表用不上。
             abilityNames={{}}
-            rows={行}
+            rows={rowItems}
             keys={table.columns}
             // 行序严格等于数组顺序：这张表没有排序（动作表那档默认按 `id_` 排）。
             initialSorting={[]}
@@ -137,11 +137,11 @@ const frameOf = (endTime: string): string => {
  * 名字为空的那几位显示成 `bit<号>`（与选值列表同一个口径：漏掉谁，那一位就成了"看不见的位"）。
  */
 function FlagEffects({row}: {row: ActionRow}) {
-    const 位 = [
+    const items = [
         ...FLAG0_NAMES.map((name, bit) => ({name, bit, mask: shownValue(row, "flag0")})),
         ...FLAG1_NAMES.map((name, bit) => ({name, bit, mask: shownValue(row, "flag1")})),
     ].filter(({mask, bit}) => flagHasBit(flagMask(mask), bit))
-    if (位.length === 0) return null
+    if (items.length === 0) return null
     return (
         /*
             宽度已经由 `ColumnSpec.width` 钉死（400），所以这里只管**在这个宽度里换行**：
@@ -153,7 +153,7 @@ function FlagEffects({row}: {row: ActionRow}) {
             内边距与别的只读格一致（这一列走的是自定义渲染，拿不到 `CellText` 那份）。
         */
         <div className="flex w-full flex-wrap items-center gap-1 px-1 py-0.75 text-xs">
-            {位.map(({name, bit}) => (
+            {items.map(({name, bit}) => (
                 <Badge key={bit} className="shrink-0 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                     {name === "" ? `bit${bit}` : name}
                 </Badge>
@@ -228,7 +228,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
     /* 列说明依赖文案表：`t` 一换（换语言）就得重算 —— `useMemo` 让引用稳住（列宽测量按 `keys` 重跑）。 */
     const columnSpec = useMemo(() => columnOf(t), [t])
     /* 同上：行的引用要稳（基座拿它当"换数据了没有"的判据）。 */
-    const 行 = useMemo(
+    const rowItems = useMemo(
         () =>
             rows.map((row, index) =>
                 toRow(index, cells(row), row.orig != null ? cells(originals?.[row.orig]) : undefined, row),
@@ -239,7 +239,7 @@ export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionCha
         <ActionsTable
             t={t}
             abilityNames={{}}
-            rows={行}
+            rows={rowItems}
             keys={FLAG_COLUMNS}
             columnOf={columnSpec}
             initialSorting={[]}

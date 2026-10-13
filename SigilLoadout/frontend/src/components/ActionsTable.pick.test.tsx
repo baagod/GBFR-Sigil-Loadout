@@ -62,7 +62,7 @@ const isPickOpen = () => items().length > 0
  * 把**我方那一次**让过去（契约见 `model.ts` 的 `isRevealScrolling`）。所以要测"用户滚动照旧收起"，
  * 得先把那一次让掉 —— 有的用例显式派发两次，就是这么来的。
  */
-const 滚动一次 = () => fireEvent.scroll(document)
+const scrollOnce = () => fireEvent.scroll(document)
 
 /** 让浮层有机会挂上 —— base-ui 是**异步**挂弹层的，所以"没打开"必须等过这一拍才算数。 */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 50))
@@ -79,9 +79,9 @@ async function openPick(cell: HTMLElement) {
         闸门是"先选后编"（`press.wasSelected && press.wasOnlyCell`）：格子**已经是唯一选中**时，
         第一下就展开；否则第一下只算选中、要按第二下。后者中间那一拍是给 React 落"选中"状态。
     */
-    const 已是唯一选中 = cell.classList.contains("cell-selected") && document.querySelectorAll("td.cell-selected").length === 1
+    const isOnlySelected = cell.classList.contains("cell-selected") && document.querySelectorAll("td.cell-selected").length === 1
     pressPick(cell)
-    if (!已是唯一选中) {
+    if (!isOnlySelected) {
         await tick()
         pressPick(cell)
     }
@@ -239,7 +239,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         setRows([pickRow("1000", "4087152117")])
         const container = await renderTable()
 
-        const 恢复几何 = stubRevealGeometry(container)
+        const restoreGeometry = stubRevealGeometry(container)
         /* 钉前提用：`scrollTo` 被调过就说明"跟随可视"真的走了滚动那一趟。 */
         const scrolled: HTMLElement[] = []
         const originalScrollTo = Element.prototype.scrollTo
@@ -267,7 +267,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
             await waitFor(() => expect(isPickOpen()).toBe(false))
         } finally {
             Element.prototype.scrollTo = originalScrollTo
-            恢复几何()
+            restoreGeometry()
         }
     })
 
@@ -408,8 +408,8 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
 
         await openPick(cellAt(container, 0, PICK_COL))
         await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
-        const 原值项 = items().find((el) => el.textContent === "4087152117")!
-        expect(原值项.className).toContain("text-[#a0a0a0]!")
+        const originalItems = items().find((el) => el.textContent === "4087152117")!
+        expect(originalItems.className).toContain("text-[#a0a0a0]!")
         // 而当前值那一项不灰（灰 = "这是我改之前的原值"）
         expect(items()[0].className).not.toContain("text-[#a0a0a0]")
     })
@@ -423,8 +423,8 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         await waitFor(() => expect(items()).toHaveLength(CONTROL_TYPES.length))
 
         // 表格一滚：CellPick 自己把列表收掉（滚轮滚数据区就是这个场景）。
-        滚动一次() // 先让掉"进编辑时跟随可视"那一次
-        滚动一次() // 这一下才是用户滚的
+        scrollOnce() // 先让掉"进编辑时跟随可视"那一次
+        scrollOnce() // 这一下才是用户滚的
         await waitFor(() => expect(items()).toHaveLength(0))
         expect(cell.querySelector(".cell-pick-mark")!.hasAttribute("data-popup-open")).toBe(false)
 

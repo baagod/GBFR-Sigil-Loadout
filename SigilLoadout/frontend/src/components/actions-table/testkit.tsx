@@ -277,9 +277,9 @@ export function stubRevealGeometry(container: HTMLElement) {
     Object.defineProperty(box, "scrollHeight", {configurable: true, get: () => 100000})
     Object.defineProperty(box, "scrollWidth", {configurable: true, get: () => 100000})
 
-    const 原 = new Map<HTMLElement, () => DOMRect>()
+    const original = new Map<HTMLElement, () => DOMRect>()
     for (const td of container.querySelectorAll<HTMLElement>("tbody td")) {
-        原.set(td, td.getBoundingClientRect)
+        original.set(td, td.getBoundingClientRect)
         td.getBoundingClientRect = () =>
             ({top: 2000, bottom: 2020, left: 500, right: 600, width: 100, height: 20, x: 500, y: 2000}) as DOMRect
     }
@@ -289,7 +289,7 @@ export function stubRevealGeometry(container: HTMLElement) {
         if (boxW) Object.defineProperty(box, "clientWidth", boxW)
         if (boxSH) Object.defineProperty(box, "scrollHeight", boxSH)
         if (boxSW) Object.defineProperty(box, "scrollWidth", boxSW)
-        for (const [td, fn] of 原) td.getBoundingClientRect = fn
+        for (const [td, fn] of original) td.getBoundingClientRect = fn
     }
 }
 

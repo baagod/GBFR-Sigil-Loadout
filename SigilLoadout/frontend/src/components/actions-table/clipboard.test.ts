@@ -39,16 +39,16 @@ describe("剪贴板：TSV 读写", () => {
         都走这里。所以下面前两组用**任意字符串**造样本，不依赖某一列。
     */
     it("toTsv：值里的引号原样带出（不套引号包裹、不翻倍）", () => {
-        for (const 值 of [
+        for (const value of [
             '["0"]',
             '["1","4150991022","0","0","0","0","0","1"]',
             'a"b',
             '她说"你好"',
             '{"k":"v"}',
         ]) {
-            const tsv = toTsv([[值]])
-            expect(tsv).toBe(值) // 写出去就是原样
-            expect(parseTsv(tsv)[0][0]).toBe(值) // 读回来仍是它 —— 这才是这条修复的真正契约
+            const tsv = toTsv([[value]])
+            expect(tsv).toBe(value) // 写出去就是原样
+            expect(parseTsv(tsv)[0][0]).toBe(value) // 读回来仍是它 —— 这才是这条修复的真正契约
         }
     })
 
@@ -65,8 +65,8 @@ describe("剪贴板：TSV 读写", () => {
 
     /** 写出与读入**对称**：来回一圈必须是同一个值（这是"复制粘贴不掉字符"的总契约）。 */
     it("往返无损：任何值复制出去再粘回来都是原值", () => {
-        for (const 值 of ["-", "-1", "=1+1", "+1", "@x", " -1", "'abc", "a'b", '["0"]', '她说"你好"', "31a3", ""]) {
-            expect(parseTsv(toTsv([[值]]))[0][0]).toBe(值)
+        for (const value of ["-", "-1", "=1+1", "+1", "@x", " -1", "'abc", "a'b", '["0"]', '她说"你好"', "31a3", ""]) {
+            expect(parseTsv(toTsv([[value]]))[0][0]).toBe(value)
         }
     })
 })
@@ -106,7 +106,7 @@ describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => 
         expect(written(plan)).toEqual(["r0c0=a", "r0c1=b", "r0c2=c", "r0c3=a", "r0c4=b", "r0c5=c"])
     })
 
-    it("复制 2×2 → 选 3×3：第 3 行/列凑不满一份，只写 2×2", () => {
+    it("复制 2×2 → 选 3×3：第 3 line/列凑不满一份，只写 2×2", () => {
         const plan = planPaste({
             block: [
                 ["a", "b"],
@@ -167,7 +167,7 @@ describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => 
                 ["a", "b"],
                 ["c", "d"],
             ],
-            rows: sheet(3, 2).rows, // 表只有 3 行 2 列，选区说 4×4
+            rows: sheet(3, 2).rows, // 表只有 3 line 2 列，选区说 4×4
             start: {row: 0, col: 0},
             size: {rows: 4, cols: 4},
         })

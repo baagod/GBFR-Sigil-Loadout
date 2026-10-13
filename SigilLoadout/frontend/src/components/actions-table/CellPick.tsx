@@ -191,7 +191,7 @@ export function CellPick({
 
     /** 登记"这一格的进编辑"（= 展开列表），与普通格子的 `Cell.enterEdit` 一一对应。 */
     /** 列表容器：**挂上来的那一刻**把焦点交给它（弹层是异步挂的，见下面 `<ComboboxList ref>`）。 */
-    const 列表 = useRef<HTMLElement | null>(null)
+    const listEl = useRef<HTMLElement | null>(null)
     useEnterEditHandler(cellKey, openForEdit)
 
 
@@ -219,16 +219,16 @@ export function CellPick({
      *     （受控的 `open` 那时还是旧值，实测"鼠标点得开、Enter 打不开"）。
      * 捕获监听挂在**触发器自身**、且早于 base-ui 的冒泡处理器 → 就地掐断，谁的处理器都不跑。
      * ⚠️ 别加 `preventDefault`：表格的处理器要看到 `defaultPrevented === false` 才会移动单元格。
-     * 列表**已经开着**时不拦：那时上下键归 base-ui 的列表导航。
+     * listEl**已经开着**时不拦：那时上下键归 base-ui 的列表导航。
      */
     useEffect(() => {
         const trigger = cellRef.current
         if (!trigger || open) return
-        const 拦 = (e: globalThis.KeyboardEvent) => {
+        const blockArrows = (e: globalThis.KeyboardEvent) => {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") e.stopPropagation()
         }
-        trigger.addEventListener("keydown", 拦, true)
-        return () => trigger.removeEventListener("keydown", 拦, true)
+        trigger.addEventListener("keydown", blockArrows, true)
+        return () => trigger.removeEventListener("keydown", blockArrows, true)
     }, [open])
 
     // 点到别处：只记"焦点别抢回来"，关闭本身交给组件（与 FlagCell 同一段）。
@@ -367,7 +367,7 @@ export function CellPick({
                             焦点进列表，方向键那一层（floating-ui 的 useListNavigation）才收得到。
                             用户实测：展开后手动点一下列表内部就能导航，差别只在这一个焦点。
                         */
-                        列表.current = el
+                        listEl.current = el
                         if (el && open && document.activeElement !== el) el.focus()
                     }}
                 >

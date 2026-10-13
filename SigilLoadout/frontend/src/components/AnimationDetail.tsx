@@ -263,25 +263,25 @@ export function AnimationDetail({motion: initialMotion, charCode, t, onClose}: {
      */
     const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
         const carryOf = (row: ActionRow) => (row.carry ?? {}) as {orig?: number | null; children?: TrackRow["children"]}
-        const 列: readonly string[] = key === flagsKey ? FLAG_KEYS : (tables[key]?.columns ?? [])
+        const columns: readonly string[] = key === flagsKey ? FLAG_KEYS : (tables[key]?.columns ?? [])
         if (key === flagsKey) {
-            const 转 = (row: ActionRow, index: number): FlagRow =>
-                ({...Object.fromEntries(列.map((k) => [k, shownValue(row, k)])), index, orig: carryOf(row).orig ?? null, removed: undefined}) as FlagRow
-            const 回 = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...转(row, next.length + i), removed: true}))
-            setFlags([...next.map(转), ...回])
+            const toRow = (row: ActionRow, index: number): FlagRow =>
+                ({...Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])), index, orig: carryOf(row).orig ?? null, removed: undefined}) as FlagRow
+            const restored = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
+            setFlags([...next.map(toRow), ...restored])
         } else {
             setTables((prev) => {
                 const table = prev[key]
                 if (!table) return prev
-                const 转 = (row: ActionRow, index: number): TrackRow => ({
+                const toRow = (row: ActionRow, index: number): TrackRow => ({
                     index,
-                    values: Object.fromEntries(列.map((k) => [k, shownValue(row, k)])),
+                    values: Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])),
                     children: carryOf(row).children ?? [],
                     orig: carryOf(row).orig ?? null,
                     removed: undefined,
                 })
-                const 回 = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...转(row, next.length + i), removed: true}))
-                return {...prev, [key]: {...table, rows: [...next.map(转), ...回]}}
+                const restored = deleted.filter((row) => carryOf(row).orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
+                return {...prev, [key]: {...table, rows: [...next.map(toRow), ...restored]}}
             })
         }
         markDirty(key)
@@ -614,7 +614,7 @@ export const readValue = (row: unknown, key: string): string => {
 }
 
 /** 在 `after` 那一行**之后**插一行（`after < 0` 或越界 = 行末）；抄哪一行由 `造` 定（没有源行也要能造出空行）。 */
-export const insertAfter = <T,>(after: number, rows: T[], 造: (源: T | undefined) => T): T[] => {
+export const insertAfter = <T,>(after: number, rows: T[], 造: (source: T | undefined) => T): T[] => {
     const at = after >= 0 && after < rows.length ? after + 1 : rows.length
     return [...rows.slice(0, at), 造(rows[after >= 0 ? after : rows.length - 1]), ...rows.slice(at)]
 }
@@ -625,15 +625,15 @@ export const insertAfter = <T,>(after: number, rows: T[], 造: (源: T | undefin
  * ‼️ `orig` / `removed` 必须显式清掉：抄来的行是**新行** —— `orig` 留着会被当成原行去"假删除"、
  * 也会拿源行的原值去比；`removed` 留着会让新行一出生就是红的。`index` 由 `reindex` 统一补。
  */
-export const copyFlagRow = (源?: FlagRow | TrackRow): FlagRow =>
-    ({...Object.fromEntries(FLAG_KEYS.map((key) => [key, readValue(源, key)])), index: 0, orig: null, removed: undefined}) as FlagRow
+export const copyFlagRow = (source?: FlagRow | TrackRow): FlagRow =>
+    ({...Object.fromEntries(FLAG_KEYS.map((key) => [key, readValue(source, key)])), index: 0, orig: null, removed: undefined}) as FlagRow
 
 /** 照目标表的列**抄一行通用轨**：`children` 要深拷（attack 行的 `<AilmentNN>` 就在里面）。 */
-export const copyTrackRow = (列: readonly string[]) => (源?: FlagRow | TrackRow): TrackRow => {
-    const r = 源 as TrackRow | undefined
+export const copyTrackRow = (columns: readonly string[]) => (source?: FlagRow | TrackRow): TrackRow => {
+    const r = source as TrackRow | undefined
     return {
         index: 0,
-        values: Object.fromEntries(列.map((key) => [key, readValue(源, key)])),
+        values: Object.fromEntries(columns.map((key) => [key, readValue(source, key)])),
         children: (r?.children ?? []).map((child) => ({...child, values: {...child.values}})),
         orig: null,
         removed: undefined,
