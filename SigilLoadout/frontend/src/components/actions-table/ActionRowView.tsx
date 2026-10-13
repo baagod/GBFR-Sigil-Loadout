@@ -201,20 +201,14 @@ export const ActionRowView = memo(function ActionRowView({
     /*
         ‼️ **握把列也要算进选中框**（用户口径：除了行号列，其他格的选择都带边框）。
 
-        为什么不能"直接不实现"：握把不在**列模型**里（它是基座额外渲染的一格），而选区矩形只覆盖列模型
-        里的格子 —— 所以它天生盖不到握把。这不是轨表做了不同的行为：两边跑的是同一份基座，差别只是
-        **轨表开了 `reorder`**（才有握把列，见 `TrackGrid` 那一处）。
-
-        做法：把"选区左边界落在第一个数据列"这件事**交接**给握把 —— 握把画左+上+下三条，第一个数据列
-        自己那条左边不画（`selectionClass` 的 `dropLeftEdge`）。两格相邻的边界只能画一次，所以必须是
-        "交接"，不是两边都画。
+        为什么不能"直接不实现"：握把不在**列模型**里（基座额外渲染的一格），而选区矩形只覆盖模型里的
+        格子 —— 它天生盖不到握把。做法：把左边界**交接**给握把（画 左+上+下），第一个数据列那条左边
+        不画（`selectionClass(cell, {left: true})`）—— 两格相邻的边界只能画一次。
     */
     const firstData = rowCells[0]
-    /* 判据只有一件事：**这一行的第一个数据列在选区里**（它选中才谈得上把左边界交接给握把）。
-       `sortable` 先短路：没开拖动的表（动作表）每行都不必去问库要边信息。 */
+    /* `sortable` 先短路：没开拖动的表（动作表）每行都不必去问库要边信息。 */
     const firstEdges = sortable && firstData?.getIsSelected() ? firstData.getSelectionEdges() : null
-    /* 握把要画的 = 第一个数据列那一圈**去掉右边**（右边归它自己）；`cell-edge-*` 只设变量，线由
-       `.cell-selectable::before` 画，所以下面挂环时得把 `cell-selectable` 一起带上。 */
+    /* 握把画的 = 那一圈去掉右边；线由 `.cell-selectable::before` 画，所以挂环时得连它一起带上。 */
     const gripRing = firstEdges ? ringClasses({...firstEdges, right: false}, "cell-edge") : ""
     /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
     const removed = row.original.removed === true

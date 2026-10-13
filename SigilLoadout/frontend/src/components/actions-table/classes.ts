@@ -228,14 +228,9 @@ export function selectionClass(cell: Cell<typeof features, ActionRow>, hide: {ri
     const edges = cell.getSelectionEdges()
     /*
         ‼️ 有两条边**不该由这一格画**（判据由调用方给，都是"这条边界已经归别人了"）：
-
-        `hide.right` —— **整行选中时行末那一格不画右边缘**：行手势选出来的区本来就在表格右端收口，
-        而末列没有格线（`[&_tr>*:last-child]:border-r-0`）—— 那条边就只剩"选区轮廓"这层意义，
-        看着像表格右边缘凭空多出一道竖线。**只在整行选中时摘**：矩形选区收在末列时那条边还得在。
-        `hide.left` —— 左边界**交接给握把列**（握着不在列模型里，见 `ActionRowView`）：
-
-        ⚠️ 用**具名选项**而不是两个布尔位置参数：两个同型、相邻、靠位置区分的参数是错位隐患。
-        另注：几何上那 1px 外扩由样式表收回格内（见上面那段），这里管的是"要不要画这条边"。
+        `hide.right` = 整行选中时行末那格（末列没有格线，那条边只剩轮廓意义，看着像表格右缘多一道竖线）；
+        `hide.left`  = 左边界交接给了握把列（不在列模型里，见 `ActionRowView`）。
+        ⚠️ 用具名选项而不是两个同型位置参数 —— 相邻同型参数是错位隐患。
     */
     const ring = {...edges, ...(hide.right ? {right: false} : {}), ...(hide.left ? {left: false} : {})}
     return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(ring, "cell-edge")].filter(Boolean).join(" ")
