@@ -250,6 +250,13 @@ export function CellPick({
             open={open}
             onOpenChange={(next, eventDetails) => {
                 if (!next) {
+                    /*
+                        ‼️ **关就立刻消失**（`instantClose` → 当帧 `hidden!`），别让弹层在原地等下一步：
+                        选一个值那一趟里"关闭"排在**提交 + 整表重量列宽**之后 —— 真机实测 136~154ms
+                        （Esc / 点别处只要 60~74ms），看着就是"收起得有点慢"。列表先撤，表格那些活照旧干。
+                        （滚动那条路本来就这么做，理由同一个：别让列表在原地淡出一百毫秒。）
+                    */
+                    setInstantClose(true)
                     setOpen(false)
                     return
                 }
