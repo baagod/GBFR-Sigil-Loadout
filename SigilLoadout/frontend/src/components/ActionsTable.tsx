@@ -64,6 +64,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {ActionRowView} from "@/components/actions-table/ActionRowView"
+import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import {
     GRIP_WIDTH,
     HANDLE_CELL,
@@ -783,8 +784,24 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            {/*
+                ‼️ **量完之前：只有这一块骨架视图，表格整块不参与排版。**
+
+                表格必须留在 DOM 里（量列宽靠它的 rect 与列的自然宽度，`display: none` 会让 rect 归零 →
+                永远量不出来、表再也不显示），但**不能留在滚动容器里** —— 绝对定位的表格照样会被算进
+                那个容器的可滚动区（用户实测：骨架旁边还是冒出滚动条）。
+                所以把**整个滚动容器**在量完前挪出屏幕，骨架占它原来的位置（`flex-1`）。
+            */}
+            {!measured && <TableSkeleton />}
             {/* 滚动容器：吸顶表头、格子里的伪元素、以及"跟随可视"都按它定位/测量。 */}
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto border table-border">
+            <div
+                ref={scrollRef}
+                className={
+                    measured
+                        ? "min-h-0 flex-1 overflow-auto border table-border"
+                        : "pointer-events-none absolute top-0 -left-[99999px] w-[1200px] overflow-auto border table-border"
+                }
+            >
             <table
                 ref={tableRef}
                 /*
@@ -812,7 +829,17 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     摊走 —— 每列比量出来的整数窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil`
                     的那件事，换个入口再来一遍）。
                 */
-                className={`${measured ? "table-fixed " : "invisible "}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
+                /*
+                    ‼️ **量完之前表格脱离文档流**（`absolute` + `invisible`），而不是只 `invisible`：
+
+                    量列宽要靠表格自己的 rect 与列的自然宽度，所以它**必须留在 DOM 里**（`display: none`
+                    会让 rect 归零 → 那趟永远等不到尺寸 → 表格再也不显示）。但它那一万两千多像素的宽
+                    如果要参与排版，就会先把滚动条撑出来、还跟骨架叠在一起（用户看到的"有滚动条 + 空白"）。
+
+                    `absolute` 同时满足两条：仍在 DOM、仍有真实 rect（量得到），但不参与容器排版
+                    （不撑滚动条、不与骨架叠加）。量完 `measured` 一为真就回到流里、切 `table-fixed`。
+                */
+                className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
             >
                 <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
