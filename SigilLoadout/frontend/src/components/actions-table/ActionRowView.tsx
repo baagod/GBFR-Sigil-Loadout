@@ -18,6 +18,7 @@ import {
     READ_ONLY_BG,
     cellCopyRing,
     handleCellClass,
+    ringClasses,
     selectionClass,
 } from "./classes"
 import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, snapshotKey} from "./model"
@@ -197,6 +198,23 @@ export const ActionRowView = memo(function ActionRowView({
 }) {
     /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
     const rowCells = row.getAllCells()
+    /*
+        ‼️ **握把列也要算进选中框**（用户口径：除了行号列，其他格的选择都带边框）。
+
+        为什么不能"直接不实现"：握把不在**列模型**里（它是基座额外渲染的一格），而选区矩形只覆盖列模型
+        里的格子 —— 所以它天生盖不到握把。这不是轨表做了不同的行为：两边跑的是同一份基座，差别只是
+        **轨表开了 `reorder`**（才有握把列，见 `TrackGrid` 那一处）。
+
+        做法：把"选区左边界落在第一个数据列"这件事**交接**给握把 —— 握把画左+上+下三条，第一个数据列
+        自己那条左边不画（`selectionClass` 的 `dropLeftEdge`）。两格相邻的边界只能画一次，所以必须是
+        "交接"，不是两边都画。
+    */
+    const firstData = rowCells[0]
+    /* 判据只有一件事：**这一行的第一个数据列在选区里**（它选中才谈得上把左边界交接给握把）。 */
+    const firstEdges = firstData?.getIsSelected() ? firstData.getSelectionEdges() : null
+    /* 握把要画的 = 第一个数据列那一圈**去掉右边**（右边归它自己）；`cell-edge-*` 只设变量，线由
+       `.cell-selectable::before` 画，所以下面挂环时得把 `cell-selectable` 一起带上。 */
+    const gripRing = sortable && firstEdges ? ringClasses({...firstEdges, right: false}, "cell-edge") : ""
     /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
     const removed = row.original.removed === true
     /**
@@ -266,10 +284,18 @@ export const ActionRowView = memo(function ActionRowView({
                     */
                     aria-label="拖动排序"
                     {...drag.listeners}
-                    className={`${handleCellClass(removed, rowSelected)} touch-none cursor-grab active:cursor-grabbing ${
-                        drag.isDragging ? "opacity-40" : ""
-                    }`}
-                    style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}}
+                    /*
+                        ‼️ 选中环那一圈**靠 `.cell-selectable::before` 画**（`cell-edge-*` 那几个类只设
+                        `--edge-*` 变量，自己不画线，见 `style.css`）。握把这一格用的是 `handleCellClass`、
+                        本来没有 `cell-selectable` —— 只挂 `cell-edge-*` 的话**一个像素都不会有**（用户报的
+                        "还是没边框"就是这么来的：类挂上了，选择器匹配不到）。
+                        所以有环时把 `cell-selectable` 一起带上；光标用**行内**写死 `grab`（那张表里的
+                        `cursor: cell` 特异性高过 Tailwind 的 `cursor-grab`，不写死就会被改成交叉光标）。
+                    */
+                    className={`${handleCellClass(removed, rowSelected)} relative touch-none cursor-grab active:cursor-grabbing ${
+                        gripRing ? `${gripRing} cell-selectable` : ""
+                    } ${drag.isDragging ? "opacity-40" : ""}`}
+                    style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
                 >
                     <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
                 </td>
@@ -277,6 +303,8 @@ export const ActionRowView = memo(function ActionRowView({
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
                 const key = cell.column.id
+                /* 行末那一格（DOM 顺序 = 列模型顺序）—— 整行选中时它不画右边缘（用户口径，见 `selectionClass`）。 */
+                const isRowEnd = cell.id === rowCells[rowCells.length - 1]?.id
                 const pinned = cell.column.getIsPinned()
                 const kind = columnKind(key)
                 /*
@@ -302,8 +330,9 @@ export const ActionRowView = memo(function ActionRowView({
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={String(cell.getValue() ?? "")}
-                        /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）。 */
-                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell)} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
+                        /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）；`rowSelected` 一并交给
+                           `selectionClass`：整行选中时行末那一格不画右边缘（用户口径，理由见那个函数）。 */
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell, rowSelected && isRowEnd, gripRing !== "" && cell.id === firstData?.id)} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}
                         /*

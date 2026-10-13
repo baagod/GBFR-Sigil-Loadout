@@ -223,10 +223,19 @@ export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
  * 没选中时**提前返回**：`getSelectionEdges()` 会再解析一遍位置，只为发现"没选中"不值当
  * （大表里绝大多数格子都没选中）。
  */
-export function selectionClass(cell: Cell<typeof features, ActionRow>): string {
+export function selectionClass(cell: Cell<typeof features, ActionRow>, dropRightEdge = false, dropLeftEdge = false): string {
     if (!cell.getIsSelected()) return ""
     const edges = cell.getSelectionEdges()
-    return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(edges, "cell-edge")].filter(Boolean).join(" ")
+    /*
+        ‼️ **整行选中时，行末那一格不画右边缘**（用户口径，判据由调用方给：整行选中 + 这一格是行末那格）：
+        行手势选出来的区本来就在表格右端收口，而末列没有格线（`[&_tr>*:last-child]:border-r-0`）——
+        那条边就只剩"选区轮廓"这一层意义，看着像表格右边缘凭空多出一道竖线。
+
+        ⚠️ **只在整行选中时摘**：任意矩形选区收在末列时那条边还得在（否则选区右边看着被切掉）。
+        另注：几何上那 1px 外扩由样式表收回格内（见上面那段），这里管的是"要不要画这条边"。
+    */
+    const ring = {...edges, ...(dropRightEdge ? {right: false} : {}), ...(dropLeftEdge ? {left: false} : {})}
+    return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(ring, "cell-edge")].filter(Boolean).join(" ")
 }
 
 /** 一格在外圈的哪几条边上 —— 两条来路（库的选区 / 我们自己的复制区）都归成这个形状。 */
@@ -237,7 +246,7 @@ type RingEdges = {top: boolean; right: boolean; bottom: boolean; left: boolean}
  * 选区轮廓与复制区虚线是同一套写法（逐格挂"自己有哪几条边"，样式表按类名画线），
  * 分开写两份的话，哪天加第五条边就会只改一处。
  */
-const ringClasses = (edges: RingEdges, prefix: "cell-edge" | "cell-copy") =>
+export const ringClasses = (edges: RingEdges, prefix: "cell-edge" | "cell-copy") =>
     (["top", "right", "bottom", "left"] as const)
         .filter((side) => edges[side])
         .map((side) => `${prefix}-${side}`)

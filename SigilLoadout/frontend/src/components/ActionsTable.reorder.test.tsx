@@ -17,7 +17,7 @@
     里量不到，但"选择器会不会命中"完全由这个结构决定）。
 */
 import {afterEach, describe, expect, it, vi} from "vitest"
-import {render} from "@testing-library/react"
+import {fireEvent, render} from "@testing-library/react"
 
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -26,7 +26,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
-import {abilityNames, cleanup, makeRow, t, tableProps} from "@/components/actions-table/testkit"
+import {abilityNames, cleanup, makeRow, pressHandle, t, tableProps} from "@/components/actions-table/testkit"
 
 afterEach(cleanup)
 
@@ -48,5 +48,31 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
 
         // 末尾那个子元素只能是最后一行 —— 多出一个 `<div>`（dnd-kit 的 live region）就会让下面两条 CSS 失配。
         expect(tbody.lastElementChild!.tagName).toBe("TR")
+    })
+
+    /*
+        ‼️ **握把列也要带选中框**（用户口径：除了行号列，其他格的选择都带边框）。
+
+        握把**不在列模型里**（基座额外渲染的一格），而选区矩形只覆盖列模型里的格子 —— 所以
+        "选区左边界落在第一个数据列"这件事要**交接**给握把：握把画 左+上+下，第一个数据列不再画
+        自己那条左边（两格相邻的边界只能画一次）。
+    */
+    it("整行选中：握把列挂选中边（左+上+下），第一个数据列让出左边", () => {
+        const container = renderTable(() => {})
+        pressHandle(container, 0)
+        fireEvent.mouseUp(window)
+
+        const edgesOf = (el: Element) => (el.className.match(/cell-edge-\w+/g) ?? []).sort().join(" ")
+        const grip = container.querySelector("td[aria-label='拖动排序']")!
+        const first = container.querySelector("tbody tr td[data-col-id]")!
+
+        expect(edgesOf(grip)).toBe("cell-edge-bottom cell-edge-left cell-edge-top")
+        /*
+            ‼️ **光有 `cell-edge-*` 画不出来**：那几个类只设 `--edge-*` 变量，真正画线的是
+            `.cell-selectable::before`（见 `style.css`）—— 握把那格本来没有 `cell-selectable`，
+            只挂边类时**一个像素都不会有**（真机踩过：类挂上了、看着还是没边框）。
+        */
+        expect(grip.className).toContain("cell-selectable")
+        expect(edgesOf(first)).not.toContain("cell-edge-left")
     })
 })
