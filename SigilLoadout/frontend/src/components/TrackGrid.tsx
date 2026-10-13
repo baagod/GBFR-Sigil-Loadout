@@ -1,6 +1,6 @@
 import {useMemo} from "react"
 
-import type {FlagRow, TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
+import type {TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
 import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 import {ActionsTable} from "@/components/ActionsTable"
@@ -149,7 +149,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
         <TrackShell
             t={t}
             rows={rowItems}
-            keys={table.columns}
+            keys={isFlags ? FLAG_COLUMNS : table.columns}
             columnOf={columnSpec}
             pickerOf={isFlags ? (key) => flagPickers[key] : undefined}
             onEdit={onEdit}
@@ -168,11 +168,17 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
  */
 export const FLAG_KEYS = ["config", "startTime", "endTime", "layerFlag", "flag0", "flag1", "sysFlag", "freeArg"] as const
 
+/*
+    ‼️ **上屏的列比"数据键"多两列**：`frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0/flag1 的效果一览）
+    都是"同一份数据看第二眼"，不进 XML 也不参与改动比较。后端给的 `columns` 只有那 8 个数据键
+    （实测：删掉这份清单，表头就少了 frame 与 flagEffects 两列），所以这里要从 `FLAG_KEYS` 派生出来。
+*/
+const FLAG_COLUMNS = FLAG_KEYS.flatMap((key) => (key === "endTime" ? [key, "frame"] : key === "flag1" ? [key, "flagEffects"] : [key]))
+
 /**
  * **上屏的列**：数据键之外多两列 —— `frame`（帧 = 结束时间 × 60）与 `flagEffects`（flag0 / flag1 的效果一览）。
  * 它们都是"同一份数据看第二眼"，所以列 id 另起一个、数据键/内容由下面的 `columnOf` 说（见 `ColumnSpec`）。
  */
-const FLAG_COLUMNS = FLAG_KEYS.flatMap((key) => (key === "endTime" ? [key, "frame"] : key === "flag1" ? [key, "flagEffects"] : [key]))
 
 /** 帧 = 结束时间 × 60（和主面板那一列同一算法）。 */
 const frameOf = (endTime: string): string => {
@@ -254,46 +260,3 @@ const flagPickers: Record<string, PickerConfig> = {
     flag1: {multiple: true, names: FLAG1_NAMES},
 }
 
-export function FlagsGrid({rows, t, originals, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
-    rows: FlagRow[]
-    t: Messages
-    /** 原表那些行（后端 `LoadFlagsOriginal`）：选值列表靠它标出"原值就置着的位"。 */
-    originals?: FlagRow[]
-    /** 改了一格（`null` = 回原值）：草稿归基座，这里收回来更新本层状态（工具条与保存照旧）。 */
-    onEdit?: (rowId: string, key: string, value: string | null) => void
-    onReorder: (from: number, to: number) => void
-    /** 整行选中的行变了（工具条按它决定按钮亮不亮、Ctrl+C/X 复制哪几行）—— 由基座算好上报。 */
-    onSelectionChange?: (rowIds: string[]) => void
-    /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
-    onCopyReady?: (copy: () => void) => void
-    /** 基座那份**行级命令**（添加/复制/剪切/粘贴/删除）：接给工具条，见 `useRowCommands`。 */
-    onRowsReady?: (commands: RowCommands) => void
-    /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
-    onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
-}) {
-    /* 列说明依赖文案表：`t` 一换（换语言）就得重算 —— `useMemo` 让引用稳住（列宽测量按 `keys` 重跑）。 */
-    const columnSpec = useMemo(() => columnOf(t), [t])
-    /* 同上：行的引用要稳（基座拿它当"换数据了没有"的判据）。 */
-    const rowItems = useMemo(
-        () =>
-            rows.map((row, index) =>
-                toRow(index, row.values, row.orig != null ? originals?.[row.orig]?.values : undefined, row),
-            ),
-        [rows, originals],
-    )
-    return (
-        <TrackShell
-            t={t}
-            rows={rowItems}
-            keys={FLAG_COLUMNS}
-            columnOf={columnSpec}
-            pickerOf={(key) => flagPickers[key]}
-            onEdit={onEdit}
-            onReorder={onReorder}
-            onSelectionChange={onSelectionChange}
-            onCopyReady={onCopyReady}
-            onRowsReady={onRowsReady}
-            onRowsChange={onRowsChange}
-        />
-    )
-}

@@ -3,7 +3,7 @@ import {Input} from "@/components/ui/input"
 import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
 
 /*
-    共用的可编辑格。**它不属于任何一页** —— 动作表、轨表（TrackGrid / FlagsGrid）与全局参数表
+    共用的可编辑格。**它不属于任何一页** —— 动作表、轨表（TrackGrid）与全局参数表
     （GlobalParamPanel）都用它；放在某一页里会让别的页反过来 import 那一页，实测形成过两处环形依赖：
     `ActionsPanel ↔ GlobalParamPanel`、`ActionsPanel → AnimationDetail → TrackGrid → ActionsPanel` ✗。
     所以它有自己一个文件 ✓（两处环的成因都只是这一个组件）。
