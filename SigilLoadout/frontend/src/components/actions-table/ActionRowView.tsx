@@ -210,11 +210,12 @@ export const ActionRowView = memo(function ActionRowView({
         "交接"，不是两边都画。
     */
     const firstData = rowCells[0]
-    /* 判据只有一件事：**这一行的第一个数据列在选区里**（它选中才谈得上把左边界交接给握把）。 */
-    const firstEdges = firstData?.getIsSelected() ? firstData.getSelectionEdges() : null
+    /* 判据只有一件事：**这一行的第一个数据列在选区里**（它选中才谈得上把左边界交接给握把）。
+       `sortable` 先短路：没开拖动的表（动作表）每行都不必去问库要边信息。 */
+    const firstEdges = sortable && firstData?.getIsSelected() ? firstData.getSelectionEdges() : null
     /* 握把要画的 = 第一个数据列那一圈**去掉右边**（右边归它自己）；`cell-edge-*` 只设变量，线由
        `.cell-selectable::before` 画，所以下面挂环时得把 `cell-selectable` 一起带上。 */
-    const gripRing = sortable && firstEdges ? ringClasses({...firstEdges, right: false}, "cell-edge") : ""
+    const gripRing = firstEdges ? ringClasses({...firstEdges, right: false}, "cell-edge") : ""
     /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
     const removed = row.original.removed === true
     /**
@@ -332,7 +333,7 @@ export const ActionRowView = memo(function ActionRowView({
                         shown={String(cell.getValue() ?? "")}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）；`rowSelected` 一并交给
                            `selectionClass`：整行选中时行末那一格不画右边缘（用户口径，理由见那个函数）。 */
-                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell, rowSelected && isRowEnd, gripRing !== "" && cell.id === firstData?.id)} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell, {right: rowSelected && isRowEnd, left: gripRing !== "" && cell.id === firstData?.id})} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}
                         /*

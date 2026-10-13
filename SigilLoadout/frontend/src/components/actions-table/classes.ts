@@ -223,18 +223,21 @@ export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
  * 没选中时**提前返回**：`getSelectionEdges()` 会再解析一遍位置，只为发现"没选中"不值当
  * （大表里绝大多数格子都没选中）。
  */
-export function selectionClass(cell: Cell<typeof features, ActionRow>, dropRightEdge = false, dropLeftEdge = false): string {
+export function selectionClass(cell: Cell<typeof features, ActionRow>, hide: {right?: boolean; left?: boolean} = {}): string {
     if (!cell.getIsSelected()) return ""
     const edges = cell.getSelectionEdges()
     /*
-        ‼️ **整行选中时，行末那一格不画右边缘**（用户口径，判据由调用方给：整行选中 + 这一格是行末那格）：
-        行手势选出来的区本来就在表格右端收口，而末列没有格线（`[&_tr>*:last-child]:border-r-0`）——
-        那条边就只剩"选区轮廓"这一层意义，看着像表格右边缘凭空多出一道竖线。
+        ‼️ 有两条边**不该由这一格画**（判据由调用方给，都是"这条边界已经归别人了"）：
 
-        ⚠️ **只在整行选中时摘**：任意矩形选区收在末列时那条边还得在（否则选区右边看着被切掉）。
+        `hide.right` —— **整行选中时行末那一格不画右边缘**：行手势选出来的区本来就在表格右端收口，
+        而末列没有格线（`[&_tr>*:last-child]:border-r-0`）—— 那条边就只剩"选区轮廓"这层意义，
+        看着像表格右边缘凭空多出一道竖线。**只在整行选中时摘**：矩形选区收在末列时那条边还得在。
+        `hide.left` —— 左边界**交接给握把列**（握着不在列模型里，见 `ActionRowView`）：
+
+        ⚠️ 用**具名选项**而不是两个布尔位置参数：两个同型、相邻、靠位置区分的参数是错位隐患。
         另注：几何上那 1px 外扩由样式表收回格内（见上面那段），这里管的是"要不要画这条边"。
     */
-    const ring = {...edges, ...(dropRightEdge ? {right: false} : {}), ...(dropLeftEdge ? {left: false} : {})}
+    const ring = {...edges, ...(hide.right ? {right: false} : {}), ...(hide.left ? {left: false} : {})}
     return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(ring, "cell-edge")].filter(Boolean).join(" ")
 }
 

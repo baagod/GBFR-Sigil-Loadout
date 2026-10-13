@@ -64,7 +64,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {ActionRowView} from "@/components/actions-table/ActionRowView"
-import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
+import {MeasureFrame} from "@/components/actions-table/MeasureFrame"
 import {
     GRIP_WIDTH,
     HANDLE_CELL,
@@ -785,23 +785,10 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                 </AlertDialogContent>
             </AlertDialog>
             {/*
-                ‼️ **量完之前：只有这一块骨架视图，表格整块不参与排版。**
-
-                表格必须留在 DOM 里（量列宽靠它的 rect 与列的自然宽度，`display: none` 会让 rect 归零 →
-                永远量不出来、表再也不显示），但**不能留在滚动容器里** —— 绝对定位的表格照样会被算进
-                那个容器的可滚动区（用户实测：骨架旁边还是冒出滚动条）。
-                所以把**整个滚动容器**在量完前挪出屏幕，骨架占它原来的位置（`flex-1`）。
+                **量完之前那一块交给 `MeasureFrame`**：骨架占位 + 表格整块离屏（理由都写在那组件里，
+                这里不再复述一遍 —— 概念只留一处）。
             */}
-            {!measured && <TableSkeleton />}
-            {/* 滚动容器：吸顶表头、格子里的伪元素、以及"跟随可视"都按它定位/测量。 */}
-            <div
-                ref={scrollRef}
-                className={
-                    measured
-                        ? "min-h-0 flex-1 overflow-auto border table-border"
-                        : "pointer-events-none absolute top-0 -left-[99999px] w-[1200px] overflow-auto border table-border"
-                }
-            >
+            <MeasureFrame measured={measured} scrollRef={scrollRef}>
             <table
                 ref={tableRef}
                 /*
@@ -964,7 +951,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                     </RevealContext.Provider>
                 </tbody>
             </table>
-            </div>
+            </MeasureFrame>
         </div>
         </ReorderDnd>
     )
