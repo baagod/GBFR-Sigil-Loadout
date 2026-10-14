@@ -42,7 +42,7 @@ export const CellContent = memo(function CellContent({
     raw,
     original,
     shown,
-    actionLabel,
+    mutedOverride,
     draggedRef,
     edit,
     onEnterEdit,
@@ -59,12 +59,8 @@ export const CellContent = memo(function CellContent({
     original: string
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
-    /**
-     * **这一格上屏显示什么** —— 只有 `abilityTag_` 那一列会拿到（由行那层按"能力名 → 动作名 → 原文"算好，
-     * 见 `lib/ability.ts` 的 `actionTagLabel`）：它显示的是这条动作的名字，不是数据里的技能键。可编辑格与
-     * 只读格都认它。
-     */
-    actionLabel?: {text: string; muted: boolean}
+    /** **灰不灰**的覆盖（只有 `abilityTag_` 那一列会给，见 `Cell`）。 */
+    mutedOverride?: boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 是"拖出去拉选区"，不该进编辑。 */
     draggedRef: RefObject<boolean>
     edit: (rowId: string, key: string, value: string | null) => void
@@ -78,14 +74,8 @@ export const CellContent = memo(function CellContent({
     /* 这一列的详情入口（没有就是 undefined）—— 基座不问"为什么"，见 `DrillContext`。 */
     const drillOf = useContext(DrillContext)
     if (readOnly || kind === "readonly") {
-        /*
-            只读列：没有编辑态。`abilityTag_` 在这一层换成**这一行的动作名**（`actionLabel`，由行那层算好）：
-            查得到中文就用中文当值（正常色），查不到就显示日文原文当占位符（灰）—— 数据里那个技能键不上屏。
-        */
+        // 只读列：没有编辑态 —— 显示值就是 `shown`（父层按"改动优先、否则原值"给的）。
         // ‼️ 内边距用**对等**那份：只读格不会变成输入框，不该继承右侧那份光标余量（见 `READONLY_PADDING`）。
-        if (actionLabel) {
-            return <CellText padding={READONLY_PADDING} text={actionLabel.text} muted={actionLabel.muted} />
-        }
         return <CellText padding={READONLY_PADDING} text={shown} />
     }
     /*
@@ -120,7 +110,7 @@ export const CellContent = memo(function CellContent({
             value={raw}
             original={original}
             shown={shown}
-            actionLabel={actionLabel}
+            mutedOverride={mutedOverride}
             onCommit={(value) => edit(rowId, fieldKey, value)}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
@@ -183,7 +173,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-export function Cell({rowId, fieldKey, value, original, shown, actionLabel, onCommit, dragged, onEnterEdit, drill}: {
+export function Cell({rowId, fieldKey, value, original, shown, mutedOverride, onCommit, dragged, onEnterEdit, drill}: {
     /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
     rowId: string
     /** 这一格的列名（同上）。 */
@@ -195,10 +185,10 @@ export function Cell({rowId, fieldKey, value, original, shown, actionLabel, onCo
     /** **显示值**（父层给：`accessorFn` 那份，与排序同口径）。 */
     shown: string
     /**
-     * **这一格上屏显示什么** —— 只有 `abilityTag_` 那一列会拿到（见 `lib/ability.ts` 的 `actionTagLabel`）：
-     * 它显示的是这条动作的能力名 / 动作名，不是数据里的技能键。不给就照旧显示 `shown`。
+     * **灰不灰**的覆盖 —— 只有 `abilityTag_` 那一列会给。那一列的"值"是生成期写进表里的名字：**表里有名字
+     * 就是有值（不灰）**，只有拿 `actionName_` 原文兜底时才算占位符（灰）。别的列不给，照旧按"改没改过"判。
      */
-    actionLabel?: {text: string; muted: boolean}
+    mutedOverride?: boolean
     /** 提交这一格；`null` = 回到原值（没改过）。 */
     onCommit: (value: string | null) => void
     /**
@@ -304,10 +294,8 @@ export function Cell({rowId, fieldKey, value, original, shown, actionLabel, onCo
         <>
             <CellText
                 ref={textRef}
-                // 显示文本：`abilityTag_` 那一列上屏的是能力名 / 动作名，不是数据里那个键（见 `actionLabel`）。
-                // `muted` 也跟着它走：那一列的灰表示"这条还没名字"（占位符），不是"这一格还没改过"。
-                text={actionLabel?.text ?? shown}
-                muted={actionLabel ? actionLabel.muted : placeholder}
+                text={shown}
+                muted={mutedOverride ?? placeholder}
                 /*
                     ‼️ **这一格在按下之前没被选中 → 这一次 focus 不许进编辑**（拖选的第一下、或者点一个
                     没选中的格子，都只算"选中"）。不闸的话：`wasSelectedRef` 在 `td` 的 mousedown 里刚被

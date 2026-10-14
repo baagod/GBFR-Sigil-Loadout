@@ -435,6 +435,12 @@ func mergeActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) 
 			return nil, false, fmt.Errorf("改动里有 id_ = %q，但动作表里没有这条记录", id)
 		}
 		for key, value := range fields {
+			// ‼️ `abilityTag_` **不写回动作表**：那一列在界面上装的是"这条动作的名字"（给人看的），
+			// 游戏那边读的技能键一律用**原值** —— 部署不该因为你改了个名字而变。改动照样进账本
+			// （界面靠它显示你改过的名字），只是不落到这张表里。
+			if key == "abilityTag_" {
+				continue
+			}
 			node := record.entry(key)
 			if node == nil {
 				return nil, false, fmt.Errorf("改动里有 id_ = %q 的 %s，但记录里没有这一格", id, key)

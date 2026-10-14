@@ -5,7 +5,6 @@
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
 import type {Cell, Row} from "@tanstack/react-table"
 
-import {actionTagLabel} from "@/lib/ability"
 import {CellContent} from "./Cell"
 import {useSortable} from "@dnd-kit/sortable"
 import {
@@ -44,10 +43,10 @@ const RowCell = memo(function RowCell({
     raw,
     original,
     shown,
+    mutedOverride,
     className,
     width,
     left,
-    actionLabel,
     draggedRef,
     dragRowRef,
     cellRef,
@@ -69,11 +68,8 @@ const RowCell = memo(function RowCell({
     original: string
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
-    /**
-     * **只读格显示什么** —— 只给 `abilityTag_`：那一列不上屏技能键，显示的是**这一行的动作名**
-     * （`actionName_`，见下面那段）。别的列不给。
-     */
-    actionLabel?: {text: string; muted: boolean}
+    /** **灰不灰**的覆盖（只有 `abilityTag_` 那一列会给，见 `Cell.tsx`）。 */
+    mutedOverride?: boolean
     /** 这一格选没选中（底色与轮廓都由它推出来）。 */
     className: string
     width: number | null
@@ -125,7 +121,7 @@ const RowCell = memo(function RowCell({
                     raw={raw}
                     original={original}
                     shown={shown}
-                    actionLabel={actionLabel}
+                    mutedOverride={mutedOverride}
                     draggedRef={draggedRef}
                     edit={edit}
                     onEnterEdit={onEnterEdit}
@@ -307,6 +303,8 @@ export const ActionRowView = memo(function ActionRowView({
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
                 const key = cell.column.id
+                /** 这一格的**改动值**（空串 = 没改过）—— 下面几处都要它。 */
+                const raw = row.original.values[key] ?? ""
                 /* 行末那一格（DOM 顺序 = 列模型顺序）—— 整行选中时它不画右边缘（用户口径，见 `selectionClass`）。 */
                 const isRowEnd = cell.id === rowCells[rowCells.length - 1]?.id
                 const pinned = cell.column.getIsPinned()
@@ -324,13 +322,17 @@ export const ActionRowView = memo(function ActionRowView({
                 /* 这一格的键（`snapshotKey`）算**一次**给下面两处共用，别每处再拼一遍。 */
                 const isActiveCell = activeCellKey === snapshotKey(row.id, key)
                 /*
-                    `abilityTag_` 那一格显示什么：**这一行的动作名去表里查**（技能键不上屏）。表里的名字是生成期
-                    拿每一行的 `abilityTag_` 查游戏文本写进去的，这里不再做第二套判断。别的列是 `undefined`。
+                    `abilityTag_` 那一列上屏的是**这条动作的名字**（生成期写进表里的）。分得清两件事：
+
+                      · **表里有名字** → 那是有值，正常色；
+                      · 表里没名字（空串 / 没这个键）→ 拿 `actionName_` 原文兜，那是**占位符**，灰。
+
+                    用户改过就显示改动本身（不灰）。技能键不上屏，也不会被部署写回去（见 mergeActionTable）。
                 */
-                const actionLabel =
-                    key === "abilityTag_"
-                        ? actionTagLabel(actionNames, shownValue(row.original, "actionName_"))
-                        : undefined
+                const actionName = shownValue(row.original, "actionName_")
+                const named = actionNames[actionName] ?? ""
+                const isActionTag = key === "abilityTag_"
+                const abilityTagText = named !== "" ? named : actionName
                 return (
                     <RowCell
                         key={cell.id}
@@ -339,9 +341,12 @@ export const ActionRowView = memo(function ActionRowView({
                         fieldKey={key}
                         kind={kind}
                         readOnly={notWritable}
-                        raw={row.original.values[key] ?? ""}
-                        original={row.original.originals[key] ?? ""}
-                        shown={String(cell.getValue() ?? "")}
+                        raw={raw}
+                        original={isActionTag ? abilityTagText : (row.original.originals[key] ?? "")}
+                        // 改过就显示改动本身；没改过时 `abilityTag_` 显示名字（或原文兜底）。
+                        shown={isActionTag && raw === "" ? abilityTagText : String(cell.getValue() ?? "")}
+                        // 只有"没改过、而且表里没给名字"才算占位符（灰）。
+                        mutedOverride={isActionTag ? raw === "" && named === "" : undefined}
                         /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）；`rowSelected` 一并交给
                            `selectionClass`：整行选中时行末那一格不画右边缘（用户口径，理由见那个函数）。 */
                         className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell, {right: rowSelected && isRowEnd, left: gripRing !== "" && cell.id === firstData?.id})} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
@@ -354,7 +359,6 @@ export const ActionRowView = memo(function ActionRowView({
                         left={measured && pinned ? rowHeadWidth + cell.column.getStart("start") : null}
                         /* 只有活动格拿到滚动 ref（`undefined` = React 不绑）—— 判据在行那层算好。 */
                         cellRef={isActiveCell ? scrollActiveIntoView : undefined}
-                        actionLabel={actionLabel}
                         draggedRef={draggedRef}
                         dragRowRef={dragRowRef}
                         edit={edit}

@@ -28,7 +28,7 @@ import type {Messages} from "@/lib/messages"
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd">
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName">
 
 /**
  * **只读**的列：这些格子存的是**引用键**，不是可编辑的值。
@@ -86,14 +86,29 @@ export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSp
     columnKind(key) !== "readonly" && columnOf?.(key)?.readonly !== true
 
 /**
- * **列 id → 表头文案**：所有表通用的那几条（不传 `ColumnSpec.label` 时用它兜底）。
+ * **列 id → 表头文案**：几条**跟界面语言走**的列名（不传 `ColumnSpec.label` 时用它兜底）。
  *
- * 为什么要有：`startTime` / `endTime` 是后端字段名，但它们是给人看的两个时间列 —— 谁有这两列都该显示
- * "开始 / 结束"（轨表、flags 表都在用；调用方自己的 `label` 优先级更高）。放在这里而不是某一张表的
- * 列说明里，是因为它**与"哪张表"无关**：新加一张轨表就自动有了。
+ * 为什么要有：这些都是后端字段名，但它们是给人看的 —— 谁有这两列都该显示"开始 / 结束"（轨表、flags 表
+ * 都在用）；动作表那两列同理（`abilityTag_` 装的是"这条动作的名字"，`actionName_` 是原文备注）。
+ * 调用方自己的 `label` 优先级更高。放在这里而不是某一张表的列说明里，是因为它**与"哪张表"无关**。
  */
-export const columnLabel = (id: string, t: {colStart: string; colEnd: string}): string =>
-    id === "startTime" ? t.colStart : id === "endTime" ? t.colEnd : id
+export const columnLabel = (
+    id: string,
+    t: {colStart: string; colEnd: string; colAbilityTag: string; colActionName: string},
+): string => {
+    switch (id) {
+        case "startTime":
+            return t.colStart
+        case "endTime":
+            return t.colEnd
+        case "abilityTag_":
+            return t.colAbilityTag
+        case "actionName_":
+            return t.colActionName
+        default:
+            return id
+    }
+}
 
 /**
  * **一列的补充说明**（列 id → 这份规格）—— 由调用方按列给（`ActionsTable` 的 `columnOf`）。

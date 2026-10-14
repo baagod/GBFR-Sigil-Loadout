@@ -173,11 +173,14 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         按"钉住区里的序号 × 列宽"算的。真滚动时会不会穿帮仍然要眼睛看 —— 这条只防"代码改坏"。
     */
     /*
-        `abilityTag_` 那一列显示什么**全在表里**（键 = 动作表 `actionName_` 原样、一个字不改）：表里有名字就
-        显示名字，没有（值是空串、或者表里没这个键）就显示原文当占位符。夹具那几行没有 `actionName_` 这一
-        列，所以这两条自己造行。
+        `abilityTag_` 那一列上屏的是**这条动作的名字**（生成期写进表里的），灰不灰分得清两件事：
+
+          · 表里有名字 → **有值**，正常色；
+          · 表里没名字 → 拿 `actionName_` 原文兜，那是**占位符**，灰。
+
+        夹具那几行没有 `actionName_` 这一列，所以这几条自己造行。
     */
-    it("abilityTag_：表里有名字 → 显示名字（不灰）", async () => {
+    it("abilityTag_：表里有名字 → 显示名字（有值，不灰）", async () => {
         const line = {
             id: "1000",
             values: {},
@@ -197,7 +200,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
     })
 
-    it("abilityTag_：表里没有名字（空串 / 没这个键）→ 动作名原文当占位符（灰）", async () => {
+    it("abilityTag_：表里没名字（空串 / 没这个键）→ 原文兜底（灰，占位符）", async () => {
         const line = {
             id: "1000",
             values: {},
@@ -213,17 +216,49 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     })
 
     /*
-        只读：显示名与可编辑天然冲突（键和名是两个东西，输入框里只能装一个），所以这一格不进编辑态。
+        改过就显示你改的（不灰）—— 与别的格同一条规则：改动值优先。
     */
+    it("abilityTag_：改过 → 显示改动本身（不灰）", async () => {
+        const line = {
+            id: "1000",
+            values: {abilityTag_: "我自己起的名字"},
+            originals: {id_: "1000", abilityTag_: "AB_PL1400_02", actionName_: "鏡花水月(突進斬り)"},
+        }
+        const {container} = render(
+            <ActionsTable
+                t={t}
+                actionNames={{"鏡花水月(突進斬り)": "镜花水月"}}
+                rows={[line]}
+                keys={["id_", "abilityTag_", "actionName_"]}
+            />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        const cell = cellAt(container, 0, 1)
+        expect(cell.textContent).toBe("我自己起的名字")
+        expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
+    })
+
     /*
-        可编辑：那一列显示的是**能力名 / 动作名**，而存进去的是**技能键** —— 显示与提交是两回事（双击进编辑时
-        框里是键，提交的也是键），所以它没有"只读"那一态。
+        可编辑：双击进编辑态，框里预填的是**这一格的原值**（= 那条动作的名字），和普通格同一条路。
     */
-    it("abilityTag_ 可编辑：双击进编辑态（框里是键）", async () => {
-        const container = await renderTable()
-        const cell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
+    it("abilityTag_ 可编辑：双击进编辑态，预填名字", async () => {
+        const line = {
+            id: "1000",
+            values: {},
+            originals: {id_: "1000", abilityTag_: "AB_PL1400_02", actionName_: "鏡花水月(突進斬り)"},
+        }
+        const {container} = render(
+            <ActionsTable
+                t={t}
+                actionNames={{"鏡花水月(突進斬り)": "镜花水月"}}
+                rows={[line]}
+                keys={["id_", "abilityTag_", "actionName_"]}
+            />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        const cell = cellAt(container, 0, 1)
         clickToEdit(cell)
-        expect(cell.querySelector("input")).not.toBeNull()
+        expect(cell.querySelector("input")?.value).toBe("镜花水月")
     })
 
     /*
