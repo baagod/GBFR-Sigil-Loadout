@@ -362,6 +362,22 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
     })
 
     /*
+        ‼️ **显示什么就复制什么**：这一格的值由调用方投影好（`ActionsPanel` 把动作名写进 `originals`），
+        基座这一层显示与复制读的都是它 —— 但这条**必须有用例钉住**。
+    */
+    it("复制：动作列复制出来的就是格子里显示的那个值", async () => {
+        setRows([makeRow("1000", {}, {abilityTag_: "镜花水月"})])
+        const container = await renderTable()
+        const cell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
+        expect(cell.textContent).toBe("镜花水月")
+
+        selectCell(cell)
+        const clipboard = clipboardStub()
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboard})
+        expect(clipboard.data["text/plain"]).toBe("镜花水月")
+    })
+
+    /*
         ‼️ **焦点在表格外面时也必须复制成功**（用户报的"选区选好了、Ctrl+C 没反应"）。
 
         `copy` 事件的目标是**当前有焦点的元素**：焦点不在表格里时（刚点过工具栏 / 搜索框 / 表格外空白），
@@ -393,7 +409,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(clipboard.data["text/plain"]).not.toBe("actionFreeWork0_-原值")
     })
 
-    it("粘贴：写进改动那一栏，跳过只读列（`id_` / `abilityTag_` 不写）", async () => {
+    it("粘贴：写进改动那一栏，只读列跳过不写（`id_` / `abilityTag_`）", async () => {
         const container = await renderTable()
         const target = cellAt(container, 0, 2) // 第 3 列（可编辑）
         selectCell(target) // 从这一格开始铺
@@ -521,8 +537,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\t丙")})
 
         expect(cellAt(container, 0, 0).textContent).toBe("1000") // 只读列没被改，位置也不左移 → "甲" 丢掉
-        // `abilityTag_` 是可编辑列（"乙" 写进去了），但那一格**显示的是动作名**、不是值本身 —— 夹具那几行
-        // 没有 `actionName_` 这一列，所以这里看不到"乙"。编辑能力由 render.test 那条双击用例守住。
+        expect(cellAt(container, 0, 1).textContent).toBe("AB_PL1000_01") // `abilityTag_` 也是只读列 → "乙" 丢掉
         expect(cellAt(container, 0, 2).textContent).toBe("丙") // 第 3 格落到第 3 列
     })
 

@@ -13,14 +13,15 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
+import {DrillContext} from "@/components/actions-table/model"
 
-import {KEYS, actionNames, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
 describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
     it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
-        const {container} = render(<ActionsTable t={t} actionNames={actionNames} {...tableProps([makeRow("1000")])} />)
+        const {container} = render(<ActionsTable t={t} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
         // 第一格是 `#`，而且**没有** `data-col-id` —— 量自然宽度那一趟按这个属性挑列，
         // 带上它就会被当成一个数据列量进去（列数就变了）。
@@ -91,7 +92,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         它会把整列撑宽 —— 那正是"看着像一列特别宽的空白列"。截断让列宽只跟内容走。
     */
     it("表头列名截断：内层带 truncate，且**不挂** title 提示", async () => {
-        const {container} = render(<ActionsTable t={t} actionNames={actionNames} {...tableProps([makeRow("1000")])} />)
+        const {container} = render(<ActionsTable t={t} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
 
         const head = container.querySelectorAll("thead th")[1]
@@ -106,7 +107,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         // （见 `model.columnLabel`），换一张表（比如轨表）只要列名叫这个就有。
         const line = {id: "1000", values: {}, originals: {startTime: "0.5", endTime: "1.5", someField_: "x"}}
         const {container} = render(
-            <ActionsTable t={t} actionNames={{}} rows={[line]} keys={["startTime", "endTime", "someField_"]} />,
+            <ActionsTable t={t} rows={[line]} keys={["startTime", "endTime", "someField_"]} />,
         )
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(4))
         expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
@@ -138,8 +139,8 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     })
 
     /*
-        只读列（`id_`）**不是灰色的**：它显示的是权威值本身，不是"待覆盖的占位符"。灰色只在可编辑列上
-        表示"这一格还没改过"。`abilityTag_` 取消只读之后就归可编辑那一类了（空着时显示动作名占位符）。
+        只读列（`id_` / `actionName_` / `abilityTag_`）**不是灰色的**：它们显示的是权威值本身，不是"待覆盖的
+        占位符"。灰色只在可编辑列上表示"这一格还没改过"。
     */
     it("只读列的原值不是灰的（灰 = 可编辑列'还没改过'，只读列没有这一态）", async () => {
         const container = await renderTable()
@@ -173,92 +174,73 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         按"钉住区里的序号 × 列宽"算的。真滚动时会不会穿帮仍然要眼睛看 —— 这条只防"代码改坏"。
     */
     /*
-        `abilityTag_` 那一列上屏的是**这条动作的名字**（生成期写进表里的），灰不灰分得清两件事：
+        `abilityTag_` 那一列**上屏的就是 `originals` 里那个值** —— 名字由调用方投影进来（见 `ActionsPanel`），
+        显示、复制、排序读的都是那一栏。
 
-          · 表里有名字 → **有值**，正常色；
-          · 表里没名字 → 拿 `actionName_` 原文兜，那是**占位符**，灰。
-
-        夹具那几行没有 `actionName_` 这一列，所以这几条自己造行。
+        它是**只读列**（见 model 的 READ_ONLY_KEYS）：这一列显示的是"这条动作叫什么"，而部署时这一格只带
+        原始值 —— 能改却改不到游戏里的事不做，所以它既没有编辑态、也收不了粘贴。
     */
-    it("abilityTag_：表里有名字 → 显示名字（有值，不灰）", async () => {
+    it("abilityTag_：显示投影进来的动作名（只读，不灰）", async () => {
         const line = {
             id: "1000",
             values: {},
-            originals: {id_: "1000", abilityTag_: "AB_PL1400_02", actionName_: "鏡花水月(突進斬り)"},
+            originals: {id_: "1000", abilityTag_: "镜花水月", actionName_: "鏡花水月(突進斬り)"},
         }
-        const {container} = render(
-            <ActionsTable
-                t={t}
-                actionNames={{"鏡花水月(突進斬り)": "镜花水月"}}
-                rows={[line]}
-                keys={["id_", "abilityTag_", "actionName_"]}
-            />,
-        )
+        const {container} = render(<ActionsTable t={t} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />)
         await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
         const cell = cellAt(container, 0, 1)
         expect(cell.textContent).toBe("镜花水月")
         expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
     })
 
-    it("abilityTag_：表里没名字（空串 / 没这个键）→ 原文兜底（灰，占位符）", async () => {
+    it("abilityTag_ 只读：双击不进编辑态（名字表没翻也一样）", async () => {
         const line = {
             id: "1000",
             values: {},
-            originals: {id_: "1000", abilityTag_: "", actionName_: "□神楽連打1"},
+            originals: {id_: "1000", abilityTag_: "□神楽連打1", actionName_: "□神楽連打1"},
         }
-        const {container} = render(
-            <ActionsTable t={t} actionNames={{"□神楽連打1": ""}} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />,
-        )
+        const {container} = render(<ActionsTable t={t} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />)
         await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
         const cell = cellAt(container, 0, 1)
+        // 没翻的显示原文（灰的规则只属于可编辑列，这一列不灰）
         expect(cell.textContent).toBe("□神楽連打1")
-        expect(cell.firstElementChild!.className).toContain("text-muted-foreground")
+        clickToEdit(cell)
+        expect(cell.querySelector("input")).toBeNull()
     })
 
     /*
-        改过就显示你改的（不灰）—— 与别的格同一条规则：改动值优先。
+        `actionName_`（列名「备注」）**只读**：它是 `abilityTag_` 那一列显示名的**来路**，改它等于改游戏
+        那边的动作名（见 model 的 READ_ONLY_KEYS）。
     */
-    it("abilityTag_：改过 → 显示改动本身（不灰）", async () => {
-        const line = {
-            id: "1000",
-            values: {abilityTag_: "我自己起的名字"},
-            originals: {id_: "1000", abilityTag_: "AB_PL1400_02", actionName_: "鏡花水月(突進斬り)"},
-        }
-        const {container} = render(
-            <ActionsTable
-                t={t}
-                actionNames={{"鏡花水月(突進斬り)": "镜花水月"}}
-                rows={[line]}
-                keys={["id_", "abilityTag_", "actionName_"]}
-            />,
-        )
-        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
-        const cell = cellAt(container, 0, 1)
-        expect(cell.textContent).toBe("我自己起的名字")
-        expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
-    })
-
-    /*
-        可编辑：双击进编辑态，框里预填的是**这一格的原值**（= 那条动作的名字），和普通格同一条路。
-    */
-    it("abilityTag_ 可编辑：双击进编辑态，预填名字", async () => {
+    it("actionName_ 只读：点它不进编辑态，显示原文", async () => {
         const line = {
             id: "1000",
             values: {},
-            originals: {id_: "1000", abilityTag_: "AB_PL1400_02", actionName_: "鏡花水月(突進斬り)"},
+            originals: {id_: "1000", abilityTag_: "镜花水月", actionName_: "鏡花水月(突進斬り)"},
         }
+        const {container} = render(<ActionsTable t={t} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />)
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        const cell = cellAt(container, 0, 2)
+        expect(cell.textContent).toBe("鏡花水月(突進斬り)")
+        clickToEdit(cell)
+        expect(cell.querySelector("input")).toBeNull()
+    })
+
+    /*
+        用户口径：**不挂原生悬停提示**（与上面表头列名那条同一条 —— 截断了/说不清就让它那样）。
+        那个 `···` 留着 `aria-label` 给读屏即可，hover 弹一个小方块反而碍事。
+    */
+    it("详情靶子（`···`）：有 aria-label，但**不挂** title 悬停提示", async () => {
+        const line = {id: "1000", values: {}, originals: {id_: "1000", saveMotId01_: "3400"}}
         const {container} = render(
-            <ActionsTable
-                t={t}
-                actionNames={{"鏡花水月(突進斬り)": "镜花水月"}}
-                rows={[line]}
-                keys={["id_", "abilityTag_", "actionName_"]}
-            />,
+            <DrillContext.Provider value={() => ({label: "通用轨", open: () => undefined})}>
+                <ActionsTable t={t} rows={[line]} keys={["id_", "saveMotId01_"]} />
+            </DrillContext.Provider>,
         )
         await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
-        const cell = cellAt(container, 0, 1)
-        clickToEdit(cell)
-        expect(cell.querySelector("input")?.value).toBe("镜花水月")
+        const target = container.querySelector("button[data-drill]")
+        expect(target?.getAttribute("aria-label")).toBe("通用轨")
+        expect(target?.getAttribute("title")).toBeNull()
     })
 
     /*

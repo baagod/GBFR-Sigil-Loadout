@@ -42,7 +42,6 @@ export const CellContent = memo(function CellContent({
     raw,
     original,
     shown,
-    mutedOverride,
     draggedRef,
     edit,
     onEnterEdit,
@@ -59,8 +58,6 @@ export const CellContent = memo(function CellContent({
     original: string
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
-    /** **灰不灰**的覆盖（只有 `abilityTag_` 那一列会给，见 `Cell`）。 */
-    mutedOverride?: boolean
     /** **这一次按下之后鼠标真的挪过**（`draggedRef`）：挪过 = 是"拖出去拉选区"，不该进编辑。 */
     draggedRef: RefObject<boolean>
     edit: (rowId: string, key: string, value: string | null) => void
@@ -110,7 +107,6 @@ export const CellContent = memo(function CellContent({
             value={raw}
             original={original}
             shown={shown}
-            mutedOverride={mutedOverride}
             onCommit={(value) => edit(rowId, fieldKey, value)}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
@@ -173,7 +169,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
  */
-export function Cell({rowId, fieldKey, value, original, shown, mutedOverride, onCommit, dragged, onEnterEdit, drill}: {
+export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit, drill}: {
     /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
     rowId: string
     /** 这一格的列名（同上）。 */
@@ -184,11 +180,6 @@ export function Cell({rowId, fieldKey, value, original, shown, mutedOverride, on
     original: string
     /** **显示值**（父层给：`accessorFn` 那份，与排序同口径）。 */
     shown: string
-    /**
-     * **灰不灰**的覆盖 —— 只有 `abilityTag_` 那一列会给。那一列的"值"是生成期写进表里的名字：**表里有名字
-     * 就是有值（不灰）**，只有拿 `actionName_` 原文兜底时才算占位符（灰）。别的列不给，照旧按"改没改过"判。
-     */
-    mutedOverride?: boolean
     /** 提交这一格；`null` = 回到原值（没改过）。 */
     onCommit: (value: string | null) => void
     /**
@@ -210,6 +201,7 @@ export function Cell({rowId, fieldKey, value, original, shown, mutedOverride, on
         于是点击范围是"文字右侧一整块"，虽然看不见方块。
         ⚠️ `cursor-pointer` **别删**（简化布局那次连它一起删了，手光标就没了）；也**不用 `Button variant="ghost"`**（用户口径）：ghost 自带 hover 底色，在这一格里就是多出一块
         按钮面；这里只要"图标自己在悬停时亮起来"。位置也不靠绝对定位 + 补偿内边距 —— 走 `trailing` 槽。
+        ⚠️ **不挂 `title`**（用户口径：不要原生悬停提示，表头列名那条同理）—— `aria-label` 留着（读屏要它）。
     */
     const drillTarget = drill ? (
         <button
@@ -220,7 +212,6 @@ export function Cell({rowId, fieldKey, value, original, shown, mutedOverride, on
             }}
             onClick={() => drill.open(shown)}
             aria-label={drill.label}
-            title={drill.label}
             data-drill=""
             className="-mr-2 flex shrink-0 cursor-pointer items-center self-stretch px-2 text-muted-foreground/50 hover:text-foreground"
         >
@@ -295,7 +286,7 @@ export function Cell({rowId, fieldKey, value, original, shown, mutedOverride, on
             <CellText
                 ref={textRef}
                 text={shown}
-                muted={mutedOverride ?? placeholder}
+                muted={placeholder}
                 /*
                     ‼️ **这一格在按下之前没被选中 → 这一次 focus 不许进编辑**（拖选的第一下、或者点一个
                     没选中的格子，都只算"选中"）。不闸的话：`wasSelectedRef` 在 `td` 的 mousedown 里刚被

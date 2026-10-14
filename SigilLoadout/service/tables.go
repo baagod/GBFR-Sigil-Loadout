@@ -6,12 +6,9 @@
 package service
 
 import (
-	"bytes"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -151,7 +148,8 @@ type LimitBonusText struct {
 // 已经删了，它没有第二个消费者。
 //
 // ⚠️ 它是一张 map，所以**键序在这里留不住**（解码那一刻就没了）。而那份键序是有意义的 —— 它是游戏的
-// 角色顺序（生成器按 `chara.UIOrder` 排的，见 gen 的 limitbonus）。要顺序就用下面的 charaOrder。
+// 角色顺序（生成器按 `chara.UIOrder` 排的，见 gen 的 limitbonus）。要顺序就用 assets.go 的 charaCodes
+// （同一次装载里从这份文件的键读出来的），别指望这张 map。
 type CharaTable map[string]CharaInfo
 
 type CharaInfo struct {
@@ -165,43 +163,10 @@ type CharaInfo struct {
 }
 
 /*
-charaOrder 读 assets/chara.json 的**键序** = 游戏的角色顺序（生成器按 `chara.UIOrder` 排的，见 gen 的
-limitbonus）。界面上的角色列表按它排 —— 与「角色强化」「专精技能」两页同一个顺序。
-
-为什么不能顺手从 CharaTable 里取：那是一张 map，顺序在解码那一刻就没了。JSON 对象本身是有序的，所以
-这里逐 token 读一遍**键**（值整段跳过 —— 值那一份由 loadAssetsFrom 读好了）。
-
-读不出来（资产缺了 / 形状不对）返回 nil：调用方退回按码排，**不因为拿不到顺序就把列表清空**。
-*/
-func charaOrder(dir string) []string {
-	raw, err := os.ReadFile(filepath.Join(dir, "chara.json"))
-	if err != nil {
-		return nil
-	}
-	dec := jsontext.NewDecoder(bytes.NewReader(raw))
-	if tok, err := dec.ReadToken(); err != nil || tok.Kind() != jsontext.Kind('{') {
-		return nil
-	}
-	order := []string{}
-	for dec.PeekKind() != jsontext.Kind('}') {
-		tok, err := dec.ReadToken()
-		if err != nil {
-			return nil
-		}
-		order = append(order, tok.String())
-		// 值整段跳过：顺序只要键（值那一份由 loadAssetsFrom 读好了）。
-		if err := dec.SkipValue(); err != nil {
-			return nil
-		}
-	}
-	return order
-}
-
-/*
-sortByCharaOrder 把角色码排成**游戏的角色顺序**（order = charaOrder 读出来的那份）。
+sortByCharaOrder 把角色码排成**游戏的角色顺序**（order = assets.go 的 charaCodes = chara.json 的键序）。
 
 不在 order 里的码排到最后、彼此按码排 —— 一个都不丢：解包目录里多出来的角色、或者资产里还没收录的码，
-都该照常出现在列表里，只是排在后面。order 为空（拿不到顺序）时整份按码排，调用方不必特判。
+都该照常出现在列表里，只是排在后面。order 为空（资产是 `{}`）时整份按码排，调用方不必特判。
 */
 func sortByCharaOrder(codes []string, order []string) []string {
 	rank := make(map[string]int, len(order))

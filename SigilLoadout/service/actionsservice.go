@@ -65,29 +65,35 @@ type trackRef struct {
 }
 
 /*
-ActionNames 返回动作名的显示名表（assets/chara.action.zh.json：{动作表 actionName_ 的值: 显示名}）。
+ActionNames 返回动作名的显示名表（assets/chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}）。
 
-界面拿它填 `abilityTag_` 列的**空白格** —— 那一行没有技能键（普通攻击、跳跃、受击这类动作本来就不属于
-任何技能），于是显示"这条动作叫什么"。表里**每一条都有值**（没翻的那些值就是原文本身，见生成器的
-translations/README.md）：查到就填，查不到（游戏更新冒出来的新动作名）就不动那一格。
+界面拿它当 `abilityTag_` 那一列的**显示值** —— 键是那一行 `actionName_` 的**原样**（一个字不改），
+查到就显示中文名；键不写回动作表（见 mergeActionTable），所以那一列上屏的永远不是技能键。
+
+⚠️ 表里**不是每条都有中文**（实测 1072 条里 569 条是空串）：空串与"表里没这个键"在界面那边是
+**同一件事** —— 都拿 `actionName_` 原文兜底（灰色占位符）。查不到不是错误，是本工具只翻了一部分。
+
+⚠️ 而且目前**只有中文**：界面上那一列的**列名**走四语，**内容**只有中文（四语以后再说）。
 */
 func (s *ActionsService) ActionNames() map[string]string { return actionNames }
 
 /*
 ListCharacters 列出**三个数据源都解出来了**的角色码（pl1000 / pl2900 …），给界面上的角色下拉用。
-顺序是**游戏的角色顺序**（assets/chara.json 的键序 = chara.UIOrder，见 sortByCharaOrder）—— 与
-「角色强化」「专精技能」两页一致；拿不到那份资产时退回按码排。
+顺序是**游戏的角色顺序**（assets/chara.json 的键序 = chara.UIOrder，装载见 assets.go 的 charaCodes、
+排序见 tables.go 的 sortByCharaOrder）—— 与「角色强化」「专精技能」两页一致。
 
 判据就是 SetCharacter 那一把尺子（动作表 + flags 目录 + FSM 目录）：解包是按角色做的，只解了动作表、
 没解 flags 的角色切过去会失败，那它就不该出现在候选里。
+
+⚠️ 容器里带了动作表的码**全都在这里**（随包那份含 np0000 / em1900 / plffff 这类不是玩家角色的码）。
+"下拉里只列玩家角色"那条筛在界面那半（lib/chara.ts 的 PLAYER_CODE）。
 */
 func (s *ActionsService) ListCharacters() ([]string, error) {
 	cfg := s.config()
-	order := charaOrder(filepath.Join(appfiles.ExeDir(), assetsDir))
 	if codes, present, err := actionTableCodes(); err != nil {
 		return nil, err
 	} else if present {
-		return sortByCharaOrder(codes, order), nil
+		return sortByCharaOrder(codes, charaCodes), nil
 	}
 
 	root := filepath.Dir(filepath.Dir(cfg.Path))
@@ -105,7 +111,7 @@ func (s *ActionsService) ListCharacters() ([]string, error) {
 			codes = append(codes, entry.Name())
 		}
 	}
-	return sortByCharaOrder(codes, order), nil
+	return sortByCharaOrder(codes, charaCodes), nil
 }
 
 /*
@@ -386,14 +392,16 @@ func (s *ActionsService) SaveActions(rows []ActionRecord) error {
 }
 
 /*
-deployActionTable 把当前角色的动作表搬进 mod（源文件一个字节都不碰），并把**清理后**的改动表落盘。
+deployActionTable 把当前角色的动作表搬进 mod（源文件一个字节都不碰），并把改动表落盘。
 
 **产物**看 `changed`：改动全是空操作（与原表数值一致）→ 不留产物（mod 里那份删掉，游戏读它自己的原表）。
 
-**账本**看"这个角色有没有真改动"，与产物**无关**：像 `abilityTag_` 那种只给人看、不写回表的改动不进产物，
-但它照样是用户改过的（界面靠账本显示、重启也在）。别的角色的改动原样留着：它们的原表不是这一份。
+**账本**不看产物，也**不按角色清理**：整份原样落盘。像 `abilityTag_` 那种只给人看、不写回表的改动不进
+产物，但它照样是用户改过的（界面靠账本显示、重启也在）。别的角色的改动本来就该留着：它们的原表不是
+这一份。
 
-落盘长在这里的理由与 pruneTrackEdits 一样：清理的结果必须写回去 —— 否则下次读到的还是那份空操作账本。
+（这里曾经按"这个角色在账本里有没有条目"分两种写法，而两种写法算出来的是**同一份切片** —— 产物与
+账本各判各的，就别再假装它俩有关。落盘长在这里的理由与 pruneTrackEdits 一样：清理的结果必须写回去。）
 */
 func (s *ActionsService) deployActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) error {
 	body, changed, err := mergeActionTable(cfg, original, edits)
@@ -407,20 +415,7 @@ func (s *ActionsService) deployActionTable(cfg actionConfig, original *msgValue,
 	} else if err := removeDeployed(deployActionPath(cfg)); err != nil {
 		return err
 	}
-	char := charCode(cfg)
-	kept := make([]actionEdit, 0, len(edits))
-	own := false
-	for _, edit := range edits {
-		if edit.Char != char {
-			kept = append(kept, edit)
-		} else {
-			own = true
-		}
-	}
-	if own {
-		return saveActionEdits(edits)
-	}
-	return saveActionEdits(kept)
+	return saveActionEdits(edits)
 }
 
 /*

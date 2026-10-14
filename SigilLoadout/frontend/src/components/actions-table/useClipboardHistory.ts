@@ -213,7 +213,8 @@ export function useClipboardHistory({
      * ⚠️ 单个片天然满足（自己和自己共享行范围）→ 走"左右拼"那条就等于原来的矩形，不必特判。
      *
      * ⚠️ 不能用 `table.getSelectedCellRangesData()`：它走 `accessorFn`，而我们那个算的是**显示值**
-     * （`abilityTag_` 会给技能名）—— 复制出去再粘回来就把中文名写进键的位置了。所以取**数据本身**。
+     * （轨表 flags 那几列把 `1` / `0` 翻成"触发 / 持续"）—— 复制成"触发"再粘回来就把人话写进数据了。
+     * 所以取**数据本身**。
      * 列顺序用 `row.getAllCells()` 的（**渲染顺序**，钉住列在前），与 `getCellSelectionBounds()`
      * 给的列下标同一套坐标系；`getVisibleLeafColumns()` 不带钉住重排，拿它取会错位。
      */

@@ -89,7 +89,8 @@ export default function App() {
     // 角色表（chara.json）：PL 码 → {hash, element, color}。颜色已经按属性算好记在角色上，所以取色是
     // 一步。语言无关，只在挂载时取一次，切语言不重取。
     const [charaTable, setCharaTable] = useState<CharaTable>({})
-    // 动作名的显示名（chara.action.zh.json）：动作表 `abilityTag_` 列的空白格用它填。与语言无关，只取一次。
+    // 动作名的显示名（chara.action.zh.json）：动作表 `abilityTag_` 列显示它（键 = 那一行 `actionName_`）。
+    // 与语言无关，只取一次。
     const [actionNames, setActionNames] = useState<Record<string, string>>({})
     const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
     const t = messages[lang]
@@ -183,8 +184,8 @@ export default function App() {
 
             /*
                 角色表（chara.json）与动作名表（chara.action.zh.json）：都与语言无关，所以整场只取一次。
-                取不到就留空表 —— 角色名于是没有专属颜色、`abilityTag_` 的空白格少一层中文，而不是让整页
-                读不出来。
+                取不到就留空表 —— 角色名于是没有专属颜色、`abilityTag_` 那一列只剩 `actionName_` 原文，
+                而不是让整页读不出来。
             */
             const [chara, actionNameTable] = await Promise.all([
                 Characters().catch(() => null),

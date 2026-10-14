@@ -31,16 +31,17 @@ import type {Messages} from "@/lib/messages"
 export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName">
 
 /**
- * **只读**的列：这些格子存的是**引用键**，不是可编辑的值。
+ * **只读**的列：这些格子只给人看，不参与编辑，也不收粘贴。
  *
- *   · `id_` —— 后端靠它找记录（`SaveActions` 交上去的每条都带 `id`）。改了等于换了一条记录，
- *     保存时会写到别的记录上、或者直接报"没有这个 id"。
- *
- * ⚠️ `abilityTag_` **不在这里**：它显示的是这条动作的**能力名 / 动作名**（技能键不上屏，规则见
- * `lib/ability.ts` 的 `actionTagLabel`），而存进去的仍然是那个键 —— 显示与提交是两回事，所以它能编辑
- * （双击进编辑时框里是键，提交的也是键）。
+ *   · `id_`         —— 后端靠它找记录（`SaveActions` 交上去的每条都带 `id`）。改了等于换了一条记录，
+ *                      保存时会写到别的记录上、或者直接报"没有这个 id"。
+ *   · `actionName_` —— 动作名的**原文**，也是 `abilityTag_` 那一列显示名的**来路**，改它等于改游戏
+ *                      那边的动作名。
+ *   · `abilityTag_` —— **动作表那一列上屏的是"这条动作的名字"**（由调用方投影进 `originals`，见
+ *                      `ActionsPanel`），而部署时这一格**只带原始值**（见 `mergeActionTable`）—— 能改却
+ *                      改不到游戏里，那就不是一格能改的格。
  */
-const READ_ONLY_KEYS = new Set(["id_"])
+const READ_ONLY_KEYS = new Set(["id_", "actionName_", "abilityTag_"])
 
 /**
  * **选值格**的列：只能从下拉里挑、不能手打。两类，清单来源不同：
@@ -89,8 +90,8 @@ export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSp
  * **列 id → 表头文案**：几条**跟界面语言走**的列名（不传 `ColumnSpec.label` 时用它兜底）。
  *
  * 为什么要有：这些都是后端字段名，但它们是给人看的 —— 谁有这两列都该显示"开始 / 结束"（轨表、flags 表
- * 都在用）；动作表那两列同理（`abilityTag_` 装的是"这条动作的名字"，`actionName_` 是原文备注）。
- * 调用方自己的 `label` 优先级更高。放在这里而不是某一张表的列说明里，是因为它**与"哪张表"无关**。
+ * 都在用）；动作表那两列同理（`abilityTag_` 那一列显示的是"这条动作的名字"，`actionName_` 是原文备注）。
+ * 调用方自己的 `label` 优先级更高；放在这里而不是各表的列说明里，是因为这几条谁都不必再写一遍。
  */
 export const columnLabel = (
     id: string,

@@ -15,14 +15,13 @@ export type CharaEntry = { hash: string; element: string; color: string }
  *  {PL 码: 名字} 同摆法）。
  *
  * ‼️ **键序就是游戏的角色顺序**（生成器按 `chara.UIOrder` 写的，见 gen 的 limitbonus）—— 后端读它来排
- * 「角色动作」页的角色列表（见 `service/tables.go` 的 `charaOrder` / `sortByCharaOrder`），所以这份资产
- * 不能落成"按键排序"的 map。 */
+ * 「角色动作」页的角色列表（见 `service/assets.go` 的 `charaCodes`、`service/tables.go` 的
+ * `sortByCharaOrder`），所以这份资产不能落成"按键排序"的 map。 */
 export type CharaTable = Record<string, CharaEntry>
 
 /**
- * 玩家角色码的形状（`pl1000`）：NPC / 敌方（`np*` / `em*`）与占位 `plffff` 都不算。
- *
- * 游戏自己的权威标记是 `chara.IsNPC`（NPC0000/0100/0200/0300/0400/0600 那六个客串 NPC），但那张表不在
- * 随包资产里；而动作表只对 `pl` 段存在，所以看形状就够。
+ * 玩家角色码的形状（`pl1000`）：后端的角色名单 = **容器里有动作表的那些**（`ListCharacters`），而其中
+ * 混着 6 个不是玩家角色的码（np / em 段与占位 `plffff`）——「角色动作」页的下拉只要玩家。那 6 个由
+ * `chara.test.ts` 钉着；游戏自己的权威标记 `chara.IsNPC` 不在随包资产里，形状是这里能拿到的最近似的判据。
  */
 export const PLAYER_CODE = /^pl\d{4}$/i

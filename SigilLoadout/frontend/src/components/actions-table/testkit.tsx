@@ -30,25 +30,19 @@ import {messages} from "@/lib/messages"
  */
 export const t: ActionsTableMessages = messages.zh
 
-/**
- * 技能键 → 名字（`ability.lang.json` 的形状）。只放一条真正命中的，其余**故意查不到** ——
- * `abilityName` 的规矩是"查不到就回落键名、不编造"，那条回落要能测到。
- */
-/**
- * 动作名 → 名字（`chara.action.zh.json` 那一份，键 = 动作表 `actionName_` 原样）：`abilityTag_` 那一列
- * 显示它、查不到就显示原文。默认给**空表** —— `KEYS` 里没有 `actionName_`（它是动作表自己的列，不在这套
- * 精简夹具里），要测"有名字就显示名字"就在用例里自己造一行、传自己的表。
- */
-export const actionNames: Record<string, string> = {}
-
-/** 87 列：前两个用真字段名（它们是只读那两列，最容易被误改），其余凑数。 */
+/** 87 列：前两个是真字段名（内置只读那一列、与动作表那一列），其余凑数。 */
 export const KEYS = ["id_", "abilityTag_", ...Array.from({length: 85}, (_, i) => `actionFreeWork${i}_`)]
 
 /** 拿来试"长值截断"的那一列（取值时用它定位）。 */
 export const LongField = "actionFreeWork0_"
 
-/** 造一条记录：`changed` 里点名的字段算"改过"，其余一律"没改过"（value = null）。 */
-export function makeRow(id: string, changed: Record<string, string> = {}) {
+/**
+ * 造一条记录：`changed` 里点名的字段算"改过"，`originals` 里点名的字段换一份原值，其余照默认。
+ *
+ * `originals` 是给"原值不是那个假值"的用例用的 —— 例如 `abilityTag_`：生产里 `ActionsPanel` 早把
+ * **动作名**投影成了它的原值（那一格显示、复制读的都是它，见那边的 `tableRows`）。
+ */
+export function makeRow(id: string, changed: Record<string, string> = {}, originals: Record<string, string> = {}) {
     return {
         id,
         fields: KEYS.map((key) => ({
@@ -56,17 +50,19 @@ export function makeRow(id: string, changed: Record<string, string> = {}) {
             /*
                 `id_` 用**真记录号**：它是只读列、也是这一版默认排序的依据 —— 给成"所有行都一样"的
                 假值的话，排序就测不出来了。
-                `abilityTag_` 给一个**真实形状的键**：它是唯一会被翻译显示的列，第一条命中名字表、
-                第二条查不到（用来看"回落键名"）。
+                `abilityTag_` 给一个**真实形状的键**：夹具直接喂基座，所以这一格显示、复制取的都是它自己
+                （生产里那一列早被 `ActionsPanel` 投影成动作名了，见那边）。
             */
             original:
-                key === "id_"
-                    ? id
-                    : key === "abilityTag_"
-                      ? id === "1000"
-                          ? "AB_PL1000_01"
-                          : "AB_PL9999_99"
-                      : `${key}-原值`,
+                key in originals
+                    ? originals[key]
+                    : key === "id_"
+                      ? id
+                      : key === "abilityTag_"
+                        ? id === "1000"
+                            ? "AB_PL1000_01"
+                            : "AB_PL9999_99"
+                        : `${key}-原值`,
             value: key in changed ? changed[key] : null,
         })),
     }
@@ -177,7 +173,7 @@ function makeHarness(getRows: () => Rows) {
     let rerender: ((ui: ReactElement) => void) | null = null
 
     const tableEl = (onSaveReady?: (save: () => Promise<void>) => void) => (
-        <ActionsTable t={t} actionNames={actionNames} {...tableProps(getRows())} onSaveReady={onSaveReady} />
+        <ActionsTable t={t} {...tableProps(getRows())} onSaveReady={onSaveReady} />
     )
 
     /** 把"当前那一份数据"推给已挂载的表（还没渲染、或已卸载就什么都不做）。 */

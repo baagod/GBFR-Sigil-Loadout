@@ -150,7 +150,7 @@ describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => 
 
     it("只读列（`null`）：位置照占、值不写 —— 整块不左移", () => {
         const rows = sheet(1, 3).rows
-        rows[0].cells[1] = null // 中间那一列只读（id_ / abilityTag_）
+        rows[0].cells[1] = null // 中间那一列不写（内置只读的 `id_` / `actionName_`，或者压根没这一格）
         const plan = planPaste({
             block: [["a", "b", "c"]],
             rows,

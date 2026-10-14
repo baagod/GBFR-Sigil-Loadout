@@ -13,6 +13,8 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
+import { PLAYER_CODE } from "@/lib/chara"
+
 // 与 Go 侧 limitbonusservice_test.go 同一份真相：生成器写进 SigilLoadout\assets\chara.json 的那张表。
 const chara = JSON.parse(
     readFileSync(new URL("../../../assets/chara.json", import.meta.url), "utf8")
@@ -57,8 +59,8 @@ describe("chara.json 的角色表", () => {
 
     /*
         ‼️ **键序 = 游戏的角色顺序**（生成器按 `chara.UIOrder` 写的）。读它的是 **Go 侧**：「角色动作」页的
-        角色列表按这份键序排（见 service/tables.go 的 charaOrder / sortByCharaOrder，回显测试在
-        assets_test.go）。
+        角色列表按这份键序排（见 service/assets.go 的 charaCodes / service/tables.go 的 sortByCharaOrder，
+        回显测试在 assets_test.go）。
 
         这条钉的是"生成器别退回 map"：encoding/json 对 map 按键排序，那样下面的断言全对不上（而界面上只是
         悄悄变成字母序，不会报错）。形态那两条顺带钉住"别退回纯 UIOrder 排"—— 那会把 PL2000 甩到最后。
@@ -73,5 +75,21 @@ describe("chara.json 的角色表", () => {
         expect(ids.indexOf("PL2000")).toBe(ids.indexOf("PL1900") + 1)
         expect(ids.indexOf("PL0100")).toBe(ids.indexOf("PL0000") + 1)
         expect(ids[0]).toBe("PL0000")
+    })
+})
+
+/*
+「角色动作」页下拉的筛子（`PLAYER_CODE`）：后端给的名单 = **容器里有动作表的那些**，而实测 36 张里
+有 6 张不是玩家角色（np0000 / np0300 / np1800 客串 NPC、em1900 / em7000 敌方、plffff 占位）。
+这条把那 6 个一一钉住 —— 少了它，"下拉里混进 em1900"只会表现成"切过去一串报错"，不会红。
+*/
+describe("玩家角色码的形状判据", () => {
+    it("pl + 四位数字算玩家；NPC / 敌方 / 占位不算", () => {
+        for (const code of ["pl0000", "PL0100", "pl2000", "pl2900"]) {
+            expect(PLAYER_CODE.test(code), code).toBe(true)
+        }
+        for (const code of ["np0000", "np0300", "np1800", "em1900", "em7000", "plffff"]) {
+            expect(PLAYER_CODE.test(code), code).toBe(false)
+        }
     })
 })

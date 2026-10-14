@@ -135,11 +135,14 @@ func TestPackagedActionTablesCoverEveryCharacter(t *testing.T) {
 
 这条同时钉住"生成器别把那份资产退回成 map 落盘"：encoding/json 对 map 按键排序，那样下面两条断言全
 对不上，而界面上只是悄悄变成字母序（不会报错）。
+
+读的是**装载期**那一份（charaCodes，见 TestMain 的 loadAssetsFrom）：键序只在这里读一次，运行时不再
+碰磁盘。
 */
 func TestCharaOrderComesFromTheShippedAsset(t *testing.T) {
-	order := charaOrder(filepath.Join("..", "assets"))
+	order := charaCodes
 	if len(order) == 0 {
-		t.Fatal("chara.json 的键序读不出来")
+		t.Fatal("chara.json 的键序没在装载期读出来")
 	}
 	index := map[string]int{}
 	for i, code := range order {

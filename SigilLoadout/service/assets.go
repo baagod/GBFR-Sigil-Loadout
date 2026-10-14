@@ -5,11 +5,13 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	jsonv2 "encoding/json/v2"
+	"encoding/json/jsontext"
 	"sigilloadout/appfiles"
 )
 
@@ -90,18 +92,20 @@ func LoadAssets() error {
 	return loadAssetsFrom(filepath.Join(appfiles.ExeDir(), assetsDir))
 }
 
-// abilityNamesByLang 是 ability.lang.json：{语言: {能力键: 名字}}，键就是动作表 abilityTag_ 那一列
-// 的写法（AB_PL0000_01）。查不到名字的键（预留槽）由调用方回落成键名；姬塔（AB_PL0100_*）不在这张
-// 表里 —— 她与古兰是同一个角色的两个性别，名字取古兰那份，映射由调用方做。
-var abilityNamesByLang map[string]map[string]string
-
 /*
 actionNames 是 chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}。
 
-**每一条都有值** —— 没翻的那些，值就是原文本身（见生成器的 translations/README.md）。所以查它一定有
-结果：界面查到就用、查不到（新动作名）就不动。动作页的 `abilityTag_` 列拿它填空白格。
+**没翻的那些留空串**（实测 1072 条里 569 条空）—— 空串与"表里没这个键"是同一件事：界面都拿
+`actionName_` 原文兜底（灰）。所以这张表只负责"翻过的那些叫什么"，不负责给没翻的编一个名字。
+
+⚠️ 目前**只有中文**（四语以后再说）：文件名里的 `zh` 就是这个意思，不是漏了另外三份。
 */
 var actionNames map[string]string
+
+// charaCodes 是 chara.json 的**键序** = 游戏的角色顺序。CharaTable 是一张 map，键序在解码那一刻就
+// 没了（见 tables.go 那段），所以键另读一遍 —— 与上面那几张表同一次、同样只读一次。界面上的角色
+// 列表按它排（sortByCharaOrder）。
+var charaCodes []string
 
 func loadAssetsFrom(dir string) error {
 	var err error
@@ -111,11 +115,8 @@ func loadAssetsFrom(dir string) error {
 	if charaNamesByLang, err = readAsset[map[string]map[string]string](dir, "chara.lang.json"); err != nil {
 		return err
 	}
-	if abilityNamesByLang, err = readAsset[map[string]map[string]string](dir, "ability.lang.json"); err != nil {
-		return err
-	}
-	// 与上面那三张"名字表"同一类、同一次读：动作名的显示名（技能键是 AB_*、动作名是日文，两张表并起来
-	// 用，键空间不冲突 —— 见前端 lib/ability.ts）。
+	// 与上面那两张"名字表"同一类、同一次读：动作名的显示名（技能键是 AB_*、动作名是日文，两张表并起来
+	// 用，键空间不冲突 —— 动作页那一列的显示见 actionsservice.go 的 ActionNames）。
 	if actionNames, err = readAsset[map[string]string](dir, "chara.action.zh.json"); err != nil {
 		return err
 	}
@@ -160,6 +161,9 @@ func loadLimitBonusTables(dir string) error {
 		return err
 	}
 	charaTable = chara
+	if charaCodes, err = readCharaOrder(dir); err != nil {
+		return err
+	}
 
 	limitBonusTexts = make(map[string]*LimitBonusText, len(assetLangCodes()))
 	for _, lang := range assetLangCodes() {
@@ -175,6 +179,38 @@ func loadLimitBonusTables(dir string) error {
 // limitBonusTextName 是某一门语言的文案文件名（limit_bonus.zh.json）。
 func limitBonusTextName(lang string) string {
 	return "limit_bonus." + lang + ".json"
+}
+
+/*
+readCharaOrder 逐 token 读出 chara.json 顶层的**键**（值整段跳过 —— 值那一份由 readAsset 读好了）。
+
+为什么不能顺手从 CharaTable 里取：那是一张 map，键序在解码那一刻就没了，而这份键序是有意义的
+（生成器按 `chara.UIOrder` 排的，见 gen 的 limitbonus）。JSON 对象本身有序，所以这里另走一次解码器。
+
+读不出来就是错误（与同目录那几张表一样）：chara.json 缺了 / 坏了本来也过不了 readAsset。
+*/
+func readCharaOrder(dir string) ([]string, error) {
+	path := filepath.Join(dir, "chara.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("读随包数据 %s: %w", path, err)
+	}
+	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	if tok, err := dec.ReadToken(); err != nil || tok.Kind() != jsontext.Kind('{') {
+		return nil, fmt.Errorf("随包数据 %s 的顶层不是 JSON 对象", path)
+	}
+	order := []string{}
+	for dec.PeekKind() != jsontext.Kind('}') {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return nil, fmt.Errorf("读随包数据 %s 的键序: %w", path, err)
+		}
+		order = append(order, tok.String())
+		if err := dec.SkipValue(); err != nil {
+			return nil, fmt.Errorf("读随包数据 %s 的键序: %w", path, err)
+		}
+	}
+	return order, nil
 }
 
 // loadSkillboardTables 在启动时读专精技能那条链的资产（骨架 + 每语言一份文案）。

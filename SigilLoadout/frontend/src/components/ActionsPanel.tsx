@@ -22,6 +22,7 @@ import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
 import type {ActionRow} from "@/components/actions-table/model"
 import {DrillContext, columnsOf, toActionRow} from "@/components/actions-table/model"
+import {actionTagName} from "@/lib/actiontag"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
@@ -179,6 +180,22 @@ function ActionsPanelBase({t, charaNames, charaTable, actionNames}: {
     const [rows, setRows] = useState<ActionRow[]>([])
     /** 字段顺序（= 表头顺序），见 `columnsOf`。 */
     const keys = useMemo(() => columnsOf(rows), [rows])
+    /**
+     * **上屏那一份**：`abilityTag_` 那一列的**原值就是这条动作的名字**（不是技能键，那一列只读）—— 名字在
+     * 这里投影进 `originals`，于是**显示 / 复制 / 排序读的是同一个值**。
+     *
+     * ‼️ 别把这一步挪回渲染那层（`ActionRowView` 曾经自己查名字表）：那样"格子里显示的字"与"复制出来的
+     * 值"成了两个来源 —— 实测就是"动作列显示镜花水月、复制出来却是空的"（那一行本来就没有技能键，而复制
+     * 读的是技能键那一栏）。
+     */
+    const tableRows = useMemo(
+        () =>
+            rows.map((row) => ({
+                ...row,
+                originals: {...row.originals, abilityTag_: actionTagName(row.originals.actionName_ ?? "", actionNames)},
+            })),
+        [rows, actionNames],
+    )
     /**
      * 首次读取回来了没有（读的是上面那份 `LoadActions`）。
      *
@@ -518,12 +535,10 @@ function ActionsPanelBase({t, charaNames, charaTable, actionNames}: {
                                 拿它当 key 等于永远不重挂，上面这些就一个都清不掉（踩过）。
                             */
                             key={dataVersion}
-                            rows={rows}
+                            rows={tableRows}
                             keys={keys}
                             t={t}
-                            // 动作名 → 名字：`abilityTag_` 那一列显示的就是它，查不到就显示 actionName_ 原文。
-                            actionNames={actionNames}
-                            // 它数据到位后把保存动作交出来（与 GlobalParamPanel 同一个约定），
+                            // 数据到位后把保存动作交出来（与 GlobalParamPanel 同一个约定），
                             // 外面那个「保存」按钮再一起调 —— 这个组件自己没有工具条。
                             onSaveReady={(save) => {
                                 ttSaveRef.current = save
