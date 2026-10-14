@@ -7,7 +7,6 @@ package service
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
@@ -179,23 +178,19 @@ func charaOrder(dir string) []string {
 	if err != nil {
 		return nil
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	if tok, err := dec.ReadToken(); err != nil || tok.Kind() != jsontext.Kind('{') {
 		return nil
 	}
 	order := []string{}
-	for dec.More() {
-		tok, err := dec.Token()
+	for dec.PeekKind() != jsontext.Kind('}') {
+		tok, err := dec.ReadToken()
 		if err != nil {
 			return nil
 		}
-		key, ok := tok.(string)
-		if !ok {
-			return nil
-		}
-		order = append(order, key)
-		var skip json.RawMessage
-		if err := dec.Decode(&skip); err != nil {
+		order = append(order, tok.String())
+		// 值整段跳过：顺序只要键（值那一份由 loadAssetsFrom 读好了）。
+		if err := dec.SkipValue(); err != nil {
 			return nil
 		}
 	}
