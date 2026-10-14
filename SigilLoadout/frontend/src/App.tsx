@@ -3,9 +3,10 @@ import {Button} from "@/components/ui/button"
 import {ButtonGroup} from "@/components/ui/button-group"
 import {Checkbox} from "@/components/ui/checkbox"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
-import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames, AbilityNames} from "../bindings/sigilloadout/service/loadoutservice"
+import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/service/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/service/shellservice"
 import {Characters} from "../bindings/sigilloadout/service/limitbonusservice"
+import {ActionNames} from "../bindings/sigilloadout/service/actionsservice"
 import {messages, type Messages} from "@/lib/messages"
 import {LANGS, LANG_LABEL, initialLang, type Lang} from "@/lib/lang"
 import {
@@ -68,7 +69,7 @@ const LOADOUT_HEADER = `shrink-0 overflow-y-hidden ${GUTTER}`
 
 // 每语言的显示名表在 Go 侧只在启动时读一次（main.go 的 loadAssets），之后不再变，所以缓存住：
 // 换语言命中缓存就同步落地，标签与外层文字同一帧换掉，否则要先显示旧名字、等 IPC 回来再跳一次。
-const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string>; abilities: Record<string, string> }>()
+const nameCache = new Map<Lang, { names: Record<string, string>; charas: Record<string, string> }>()
 
 export default function App() {
     const [skills, setSkills] = useState<Skill[]>([])
@@ -85,40 +86,16 @@ export default function App() {
     const [names, setNames] = useState<Record<string, string>>({})
     // 角色名（chara.lang.json：{PL 码: 名字}），专职专属因子页与能力强化页的行标签。
     const [charaNames, setCharaNames] = useState<Record<string, string>>({})
-    // 能力名（ability.lang.json：{能力键: 名字}），专职动作表的 abilityTag_ 列；姬塔由前端映射到古兰。
-    const [abilityNames, setAbilityNames] = useState<Record<string, string>>({})
     // 角色表（chara.json）：PL 码 → {hash, element, color}。颜色已经按属性算好记在角色上，所以取色是
     // 一步。语言无关，只在挂载时取一次，切语言不重取。
     const [charaTable, setCharaTable] = useState<CharaTable>({})
+    // 动作名的显示名（chara.action.zh.json）：动作表 `abilityTag_` 列的空白格用它填。与语言无关，只取一次。
+    const [actionNames, setActionNames] = useState<Record<string, string>>({})
     const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
     const t = messages[lang]
 
     // 派生逻辑在 model.ts，可脱离 React 单测。
     const index = useMemo(() => buildSigilIndex(sigils, skills, names), [sigils, skills, names])
-
-    /*
-        **可玩角色名单，按游戏内部顺序**：专属表（sigils.chara.json）里出现的 PL 码就是这一份，
-        专属 / 角色强化 / 专精技能三页用的都是它。解包目录比它多两个 —— PL0100（主人公的另一个模型）
-        与 PL2000（非玩家版伊德）—— 那两个不该出现在「角色动作」页的下拉里。
-
-        顺序也照它：强化与专精那两页的顺序是**同一个序列再加一个 PL0100**，专属这份正好是去掉它的版本，
-        两者逐项对得上（实测过），所以不必另外维护一份顺序表。
-
-        名单为空（专属表还没读出来）时调用方**不过滤也不排序**：宁可多列几个、顺序先按字母，也不能把
-        下拉整个清空。
-    */
-    const playableChars = useMemo(() => {
-        const seen = new Set<string>()
-        const order: string[] = []
-        for (const entry of exclusiveTable) {
-            const code = entry.player.toUpperCase()
-            if (!seen.has(code)) {
-                seen.add(code)
-                order.push(code)
-            }
-        }
-        return order
-    }, [exclusiveTable])
 
     // 落盘要读"当前"状态，而这个回调刻意不带响应式依赖（闭包里的值会过期），所以从 ref 取。
     const latest = useRef({slots, index, lang, exclusiveState})
@@ -205,15 +182,16 @@ export default function App() {
             }
 
             /*
-                角色表（chara.json）：PL 码 → 颜色（按属性在生成期算好）。与语言无关，所以整场只取一次。
-                取不到就留空表——角色名于是没有专属颜色（继承默认前景色），而不是让整页读不出来。
+                角色表（chara.json）与动作名表（chara.action.zh.json）：都与语言无关，所以整场只取一次。
+                取不到就留空表 —— 角色名于是没有专属颜色、`abilityTag_` 的空白格少一层中文，而不是让整页
+                读不出来。
             */
-            try {
-                const chara = (await Characters()) as CharaTable | null
-                setCharaTable(chara ?? {})
-            } catch {
-                setCharaTable({})
-            }
+            const [chara, actionNameTable] = await Promise.all([
+                Characters().catch(() => null),
+                ActionNames().catch(() => null),
+            ])
+            setCharaTable((chara as CharaTable | null) ?? {})
+            setActionNames((actionNameTable as Record<string, string> | null) ?? {})
         })()
         // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态。这里也刻意不读 t——文案在渲染时由
         // failureText 取，所以没有语言依赖会把这一跑重新触发。
@@ -238,24 +216,21 @@ export default function App() {
         if (hit) {
             setNames(hit.names)
             setCharaNames(hit.charas)
-            setAbilityNames(hit.abilities)
             return
         }
         let cancelled = false
-        Promise.all([GemNames(lang), CharaNames(lang), AbilityNames(lang)])
-            .then(([gems, charas, abilities]) => {
+        Promise.all([GemNames(lang), CharaNames(lang)])
+            .then(([gems, charas]) => {
                 if (cancelled) return
-                const entry = {names: gems ?? {}, charas: charas ?? {}, abilities: abilities ?? {}}
+                const entry = {names: gems ?? {}, charas: charas ?? {}}
                 nameCache.set(lang, entry)
                 setNames(entry.names)
                 setCharaNames(entry.charas)
-                setAbilityNames(entry.abilities)
             })
             .catch(() => {
                 if (cancelled) return
                 setNames({})
                 setCharaNames({})
-            setAbilityNames({})
             })
         return () => {
             cancelled = true
@@ -485,7 +460,7 @@ export default function App() {
                     这一页自己就是滚动盒（上半区横滚、下半区纵滚），所以外层不再给 overflow-auto。
                 */}
                 <TabsContent value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
-                    <ActionsPanel t={t} charaNames={charaNames} abilityNames={abilityNames} charaTable={charaTable} playable={playableChars} />
+                    <ActionsPanel t={t} charaNames={charaNames} charaTable={charaTable} actionNames={actionNames} />
                 </TabsContent>
             </Tabs>
         </div>

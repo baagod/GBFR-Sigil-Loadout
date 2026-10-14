@@ -34,7 +34,12 @@ export const t: ActionsTableMessages = messages.zh
  * 技能键 → 名字（`ability.lang.json` 的形状）。只放一条真正命中的，其余**故意查不到** ——
  * `abilityName` 的规矩是"查不到就回落键名、不编造"，那条回落要能测到。
  */
-export const abilityNames: Record<string, string> = {"AB_PL1000_01": "能力一"}
+/**
+ * 动作名 → 名字（`chara.action.zh.json` 那一份，键 = 动作表 `actionName_` 原样）：`abilityTag_` 那一列
+ * 显示它、查不到就显示原文。默认给**空表** —— `KEYS` 里没有 `actionName_`（它是动作表自己的列，不在这套
+ * 精简夹具里），要测"有名字就显示名字"就在用例里自己造一行、传自己的表。
+ */
+export const actionNames: Record<string, string> = {}
 
 /** 87 列：前两个用真字段名（它们是只读那两列，最容易被误改），其余凑数。 */
 export const KEYS = ["id_", "abilityTag_", ...Array.from({length: 85}, (_, i) => `actionFreeWork${i}_`)]
@@ -172,7 +177,7 @@ function makeHarness(getRows: () => Rows) {
     let rerender: ((ui: ReactElement) => void) | null = null
 
     const tableEl = (onSaveReady?: (save: () => Promise<void>) => void) => (
-        <ActionsTable t={t} abilityNames={abilityNames} {...tableProps(getRows())} onSaveReady={onSaveReady} />
+        <ActionsTable t={t} actionNames={actionNames} {...tableProps(getRows())} onSaveReady={onSaveReady} />
     )
 
     /** 把"当前那一份数据"推给已挂载的表（还没渲染、或已卸载就什么都不做）。 */

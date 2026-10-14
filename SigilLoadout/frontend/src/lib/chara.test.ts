@@ -54,4 +54,24 @@ describe("chara.json 的角色表", () => {
         // 六种颜色**都被用到**：上面每条都等于表里的值，所以"画出来六种"就等价于"六个属性都有角色"。
         expect(drawn.size).toBe(Object.keys(ELEMENT_COLORS).length)
     })
+
+    /*
+        ‼️ **键序 = 游戏的角色顺序**（生成器按 `chara.UIOrder` 写的）。读它的是 **Go 侧**：「角色动作」页的
+        角色列表按这份键序排（见 service/tables.go 的 charaOrder / sortByCharaOrder，回显测试在
+        assets_test.go）。
+
+        这条钉的是"生成器别退回 map"：encoding/json 对 map 按键排序，那样下面的断言全对不上（而界面上只是
+        悄悄变成字母序，不会报错）。形态那两条顺带钉住"别退回纯 UIOrder 排"—— 那会把 PL2000 甩到最后。
+    */
+    it("键序是游戏的角色顺序（UIOrder），且同一个角色的形态挨着", () => {
+        const ids = Object.keys(chara)
+        // 游戏里 PL1200（夏洛特）/ PL1500（冈达葛萨）排在 PL0700（菲莉）之前……
+        expect(ids.indexOf("PL1200")).toBeLessThan(ids.indexOf("PL0700"))
+        expect(ids.indexOf("PL1500")).toBeLessThan(ids.indexOf("PL0700"))
+        // ……而同一个角色的几个形态**相邻**：伊德的人形/龙人形、主人公的古兰/姬塔。
+        // （光按 UIOrder 排会把 PL2000 甩到最后 —— 它的 UIOrder 是 2001。）
+        expect(ids.indexOf("PL2000")).toBe(ids.indexOf("PL1900") + 1)
+        expect(ids.indexOf("PL0100")).toBe(ids.indexOf("PL0000") + 1)
+        expect(ids[0]).toBe("PL0000")
+    })
 })

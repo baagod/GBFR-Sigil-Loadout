@@ -1,9 +1,4 @@
 {
-    "NP0000": {
-        "hash": "3529CC90",
-        "element": "wind",
-        "color": "#4fae6b"
-    },
     "PL0000": {
         "hash": "2A26B1B2",
         "element": "wind",
@@ -39,10 +34,25 @@
         "element": "dark",
         "color": "#9a72c9"
     },
+    "PL1200": {
+        "hash": "FD3BE362",
+        "element": "light",
+        "color": "#e6c66a"
+    },
+    "PL1500": {
+        "hash": "978E4B18",
+        "element": "fire",
+        "color": "#e05c4a"
+    },
     "PL0700": {
         "hash": "C3FFD418",
         "element": "light",
         "color": "#e6c66a"
+    },
+    "PL1400": {
+        "hash": "E7053919",
+        "element": "dark",
+        "color": "#9a72c9"
     },
     "PL0800": {
         "hash": "22E437E5",
@@ -64,25 +74,15 @@
         "element": "earth",
         "color": "#c89a52"
     },
-    "PL1200": {
-        "hash": "FD3BE362",
-        "element": "light",
-        "color": "#e6c66a"
+    "PL1800": {
+        "hash": "AA66178A",
+        "element": "earth",
+        "color": "#c89a52"
     },
     "PL1300": {
         "hash": "FC6CDF7B",
         "element": "wind",
         "color": "#4fae6b"
-    },
-    "PL1400": {
-        "hash": "E7053919",
-        "element": "dark",
-        "color": "#9a72c9"
-    },
-    "PL1500": {
-        "hash": "978E4B18",
-        "element": "fire",
-        "color": "#e05c4a"
     },
     "PL1600": {
         "hash": "0D21B430",
@@ -94,25 +94,15 @@
         "element": "dark",
         "color": "#9a72c9"
     },
-    "PL1800": {
-        "hash": "AA66178A",
-        "element": "earth",
-        "color": "#c89a52"
+    "PL2600": {
+        "hash": "9A8AF295",
+        "element": "water",
+        "color": "#4a8fd4"
     },
-    "PL1900": {
-        "hash": "A3A3CB2F",
-        "element": "dark",
-        "color": "#9a72c9"
-    },
-    "PL2000": {
-        "hash": "F92C7821",
-        "element": "dark",
-        "color": "#9a72c9"
-    },
-    "PL2100": {
-        "hash": "718E1A14",
-        "element": "light",
-        "color": "#e6c66a"
+    "PL2700": {
+        "hash": "9B15CFB1",
+        "element": "wind",
+        "color": "#4fae6b"
     },
     "PL2200": {
         "hash": "296471BE",
@@ -124,25 +114,10 @@
         "element": "light",
         "color": "#e6c66a"
     },
-    "PL2400": {
-        "hash": "1BB37EF0",
-        "element": "earth",
-        "color": "#c89a52"
-    },
-    "PL2500": {
-        "hash": "25D46F4B",
+    "PL2100": {
+        "hash": "718E1A14",
         "element": "light",
         "color": "#e6c66a"
-    },
-    "PL2600": {
-        "hash": "9A8AF295",
-        "element": "water",
-        "color": "#4a8fd4"
-    },
-    "PL2700": {
-        "hash": "9B15CFB1",
-        "element": "wind",
-        "color": "#4fae6b"
     },
     "PL2800": {
         "hash": "646C3168",
@@ -153,5 +128,30 @@
         "hash": "74DD4C79",
         "element": "dark",
         "color": "#9a72c9"
+    },
+    "PL1900": {
+        "hash": "A3A3CB2F",
+        "element": "dark",
+        "color": "#9a72c9"
+    },
+    "PL2000": {
+        "hash": "F92C7821",
+        "element": "dark",
+        "color": "#9a72c9"
+    },
+    "PL2400": {
+        "hash": "1BB37EF0",
+        "element": "earth",
+        "color": "#c89a52"
+    },
+    "PL2500": {
+        "hash": "25D46F4B",
+        "element": "light",
+        "color": "#e6c66a"
+    },
+    "NP0000": {
+        "hash": "3529CC90",
+        "element": "wind",
+        "color": "#4fae6b"
     }
 }

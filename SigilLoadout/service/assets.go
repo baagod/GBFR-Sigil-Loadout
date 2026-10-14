@@ -95,6 +95,14 @@ func LoadAssets() error {
 // 表里 —— 她与古兰是同一个角色的两个性别，名字取古兰那份，映射由调用方做。
 var abilityNamesByLang map[string]map[string]string
 
+/*
+actionNames 是 chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}。
+
+**每一条都有值** —— 没翻的那些，值就是原文本身（见生成器的 translations/README.md）。所以查它一定有
+结果：界面查到就用、查不到（新动作名）就不动。动作页的 `abilityTag_` 列拿它填空白格。
+*/
+var actionNames map[string]string
+
 func loadAssetsFrom(dir string) error {
 	var err error
 	if gemNamesByLang, err = readAsset[map[string]map[string]string](dir, "sigils.lang.json"); err != nil {
@@ -104,6 +112,11 @@ func loadAssetsFrom(dir string) error {
 		return err
 	}
 	if abilityNamesByLang, err = readAsset[map[string]map[string]string](dir, "ability.lang.json"); err != nil {
+		return err
+	}
+	// 与上面那三张"名字表"同一类、同一次读：动作名的显示名（技能键是 AB_*、动作名是日文，两张表并起来
+	// 用，键空间不冲突 —— 见前端 lib/ability.ts）。
+	if actionNames, err = readAsset[map[string]string](dir, "chara.action.zh.json"); err != nil {
 		return err
 	}
 	if skillInfo, err = readAsset[map[string]SkillInfo](dir, "skill_status.json"); err != nil {

@@ -30,7 +30,7 @@ import {GlobalParamPanel} from "@/components/GlobalParamPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf} from "@/lib/actionflags"
-import type {CharaTable} from "@/lib/chara"
+import {PLAYER_CODE, type CharaTable} from "@/lib/chara"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -157,15 +157,13 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
     )
 }
 
-function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
+function ActionsPanelBase({t, charaNames, charaTable, actionNames}: {
     t: Messages
     charaNames: Record<string, string>
-    /** 能力键 -> 名字（ability.lang.json）：abilityTag_ 那一列显示用；缺条目回落键名。 */
-    abilityNames: Record<string, string>
     /** 角色表（chara.json）：名字的颜色从这里取，和专属 / 角色强化 / 专精技能三页同一个来源。 */
     charaTable: CharaTable
-    /** 可玩角色名单，**按游戏内部顺序**（App 从专属表推出来）。空数组视为"名单还不知道"，那时不过滤不排序。 */
-    playable: string[]
+    /** 动作名 → 名字（chara.action.zh.json，键 = 动作表 actionName_ 原样）：`abilityTag_` 那一列的显示。 */
+    actionNames: Record<string, string>
 }) {
     /**
      * **动作表的记录 + 字段顺序** —— 这一页唯一的数据来源。
@@ -249,18 +247,17 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
     const [busy, setBusy] = useState(false)
 
     /**
-     * 下拉里的角色，**按游戏内部顺序**：后端给的是字母序，这里换成 playable 的顺序——与专属 /
-     * 角色强化 / 专精技能三页一致；顺带把"不是玩家角色的那两个版本"（pl0100 / pl2000）滤掉。
+     * 下拉里的角色 = **后端说这一页能打开的那些**（容器里有动作表）里，只留玩家角色码。
      *
-     * 名单为空（专属表还没读出来）时**原样用后端的列表**：宁可多列几个、顺序先按字母，也不能把下拉清空。
+     * ‼️ 判据是本页自己的数据，**不是别的页面的名单**。这里以前拿「专属因子表」当名单去过滤，
+     * 于是 PL2000（龙人伊德）被挡在外面 —— 它有动作表、有名字、有属性色，只因为没有专属因子。
+     * 它和 PL0100（姬塔）各自有独立的动作表（实测两份都与"同一个角色的另一个形态"逐字节不同），
+     * 不该因为别的页没有它们就编辑不了。
+     *
+     * 顺序**不在这里排**：后端交回来的就是游戏的角色顺序（`chara.UIOrder`，见 service/tables.go 的
+     * `sortByCharaOrder`）—— 与「角色强化」「专精技能」两页一致。
      */
-    const orderedChars = useMemo(() => {
-        if (playable.length === 0) return characters
-        const rank = new Map(playable.map((code, i) => [code, i]))
-        return characters
-            .filter((code) => rank.has(code.toUpperCase()))
-            .sort((a, b) => rank.get(a.toUpperCase())! - rank.get(b.toUpperCase())!)
-    }, [characters, playable])
+    const orderedChars = useMemo(() => characters.filter((code) => PLAYER_CODE.test(code)), [characters])
 
     /**
      * 一次把这一页的几份数据读回来：当前角色码（从动作表路径上取）、FSM 名单、角色候选（下拉用）、
@@ -524,8 +521,8 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
                             rows={rows}
                             keys={keys}
                             t={t}
-                            // 技能键 → 名字：它把 `abilityTag_` 那一列显示成技能名（与现有表同一个来路）。
-                            abilityNames={abilityNames}
+                            // 动作名 → 名字：`abilityTag_` 那一列显示的就是它，查不到就显示 actionName_ 原文。
+                            actionNames={actionNames}
                             // 它数据到位后把保存动作交出来（与 GlobalParamPanel 同一个约定），
                             // 外面那个「保存」按钮再一起调 —— 这个组件自己没有工具条。
                             onSaveReady={(save) => {

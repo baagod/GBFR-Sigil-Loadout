@@ -1,11 +1,28 @@
+/*
+    `abilityTag_` 那一列显示什么。
+
+    **只有这一条规则**：查那张表（`assets/chara.action.zh.json`，键 = 动作表 `actionName_` 原样、一个字不改）
+    —— 有名字就显示它；没有（值空串、或者表里根本没这个键）就显示 `actionName_` 原文当占位符（灰）。
+
+    能力名是在**生成期**写进那张表的（拿每一行的 `abilityTag_` 去游戏文本里查，查不到就是空串），
+    所以这里**不再有第二套逻辑** —— 没有"官方名优先"、没有"去括号"、没有姬塔特例，那些全在生成期解决。
+    见 gen 的 translations/README.md。
+*/
+
+/** 查这条动作的名字（没有就是空串）。 */
+export const actionNameOf = (actionNames: Record<string, string>, actionName: string): string =>
+    actionName === "" ? "" : (actionNames[actionName] ?? "")
+
 /**
- * 能力键 → 显示名（随包的 ability.lang.json：{能力键: 名字}）。
+ * 这一格显示什么、灰不灰。
  *
- * 查不到就回落**键名本身**：表里那 10 个预留/未启用槽（AB_NP0000_04、AB_PL2000_05、AB_PL2100_09..16）
- * 十门语言全都没有名字 —— 别编造（见生成器的 game/texts/ability.go）。
- *
- * 姬塔（AB_PL0100_*）在表里也没有：她与古兰是同一个角色的两个性别、技能相同，名字只有古兰那一份，
- * 所以把前缀换成 AB_PL0000_ 再查一次。
+ * `muted` 表示"显示的是动作名原文、不是名字" —— 也就是占位符态。数据里那个技能键（`AB_*`）**不上屏**。
  */
-export const abilityName = (names: Record<string, string>, tag: string): string =>
-    names[tag] ?? names[tag.replace(/^AB_PL0100/, "AB_PL0000")] ?? tag
+export const actionTagLabel = (
+    actionNames: Record<string, string>,
+    actionName: string,
+): {text: string; muted: boolean} => {
+    const named = actionNameOf(actionNames, actionName)
+    if (named !== "") return {text: named, muted: false}
+    return {text: actionName, muted: true}
+}

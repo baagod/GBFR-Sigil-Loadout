@@ -56,11 +56,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 [-Target <path>
 
 将解压 `dist/GBFR-Sigil-Loadout-<版本>.zip` 到 `C:\Users\<username>\Desktop\Reloaded-II\Mods\` ( `-Target` 可改 )。
 
-迭代时（改完即看，不动生产包）：
+**迭代时（改完即看，不动生产包）：**
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy-quick.ps1 -DebugPort 9222
 ```
 
-`-DebugPort` 会把 WebView2 的调试端口打开；配合 [`tools/debug/`](tools/debug/README.md) 那套台架（CDP 量真实
-DOM、真鼠标量选区像素、只渲染动作表的独立调试页），布局类问题不必靠截图猜。
+`-DebugPort` 会把 WebView2 的调试端口打开；配合 [`tools/debug/`](tools/debug/README.md) 那套台架（CDP 量真实 DOM、真鼠标量选区像素、只渲染动作表的独立调试页），布局类问题不必靠截图猜。

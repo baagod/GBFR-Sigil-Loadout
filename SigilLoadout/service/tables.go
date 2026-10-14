@@ -6,9 +6,15 @@
 package service
 
 import (
+	"bytes"
+	"encoding/json"
 	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 )
 
 // ExplainBand 是一段共用同一份说明文案的等级区间。多数技能只有一个分段，少数会在中途换措辞，
@@ -144,6 +150,9 @@ type LimitBonusText struct {
 // CharaTable 是 assets/chara.json：语言无关的角色属性，**顶层就是 PL 码**。一次取值就拿到那个
 // 角色的颜色（生成器按 element 算好写进来的），不必先取属性名再去第二张表里查——原来那张六色调色表
 // 已经删了，它没有第二个消费者。
+//
+// ⚠️ 它是一张 map，所以**键序在这里留不住**（解码那一刻就没了）。而那份键序是有意义的 —— 它是游戏的
+// 角色顺序（生成器按 `chara.UIOrder` 排的，见 gen 的 limitbonus）。要顺序就用下面的 charaOrder。
 type CharaTable map[string]CharaInfo
 
 type CharaInfo struct {
@@ -154,4 +163,67 @@ type CharaInfo struct {
 	// 的颜色都是合法 hex、且与属性对得上"这条不变量由前端直接对着资产文件断言（见 chara.test.ts 与
 	// lib/chara.ts 的 CharaEntry），所以在 Go 这边留一份只给测试看的字段没有意义。
 	Color string `json:"color"`
+}
+
+/*
+charaOrder 读 assets/chara.json 的**键序** = 游戏的角色顺序（生成器按 `chara.UIOrder` 排的，见 gen 的
+limitbonus）。界面上的角色列表按它排 —— 与「角色强化」「专精技能」两页同一个顺序。
+
+为什么不能顺手从 CharaTable 里取：那是一张 map，顺序在解码那一刻就没了。JSON 对象本身是有序的，所以
+这里逐 token 读一遍**键**（值整段跳过 —— 值那一份由 loadAssetsFrom 读好了）。
+
+读不出来（资产缺了 / 形状不对）返回 nil：调用方退回按码排，**不因为拿不到顺序就把列表清空**。
+*/
+func charaOrder(dir string) []string {
+	raw, err := os.ReadFile(filepath.Join(dir, "chara.json"))
+	if err != nil {
+		return nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return nil
+	}
+	order := []string{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil
+		}
+		key, ok := tok.(string)
+		if !ok {
+			return nil
+		}
+		order = append(order, key)
+		var skip json.RawMessage
+		if err := dec.Decode(&skip); err != nil {
+			return nil
+		}
+	}
+	return order
+}
+
+/*
+sortByCharaOrder 把角色码排成**游戏的角色顺序**（order = charaOrder 读出来的那份）。
+
+不在 order 里的码排到最后、彼此按码排 —— 一个都不丢：解包目录里多出来的角色、或者资产里还没收录的码，
+都该照常出现在列表里，只是排在后面。order 为空（拿不到顺序）时整份按码排，调用方不必特判。
+*/
+func sortByCharaOrder(codes []string, order []string) []string {
+	rank := make(map[string]int, len(order))
+	for i, code := range order {
+		rank[strings.ToUpper(code)] = i
+	}
+	out := append([]string(nil), codes...) // 不改调用方那一份
+	sort.Slice(out, func(i, j int) bool {
+		ri, iok := rank[strings.ToUpper(out[i])]
+		rj, jok := rank[strings.ToUpper(out[j])]
+		if iok != jok {
+			return iok
+		}
+		if ri != rj {
+			return ri < rj
+		}
+		return out[i] < out[j]
+	})
+	return out
 }

@@ -65,17 +65,29 @@ type trackRef struct {
 }
 
 /*
+ActionNames 返回动作名的显示名表（assets/chara.action.zh.json：{动作表 actionName_ 的值: 显示名}）。
+
+界面拿它填 `abilityTag_` 列的**空白格** —— 那一行没有技能键（普通攻击、跳跃、受击这类动作本来就不属于
+任何技能），于是显示"这条动作叫什么"。表里**每一条都有值**（没翻的那些值就是原文本身，见生成器的
+translations/README.md）：查到就填，查不到（游戏更新冒出来的新动作名）就不动那一格。
+*/
+func (s *ActionsService) ActionNames() map[string]string { return actionNames }
+
+/*
 ListCharacters 列出**三个数据源都解出来了**的角色码（pl1000 / pl2900 …），给界面上的角色下拉用。
+顺序是**游戏的角色顺序**（assets/chara.json 的键序 = chara.UIOrder，见 sortByCharaOrder）—— 与
+「角色强化」「专精技能」两页一致；拿不到那份资产时退回按码排。
 
 判据就是 SetCharacter 那一把尺子（动作表 + flags 目录 + FSM 目录）：解包是按角色做的，只解了动作表、
-没解 flags 的角色切过去会失败，那它就不该出现在候选里。顺序排一下，界面上的顺序才稳。
+没解 flags 的角色切过去会失败，那它就不该出现在候选里。
 */
 func (s *ActionsService) ListCharacters() ([]string, error) {
 	cfg := s.config()
+	order := charaOrder(filepath.Join(appfiles.ExeDir(), assetsDir))
 	if codes, present, err := actionTableCodes(); err != nil {
 		return nil, err
 	} else if present {
-		return codes, nil
+		return sortByCharaOrder(codes, order), nil
 	}
 
 	root := filepath.Dir(filepath.Dir(cfg.Path))
@@ -93,8 +105,7 @@ func (s *ActionsService) ListCharacters() ([]string, error) {
 			codes = append(codes, entry.Name())
 		}
 	}
-	sort.Strings(codes)
-	return codes, nil
+	return sortByCharaOrder(codes, order), nil
 }
 
 /*

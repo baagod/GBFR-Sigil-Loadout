@@ -26,7 +26,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
-import {abilityNames, cleanup, makeRow, pressHandle, t, tableProps} from "@/components/actions-table/testkit"
+import {actionNames, cleanup, makeRow, pressHandle, t, tableProps} from "@/components/actions-table/testkit"
 
 afterEach(cleanup)
 
@@ -35,7 +35,7 @@ const renderTable = (reorder?: (from: number, to: number) => void) =>
     render(
         <ActionsTable
             t={t}
-            abilityNames={abilityNames}
+            actionNames={actionNames}
             {...tableProps([makeRow("1000"), makeRow("1001")])}
             reorder={reorder}
         />,

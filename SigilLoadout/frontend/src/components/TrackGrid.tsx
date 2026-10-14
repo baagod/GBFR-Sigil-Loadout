@@ -69,11 +69,11 @@ const toRow = (
  * **两张轨表共用的外壳**：行已经由各自的适配函数变成基座要的形状，这里只负责"上屏"。
  *
  * ‼️ flags 与普通轨**只有"列怎么上屏"这一处不同**（`keys` / `columnOf` / `pickerOf`），其余
- * （`abilityNames`、`initialSorting`、`initialPinnedCount` 与七个回调的接线）全在这一处写一次。
+ * （`actionNames`、`initialSorting`、`initialPinnedCount` 与七个回调的接线）全在这一处写一次。
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
 /** 轨表没有 `abilityTag_` 那一列，名字表用不上 —— 用**模块常量**而不是 `{}`：`memo` 靠引用比。 */
-const NO_ABILITY_NAMES: Record<string, string> = {}
+const NO_ACTION_NAMES: Record<string, string> = {}
 
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
 export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
@@ -116,7 +116,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     return (
         <ActionsTable
             t={t}
-            abilityNames={NO_ABILITY_NAMES}
+            actionNames={NO_ACTION_NAMES}
             rows={rowItems}
             keys={isFlags ? FLAG_COLUMNS : table.columns}
             columnOf={columnSpec}

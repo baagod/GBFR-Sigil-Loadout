@@ -5,6 +5,7 @@
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
 import type {Cell, Row} from "@tanstack/react-table"
 
+import {actionTagLabel} from "@/lib/ability"
 import {CellContent} from "./Cell"
 import {useSortable} from "@dnd-kit/sortable"
 import {
@@ -21,7 +22,7 @@ import {
     ringClasses,
     selectionClass,
 } from "./classes"
-import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, snapshotKey} from "./model"
+import {columnKind, features, shownValue, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, snapshotKey} from "./model"
 
 /**
  * 一格里那层 `<td>` —— **第二道 memo 命门**（第一道是外面的 `ActionRowView`）。
@@ -46,7 +47,7 @@ const RowCell = memo(function RowCell({
     className,
     width,
     left,
-    abilityNames,
+    actionLabel,
     draggedRef,
     dragRowRef,
     cellRef,
@@ -68,13 +69,17 @@ const RowCell = memo(function RowCell({
     original: string
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
+    /**
+     * **只读格显示什么** —— 只给 `abilityTag_`：那一列不上屏技能键，显示的是**这一行的动作名**
+     * （`actionName_`，见下面那段）。别的列不给。
+     */
+    actionLabel?: {text: string; muted: boolean}
     /** 这一格选没选中（底色与轮廓都由它推出来）。 */
     className: string
     width: number | null
     left: number | null
     /** **行头那几格的总宽**（行号列，能拖的表再加握把列）—— 钉住列的 `left` 要从它之后起算。 */
     rowHeadWidth: number
-    abilityNames: Record<string, string>
     draggedRef: RefObject<boolean>
     dragRowRef: RefObject<string | null>
     /**
@@ -120,7 +125,7 @@ const RowCell = memo(function RowCell({
                     raw={raw}
                     original={original}
                     shown={shown}
-                    abilityNames={abilityNames}
+                    actionLabel={actionLabel}
                     draggedRef={draggedRef}
                     edit={edit}
                     onEnterEdit={onEnterEdit}
@@ -145,7 +150,7 @@ export const ActionRowView = memo(function ActionRowView({
     rowNumber,
     measured,
     rowHeadWidth,
-    abilityNames,
+    actionNames,
     copySource,
     draggedRef,
     activeCellKey,
@@ -173,7 +178,11 @@ export const ActionRowView = memo(function ActionRowView({
     measured: boolean
     /** **行头那几格的总宽**（行号列 40，能拖的表再加握把列 32）—— 钉住列的 `left` 从它之后起算。 */
     rowHeadWidth: number
-    abilityNames: Record<string, string>
+    /**
+     * **动作名 → 名字**（`assets/chara.action.zh.json`，键 = 动作表 `actionName_` 原样）：`abilityTag_` 那一列
+     * 显示的就是它 —— 查不到就显示 `actionName_` 原文当占位符（见 `lib/ability.ts`，没有第二套逻辑）。
+     */
+    actionNames: Record<string, string>
     /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
     copySource: CopySource | null
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
@@ -314,6 +323,14 @@ export const ActionRowView = memo(function ActionRowView({
                 const columnCellClass = columnOf?.(key)?.cell ?? ""
                 /* 这一格的键（`snapshotKey`）算**一次**给下面两处共用，别每处再拼一遍。 */
                 const isActiveCell = activeCellKey === snapshotKey(row.id, key)
+                /*
+                    `abilityTag_` 那一格显示什么：**这一行的动作名去表里查**（技能键不上屏）。表里的名字是生成期
+                    拿每一行的 `abilityTag_` 查游戏文本写进去的，这里不再做第二套判断。别的列是 `undefined`。
+                */
+                const actionLabel =
+                    key === "abilityTag_"
+                        ? actionTagLabel(actionNames, shownValue(row.original, "actionName_"))
+                        : undefined
                 return (
                     <RowCell
                         key={cell.id}
@@ -337,7 +354,7 @@ export const ActionRowView = memo(function ActionRowView({
                         left={measured && pinned ? rowHeadWidth + cell.column.getStart("start") : null}
                         /* 只有活动格拿到滚动 ref（`undefined` = React 不绑）—— 判据在行那层算好。 */
                         cellRef={isActiveCell ? scrollActiveIntoView : undefined}
-                        abilityNames={abilityNames}
+                        actionLabel={actionLabel}
                         draggedRef={draggedRef}
                         dragRowRef={dragRowRef}
                         edit={edit}

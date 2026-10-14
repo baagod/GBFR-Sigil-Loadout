@@ -393,7 +393,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(clipboard.data["text/plain"]).not.toBe("actionFreeWork0_-原值")
     })
 
-    it("粘贴：写进改动那一栏，跳过只读列（id_ / abilityTag_ 不写）", async () => {
+    it("粘贴：写进改动那一栏，跳过只读列（`id_` / `abilityTag_` 不写）", async () => {
         const container = await renderTable()
         const target = cellAt(container, 0, 2) // 第 3 列（可编辑）
         selectCell(target) // 从这一格开始铺
@@ -514,14 +514,15 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(cellAt(container, 2, 2).className).not.toContain("cell-selected")
     })
 
-    it("粘贴：横跨只读列时位置不左移（只读那格的值丢掉）", async () => {
+    it("粘贴：横跨只读列时位置不左移（只读那格的值丢掉，其余照常写入）", async () => {
         const container = await renderTable()
 
         selectCell(cellAt(container, 0, 0)) // 从 `id_` 开始（只读）
         fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙\t丙")})
 
-        expect(cellAt(container, 0, 0).textContent).toBe("1000") // 只读列没被改
-        expect(cellAt(container, 0, 1).textContent).toBe("能力一") // 同上
+        expect(cellAt(container, 0, 0).textContent).toBe("1000") // 只读列没被改，位置也不左移 → "甲" 丢掉
+        // `abilityTag_` 是可编辑列（"乙" 写进去了），但那一格**显示的是动作名**、不是值本身 —— 夹具那几行
+        // 没有 `actionName_` 这一列，所以这里看不到"乙"。编辑能力由 render.test 那条双击用例守住。
         expect(cellAt(container, 0, 2).textContent).toBe("丙") // 第 3 格落到第 3 列
     })
 

@@ -15,7 +15,7 @@ import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 
 import {CELL_PADDING, INPUT_PADDING} from "@/components/actions-table/classes"
-import {KEYS, LongField, abilityNames, cellAt, clickToEdit, cleanup, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
+import {KEYS, LongField, actionNames, cellAt, clickToEdit, cleanup, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, rows} = useTableHarness()
 
@@ -280,7 +280,7 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         const errors: unknown[][] = []
         const spy = vi.spyOn(console, "error").mockImplementation((...args) => void errors.push(args))
         try {
-            const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps(rows())} />)
+            const {container} = render(<ActionsTable t={t} actionNames={actionNames} {...tableProps(rows())} />)
             /* 等表格真的上屏（顺带把 effect / 告警冲干净）—— 别写恒真的断言等：那等于没等。 */
             await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(rows().length))
         } finally {

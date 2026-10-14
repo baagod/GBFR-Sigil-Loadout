@@ -59,6 +59,9 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json',
     'limit_bonus.json', 'limit_bonus.zh.json', 'limit_bonus.en.json', 'limit_bonus.ja.json',
     'limit_bonus.ko.json', 'chara.json',
+    # 动作名 → 名字（动作表 actionName_ 那一列显示它）：由 `gen actionnames` 从 36 张动作表的
+    # actionName_/abilityTag_ 与游戏文本 ability.lang.json 算出来，写进这里。
+    'chara.action.zh.json',
     # 专精技能页那两张：缺了 loadSkillboardTables 直接返错，工具启动即挂。
     'skillboard.json', 'skillboard.zh.json',
     # 全部原始数据（17929 份轨 + 36 份动作表 + 16 份全局参数，条目名就是部署路径）：少了它，除了作者本机

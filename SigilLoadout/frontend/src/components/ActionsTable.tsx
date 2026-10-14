@@ -122,10 +122,13 @@ import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onCopyReady, onRowsReady, onRowsChange, columnOf}: {
+export function ActionsTable({t, actionNames = {}, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onCopyReady, onRowsReady, onRowsChange, columnOf}: {
     t: ActionsTableMessages
-    /** 技能键 → 名字（`ability.lang.json`）：`abilityTag_` 那一列显示用，缺条目回落键名。 */
-    abilityNames: Record<string, string>
+    /**
+     * 动作名 → 名字（`chara.action.zh.json`，键 = 动作表 `actionName_` 原样）：`abilityTag_` 那一列显示它，
+     * 查不到就显示原文。不给就是空表 —— 那张表（轨表）本来就没有这一列。
+     */
+    actionNames?: Record<string, string>
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
     /**
@@ -931,7 +934,7 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
                                 rowNumber={rowIndex + 1}
                                 measured={measured}
                                 rowHeadWidth={rowHeadWidth}
-                                abilityNames={abilityNames}
+                                actionNames={actionNames}
                                 /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
                                 copySource={copySource}
                                 draggedRef={draggedRef}

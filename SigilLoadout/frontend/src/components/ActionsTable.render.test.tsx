@@ -14,13 +14,13 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
 
-import {KEYS, abilityNames, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
+import {KEYS, actionNames, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
 describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
     it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
-        const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps([makeRow("1000")])} />)
+        const {container} = render(<ActionsTable t={t} actionNames={actionNames} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
         // 第一格是 `#`，而且**没有** `data-col-id` —— 量自然宽度那一趟按这个属性挑列，
         // 带上它就会被当成一个数据列量进去（列数就变了）。
@@ -91,7 +91,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         它会把整列撑宽 —— 那正是"看着像一列特别宽的空白列"。截断让列宽只跟内容走。
     */
     it("表头列名截断：内层带 truncate，且**不挂** title 提示", async () => {
-        const {container} = render(<ActionsTable t={t} abilityNames={abilityNames} {...tableProps([makeRow("1000")])} />)
+        const {container} = render(<ActionsTable t={t} actionNames={actionNames} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
 
         const head = container.querySelectorAll("thead th")[1]
@@ -106,7 +106,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         // （见 `model.columnLabel`），换一张表（比如轨表）只要列名叫这个就有。
         const line = {id: "1000", values: {}, originals: {startTime: "0.5", endTime: "1.5", someField_: "x"}}
         const {container} = render(
-            <ActionsTable t={t} abilityNames={{}} rows={[line]} keys={["startTime", "endTime", "someField_"]} />,
+            <ActionsTable t={t} actionNames={{}} rows={[line]} keys={["startTime", "endTime", "someField_"]} />,
         )
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(4))
         expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
@@ -138,8 +138,8 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     })
 
     /*
-        只读列（`id_` / `abilityTag_`）**不是灰色的**：它们显示的是权威值本身，不是"待覆盖的占位符"。
-        灰色只在可编辑列上表示"这一格还没改过"。
+        只读列（`id_`）**不是灰色的**：它显示的是权威值本身，不是"待覆盖的占位符"。灰色只在可编辑列上
+        表示"这一格还没改过"。`abilityTag_` 取消只读之后就归可编辑那一类了（空着时显示动作名占位符）。
     */
     it("只读列的原值不是灰的（灰 = 可编辑列'还没改过'，只读列没有这一态）", async () => {
         const container = await renderTable()
@@ -173,29 +173,57 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         按"钉住区里的序号 × 列宽"算的。真滚动时会不会穿帮仍然要眼睛看 —— 这条只防"代码改坏"。
     */
     /*
-        `abilityTag_` 显示的是**技能名**而不是键，但**数据层没动** —— `values` 里始终是键、提交给后端的
-        也是键，翻译只发生在显示那一层。所以这里断言"看到的是名字"，而数据仍由下面那组只读用例守住。
+        `abilityTag_` 那一列显示什么**全在表里**（键 = 动作表 `actionName_` 原样、一个字不改）：表里有名字就
+        显示名字，没有（值是空串、或者表里没这个键）就显示原文当占位符。夹具那几行没有 `actionName_` 这一
+        列，所以这两条自己造行。
     */
-    it("abilityTag_ 显示技能名：数据层仍是键（显示归显示，提交的还是键）", async () => {
-        const container = await renderTable()
-        const cell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
-        expect(cell.textContent).toBe("能力一")
+    it("abilityTag_：表里有名字 → 显示名字（不灰）", async () => {
+        const line = {
+            id: "1000",
+            values: {},
+            originals: {id_: "1000", abilityTag_: "AB_PL1400_02", actionName_: "鏡花水月(突進斬り)"},
+        }
+        const {container} = render(
+            <ActionsTable
+                t={t}
+                actionNames={{"鏡花水月(突進斬り)": "镜花水月"}}
+                rows={[line]}
+                keys={["id_", "abilityTag_", "actionName_"]}
+            />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        const cell = cellAt(container, 0, 1)
+        expect(cell.textContent).toBe("镜花水月")
+        expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
     })
 
-    it("abilityTag_ 查不到名字就回落键名（不编造）", async () => {
-        const container = await renderTable()
-        const cell = cellAt(container, 1, KEYS.indexOf("abilityTag_"))
-        expect(cell.textContent).toBe("AB_PL9999_99")
+    it("abilityTag_：表里没有名字（空串 / 没这个键）→ 动作名原文当占位符（灰）", async () => {
+        const line = {
+            id: "1000",
+            values: {},
+            originals: {id_: "1000", abilityTag_: "", actionName_: "□神楽連打1"},
+        }
+        const {container} = render(
+            <ActionsTable t={t} actionNames={{"□神楽連打1": ""}} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        const cell = cellAt(container, 0, 1)
+        expect(cell.textContent).toBe("□神楽連打1")
+        expect(cell.firstElementChild!.className).toContain("text-muted-foreground")
     })
 
     /*
         只读：显示名与可编辑天然冲突（键和名是两个东西，输入框里只能装一个），所以这一格不进编辑态。
     */
-    it("abilityTag_ 只读：点它不进编辑态", async () => {
+    /*
+        可编辑：那一列显示的是**能力名 / 动作名**，而存进去的是**技能键** —— 显示与提交是两回事（双击进编辑时
+        框里是键，提交的也是键），所以它没有"只读"那一态。
+    */
+    it("abilityTag_ 可编辑：双击进编辑态（框里是键）", async () => {
         const container = await renderTable()
         const cell = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
         clickToEdit(cell)
-        expect(cell.querySelector("input")).toBeNull()
+        expect(cell.querySelector("input")).not.toBeNull()
     })
 
     /*
@@ -225,7 +253,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         焦点一来那一行高 1px，整片表跟着跳）。
 
         ⚠️ 只读格**不能**带它：它顺手带的 `position: relative` 会跟钉住列的 `sticky` 抢同一个属性
-        （谁赢只看样式表顺序）—— 而这张表两个只读列恰好都是钉住的。
+        （谁赢只看样式表顺序）—— 这张表剩下的那个只读列（`id_`）恰好是钉住的。
     */
     it("可编辑格带 cell-focus（画焦点环）；只读格不带（免得它的 relative 跟 sticky 抢）", async () => {
         const container = await renderTable()
@@ -233,7 +261,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const editable = cellAt(container, 0, 2)
         expect(editable.className).toContain("cell-focus")
 
-        const readOnlyPinned = cellAt(container, 0, KEYS.indexOf("abilityTag_"))
+        const readOnlyPinned = cellAt(container, 0, KEYS.indexOf("id_"))
         expect(readOnlyPinned.className).not.toContain("cell-focus")
         expect(readOnlyPinned.className).toContain("sticky") // 它靠 sticky 钉住，不能被 relative 顶掉
         expect(readOnlyPinned.className).not.toContain("relative")
@@ -275,8 +303,8 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     /*
         复制取的是**原值**（用户定的口径，与 WPS / Excel 的"当前显示值"不同）。
 
-        `abilityTag_` 那一格显示"能力一"，但数据里是 `AB_PL1000_01` —— 复制成中文名的话，
-        粘回另一行就把名字写进了键的位置，数据就坏了。所以复制**不能**走 `accessorFn`
+        值格显示的是**翻译过的选项名**（`controlTypeHash_` 那类是中文），而数据里是数字/哈希 ——
+        复制成显示值的话，粘回另一行就把名字写进了值的位置，数据就坏了。所以复制**不能**走 `accessorFn`
         （它算的是显示值），得直接读 `originals`。
     */
 })
