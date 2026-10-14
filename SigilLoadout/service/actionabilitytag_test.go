@@ -43,3 +43,25 @@ func TestMergeActionTableSkipsAbilityTag(t *testing.T) {
 		t.Fatal("改别的列应该照常写回")
 	}
 }
+
+/*
+但"不进产物"**不等于**"没改过"：用户改的名字得**留在账本里**（界面靠它显示、重启也在），只是不落进
+动作表。这里走整条 SaveActions —— 产物不该有，账本那条**必须在**。
+*/
+func TestSaveActionsKeepsAbilityTagInTheLedger(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	saveRow(t, service, "6", []ActionField{{Key: "abilityTag_", Value: strPtr("我自己起的名字")}})
+
+	edits, err := loadActionEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 || edits[0].Field != "abilityTag_" || edits[0].Value == nil || *edits[0].Value != "我自己起的名字" {
+		t.Fatalf("改的名字应该留在账本里，实际 %+v", edits)
+	}
+	if _, err := os.Stat(deployActionPath(cfg)); !os.IsNotExist(err) {
+		t.Fatal("只改 abilityTag_ 时不该有产物")
+	}
+}

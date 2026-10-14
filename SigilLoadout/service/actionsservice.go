@@ -388,8 +388,10 @@ func (s *ActionsService) SaveActions(rows []ActionRecord) error {
 /*
 deployActionTable 把当前角色的动作表搬进 mod（源文件一个字节都不碰），并把**清理后**的改动表落盘。
 
-改动全是空操作 → 与原表数值一致：不留产物（mod 里那份删掉，游戏读它自己的原表），这一批改动也不再记账。
-别的角色的改动原样留着：它们的原表不是这一份。
+**产物**看 `changed`：改动全是空操作（与原表数值一致）→ 不留产物（mod 里那份删掉，游戏读它自己的原表）。
+
+**账本**看"这个角色有没有真改动"，与产物**无关**：像 `abilityTag_` 那种只给人看、不写回表的改动不进产物，
+但它照样是用户改过的（界面靠账本显示、重启也在）。别的角色的改动原样留着：它们的原表不是这一份。
 
 落盘长在这里的理由与 pruneTrackEdits 一样：清理的结果必须写回去 —— 否则下次读到的还是那份空操作账本。
 */
@@ -398,23 +400,27 @@ func (s *ActionsService) deployActionTable(cfg actionConfig, original *msgValue,
 	if err != nil {
 		return err
 	}
-	if !changed {
-		if err := removeDeployed(deployActionPath(cfg)); err != nil {
+	if changed {
+		if err := appfiles.WriteAtomic(deployActionPath(cfg), body); err != nil {
 			return err
 		}
-		char := charCode(cfg)
-		kept := make([]actionEdit, 0, len(edits))
-		for _, edit := range edits {
-			if edit.Char != char {
-				kept = append(kept, edit)
-			}
-		}
-		return saveActionEdits(kept)
-	}
-	if err := appfiles.WriteAtomic(deployActionPath(cfg), body); err != nil {
+	} else if err := removeDeployed(deployActionPath(cfg)); err != nil {
 		return err
 	}
-	return saveActionEdits(edits)
+	char := charCode(cfg)
+	kept := make([]actionEdit, 0, len(edits))
+	own := false
+	for _, edit := range edits {
+		if edit.Char != char {
+			kept = append(kept, edit)
+		} else {
+			own = true
+		}
+	}
+	if own {
+		return saveActionEdits(edits)
+	}
+	return saveActionEdits(kept)
 }
 
 /*
