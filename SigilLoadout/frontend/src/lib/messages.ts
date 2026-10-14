@@ -94,7 +94,7 @@ const zh = {
     colStart: "开始",
     colEnd: "结束",
     colAbilityTag: "动作",
-    colActionName: "备注",
+    colActionName: "注释",
     colFrame: "帧",
     colEffects: "效果",
     // 这三个是 XML 里的原字段名，四语一致（同 colFlag0 / colFlag1 的做法）
