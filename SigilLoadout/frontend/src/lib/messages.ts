@@ -67,6 +67,11 @@ const zh = {
     remove: "删除",
     addRow: "添加",
     saveAndDeploy: "保存",
+    /**
+     * 动画详情那个弹层的「保存」：它只管**当前这个动画**那几条轨（动作表与全局参数归页面那个「保存」）。
+     * 两个按钮的文案必须分得开 —— 重装 mod 之后在弹层里按下去，别处的改动不会回来。
+     */
+    saveAnimation: "保存动画",
     generalTracks: "轨迹表",
     /** 手风琴第二个条目的标题：下面那块地方放动作表。 */
     actionsSection: "动作表",
@@ -155,6 +160,7 @@ export const messages: Record<Lang, Messages> = {
         remove: "Delete",
         addRow: "Add",
         saveAndDeploy: "Save",
+        saveAnimation: "Save animation",
         generalTracks: "Track table",
         actionsSection: "Action table",
         multiAreaCopy: "Select cells in the same row or column.",
@@ -227,6 +233,7 @@ export const messages: Record<Lang, Messages> = {
         remove: "削除",
         addRow: "追加",
         saveAndDeploy: "保存",
+        saveAnimation: "アニメーションを保存",
         generalTracks: "トラック表",
         actionsSection: "アクション表",
         multiAreaCopy: "同じ行または同じ列のセルを選んでください。",
@@ -299,6 +306,7 @@ export const messages: Record<Lang, Messages> = {
         remove: "삭제",
         addRow: "추가",
         saveAndDeploy: "저장",
+        saveAnimation: "애니메이션 저장",
         generalTracks: "트랙 표",
         actionsSection: "액션 표",
         multiAreaCopy: "같은 행이나 같은 열의 셀을 선택하세요.",

@@ -53,7 +53,7 @@ func TestActionIDsAreASetting(t *testing.T) {
 
 它很容易在不知不觉中坏掉：SetPath / SetFlagsDir / SetFsmDir 也会写这份配置，而它们手里的 IDs 是 nil
 —— tag 上少了 omitzero，nil 就会被写成 `[]`，于是"顺手改一下路径"就把"没配过"变成了"全部记录"。
-（这正是 TestSaveActionFieldsWritesTheEditBack 变红的原因：它按默认清单取 actions[1]，却拿到了全部记录里
+（这正是 TestSaveActionsWritesTheEditBack 变红的原因：它按默认清单取 actions[1]，却拿到了全部记录里
 的第 2 条。）
 */
 func TestUnsetIDListFallsBackToTheDefaultAndAnEmptyOneDoesNot(t *testing.T) {

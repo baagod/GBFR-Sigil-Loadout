@@ -738,7 +738,6 @@ func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
 	if err != nil {
 		return err
 	}
-	items := make([]trackWrite, 0, len(tables))
 	for _, table := range tables {
 		// 身份先校验（它们都会被拼进文件名）：不认的写法不该有机会进改动表。
 		if _, err := trackXMLPath(cfg, motion, table.Sub, table.Kind); err != nil {
@@ -768,10 +767,7 @@ func (s *ActionsService) SaveTracks(motion string, tables []TrackTable) error {
 		}
 		ref := trackRef{motion: motion, sub: table.Sub, kind: table.Kind}
 		edits = setTrackEdit(edits, char, ref, string(raw), marks)
-		items = append(items, trackWrite{motion: motion, sub: table.Sub, kind: table.Kind, raw: raw})
 	}
-	if err := saveTrackEdits(edits); err != nil {
-		return err
-	}
-	return s.writeAndDeployTracks(cfg, items)
+	// 收尾与 flags 那一侧**同一条**（见 actionsservice.go 的 commitTracks）：清理 + 记账 + 搬出去。
+	return s.commitTracks(cfg, edits, motion)
 }

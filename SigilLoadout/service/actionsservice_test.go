@@ -131,6 +131,23 @@ func flagValue(t *testing.T, row FlagRow, key string) string {
 func strPtr(s string) *string { return &s }
 
 /*
+saveRow / saveErr 是测试里的"保存一行"（生产走整表一次的 SaveActions，见 actionsservice.go）。
+
+留着这一对而不是到处写 `SaveActions([]ActionRecord{{ID: …}})`：单行保存是这些测试真正在断言的东西，
+信封不该盖过它。
+*/
+func saveRow(t *testing.T, service *ActionsService, id string, fields []ActionField) {
+	t.Helper()
+	if err := saveErr(service, id, fields); err != nil {
+		t.Fatalf("SaveActions(%s): %v", id, err)
+	}
+}
+
+func saveErr(service *ActionsService, id string, fields []ActionField) error {
+	return service.SaveActions([]ActionRecord{{ID: id, Fields: fields}})
+}
+
+/*
 清单上的记录一条都对不上**不是错误**：那份清单是跨角色共用的（pl1000 的表里没有 954 很正常）。
 LoadActions 返回空列表，界面在表格位置提示"没有这些记录"，而不是弹一句"读取失败：…一条都没有"。
 */
@@ -283,7 +300,7 @@ func TestContainsToken(t *testing.T) {
 这是这一页换成"原值 + 改动"模型要保证的第一件事。以前是保存即覆盖源，手滑把一格留空就把原值写没了
 （实测丢过 id 4 的 saveMotId02_/03_：本来 "-"，被写成空串）。
 */
-func TestSaveActionFieldsNeverWritesTheSource(t *testing.T) {
+func TestSaveActionsNeverWritesTheSource(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
@@ -301,9 +318,7 @@ func TestSaveActionFieldsNeverWritesTheSource(t *testing.T) {
 			fields[i].Value = strPtr("95")
 		}
 	}
-	if err := service.SaveActionFields("6", fields); err != nil {
-		t.Fatalf("SaveActionFields: %v", err)
-	}
+	saveRow(t, service, "6", fields)
 
 	after, err := os.ReadFile(cfg.Path)
 	if err != nil {
@@ -358,9 +373,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 			fields[i].Value = strPtr("95")
 		}
 	}
-	if err := service.SaveActionFields("6", fields); err != nil {
-		t.Fatalf("SaveActionFields: %v", err)
-	}
+	saveRow(t, service, "6", fields)
 
 	actions, err = service.LoadActions()
 	if err != nil {
@@ -377,9 +390,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 			fields[i].Value = nil
 		}
 	}
-	if err := service.SaveActionFields("6", fields); err != nil {
-		t.Fatalf("SaveActionFields（清空）: %v", err)
-	}
+	saveRow(t, service, "6", fields)
 
 	// 清空这一格 = 回原值。它是这张表**唯一**的改动 → 整张表与原表数值一致：mod 里那份产物被清掉
 	// （游戏回去读它自己的原表 —— 那里面当然就是原值，这正是这条测试要证的事，见 actionprune.go）。
@@ -491,7 +502,7 @@ func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
 把读出来的字段**原样**写回去：解包副本一个字节都不该变。这条护的是"整份读-改-写"里没碰过的记录
 （35 条）与没碰过的格子（87 格里除了改的那几格）不会被顺手重排或改成最简写法。
 */
-func TestSaveActionFieldsKeepsUntouchedBytes(t *testing.T) {
+func TestSaveActionsKeepsUntouchedBytes(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
@@ -503,10 +514,13 @@ func TestSaveActionFieldsKeepsUntouchedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 整表原样交一次（界面那个「保存」就是这么交的）。
+	rows := make([]ActionRecord, 0, len(actions))
 	for _, action := range actions {
-		if err := service.SaveActionFields(action.ID, action.Fields); err != nil {
-			t.Fatalf("SaveActionFields(%s): %v", action.ID, err)
-		}
+		rows = append(rows, ActionRecord{ID: action.ID, Fields: action.Fields})
+	}
+	if err := service.SaveActions(rows); err != nil {
+		t.Fatalf("SaveActions: %v", err)
 	}
 
 	after, err := os.ReadFile(cfg.Path)
@@ -525,7 +539,7 @@ func TestSaveActionFieldsKeepsUntouchedBytes(t *testing.T) {
 }
 
 // 真改一格：那一格变了、别的都不动，另一条记录也不受影响。
-func TestSaveActionFieldsWritesTheEditBack(t *testing.T) {
+func TestSaveActionsWritesTheEditBack(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
@@ -539,9 +553,7 @@ func TestSaveActionFieldsWritesTheEditBack(t *testing.T) {
 			fields[i].Value = strPtr("95")
 		}
 	}
-	if err := service.SaveActionFields("6", fields); err != nil {
-		t.Fatalf("SaveActionFields: %v", err)
-	}
+	saveRow(t, service, "6", fields)
 
 	reread, err := service.LoadActions()
 	if err != nil {
@@ -565,7 +577,7 @@ func TestSaveActionFieldsWritesTheEditBack(t *testing.T) {
 /*
 记录里没有的键当场报错，而且**不落盘**：静默丢掉等于界面上说保存成功、游戏里什么都没变。
 */
-func TestSaveActionFieldsRejectsWhatItCannotApply(t *testing.T) {
+func TestSaveActionsRejectsWhatItCannotApply(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
@@ -574,17 +586,17 @@ func TestSaveActionFieldsRejectsWhatItCannotApply(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := service.SaveActionFields("6", []ActionField{{Key: "nope_", Value: strPtr("1")}}); err == nil {
+	if err := saveErr(service, "6", []ActionField{{Key: "nope_", Value: strPtr("1")}}); err == nil {
 		t.Fatal("记录里没有的键被收下了")
 	}
-	if err := service.SaveActionFields("99", []ActionField{{Key: "id_", Value: strPtr("99")}}); err == nil {
+	if err := saveErr(service, "99", []ActionField{{Key: "id_", Value: strPtr("99")}}); err == nil {
 		t.Fatal("记录里没有的 id_ 被收下了")
 	}
-	if err := service.SaveActionFields("  ", []ActionField{{Key: "id_", Value: strPtr("1")}}); err == nil {
+	if err := saveErr(service, "  ", []ActionField{{Key: "id_", Value: strPtr("1")}}); err == nil {
 		t.Fatal("空的 id_ 被收下了")
 	}
 	// supportEffectList_ 那一格要的是 JSON 字符串数组。
-	if err := service.SaveActionFields("6", []ActionField{{Key: "supportEffectList_", Value: strPtr("0")}}); err == nil {
+	if err := saveErr(service, "6", []ActionField{{Key: "supportEffectList_", Value: strPtr("0")}}); err == nil {
 		t.Fatal("数组那一格收下了一段不是 JSON 数组的文本")
 	}
 
@@ -637,4 +649,200 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(modDir, "pl", "pl1000", "pl1000_3400_0_seq_edit_flags.bxm")); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("没改过的 3400 也被搬了")
 	}
+}
+
+/*
+「交上来的值与原值逐字相同」= 没改：账本里不留条目（界面于是显示灰字占位符，而不是"看着改过、
+其实一模一样"的亮字）。
+*/
+func TestSaveActionsDropsAValueEqualToTheOriginal(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	actions, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := ""
+	for _, field := range actionByID(t, actions, "6").Fields {
+		if field.Key == "abilityChargeTime_" {
+			original = field.Original
+		}
+	}
+
+	// 手打了一遍原值（不是留空）：**还是"没改"**。
+	saveRow(t, service, "6", []ActionField{{Key: "abilityChargeTime_", Value: strPtr(original)}})
+
+	edits, err := loadActionEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 0 {
+		t.Fatalf("与原值相同的提交不该进账本，实际 %+v", edits)
+	}
+	for _, action := range mustLoadActions(t, service) {
+		if action.ID != "6" {
+			continue
+		}
+		for _, field := range action.Fields {
+			if field.Key == "abilityChargeTime_" && field.Value != nil {
+				t.Fatalf("读回来是 %q，want nil（界面据此显示灰字占位符）", *field.Value)
+			}
+		}
+	}
+}
+
+/*
+账本**只记真改过的那几格**：把整份字段原样交回来（含 87 个 nil —— 老前端就是这么交的）不该把它撑大。
+
+这条护的是"账本 = 改动清单"这个模型：界面曾经为每一格都记一条 null，一张表 2871 条、408 KB，而真改动
+只有一条。现在 nil 条目连读都读不出来（见 loadActionEdits），更不会被写回去。
+*/
+func TestSaveActionsKeepsTheLedgerToTheEditedCells(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	actions, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 整表一次交回来：没改的格子是 nil（老前端的口径）。
+	rows := make([]ActionRecord, 0, len(actions))
+	for _, action := range actions {
+		fields := action.Fields
+		if action.ID == "6" {
+			for i := range fields {
+				if fields[i].Key == "abilityChargeTime_" {
+					fields[i].Value = strPtr("95")
+				}
+			}
+		}
+		rows = append(rows, ActionRecord{ID: action.ID, Fields: fields})
+	}
+	if err := service.SaveActions(rows); err != nil {
+		t.Fatalf("SaveActions: %v", err)
+	}
+
+	edits, err := loadActionEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("账本该只有那一格改动，实际 %d 条", len(edits))
+	}
+	if edits[0].ID != "6" || edits[0].Field != "abilityChargeTime_" || edits[0].Value == nil || *edits[0].Value != "95" {
+		t.Fatalf("账本里那条不对: %+v", edits[0])
+	}
+}
+
+/*
+「整行替换」：交上来的就是这一行**现在**全部的改动 —— 上一次交过、这一次没交的格子，算回到原值。
+
+界面删空一格就是这条路的自然结果（它不再把没改的键交上来），所以后端不能再按"逐格 patch"理解。
+*/
+func TestSaveActionsReplacesTheWholeRow(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	sampleActionTable(t, cfg)
+	original := fieldOriginal(t, service, "6", "actionName_")
+
+	// 同一条记录改两格。
+	saveRow(t, service, "6", []ActionField{
+		{Key: "abilityChargeTime_", Value: strPtr("95")},
+		{Key: "actionName_", Value: strPtr("改过的名字")},
+	})
+	edits, err := loadActionEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 2 {
+		t.Fatalf("两格改动该记两条，实际 %d 条", len(edits))
+	}
+
+	// 再交一次，这次只带其中一格 —— 另一格该整份消失（回到原值）。
+	saveRow(t, service, "6", []ActionField{{Key: "abilityChargeTime_", Value: strPtr("96")}})
+	edits, err = loadActionEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 || edits[0].Field != "abilityChargeTime_" {
+		t.Fatalf("整行替换之后账本该只剩 abilityChargeTime_，实际 %+v", edits)
+	}
+
+	// 部署产物里那一格也要跟着回原值（账本没了那条，合成的就是原表的值）。
+	deployed, err := loadActionTable(filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := actionFieldValue(recordByID(deployed, "6").entry("actionName_")); got != original {
+		t.Fatalf("没再交的那一格部署出去是 %q，want 原值 %q", got, original)
+	}
+	if got, _ := actionFieldValue(recordByID(deployed, "6").entry("abilityChargeTime_")); got != "96" {
+		t.Fatalf("这次交的那一格部署出去是 %q，want 96", got)
+	}
+}
+
+/*
+整表一次保存的**失败半径**：任何一行不合格就什么都不落盘（账本、mod 产物都不动）。
+
+逐行写的时候这条做不到 —— 第 1 行已经落盘、第 2 行才报错，磁盘上就留下半份改动，而"部署"那一步跟着
+被跳过（正是 ActionsPanel 那段"半保存 + 没部署"的来由）。
+*/
+func TestSaveActionsWritesNothingWhenOneRowIsRejected(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	sampleActionTable(t, cfg)
+
+	// 先真改一格：产物该出现。它就是下面"没被动过"的对照。
+	fields := actionByID(t, mustLoadActions(t, service), "6").Fields
+	for i := range fields {
+		if fields[i].Key == "abilityChargeTime_" {
+			fields[i].Value = strPtr("95")
+		}
+	}
+	saveRow(t, service, "6", fields)
+	deployed := filepath.Join(modDir, "system", "player", "data", "pl1000", "pl1000_action.msg")
+	before, err := os.ReadFile(deployed)
+	if err != nil {
+		t.Fatalf("改过之后该有产物: %v", err)
+	}
+
+	// 一次交两行：第一行合格、第二行的键记录里没有 → 整批被拒。
+	if err := service.SaveActions([]ActionRecord{
+		{ID: "6", Fields: []ActionField{{Key: "abilityChargeTime_", Value: strPtr("96")}}},
+		{ID: "4", Fields: []ActionField{{Key: "nope_", Value: strPtr("1")}}},
+	}); err == nil {
+		t.Fatal("记录里没有的键被收下了")
+	}
+
+	if got := fieldValue(actionByID(t, mustLoadActions(t, service), "6"), "abilityChargeTime_"); got != "95" {
+		t.Fatalf("被拒的那一批里第一行却落了盘：读回来是 %q，want 95", got)
+	}
+	after, err := os.ReadFile(deployed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("被拒的那一批把产物也改了")
+	}
+}
+
+// mustLoadActions 读一次表，读不出来当场失败（测试里到处都要这一对三行）。
+func mustLoadActions(t *testing.T, service *ActionsService) []Action {
+	t.Helper()
+	actions, err := service.LoadActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return actions
+}
+
+// fieldOriginal 取某个字段的原值（写回原值那几条测试要用它当"默认值"）。
+func fieldOriginal(t *testing.T, service *ActionsService, id, key string) string {
+	t.Helper()
+	for _, field := range actionByID(t, mustLoadActions(t, service), id).Fields {
+		if field.Key == key {
+			return field.Original
+		}
+	}
+	t.Fatalf("记录 %s 里没有 %s", id, key)
+	return ""
 }

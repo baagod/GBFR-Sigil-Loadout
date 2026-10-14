@@ -16,7 +16,7 @@ import {cleanup, fireEvent, render, waitFor} from "@testing-library/react"
 import type {ReactElement} from "react"
 import {afterEach, beforeEach, expect, vi} from "vitest"
 
-import {LoadActions, SaveActionFields} from "../../../bindings/sigilloadout/service/actionsservice"
+import {LoadActions, SaveActions} from "../../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_SELECTED_BG, PICK_MARK} from "@/components/actions-table/classes"
 import {columnsOf, toActionRow, type ActionsTableMessages} from "@/components/actions-table/model"
@@ -147,7 +147,7 @@ export function useTableHarness() {
  */
 function installServiceMocks() {
     vi.resetAllMocks()
-    vi.mocked(SaveActionFields).mockResolvedValue(undefined)
+    vi.mocked(SaveActions).mockResolvedValue(undefined)
     /*
         ‼️ `LoadActions` 是"**一调就炸**"，不是拿它喂数据：表是受控视图，生产里读它的只有 `ActionsPanel`。
         留着这一条是为了守住"表自己不许再读一次"——那是"同一份数据两个来源"那类顺序问题的来路；

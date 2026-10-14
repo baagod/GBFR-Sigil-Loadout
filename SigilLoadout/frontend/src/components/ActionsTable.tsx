@@ -53,7 +53,7 @@ import {
     type SortingState,
 } from "@tanstack/react-table"
 
-import {SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
+import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -394,20 +394,25 @@ export function ActionsTable({t, abilityNames, rows: rowsProp, keys: keysProp, o
         onCellSelectionChange: setCellSelection,
     })
 
-    // 保存：整条记录交出去（后端只认记录里已有的键，也只会动交出去的格子）。提交口径见上面那段。
+    /*
+        保存：**整表一次**交出去，只带有值的那些格子。
+
+        ‼️ 一次而不是逐行：一行要"读原表 → 合并 → 编码整份 msgpack → 写文件 → 重写账本"，逐行做一次点击
+        就是 35 次（实测 700 ms 级），而且第 N 行失败时前 N−1 行已经落盘、部署又被跳过 —— 半保存。
+        后端按"整行替换"算：没交的键（本行没改、或有值但等于原值）就是回到原值（见 SaveActions）。
+    */
     useEffect(() => {
         onSaveReady?.(async () => {
-            for (const row of rows) {
-                await SaveActionFields(
-                    row.id,
-                    keys.map((key) => {
-                        const typed = row.values[key] ?? ""
-                        return {key, value: typed === "" ? null : typed}
-                    }),
-                )
-            }
+            await SaveActions(
+                rows.map((row) => ({
+                    id: row.id,
+                    fields: Object.entries(row.values)
+                        .filter(([, value]) => value !== "")
+                        .map(([key, value]) => ({key, value})),
+                })),
+            )
         })
-    }, [rows, keys, onSaveReady])
+    }, [rows, onSaveReady])
 
     /**
      * 选区解析出来的矩形边界（库**记忆化**过，一次渲染只算一遍）。

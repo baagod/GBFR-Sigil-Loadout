@@ -126,9 +126,23 @@ export function useClipboardHistory({
      * 它变的时候本来就该重渲）。
      */
     const edit = useCallback(
-        (rowId: string, columnId: string, value: string | null) => {
-            const next = value ?? ""
-            const before = rowsRef.current.find((row) => row.id === rowId)?.values[columnId] ?? ""
+        /**
+         * @param normalise 值打成与原值一模一样时，是否归一成"没改过"（**默认是**）。粘贴那条路要关掉它：
+         *   用户口径是"往源区里粘一个跟原来一模一样的值，**虚线照样撤**"（见 `CopySource` 规则②）——
+         *   归一之后那一格连写都不写，那一记粘贴就什么痕迹都没有了。
+         */
+        (rowId: string, columnId: string, value: string | null, normalise = true) => {
+            const row = rowsRef.current.find((one) => one.id === rowId)
+            const raw = value ?? ""
+            /*
+                ‼️ **打成与原值一样 = 没改**：这一格没有"改成与原值相同的值"那一态（与"清空"同一条口径，
+                见 model.ts 那段）。所以在这里当场归一成空串 —— 界面**立刻**回灰字、账本里不留条目，
+                而不是"保存前后都是亮的，其实与原值一模一样"（用户报的正是这一条）。
+
+                归一之后再判重：原来的值就是空串时等于什么都没发生（不写 state、也不进撤销栈）。
+            */
+            const next = normalise && raw === (row?.originals[columnId] ?? "") ? "" : raw
+            const before = row?.values[columnId] ?? ""
             if (before === next) return // 值没变不是一步：不写 state、也不进撤销栈
             if (!undoingRef.current && !batchingRef.current) undoRef.current.push([{rowId, columnId, before}])
             /*
@@ -401,7 +415,9 @@ export function useClipboardHistory({
             */
             batchingRef.current = true
             try {
-                for (const w of writes) edit(w.rowId, w.columnId, w.value)
+                // `normalise = false`：粘贴不归一（理由见 `edit` 的参数说明）—— 粘一个与原值相同的值
+                // 也要**真的写进去**，好让"动过源区 → 撤虚线"这条规则成立。
+                for (const w of writes) edit(w.rowId, w.columnId, w.value, false)
             } finally {
                 batchingRef.current = false
             }

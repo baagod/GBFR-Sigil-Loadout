@@ -8,7 +8,7 @@ import {fireEvent, screen} from "@testing-library/react"
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     LoadActions: vi.fn(),
-    SaveActionFields: vi.fn(),
+    SaveActions: vi.fn(),
 }))
 
 import {PINNED_COUNT} from "@/components/actions-table/classes"

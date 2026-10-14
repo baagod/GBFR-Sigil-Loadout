@@ -313,19 +313,31 @@ func loadActionOriginal(cfg actionConfig) (*msgValue, error) {
 }
 
 /*
-SaveActionFields 记下 id_ = id 这条记录的改动，并部署到 Mods。
+ActionRecord 是界面交上来的一条记录：id_ 加上"这一行现在有哪些改动"。
+
+界面把**整张表**的这些一起交过来（见 SaveActions）—— 没交的记录保持原状（比如清单筛掉了看不见的那些），
+所以这个切片不必包含表里全部记录。
+*/
+type ActionRecord struct {
+	ID     string        `json:"id"`
+	Fields []ActionField `json:"fields"`
+}
+
+/*
+SaveActions 保存整张表的改动并部署到 Mods（界面上那个「保存」按一次就是这一下）。
 
 **不写源文件**：改动进用户目录的 action_edits.json（原始动作表永远只读），部署时"原始 + 改动"合成
-一份 msgpack 写进 mod —— 所以 mod 里是完整成品，不是补丁。Value 为 nil 的格子 = 回到原值（界面留空即此）。
+一份 msgpack 写进 mod —— 所以 mod 里是完整成品，不是补丁。
 
-只认记录里已有的键：多出来的键当场报错（静默丢掉等于界面上说保存成功、游戏里什么都没变）。
+口径是**整行替换**（见 actionRowEdits / replaceActionEdits）：每条记录交上来的就是它现在全部的改动 ——
+没交的格子、交了 `null` 的格子、以及交了**与原值相同**的格子，一律算"回到原值"。所以界面只交"有值的
+那些格子"。
+
+为什么是整表一次、而不是每行调一次：一行改动要"读原表 → 合并 → 编码整份 msgpack → 写文件 → 重写账本"，
+逐行做就是 35 次（实测一次点击 700 ms 级）。更要紧的是**失败半径**：逐行写时第 N 行失败，前 N−1 行
+已经落盘、而"部署"那一步又被跳过 —— 磁盘上一半新一半旧。一次做完之后，校验全部通过才落盘、才部署。
 */
-func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return errors.New("没给记录 id_")
-	}
-
+func (s *ActionsService) SaveActions(rows []ActionRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -334,48 +346,50 @@ func (s *ActionsService) SaveActionFields(id string, fields []ActionField) error
 	if err != nil {
 		return err
 	}
-	record := recordByID(original, id)
-	if record == nil {
-		return fmt.Errorf("动作表里没有 id_ = %q 的记录", id)
-	}
-	for _, field := range fields {
-		if record.entry(field.Key) == nil {
-			return fmt.Errorf("id_ = %q 的记录里没有 %s 这一格", id, field.Key)
-		}
-	}
-
 	edits, err := loadActionEdits()
 	if err != nil {
 		return err
 	}
+
 	char := charCode(cfg)
-	for _, field := range fields {
-		edits = setActionEdit(edits, char, id, field.Key, field.Value)
+	for _, row := range rows {
+		id := strings.TrimSpace(row.ID)
+		if id == "" {
+			return errors.New("没给记录 id_")
+		}
+		record := recordByID(original, id)
+		if record == nil {
+			return fmt.Errorf("动作表里没有 id_ = %q 的记录", id)
+		}
+		next, err := actionRowEdits(record, char, id, row.Fields)
+		if err != nil {
+			return err
+		}
+		edits = replaceActionEdits(edits, char, id, next)
 	}
+
 	// 部署这一步把三件事一次办完：非法值当场报错（坏值不会先被存下来）、"有没有真改动"顺手算出来、
 	// 该写的字节也合成了。它同时决定账本该记什么 —— 全是空操作的改动不记账，mod 里那份也删掉
 	// （见 actionprune.go）。
-	kept, err := s.deployActionTable(cfg, edits)
-	if err != nil {
-		return err
-	}
-	return saveActionEdits(kept)
+	return s.deployActionTable(cfg, original, edits)
 }
 
 /*
-deployActionTable 把当前角色的动作表写进 mod（源文件一个字节都不碰），并把**清理后**的改动表还给调用方。
+deployActionTable 把当前角色的动作表搬进 mod（源文件一个字节都不碰），并把**清理后**的改动表落盘。
 
 改动全是空操作 → 与原表数值一致：不留产物（mod 里那份删掉，游戏读它自己的原表），这一批改动也不再记账。
 别的角色的改动原样留着：它们的原表不是这一份。
+
+落盘长在这里的理由与 pruneTrackEdits 一样：清理的结果必须写回去 —— 否则下次读到的还是那份空操作账本。
 */
-func (s *ActionsService) deployActionTable(cfg actionConfig, edits []actionEdit) ([]actionEdit, error) {
-	body, changed, err := mergeActionTable(cfg, edits)
+func (s *ActionsService) deployActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) error {
+	body, changed, err := mergeActionTable(cfg, original, edits)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !changed {
 		if err := removeDeployed(deployActionPath(cfg)); err != nil {
-			return nil, err
+			return err
 		}
 		char := charCode(cfg)
 		kept := make([]actionEdit, 0, len(edits))
@@ -384,26 +398,25 @@ func (s *ActionsService) deployActionTable(cfg actionConfig, edits []actionEdit)
 				kept = append(kept, edit)
 			}
 		}
-		return kept, nil
+		return saveActionEdits(kept)
 	}
 	if err := appfiles.WriteAtomic(deployActionPath(cfg), body); err != nil {
-		return nil, err
+		return err
 	}
-	return edits, nil
+	return saveActionEdits(edits)
 }
 
 /*
-mergeActionTable 现读一份**原始**动作表、把改动套上去，一次算出：合并后的字节（没有真改动时是 nil，
+mergeActionTable 把改动套在**调用方读好的**那份原表上，一次算出：合并后的字节（没有真改动时是 nil，
 因为调用方要的只是"删掉 mod 里那份"）、有没有真改动、以及多出来的记录 / 格子 / 非法值这些错。
 
+原表由调用方交进来：保存那一步本来就要读一份来逐格比对（见 SaveActions），在这里再读一遍就是白解析
+一遍 msgpack。合并是就地改树的 —— 所以这一份用完就扔，别在别处再拿它。
+
 逐格比的是 actionFieldValue 给的**界面写法**（数组那几格是 JSON 串）；取值失败时保守地当作"改过" ——
-清理这种事，拿不准就别删。合并是就地改树的，所以它自己读一份、用完就扔。
+清理这种事，拿不准就别删。
 */
-func mergeActionTable(cfg actionConfig, edits []actionEdit) ([]byte, bool, error) {
-	original, err := loadActionOriginal(cfg)
-	if err != nil {
-		return nil, false, err
-	}
+func mergeActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) ([]byte, bool, error) {
 	changed := false
 	for id, fields := range mergeActionEdits(edits, charCode(cfg)) {
 		record := recordByID(original, id)
@@ -506,10 +519,24 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	}
 	ref := trackRef{motion: motion, sub: flagSub, kind: flagsKind}
 	edits = setTrackEdit(edits, charCode(cfg), ref, string(raw), marks)
-	if err := saveTrackEdits(edits); err != nil {
+	return s.commitTracks(cfg, edits, motion)
+}
+
+/*
+commitTracks 是"保存这批轨"的收尾：清理账本 → 记账 → 把**还改着**的轨搬进 mod。
+
+清理在前（pruneTrackEdits）：与原表数值一致的轨不算改动 —— 账本里剔掉、mod 里那份也删掉。于是"接下来
+要搬哪些"可以直接问清理后的账本（trackRefsOf），写文件那一处因此不必再判一次"这条改没改"：判据只有
+trackXMLUnchanged 一份，只在 pruneTrackEdits 里判（见 actionprune.go）。
+
+motion 非空 = 只搬这个动画的轨（保存的那条路）；空 = 这个角色的全部（部署那条路）。
+*/
+func (s *ActionsService) commitTracks(cfg actionConfig, edits []trackEdit, motion string) error {
+	edits, err := pruneTrackEdits(cfg, edits)
+	if err != nil {
 		return err
 	}
-	return s.writeAndDeployTracks(cfg, []trackWrite{{motion: motion, sub: flagSub, kind: flagsKind, raw: raw}})
+	return s.deployRefs(cfg, edits, trackRefsOf(edits, charCode(cfg), motion))
 }
 
 // Deploy 把当前状态部署到 Mods 目录：动作表总是搬；轨搬 **UserDir 改动表里记着的那些**（限当前角色）；
@@ -531,11 +558,11 @@ func (s *ActionsService) Deploy() error {
 		return err
 	}
 	// 动作表：部署这一步顺手把"全是空操作"的改动从账本里清掉（见 actionprune.go）。
-	edits, err = s.deployActionTable(cfg, edits)
+	original, err := loadActionOriginal(cfg)
 	if err != nil {
 		return err
 	}
-	if err := saveActionEdits(edits); err != nil {
+	if err := s.deployActionTable(cfg, original, edits); err != nil {
 		return err
 	}
 
@@ -543,14 +570,8 @@ func (s *ActionsService) Deploy() error {
 	if err != nil {
 		return err
 	}
-	trackEdits, err = dropUnchangedTracks(cfg, trackEdits)
-	if err != nil {
-		return err
-	}
-	if err := saveTrackEdits(trackEdits); err != nil {
-		return err
-	}
-	if err := s.deployRefs(cfg, trackEdits, trackRefsOf(trackEdits, charCode(cfg), "")); err != nil {
+	// 轨：清理 + 记账 + 把还改着的全部搬一遍（与保存那条路同一个收尾，只是 motion 为空 = 全部）。
+	if err := s.commitTracks(cfg, trackEdits, ""); err != nil {
 		return err
 	}
 
@@ -606,16 +627,32 @@ func trackRefsOf(edits []trackEdit, char, motion string) []trackRef {
 }
 
 // deployRefs 把这几条轨按改动合成 XML、编成 BXM 搬进 mod（调用方持有 s.mu）。
+//
+// ⚠️ **refs 必须来自清理过的账本**（pruneTrackEdits 之后）—— 那里面留着的都是"与原表不同"的轨，所以
+// 这里不再判一次"改没改"（判据只有 trackXMLUnchanged 一份，在 actionprune.go 里），也就不会出现"把
+// 等于原版的那份合成出来写进 mod"。三个调用点都满足这条：commitTracks 与 DeployMissingTracks 都在
+// 清理之后才取 refs。
+//
+// 以前这里是"先把每条轨的 XML 拼成 trackWrite、再交给 writeAndDeployTracks 写"，那一层信封的唯一作用
+// 就是把身份和字节一起带过去 —— 而字节在账本里本来就有（trackSourceXML 取回来的是同一份），所以信封
+// 与那个函数一起去掉了。
 func (s *ActionsService) deployRefs(cfg actionConfig, edits []trackEdit, refs []trackRef) error {
-	items := make([]trackWrite, 0, len(refs))
 	for _, ref := range refs {
 		raw, err := trackSourceXML(cfg, edits, ref.motion, ref.sub, ref.kind)
 		if err != nil {
 			return err
 		}
-		items = append(items, trackWrite{motion: ref.motion, sub: ref.sub, kind: ref.kind, raw: raw})
+		body, err := xmlToBXM(raw)
+		if err != nil {
+			return fmt.Errorf("把 %s_%s_%s_seq_edit_%s 的 XML 编成 BXM: %w",
+				charCode(cfg), ref.motion, ref.sub, ref.kind, err)
+		}
+		dst := deployTrackPath(cfg, ref.motion, ref.sub, ref.kind)
+		if err := appfiles.WriteAtomic(dst, body); err != nil {
+			return fmt.Errorf("部署到 %s: %w", dst, err)
+		}
 	}
-	return s.writeAndDeployTracks(cfg, items)
+	return nil
 }
 
 // missingRefs 从 refs 里挑出**mod 目录里还没有产物**的那些（文件已经在的原样不动）。
@@ -659,12 +696,9 @@ func (s *ActionsService) DeployMissingTracks(motion string) error {
 	if err != nil {
 		return err
 	}
-	// 先清理：与原表逐字节一致的轨不算改动，账本与 mod 里都不留（见 actionprune.go）。
-	edits, err = dropUnchangedTracks(cfg, edits)
+	// 先清理（这一步也把清理结果落盘）：与原表数值一致的轨不算改动，账本与 mod 里都不留。
+	edits, err = pruneTrackEdits(cfg, edits)
 	if err != nil {
-		return err
-	}
-	if err := saveTrackEdits(edits); err != nil {
 		return err
 	}
 	missing, err := missingRefs(cfg, trackRefsOf(edits, charCode(cfg), motion))
@@ -764,52 +798,6 @@ func fsmPath(cfg actionConfig, name string) (string, error) {
 	}
 	char := charCode(cfg)
 	return filepath.Join(cfg.FsmDir, char+"_"+name+"_fsm_ingame.msg"), nil
-}
-
-// trackWrite 是一条要写出去的轨：身份 + 已经拼好的 XML 字节。
-type trackWrite struct {
-	motion string
-	sub    string
-	kind   string
-	raw    []byte
-}
-
-/*
-writeAndDeployTracks 把若干条轨的 XML 编成 BXM 再搬进 mod 目录。
-
-以前是"XML 写进临时目录 → 起一次 GBFRDataTools 转成 BXM → 再搬"，现在编解码在自己手里（bxm.go），
-临时目录与那个外部 exe 都省了。**写出的字节与工具逐字节相同**：全库 17929 份对过（bxm_test.go 的
-TestBXMCorpus），保存路径上也还有一条拿工具当尺子的测试（actiontracks_test.go）。
-
-flags 的保存、通用轨的保存、以及 Deploy 里"把改动表里记着的轨搬一遍"都走这里（调用方持有 s.mu）。
-搬的顺序按传进来的先后：真出错时日志里看得出停在哪一条。
-*/
-func (s *ActionsService) writeAndDeployTracks(cfg actionConfig, items []trackWrite) error {
-	for _, item := range items {
-		dst := deployTrackPath(cfg, item.motion, item.sub, item.kind)
-		// 与原表逐字节一致的轨**不留产物**：改回原值之后再保存，mod 里那份要消失（游戏回去读自己的
-		// 原表）。判据与账本清理同一条（见 actionprune.go 的 trackXMLUnchanged），落在写文件这一处
-		// 就不管从哪个入口来的都成立。
-		unchanged, err := trackXMLUnchanged(cfg, item.motion, item.sub, item.kind, item.raw)
-		if err != nil {
-			return err
-		}
-		if unchanged {
-			if err := removeDeployed(dst); err != nil {
-				return err
-			}
-			continue
-		}
-		body, err := xmlToBXM(item.raw)
-		if err != nil {
-			return fmt.Errorf("把 %s_%s_%s_seq_edit_%s 的 XML 编成 BXM: %w",
-				charCode(cfg), item.motion, item.sub, item.kind, err)
-		}
-		if err := appfiles.WriteAtomic(dst, body); err != nil {
-			return fmt.Errorf("部署到 %s: %w", dst, err)
-		}
-	}
-	return nil
 }
 
 // msgpack 树 ↔ 界面行的编解码（parseActionTable / loadActionTable / recordByID / actionFields /

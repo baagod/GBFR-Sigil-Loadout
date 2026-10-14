@@ -4,8 +4,9 @@
 游戏回去读它自己的原表。
 
 "有没有改"由谁回答：动作表 / 全局参数在**合成**那一步顺手算出来（见 mergeActionTable / mergeGlobalParam
-的 changed 与 deploy* 的返回值）；轨的判据是整份 XML，所以判在写文件那一处（trackXMLUnchanged）与存账本
-之前（dropUnchangedTracks）。一律只谈**当前角色 / 当前那张表**：原表是按动作表所在目录取来的。
+的 changed 与 deploy* 的返回值）；轨的判据是整份 XML，判据只有 trackXMLUnchanged 一份，三处都走它 ——
+保存的收尾（SaveFlags / SaveTracks → commitTracks）、部署（Deploy）、补部署（DeployMissingTracks）。
+一律只谈**当前角色 / 当前那张表**：原表是按动作表所在目录取来的。
 */
 package service
 
@@ -23,8 +24,17 @@ func removeDeployed(path string) error {
 	return nil
 }
 
-// dropUnchangedTracks 把"改动后与原表一致"的轨从账本里去掉，并删掉 mod 里那份产物。
-func dropUnchangedTracks(cfg actionConfig, edits []trackEdit) ([]trackEdit, error) {
+/*
+pruneTrackEdits 把"改动后与原表一致"的轨从账本里去掉、把 mod 里那份产物删掉，并把清理后的账本**落盘**，
+返回留下的那些。
+
+落盘长在这里，而不是让每个调用方各自记得再写一次：不落盘，下次读到的还是那份"等于原版"的账本，而它会
+盖住以后随包原始数据的更新（见 setTrackEdit 的注释）。三个入口（保存的收尾、部署、补部署）都从这一步
+开始，各自再决定"接下来搬哪些"：前两个搬当前角色**还改着**的全部轨，补部署只搬缺文件的那些。
+
+判据是整份 XML（trackXMLUnchanged）：轨都在几百字节量级，整份账本判一遍就是这个数量级的活。
+*/
+func pruneTrackEdits(cfg actionConfig, edits []trackEdit) ([]trackEdit, error) {
 	char := charCode(cfg)
 	kept := make([]trackEdit, 0, len(edits))
 	for _, edit := range edits {
@@ -41,6 +51,9 @@ func dropUnchangedTracks(cfg actionConfig, edits []trackEdit) ([]trackEdit, erro
 			}
 		}
 		kept = append(kept, edit)
+	}
+	if err := saveTrackEdits(kept); err != nil {
+		return nil, err
 	}
 	return kept, nil
 }

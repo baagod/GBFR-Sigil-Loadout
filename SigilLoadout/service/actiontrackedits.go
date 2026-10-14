@@ -202,9 +202,8 @@ func trackEditFor(edits []trackEdit, char string, ref trackRef) (string, bool) {
 
 // setTrackEdit 记下改动（已有就覆盖），连同这一版的行身份一起存。
 //
-// 每次保存都记一条，**即使这次没真的改**（打开又原样保存）。不做"与原始相同就删掉这条"：那要求保存时
-// 先读一遍原始，于是一个本来不需要读的操作平白多出一条失败路径（解包目录被挪走、资产缺了这一条，就
-// 连保存都做不成）。代价只是改动文件里多一条，且它盖住以后随包原始数据的更新。
+// 这里**只负责记**，不判"与原版一不一样"：那一步在保存的收尾里做（actionsservice.go 的 commitTracks →
+// pruneTrackEdits）。于是"打开又原样保存"这类空操作不会留在账本里，也不会盖住以后随包原始数据的更新。
 func setTrackEdit(edits []trackEdit, char string, ref trackRef, xml string, rows []rowMark) []trackEdit {
 	for i, edit := range edits {
 		if edit.Char == char && edit.ref() == ref {

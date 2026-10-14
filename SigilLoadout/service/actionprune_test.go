@@ -2,6 +2,7 @@ package service
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -106,6 +107,73 @@ func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 	}
 	if _, err := os.Stat(deployed); !os.IsNotExist(err) {
 		t.Fatalf("与原表一致之后 mod 里不该再留着这份产物（err=%v）", err)
+	}
+	// **账本也一起干净**：这条规矩长在保存自己身上（SaveFlags → commitTracks），不靠调用方再喊一次
+	// DeployMissingTracks 兜着。
+	edits, err := loadTrackEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, edit := range edits {
+		if edit.Char == charCode(cfg) && edit.Motion == "3400" && edit.Kind == flagsKind {
+			t.Fatalf("与原表一致之后账本里不该再记着这条轨: %+v", edit)
+		}
+	}
+}
+
+/*
+通用轨那条路同理（SaveTracks → commitTracks）：改回原值之后产物与账本都要干净。
+
+样本用仓库里的 attack XML（走"解包目录兜底"那条读路径）：它是一份多行、带子元素的轨 —— 判"改没改"
+靠的就是整份 XML 归一之后逐字节比（见 actionprune.go）。
+*/
+func TestSaveTracksRemovesDeploymentWhenBackToOriginal(t *testing.T) {
+	service, cfg, _ := actionsFixture(t)
+	sample := filepath.Join("testdata", "pl1000_0b11_0_seq_edit_attack.xml")
+	raw, err := os.ReadFile(sample)
+	if err != nil {
+		t.Fatalf("读样本 %s: %v", sample, err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.FlagsDir, "pl1000_0b11_0_seq_edit_attack.xml"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deployed := deployTrackPath(cfg, "0b11", "0", "attack")
+
+	table, err := service.LoadTrack("0b11", "0", "attack")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := table.Rows[0].Values["Power"]
+	table.Rows[0].Values["Power"] = "3"
+	if original == "3" {
+		table.Rows[0].Values["Power"] = "0"
+	}
+	if err := service.SaveTracks("0b11", []TrackTable{*table}); err != nil {
+		t.Fatalf("SaveTracks: %v", err)
+	}
+	if _, err := os.Stat(deployed); err != nil {
+		t.Fatalf("改过之后 mod 里该有这份产物: %v", err)
+	}
+
+	table, err = service.LoadTrack("0b11", "0", "attack")
+	if err != nil {
+		t.Fatal(err)
+	}
+	table.Rows[0].Values["Power"] = original
+	if err := service.SaveTracks("0b11", []TrackTable{*table}); err != nil {
+		t.Fatalf("SaveTracks（改回原值）: %v", err)
+	}
+	if _, err := os.Stat(deployed); !os.IsNotExist(err) {
+		t.Fatalf("与原表一致之后 mod 里不该再留着这份产物（err=%v）", err)
+	}
+	edits, err := loadTrackEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, edit := range edits {
+		if edit.Char == charCode(cfg) && edit.Motion == "0b11" && edit.Kind == "attack" {
+			t.Fatalf("与原表一致之后账本里不该再记着这条轨: %+v", edit)
+		}
 	}
 }
 

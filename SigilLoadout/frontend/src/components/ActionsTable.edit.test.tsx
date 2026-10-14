@@ -8,10 +8,10 @@ import {fireEvent, render, waitFor} from "@testing-library/react"
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     LoadActions: vi.fn(),
-    SaveActionFields: vi.fn(),
+    SaveActions: vi.fn(),
 }))
 
-import {SaveActionFields} from "../../bindings/sigilloadout/service/actionsservice"
+import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 
 import {CELL_PADDING, INPUT_PADDING} from "@/components/actions-table/classes"
@@ -110,7 +110,7 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(document.activeElement).toBe(textLayer)
         expect(textLayer.getAttribute("tabindex")).toBe("0")
         // Esc 之后紧接着的那次 blur 不许提交（Esc = 放弃草稿）
-        expect(SaveActionFields).not.toHaveBeenCalled()
+        expect(SaveActions).not.toHaveBeenCalled()
         // 草稿确实丢掉了：显示的仍是原值
         expect(cell.textContent).toBe("actionFreeWork0_-原值")
     })
@@ -156,33 +156,29 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(cell.textContent).toBe("actionFreeWork0_-原值")
     })
 
-    it("保存：跟原值一样的交 null，改过的交那个值（**不传 original**）", async () => {
+    /*
+        ‼️ 保存是**整表一次**（`SaveActions`），而且只交改过的那些键（没交的 = 回到原值）。
+
+        一次而不是逐行：逐行交时第 N 行失败、前 N−1 行已经落盘（而部署那一步又被跳过）。
+    */
+    it("保存：整表一次交出去，只带改过的那些键（没交的 = 回到原值）", async () => {
         const {save} = await renderWithSave()
         await save()
 
-        expect(SaveActionFields).toHaveBeenCalledTimes(2)
+        // **一次**调用，不是每条记录一次
+        expect(SaveActions).toHaveBeenCalledTimes(1)
 
-        const [firstId, firstFields] = vi.mocked(SaveActionFields).mock.calls[0] as [
-            string,
-            {key: string; value: string | null; original?: string}[],
+        const [rows] = vi.mocked(SaveActions).mock.calls[0] as [
+            {id: string; fields: {key: string; value: string | null}[]}[],
         ]
-        expect(firstId).toBe("1000")
-        expect(firstFields).toHaveLength(KEYS.length)
-        // 第一条全没改过 → 全是 null（后端据此记为"没改过"）
-        expect(firstFields.every((field) => field.value === null)).toBe(true)
-        // 后端不读 original，前端就不该传
-        expect(firstFields.every((field) => field.original === undefined)).toBe(true)
-
-        const [, secondFields] = vi.mocked(SaveActionFields).mock.calls[1] as [
-            string,
-            {key: string; value: string | null}[],
-        ]
-        expect(secondFields.find((field) => field.key === "actionFreeWork0_")?.value).toBe(
-            "actionFreeWork0_-改过",
-        )
+        // 表里两条记录都交（一条没改动也要交：后端按"整行替换"算 —— 不交就等于那一行还是旧改动）
+        expect(rows.map((row) => row.id)).toEqual(["1000", "1001"])
+        expect(rows[0].fields).toEqual([])
+        // 交上来的**只有**改过的那一格；后端不读 original，前端就不该传
+        expect(rows[1].fields).toEqual([{key: "actionFreeWork0_", value: "actionFreeWork0_-改过"}])
     })
 
-    it("把改过的格子删空：交 null（**空 = 回到原值**，界面退回占位符）", async () => {
+    it("把改过的格子删空：那一格不再出现在提交里（**空 = 回到原值**）", async () => {
         const {container, save} = await renderWithSave()
 
         // 第二条记录的第 3 列是改过的值
@@ -192,12 +188,30 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         fireEvent.change(input, {target: {value: ""}})
         fireEvent.blur(input)
 
-        vi.mocked(SaveActionFields).mockClear()
+        vi.mocked(SaveActions).mockClear()
         await save()
-        const [, fields] = vi.mocked(SaveActionFields).mock.calls[1] as [string, {key: string; value: string | null}[]]
-        // 空 = 没填 = **回到原值**（后端把这一格记为"没改过"）。这与"清空"是同一条口径：
-        // 这张表的格子没有"改成空值"这一态 —— 空就是占位符本身，见文件头那段。
-        expect(fields.find((field) => field.key === "actionFreeWork0_")?.value).toBeNull()
+        const [rows] = vi.mocked(SaveActions).mock.calls[0] as [{id: string; fields: {key: string}[]}[]]
+        // 这一格不在提交里 = 后端把这条改动整份换掉（账本里那条随之消失，界面回灰字占位符）。
+        const second = rows.find((row) => row.id === "1001")
+        expect(second?.fields.find((field) => field.key === "actionFreeWork0_")).toBeUndefined()
+    })
+
+    /*
+        ‼️ **打成与原值一模一样 = 没改**：这张表的格子只有"改过"与"没改过"两态。
+
+        不归一的话，那一格会一直亮着（用户报的："输入的值和原值一致，界面却显示成改过"），而且后端账本里
+        留下一条与原值相同的"改动"。归一发生在 `useClipboardHistory` 的 `edit` 里 —— 所以是**当场**回灰字。
+    */
+    it("打成与原值一样：不算改动，当场回灰色占位符", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2) // 没改过的格子，原值就是 actionFreeWork0_-原值
+
+        clickToEdit(cell)
+        fireEvent.change(cell.querySelector("input")!, {target: {value: "actionFreeWork0_-原值"}})
+        fireEvent.blur(cell.querySelector("input")!)
+
+        expect(cell.textContent).toBe("actionFreeWork0_-原值")
+        expect(cell.firstElementChild!.className).toContain("text-muted-foreground")
     })
 
     it("改过又清空之后，界面上退回显示**原值**（占位符）", async () => {

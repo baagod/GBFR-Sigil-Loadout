@@ -71,7 +71,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [tables, setTables] = useState<Record<string, TrackTable>>({})
     const flags: FlagRow[] = tables[flagsKey]?.rows ?? []
 
-    const [dirty, setDirty] = useState<string[]>([])
     const [fsmNames, setFsmNames] = useState<string[]>([])
     const [fsmName, setFsmName] = useState<string | null>(null)
     // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
@@ -107,7 +106,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         // 换号（隐藏 mot 里展开另一行）等于换一份数据：先清掉上一号的草稿与选中，
         // 否则它们会跟着新号一起被交出去（保存时写错号）。
         setLoaded(false)
-        setDirty([])
         setSel(null)
         let alive = true
         void (async () => {
@@ -159,10 +157,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         }
     }, [motion])
 
-    const markDirty = (key: string) =>
-        setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]))
-
-
     /** 改一格（flags 与普通轨共用）。**清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
         const row = tables[key]?.rows[index]
@@ -174,7 +168,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             const rows = table.rows.map((r, i) => (i === index ? {...r, values: {...r.values, [column]: next}} : r))
             return {...prev, [key]: {...table, rows}}
         })
-        markDirty(key)
     }
 
     // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
@@ -260,7 +253,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             if (!table) return prev
             return {...prev, [key]: {...table, rows}}
         })
-        markDirty(key)
     }
     /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     const reorder = (key: string, from: number, to: number) => {
@@ -269,7 +261,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             if (!table) return prev
             return {...prev, [key]: {...table, rows: arrayMove(table.rows, from, to)}}
         })
-        markDirty(key)
         // 行序变了，原来记的号码全错位：清掉重选。
         setSel(null)
     }
@@ -292,17 +283,21 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             // 整张表原样交给后端（含行身份 `orig` / `removed`）：由它决定"哪些行进 XML"（假删除的不进）、
             // 并把行身份跟改动一起存进 track_edits.json —— 下次打开照样认得每一行是原版第几行。
             //
+            // ‼️ **交全部**（不是只交"这次碰过的"那几块）：后端按"交上来的就是这条轨现在的内容"整份替换，
+            // 而"哪些该搬进 mod"由**账本**回答（见 commitTracks）。界面自己再记一本"动过哪几块"是重复
+            // 状态 —— 撤销、重排、换号都得跟着维护它，迟早对不上。
+            //
             // ⚠️ 这两句**必须顺序发**，别看着"互不相干"就并成 Promise.all：它们写的是**同一本账**
             //（track_edits.json 的读-改-写），并行就是其中一次的改动被另一次覆盖掉。
-            if (dirty.includes(flagsKey)) {
+            if (tables[flagsKey]) {
                 await SaveFlags(motion, flags)
             }
-            const changed = dirty
-                .filter((key) => key !== flagsKey)
-                .map((key) => tables[key])
-                .filter(Boolean)
-            if (changed.length > 0) {
-                await SaveTracks(motion, changed)
+            const tracks = infos
+                .filter((info) => info.kind !== "flags")
+                .map((info) => tables[trackKey(info)])
+                .filter((table): table is TrackTable => table !== undefined)
+            if (tracks.length > 0) {
+                await SaveTracks(motion, tracks)
             }
             // 改动表里记着、mod 目录里却没有的轨：补一次。mod 目录会被整个换掉（deploy.ps1 / 重装），
             // 而账本不会 —— 上面两句只在"这次改过"时才写，于是那种缺文件的轨点保存什么都不发生 ✗。
@@ -311,7 +306,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             // 写完重读一遍：写回的字节与内存里的是同一份，但"读回来"才是真的落地了。
             const list = (await ListTracks(motion)) ?? []
             setInfos(list)
-            setDirty([])
             // **原表不换、行不丢**：原表是游戏原版数据（只读），保存不改变它 —— 于是"相对原版改了什么"
             // 保存后依然看得见，被假删除的行也照样留在界面上（它们本来就不进文件）。只是想看"干净状态"，
             // 重开一次弹层即可（那时读到的当前表就是刚保存的那份）。
@@ -527,8 +521,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
                         <DialogTitle className="text-base font-medium">{title}</DialogTitle>
                         <div className="flex items-center gap-2">
-                            {/* 保存并部署：一直可点 —— 没改动时点了也只是读一遍。 */}
-                            <Button onClick={() => void save()}>{t.saveAndDeploy}</Button>
+                            {/* 只管**当前动画**那几条轨，所以文案与页面那个「保存」分开（见 messages 的 saveAnimation）。 */}
+                            <Button onClick={() => void save()}>{t.saveAnimation}</Button>
                             <Button variant="outline" onClick={onClose}>
                                 {t.cancel}
                             </Button>

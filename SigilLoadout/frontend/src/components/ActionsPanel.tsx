@@ -360,7 +360,7 @@ function ActionsPanelBase({t, charaNames, abilityNames, charaTable, playable}: {
      * 动作表由 `ActionsTable` 自己保存（草稿住在它那儿，见 `ttSaveRef`）；最后一律部署一次。
      *
      * ‼️ **成功不报、失败要弹**（用户口径是"这一排不要提示"，那条说的是状态行 —— 而失败是另一回事）：
-     * 动作表是**逐行写**的，第 N 行失败时前 N−1 行已经落盘，`Deploy()` 又被跳过 → 磁盘上一半是新的、
+     * 这三步里任何一步失败，磁盘上就是"保存了一半"（前面那几步已经落了盘，而 `Deploy()` 被跳过），
      * 游戏里一点没变。这种"半保存 + 没部署"如果只写进 DevTools，用户会以为存好了。
      * 所以失败走仓库既有的 `PanelFailureDialog`（与因子页 / 上限页同一个对话框、同一个 hook）。
      */

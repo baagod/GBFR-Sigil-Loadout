@@ -49,7 +49,12 @@ func actionEntry(char string) string {
 	return "system/player/data/" + char + "/" + char + "_action.msg"
 }
 
-// loadActionEdits 读改动表。文件不存在 = 一处都没改过，不是错误。
+// loadActionEdits 读改动表，**只收有值的条目**。文件不存在 = 一处都没改过，不是错误。
+//
+// 为什么在读这一处就丢掉 nil 条目：`Value` 为 nil 的意思是"这一格没被编辑过"，它在合并时被跳过
+// （见 mergeActionEdits），**等价于不存在**。而账本里曾经有过大量这种条目 —— 界面那半把整张表的每个键
+// 都交了一遍，后端就为每一格都记了一条 null（实测一张表 2871 条、408 KB，真改动只有一条）。
+// 在这里丢掉，用户现存的账本下一次读取就自愈，写回去的也就是净化过的这一份。
 func loadActionEdits() ([]actionEdit, error) {
 	raw, err := os.ReadFile(actionEditsPath())
 	if os.IsNotExist(err) {
@@ -62,7 +67,13 @@ func loadActionEdits() ([]actionEdit, error) {
 	if err := jsonv2.Unmarshal(raw, &file); err != nil {
 		return nil, fmt.Errorf("解析 %s: %w", actionEditsPath(), err)
 	}
-	return file.Edits, nil
+	edits := make([]actionEdit, 0, len(file.Edits))
+	for _, edit := range file.Edits {
+		if edit.Value != nil {
+			edits = append(edits, edit)
+		}
+	}
+	return edits, nil
 }
 
 // saveActionEdits 原子写回改动表。
@@ -96,14 +107,48 @@ func mergeActionEdits(edits []actionEdit, char string) map[string]map[string]str
 	return merged
 }
 
-// setActionEdit 把一格改动写进列表：同 (角色, id, 格子) 只有一条，后来的覆盖先前的。
-// value 为 nil 就把它记为"没改过"（回原值）——条目留着，语义与 skillboard/limitbonus 一致。
-func setActionEdit(edits []actionEdit, char, id, field string, value *string) []actionEdit {
-	for i, edit := range edits {
-		if edit.Char == char && edit.ID == id && edit.Field == field {
-			edits[i].Value = value
-			return edits
+/*
+replaceActionEdits 把某条记录的改动**整份换掉**：先去掉它原有的全部条目，再放进这一份新的。
+
+为什么是"整份换"而不是"逐格改"：界面交上来的就是"这一行现在全部的改动"（它的 `values` 只有非空的
+那些键），"没交"与"交 nil"都表示回到原值。逐格 patch 需要一个额外的"这一格被删了"的信号，而那个信号
+在按值传参的接口里不存在 —— 于是只能靠"把 87 个键全交一遍"来表达，正是账本灌水（以及"打了原值却显示
+成改过"）的来源。
+*/
+func replaceActionEdits(edits []actionEdit, char, id string, next []actionEdit) []actionEdit {
+	out := make([]actionEdit, 0, len(edits)+len(next))
+	for _, edit := range edits {
+		if edit.Char == char && edit.ID == id {
+			continue
 		}
+		out = append(out, edit)
 	}
-	return append(edits, actionEdit{Char: char, ID: id, Field: field, Value: value})
+	return append(out, next...)
+}
+
+/*
+actionRowEdits 把界面交上来的**一条记录**翻成账本条目：只收"真改过"的那些格子。
+
+两样都丢掉：`Value` 为 nil（这一格没改过）与值**与原值逐字相同**（打回了原值）。界面于是显示灰色
+占位符，而不是"看着改过、其实与原值一模一样"的亮字。
+
+只认记录里已有的键：多出来的键当场报错 —— 静默丢掉等于界面上说保存成功、游戏里什么都没变。
+*/
+func actionRowEdits(record *msgValue, char, id string, fields []ActionField) ([]actionEdit, error) {
+	next := make([]actionEdit, 0, len(fields))
+	for _, field := range fields {
+		node := record.entry(field.Key)
+		if node == nil {
+			return nil, fmt.Errorf("id_ = %q 的记录里没有 %s 这一格", id, field.Key)
+		}
+		if field.Value == nil {
+			continue
+		}
+		// 取值失败（数组那几格给的 JSON 认不出来）时保守地当作"改过"：宁可留一条，也别把它当回原值。
+		if before, err := actionFieldValue(node); err == nil && before == *field.Value {
+			continue
+		}
+		next = append(next, actionEdit{Char: char, ID: id, Field: field.Key, Value: field.Value})
+	}
+	return next, nil
 }
