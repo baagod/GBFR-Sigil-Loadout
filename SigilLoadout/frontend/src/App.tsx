@@ -6,7 +6,6 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {LoadSigils, LoadConfig, SaveLoadout, LoadExclusives, GemNames, CharaNames} from "../bindings/sigilloadout/service/loadoutservice"
 import {MinimiseApp, SetTrayExitLabel} from "../bindings/sigilloadout/service/shellservice"
 import {Characters} from "../bindings/sigilloadout/service/limitbonusservice"
-import {ActionNames} from "../bindings/sigilloadout/service/actionsservice"
 import {messages, type Messages} from "@/lib/messages"
 import {LANGS, LANG_LABEL, initialLang, type Lang} from "@/lib/lang"
 import {
@@ -89,9 +88,6 @@ export default function App() {
     // 角色表（chara.json）：PL 码 → {hash, element, color}。颜色已经按属性算好记在角色上，所以取色是
     // 一步。语言无关，只在挂载时取一次，切语言不重取。
     const [charaTable, setCharaTable] = useState<CharaTable>({})
-    // 动作名的显示名（chara.action.zh.json）：动作表 `abilityTag_` 列显示它（键 = 那一行 `actionName_`）。
-    // 与语言无关，只取一次。
-    const [actionNames, setActionNames] = useState<Record<string, string>>({})
     const [lang, setLang] = useState<Lang>(initialLang) // 存在 loadout.json 里
     const t = messages[lang]
 
@@ -183,16 +179,15 @@ export default function App() {
             }
 
             /*
-                角色表（chara.json）与动作名表（chara.action.zh.json）：都与语言无关，所以整场只取一次。
-                取不到就留空表 —— 角色名于是没有专属颜色、`abilityTag_` 那一列只剩 `actionName_` 原文，
-                而不是让整页读不出来。
+                角色表（chara.json）：PL 码 → 颜色（按属性在生成期算好）。与语言无关，所以整场只取一次。
+                取不到就留空表 —— 角色名于是没有专属颜色（继承默认前景色），而不是让整页读不出来。
             */
-            const [chara, actionNameTable] = await Promise.all([
-                Characters().catch(() => null),
-                ActionNames().catch(() => null),
-            ])
-            setCharaTable((chara as CharaTable | null) ?? {})
-            setActionNames((actionNameTable as Record<string, string> | null) ?? {})
+            try {
+                const chara = (await Characters()) as CharaTable | null
+                setCharaTable(chara ?? {})
+            } catch {
+                setCharaTable({})
+            }
         })()
         // 只在挂载时跑一次：它读的是启动那一刻的磁盘状态。这里也刻意不读 t——文案在渲染时由
         // failureText 取，所以没有语言依赖会把这一跑重新触发。
@@ -461,7 +456,7 @@ export default function App() {
                     这一页自己就是滚动盒（上半区横滚、下半区纵滚），所以外层不再给 overflow-auto。
                 */}
                 <TabsContent value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
-                    <ActionsPanel t={t} charaNames={charaNames} charaTable={charaTable} actionNames={actionNames} />
+                    <ActionsPanel t={t} charaNames={charaNames} charaTable={charaTable} />
                 </TabsContent>
             </Tabs>
         </div>

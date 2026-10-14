@@ -37,9 +37,9 @@ export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCo
  *                      保存时会写到别的记录上、或者直接报"没有这个 id"。
  *   · `actionName_` —— 动作名的**原文**，也是 `abilityTag_` 那一列显示名的**来路**，改它等于改游戏
  *                      那边的动作名。
- *   · `abilityTag_` —— **动作表那一列上屏的是"这条动作的名字"**（由调用方投影进 `originals`，见
- *                      `ActionsPanel`），而部署时这一格**只带原始值**（见 `mergeActionTable`）—— 能改却
- *                      改不到游戏里，那就不是一格能改的格。
+ *   · `abilityTag_` —— **动作表那一列上屏的是"这条动作的名字"**（后端 `LoadActions` 就把显示名投影成了
+ *                      它的原值，见 `actionRowFields`），而部署时这一格**只带原始值**（见 `mergeActionTable`）
+ *                      —— 能改却改不到游戏里，那就不是一格能改的格。
  */
 const READ_ONLY_KEYS = new Set(["id_", "actionName_", "abilityTag_"])
 

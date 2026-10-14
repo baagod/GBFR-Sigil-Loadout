@@ -51,7 +51,7 @@ export function makeRow(id: string, changed: Record<string, string> = {}, origin
                 `id_` 用**真记录号**：它是只读列、也是这一版默认排序的依据 —— 给成"所有行都一样"的
                 假值的话，排序就测不出来了。
                 `abilityTag_` 给一个**真实形状的键**：夹具直接喂基座，所以这一格显示、复制取的都是它自己
-                （生产里那一列早被 `ActionsPanel` 投影成动作名了，见那边）。
+                （生产里后端 `LoadActions` 就把显示名投影进了这一格的原值，见 `actionRowFields`）。
             */
             original:
                 key in originals

@@ -63,6 +63,45 @@ func actionFields(record *msgValue) ([]ActionField, error) {
 	return fields, nil
 }
 
+/*
+动作表里那两格的名字：一格是技能键、一格是这条动作的名字。界面上**前者显示的是后者**（见
+actionRowFields）、部署时前者不写回（见 mergeActionTable）—— 两处都用这两个常量，别再各写一遍字面量。
+*/
+const (
+	abilityTagField = "abilityTag_"
+	actionNameField = "actionName_"
+)
+
+/*
+actionRowFields 是"一条记录 → 界面上那一行"：`actionFields` 摊平，再把 `abilityTag_` 那一格的**原值**
+换成**这条动作的显示名**（`actionName_` 过一次 chara.action.zh.json，见 actionTagName）。
+
+投影放在这一层、而不是发给界面让界面自己查：① 那一列**只读**、只给人看，是个纯显示值；② 那份名字表
+本来就在这边装着（见 assets.go）—— 先整份发过去再让界面查一遍，多一次 IPC，还多出一个"名字表比数据
+晚到"的时序窗口（界面上那一列会先显示技能键）。这里投影好，界面拿到的就是能直接显示/复制/排序的那一份。
+*/
+func actionRowFields(record *msgValue) ([]ActionField, error) {
+	fields, err := actionFields(record)
+	if err != nil {
+		return nil, err
+	}
+	// `actionName_` 在文件里的位置不定，所以先在摊平好的那一份里找它（找不到就是空串 → 显示名也是空串）。
+	actionName := ""
+	for _, field := range fields {
+		if field.Key == actionNameField {
+			actionName = field.Original
+			break
+		}
+	}
+	display := actionTagName(actionName)
+	for i := range fields {
+		if fields[i].Key == abilityTagField {
+			fields[i].Original = display
+		}
+	}
+	return fields, nil
+}
+
 // actionFieldValue 是记录里一格在界面上的写法：数组（只有 supportEffectList_ 是）按 JSON 数组给，
 // 别的都是原样的字符串——空值有 "-" / "-1" / "" / "0" 几种写法，**一个都不归一化**。
 func actionFieldValue(v *msgValue) (string, error) {

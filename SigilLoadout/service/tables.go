@@ -167,23 +167,24 @@ sortByCharaOrder 把角色码排成**游戏的角色顺序**（order = assets.go
 
 不在 order 里的码排到最后、彼此按码排 —— 一个都不丢：解包目录里多出来的角色、或者资产里还没收录的码，
 都该照常出现在列表里，只是排在后面。order 为空（资产是 `{}`）时整份按码排，调用方不必特判。
+
+⚠️ **就地排**（与 `sort.Strings` 同一个约定）：调用方交进来的都是它自己刚拼的那一份（见 ListCharacters）。
 */
 func sortByCharaOrder(codes []string, order []string) []string {
 	rank := make(map[string]int, len(order))
 	for i, code := range order {
 		rank[strings.ToUpper(code)] = i
 	}
-	out := append([]string(nil), codes...) // 不改调用方那一份
-	sort.Slice(out, func(i, j int) bool {
-		ri, iok := rank[strings.ToUpper(out[i])]
-		rj, jok := rank[strings.ToUpper(out[j])]
+	sort.Slice(codes, func(i, j int) bool {
+		ri, iok := rank[strings.ToUpper(codes[i])]
+		rj, jok := rank[strings.ToUpper(codes[j])]
 		if iok != jok {
 			return iok
 		}
 		if ri != rj {
 			return ri < rj
 		}
-		return out[i] < out[j]
+		return codes[i] < codes[j]
 	})
-	return out
+	return codes
 }

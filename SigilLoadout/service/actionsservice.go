@@ -41,7 +41,9 @@ type Action struct {
 // ActionField 是记录里的一格。数组类字段（只有 supportEffectList_ 是）编码成 JSON 字符串塞进 Value：
 // 界面拿到的是一段能直接接着编辑的文本，Go 这边不为它另立一个类型。
 //
-// Original 是**随包资产里的原始值**（只读；界面把它当灰色占位符），Value 是玩家的改动，nil = 没改过。
+// Original 是界面上那一格的**原值**（只读：界面显示它、复制它、拿它当"没改过"的基准）；Value 是玩家的
+// 改动，nil = 没改过。多数列的 Original 就是随包资产里的值，`abilityTag_` 那一列是**这条动作的显示名**
+// （见 actionRowFields）—— 那一列只给人看，技能键没必要发给界面。
 // 与 skillboard/limitbonus 的 Values []*int 同一套语义：null 不是"空值"，是"这一格没被编辑过"。
 type ActionField struct {
 	Key      string  `json:"key"`
@@ -63,19 +65,6 @@ type trackRef struct {
 	sub    string
 	kind   string
 }
-
-/*
-ActionNames 返回动作名的显示名表（assets/chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}）。
-
-界面拿它当 `abilityTag_` 那一列的**显示值** —— 键是那一行 `actionName_` 的**原样**（一个字不改），
-查到就显示中文名；键不写回动作表（见 mergeActionTable），所以那一列上屏的永远不是技能键。
-
-⚠️ 表里**不是每条都有中文**（实测 1072 条里 569 条是空串）：空串与"表里没这个键"在界面那边是
-**同一件事** —— 都拿 `actionName_` 原文兜底（灰色占位符）。查不到不是错误，是本工具只翻了一部分。
-
-⚠️ 而且目前**只有中文**：界面上那一列的**列名**走四语，**内容**只有中文（四语以后再说）。
-*/
-func (s *ActionsService) ActionNames() map[string]string { return actionNames }
 
 /*
 ListCharacters 列出**三个数据源都解出来了**的角色码（pl1000 / pl2900 …），给界面上的角色下拉用。
@@ -231,7 +220,7 @@ func (s *ActionsService) LoadActions() ([]Action, error) {
 				continue
 			}
 			seen[idField.str] = true
-			fields, err := actionFields(record)
+			fields, err := actionRowFields(record)
 			if err != nil {
 				return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", idField.str, err)
 			}
@@ -436,10 +425,15 @@ func mergeActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) 
 			return nil, false, fmt.Errorf("改动里有 id_ = %q，但动作表里没有这条记录", id)
 		}
 		for key, value := range fields {
-			// ‼️ `abilityTag_` **不写回动作表**：那一列在界面上装的是"这条动作的名字"（给人看的），
-			// 游戏那边读的技能键一律用**原值** —— 部署不该因为你改了个名字而变。改动照样进账本
-			// （界面靠它显示你改过的名字），只是不落到这张表里。
-			if key == "abilityTag_" {
+			/*
+				‼️ `abilityTag_` **不写回动作表**：那一格在界面上显示的是"这条动作的名字"，而游戏读的
+				技能键一律用**原值** —— 部署不该因为这一列上写了什么而变。
+
+				现在那一列已经**只读**（见前端 model 的 READ_ONLY_KEYS），界面再也造不出这种改动；留下
+				这道闸是护**已经在账本里的那些**（这一列只读之前用户改过的）：把闸拆了，下次部署就会把
+				一个中文名字写进技能键那一格。这是数据安全，不是旧版本兼容。
+			*/
+			if key == abilityTagField {
 				continue
 			}
 			node := record.entry(key)

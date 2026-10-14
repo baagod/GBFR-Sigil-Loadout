@@ -214,14 +214,8 @@ func TestSortByCharaOrderKeepsEveryone(t *testing.T) {
 		[]string{"pl0000", "pl1200", "pl0700", "pl0800", "pl0900"}; !slices.Equal(got, want) {
 		t.Fatalf("排序结果 %v，want %v（不在资产里的排最后、彼此按码）", got, want)
 	}
-	// 拿不到顺序（资产缺了）时整份按码排 —— 不能因为没顺序就把列表清空。
+	// 拿不到顺序（资产是 `{}`）时整份按码排 —— 不能因为没顺序就把列表清空。
 	if got, want := sortByCharaOrder([]string{"pl2000", "pl1000"}, nil), []string{"pl1000", "pl2000"}; !slices.Equal(got, want) {
 		t.Fatalf("没有顺序时该按码排，实际 %v", got)
-	}
-	// 不改调用方那一份（调用方拿的是 ListCharacters 的返回，不是这里传进去的切片）。
-	in := []string{"pl0900", "pl0000"}
-	_ = sortByCharaOrder(in, order)
-	if !slices.Equal(in, []string{"pl0900", "pl0000"}) {
-		t.Fatalf("入参被改了：%v", in)
 	}
 }

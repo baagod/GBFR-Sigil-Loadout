@@ -22,7 +22,6 @@ import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
 import type {ActionRow} from "@/components/actions-table/model"
 import {DrillContext, columnsOf, toActionRow} from "@/components/actions-table/model"
-import {actionTagName} from "@/lib/actiontag"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
@@ -158,13 +157,11 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
     )
 }
 
-function ActionsPanelBase({t, charaNames, charaTable, actionNames}: {
+function ActionsPanelBase({t, charaNames, charaTable}: {
     t: Messages
     charaNames: Record<string, string>
     /** 角色表（chara.json）：名字的颜色从这里取，和专属 / 角色强化 / 专精技能三页同一个来源。 */
     charaTable: CharaTable
-    /** 动作名 → 名字（chara.action.zh.json，键 = 动作表 actionName_ 原样）：`abilityTag_` 那一列的显示。 */
-    actionNames: Record<string, string>
 }) {
     /**
      * **动作表的记录 + 字段顺序** —— 这一页唯一的数据来源。
@@ -180,22 +177,6 @@ function ActionsPanelBase({t, charaNames, charaTable, actionNames}: {
     const [rows, setRows] = useState<ActionRow[]>([])
     /** 字段顺序（= 表头顺序），见 `columnsOf`。 */
     const keys = useMemo(() => columnsOf(rows), [rows])
-    /**
-     * **上屏那一份**：`abilityTag_` 那一列的**原值就是这条动作的名字**（不是技能键，那一列只读）—— 名字在
-     * 这里投影进 `originals`，于是**显示 / 复制 / 排序读的是同一个值**。
-     *
-     * ‼️ 别把这一步挪回渲染那层（`ActionRowView` 曾经自己查名字表）：那样"格子里显示的字"与"复制出来的
-     * 值"成了两个来源 —— 实测就是"动作列显示镜花水月、复制出来却是空的"（那一行本来就没有技能键，而复制
-     * 读的是技能键那一栏）。
-     */
-    const tableRows = useMemo(
-        () =>
-            rows.map((row) => ({
-                ...row,
-                originals: {...row.originals, abilityTag_: actionTagName(row.originals.actionName_ ?? "", actionNames)},
-            })),
-        [rows, actionNames],
-    )
     /**
      * 首次读取回来了没有（读的是上面那份 `LoadActions`）。
      *
@@ -535,7 +516,7 @@ function ActionsPanelBase({t, charaNames, charaTable, actionNames}: {
                                 拿它当 key 等于永远不重挂，上面这些就一个都清不掉（踩过）。
                             */
                             key={dataVersion}
-                            rows={tableRows}
+                            rows={rows}
                             keys={keys}
                             t={t}
                             // 数据到位后把保存动作交出来（与 GlobalParamPanel 同一个约定），

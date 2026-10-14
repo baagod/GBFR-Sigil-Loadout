@@ -138,17 +138,6 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         expect(cell.firstElementChild!.className).toContain("text-muted-foreground")
     })
 
-    /*
-        只读列（`id_` / `actionName_` / `abilityTag_`）**不是灰色的**：它们显示的是权威值本身，不是"待覆盖的
-        占位符"。灰色只在可编辑列上表示"这一格还没改过"。
-    */
-    it("只读列的原值不是灰的（灰 = 可编辑列'还没改过'，只读列没有这一态）", async () => {
-        const container = await renderTable()
-        const cell = cellAt(container, 0, 0) // id_
-        expect(cell.textContent).toBe("1000")
-        expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
-    })
-
     it("改过的格子显示**改动本身**，不是原值、也不灰", async () => {
         const container = await renderTable()
         // 第 3 列（下标 2）= actionFreeWork0_，第二条记录改过它
@@ -174,13 +163,14 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         按"钉住区里的序号 × 列宽"算的。真滚动时会不会穿帮仍然要眼睛看 —— 这条只防"代码改坏"。
     */
     /*
-        `abilityTag_` 那一列**上屏的就是 `originals` 里那个值** —— 名字由调用方投影进来（见 `ActionsPanel`），
-        显示、复制、排序读的都是那一栏。
+        **内置只读列**（`id_` / `actionName_` / `abilityTag_`，见 model 的 READ_ONLY_KEYS）：显示原值、不灰、
+        不进编辑态。`abilityTag_` 那一格的原值就是后端投影好的动作名（见 `actionRowFields`）—— 与别的只读列
+        走同一条路，基座这里没有任何特判。
 
-        它是**只读列**（见 model 的 READ_ONLY_KEYS）：这一列显示的是"这条动作叫什么"，而部署时这一格只带
-        原始值 —— 能改却改不到游戏里的事不做，所以它既没有编辑态、也收不了粘贴。
+        一条表驱动的用例，而不是「每列抄一遍」：这条契约的完整性由那份清单决定，逐列抄只会在加列时漏掉一个
+        ——而"漏掉"的表现是那一列悄悄能编辑，不会红。
     */
-    it("abilityTag_：显示投影进来的动作名（只读，不灰）", async () => {
+    it("内置只读列：显示原值、不灰、双击不进编辑态", async () => {
         const line = {
             id: "1000",
             values: {},
@@ -188,42 +178,18 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         }
         const {container} = render(<ActionsTable t={t} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />)
         await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
-        const cell = cellAt(container, 0, 1)
-        expect(cell.textContent).toBe("镜花水月")
-        expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
-    })
-
-    it("abilityTag_ 只读：双击不进编辑态（名字表没翻也一样）", async () => {
-        const line = {
-            id: "1000",
-            values: {},
-            originals: {id_: "1000", abilityTag_: "□神楽連打1", actionName_: "□神楽連打1"},
+        const readonly: [number, string][] = [
+            [0, "1000"], // id_
+            [1, "镜花水月"], // abilityTag_：原值 = 动作名
+            [2, "鏡花水月(突進斬り)"], // actionName_：原文
+        ]
+        for (const [col, text] of readonly) {
+            const cell = cellAt(container, 0, col)
+            expect(cell.textContent, `第 ${col} 列的原值`).toBe(text)
+            expect(cell.firstElementChild!.className, `第 ${col} 列不该是灰的`).not.toContain("text-muted-foreground")
+            clickToEdit(cell)
+            expect(cell.querySelector("input"), `第 ${col} 列不该有编辑框`).toBeNull()
         }
-        const {container} = render(<ActionsTable t={t} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />)
-        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
-        const cell = cellAt(container, 0, 1)
-        // 没翻的显示原文（灰的规则只属于可编辑列，这一列不灰）
-        expect(cell.textContent).toBe("□神楽連打1")
-        clickToEdit(cell)
-        expect(cell.querySelector("input")).toBeNull()
-    })
-
-    /*
-        `actionName_`（列名「备注」）**只读**：它是 `abilityTag_` 那一列显示名的**来路**，改它等于改游戏
-        那边的动作名（见 model 的 READ_ONLY_KEYS）。
-    */
-    it("actionName_ 只读：点它不进编辑态，显示原文", async () => {
-        const line = {
-            id: "1000",
-            values: {},
-            originals: {id_: "1000", abilityTag_: "镜花水月", actionName_: "鏡花水月(突進斬り)"},
-        }
-        const {container} = render(<ActionsTable t={t} rows={[line]} keys={["id_", "abilityTag_", "actionName_"]} />)
-        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
-        const cell = cellAt(container, 0, 2)
-        expect(cell.textContent).toBe("鏡花水月(突進斬り)")
-        clickToEdit(cell)
-        expect(cell.querySelector("input")).toBeNull()
     })
 
     /*
