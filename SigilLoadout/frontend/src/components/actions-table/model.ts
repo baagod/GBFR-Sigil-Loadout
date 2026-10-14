@@ -28,7 +28,10 @@ import type {Messages} from "@/lib/messages"
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName">
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName" | "colBranchX" | "colBranchY" | "colBranchXJust" | "colBranchYJust" | "colBranchXHold" | "colBranchYHold" | "colBranchHit" | "colSaveMotId">
+
+/** 十二个 `saveMotIdNN_`（值 = 一个动画号）：表头"动画 ID NN"，那个号从字段名里取。 */
+const SAVE_MOT_ID_COLUMN = /^saveMotId(\d{2})_$/
 
 /**
  * **只读**的列：这些格子只给人看，不参与编辑，也不收粘贴。
@@ -89,14 +92,31 @@ export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSp
 /**
  * **列 id → 表头文案**：几条**跟界面语言走**的列名（不传 `ColumnSpec.label` 时用它兜底）。
  *
- * 为什么要有：这些都是后端字段名，但它们是给人看的 —— 谁有这两列都该显示"开始 / 结束"（轨表、flags 表
- * 都在用）；动作表那两列同理（`abilityTag_` 那一列显示的是"这条动作的名字"，`actionName_` 是它的原文）。
+ * 为什么要有：这些都是后端字段名，但它们是给人看的 —— `startTime` / `endTime` 谁有这两列都该显示
+ * "开始 / 结束"（轨表、flags 表都在用）；动作表那几列同理（`abilityTag_` 那一列显示的是"这条动作的名字"、
+ * `actionName_` 是它的原文、七个 `branch*_` 是"哪个输入派生到哪个动作"）。
  * 调用方自己的 `label` 优先级更高；放在这里而不是各表的列说明里，是因为这几条谁都不必再写一遍。
  */
 export const columnLabel = (
     id: string,
-    t: {colStart: string; colEnd: string; colAbilityTag: string; colActionName: string},
+    t: {
+        colStart: string
+        colEnd: string
+        colAbilityTag: string
+        colActionName: string
+        colBranchX: string
+        colBranchY: string
+        colBranchXJust: string
+        colBranchYJust: string
+        colBranchXHold: string
+        colBranchYHold: string
+        colBranchHit: string
+        colSaveMotId: (no: string) => string
+    },
 ): string => {
+    // 十二列共用一个模板（逐个写十二个 key 要多 48 行翻译，而它们只差字段名里那个号）。
+    const motId = SAVE_MOT_ID_COLUMN.exec(id)
+    if (motId) return t.colSaveMotId(motId[1])
     switch (id) {
         case "startTime":
             return t.colStart
@@ -106,6 +126,21 @@ export const columnLabel = (
             return t.colAbilityTag
         case "actionName_":
             return t.colActionName
+        // 动作表那七个「动作 → 动作」的引用列（字段名与出处见 docs/action 的字段表 12~18 行）
+        case "branchXAtk_":
+            return t.colBranchX
+        case "branchYAtk_":
+            return t.colBranchY
+        case "branchXAtk_Just_":
+            return t.colBranchXJust
+        case "branchYAtk_Just_":
+            return t.colBranchYJust
+        case "branchXAtk_Hold_":
+            return t.colBranchXHold
+        case "branchYAtk_Hold_":
+            return t.colBranchYHold
+        case "branchAtkHit_":
+            return t.colBranchHit
         default:
             return id
     }

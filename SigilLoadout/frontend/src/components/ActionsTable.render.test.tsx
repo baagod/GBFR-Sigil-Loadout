@@ -113,6 +113,28 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
     })
 
+    /*
+        动作表那几列的表头文案（同一个 `model.columnLabel`）：七个 `branch*_` 逐个给，十二个 `saveMotIdNN_`
+        共用一个模板、**号从字段名里取**（逐列写十二个 key 要多 48 行翻译，而它们只差那个号）。
+
+        同时钉住兜底：认不出的列照旧显示字段名本身。
+    */
+    it("动作表的列名：`branch*_` 七个逐个、`saveMotIdNN_` 十二个各带自己的号", async () => {
+        const keys = ["branchXAtk_", "branchYAtk_Hold_", "branchAtkHit_", "saveMotId01_", "saveMotId12_", "actionFreeWork0_"]
+        const line = {id: "1000", values: {}, originals: {id_: "1000"}}
+        const {container} = render(<ActionsTable t={t} rows={[line]} keys={keys} />)
+        await waitFor(() => expect(container.querySelectorAll("thead th")).toHaveLength(keys.length + 1))
+        expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual([
+            "#",
+            "X 派生",
+            "按住 Y 派生",
+            "命中派生",
+            "动画 ID 01",
+            "动画 ID 12",
+            "actionFreeWork0_",
+        ])
+    })
+
     it("只读格的内边距**左右对等**、上下 3px；表头文字居中（都没输入框，不继承那份光标余量）", async () => {
         const container = await renderTable()
         // 第 0 列 = `id_`（只读）：`pr-2` 那 8px 是给编辑框留的"光标余量"，只读格不该有。

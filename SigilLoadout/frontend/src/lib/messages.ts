@@ -95,6 +95,16 @@ const zh = {
     colEnd: "结束",
     colAbilityTag: "动作",
     colActionName: "注释",
+    // 动作表里那七个「动作 → 动作」的引用列（值 = 另一个动作的 id，见 docs/action 的字段表 12~18 行）
+    colBranchX: "X 派生",
+    colBranchY: "Y 派生",
+    colBranchXJust: "Just X 派生",
+    colBranchYJust: "Just Y 派生",
+    colBranchXHold: "按住 X 派生",
+    colBranchYHold: "按住 Y 派生",
+    colBranchHit: "命中派生",
+    // 十二个 `saveMotIdNN_`（值 = 一个动画号，字段表 24~35 行）：表头各带自己那一号。
+    colSaveMotId: (no: string) => `动画 ID ${no}`,
     colFrame: "帧",
     colEffects: "效果",
     // 这三个是 XML 里的原字段名，四语一致（同 colFlag0 / colFlag1 的做法）
@@ -179,6 +189,16 @@ export const messages: Record<Lang, Messages> = {
         colEnd: "End",
         colAbilityTag: "Action",
         colActionName: "Note",
+        // 动作表里那七个「动作 → 动作」的引用列（值 = 另一个动作的 id）
+        colBranchX: "X Branch",
+        colBranchY: "Y Branch",
+        colBranchXJust: "Just X Branch",
+        colBranchYJust: "Just Y Branch",
+        colBranchXHold: "Hold X Branch",
+        colBranchYHold: "Hold Y Branch",
+        colBranchHit: "On-Hit Branch",
+        // 十二个 `saveMotIdNN_`（值 = 一个动画号）：表头各带自己那一号。
+        colSaveMotId: (no: string) => `Animation ID ${no}`,
         colFrame: "Frame",
         colEffects: "Effects",
         colLayerFlag: "LayerFlag",
@@ -254,6 +274,16 @@ export const messages: Record<Lang, Messages> = {
         colEnd: "終了",
         colAbilityTag: "アクション",
         colActionName: "メモ",
+        // 动作表里那七个「动作 → 动作」的引用列（值 = 另一个动作的 id）
+        colBranchX: "X 派生",
+        colBranchY: "Y 派生",
+        colBranchXJust: "ジャスト X 派生",
+        colBranchYJust: "ジャスト Y 派生",
+        colBranchXHold: "X 長押し派生",
+        colBranchYHold: "Y 長押し派生",
+        colBranchHit: "ヒット派生",
+        // 十二个 `saveMotIdNN_`（値 = アニメーション番号）：表头各带自己那一号。
+        colSaveMotId: (no: string) => `アニメーション ID ${no}`,
         colFrame: "フレーム",
         colEffects: "効果",
         colLayerFlag: "LayerFlag",
@@ -329,6 +359,16 @@ export const messages: Record<Lang, Messages> = {
         colEnd: "종료",
         colAbilityTag: "액션",
         colActionName: "메모",
+        // 动作表里那七个「动作 → 动作」的引用列（值 = 另一个动作的 id）
+        colBranchX: "X 파생",
+        colBranchY: "Y 파생",
+        colBranchXJust: "저스트 X 파생",
+        colBranchYJust: "저스트 Y 파생",
+        colBranchXHold: "X 홀드 파생",
+        colBranchYHold: "Y 홀드 파생",
+        colBranchHit: "명중 파생",
+        // 十二个 `saveMotIdNN_`（值 = 애니메이션 번호）：表头各带自己那一号。
+        colSaveMotId: (no: string) => `애니메이션 ID ${no}`,
         colFrame: "프레임",
         colEffects: "효과",
         colLayerFlag: "LayerFlag",
