@@ -375,8 +375,8 @@ func (s *ActionsService) SaveActions(rows []ActionRecord) error {
 	}
 
 	// 部署这一步把三件事一次办完：非法值当场报错（坏值不会先被存下来）、"有没有真改动"顺手算出来、
-	// 该写的字节也合成了。它同时决定账本该记什么 —— 全是空操作的改动不记账，mod 里那份也删掉
-	// （见 actionprune.go）。
+	// 该写的字节也合成了。它同时决定 mod 里那份产物留不留 —— 改动全是空操作（与原表数值一致）就不留
+	// （见 actionprune.go）。账本不在这里清：写入那一侧就不收空操作（`actionRowEdits`）。
 	return s.deployActionTable(cfg, original, edits)
 }
 
@@ -389,8 +389,8 @@ deployActionTable 把当前角色的动作表搬进 mod（源文件一个字节�
 产物，但它照样是用户改过的（界面靠账本显示、重启也在）。别的角色的改动本来就该留着：它们的原表不是
 这一份。
 
-（这里曾经按"这个角色在账本里有没有条目"分两种写法，而两种写法算出来的是**同一份切片** —— 产物与
-账本各判各的，就别再假装它俩有关。落盘长在这里的理由与 pruneTrackEdits 一样：清理的结果必须写回去。）
+（这里曾经按"这个角色在账本里有没有条目"分两种写法，而两种写法算出来的是**同一份切片** —— 产物与账本
+各判各的，就别再假装它俩有关。落盘留在这里，是因为保存这条路只有这一处会把整份账本写回去。）
 */
 func (s *ActionsService) deployActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) error {
 	body, changed, err := mergeActionTable(cfg, original, edits)

@@ -1,11 +1,16 @@
 /*
 账本清理：一张表如果**改动全是空操作**，那它和原表数值一致 —— 它不该留在 mod 里（那份产物是"这条表被
-改过"的证据，也是唯一会被游戏读到的东西），也不该再记在账本里。于是账本里去掉它、mod 里那份删掉，
-游戏回去读它自己的原表。
+改过"的证据，也是唯一会被游戏读到的东西）。于是 mod 里那份删掉，游戏回去读它自己的原表。
 
-"有没有改"由谁回答：动作表 / 全局参数在**合成**那一步顺手算出来（见 mergeActionTable / mergeGlobalParam
+"有没有改"由谁回答：全局参数与动作表都在**合成**那一步顺手算出来（见 mergeGlobalParam / mergeActionTable
 的 changed 与 deploy* 的返回值）；轨的判据是整份 XML，判据只有 trackXMLUnchanged 一份，三处都走它 ——
 保存的收尾（SaveFlags / SaveTracks → commitTracks）、部署（Deploy）、补部署（DeployMissingTracks）。
+
+⚠️ **动作表的账本不在这里清**：它在**写入**那一侧就干净了 —— `actionRowEdits` 不收"与原值逐字相同"的
+格子，所以账本里只会有真改动（那条规则由 actionsservice_test.go 钉着）。唯一既不写回表、也不算"有没有改"
+的是 `abilityTag_`（只读的显示列，见 mergeActionTable）：它**故意留着** —— 要自愈的是"等于原值"，不是
+"只给人看"。
+
 一律只谈**当前角色 / 当前那张表**：原表是按动作表所在目录取来的。
 */
 package service
