@@ -15,9 +15,6 @@ import (
 // 命名跟「角色强化」那条链一致：**按功能命名**（那边是 limit_bonus.json），不再带 _edits 后缀。
 const skillboardEditListName = "skillboard.json"
 
-// skillboardLegacyEditListName 是改名前的名字，只给一次性迁移用（见 migrateSkillboardConfig）。
-const skillboardLegacyEditListName = "skillboard_edits.json"
-
 // skillboardRowBase 是一个节点的两类行都有的部分：Key 是**改哪一行**（它挂的参数行哈希），
 // Hash 是**看哪段字**（它自己那一行的哈希）—— 文案按**类型哈希**索引，行文案在那份数组里按下标取。
 //
@@ -117,17 +114,9 @@ func skillboardConfigPath() string {
 	return filepath.Join(appfiles.UserDir(), skillboardEditListName)
 }
 
-// skillboardLegacyConfigPath 是改名前的文件名（skillboard_edits.json）。只用于一次性迁移（见
-// editlist.go 的 migrateEditList），迁完就不再有人读它。C# 那半也留了一条同样的兼容读取（见
-// SkillboardFeature.ConfigFileName）。
-func skillboardLegacyConfigPath() string {
-	return filepath.Join(appfiles.UserDir(), skillboardLegacyEditListName)
-}
-
 // LoadSkillboardEdits 读编辑列表；文件不存在就是"一次都没编辑过"（空列表，不是错误）。
-// 改名前的 skillboard_edits.json 由 loadEditList 在读取前原子迁移过来。
 func (s *SkillboardService) LoadSkillboardEdits() ([]SkillboardEdit, error) {
-	return loadEditList[SkillboardEdit](skillboardConfigPath(), skillboardLegacyConfigPath(), nil)
+	return loadEditList[SkillboardEdit](skillboardConfigPath(), nil)
 }
 
 // SaveSkillboardEdits 接过最新的编辑列表并重启防抖，写入发生在编辑停下来之后（同 SaveLimitBonusEdits）。

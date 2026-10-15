@@ -16,10 +16,81 @@ import {createContext, useContext, useEffect, type ReactNode} from "react"
 import {CELL_CHOICES} from "@/lib/controltypes"
 import type {Messages} from "@/lib/messages"
 
+/*
+**列 id → 消息键**：表头文案"哪一列叫什么"**只写在这一张表里** —— `ActionsTableLabels` 的类型、下面
+`columnLabel` 的参数类型都从它推出来，所以加一列只动一处。
+
+（原来同一份映射写了三遍：`Pick` 一份、`columnLabel` 的参数类型一份、`switch` 一份。三份还会悄悄漂 ——
+漏掉 `switch` 那一支**不报错**，那一列就静默退回原始字段名；现在漏了就是漏了，没有第二处要同步。）
+*/
+const PLAIN_COLUMNS = {
+    id_: "colId", // 动作编号（游戏里别处也按它引用这条动作），四语一致
+    startTime: "colStart",
+    endTime: "colEnd",
+    abilityTag_: "colAbilityTag",
+    actionName_: "colActionName",
+    // 动作表那七个「动作 → 动作」的引用列（值 = 另一个动作的 id，字段名与出处见 docs/action 的字段表 12~18 行）
+    branchXAtk_: "colBranchX",
+    branchYAtk_: "colBranchY",
+    branchXAtk_Just_: "colBranchXJust",
+    branchYAtk_Just_: "colBranchYJust",
+    branchXAtk_Hold_: "colBranchXHold",
+    branchYAtk_Hold_: "colBranchYHold",
+    branchAtkHit_: "colBranchHit",
+    supportEffectList_: "colSupportEffectList", // 哈希 + 6 个值的数组：Flag1:2 被调用时据此挂 Buff
+    saveActionType_: "colSaveActionType", // 冷却消耗时机的小枚举（2 = 一次性）
+    straddleFlagBit_: "colStraddleFlagBit", // 位标记：这条动作怎么被游戏处理、能不能接招
+    usePoint_: "colUsePoint", // 该动作给这场战斗贡献多少分
+    autoHormingType_: "colAutoHormingType", // ⚠️ 游戏数据里就叫 `autoHorming*`（Homing 少个 o），别"改顺"
+    autoHormingOffsetDist_: "colAutoHormingOffsetDist",
+    abilityStocks_: "colAbilityStocks", // 技能能攒几次充能
+    saveAbilityChargeType_: "colSaveAbilityChargeType", // ⚠️ 不是秒（值域见 messages.ts 的注释）
+    abilityChargeDelayMin_: "colAbilityChargeDelayMin", // 冷却开始前额外等多久（实测带小数 2.5，确实是秒）
+    abilityChargeDelayMax_: "colAbilityChargeDelayMax",
+    dist_: "colDist", // AI 认为这个动作该在多远处发动
+    type_: "colType", // 语义未定（99.6% 是 0）：表头就叫"类型"，不猜
+    abilityChargeTime_: "colAbilityChargeTime", // 这里才是"秒"
+    controlTypeHash_: "colControlTypeHash", // Control Type 的哈希：动画怎么播放/串接
+    supportTypeHash_: "colSupportTypeHash", // 98% 是 0，上游说游戏代码不用它
+    // 这一批（图标/分类/上限/贡献/四个 is*）都实测过值域，值域写在 messages.ts 的注释里
+    uiIconCategory_: "colUiIconCategory",
+    actionCategory_: "colActionCategory",
+    isTriggerAttackHit_: "colIsTriggerAttackHit",
+    derivedId_: "colDerivedId",
+    damageLimitType_: "colDamageLimitType",
+    damageLimitDataIndex_: "colDamageLimitDataIndex",
+    relatedAbilityType_: "colRelatedAbilityType",
+    indirectDamagePoint_: "colIndirectDamagePoint",
+    isIndirectDamageAddMulti_: "colIsIndirectDamageAddMulti",
+    isCheckComboCutAbility_: "colIsCheckComboCutAbility",
+    isNoClearPrecedingInput_: "colIsNoClearPrecedingInput",
+    isChangeAttackInputPriority_: "colIsChangeAttackInputPriority",
+} as const satisfies Record<string, keyof Messages>
+
+/** 上面那张表用到的那几个消息键。 */
+type PlainLabelKey = (typeof PLAIN_COLUMNS)[keyof typeof PLAIN_COLUMNS]
+
+/*
+**带编号的四族列** —— 表头是"某个词 + 字段名里那个号"，所以各用一个正则取号 + 自己的模板：
+`saveMotIdNN_`（动画）、`actionFreeWorkNN_`（动作参数）、`freeWorkNN_`（自由参数）、`bulletFreeWorkNN_`
+（子弹参数）。四族共 50 列，逐个写进上面那张表要多两百条翻译，而它们只差那个号。
+
+⚠️ 四条正则都以 `^` 锚住全名，所以互不吞并：`^freeWork…` 匹配不到 `actionFreeWork…` / `bulletFreeWork…`。
+*/
+const NUMBERED_COLUMNS: readonly [RegExp, (t: ActionsTableLabels, no: string) => string][] = [
+    [/^saveMotId(\d{2})_$/, (t, no) => t.colSaveMotId(no)],
+    [/^actionFreeWork(\d{2})_$/, (t, no) => t.colActionFreeWork(no)],
+    [/^freeWork(\d{2})_$/, (t, no) => t.colFreeWork(no)],
+    [/^bulletFreeWork(\d{2})_$/, (t, no) => t.colBulletFreeWork(no)],
+]
+
+/** 列名要的那几个消息键（单列从 `PLAIN_COLUMNS` 推出来，带编号那四个手写 —— 它们只有四个）。 */
+type ActionsTableLabels = Pick<Messages, PlainLabelKey | "colSaveMotId" | "colActionFreeWork" | "colFreeWork" | "colBulletFreeWork">
+
 /**
- * 这张表真正用到的那几条文案。
+ * 这张表真正用到的那几条文案 = 列名（`ActionsTableLabels`）+ 表格自己用的那 4 条。
  *
- * ‼️ **故意收窄**，不用整个 `Messages`：表只用得到这 6 条，而接口要求整个（~50 键）的话，
+ * ‼️ **故意收窄**，不用整个 `Messages`：接口要求整个（~50 键）的话，
  * 每个调用点与每份测试夹具都得凑出一个完整的 `Messages` —— 测试侧因此出现
  * `as unknown as Messages` 这种**绕过全部检查**的双重断言（夹具少一个键、串一个名都测不出来）。
  * 收窄之后夹具不必凑（测试直接用生产那份 `messages.zh`），而类型系统仍逐键在查；
@@ -28,19 +99,7 @@ import type {Messages} from "@/lib/messages"
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colId" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName" | "colBranchX" | "colBranchY" | "colBranchXJust" | "colBranchYJust" | "colBranchXHold" | "colBranchYHold" | "colBranchHit" | "colSaveMotId" | "colActionFreeWork" | "colFreeWork" | "colBulletFreeWork" | "colSupportEffectList" | "colSaveActionType" | "colStraddleFlagBit" | "colUsePoint" | "colAutoHormingType" | "colAutoHormingOffsetDist" | "colAbilityStocks" | "colSaveAbilityChargeType" | "colAbilityChargeDelayMin" | "colAbilityChargeDelayMax" | "colDist" | "colType" | "colAbilityChargeTime" | "colControlTypeHash" | "colSupportTypeHash" | "colUiIconCategory" | "colActionCategory" | "colIsTriggerAttackHit" | "colDerivedId" | "colDamageLimitType" | "colDamageLimitDataIndex" | "colRelatedAbilityType" | "colIndirectDamagePoint" | "colIsIndirectDamageAddMulti" | "colIsCheckComboCutAbility" | "colIsNoClearPrecedingInput" | "colIsChangeAttackInputPriority">
-
-/*
-**带编号的四族列** —— 表头是"某个词 + 字段名里那个号"，所以各用一个模板 + 正则取号：
-`saveMotIdNN_`（动画）、`actionFreeWorkNN_`（动作参数）、`freeWorkNN_`（自由参数）、`bulletFreeWorkNN_`
-（子弹参数）。四族共 50 列，逐个写 key 要多两百条翻译，而它们只差那个号。
-
-⚠️ 四条正则都以 `^` 锚住全名，所以互不吞并：`^freeWork…` 匹配不到 `actionFreeWork…` / `bulletFreeWork…`。
-*/
-const SAVE_MOT_ID_COLUMN = /^saveMotId(\d{2})_$/
-const ACTION_FREE_WORK_COLUMN = /^actionFreeWork(\d{2})_$/
-const FREE_WORK_COLUMN = /^freeWork(\d{2})_$/
-const BULLET_FREE_WORK_COLUMN = /^bulletFreeWork(\d{2})_$/
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch"> & ActionsTableLabels
 
 
 /**
@@ -51,8 +110,8 @@ const BULLET_FREE_WORK_COLUMN = /^bulletFreeWork(\d{2})_$/
  *   · `actionName_` —— 动作名的**原文**，也是 `abilityTag_` 那一列显示名的**来路**，改它等于改游戏
  *                      那边的动作名。
  *   · `abilityTag_` —— **动作表那一列上屏的是"这条动作的名字"**（后端 `LoadActions` 就把显示名投影成了
- *                      它的原值，见 `actionRowFields`），而部署时这一格**只带原始值**（见 `mergeActionTable`）
- *                      —— 能改却改不到游戏里，那就不是一格能改的格。
+ *                      它的原值，见 `actionRowFields`）：格子里装的名字**不是这一格的字段值**，没有可写
+ *                      回去的东西 —— 所以它只读。
  */
 const READ_ONLY_KEYS = new Set(["id_", "actionName_", "abilityTag_"])
 
@@ -107,160 +166,17 @@ export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSp
  * `actionName_` 是它的原文、七个 `branch*_` 是"哪个输入派生到哪个动作"、`saveMotIdNN_` 是它调用的动画、
  * `actionFreeWorkNN_` 是它的自由数值、`supportEffectList_` 是它挂的 Buff）。
  *
- * **带编号的四族**（见文件上方那四条正则）走"一个模板 + 从字段名里取号"，其余单列在下面的 switch 里逐条写。
+ * 映射本身在文件上方：单列在 `PLAIN_COLUMNS`，带编号的四族在 `NUMBERED_COLUMNS`。
  * 调用方自己的 `label` 优先级更高；放在这里而不是各表的列说明里，是因为这几条谁都不必再写一遍。
  */
-export const columnLabel = (
-    id: string,
-    t: {
-        colId: string
-        colStart: string
-        colEnd: string
-        colAbilityTag: string
-        colActionName: string
-        colBranchX: string
-        colBranchY: string
-        colBranchXJust: string
-        colBranchYJust: string
-        colBranchXHold: string
-        colBranchYHold: string
-        colBranchHit: string
-        colSaveMotId: (no: string) => string
-        colActionFreeWork: (no: string) => string
-        colFreeWork: (no: string) => string
-        colBulletFreeWork: (no: string) => string
-        colSupportEffectList: string
-        colSaveActionType: string
-        colStraddleFlagBit: string
-        colUsePoint: string
-        colAutoHormingType: string
-        colAutoHormingOffsetDist: string
-        colAbilityStocks: string
-        colSaveAbilityChargeType: string
-        colAbilityChargeDelayMin: string
-        colAbilityChargeDelayMax: string
-        colDist: string
-        colType: string
-        colAbilityChargeTime: string
-        colControlTypeHash: string
-        colSupportTypeHash: string
-        colUiIconCategory: string
-        colActionCategory: string
-        colIsTriggerAttackHit: string
-        colDerivedId: string
-        colDamageLimitType: string
-        colDamageLimitDataIndex: string
-        colRelatedAbilityType: string
-        colIndirectDamagePoint: string
-        colIsIndirectDamageAddMulti: string
-        colIsCheckComboCutAbility: string
-        colIsNoClearPrecedingInput: string
-        colIsChangeAttackInputPriority: string
-    },
-): string => {
-    const motId = SAVE_MOT_ID_COLUMN.exec(id)
-    if (motId) return t.colSaveMotId(motId[1])
-    const actionFreeWork = ACTION_FREE_WORK_COLUMN.exec(id)
-    if (actionFreeWork) return t.colActionFreeWork(actionFreeWork[1])
-    const freeWork = FREE_WORK_COLUMN.exec(id)
-    if (freeWork) return t.colFreeWork(freeWork[1])
-    const bulletFreeWork = BULLET_FREE_WORK_COLUMN.exec(id)
-    if (bulletFreeWork) return t.colBulletFreeWork(bulletFreeWork[1])
-    switch (id) {
-        // 动作编号（游戏里别处也按它引用这条动作），四语一致。
-        case "id_":
-            return t.colId
-        case "startTime":
-            return t.colStart
-        case "endTime":
-            return t.colEnd
-        case "abilityTag_":
-            return t.colAbilityTag
-        case "actionName_":
-            return t.colActionName
-        // 动作表那七个「动作 → 动作」的引用列（字段名与出处见 docs/action 的字段表 12~18 行）
-        case "branchXAtk_":
-            return t.colBranchX
-        case "branchYAtk_":
-            return t.colBranchY
-        case "branchXAtk_Just_":
-            return t.colBranchXJust
-        case "branchYAtk_Just_":
-            return t.colBranchYJust
-        case "branchXAtk_Hold_":
-            return t.colBranchXHold
-        case "branchYAtk_Hold_":
-            return t.colBranchYHold
-        case "branchAtkHit_":
-            return t.colBranchHit
-        // 这一格是个数组（哈希 + 6 个值）：游戏在 Flag1:2 被调用时据此给角色/队友挂 Buff。
-        case "supportEffectList_":
-            return t.colSupportEffectList
-        // 技能冷却消耗时机的小枚举（1 = 普通、2 = 一次性）与"这条动作怎么被游戏处理"的位标记。
-        case "saveActionType_":
-            return t.colSaveActionType
-        case "straddleFlagBit_":
-            return t.colStraddleFlagBit
-        // 这个动作给这场战斗贡献多少分；下面两个名字里那个 `Horming` 是**游戏自己**的拼法
-        // （字段名一个字都不能改顺：改了这两条 case 就永远匹配不上）。
-        case "usePoint_":
-            return t.colUsePoint
-        case "autoHormingType_":
-            return t.colAutoHormingType
-        case "autoHormingOffsetDist_":
-            return t.colAutoHormingOffsetDist
-        // 充能次数 / 冷却那三格（`abilityChargeDelayMin_` 实测带小数 2.5，确实是秒；
-        // `saveAbilityChargeType_` 不是秒 —— 见 messages 里的实测值域）。
-        case "abilityStocks_":
-            return t.colAbilityStocks
-        case "saveAbilityChargeType_":
-            return t.colSaveAbilityChargeType
-        case "abilityChargeDelayMin_":
-            return t.colAbilityChargeDelayMin
-        case "abilityChargeDelayMax_":
-            return t.colAbilityChargeDelayMax
-        // AI 认为这个动作该在多远处发动（上游：Affects the distance the action is set to be called at by AI）。
-        case "dist_":
-            return t.colDist
-        // 语义未定（99.6% 是 0，非零只有 6 条）—— 表头就叫"类型"，不猜。
-        case "type_":
-            return t.colType
-        // 冷却时长（秒）与另两个"哈希/未使用"的列：`controlTypeHash_` 是动画播放模式、
-        // `supportTypeHash_` 上游直言游戏代码不用它。
-        case "abilityChargeTime_":
-            return t.colAbilityChargeTime
-        case "controlTypeHash_":
-            return t.colControlTypeHash
-        case "supportTypeHash_":
-            return t.colSupportTypeHash
-        // 剩下这一批（图标/分类/上限/贡献/四个 is*）都是**实测过值域**的列，值域写在 messages.ts 的注释里。
-        case "uiIconCategory_":
-            return t.colUiIconCategory
-        case "actionCategory_":
-            return t.colActionCategory
-        case "isTriggerAttackHit_":
-            return t.colIsTriggerAttackHit
-        case "derivedId_":
-            return t.colDerivedId
-        case "damageLimitType_":
-            return t.colDamageLimitType
-        case "damageLimitDataIndex_":
-            return t.colDamageLimitDataIndex
-        case "relatedAbilityType_":
-            return t.colRelatedAbilityType
-        case "indirectDamagePoint_":
-            return t.colIndirectDamagePoint
-        case "isIndirectDamageAddMulti_":
-            return t.colIsIndirectDamageAddMulti
-        case "isCheckComboCutAbility_":
-            return t.colIsCheckComboCutAbility
-        case "isNoClearPrecedingInput_":
-            return t.colIsNoClearPrecedingInput
-        case "isChangeAttackInputPriority_":
-            return t.colIsChangeAttackInputPriority
-        default:
-            return id
+export const columnLabel = (id: string, t: ActionsTableLabels): string => {
+    for (const [pattern, label] of NUMBERED_COLUMNS) {
+        const no = pattern.exec(id)?.[1]
+        if (no !== undefined) return label(t, no)
     }
+    // 认不出的字段名：表头就显示它自己，不编名字。
+    const key = (PLAIN_COLUMNS as Record<string, PlainLabelKey>)[id]
+    return key ? t[key] : id
 }
 
 /**

@@ -61,7 +61,7 @@ func configPath() string {
 // 存在但读不出或解析不了的文件是错误，而不是空列表：空列表是一个真实状态（所有编辑都关掉了），
 // 而把坏文件显示成空列表，会让用户的下一次按键把这份空覆盖回他自己的编辑内容。
 func (s *EditService) LoadEdits() ([]SigilSkill, error) {
-	return loadEditList(configPath(), "", padSigilSkill)
+	return loadEditList(configPath(), padSigilSkill)
 }
 
 // padSigilSkill 把一条记录的参槽补齐到正好 LevelValueCount 长。

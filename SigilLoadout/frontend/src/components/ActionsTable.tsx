@@ -74,7 +74,9 @@ import {
     HANDLE_WIDTH,
     HEAD_CELL,
     HEAD_DRILL,
+    HEAD_FIELD,
     HEAD_HEIGHT,
+    HEAD_LABEL,
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
@@ -882,21 +884,16 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                                         <div className="truncate">
                                             {header.isPlaceholder ? null : (
                                                 /*
-                                                    **表头两行：译名在上、原始字段名在下**（用户口径）。
-
-                                                    为什么留着字段名：译名一改（「名称」→「动作」这种事已经发生过一次），
-                                                    光看表头就没人知道它对应表里哪一列了；字段名是**跨工具/跨文档**的那把钥匙。
-                                                    ⚠️ 两行都要 `data-head-line`：量宽那一趟**按行分别量**（见 useColumnMeasure），
-                                                    拿 `th.textContent` 会把两行连成一串来量，列宽白胖一圈。
+                                                    表头**两行**：译名在上、原始字段名在下（用户口径）。字段名留着，是因为
+                                                    译名一改（「名称」→「动作」这种事已经发生过一次），光看表头就没人知道它
+                                                    对应表里哪一列了 —— 字段名是跨工具/跨文档的那把钥匙。
+                                                    ⚠️ 两行都要 `data-head-line`：量宽那一趟**按行分别量**（见 useColumnMeasure）。
                                                 */
                                                 <>
-                                                    <div className="truncate" data-head-line="">
+                                                    <div className={HEAD_LABEL} data-head-line="">
                                                         {flexRender(header.column.columnDef.header, header.getContext())}
                                                     </div>
-                                                    <div
-                                                        className="truncate text-[11px] leading-tight font-normal text-muted-foreground/70"
-                                                        data-head-line=""
-                                                    >
+                                                    <div className={HEAD_FIELD} data-head-line="">
                                                         {header.column.id}
                                                     </div>
                                                 </>

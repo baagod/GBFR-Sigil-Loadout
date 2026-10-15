@@ -93,7 +93,7 @@ func limitBonusConfigPath() string {
 // 存在但读不出或解析不了的文件是错误，而不是空列表：空列表是一个真实状态（一栏都没开），而把坏
 // 文件显示成空列表，会让用户的下一次按键把这份空覆盖回他自己的编辑内容。
 func (s *LimitBonusService) LoadLimitBonusEdits() ([]LimitBonusEdit, error) {
-	return loadEditList[LimitBonusEdit](limitBonusConfigPath(), "", nil)
+	return loadEditList[LimitBonusEdit](limitBonusConfigPath(), nil)
 }
 
 // SaveLimitBonusEdits 接过最新的编辑列表并重启防抖，好让写入发生在编辑停下来之后（见 debounceDelay）。

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 
 	"sigilloadout/appfiles"
 )
@@ -16,7 +15,7 @@ import (
 	三条链的编辑列表是**同一条契约**：{"edits":[…]}、从用户目录读、文件不存在=空列表、坏文件=带文件名
 	的错误（显示成空列表会让用户的下一次按键覆盖掉自己的编辑）、落盘前补齐形状、防抖写出、关机兜底。
 
-	差异只有三处——文件名、补齐规则、"改名前的老文件"（只有专精链有）——所以读与写各只留一份实现。
+	差异只有两处——文件名与补齐规则——所以读与写各只留一份实现。
 	各 service 仍然自己持有 appfiles.Debounced（每条链一份待写状态）与自己的常量，只把这两个函数转发。
 */
 
@@ -27,11 +26,7 @@ type editList[T any] struct {
 
 // loadEditList 读一份编辑列表。**路径每次调用时算**（由调用方的 xxxConfigPath() 给）：它走
 // appfiles.UserDir()，而测试靠 Setenv 换 LOCALAPPDATA，存下来就会读到真实用户目录。
-func loadEditList[T any](path string, legacyPath string, pad func(*T)) ([]T, error) {
-	if err := migrateEditList(path, legacyPath); err != nil {
-		return nil, err
-	}
-
+func loadEditList[T any](path string, pad func(*T)) ([]T, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -75,24 +70,4 @@ func padAll[T any](edits []T, pad func(*T)) {
 	for i := range edits {
 		pad(&edits[i])
 	}
-}
-
-// migrateEditList 把改名前的文件挪到新名字下。只在**新文件还不存在**时动，用 Rename（同一目录内是
-// 原子的）：失败就当没迁，用户的旧文件原样留着——宁可这次读不到，也不能把唯一的编辑数据弄丢。
-// legacyPath 为空 = 这条链没有改过名。
-func migrateEditList(path string, legacyPath string) error {
-	if legacyPath == "" {
-		return nil
-	}
-	if _, err := os.Stat(path); err == nil {
-		return nil // 新文件已经在，什么都不做
-	}
-	if _, err := os.Stat(legacyPath); err != nil {
-		return nil // 新旧都没有 = 用户还没编辑过
-	}
-	if err := os.Rename(legacyPath, path); err != nil {
-		return fmt.Errorf("renaming %s to %s: %w",
-			filepath.Base(legacyPath), filepath.Base(path), err)
-	}
-	return nil
 }

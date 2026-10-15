@@ -6,13 +6,12 @@ import (
 )
 
 /*
-`abilityTag_` 那一列在界面上装的是"这条动作的名字"（给人看的），**不写回动作表**：游戏读的技能键一律用
-原值 —— 部署不该因为你改了个名字而变。
+产物看"有没有**真**改动"：把原值逐字写回去 = 空操作 → 不写产物（mod 里那份删掉，游戏读它自己的原表）。
 
-这里直接钉**合并那一步**（不经过 SaveActions）：哪怕账本里明明白白记着这一格改过，合并回动作表时也得
-什么都不变（`changed = false`、没有产物）。
+界面上造不出这种情况 —— `actionRowEdits` 在写入那一侧就不收"与原值逐字相同"的格子；这里直接钉
+`mergeActionTable` 这一步（账本被手改过、或随包资产换过，都是真实入口）。
 */
-func TestMergeActionTableSkipsAbilityTag(t *testing.T) {
+func TestMergeActionTableLeavesTheTableAloneWhenNothingChanged(t *testing.T) {
 	_, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 	code := charCode(cfg)
@@ -25,44 +24,40 @@ func TestMergeActionTableSkipsAbilityTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 原值从解析出来的树里现取，别写死：夹具改了也不该假红。
+	record := recordByID(original, "6")
+	if record == nil {
+		t.Fatal("夹具里该有 id_ = 6 这条记录")
+	}
+	fields, err := actionFields(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original6 := ""
+	for _, field := range fields {
+		if field.Key == "abilityChargeTime_" {
+			original6 = field.Original
+		}
+	}
+	if original6 == "" {
+		t.Fatal("夹具里 id_ = 6 该有 abilityChargeTime_")
+	}
 
-	edits := []actionEdit{{Char: code, ID: "6", Field: "abilityTag_", Value: strPtr("我自己起的名字")}}
-	merged, changed, err := mergeActionTable(cfg, original, edits)
+	noop := []actionEdit{{Char: code, ID: "6", Field: "abilityChargeTime_", Value: &original6}}
+	merged, changed, err := mergeActionTable(cfg, original, noop)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if changed || merged != nil {
-		t.Fatalf("只改 abilityTag_ 时不该写回动作表（changed=%v，产物 %d 字节）", changed, len(merged))
+		t.Fatalf("把原值写回去不算改动（changed=%v，产物 %d 字节）", changed, len(merged))
 	}
 
-	// 对照：同一份表上改**别的**列照常写回 —— 上一条不是因为"整个合并坏了"才通过的。
-	normal := []actionEdit{{Char: code, ID: "6", Field: "abilityChargeTime_", Value: strPtr("12345")}}
-	if _, changed, err := mergeActionTable(cfg, original, normal); err != nil {
+	// 对照：真改一个值就照常写回 —— 上一条不是因为"整个合并坏了"才通过的。
+	different := original6 + "1"
+	if _, changed, err := mergeActionTable(cfg, original, []actionEdit{{Char: code, ID: "6", Field: "abilityChargeTime_", Value: &different}}); err != nil {
 		t.Fatal(err)
 	} else if !changed {
-		t.Fatal("改别的列应该照常写回")
-	}
-}
-
-/*
-但"不进产物"**不等于**"没改过"：用户改的名字得**留在账本里**（界面靠它显示、重启也在），只是不落进
-动作表。这里走整条 SaveActions —— 产物不该有，账本那条**必须在**。
-*/
-func TestSaveActionsKeepsAbilityTagInTheLedger(t *testing.T) {
-	service, cfg, _ := actionsFixture(t)
-	sampleActionTable(t, cfg)
-
-	saveRow(t, service, "6", []ActionField{{Key: "abilityTag_", Value: strPtr("我自己起的名字")}})
-
-	edits, err := loadActionEdits()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(edits) != 1 || edits[0].Field != "abilityTag_" || edits[0].Value == nil || *edits[0].Value != "我自己起的名字" {
-		t.Fatalf("改的名字应该留在账本里，实际 %+v", edits)
-	}
-	if _, err := os.Stat(deployActionPath(cfg)); !os.IsNotExist(err) {
-		t.Fatal("只改 abilityTag_ 时不该有产物")
+		t.Fatal("真改了值应该照常写回")
 	}
 }
 
