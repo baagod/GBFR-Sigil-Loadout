@@ -31,8 +31,17 @@ function Stop-SigilLoadout {
 
 function Start-SigilLoadout {
     explorer.exe (Join-Path $modDir 'SigilLoadout.exe')
-    Start-Sleep -Seconds 3
-    return [bool](Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue)
+    # 启动是经 explorer 转手的，进程出现得比固定 3 秒慢（实测会晚到十几秒）—— 轮询到它出现为止，
+    # 别让一次早查就把"其实起来了"判成失败。出现之后再等 2 秒复核一次：真崩了还是要报出来。
+    $deadline = (Get-Date).AddSeconds(20)
+    while ((Get-Date) -lt $deadline) {
+        if (Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue) {
+            Start-Sleep -Seconds 2
+            return [bool](Get-Process -Name 'SigilLoadout' -ErrorAction SilentlyContinue)
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    return $false
 }
 
 Stop-SigilLoadout

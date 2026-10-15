@@ -67,6 +67,9 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     # 全部原始数据（17929 份轨 + 36 份动作表 + 16 份全局参数，条目名就是部署路径）：少了它，除了作者本机
     # （那边有解包目录兜底），别人装上去每个角色的轨与动作表都读不到，全局参数那一页也空着。
     'data.zip')
+# ⚠️ `ability.lang.json` **故意不在上面这份清单里**（它不进包、运行时不读它），但它在 `assets\` 下是
+# **生成器的输入**：`gen actionnames` 从它读"技能键 → 中文名"来产出 `chara.action.zh.json`。
+# 别当成死资产删掉 —— 删了 `gen export` 会在 readAbility 那一步直接报错。
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }
