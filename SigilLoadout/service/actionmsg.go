@@ -149,8 +149,8 @@ func setActionFieldValue(node *msgValue, value string) error {
 
 // flattenMsg 把一棵 msgpack 树拍成 key.path 的行：数组用下标进路径，映射用键名。
 //
-// 同名的兄弟键（根上连着几条 FSMNode 就是）第 2 个起带 #1 / #2 后缀——与参考实现同一套记法，
-// 界面据此仍然能唯一定位一行。空容器也出一行（[] / {}），否则它会从界面上整个消失。
+// 同名的兄弟键（根上连着几条 FSMNode 就是）第 2 个起带 #1 / #2 后缀 —— 界面据此仍然能唯一定位一行。
+// 空容器也出一行（[] / {}），否则它会从界面上整个消失。
 //
 // 值一律填 Original：FSM 这块**只读**（没有编辑入口），所以 Value 永远是 nil。
 func flattenMsg(v *msgValue, path string, out *[]ActionField) {

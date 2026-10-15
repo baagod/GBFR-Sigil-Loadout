@@ -28,10 +28,20 @@ import type {Messages} from "@/lib/messages"
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName" | "colBranchX" | "colBranchY" | "colBranchXJust" | "colBranchYJust" | "colBranchXHold" | "colBranchYHold" | "colBranchHit" | "colSaveMotId">
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "colId" | "colStart" | "colEnd" | "colAbilityTag" | "colActionName" | "colBranchX" | "colBranchY" | "colBranchXJust" | "colBranchYJust" | "colBranchXHold" | "colBranchYHold" | "colBranchHit" | "colSaveMotId" | "colActionFreeWork" | "colFreeWork" | "colBulletFreeWork" | "colSupportEffectList" | "colSaveActionType" | "colStraddleFlagBit" | "colUsePoint" | "colAutoHormingType" | "colAutoHormingOffsetDist" | "colAbilityStocks" | "colSaveAbilityChargeType" | "colAbilityChargeDelayMin" | "colAbilityChargeDelayMax" | "colDist" | "colType" | "colAbilityChargeTime" | "colControlTypeHash" | "colSupportTypeHash" | "colUiIconCategory" | "colActionCategory" | "colIsTriggerAttackHit" | "colDerivedId" | "colDamageLimitType" | "colDamageLimitDataIndex" | "colRelatedAbilityType" | "colIndirectDamagePoint" | "colIsIndirectDamageAddMulti" | "colIsCheckComboCutAbility" | "colIsNoClearPrecedingInput" | "colIsChangeAttackInputPriority">
 
-/** 十二个 `saveMotIdNN_`（值 = 一个动画号）：表头"动画 ID NN"，那个号从字段名里取。 */
+/*
+**带编号的四族列** —— 表头是"某个词 + 字段名里那个号"，所以各用一个模板 + 正则取号：
+`saveMotIdNN_`（动画）、`actionFreeWorkNN_`（动作参数）、`freeWorkNN_`（自由参数）、`bulletFreeWorkNN_`
+（子弹参数）。四族共 50 列，逐个写 key 要多两百条翻译，而它们只差那个号。
+
+⚠️ 四条正则都以 `^` 锚住全名，所以互不吞并：`^freeWork…` 匹配不到 `actionFreeWork…` / `bulletFreeWork…`。
+*/
 const SAVE_MOT_ID_COLUMN = /^saveMotId(\d{2})_$/
+const ACTION_FREE_WORK_COLUMN = /^actionFreeWork(\d{2})_$/
+const FREE_WORK_COLUMN = /^freeWork(\d{2})_$/
+const BULLET_FREE_WORK_COLUMN = /^bulletFreeWork(\d{2})_$/
+
 
 /**
  * **只读**的列：这些格子只给人看，不参与编辑，也不收粘贴。
@@ -94,12 +104,16 @@ export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSp
  *
  * 为什么要有：这些都是后端字段名，但它们是给人看的 —— `startTime` / `endTime` 谁有这两列都该显示
  * "开始 / 结束"（轨表、flags 表都在用）；动作表那几列同理（`abilityTag_` 那一列显示的是"这条动作的名字"、
- * `actionName_` 是它的原文、七个 `branch*_` 是"哪个输入派生到哪个动作"）。
+ * `actionName_` 是它的原文、七个 `branch*_` 是"哪个输入派生到哪个动作"、`saveMotIdNN_` 是它调用的动画、
+ * `actionFreeWorkNN_` 是它的自由数值、`supportEffectList_` 是它挂的 Buff）。
+ *
+ * **带编号的四族**（见文件上方那四条正则）走"一个模板 + 从字段名里取号"，其余单列在下面的 switch 里逐条写。
  * 调用方自己的 `label` 优先级更高；放在这里而不是各表的列说明里，是因为这几条谁都不必再写一遍。
  */
 export const columnLabel = (
     id: string,
     t: {
+        colId: string
         colStart: string
         colEnd: string
         colAbilityTag: string
@@ -112,12 +126,50 @@ export const columnLabel = (
         colBranchYHold: string
         colBranchHit: string
         colSaveMotId: (no: string) => string
+        colActionFreeWork: (no: string) => string
+        colFreeWork: (no: string) => string
+        colBulletFreeWork: (no: string) => string
+        colSupportEffectList: string
+        colSaveActionType: string
+        colStraddleFlagBit: string
+        colUsePoint: string
+        colAutoHormingType: string
+        colAutoHormingOffsetDist: string
+        colAbilityStocks: string
+        colSaveAbilityChargeType: string
+        colAbilityChargeDelayMin: string
+        colAbilityChargeDelayMax: string
+        colDist: string
+        colType: string
+        colAbilityChargeTime: string
+        colControlTypeHash: string
+        colSupportTypeHash: string
+        colUiIconCategory: string
+        colActionCategory: string
+        colIsTriggerAttackHit: string
+        colDerivedId: string
+        colDamageLimitType: string
+        colDamageLimitDataIndex: string
+        colRelatedAbilityType: string
+        colIndirectDamagePoint: string
+        colIsIndirectDamageAddMulti: string
+        colIsCheckComboCutAbility: string
+        colIsNoClearPrecedingInput: string
+        colIsChangeAttackInputPriority: string
     },
 ): string => {
-    // 十二列共用一个模板（逐个写十二个 key 要多 48 行翻译，而它们只差字段名里那个号）。
     const motId = SAVE_MOT_ID_COLUMN.exec(id)
     if (motId) return t.colSaveMotId(motId[1])
+    const actionFreeWork = ACTION_FREE_WORK_COLUMN.exec(id)
+    if (actionFreeWork) return t.colActionFreeWork(actionFreeWork[1])
+    const freeWork = FREE_WORK_COLUMN.exec(id)
+    if (freeWork) return t.colFreeWork(freeWork[1])
+    const bulletFreeWork = BULLET_FREE_WORK_COLUMN.exec(id)
+    if (bulletFreeWork) return t.colBulletFreeWork(bulletFreeWork[1])
     switch (id) {
+        // 动作编号（游戏里别处也按它引用这条动作），四语一致。
+        case "id_":
+            return t.colId
         case "startTime":
             return t.colStart
         case "endTime":
@@ -141,6 +193,71 @@ export const columnLabel = (
             return t.colBranchYHold
         case "branchAtkHit_":
             return t.colBranchHit
+        // 这一格是个数组（哈希 + 6 个值）：游戏在 Flag1:2 被调用时据此给角色/队友挂 Buff。
+        case "supportEffectList_":
+            return t.colSupportEffectList
+        // 技能冷却消耗时机的小枚举（1 = 普通、2 = 一次性）与"这条动作怎么被游戏处理"的位标记。
+        case "saveActionType_":
+            return t.colSaveActionType
+        case "straddleFlagBit_":
+            return t.colStraddleFlagBit
+        // 这个动作给这场战斗贡献多少分；下面两个名字里那个 `Horming` 是**游戏自己**的拼法
+        // （字段名一个字都不能改顺：改了这两条 case 就永远匹配不上）。
+        case "usePoint_":
+            return t.colUsePoint
+        case "autoHormingType_":
+            return t.colAutoHormingType
+        case "autoHormingOffsetDist_":
+            return t.colAutoHormingOffsetDist
+        // 充能次数 / 冷却那三格（`abilityChargeDelayMin_` 实测带小数 2.5，确实是秒；
+        // `saveAbilityChargeType_` 不是秒 —— 见 messages 里的实测值域）。
+        case "abilityStocks_":
+            return t.colAbilityStocks
+        case "saveAbilityChargeType_":
+            return t.colSaveAbilityChargeType
+        case "abilityChargeDelayMin_":
+            return t.colAbilityChargeDelayMin
+        case "abilityChargeDelayMax_":
+            return t.colAbilityChargeDelayMax
+        // AI 认为这个动作该在多远处发动（上游：Affects the distance the action is set to be called at by AI）。
+        case "dist_":
+            return t.colDist
+        // 语义未定（99.6% 是 0，非零只有 6 条）—— 表头就叫"类型"，不猜。
+        case "type_":
+            return t.colType
+        // 冷却时长（秒）与另两个"哈希/未使用"的列：`controlTypeHash_` 是动画播放模式、
+        // `supportTypeHash_` 上游直言游戏代码不用它。
+        case "abilityChargeTime_":
+            return t.colAbilityChargeTime
+        case "controlTypeHash_":
+            return t.colControlTypeHash
+        case "supportTypeHash_":
+            return t.colSupportTypeHash
+        // 剩下这一批（图标/分类/上限/贡献/四个 is*）都是**实测过值域**的列，值域写在 messages.ts 的注释里。
+        case "uiIconCategory_":
+            return t.colUiIconCategory
+        case "actionCategory_":
+            return t.colActionCategory
+        case "isTriggerAttackHit_":
+            return t.colIsTriggerAttackHit
+        case "derivedId_":
+            return t.colDerivedId
+        case "damageLimitType_":
+            return t.colDamageLimitType
+        case "damageLimitDataIndex_":
+            return t.colDamageLimitDataIndex
+        case "relatedAbilityType_":
+            return t.colRelatedAbilityType
+        case "indirectDamagePoint_":
+            return t.colIndirectDamagePoint
+        case "isIndirectDamageAddMulti_":
+            return t.colIsIndirectDamageAddMulti
+        case "isCheckComboCutAbility_":
+            return t.colIsCheckComboCutAbility
+        case "isNoClearPrecedingInput_":
+            return t.colIsNoClearPrecedingInput
+        case "isChangeAttackInputPriority_":
+            return t.colIsChangeAttackInputPriority
         default:
             return id
     }

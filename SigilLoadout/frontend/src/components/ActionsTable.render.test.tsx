@@ -19,6 +19,16 @@ import {KEYS, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from
 
 const {renderTable, setRows} = useTableHarness()
 
+/**
+ * 一个表头格的**两行文字**：`[译名, 原始字段名]`（`#` 那种只有一行的格返回它自己那串文字）。
+ *
+ * 表头两行是用户口径（译名一改就没人知道对应哪个字段了，见 `ActionsTable` 的表头渲染）。
+ */
+const headLines = (th: Element): string | string[] => {
+    const lines = [...th.querySelectorAll("[data-head-line]")].map((el) => el.textContent)
+    return lines.length > 0 ? lines : (th.textContent ?? "")
+}
+
 describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
     it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
         const {container} = render(<ActionsTable t={t} {...tableProps([makeRow("1000")])} />)
@@ -100,6 +110,11 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         expect(inner.className).toContain("truncate")
         // 用户要求移除悬停提示：完整列名不再挂 title（截断了就让它截断）。
         expect(head.getAttribute("title")).toBeNull()
+        // 两行：译名在上、原始字段名在下，各自 truncate。
+        expect([...head.querySelectorAll("[data-head-line]")].map((el) => [el.textContent, el.className.includes("truncate")])).toEqual([
+            ["ID", true],
+            ["id_", true],
+        ])
     })
 
     it("`startTime` / `endTime` 的表头译文由**基座兜底**（任何表都有，不必自己写列说明）", async () => {
@@ -110,29 +125,73 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
             <ActionsTable t={t} rows={[line]} keys={["startTime", "endTime", "someField_"]} />,
         )
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(4))
-        expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual(["#", "开始", "结束", "someField_"])
+        expect([...container.querySelectorAll("thead th")].map(headLines)).toEqual([
+            "#",
+            ["开始", "startTime"],
+            ["结束", "endTime"],
+            // 认不出的列：两行都是字段名本身。
+            ["someField_", "someField_"],
+        ])
     })
 
     /*
-        动作表那几列的表头文案（同一个 `model.columnLabel`）：七个 `branch*_` 逐个给，十二个 `saveMotIdNN_`
-        共用一个模板、**号从字段名里取**（逐列写十二个 key 要多 48 行翻译，而它们只差那个号）。
+        动作表那几列的表头文案（同一个 `model.columnLabel`）：单列在 switch 里逐个给；**带编号的四族**
+        （`saveMotIdNN_` / `actionFreeWorkNN_` / `freeWorkNN_` / `bulletFreeWorkNN_`）共用一个模板、号从
+        字段名里取 —— 逐列写 key 要多两百条翻译，而它们只差那个号。
 
-        同时钉住兜底：认不出的列照旧显示字段名本身。
+        同时钉住兜底与"互不吞并"：`actionFreeWork0_` 只有一位数字（不该被模板吞掉，照旧显示字段名），
+        `freeWork06_` 也不该被 `actionFreeWork` 那条正则抢走。
     */
-    it("动作表的列名：`branch*_` 七个逐个、`saveMotIdNN_` 十二个各带自己的号", async () => {
-        const keys = ["branchXAtk_", "branchYAtk_Hold_", "branchAtkHit_", "saveMotId01_", "saveMotId12_", "actionFreeWork0_"]
+    it("动作表的列名：单列逐个给，四族带编号的各带自己的号", async () => {
+        /*
+            表头**两行**：`[译名, 原始字段名]`（`#` 那格只有 `#`）。键直接从这份期望里取，免得两处各写一遍。
+        */
+        const expected: [string, string][] = [
+            ["ID", "id_"],
+            ["动作", "abilityTag_"],
+            ["X 派生", "branchXAtk_"],
+            ["长按 Y 派生", "branchYAtk_Hold_"],
+            ["命中派生", "branchAtkHit_"],
+            ["动画 01", "saveMotId01_"],
+            ["动画 12", "saveMotId12_"],
+            ["动作参数 28", "actionFreeWork28_"],
+            ["自由参数 06", "freeWork06_"],
+            ["子弹参数 04", "bulletFreeWork04_"],
+            ["附加效果", "supportEffectList_"],
+            ["动作类型", "saveActionType_"],
+            ["跨步标志", "straddleFlagBit_"],
+            ["贡献点数", "usePoint_"],
+            ["追踪类型", "autoHormingType_"],
+            ["追踪偏移", "autoHormingOffsetDist_"],
+            ["充能次数", "abilityStocks_"],
+            ["冷却类型", "saveAbilityChargeType_"],
+            ["冷却延迟 (最小)", "abilityChargeDelayMin_"],
+            ["冷却延迟 (最大)", "abilityChargeDelayMax_"],
+            ["使用距离 (AI)", "dist_"],
+            ["类型", "type_"],
+            ["冷却时间 (秒)", "abilityChargeTime_"],
+            ["动画模式", "controlTypeHash_"],
+            ["支援类型", "supportTypeHash_"],
+            ["图标类别", "uiIconCategory_"],
+            ["动作分类 (AI)", "actionCategory_"],
+            ["触发效果", "isTriggerAttackHit_"],
+            ["派生 ID", "derivedId_"],
+            ["伤害上限类型", "damageLimitType_"],
+            ["伤害上限索引", "damageLimitDataIndex_"],
+            ["关联能力", "relatedAbilityType_"],
+            ["额外贡献", "indirectDamagePoint_"],
+            ["额外贡献加算", "isIndirectDamageAddMulti_"],
+            ["连段切断检查", "isCheckComboCutAbility_"],
+            ["不清空前序输入", "isNoClearPrecedingInput_"],
+            ["更改攻击输入优先级", "isChangeAttackInputPriority_"],
+            // 没认出来的列：两行都是字段名本身（兜底）。`0_` 只有一位数字，不该被模板吞掉。
+            ["actionFreeWork0_", "actionFreeWork0_"],
+        ]
+        const keys = expected.map(([, key]) => key)
         const line = {id: "1000", values: {}, originals: {id_: "1000"}}
         const {container} = render(<ActionsTable t={t} rows={[line]} keys={keys} />)
         await waitFor(() => expect(container.querySelectorAll("thead th")).toHaveLength(keys.length + 1))
-        expect([...container.querySelectorAll("thead th")].map((th) => th.textContent)).toEqual([
-            "#",
-            "X 派生",
-            "按住 Y 派生",
-            "命中派生",
-            "动画 ID 01",
-            "动画 ID 12",
-            "actionFreeWork0_",
-        ])
+        expect([...container.querySelectorAll("thead th")].map(headLines)).toEqual(["#", ...expected])
     })
 
     it("只读格的内边距**左右对等**、上下 3px；表头文字居中（都没输入框，不继承那份光标余量）", async () => {

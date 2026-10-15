@@ -119,6 +119,15 @@ export const HANDLE_HEAD_CURSOR =
 export const ROW_HEIGHT = "h-6"
 
 /**
+ * **表头那一行的高度**：比数据行（`ROW_HEIGHT` = 24px）高 —— 表头是**两行**（译名 + 原始字段名，
+ * 见 `ActionsTable` 的表头渲染），24px 装不下。数据行的高度**不动**（一行数据仍是一行）。
+ *
+ * ⚠️ 动它要连带看三处：表头那两个行头格（`#` / 握把，它们也在这条 40px 的行里）、
+ * `useColumnMeasure` 里"按行量表头文字"那段、以及 `useReveal`（吸顶偏移是**现量** `thead` 高度，不用改）。
+ */
+export const HEAD_HEIGHT = "h-10"
+
+/**
  * 格子内边距。**可编辑格用它** —— 左边比右边小是有意的：文字更贴格子左边缘，一眼能看出列从哪儿开始；
  * 右边那点别跟着缩：**光标余量 = 显示态总内边距 − 编辑框总内边距**（见 INPUT_PADDING），右边缩了余量就被吃掉。
  *
@@ -183,6 +192,9 @@ export const PICK_TEXT = "truncate min-w-0"
  */
 export const HANDLE_INNER = `${ROW_HEIGHT} flex items-center justify-center ${READONLY_PADDING} ${FONT} tabular-nums`
 
+/** 表头那一行的行号格内层：字体与 `HANDLE_INNER` 同一套，高度跟表头走（两行）。 */
+export const HANDLE_HEAD_INNER = `${HEAD_HEIGHT} flex items-center justify-center ${READONLY_PADDING} ${FONT} tabular-nums`
+
 /**
  * 钉住的列 / 行号格：**只负责"吸顶 + 层高"**（底色由调用点按"只读 / 可编辑"给 —— 两个只读列恰好
  * 都是钉住的，埋进常量里它们就没法用别的底色）。
@@ -200,7 +212,7 @@ export const PINNED_CELL = "cell-pinned sticky"
  * `text-center`：表头**文字居中**（用户要的）—— 数据格左对齐、表头居中，也正好与"左右对等的内边距"
  * 配套：内边距不等时，居中出来的中心是偏的。
  */
-export const HEAD_CELL = `sticky top-0 z-20 ${ROW_HEIGHT} border-r border-b ${HEAD_BG} ${HEAD_PADDING} text-center font-medium whitespace-nowrap ${FONT}`
+export const HEAD_CELL = `sticky top-0 z-20 ${HEAD_HEIGHT} border-r border-b ${HEAD_BG} ${HEAD_PADDING} text-center font-medium whitespace-nowrap ${FONT}`
 
 /**
  * 表体每一格都带的类（格线 + 选中那套的**基底**）。

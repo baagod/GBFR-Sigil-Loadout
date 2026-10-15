@@ -70,10 +70,11 @@ import {
     HANDLE_CELL,
     HEAD_BG,
     HANDLE_HEAD_CURSOR,
-    HANDLE_INNER,
+    HANDLE_HEAD_INNER,
     HANDLE_WIDTH,
     HEAD_CELL,
     HEAD_DRILL,
+    HEAD_HEIGHT,
     PINNED_CELL,
     PINNED_COUNT,
 } from "@/components/actions-table/classes"
@@ -843,8 +844,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                                 不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
                                 宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
                             */}
-                            <th className={`${HANDLE_CELL} ${HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
-                                <div className={HANDLE_INNER}>#</div>
+                            <th className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
+                                <div className={HANDLE_HEAD_INNER}>#</div>
                             </th>
                             {/*
                                 **握把列的占位表头**：表体那一格有它，表头必须有对应的一格 —— 否则
@@ -852,7 +853,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                                 留空：这一列没有"名字"可言（拖动是手势，不是数据）。
                             */}
                             {reorder !== undefined && (
-                                <th aria-hidden className={`${HANDLE_CELL} ${HEAD_BG} top-0`} style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}} />
+                                <th aria-hidden className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`} style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}} />
                             )}
                             {headerGroup.headers.map((header) => {
                                 const pinned = header.column.getIsPinned()
@@ -879,9 +880,27 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                                         className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} ${HEAD_BG}` : ""} ${drillOf(header.column.id) ? HEAD_DRILL : ""}`}
                                     >
                                         <div className="truncate">
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(header.column.columnDef.header, header.getContext())}
+                                            {header.isPlaceholder ? null : (
+                                                /*
+                                                    **表头两行：译名在上、原始字段名在下**（用户口径）。
+
+                                                    为什么留着字段名：译名一改（「名称」→「动作」这种事已经发生过一次），
+                                                    光看表头就没人知道它对应表里哪一列了；字段名是**跨工具/跨文档**的那把钥匙。
+                                                    ⚠️ 两行都要 `data-head-line`：量宽那一趟**按行分别量**（见 useColumnMeasure），
+                                                    拿 `th.textContent` 会把两行连成一串来量，列宽白胖一圈。
+                                                */
+                                                <>
+                                                    <div className="truncate" data-head-line="">
+                                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                                    </div>
+                                                    <div
+                                                        className="truncate text-[11px] leading-tight font-normal text-muted-foreground/70"
+                                                        data-head-line=""
+                                                    >
+                                                        {header.column.id}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </th>
                                 )

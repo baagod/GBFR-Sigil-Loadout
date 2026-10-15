@@ -244,11 +244,20 @@ export function useColumnMeasure(
             if (inner) {
                 // 内边距 + 边框 = 外框 − 内层可见宽（把"textWidth"换算成"列宽"要加回它）。
                 const padding = Math.max(0, natural - inner.clientWidth)
-                ruler.className = inner.className
-                ruler.textContent = th.textContent
-                const textWidth = ruler.getBoundingClientRect().width
+                /*
+                    ‼️ 表头是**两行**（译名 + 原始字段名，见 `ActionsTable` 的表头渲染），所以**按行分别量、
+                    取较宽的那一行**：拿 `th.textContent` 会把两行**连成一串**来量（`名称abilityTag_`），
+                    量出来的宽度比任何一行都宽，列宽白胖一圈。
+                    每一行用它自己的类名当尺子（译名是 `FONT`、字段名是小一号），所以量出来就是它需要的宽度。
+                */
+                let headerTextWidth = 0
+                for (const line of th.querySelectorAll<HTMLElement>("[data-head-line]")) {
+                    ruler.className = line.className
+                    ruler.textContent = line.textContent ?? ""
+                    headerTextWidth = Math.max(headerTextWidth, ruler.getBoundingClientRect().width)
+                }
                 // 量不到（比如 happy-dom 没有真实布局，一律 0）就不采信这把尺子，照旧用自然宽。
-                if (textWidth > 0) needed = Math.max(needed, textWidth + padding)
+                if (headerTextWidth > 0) needed = Math.max(needed, headerTextWidth + padding)
             }
             /*
                 ⚠️ 用 `ceil` **向上**取整，不能 `round`。
