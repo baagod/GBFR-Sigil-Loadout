@@ -171,41 +171,85 @@ func TestCharaOrderComesFromTheShippedAsset(t *testing.T) {
 }
 
 /*
-动作名的显示名表（chara.action.zh.json）：随包发布。**键 = 动作表 `actionName_` 的原样**（一个字不改），
-还没填中文的那些值是**空串** —— 界面把空串与"表里没这个键"当同一件事（都表示"还没名字"，于是显示原文）。
+动作名的显示名表（chara.action.zh.json）：**键 = 动作表 `actionName_` 的原样**（一个字不改，括号/冒号
+后缀都算键的一部分），**每个键都有值**（还没翻的填成键名自己）。
 
-这条钉三件事：表进来了、键都不空、以及**没翻的留空而不是被删掉**（删掉就没法就地补中文了）。
+界面那一列**直接查表**（`actionNames[name]`，见 actionRowFields）—— 查不到就是一片空白。所以"随包 36 张表
+里出现过的每个动作名都在表里、且非空"是硬契约：这条扫随包的 data.zip 把它钉住。
 */
-func TestActionNamesHoldEveryActionName(t *testing.T) {
+func TestActionNamesCoverEveryPackagedActionName(t *testing.T) {
 	if len(actionNames) == 0 {
 		t.Fatal("chara.action.zh.json 没装进来")
 	}
-	blank := 0
-	for key, value := range actionNames {
-		if key == "" {
-			t.Fatal("有动作名的键是空的")
+	previous := dataAssetPath
+	dataAssetPath = filepath.Join("..", "assets", dataAssetName)
+	t.Cleanup(func() { closeDataAsset(); dataAssetPath = previous })
+
+	codes, present, err := actionTableCodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !present {
+		t.Skip("这份构建里没有随包 data.zip")
+	}
+
+	names, missing, empty := 0, 0, 0
+	for _, code := range codes {
+		raw, ok, err := readOriginal(actionEntry(code))
+		if err != nil {
+			t.Fatal(err)
 		}
-		if value == "" {
-			blank++
+		if !ok {
+			t.Fatalf("随包里没有 %s 的动作表", code)
+		}
+		root, err := parseActionTable(raw, actionEntry(code))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range root.entries {
+			if entry.value.format != msgMap {
+				continue
+			}
+			node := entry.value.entry(actionNameField)
+			if node == nil {
+				continue
+			}
+			name, err := actionFieldValue(node)
+			if err != nil || name == "" {
+				continue
+			}
+			names++
+			value, ok := actionNames[name]
+			if !ok {
+				missing++
+				if missing <= 5 {
+					t.Errorf("%s：动作名 %q 不在显示名表里（界面会是一片空白）", code, name)
+				}
+			} else if value == "" {
+				empty++
+			}
 		}
 	}
-	// 这一行挂着技能键的：用游戏文本里的名字（`鏡花水月(突進斬り)` 那一行挂的是「镜花水月」）。
+	if missing > 0 || empty > 0 {
+		t.Fatalf("随包表里 %d 条动作名：表里缺 %d 个、空值 %d 个", names, missing, empty)
+	}
+
+	// 值可以就是键名自己（没翻的那批）——界面于是显示原文，而不是空白。
+	if got, ok := actionNames["近接コンボ1"]; !ok || got != "近接コンボ1" {
+		t.Fatalf("近接コンボ1 应该填成键名自己，实际 %q（在不在表里：%v）", got, ok)
+	}
+	// 键挂在技能键上的：值来自游戏文本（`鏡花水月(突進斬り)` 那一行挂的是「镜花水月」）。
 	if got := actionNames["鏡花水月(突進斬り)"]; got != "镜花水月" {
 		t.Fatalf("鏡花水月(突進斬り) 应该是 镜花水月，实际 %q", got)
 	}
-	// 没有技能键的：值来自资产里已有的那一份（`□コンボ1段目` → `X`）—— 生成器不会重算已有的键。
+	// 没有技能键的：值来自资产里已有的那一份（生成器不会重算已有的键）。
 	if got := actionNames["□コンボ1段目"]; got != "X" {
 		t.Fatalf("□コンボ1段目 应该是 X（字典翻译），实际 %q", got)
 	}
-	// 两份都没有的**留空**（界面于是显示动作名原文当占位符）—— 不是"删掉这个键"。
-	if got, ok := actionNames["近接コンボ1"]; !ok || got != "" {
-		t.Fatalf("近接コンボ1 应该留空，实际 %q（在不在表里：%v）", got, ok)
-	}
-	// 带冒号后缀的也是一个**独立的键**（键 = `actionName_` 原样，一个字不改）。
 	if _, ok := actionNames["至人己無(カウンター)：ワープ"]; !ok {
 		t.Fatal("至人己無(カウンター)：ワープ 这个键应该在表里")
 	}
-	t.Logf("动作名显示名 %d 条（有名字 %d / 留空 %d）", len(actionNames), len(actionNames)-blank, blank)
+	t.Logf("显示名表 %d 条；随包表里 %d 条动作名全部命中", len(actionNames), names)
 }
 
 func TestSortByCharaOrderKeepsEveryone(t *testing.T) {

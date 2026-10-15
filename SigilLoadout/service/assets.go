@@ -93,24 +93,15 @@ func LoadAssets() error {
 }
 
 /*
-actionNames 是 chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}。只在这边用（`actionTagName`），
-不发给界面：`LoadActions` 拿它把显示名投影进 `abilityTag_` 那一格（见 actionRowFields）。
+actionNames 是 chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}。只在这边用，不发给界面：
+`LoadActions` 拿它把显示名投影进 `abilityTag_` 那一格（见 actionRowFields）。
 
-**没翻的那些留空串**（实测 1072 条里 569 条空）—— 空串与"表里没这个键"是同一件事：都回落 `actionName_`
-原文。所以这张表只负责"翻过的那些叫什么"，不负责给没翻的编一个名字。
+**每个键都有值**（还没翻的填成键名自己）—— 所以查表就是最终显示名，没有"空串回落"这一步。
+查不到就是这一格空着：那是这份资产缺条目，不是代码要兜的事（覆盖由 assets_test.go 扫随包 36 张表钉着）。
 
 ⚠️ 目前**只有中文**（四语以后再说）：文件名里的 `zh` 就是这个意思，不是漏了另外三份。
 */
 var actionNames map[string]string
-
-// actionTagName 是"动作名（`actionName_` 的原样）→ 界面上那一列显示的名字"：名字表里有就用，没翻
-// （空串）或没这个键就拿原文兜底 —— 界面于是显示日文原名，而不是一片空白或编出来的名字。
-func actionTagName(actionName string) string {
-	if name := actionNames[actionName]; name != "" {
-		return name
-	}
-	return actionName
-}
 
 // charaCodes 是 chara.json 的**键序** = 游戏的角色顺序。CharaTable 是一张 map，键序在解码那一刻就
 // 没了（见 tables.go 那段），所以键另读一遍 —— 与上面那几张表同一次、同样只读一次。界面上的角色

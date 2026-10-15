@@ -74,7 +74,7 @@ const (
 
 /*
 actionRowFields 是"一条记录 → 界面上那一行"：`actionFields` 摊平，再把 `abilityTag_` 那一格的**原值**
-换成**这条动作的显示名**（`actionName_` 过一次 chara.action.zh.json，见 actionTagName）。
+换成**这条动作的显示名**（`actionName_` 查 chara.action.zh.json 的显示名表）。
 
 投影放在这一层、而不是发给界面让界面自己查：① 那一列**只读**、只给人看，是个纯显示值；② 那份名字表
 本来就在这边装着（见 assets.go）—— 先整份发过去再让界面查一遍，多一次 IPC，还多出一个"名字表比数据
@@ -93,7 +93,7 @@ func actionRowFields(record *msgValue) ([]ActionField, error) {
 			break
 		}
 	}
-	display := actionTagName(actionName)
+	display := actionNames[actionName]
 	for i := range fields {
 		if fields[i].Key == abilityTagField {
 			fields[i].Original = display
