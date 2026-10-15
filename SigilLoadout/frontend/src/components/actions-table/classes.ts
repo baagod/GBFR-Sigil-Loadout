@@ -119,11 +119,8 @@ export const HANDLE_HEAD_CURSOR =
 export const ROW_HEIGHT = "h-6"
 
 /**
- * **表头那一行的高度**：比数据行（`ROW_HEIGHT` = 24px）高 —— 表头是**两行**（译名 + 原始字段名，
- * 见 `ActionsTable` 的表头渲染），24px 装不下。数据行的高度**不动**（一行数据仍是一行）。
- *
- * 跟着它走的只有表头那两个行头格（`#` / 握把，同在 `ActionsTable` 那条 `<tr>` 里）；吸顶偏移与量宽都是
- * **现量 DOM**（`useReveal` 量 `thead` 高度、`useColumnMeasure` 量文字宽度），不必跟着改。
+ * **表头那一行的高度**：表头两行（译名 + 原始字段名），24px 装不下；数据行高（`ROW_HEIGHT`）不动。
+ * 跟着它走的只有表头那两个行头格（`#` / 握把）—— 吸顶与量宽都是现量 DOM，不必跟着改。
  */
 export const HEAD_HEIGHT = "h-10"
 
@@ -187,12 +184,8 @@ export const PICK_MARK = "cell-pick-mark"
 export const PICK_TEXT = "truncate min-w-0"
 
 /**
- * 行号格的内层：高度、内边距、字号都照 `CellText` 抄 —— 格子高度、数字基线与数据格才齐平。
- * 多了个 `justify-center`：行号居中（表头那个 `#` 也走它，两行才对得齐）。
- */
-/**
- * 行头格里那层内容（行号）。高度由调用方给：表体那一格跟 `ROW_HEIGHT`、表头那一格跟 `HEAD_HEIGHT`
- * —— 两处只差这一个高度，字体 / 内边距 / 居中必须一模一样，所以只有一处拼类名。
+ * 行号格的内层：高度、内边距、字号照 `CellText` 抄（格子高度、数字基线与数据格才齐平）+ 居中。
+ * 高度由调用方给 —— 表体 `ROW_HEIGHT`、表头 `HEAD_HEIGHT`，两处只差这一个高度，所以只有一处拼类名。
  */
 const handleInner = (height: string) => `${height} flex items-center justify-center ${READONLY_PADDING} ${FONT} tabular-nums`
 
@@ -202,13 +195,14 @@ export const HANDLE_INNER = handleInner(ROW_HEIGHT)
 export const HANDLE_HEAD_INNER = handleInner(HEAD_HEIGHT)
 
 /**
- * 表头里那两行的类：**译名**在上、**原始字段名**在下。
+ * 表头那两行的类：译名在上、原始字段名在下。
  *
- * 字段名那行小一号、灰一号，但它照样是"表头文字"：`useColumnMeasure` 拿这两行的类名当尺子，量这一列
- * 需要多宽 —— 所以字体写在这里，别散回 `ActionsTable` 的 JSX 里。
+ * ⚠️ 字段名那行**不写颜色**，只压 `opacity-60` —— 颜色得跟着**这一格继承到的**文字色走：普通表头是
+ * `--foreground`，而 `saveMotId*` 那几个下钻列是 `HEAD_DRILL` 的 primary 底 + `primary-foreground`，
+ * 写死灰 token 在后者上就看不见（真机踩过）。两行都是"表头文字"，量宽的尺子读的就是这里的字体。
  */
 export const HEAD_LABEL = "truncate"
-export const HEAD_FIELD = "truncate text-[11px] leading-tight font-normal text-muted-foreground/70"
+export const HEAD_FIELD = "truncate text-[11px] leading-tight font-normal opacity-60"
 
 /**
  * 钉住的列 / 行号格：**只负责"吸顶 + 层高"**（底色由调用点按"只读 / 可编辑"给 —— 两个只读列恰好
@@ -327,4 +321,3 @@ export const cellCopyRing = (copy: CopySource | null, rowId: string, columnId: s
     const edge = copyRingEdge(copy, rowId, columnId)
     return edge ? ringClasses(edge, "cell-copy") : ""
 }
-

@@ -16,13 +16,8 @@ import {createContext, useContext, useEffect, type ReactNode} from "react"
 import {CELL_CHOICES} from "@/lib/controltypes"
 import type {Messages} from "@/lib/messages"
 
-/*
-**列 id → 消息键**：表头文案"哪一列叫什么"**只写在这一张表里** —— `ActionsTableLabels` 的类型、下面
-`columnLabel` 的参数类型都从它推出来，所以加一列只动一处。
-
-（原来同一份映射写了三遍：`Pick` 一份、`columnLabel` 的参数类型一份、`switch` 一份。三份还会悄悄漂 ——
-漏掉 `switch` 那一支**不报错**，那一列就静默退回原始字段名；现在漏了就是漏了，没有第二处要同步。）
-*/
+/* **列 id → 消息键**：表头文案只写在这一张表里 —— `ActionsTableLabels` 与 `columnLabel` 的类型都从它推出来。
+   （以前这份映射写了三遍：Pick、参数类型、switch。漏掉 switch 那一支**不报错**，列名会静默退回字段名。） */
 const PLAIN_COLUMNS = {
     id_: "colId", // 动作编号（游戏里别处也按它引用这条动作），四语一致
     startTime: "colStart",
@@ -70,13 +65,9 @@ const PLAIN_COLUMNS = {
 /** 上面那张表用到的那几个消息键。 */
 type PlainLabelKey = (typeof PLAIN_COLUMNS)[keyof typeof PLAIN_COLUMNS]
 
-/*
-**带编号的四族列** —— 表头是"某个词 + 字段名里那个号"，所以各用一个正则取号 + 自己的模板：
-`saveMotIdNN_`（动画）、`actionFreeWorkNN_`（动作参数）、`freeWorkNN_`（自由参数）、`bulletFreeWorkNN_`
-（子弹参数）。四族共 50 列，逐个写进上面那张表要多两百条翻译，而它们只差那个号。
-
-⚠️ 四条正则都以 `^` 锚住全名，所以互不吞并：`^freeWork…` 匹配不到 `actionFreeWork…` / `bulletFreeWork…`。
-*/
+/* **带编号的四族**（`saveMotIdNN_` 动画 / `actionFreeWorkNN_` 动作参数 / `freeWorkNN_` 自由参数 /
+   `bulletFreeWorkNN_` 子弹参数）：50 列只差字段名里那个号，所以正则取号 + 一个模板。
+   四条正则都 `^` 锚住全名，互不吞并（`freeWork` 匹配不到 `actionFreeWork`）。 */
 const NUMBERED_COLUMNS: readonly [RegExp, (t: ActionsTableLabels, no: string) => string][] = [
     [/^saveMotId(\d{2})_$/, (t, no) => t.colSaveMotId(no)],
     [/^actionFreeWork(\d{2})_$/, (t, no) => t.colActionFreeWork(no)],
@@ -159,15 +150,10 @@ export const writableColumn = (key: string, columnOf?: (key: string) => ColumnSp
     columnKind(key) !== "readonly" && columnOf?.(key)?.readonly !== true
 
 /**
- * **列 id → 表头文案**：几条**跟界面语言走**的列名（不传 `ColumnSpec.label` 时用它兜底）。
+ * **列 id → 表头文案**（不传 `ColumnSpec.label` 时兜底）：字段名是给人看的，所以"开始 / 结束"这类
+ * 通用列名谁有谁用，不必每张表再写一遍；调用方自己的 `label` 优先级更高。
  *
- * 为什么要有：这些都是后端字段名，但它们是给人看的 —— `startTime` / `endTime` 谁有这两列都该显示
- * "开始 / 结束"（轨表、flags 表都在用）；动作表那几列同理（`abilityTag_` 那一列显示的是"这条动作的名字"、
- * `actionName_` 是它的原文、七个 `branch*_` 是"哪个输入派生到哪个动作"、`saveMotIdNN_` 是它调用的动画、
- * `actionFreeWorkNN_` 是它的自由数值、`supportEffectList_` 是它挂的 Buff）。
- *
- * 映射本身在文件上方：单列在 `PLAIN_COLUMNS`，带编号的四族在 `NUMBERED_COLUMNS`。
- * 调用方自己的 `label` 优先级更高；放在这里而不是各表的列说明里，是因为这几条谁都不必再写一遍。
+ * 映射在文件上方：单列 `PLAIN_COLUMNS`、带编号的四族 `NUMBERED_COLUMNS`。
  */
 export const columnLabel = (id: string, t: ActionsTableLabels): string => {
     for (const [pattern, label] of NUMBERED_COLUMNS) {

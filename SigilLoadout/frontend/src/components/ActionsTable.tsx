@@ -765,7 +765,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
             外框画在**这一层**（滚动视口），不画在 `<table>` 上：它才是滚动的那一层，框得钉住不跟内容跑。
 
             `border-separate border-spacing-0`：格线是每格自己的 `border-r/border-b`，不是 collapse 共享的。
-            两条 `:last-child` 收边：最后一行的下边框、最右一列的右边框都去掉，否则和外框叠成双线。
+            `:last-child` 只收最右那一列的右边框（最后一行的**下边框留着**，用户口径）。
         */
         /* `DndContext` 包在最外面：它的辅助 `<div>` 绝不能落进 `<tbody>`（见 `ReorderDnd` 那段）。 */
         <ReorderDnd reorder={reorder} rows={modelRows} bound={clampToViewport}>
@@ -830,7 +830,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     （`display: none` 会让 rect 归零），但不占版面才不会撑出滚动条、不与骨架叠
                     —— 完整理由见 `MeasureFrame`（那边管容器，这边管表格自己）。
                 */
-                className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 text-sm [&_tbody_tr:last-child>*]:border-b-0 [&_tr>*:last-child]:border-r-0`}
+                className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 text-sm [&_tr>*:last-child]:border-r-0`}
             >
                 <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
@@ -883,12 +883,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                                     >
                                         <div className="truncate">
                                             {header.isPlaceholder ? null : (
-                                                /*
-                                                    表头**两行**：译名在上、原始字段名在下（用户口径）。字段名留着，是因为
-                                                    译名一改（「名称」→「动作」这种事已经发生过一次），光看表头就没人知道它
-                                                    对应表里哪一列了 —— 字段名是跨工具/跨文档的那把钥匙。
-                                                    ⚠️ 两行都要 `data-head-line`：量宽那一趟**按行分别量**（见 useColumnMeasure）。
-                                                */
+                                                /* 表头两行：译名在上、原始字段名在下（字段名是"这一列对应哪个字段"的钥匙）。
+                                                   ⚠️ 两行都要 `data-head-line`：量宽按行分别量（见 useColumnMeasure）。 */
                                                 <>
                                                     <div className={HEAD_LABEL} data-head-line="">
                                                         {flexRender(header.column.columnDef.header, header.getContext())}
