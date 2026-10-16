@@ -41,13 +41,12 @@ import type {Messages} from "@/lib/messages"
  * （chara.lang.json，PL 码大写），名字取不到就只显示码。三十多个角色，所以用 combobox 而不是 select：
  * 敲名字或 PL 码都能搜。
  */
-function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
+function CharacterPicker({value, codes, names, colors, onSelect, t}: {
     value: string
     codes: string[]
     names: Record<string, string>
     /** 角色表（chara.json）：取名字的颜色，与专属 / 角色强化 / 专精技能三页同一条来源。 */
     colors: CharaTable
-    disabled: boolean
     onSelect: (code: string) => void
     t: Messages
 }) {
@@ -103,13 +102,12 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
             items={items}
             value={selected}
             autoHighlight
-            disabled={disabled}
             open={open}
             onOpenChange={setOpen}
             onValueChange={(item) => {
                 if (!item || item.value === value) return
                 setPickedClose(true) // 这一次关闭不走淡出（见下面弹层的类名）
-                setOpen(false) // 先收弹层，再让外面去读数据（读取期间这一格显示旧名字，见上面 disabled 那段）
+                setOpen(false) // 先收弹层，再让外面去读数据（读取期间整行由 fieldset 统一禁用，见调用点）
                 onSelect(item.value)
             }}
         >
@@ -117,7 +115,7 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                 弹层里**没有搜索框**，因此也不需要 filter；样式照 SkillPicker 那套：outline 按钮 + 名在左箭头在右。 */}
             <ComboboxTrigger
                 render={
-                    <Button variant="outline" disabled={disabled} className="w-56 justify-between font-medium">
+                    <Button variant="outline" className="w-56 justify-between font-medium">
                         <span className="truncate" style={{color: colors[value.toUpperCase()]?.color}}>
                             {selected.label}
                         </span>
@@ -424,8 +422,18 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
             */}
             <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4">
                 {/* 这一行（角色选择 + 记录清单 + 提示 + 保存 + 部署）。部署用 ml-auto 顶到最右边，其余靠左。
-                    shrink-0：表格该滚就滚，这一行不跟着压缩。 */}
-                <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+                    shrink-0：表格该滚就滚，这一行不跟着压缩。
+
+                    ‼️ **整行是一个 `fieldset`**：读表期间（`pageBusy` = 正在读写 / 部署 / 还没就位）一次把里面的
+                    控件**全**禁用 —— 切角色、记录清单、三块切换、保存，全由浏览器原生的 `fieldset[disabled]` 兜住。
+                    原来是逐个控件传 `disabled`（只有 combobox 与保存传了，输入框与三块切换漏在外面 = 能点却没用的
+                    按钮）。逐个传要人盯着改，漏一个就是一个静默的坏交互；原生属性天生不会漏。
+                    样式上要清掉 fieldset 自带的边框 / 外边距，以及那条 `min-inline-size: min-content`
+                    （不清掉它，`flex-1` 的搜索框就收缩不了）。 */}
+                <fieldset
+                    disabled={pageBusy}
+                    className="m-0 flex min-w-0 shrink-0 flex-wrap items-center gap-2.5 border-0 p-0"
+                >
                     {/* 角色是整页的选择：动作表、flags、FSM 都跟着它走。有没落盘的改动时锁住——
                         换角色会把动作表的草稿与 flags 的行整份换掉，那等于把改动丢掉。 */}
                     <CharacterPicker
@@ -435,8 +443,7 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         colors={charaTable}
                         // 不因"有未保存的改动"而禁用：那会让这一排在编辑完之后一直发灰（要的是**永远没有
                         // 禁用状态**）。代价是带着草稿换角色会丢掉草稿——switchCharacter 本来就会清 dirty
-                        // 再重读，而"保存"就在同一行右手边。只有正在读写/deploy 时才短暂禁用。
-                        disabled={pageBusy}
+                        // 再重读，而"保存"就在同一行右手边。读写/deploy 期间由外层那个 fieldset 统一禁用。
                         onSelect={(code) => void switchCharacter(code)}
                         t={t}
                     />
@@ -491,10 +498,10 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
                         松紧不一，英文 Save 那档就白留一截）。
                         这里**不再有任何状态行**：成功/失败都不在界面上报（失败只写 console.error）。 */}
-                    <Button disabled={pageBusy} onClick={() => void handleSaveAndDeploy()}>
+                    <Button onClick={() => void handleSaveAndDeploy()}>
                         {t.saveAndDeploy}
                     </Button>
-                </div>
+                </fieldset>
                 {/* 下方那块地方：三块由顶栏那两个按钮切换 —— 不再用手风琴，也不再有那两行标题。
                     三块都留在 DOM 里，没在看的那块压成 h-0 + overflow-hidden（与原来 keepMounted 一个效果）：
                     切回来时 ids 输入框的内容与滚动位置都还在。
