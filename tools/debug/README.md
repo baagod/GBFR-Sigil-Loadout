@@ -39,6 +39,7 @@ node tools/debug/cdp-probe.mjs --clip 0,140,640,200 --scale 4 --shot zoom.png
 | 文件 | 作用 |
 |---|---|
 | `cdp-probe.mjs` | CDP 直连运行中的工具：跑任意 JS、量动作表布局、按 `--clip/--scale` 放大截图 |
+| `probe-widths.mjs` | 把**某一列**的宽度拆开算（列宽 vs 最宽值文本宽 vs 内边距/边框）：`--col supportEffectList`，结果写 `%TEMP%\widths.json`（别往控制台打中文，GBK 会乱码）|
 | `cdp.mjs` | 探针共用的 CDP 管道：连 page target，给 `send` / `evaluate` / `sleep` |
 
 > 合成事件（`dispatchEvent`）**驱动不了这张表的选区** —— React 的选区 handler 不认。要动鼠标就用
