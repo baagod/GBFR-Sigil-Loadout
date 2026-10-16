@@ -181,7 +181,13 @@ func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _
 			fakeHide(hwnd)
 		} else {
 			revealTool(hwnd)
-			w.Restore()
+			/*
+				‼️ **不能用 `w.Restore()`**：Wails 那个 Restore 是"取消最小化 / **取消最大化** / 取消全屏"——
+				最大化的窗口会被它 `UnMaximise()` 成普通大小（真机复现：最大化 → 点托盘 → IsZoomed 变 false）。
+				这里只需要把**真的被最小化**的窗口捞回来：`UnMinimise()` 内部自带 `IsMinimised()` 判断，
+				对最大化 / 普通状态一个字都不动。
+			*/
+			w.UnMinimise()
 			w.Show()
 			w.Focus()
 		}
@@ -197,7 +203,8 @@ func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _
 		if toolHidden.Load() {
 			revealTool(hwnd)
 		}
-		w.Restore()
+		// ⚠️ `UnMinimise()` 而不是 `Restore()`：最大化的窗口不能被还原成普通大小（理由见上面 wmToggle 那段）。
+		w.UnMinimise()
 		w.Show()
 		w.Focus()
 		return 0, true
