@@ -60,6 +60,19 @@
         --border:               oklch(0.922 0 0);
         --input:                oklch(0.922 0 0);
         --ring:                 oklch(0.708 0 0);
+
+        /*
+            **层高刻度（页面级，不只是表格）**。
+
+            ‼️ 必须是 **全局** 的。原先它们写在 `table { }` 里 —— 只有表格子树解析得到；别的页
+            （专精技能页的吸顶角色行）写 `z-index: var(--z-focus)` 时变量解析不出来，
+            **整条 `z-index` 会被丢弃**、回落到 `auto`，于是被下面类型行的 `z-index: 20` 压住
+            （实测：角色行 computed `z-index` 是 `auto`，吸顶被"穿透"）。
+        */
+        --z-focus:              30;
+        --z-edge:               41;
+        --z-pinned:             50;
+        --z-pinned-edge:        calc(var(--z-pinned) + 1);
 }
 
 .dark {
@@ -356,12 +369,9 @@ table {
     --edge-right: 0px;
     --edge-bottom: 0px;
     --edge-left: 0px;
-    --z-focus: 30;
-    --z-edge: 41;
 
-    --z-pinned: 50;
-    --z-pinned-edge: calc(var(--z-pinned) + 1);
-
+    /* 层高刻度（`--z-focus` / `--z-edge` / `--z-pinned` / `--z-pinned-edge`）在 **`:root`** ——
+       它是页面级的，别的页也要用；写在 `table` 里只有表格解析得到（踩过，见 `:root` 那段）。 */
 }
 
 table td.cell-pinned,
