@@ -3,7 +3,7 @@
     动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）
 */
 import {describe, expect, it, vi} from "vitest"
-import {render, waitFor} from "@testing-library/react"
+import {render, fireEvent, waitFor} from "@testing-library/react"
 
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -15,7 +15,7 @@ import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
 import {DrillContext} from "@/components/actions-table/model"
 
-import {KEYS, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, tableProps, useTableHarness, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -240,13 +240,13 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     */
     /*
         **内置只读列**（`id_` / `actionName_` / `abilityTag_`，见 model 的 READ_ONLY_KEYS）：显示原值、不灰、
-        不进编辑态。`abilityTag_` 那一格的原值就是后端投影好的动作名（见 `actionRowFields`）—— 与别的只读列
-        走同一条路，基座这里没有任何特判。
+        双击只让那串文字变可选（**不是**输入框）。`abilityTag_` 那一格的原值就是后端投影好的动作名
+        （见 `actionRowFields`）—— 与别的只读列走同一条路，基座这里没有任何特判。
 
         一条表驱动的用例，而不是「每列抄一遍」：这条契约的完整性由那份清单决定，逐列抄只会在加列时漏掉一个
         ——而"漏掉"的表现是那一列悄悄能编辑，不会红。
     */
-    it("内置只读列：显示原值、不灰、双击不进编辑态", async () => {
+    it("内置只读列：显示原值、不灰、双击只放开文字选择（没有输入框）", async () => {
         const line = {
             id: "1000",
             values: {},
@@ -263,8 +263,10 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
             const cell = cellAt(container, 0, col)
             expect(cell.textContent, `第 ${col} 列的原值`).toBe(text)
             expect(cell.firstElementChild!.className, `第 ${col} 列不该是灰的`).not.toContain("text-muted-foreground")
-            clickToEdit(cell)
-            expect(cell.querySelector("input"), `第 ${col} 列不该有编辑框`).toBeNull()
+            // ⚠️ 只认双击那一下（不是 `clickToEdit`：它的语义是"点开编辑"，而只读列没有编辑态）。
+            fireEvent.doubleClick(cell.firstElementChild!)
+            expect(cell.querySelector("input"), `第 ${col} 列不该有输入框`).toBeNull()
+            expect((cell.firstElementChild as HTMLElement).style.userSelect, `第 ${col} 列该可选`).toBe("text")
         }
     })
 

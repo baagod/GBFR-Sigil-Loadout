@@ -23,7 +23,7 @@ export const TableSkeleton = () => (
     <div
         aria-hidden
         data-table-skeleton=""
-        className="pointer-events-none grid min-h-0 flex-1 auto-rows-min content-start gap-x-5 gap-y-2 overflow-hidden p-2"
+        className="pointer-events-none grid min-h-0 flex-1 auto-rows-min content-start gap-5 overflow-hidden p-2"
         style={{gridTemplateColumns: "repeat(6, minmax(0, 1fr))"}}
     >
         {Array.from({length: 24 * 6}).map((_, i) => (

@@ -2,7 +2,7 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type Ref, type RefObject} from "react"
+import {memo, useCallback, useContext, useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type ReactNode, type Ref, type RefObject} from "react"
 
 import {MoreHorizontal} from "lucide-react"
 import {CellPick} from "./CellPick"
@@ -50,7 +50,7 @@ export const CellContent = memo(function CellContent({
     fieldKey: string
     /** 这一列是什么列（列策略的唯一出处，见 `model.ts` 的 `columnKind`）。 */
     kind: ColumnKind
-    /** 这一列**notWritable**（只读列，或调用方标了 `readonly`）—— 只显示文本，没有编辑态。 */
+    /** 这一列**notWritable**（只读列，或调用方标了 `readonly`）—— 双击进"可选态"，没有编辑态。 */
     readOnly?: boolean
     /** 改动值（空串 = 没改过）。 */
     raw: string
@@ -70,10 +70,33 @@ export const CellContent = memo(function CellContent({
     const pickerOf = useContext(PickerOfContext)
     /* 这一列的详情入口（没有就是 undefined）—— 基座不问"为什么"，见 `DrillContext`。 */
     const drillOf = useContext(DrillContext)
+    /* 只读列：**双击**让这一格的文字变可选（还是显示层那串 label，没有编辑态）。
+       不能默认放开：拖选一片格子会把划过的文字一起选蓝（轨表「效果」列报过）。 */
+    const textRef = useRef<HTMLDivElement>(null)
+    const [selectable, setSelectable] = useState(false)
     if (readOnly || kind === "readonly") {
-        // 只读列：没有编辑态 —— 显示值就是 `shown`（父层按"改动优先、否则原值"给的）。
-        // ‼️ 内边距用**对等**那份：只读格不会变成输入框，不该继承右侧那份光标余量（见 `READONLY_PADDING`）。
-        return <CellText padding={READONLY_PADDING} text={shown} />
+        return (
+            <CellText
+                ref={textRef}
+                padding={READONLY_PADDING}
+                text={shown}
+                selectable={selectable}
+                /* 能编程聚焦即可（失焦 = 退出）；不进 Tab 序列。 */
+                tabIndex={-1}
+                onDoubleClick={() => {
+                    setSelectable(true)
+                    /* `preventScroll`：滚动只归 `useReveal` 那一处，别让 focus 顺手把表滚一格（同 Esc 那条路）。 */
+                    textRef.current?.focus({preventScroll: true})
+                }}
+                onBlur={(e) => {
+                    /*
+                        ‼️ 判 `relatedTarget`：Chromium 里按在格内那个 `span` 上时，焦点会**先离开这一层再回来**
+                        （`relatedTarget` 就是它自己）—— 只按 blur 还原的话，双击进来的第一下拖选当场失效。
+                    */
+                    if (e.relatedTarget !== e.currentTarget) setSelectable(false)
+                }}
+            />
+        )
     }
     /*
         ‼️ **双击才进编辑**（Excel / WPS 同一口径）：单击永远只是"选"。所以这里没有"这一次点击算不算编辑"
@@ -123,19 +146,29 @@ export const CellContent = memo(function CellContent({
  * 只设 `opacity-0`（透明、仍占位、且仍可聚焦 —— Esc 那条路要用），**绝不离开文档流** ——
  * 详见 `Cell` 里那段。
  */
-function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, tabIndex, onFocus, trailing, ref}: {
+function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, selectable = false, tabIndex, onFocus, onBlur, trailing, ref}: {
     text: string
-    /** 这一格的内边距（默认 CELL_PADDING；只读格传 READONLY_PADDING —— 它没有输入框，见那个常量）。 */
+    /** 这一格的内边距（默认 CELL_PADDING；表头那类不变成输入框的用 READONLY_PADDING，见那个常量）。 */
     padding?: string
     /** 灰色：这一格显示的是**原值**（还没改过）。 */
     muted?: boolean
-    /** **双击**才进编辑（可编辑列给它；只读列不给）—— 单击永远只是"选"。 */
+    /** **双击**才进编辑（可编辑列）/ 进可选态（只读列）—— 单击永远只是"选"。 */
     onDoubleClick?: () => void
     /** 编辑态：这一层只透明、仍占位。 */
     hidden?: boolean
+    /**
+     * **可选态**（只读列双击进来）：文字可选、光标变 I 形，并且**这一层自己吃掉按下** ——
+     * 那一记拖拽归"划文字"，格选区手势让位（与编辑态那个输入框同一条职责划分，Excel 同款）。
+     *
+     * ‼️ 样式只能走**内联**：td 那条 `user-select: none`（`cell-selectable`）是**未分层**规则，未分层压过
+     * utilities 层 —— 挂 Tailwind 的 `select-text` 不生效。让位与放开必须同时发生，所以两半一起写在这里。
+     */
+    selectable?: boolean
     /** 显示态 `0`（可聚焦）、编辑态 `-1`（避开 Tab 序列）—— Esc 退出编辑要把焦点交回这一层。 */
     tabIndex?: number
     onFocus?: () => void
+    /** 焦点走了（只读列据此还原文字选择）。⚠️ 看 `relatedTarget`，见调用点。 */
+    onBlur?: (e: ReactFocusEvent<HTMLDivElement>) => void
     /** 右端的尾节点（详情靶子那类）：与文字**同一套 flex 布局**，不靠绝对定位 + 补偿内边距。 */
     trailing?: ReactNode
     ref?: Ref<HTMLDivElement>
@@ -145,6 +178,9 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
             ref={ref}
             tabIndex={tabIndex}
             onFocus={onFocus}
+            onBlur={onBlur}
+            onMouseDown={selectable ? (e) => e.stopPropagation() : undefined}
+            style={selectable ? {userSelect: "text", cursor: "text"} : undefined}
             // 编辑态这层是透明的：别把同一份文本再塞进无障碍树（那时该读的是上面那个输入框）。
             aria-hidden={hidden || undefined}
             // `truncate` = overflow:hidden + text-overflow:ellipsis + white-space:nowrap（一个类给全）。
@@ -164,10 +200,12 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
 }
 
 /**
- * 一格：平时是文本（没改过显示灰色原值），点一下变输入框，回车提交、Esc 退出编辑。
+ * 一格：平时是文本（没改过显示灰色原值），双击变输入框、回车提交、Esc 退出编辑。
  *
  * 与现有表 `EditableCell` 的 override 那套对齐：没改过显示原值（灰）、点开预填原值、
  * 草稿等于原值就当"没改"（交 null 回到占位符）。**把一格删空 = 回到原值**。
+ *
+ * ⚠️ 只读列**不走这里**（它没有编辑态）：见 `CellContent` 里那一支 —— 双击进的是显示层自己的可选态。
  */
 export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit, drill}: {
     /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
@@ -318,6 +356,12 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                         办法就是这个标记。少了它，在一格里按 Esc 会把整个窗口收走（用户报过）。
                     */
                     data-esc-own=""
+                    /*
+                        ‼️ 编辑态里按下归"改这一格的内容"（摆光标 / 划字），**格选区手势让位** —— 与只读列的
+                        可选态同一条职责划分（Excel 同款：编辑中的单元格不参与区域选择，要拉选区先 Esc 退出）。
+                        不拦的话同一记拖拽会既划字、又把选区拉成一片。
+                    */
+                    onMouseDown={(e) => e.stopPropagation()}
                     value={draft}
                     // 编辑框也挂原值当 placeholder：预填的原值被删光后框里还有参照（它只是提示，提交的仍是空）。
                     placeholder={original}

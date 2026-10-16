@@ -74,4 +74,9 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
         // ‼️ 复制区**整格不许提层**：一提就把邻格的选区边框咬掉 2px（同坐标差分实测 96 个绿像素）
         expect(code).not.toMatch(/--z-(copy|pinned-copy)/)
     })
+
+    /* ‼️ "拖拽 = 拉选区"的前提；也是只读格可选态只能走**行内样式**的原因（未分层压过 utilities 层）。 */
+    it("`.cell-selectable` 自己按住文字选择", () => {
+        expect(code).toMatch(/\.cell-selectable\s*\{[^}]*user-select:\s*none/)
+    })
 })

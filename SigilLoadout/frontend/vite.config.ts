@@ -20,5 +20,8 @@ export default defineConfig({
     // 选项）。只影响测试，与产物无关。defineConfig 因此从 vitest/config 引（它是 vite 那个的超集）。
     test: {
         fsModuleCache: true,
+        /* 默认 5s 对这里的慢用例不够（空载 1~2.5s，机器一忙就成片 `Test timed out in 5000ms`）——
+           实测：3 个 vitest 并发时 15 条超时。给足余量，别让假红引着去查不存在的 bug。 */
+        testTimeout: 15000,
     },
 });

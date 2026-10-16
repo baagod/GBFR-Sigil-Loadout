@@ -15,7 +15,7 @@ import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 
 import {CELL_PADDING, INPUT_PADDING} from "@/components/actions-table/classes"
-import {KEYS, LongField, cellAt, clickToEdit, cleanup, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, cleanup, selectCell, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, rows} = useTableHarness()
 
@@ -64,6 +64,64 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(input).not.toBeNull()
         expect(input.className).toContain("absolute")
         expect(input.className).toContain("inset-0")
+    })
+
+    /*
+        用户要求：**只读列的文字要能选**（动作名 / 记录号那类），但不许编辑。
+
+        ‼️ 双击让这一格进"可选态"：还是显示层那串 label（**没有输入框**）—— 样式走内联（td 那条
+        `user-select: none` 是未分层的，utility 压不过，见 `CellText`）；失焦还原。
+        不能默认放开：拖选一片格子会把划过的文字一起选蓝（轨表「效果」列报过）。
+    */
+    it("只读格：双击后文字可选（**没有输入框**），焦点一走就还原", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 0) // 第 0 列 = `id_`：只读
+        const layer = cell.firstElementChild as HTMLElement
+
+        expect(layer.style.userSelect).toBe("")
+        selectCell(cell) // 先让这一格处于选中：Ctrl 点在它上面才有"减选"可言
+        fireEvent.doubleClick(layer)
+
+        expect(layer.style.userSelect).toBe("text")
+        expect(cell.querySelector("input")).toBeNull() // 不进编辑态
+        expect(cell.className).toContain("cell-selected")
+
+        /*
+            ‼️ 进了态，按下就归"划文字"：**格选区手势让位** —— Ctrl 点在已选中的格上本该是"减选"，
+            这一下不该发生（与下面编辑态那条同一条职责划分，Excel 同款）。
+        */
+        fireEvent.mouseDown(layer, {ctrlKey: true})
+        expect(cell.className, "可选态里按下不该动选区").toContain("cell-selected")
+
+        /*
+            ‼️ 真机踩到的坑：Chromium 里按在格内那个 `span` 上时，焦点会**先离开这一层再回来**
+            （`relatedTarget` 就是它自己）—— 那一记 blur 不许把可选态还原掉（否则双击后的第一下拖选当场失效）。
+        */
+        fireEvent.blur(layer, {relatedTarget: layer})
+        expect(layer.style.userSelect, "焦点只是抖了一下，不算走").toBe("text")
+
+        fireEvent.blur(layer, {relatedTarget: document.body})
+        expect(layer.style.userSelect).toBe("")
+    })
+
+    /*
+        ‼️ **编辑态里按下：格选区手势让位**（Excel 同款：编辑中的单元格不参与区域选择，要拉选区先 Esc）。
+        两面都钉：编辑框里按下不减选（让位生效），**没进编辑态**的格子照旧按 Ctrl 减选（手势没坏）。
+    */
+    it("编辑态里按下：格选区手势让位；没进编辑态的格子照旧减选", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2)
+        clickToEdit(cell)
+        const input = cell.querySelector("input")!
+        expect(cell.className).toContain("cell-selected")
+
+        fireEvent.mouseDown(input, {ctrlKey: true})
+        expect(cell.className, "编辑态里按下不该动选区").toContain("cell-selected")
+
+        /* 反面：同一格退出编辑之后，Ctrl 点它就是正常的"减选"。 */
+        fireEvent.keyDown(input, {key: "Escape"})
+        fireEvent.mouseDown(cell, {ctrlKey: true})
+        expect(cell.className, "退出编辑后 Ctrl 点仍该减选").not.toContain("cell-selected")
     })
 
     /*
