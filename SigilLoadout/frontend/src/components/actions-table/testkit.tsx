@@ -232,6 +232,21 @@ export function handleAt(container: HTMLElement, row: number) {
  * 把每行桩成 `height` px 高（默认 20）—— `rowIdAtY` 那类"按光标 Y 算行"的逻辑靠它。
  * 返回这些行，测试若要逐行断言可直接用。
  */
+/**
+ * **量宽用的几何桩**：happy-dom 不做布局，`getBoundingClientRect()` 一律 0，而这张表的量宽
+ * **必须先"看得见"**（隐藏容器里量什么都是 0）。所以把尺寸**显式喂进去**：
+ * `<table>` 给个非 0 的框、表头给自然宽度（77.4 → 向上取整成 78）。
+ *
+ * ⚠️ 装完自己收：调用方 `vi.restoreAllMocks()`（通常写在 `finally` 里）—— 别把桩漏给下一个用例。
+ */
+export function stubColumnGeometry() {
+    return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+        if (this.tagName === "TABLE") return {width: 900, height: 300} as DOMRect
+        if (this.tagName === "TH") return {width: 77.4, height: 24} as DOMRect
+        return {width: 0, height: 0} as DOMRect
+    })
+}
+
 export function stubRowRects(container: HTMLElement, height = 20) {
     const rows = [...container.querySelectorAll("tbody tr")] as HTMLElement[]
     rows.forEach((row, index) => {

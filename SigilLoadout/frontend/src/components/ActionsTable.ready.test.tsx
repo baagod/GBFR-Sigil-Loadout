@@ -21,21 +21,10 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {ActionsTable} from "@/components/ActionsTable"
 
-import {makeRow, t, tableProps} from "@/components/actions-table/testkit"
+import {makeRow, stubColumnGeometry, t, tableProps} from "@/components/actions-table/testkit"
 
 /** 表格自己那个滚动容器（离屏与否都看它）。 */
 const scroller = (container: HTMLElement) => container.querySelector<HTMLElement>("div[aria-busy]")!
-
-/**
- * happy-dom 不做布局：把尺寸**显式喂进去**，量宽那两趟才走得完（同 `render.test.tsx`）。
- * 量不出来时表格永远停在"没就位"，这个文件就测不出东西。
- */
-const stubGeometry = () =>
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-        if (this.tagName === "TABLE") return {width: 900, height: 300} as DOMRect
-        if (this.tagName === "TH") return {width: 77.4, height: 24} as DOMRect
-        return {width: 0, height: 0} as DOMRect
-    })
 
 /** 等到"就位"：不再离屏。 */
 const ready = (container: HTMLElement) =>
@@ -43,7 +32,7 @@ const ready = (container: HTMLElement) =>
 
 describe("动作表 · 就位与骨架的契约", () => {
     it("还没就位（loading）：量完了也整块离屏 —— 面板那边正顶着骨架", async () => {
-        stubGeometry()
+        stubColumnGeometry()
         try {
             const {container} = render(<ActionsTable t={t} loading {...tableProps([makeRow("1000")])} />)
             // 先让它**真的量完**（否则"离屏"只是因为没量好，测不出 loading 的作用）。
@@ -56,7 +45,7 @@ describe("动作表 · 就位与骨架的契约", () => {
     })
 
     it("量好就位：回到原位、可交互，并回一次 onReady（面板据此撤骨架）", async () => {
-        stubGeometry()
+        stubColumnGeometry()
         try {
             const onReady = vi.fn()
             const {container} = render(<ActionsTable t={t} onReady={onReady} {...tableProps([makeRow("1000")])} />)
@@ -71,7 +60,7 @@ describe("动作表 · 就位与骨架的契约", () => {
     })
 
     it("忙（busy）但已就位：留在原位、只是点不动 —— 不藏表", async () => {
-        stubGeometry()
+        stubColumnGeometry()
         try {
             const {container} = render(<ActionsTable t={t} busy {...tableProps([makeRow("1000")])} />)
             await ready(container)

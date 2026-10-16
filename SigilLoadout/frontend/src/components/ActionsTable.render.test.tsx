@@ -15,7 +15,7 @@ import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
 import {DrillContext} from "@/components/actions-table/model"
 
-import {KEYS, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, t} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, clickToEdit, tableProps, useTableHarness, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -54,14 +54,9 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     it("列宽：量出自然宽度后取整，并锁进 table-fixed（消掉亚像素的断线）", async () => {
         /*
             happy-dom 不做布局，`getBoundingClientRect()` 一律是 0 —— 而这张表的量宽**必须先"看得见"**
-            （隐藏容器里量什么都是 0，见 `useLayoutEffect` 里那段）。所以这里把尺寸**显式喂进去**：
-            `<table>` 给个非 0 的框、表头给自然宽度（77.4 → 向上取整成 78）。
+            （隐藏容器里量什么都是 0，见 `useLayoutEffect` 里那段）。几何桩在 `testkit.stubColumnGeometry`。
         */
-        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-            if (this.tagName === "TABLE") return {width: 900, height: 300} as DOMRect
-            if (this.tagName === "TH") return {width: 77.4, height: 24} as DOMRect
-            return {width: 0, height: 0} as DOMRect
-        })
+        stubColumnGeometry()
         try {
             const container = await renderTable()
             const table = container.querySelector("table") as HTMLTableElement
