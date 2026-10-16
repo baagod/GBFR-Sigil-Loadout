@@ -59,7 +59,6 @@ import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionRowView} from "@/components/actions-table/ActionRowView"
 import {ActionsTableHead} from "@/components/actions-table/ActionsTableHead"
 import {CopyRejectedDialog} from "@/components/actions-table/CopyRejectedDialog"
-import {MeasureFrame} from "@/components/actions-table/MeasureFrame"
 import {GRIP_WIDTH, HANDLE_WIDTH, PINNED_COUNT} from "@/components/actions-table/classes"
 import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
@@ -106,7 +105,7 @@ import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onCopyReady, onRowsReady, onRowsChange, columnOf}: {
+export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onCopyReady, onRowsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -172,6 +171,15 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 把本来有原身份的行加回去标红）。
      */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
+    /**
+     * **这一份数据已经作废**（换角色 / 改清单那一段）：表格立刻**消失**（整块离屏），
+     * 由 `ActionsPanel` 那个**独立**的骨架视图顶上 —— 列宽没量好之前也一样不显示（见下面那个容器）。
+     */
+    loading?: boolean
+    /** 这一页正在忙（换角色 / 改清单 / 保存部署）：**点不动**（表格本身照旧显示）。 */
+    busy?: boolean
+    /** 列宽量好了（= 表格可以显示了）—— 面板据此撤掉骨架（见 `ActionsPanel` 的 `tableLoading`）。 */
+    onReady?: () => void
 }) {
     /**
      * **当前要显示的那份数据** = 父组件给的 prop，外加本层的"编辑覆盖"。
@@ -306,6 +314,18 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * `useColumnMeasure` 里：它是"DOM 测量 + 三个自洽 state"，与表的交互逻辑一刀两断。
      */
     const {columnSizing, measured} = useColumnMeasure(tableRef, keys, rows, fixedWidths)
+
+    /**
+     * **"还没就位" = 这一份数据已作废，或者列宽还没量出来**：两种都要整块离屏 —— 面板那边同时顶着骨架。
+     *
+     * `busy` 不在里面：保存部署时表格照旧显示（只是点不动），别把好好的表藏起来。
+     */
+    const hidden = loading || !measured
+
+    // 量好了通知面板撤骨架（面板那边给的是 `useCallback`，引用稳）。
+    useEffect(() => {
+        if (measured) onReady?.()
+    }, [measured, onReady])
     /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
     const scrollRef = useRef<HTMLDivElement>(null)
     /**
@@ -761,10 +781,22 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 onClose={() => setCopyHint("")}
             />
             {/*
-                **量完之前那一块交给 `MeasureFrame`**：骨架占位 + 表格整块离屏（理由都写在那组件里，
-                这里不再复述一遍 —— 概念只留一处）。
+                **表格自己的壳**。骨架**不在这里**、也不是它的父级：骨架是 `ActionsPanel` 平级渲染的
+                另一个独立视图（见 `TableSkeleton`），这一层只管表格自己。
+
+                ‼️ 还没就位（`hidden`）之前整块**离屏**（不是 `display: none`）：量列宽靠表格自己的 rect
+                与列的自然宽度，`display: none` 会让 rect 归零 → 那趟永远等不到尺寸 → 表格再也不显示。
+                挪到屏幕外（`absolute` + 负 `left` + 定宽）：仍在 DOM、仍量得到，但不参与排版 —— 否则它
+                那一万两千多像素的宽会先撑出滚动条、还跟骨架叠在一起（用户实测："骨架旁边还是冒出滚动条"）。
+
+                ⚠️ 只挪表格不够：绝对定位的子元素照样被算进滚动容器的可滚动区，所以**容器自己也一起让开**。
             */}
-            <MeasureFrame measured={measured} scrollRef={scrollRef}>
+            <div
+                ref={scrollRef}
+                /* `aria-busy` 与"点不动"同一判据：还没就位、或者这一页在忙。 */
+                aria-busy={hidden || busy}
+                className={`${hidden || busy ? "pointer-events-none " : ""}${hidden ? "absolute top-0 -left-[99999px] w-[1200px]" : "min-h-0 flex-1"} overflow-auto border table-border`}
+            >
             <table
                 ref={tableRef}
                 /*
@@ -793,9 +825,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     的那件事，换个入口再来一遍）。
                 */
                 /*
-                    ‼️ 量完之前表格还要**脱离文档流**（`absolute` + `invisible`）：留在 DOM 里才量得到
-                    （`display: none` 会让 rect 归零），但不占版面才不会撑出滚动条、不与骨架叠
-                    —— 完整理由见 `MeasureFrame`（那边管容器，这边管表格自己）。
+                    ‼️ 量完之前表格**隐身**：仍留在 DOM 里（量列宽靠它的 rect 与列的自然宽度），
+                    但不占版面 —— 否则它那一万两千多像素的宽会先把滚动条撑出来、还跟骨架叠在一起。
+                    容器 meanwhile 整块离屏（见上面那段）。
                 */
                 className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 text-sm [&_tr>*:last-child]:border-r-0`}
             >
@@ -867,7 +899,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     </RevealContext.Provider>
                 </tbody>
             </table>
-            </MeasureFrame>
+            </div>
         </div>
         </ReorderDnd>
     )

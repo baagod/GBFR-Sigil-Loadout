@@ -5,7 +5,7 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useEffect, useMemo, useRef, useState} from "react"
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from "react"
 
 import {LoadActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy} from "../../bindings/sigilloadout/service/actionsservice"
 import {Button} from "@/components/ui/button"
@@ -20,6 +20,7 @@ import {
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
+import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import type {ActionRow} from "@/components/actions-table/model"
 import {DrillContext, columnsOf, toActionRow} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
@@ -185,6 +186,20 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
      * 同一次 setState 落地）。分开之后渲染那三态才说得清。
      */
     const [loaded, setLoaded] = useState(false)
+
+    /**
+     * **动作表就位了没有**：为真时表格整块离屏、由 `TableSkeleton` 顶上 —— 首次进页面、换角色、
+     * 改记录清单（这几件事都会重挂载表格并重量列宽）一律如此。表格量好列宽后回 `onReady` 把它关掉。
+     *
+     * ‼️ 为什么不"把表格留在原地、只是禁用"：列宽是**量出来**的，留在原地会先按自然宽度排一遍、
+     * 量完再锁 `table-fixed` —— 肉眼就是**抖一下**（用户口径）。所以宁可让表格消失、骨架顶上。
+     *
+     * ‼️ 骨架与表格是**两个独立视图**：骨架由这一层平级渲染（见下面 JSX），既不包着表格、也不在
+     * 表格里面；`TableSkeleton` 自己不知道表格的存在。
+     */
+    const [tableLoading, setTableLoading] = useState(true)
+    /** 表格量好列宽了（引用要稳：`ActionsTable` 那个 effect 依赖它）。 */
+    const handleTableReady = useCallback(() => setTableLoading(false), [])
     /**
      * **每次把这页数据重新读一遍就 +1**，当 `<ActionsTable key>` 用 —— 换角色、以及改记录清单之后的
      * 重新读取都会 +1，于是表**整个重新挂载**。
@@ -245,6 +260,15 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
     const [busy, setBusy] = useState(false)
 
     /**
+     * **"这一页现在能用了"的判据**：不只是"后端在忙"，还包括**动作表还没就位**（列宽在量、骨架正顶着）。
+     *
+     * ‼️ 两者分开就会露出破绽：换角色时 `busy` 随 `loadAll` 结束就落了，可表格还要量 ~0.4s 列宽
+     * （111 行 × 88 列要排两遍，见 `TableSkeleton` 里那段逐帧记录）—— 那几百毫秒里角色下拉已经能点、
+     * 骨架却还在，看着像"卡住了"（用户实测反馈："combox 都亮起可用了，骨架还在加载"）。
+     */
+    const pageBusy = busy || tableLoading
+
+    /**
      * 下拉里的角色 = **后端说这一页能打开的那些**（容器里有动作表）里，只留玩家角色码。
      *
      * ‼️ 判据是本页自己的数据，**不是别的页面的名单**。这里以前拿「专属因子表」当名单去过滤，
@@ -268,6 +292,8 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
      * `switchCharacter` 先 `await SetCharacter` 再调本函数。
      */
     const loadAll = async () => {
+        // ‼️ 第一件事：把表**立刻**藏起来、骨架顶上（换角色时旧数据还挂在表上，不能让它继续显示）。
+        setTableLoading(true)
         const [path, codes, ids] = await Promise.all([Path(), ListCharacters(), ActionIDs()])
         setCharCode(charCodeOf(path ?? ""))
         setCharacters(codes ?? [])
@@ -280,6 +306,8 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
         setRows(loaded.map(toActionRow))
         setLoaded(true)
         setDataVersion((v) => v + 1) // 换一份数据 → 让表整个重新挂载（理由见 `dataVersion`）
+        // 一条记录都没有 → 表格根本不会挂载、也就没人会回 `onReady`：这里自己收骨架，改显示空提示。
+        if (loaded.length === 0) setTableLoading(false)
     }
 
     useEffect(() => {
@@ -401,7 +429,7 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         // 不因"有未保存的改动"而禁用：那会让这一排在编辑完之后一直发灰（要的是**永远没有
                         // 禁用状态**）。代价是带着草稿换角色会丢掉草稿——switchCharacter 本来就会清 dirty
                         // 再重读，而"保存"就在同一行右手边。只有正在读写/deploy 时才短暂禁用。
-                        disabled={busy}
+                        disabled={pageBusy}
                         onSelect={(code) => void switchCharacter(code)}
                         t={t}
                     />
@@ -456,7 +484,7 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
                         松紧不一，英文 Save 那档就白留一截）。
                         这里**不再有任何状态行**：成功/失败都不在界面上报（失败只写 console.error）。 */}
-                    <Button disabled={busy} onClick={() => void handleSaveAndDeploy()}>
+                    <Button disabled={pageBusy} onClick={() => void handleSaveAndDeploy()}>
                         {t.saveAndDeploy}
                     </Button>
                 </div>
@@ -485,19 +513,25 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         来源，"谁先回来"成了隐式依赖（换角色时尤其明显），而 `keys.length === 0`
                         那条判据其实**不可达**（keys 与数据同一次 setState 落地）。
 
-                        现在三态说得清：`!loaded` = 还没读到；`rows.length === 0` = 读到了但一条都没有
-                        （不是错误，是 ids 与表不匹配，见后端 LoadActions）；否则挂表。
+                        现在说得清：`tableLoading` = 还没就位（骨架顶着 —— 首次读取、换角色、改清单都算）；
+                        `rows.length === 0` = 读到了但一条都没有（不是错误，是 ids 与表不匹配，见后端
+                        LoadActions）；否则挂表。
 
                         ⚠️ JSX 里的块注释**必须包在大括号里**（写成"大括号 + 块注释"那个形状），
                         不能只写裸的块注释 —— 裸的会被当成**文本节点**直接渲染到界面上
                         （踩过：界面上顶着整整一大段源码注释）。
                     */}
-                    {!loaded ? (
-                        <div className="pb-1 text-xs text-muted-foreground">{t.loading}</div>
-                    ) : rows.length === 0 ? (
+                    {/*
+                        **骨架**：表格就位之前的占位视图 —— 与下面那个 `<ActionsTable>` 是**平级**的两件事
+                        （既不是它包着表格，也不是表格在它里面），同一条判据 `tableLoading` 二选一。
+                    */}
+                    {tableLoading && <TableSkeleton />}
+                    {/* 读到了、但一条记录都没有：表格不会挂载，也就没人回 onReady —— 这里直接收骨架给空提示。 */}
+                    {!tableLoading && loaded && rows.length === 0 && (
                         // 就地显示、不居中也不撑高：一行 14px 的灰字。
                         <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
-                    ) : (
+                    )}
+                    {loaded && rows.length > 0 && (
                         // ⚠️ 新表（TanStack）**已转正**：它就是动作表本身，旧的 TrackTable 那套连同切换开关一起删了。
                         // 保存走 ttSaveRef（见 handleSaveAndDeploy）—— 这个组件自己没有工具条。
                         /*
@@ -516,6 +550,12 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                                 拿它当 key 等于永远不重挂，上面这些就一个都清不掉（踩过）。
                             */
                             key={dataVersion}
+                            // 这一份数据还没就位（换角色 / 改清单那一段）：表格整块离屏，骨架在上面顶着。
+                            loading={tableLoading}
+                            // 保存部署这类"忙"：表格照旧显示，只是点不动。
+                            busy={busy}
+                            // 列宽量好了 → 撤掉上面那个骨架（TableSkeleton）。
+                            onReady={handleTableReady}
                             rows={rows}
                             keys={keys}
                             t={t}
