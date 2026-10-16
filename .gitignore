@@ -28,3 +28,6 @@ openwiki/.run.json
 
 # cdp-probe.mjs / selection 截图这类探针产物（源文件 cdp.mjs / cdp-probe.mjs 入库）
 tools/debug/*.png
+
+# 本地参考用例（TanStack Table + shadcn 的示例，供查资料；不进版本库）
+docs/reference/
