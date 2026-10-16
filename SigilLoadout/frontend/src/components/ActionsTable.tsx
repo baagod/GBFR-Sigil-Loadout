@@ -38,7 +38,7 @@
     以及"整行选中"上报给调用方。手势那块与两个 ref 镜像（`tableInstanceRef` /
     `dragRowRef`）缠在一起，再往外抽要先搬一堆 ref —— 想动它时先想清楚这笔账，别只为行数好看。
 */
-import {useContext, 
+import {
     useCallback,
     useEffect,
     useMemo,
@@ -61,7 +61,7 @@ import {ActionsTableHead} from "@/components/actions-table/ActionsTableHead"
 import {CopyRejectedDialog} from "@/components/actions-table/CopyRejectedDialog"
 import {MeasureFrame} from "@/components/actions-table/MeasureFrame"
 import {GRIP_WIDTH, HANDLE_WIDTH, PINNED_COUNT} from "@/components/actions-table/classes"
-import {BranchPickContext, DrillContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 import {rowFullySelected, rowSelectionKey} from "@/components/actions-table/selection"
@@ -251,8 +251,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 排序该发生在**渲染那一层**；另外等以后做"点表头排序"，这里换个初始值就能接上。
      */
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [{id: "id_", desc: false}])
-    /** 这一列的详情入口（见 DrillContext）—— 表头配色与格右端靶子**同一份判据**，不再各认一次列名。 */
-    const drillOf = useContext(DrillContext)
+    /** 表头那一行里的钻取配色由 `ActionsTableHead` 自己 `useContext(DrillContext)` —— 这一层不用再转一手。 */
     /**
      * **这一次按下是不是"拖"**（按下到松开移动超过几个像素）。
      *
@@ -802,10 +801,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
             >
                 <ActionsTableHead
                     table={table}
-                    reorder={reorder}
+                    sortable={reorder !== undefined}
                     measured={measured}
                     rowHeadWidth={rowHeadWidth}
-                    drillOf={(id) => Boolean(drillOf(id))}
                 />
                 <tbody>
                     {/*

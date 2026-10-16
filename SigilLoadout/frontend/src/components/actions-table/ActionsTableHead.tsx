@@ -6,6 +6,7 @@
 
     行号列与握把列**不属于列模型**（见 `classes.ts` 的 HANDLE_WIDTH 那段），所以这两格是手写的。
 */
+import {useContext} from "react"
 import {flexRender, type Table} from "@tanstack/react-table"
 
 import {
@@ -22,25 +23,24 @@ import {
     HEAD_LABEL,
     PINNED_CELL,
 } from "@/components/actions-table/classes"
-import {features, type ActionRow} from "@/components/actions-table/model"
+import {DrillContext, features, type ActionRow} from "@/components/actions-table/model"
 
 export function ActionsTableHead({
     table,
-    reorder,
+    sortable,
     measured,
     rowHeadWidth,
-    drillOf,
 }: {
     table: Table<typeof features, ActionRow>
-    /** 行序能拖时才画握把列的占位表头（同 `ActionsTable` 的 `reorder`）。 */
-    reorder?: (from: number, to: number) => void
+    /** 行序能拖时才画握把列的占位表头（同 `ActionRowView` 的 `sortable`，由 `reorder` 是否存在决定）。 */
+    sortable: boolean
     /** 量完列宽之前不写死宽度（同 `useColumnMeasure`）。 */
     measured: boolean
     /** 行头那几格的宽度，钉住列的 `left` 要从它之后起算。 */
     rowHeadWidth: number
-    /** 表头用哪一份"钻取"配色（`actions-table/model.ts` 的 DrillContext 取值）。 */
-    drillOf: (columnId: string) => boolean
 }) {
+    /** 表头用哪一份"钻取"配色 —— 与格右端那个 `···` 靶子**同一份判据**（见 model.ts 的 DrillContext）。 */
+    const drillOf = useContext(DrillContext)
     return (
         <thead>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -64,7 +64,7 @@ export function ActionsTableHead({
                         `table-fixed` 的列宽还是按表头算，握把那 32px 又要被摊到别的列上去。
                         留空：这一列没有"名字"可言（拖动是手势，不是数据）。
                     */}
-                    {reorder !== undefined && (
+                    {sortable && (
                         <th aria-hidden className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`} style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}} />
                     )}
                     {headerGroup.headers.map((header) => {
