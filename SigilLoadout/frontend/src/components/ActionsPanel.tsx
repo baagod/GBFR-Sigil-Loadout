@@ -128,6 +128,11 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
             <ComboboxContent
                 className={
                     /*
+                        ‼️ **弹层与 combobox 同宽**：宽度基类本来就给了（`w-(--anchor-width)`），但同一条基类里
+                        还有一条 `min-w-[calc(var(--anchor-width)+--spacing(7))]` —— min 压过 width，弹层于是比
+                        触发器宽 28px（截图里右边多出来的那一截）。所以这里得把 min 拉回同一个锚宽。
+                        `!` 是必须的：基类带变体、权重相同，谁赢只看样式表顺序（与下面 `duration-0` 同一条口径）。
+
                         ‼️ **选完一项时不做淡出**（`duration-0` + 去掉 `animate-out`）。
                         库里那套 `data-closed:animate-out fade-out-0 zoom-out-95` 让收尾拖一拍 —— 点外面收起时
                         那点淡出好看，但"选完角色"是**用户已经做完的决定**，那一刻弹层该**当场消失**。
@@ -137,7 +142,7 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                         所以这一条**没有**单独改变可观测时间 —— 它只是让意图明确（选中即关，不等动画）。
                         真正的病根是上面那条：关闭原先跟着 `value` 走、要等异步读取回来。
                     */
-                    pickedClose ? "duration-0 data-closed:animate-none" : undefined
+                    `min-w-(--anchor-width)! ${pickedClose ? "duration-0 data-closed:animate-none" : ""}`
                 }
             >
                 <ComboboxEmpty>{t.charEmpty}</ComboboxEmpty>
@@ -148,7 +153,9 @@ function CharacterPicker({value, codes, names, colors, disabled, onSelect, t}: {
                     只这一个 combo 这样，SkillPicker 那个不动。 */}
                 <ComboboxList className="max-h-[min(30.5rem,calc(var(--available-height)-2.25rem))] font-medium">
                     {(item) => (
-                        <ComboboxItem key={item.value} value={item}>
+                        /* 项内"名字 → 码"之间那 8px（基类 `gap-2`）按用户口径减到 4px。
+                           ⚠️ 别把 `w-[7em]` 那个定宽列当成同一件事：它管的是"码从一个 x 起"。 */
+                        <ComboboxItem key={item.value} value={item} className="gap-1!">
                             {renderCode(item.value)}
                         </ComboboxItem>
                     )}
