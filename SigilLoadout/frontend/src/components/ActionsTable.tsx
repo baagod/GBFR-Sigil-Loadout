@@ -29,10 +29,13 @@
         （撤销栈的记账规则长在 `edit` 里，所以它们必须同居）；
       · `actions-table/useRowCommands.ts` —— 行级命令（添加/复制/剪切/粘贴/删除）；
       · `actions-table/ActionRowView.tsx` —— 表体一行（memo 那一层）；
-      · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态。
+      · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态；
+      · `actions-table/ActionsTableHead.tsx`   —— 表头那一行的渲染（两行表头 / 钉住 / 握把占位）；
+      · `actions-table/CopyRejectedDialog.tsx` —— 「复制被拒」那个对话框。
 
     ‼️ **这个文件里还剩下的**：数据读取的接线、选区手势编排（行号/数据格拖动）、列与行的清单计算、
-    渲染，以及"整行选中"上报给调用方。手势那块与两个 ref 镜像（`tableInstanceRef` /
+    表体的渲染（表头与"复制被拒"框已经抽成 `ActionsTableHead.tsx` / `CopyRejectedDialog.tsx`），
+    以及"整行选中"上报给调用方。手势那块与两个 ref 镜像（`tableInstanceRef` /
     `dragRowRef`）缠在一起，再往外抽要先搬一堆 ref —— 想动它时先想清楚这笔账，别只为行数好看。
 */
 import {useContext, 
@@ -44,7 +47,6 @@ import {useContext,
     type MouseEvent as ReactMouseEvent,
 } from "react"
 import {
-    flexRender,
     useTable,
     type Cell,
     type CellSelectionState,
@@ -54,32 +56,11 @@ import {
 } from "@tanstack/react-table"
 
 import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {ActionRowView} from "@/components/actions-table/ActionRowView"
+import {ActionsTableHead} from "@/components/actions-table/ActionsTableHead"
+import {CopyRejectedDialog} from "@/components/actions-table/CopyRejectedDialog"
 import {MeasureFrame} from "@/components/actions-table/MeasureFrame"
-import {
-    GRIP_WIDTH,
-    HANDLE_CELL,
-    HEAD_BG,
-    HANDLE_HEAD_CURSOR,
-    HANDLE_HEAD_INNER,
-    HANDLE_WIDTH,
-    HEAD_CELL,
-    HEAD_DRILL,
-    HEAD_FIELD,
-    HEAD_HEIGHT,
-    HEAD_LABEL,
-    PINNED_CELL,
-    PINNED_COUNT,
-} from "@/components/actions-table/classes"
+import {GRIP_WIDTH, HANDLE_WIDTH, PINNED_COUNT} from "@/components/actions-table/classes"
 import {BranchPickContext, DrillContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
@@ -774,25 +755,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 复制被拒：**用对话框**（Excel / WPS 也是弹框说这句话），不是表格上方一行小字。
                 只在"多片跨行又跨列"时开（见 `planCopy`）；`copyHint` 非空即开，关掉就清空。
             */}
-            <AlertDialog open={copyHint !== ""} onOpenChange={(open) => !open && setCopyHint("")}>
-                {/* `size="sm"` = 官方那个窄档（`max-w-xs`）：提示只有一句话，默认那档 512px 太空。 */}
-                <AlertDialogContent size="sm">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t.multiAreaCopyTitle}</AlertDialogTitle>
-                        <AlertDialogDescription>{copyHint}</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        {/*
-                            `size="sm"` 的页脚是**两列网格**（官方 sm 档如此），只放一个按钮会只占左半格。
-                            这里让它跨两列 → **占满底部**：是"这一处调用点怎么摆"，所以类加在调用点，
-                            不写进 `ui/alert-dialog.tsx`（那个组件要跟上游保持一致）。
-                        */}
-                        <AlertDialogAction className="col-span-2" onClick={() => setCopyHint("")}>
-                            {t.ok}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <CopyRejectedDialog
+                hint={copyHint}
+                title={t.multiAreaCopyTitle}
+                ok={t.ok}
+                onClose={() => setCopyHint("")}
+            />
             {/*
                 **量完之前那一块交给 `MeasureFrame`**：骨架占位 + 表格整块离屏（理由都写在那组件里，
                 这里不再复述一遍 —— 概念只留一处）。
@@ -832,75 +800,13 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 */
                 className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 text-sm [&_tr>*:last-child]:border-r-0`}
             >
-                <thead>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                        // 表头整行吸顶，**再高冻结层一层**（表头 60 > 冻结 50）：垂直滚动时表体的冻结列
-                        // 会滑到表头的位置上，压不住就穿出来。
-                        /*
-                            表头**整行**一个光标：`cursor` 是继承属性，写在 `<tr>` 上一次覆盖所有 `<th>`。
-                            （别往 `HEAD_CELL` 里塞 —— Tailwind 容不下带引号的 `url()`。）
-                        */
-                        <tr key={headerGroup.id} className="sticky top-0 z-60" style={{cursor: HANDLE_HEAD_CURSOR}}>
-                            {/*
-                                行号列 —— **不属于列模型**（见 HANDLE_WIDTH 那段）。
-                                不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
-                                宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
-                            */}
-                            <th className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
-                                <div className={HANDLE_HEAD_INNER}>#</div>
-                            </th>
-                            {/*
-                                **握把列的占位表头**：表体那一格有它，表头必须有对应的一格 —— 否则
-                                `table-fixed` 的列宽还是按表头算，握把那 32px 又要被摊到别的列上去。
-                                留空：这一列没有"名字"可言（拖动是手势，不是数据）。
-                            */}
-                            {reorder !== undefined && (
-                                <th aria-hidden className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`} style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}} />
-                            )}
-                            {headerGroup.headers.map((header) => {
-                                const pinned = header.column.getIsPinned()
-                                return (
-                                    <th
-                                        key={header.id}
-                                        colSpan={header.colSpan}
-                                        /*
-                                            `width` 由库的 sizing state 给（**整数**，见那段测量）。
-                                            钉住的列还要 `left`：`column.getStart('start')` 是库按 size
-                                            累加出来的"在钉住区里的偏移"，正好就是 sticky 要的 left ——
-                                            比自己量一遍可靠（那个还得处理"一列变宽、另一列变窄、总宽不变"）。
-                                        */
-                                        style={{
-                                            width: measured ? header.getSize() : undefined,
-                                            /*
-                                                ‼️ 同上（表体那一格）：库给钉住列的 `left` 是从 0 起算的，
-                                                行头那几格得自己加 —— 否则 `id_` 的表头会盖住 `#` 表头。
-                                            */
-                                            left: measured && pinned ? rowHeadWidth + header.column.getStart("start") : undefined,
-                                        }}
-                                        // 量宽时靠它把每列挑出来（表头那一行是"自然宽度"的来源）。
-                                        data-col-id={header.column.id}
-                                        className={`${HEAD_CELL} ${pinned ? `${PINNED_CELL} ${HEAD_BG}` : ""} ${drillOf(header.column.id) ? HEAD_DRILL : ""}`}
-                                    >
-                                        <div className="truncate">
-                                            {header.isPlaceholder ? null : (
-                                                /* 表头两行：译名在上、原始字段名在下（字段名是"这一列对应哪个字段"的钥匙）。
-                                                   ⚠️ 两行都要 `data-head-line`：量宽按行分别量（见 useColumnMeasure）。 */
-                                                <>
-                                                    <div className={HEAD_LABEL} data-head-line="">
-                                                        {flexRender(header.column.columnDef.header, header.getContext())}
-                                                    </div>
-                                                    <div className={HEAD_FIELD} data-head-line="">
-                                                        {header.column.id}
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </th>
-                                )
-                            })}
-                        </tr>
-                    ))}
-                </thead>
+                <ActionsTableHead
+                    table={table}
+                    reorder={reorder}
+                    measured={measured}
+                    rowHeadWidth={rowHeadWidth}
+                    drillOf={(id) => Boolean(drillOf(id))}
+                />
                 <tbody>
                     {/*
                         ‼️ `getRowModel()` **只在这里取一次**（`modelRows`），别再在 map 里取第二遍 ——
