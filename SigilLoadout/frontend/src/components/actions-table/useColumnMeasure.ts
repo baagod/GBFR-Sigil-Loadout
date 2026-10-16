@@ -253,8 +253,7 @@ export function useColumnMeasure(
             }
             const layers = textLayersOf(cell)
             const widestLayer = layers.reduce<HTMLElement | null>((a, b) => (!a || b.scrollWidth > a.scrollWidth ? b : a), null)
-            // `+ 1` 是右边框（`sizes` 写进 `td` 是 border-box）。
-            const byScroll = Math.max(...layers.map((l) => l.scrollWidth), 0) + chrome + 1
+            const byScroll = Math.max(...layers.map((l) => l.scrollWidth), 0) + chrome
             if (widestLayer && widestLayer.scrollWidth > (measuredLongest.get(id) ?? -1)) {
                 measuredLongest.set(id, widestLayer.scrollWidth)
                 useFontOf(widestLayer)
@@ -274,6 +273,15 @@ export function useColumnMeasure(
                 sizes[id] = fixedWidths[id]
                 continue
             }
+            /*
+                ‼️ `natural` **不只是"浏览器给的宽度"**：单元格里**非文字的那部分全靠它承载** ——
+                内边距、钻取靶子（`···`，`shrink-0` 且在流内）、选值箭头、flex gap。
+                下面 `byScroll` / `byText` 量的是**文字本身**，所以把 `natural` 去掉，列宽就会短掉那
+                十几到二十几像素（文字顶到边上、或跟靶子叠在一起）。别"顺手优化"掉它。
+
+                （同一句也解释了为什么"内边距/箭头"不单独算：那要按 CSS 常量累加，试过，算出 33，
+                列宽直接爆 —— 见下面 `chrome` 那段。）
+            */
             const natural = th.getBoundingClientRect().width / layoutScale
             const inner = th.firstElementChild as HTMLElement | null
             let needed = Math.max(natural, contentWidths.get(id) ?? 0)
