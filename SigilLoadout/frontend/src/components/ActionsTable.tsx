@@ -437,6 +437,15 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      */
     const modelRows = table.getRowModel().rows
     /**
+     * 拖行序那份 id 清单，**引用必须稳**（理由见下面 `SortableContext` 那段）：
+     * `modelRows` 每次渲染都是新数组，所以比对的是"id 串"；串没变就交回同一个数组。
+     */
+    const sortableIds = useMemo(
+        () => modelRows.map((row) => row.id),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [modelRows.map((row) => row.id).join("\u0000")],
+    )
+    /**
      * 整行选区的**列方向两端** + 最后一列下标（行号格的选中判据要用）。
      *
      * 取 `getAllCells()` 的**渲染顺序**：与 `getCellSelectionBounds()` 给的列下标是同一套坐标系
@@ -852,9 +861,14 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     <BranchPickContext.Provider value={branchPick}>
                     {/* 值格参数（多选 / 位名表 / 挂不挂搜索框）：各表自己给；不给 = 这一列不是值格。 */}
                     <PickerOfContext.Provider value={pickerOf ?? NO_PICKER}>
-                    {/* `SortableContext` **无条件**挂（行组件里那个 `useSortable` 不能条件调用）——
-                        它是纯 context，不产生 DOM，留在 `tbody` 里没关系；挂 `DndContext` 的那层在最外面。 */}
-                    <SortableContext items={modelRows.map((row) => row.id)} strategy={verticalListSortingStrategy}>
+                    {/* ‼️ `items` 必须是**稳定引用**：dnd-kit 的 `SortableContext` 把 `items` 原样塞进 context，
+                        引用一变，每一个 `useSortable` 消费者就全部重渲 —— 而 context 变化**穿透 memo**
+                        （`ActionRowView` 那把 memo 闸门对它无效）。原来这里写的是 `modelRows.map(...)`：
+                        每次渲染一个新数组，于是拖选每跨一行就要把 138 行 × 87 格 = 12006 个格子重建一遍
+                        （真机实测：每跨一行一个 100ms+ 的长帧）。行集合没变时这里必须是同一个数组。
+                        `SortableContext` **无条件**挂（行组件里那个 `useSortable` 不能条件调用）——
+                        它是纯 context，不产生 DOM，留在 `tbody` 里没关系。 */}
+                    <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
                     {modelRows.map((row, rowIndex) => {
                         /*
                             ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
