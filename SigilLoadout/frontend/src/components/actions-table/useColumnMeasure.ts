@@ -184,6 +184,24 @@ export function useColumnMeasure(
         const ruler = document.createElement("span")
         ruler.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;white-space:nowrap"
         document.body.appendChild(ruler)
+        /*
+            ‼️ 尺子的字体照**被量元素自己算出来的那套**（`getComputedStyle`），**不照抄类名**。
+
+            两条都踩过：
+              · 照抄类名会把宽度类一起抄进来 —— 值格那层是 `w-full`，离屏 span 会被撑到整个窗口宽
+                （实测列宽直接爆到 4563px）；
+              · 只抄表头那层的类，字体就跟**表体**不一致 —— 表体带 `tabular-nums`（数字等宽），
+                表头没有，于是数字串被量**窄**了。真机实测：`supportEffectList_` 那列最长值需要 558.3px，
+                列宽只给了 555，末尾那截被 `truncate` 吃掉 3.3px。
+        */
+        const useFontOf = (el: HTMLElement) => {
+            const cs = getComputedStyle(el)
+            ruler.style.cssText =
+                "position:absolute;left:-99999px;top:0;visibility:hidden;white-space:nowrap;" +
+                `font-family:${cs.fontFamily};font-size:${cs.fontSize};font-weight:${cs.fontWeight};` +
+                `font-style:${cs.fontStyle};letter-spacing:${cs.letterSpacing};` +
+                `font-variant-numeric:${cs.fontVariantNumeric};font-feature-settings:${cs.fontFeatureSettings}`
+        }
 
         /*
             ‼️ **表体内容也要量**（只靠 `natural` 不够）。
@@ -198,32 +216,50 @@ export function useColumnMeasure(
             用表头同一把离屏尺子量一次（表头那条路径一直在用尺子，所以表头从不截断）。
         */
         const contentWidths = new Map<string, number>()
-        /** 这一列**已经用尺子量过**的最长文本长度（让"每列只量一次"，不是每格都量）。 */
+        /** 这一列**已经用尺子量过**的那条最长文本有多宽（让"每列只量一次"，不是每格都量）。 */
         const measuredLongest = new Map<string, number>()
         /*
-            ⚠️ 尺子**不能照抄表体那层的类**：值格那层是 `flex w-full …`，`w-full` 会把离屏 span 撑到
-            整个窗口宽（实测列宽直接爆到 4563px）。字体照**表头内层**那份（与格子同一套字号/字重，但不含宽度）。
+            ‼️ "最长列值"要按**真实宽**挑，不能按字符数：中文比拉丁宽得多，按长度挑会挑中一条偏窄的 ——
+            而那条偏窄的又只由 `scrollWidth`（**取整**过的）兜底，真机上就是"末尾少一个字"。
+
+            装文字的层带 `truncate`（`overflow: hidden`），它的 `scrollWidth` 是**内容真实宽**、不随列宽变，
+            正好当"哪条最长"的判据。
+            ⚠️ **不能读包装层**：值格的包装层是 `flex w-full truncate`，里面那层 `flex-1` 会跟着收缩，
+            包装层的 `scrollWidth` 永远等于它自己的盒宽（实测 `supportEffectList_` 那列读到 554 = 盒宽，
+            而文本真要 558.3）—— 兜底就此失效。
         */
-        const rulerClassName = (el.querySelector("thead th[data-col-id] > div") as HTMLElement | null)?.className ?? ""
+        const textLayersOf = (cell: HTMLElement) =>
+            cell.matches(".truncate") ? [cell, ...cell.querySelectorAll<HTMLElement>(".truncate")] : [...cell.querySelectorAll<HTMLElement>(".truncate")]
+        /*
+            ‼️ `chrome`（= 边框）**每列只算一次**，不是逐格算。
+
+            一列在表里**只有一份宽度**，值格的内边距/边框/箭头对这条列的每一行都是同一套 ——
+            实测 87 列 × 12006 格：`chrome` 与单元格形态**逐列零变化**（`badCount: 0`）。逐格读
+            `getBoundingClientRect()` + `clientWidth` 是白读 2.4 万次属性（约 8ms）。
+
+            ⚠️ 算法本身别改：`chrome` = "外框 − 内层可见宽"**恰好只剩边框**（`cell.scrollWidth` 里已经含了
+            内边距；按 CSS 常量再累加 padding/gap/箭头就是重复计算 —— 试过：算出 33，列宽会爆，
+            而且 `columnGap` 在无 gap 时是 `"normal"`、`parseFloat` 得到 NaN）。
+        */
+        const chromeOf = new Map<string, number>()
         for (const td of el.querySelectorAll<HTMLElement>("tbody td[data-col-id]")) {
             const id = td.dataset.colId
             const cell = td.firstElementChild as HTMLElement | null
             if (!id || !cell) continue
-            /*
-                ⚠️ `chrome` 用"外框 − 内层可见宽"**是对的，别改成按 CSS 常量累加**：
-                `cell.scrollWidth` 里**已经含了内边距**，所以这个差值恰好只剩**边框**（实测 1px）；
-                按 CSS 再加一遍 padding/gap/箭头就是重复计算（试过：算出 33，列宽会爆），
-                而且 `columnGap` 在无 gap 时是 `"normal"`、`parseFloat` 得到 NaN。
-            */
-            const chrome = Math.max(0, td.getBoundingClientRect().width / layoutScale - cell.clientWidth)
-            const byScroll = cell.scrollWidth + chrome
-            const text = cell.textContent ?? ""
-            if (text.length > (measuredLongest.get(id) ?? -1)) {
-                measuredLongest.set(id, text.length)
-                ruler.className = rulerClassName
-                ruler.textContent = text
+            let chrome = chromeOf.get(id)
+            if (chrome === undefined) {
+                chrome = Math.max(0, td.getBoundingClientRect().width / layoutScale - cell.clientWidth)
+                chromeOf.set(id, chrome)
+            }
+            const layers = textLayersOf(cell)
+            const widestLayer = layers.reduce<HTMLElement | null>((a, b) => (!a || b.scrollWidth > a.scrollWidth ? b : a), null)
+            // `+ 1` 是右边框（`sizes` 写进 `td` 是 border-box）。
+            const byScroll = Math.max(...layers.map((l) => l.scrollWidth), 0) + chrome + 1
+            if (widestLayer && widestLayer.scrollWidth > (measuredLongest.get(id) ?? -1)) {
+                measuredLongest.set(id, widestLayer.scrollWidth)
+                useFontOf(widestLayer)
+                ruler.textContent = widestLayer.textContent ?? ""
                 const byText = ruler.getBoundingClientRect().width
-                // `+ 1` 是右边框（`sizes` 写进 `td` 是 border-box）。
                 if (byText > 0) contentWidths.set(id, Math.max(contentWidths.get(id) ?? 0, byText + chrome + 2))
             }
             contentWidths.set(id, Math.max(contentWidths.get(id) ?? 0, byScroll))
@@ -245,10 +281,10 @@ export function useColumnMeasure(
                 // 内边距 + 边框 = 外框 − 内层可见宽（把"textWidth"换算成"列宽"要加回它）。
                 const padding = Math.max(0, natural - inner.clientWidth)
                 /* ‼️ 表头是两行，**按行分别量、取较宽的那行**：拿 `th.textContent` 会把两行连成一串来量
-                   （`名称abilityTag_`），列宽白胖一圈。每行用它自己的类名当尺子（字号不同）。 */
+                   （`名称abilityTag_`），列宽白胖一圈。每行用它自己的字体（字号可能不同）。 */
                 let headerTextWidth = 0
                 for (const line of th.querySelectorAll<HTMLElement>("[data-head-line]")) {
-                    ruler.className = line.className
+                    useFontOf(line)
                     ruler.textContent = line.textContent ?? ""
                     headerTextWidth = Math.max(headerTextWidth, ruler.getBoundingClientRect().width)
                 }
