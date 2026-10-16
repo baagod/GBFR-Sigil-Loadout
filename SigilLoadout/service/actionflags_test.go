@@ -48,13 +48,8 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	if !reflect.DeepEqual(first, want) {
 		t.Fatalf("第一行解成了 %+v，want %+v", first, want)
 	}
-
-	// motion 会被拼进文件名，不认的写法一律挡在外面。
-	for _, motion := range []string{"", "340", "34000", "340A", "../x", `pl\1000`} {
-		if _, err := service.LoadFlags(motion); err == nil {
-			t.Fatalf("motion %q 被当成了合法写法", motion)
-		}
-	}
+	// 坏 motion（空串 / 位数不对 / 大写 / 路径穿越）不在这里重复测：六个入口那条统一钉住
+	// （actionmotion_test.go 的 TestEveryMotionEntryPointRejectsBadMotions，坏值列表与本处曾逐字相同）。
 }
 
 /*

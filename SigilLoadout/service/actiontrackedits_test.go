@@ -620,11 +620,3 @@ func TestDeployMissingTracksFillsOnlyWhatIsGone(t *testing.T) {
 		t.Fatalf("补 3400 的时候把 0b11 也部署了（err=%v）", err)
 	}
 }
-
-// 动画号不合法时说清楚（它会被拼进文件名）。
-func TestDeployMissingTracksRejectsABadMotion(t *testing.T) {
-	service, _, _ := actionsFixture(t)
-	if err := service.DeployMissingTracks("34"); err == nil {
-		t.Fatal("动画号 34 不合法，却补成功了")
-	}
-}

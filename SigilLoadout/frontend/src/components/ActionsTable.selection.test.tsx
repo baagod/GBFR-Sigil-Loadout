@@ -13,7 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {PINNED_COUNT} from "@/components/actions-table/classes"
 
-import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyCellsOf, handleAt, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows, addRow} = useTableHarness()
 
@@ -302,8 +302,8 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(clipboard.data["text/plain"]).toBeUndefined() // 没写剪贴板
         // 提示是**对话框**（不是表格上方一行小字）：窄档（官方 size="sm"）+ 标题 + 说明 + 确定
         expect(screen.getByRole("alertdialog").getAttribute("data-size")).toBe("sm")
-        expect(screen.getByText("无法复制选中区域")).toBeTruthy()
-        expect(screen.getByText(/同一行或同一列/)).toBeTruthy()
+        expect(screen.getByText(t.multiAreaCopyTitle)).toBeTruthy()
+        expect(screen.getByText(t.multiAreaCopy)).toBeTruthy()
     })
 
     it("多片复制：虚线**每片各一圈**（不是外接矩形一圈）", async () => {

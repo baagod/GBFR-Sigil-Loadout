@@ -23,6 +23,16 @@ import {ActionsTable} from "@/components/ActionsTable"
 
 import {makeRow, stubColumnGeometry, t, tableProps} from "@/components/actions-table/testkit"
 
+/**
+ * ‼️ **只喂 3 列**：这三条钉的是"就位与骨架"，与列数无关，而列宽测量那一趟是**按格数线性**的
+ * （要把表放开成 max-content、逐格读属性、再写回）—— happy-dom 下 87 列 × 1 行要跑满整趟，
+ * 实测 3 条加起来约 12s，缩到 3 列后不足 1s。契约一个字没变。
+ */
+const fewColumns = () => {
+    const {rows, keys} = tableProps([makeRow("1000")])
+    return {rows, keys: keys.slice(0, 3)}
+}
+
 /** 表格自己那个滚动容器（离屏与否都看它）。 */
 const scroller = (container: HTMLElement) => container.querySelector<HTMLElement>("div[aria-busy]")!
 
@@ -34,7 +44,7 @@ describe("动作表 · 就位与骨架的契约", () => {
     it("还没就位（loading）：量完了也整块离屏 —— 面板那边正顶着骨架", async () => {
         stubColumnGeometry()
         try {
-            const {container} = render(<ActionsTable t={t} loading {...tableProps([makeRow("1000")])} />)
+            const {container} = render(<ActionsTable t={t} loading {...fewColumns()} />)
             // 先让它**真的量完**（否则"离屏"只是因为没量好，测不出 loading 的作用）。
             await waitFor(() => expect(container.querySelector("table")!.className).toContain("table-fixed"))
             expect(scroller(container).className).toContain("-left-[99999px]")
@@ -48,7 +58,7 @@ describe("动作表 · 就位与骨架的契约", () => {
         stubColumnGeometry()
         try {
             const onReady = vi.fn()
-            const {container} = render(<ActionsTable t={t} onReady={onReady} {...tableProps([makeRow("1000")])} />)
+            const {container} = render(<ActionsTable t={t} onReady={onReady} {...fewColumns()} />)
             await ready(container)
             expect(onReady).toHaveBeenCalled()
             expect(scroller(container).className).toContain("min-h-0 flex-1")
@@ -62,7 +72,7 @@ describe("动作表 · 就位与骨架的契约", () => {
     it("忙（busy）但已就位：留在原位、只是点不动 —— 不藏表", async () => {
         stubColumnGeometry()
         try {
-            const {container} = render(<ActionsTable t={t} busy {...tableProps([makeRow("1000")])} />)
+            const {container} = render(<ActionsTable t={t} busy {...fewColumns()} />)
             await ready(container)
             expect(scroller(container).className).toContain("min-h-0 flex-1")
             expect(scroller(container).className).toContain("pointer-events-none")

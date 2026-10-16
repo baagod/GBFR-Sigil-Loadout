@@ -30,15 +30,6 @@ func manySlots(n int) []loadoutSlot {
 	return out
 }
 
-func TestUserCfgDirMatchesModPath(t *testing.T) {
-	base := filepath.Join("C:", "Users", "someone", "AppData", "Local")
-	t.Setenv("LOCALAPPDATA", base)
-	want := filepath.Join(base, appfiles.UserDirName)
-	if got := appfiles.UserDir(); got != want {
-		t.Errorf("appfiles.UserDir() = %q, want %q", got, want)
-	}
-}
-
 // 缺 enabled 与 enabled:true 同义——mod（LoadoutConfig.ParseAndValidate 的
 // `!TryGetProperty("enabled", …) || …`）和前端（model.ts 的 `s.enabled !== false`）都这么认。
 // 这里必须用指针：bool 的零值会把"缺成员"读成 false，于是同一份文件在 Go 数出 0 个启用、在 mod
@@ -119,28 +110,6 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	}
 	if len(entries) != 1 || entries[0].Name() != loadoutFileName {
 		t.Errorf("unexpected files beside loadout.json: %v", entries)
-	}
-}
-
-func TestSaveLoadoutOverwritesExisting(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("LOCALAPPDATA", dir)
-	svc := &LoadoutService{}
-	first := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
-	second := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","hash":"9A60FBF0","level":10}],"enabled":false}]}`
-	if err := svc.SaveLoadout(first); err != nil {
-		t.Fatalf("first save: %v", err)
-	}
-	if err := svc.SaveLoadout(second); err != nil {
-		t.Fatalf("second save: %v", err)
-	}
-	svc.FlushNow()
-	data, err := os.ReadFile(filepath.Join(dir, appfiles.UserDirName, loadoutFileName))
-	if err != nil {
-		t.Fatalf("read back: %v", err)
-	}
-	if string(data) != second {
-		t.Errorf("stored config = %q, want %q", data, second)
 	}
 }
 

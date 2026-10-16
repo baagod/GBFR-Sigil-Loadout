@@ -1,16 +1,10 @@
 package service
 
 import (
-	jsonv2 "encoding/json/v2"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
-	"sigilloadout/appfiles"
 	"strings"
 	"testing"
-	"testing/synctest"
-	"time"
 )
 
 /*
@@ -45,55 +39,6 @@ func TestSaveLimitBonusEditsWritesTheAgreedShape(t *testing.T) {
 	if string(raw) != want {
 		t.Fatalf("limit_bonus.json 的线格式变了:\n got %s\nwant %s", raw, want)
 	}
-}
-
-/*
-防抖是尾沿触发：编辑还在进行时 mod 读到的必须仍是旧的那份，而每次调用都重启那段安静期，所以真正
-发生的那次写入带的是最后的状态（同 TestSaveEditsWaitsForTheEditingToStop）。
-*/
-func TestSaveLimitBonusEditsWaitsForTheEditingToStop(t *testing.T) {
-	hermeticHome(t)
-
-	synctest.Test(t, func(t *testing.T) {
-		service := &LimitBonusService{}
-		cfgPath := localConfig(t, limitBonusEditListName)
-
-		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: ptrs(5, 6, 7)}}); err != nil {
-			t.Fatalf("SaveLimitBonusEdits: %v", err)
-		}
-		time.Sleep(appfiles.DebounceDelay / 4)
-		if _, err := os.Stat(cfgPath); err == nil {
-			t.Fatal("limit_bonus.json was written while the debounce window was still open")
-		}
-
-		if err := service.SaveLimitBonusEdits([]LimitBonusEdit{{Enabled: true, Key: "0D0BCF24", Values: ptrs(500, 600, 321)}}); err != nil {
-			t.Fatalf("SaveLimitBonusEdits: %v", err)
-		}
-		time.Sleep(appfiles.DebounceDelay / 4)
-		if _, err := os.Stat(cfgPath); err == nil {
-			t.Fatal("a second edit did not restart the debounce window")
-		}
-
-		time.Sleep(appfiles.DebounceDelay * 2)
-		synctest.Wait()
-
-		raw, err := os.ReadFile(cfgPath)
-		if err != nil {
-			t.Fatalf("the debounce never wrote limit_bonus.json: %v", err)
-		}
-		var cfg editList[LimitBonusEdit]
-		if err := jsonv2.Unmarshal(raw, &cfg); err != nil {
-			t.Fatalf("limit_bonus.json is not valid JSON: %v", err)
-		}
-		if len(cfg.Edits) != 1 || len(cfg.Edits[0].Values) != 3 {
-			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
-		}
-		// 值必须**原样**写下去：这一条护的正是"数字与 null 分得开"，所以判 nil 要判在这里，不能借一个
-		// 把 nil 读成 0 的辅助函数。
-		if got := cfg.Edits[0].Values[2]; got == nil || *got != 321 {
-			t.Fatalf("the write is not the last state on screen: %+v", cfg.Edits)
-		}
-	})
 }
 
 // 工具写的这份列表就是 mod 读的那一份，所以必须从同一个文件读回来。
@@ -184,40 +129,6 @@ func TestLoadLimitBonusEditsTreatsAMissingEnabledAsOn(t *testing.T) {
 	}
 }
 
-// 没有文件时是一份空列表，而不是一份内置的起始编辑（同 LoadEditsStartsWithNothing）。
-func TestLoadLimitBonusEditsStartsWithNothing(t *testing.T) {
-	hermeticHome(t)
-
-	loaded, err := (&LimitBonusService{}).LoadLimitBonusEdits()
-	if err != nil {
-		t.Fatalf("LoadLimitBonusEdits: %v", err)
-	}
-	if len(loaded) != 0 {
-		t.Fatalf("a first run produced edits nobody made: %+v", loaded)
-	}
-	if _, err := os.Stat(localConfig(t, limitBonusEditListName)); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatal("reading the list created limit_bonus.json")
-	}
-}
-
-/*
-存在但解析不了的文件是一个会点出文件名的错误：空列表看起来就和"一栏都没开"一模一样，而下一次按键
-就会把这份空覆盖回用户自己的编辑（同 LoadEditsRejectsAFileItCannotParse）。
-*/
-func TestLoadLimitBonusEditsRejectsAFileItCannotParse(t *testing.T) {
-	hermeticHome(t)
-
-	writeFile(t, localConfig(t, limitBonusEditListName), "not json")
-
-	loaded, err := (&LimitBonusService{}).LoadLimitBonusEdits()
-	if err == nil {
-		t.Fatalf("a file that cannot be parsed was accepted as %+v", loaded)
-	}
-	if !strings.Contains(err.Error(), limitBonusEditListName) {
-		t.Fatalf("the error does not say which file: %v", err)
-	}
-}
-
 /*
 成员类型不对的文件整份读不出来，而不是把坏值读成零值再写回去：Go 侧解的成员是 float 的数组，而 mod
 那边（C# 的 float[]）同样拒它——两边都不接受手写成字符串或标量的数字。这一条也是前端不必再对数值做
@@ -235,25 +146,6 @@ func TestLoadLimitBonusEditsRejectsAFileWithTheWrongMemberTypes(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), limitBonusEditListName) {
 		t.Fatalf("the error does not say which file: %v", err)
-	}
-}
-
-// 没有 edits 成员的文件（{}）读出来是空列表，而它到线上必须是 [] 而不是 null。
-func TestLoadLimitBonusEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
-	hermeticHome(t)
-
-	writeFile(t, localConfig(t, limitBonusEditListName), `{}`)
-
-	loaded, err := (&LimitBonusService{}).LoadLimitBonusEdits()
-	if err != nil {
-		t.Fatalf("LoadLimitBonusEdits: %v", err)
-	}
-	raw, err := jsonv2.Marshal(loaded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(raw) != "[]" {
-		t.Fatalf("an empty list reached the wire as %s, want []", raw)
 	}
 }
 

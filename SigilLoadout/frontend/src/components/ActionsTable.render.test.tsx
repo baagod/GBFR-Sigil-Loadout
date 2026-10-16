@@ -30,7 +30,7 @@ const headLines = (th: Element): string | string[] => {
 }
 
 describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
-    it("87 个数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
+    it("数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
         const {container} = render(<ActionsTable t={t} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
         // 第一格是 `#`，而且**没有** `data-col-id` —— 量自然宽度那一趟按这个属性挑列，
@@ -140,45 +140,22 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     it("动作表的列名：单列逐个给，四族带编号的各带自己的号", async () => {
         /*
             表头**两行**：`[译名, 原始字段名]`（`#` 那格只有 `#`）。键直接从这份期望里取，免得两处各写一遍。
+
+            ⚠️ **这里只放代表**，不是把 `messages.zh` 抄一遍：逐条对拍 35 个文案，改一个译名就红一次，
+            而契约其实只有三条 —— 真字段有译名、带编号的四族各带自己的号、认不出的字段兜底成字段名。
+            下面每一族留两端 + 一个"可能被邻族正则吞掉"的。
         */
         const expected: [string, string][] = [
             ["ID", "id_"],
             ["动作", "abilityTag_"],
             ["X 派生", "branchXAtk_"],
-            ["长按 Y 派生", "branchYAtk_Hold_"],
-            ["命中派生", "branchAtkHit_"],
             ["动画 01", "saveMotId01_"],
             ["动画 12", "saveMotId12_"],
             ["动作参数 28", "actionFreeWork28_"],
             ["自由参数 06", "freeWork06_"],
             ["子弹参数 04", "bulletFreeWork04_"],
             ["附加效果", "supportEffectList_"],
-            ["动作类型", "saveActionType_"],
-            ["跨步标志", "straddleFlagBit_"],
-            ["贡献点数", "usePoint_"],
-            ["追踪类型", "autoHormingType_"],
-            ["追踪偏移", "autoHormingOffsetDist_"],
-            ["充能次数", "abilityStocks_"],
-            ["冷却类型", "saveAbilityChargeType_"],
-            ["冷却延迟 (最小)", "abilityChargeDelayMin_"],
-            ["冷却延迟 (最大)", "abilityChargeDelayMax_"],
-            ["使用距离 (AI)", "dist_"],
-            ["类型", "type_"],
-            ["冷却时间 (秒)", "abilityChargeTime_"],
-            ["动画模式", "controlTypeHash_"],
-            ["支援类型", "supportTypeHash_"],
-            ["图标类别", "uiIconCategory_"],
-            ["动作分类 (AI)", "actionCategory_"],
-            ["触发效果", "isTriggerAttackHit_"],
-            ["派生 ID", "derivedId_"],
             ["伤害上限类型", "damageLimitType_"],
-            ["伤害上限索引", "damageLimitDataIndex_"],
-            ["关联能力", "relatedAbilityType_"],
-            ["额外贡献", "indirectDamagePoint_"],
-            ["额外贡献加算", "isIndirectDamageAddMulti_"],
-            ["连段切断检查", "isCheckComboCutAbility_"],
-            ["不清空前序输入", "isNoClearPrecedingInput_"],
-            ["更改攻击输入优先级", "isChangeAttackInputPriority_"],
             // 没认出来的列：两行都是字段名本身（兜底）。`0_` 只有一位数字，不该被模板吞掉。
             ["actionFreeWork0_", "actionFreeWork0_"],
         ]

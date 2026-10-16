@@ -235,8 +235,10 @@ func TestActionNamesCoverEveryPackagedActionName(t *testing.T) {
 	}
 
 	// 值可以就是键名自己（没翻的那批）——界面于是显示原文，而不是空白。
-	if got, ok := actionNames["近接コンボ1"]; !ok || got != "近接コンボ1" {
-		t.Fatalf("近接コンボ1 应该填成键名自己，实际 %q（在不在表里：%v）", got, ok)
+	// ⚠️ 样例键要挑**不会被翻译**的那种（这里是占位式的动作名）：以前用的是 `近接コンボ1`，
+	// 后来它被填了"近战连击1"，这条断言就跟着红了 —— 契约没坏，是样例过期。
+	if got, ok := actionNames["XXXX"]; !ok || got != "XXXX" {
+		t.Fatalf("XXXX 应该填成键名自己，实际 %q（在不在表里：%v）", got, ok)
 	}
 	// 键挂在技能键上的：值来自游戏文本（`鏡花水月(突進斬り)` 那一行挂的是「镜花水月」）。
 	if got := actionNames["鏡花水月(突進斬り)"]; got != "镜花水月" {

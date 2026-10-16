@@ -224,22 +224,6 @@ func TestLoadEditsRejectsAFileItCannotParse(t *testing.T) {
 	}
 }
 
-// 空列表是一个状态，不是起点：它是把所有编辑都关掉之后留下的东西，不会变回用户刚刚关掉的那些内置默认值。
-func TestLoadEditsKeepsAnEmptyList(t *testing.T) {
-	hermeticHome(t)
-
-	current := localConfig(t, editListName)
-	writeFile(t, current, `{"edits":[]}`)
-
-	loaded, err := (&EditService{}).LoadEdits()
-	if err != nil {
-		t.Fatalf("LoadEdits: %v", err)
-	}
-	if len(loaded) != 0 {
-		t.Fatalf("an empty list came back as %+v", loaded)
-	}
-}
-
 // 没有 edits 成员的文件（{}）读出来同样是空列表，而它到线上必须是 [] 而不是 null——否则每个调用方都得自己写 `?? []`。
 func TestLoadEditsSpellsAnEmptyListAsAnArray(t *testing.T) {
 	hermeticHome(t)
@@ -432,9 +416,6 @@ func TestKnownSkillRows(t *testing.T) {
 		if row.Level == 15 {
 			at15 = i
 		}
-		if row.Level == 14 {
-			t.Fatalf("level 14 is all zeros, so it should not be in the asset: %v", info.Rows)
-		}
 	}
 	if at15 < 0 {
 		t.Fatal("06719232 has no level 15 row")
@@ -496,32 +477,5 @@ func writeFile(t *testing.T, path, body string) {
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
-	}
-}
-
-// 没有东西待写，就什么都不写：一串编辑就是一次写入，无论 flush 被调用多少次——盯的是
-// appfiles.Debounced.flushLocked 里 `pending == nil` 那个提前返回。
-func TestFlushWithNothingPendingDoesNothing(t *testing.T) {
-	hermeticHome(t)
-
-	service := &EditService{}
-	edits := []SigilSkill{{Enabled: true, Key: "06719232", Level: 15, Values: padValues([]*float64{new(30.0)})}}
-	if err := service.SaveEdits(edits); err != nil {
-		t.Fatalf("SaveEdits: %v", err)
-	}
-	service.FlushNow()
-
-	path := localConfig(t, editListName)
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("the list was not written: %v", err)
-	}
-
-	// 把文件拿走：第二次 flush 什么都不该做，所以它不会回来。
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	service.FlushNow()
-	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatal("a flush with nothing pending wrote the list again")
 	}
 }

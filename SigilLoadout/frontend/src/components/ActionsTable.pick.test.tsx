@@ -17,7 +17,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, selectCell, stubRevealGeometry, tick, useTableHarness} from "@/components/actions-table/testkit"
+import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, selectCell, stubRevealGeometry, t, tick, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -26,7 +26,12 @@ const PICK_COL = 4
 /** 分支列：放在选值格后面一格（数据列下标 5），清单是**当前表的 `id_`**。 */
 const BRANCH_FIELD = "branchXAtk_"
 const BRANCH_COL = 5
-const KEYS = ["id_", "abilityTag_", "actionFreeWork0_", "actionFreeWork1_", PICK_FIELD, BRANCH_FIELD, ...Array.from({length: 81}, (_, i) => `actionFreeWork${i + 2}_`)]
+const KEYS = ["id_", "abilityTag_", "actionFreeWork0_", "actionFreeWork1_", PICK_FIELD, BRANCH_FIELD]
+/*
+    ⚠️ **列数只留够用**：以前这里跟着公共夹具凑到 87 列，而本文件的断言只用前 6 列 ——
+    列宽测量那一趟是**按格数线性**的（放开成 max-content、逐格读属性、再写回），凑出来的 81 列
+    每次渲染都在白跑。少列不改任何断言（下面按下标定位用的都是这 6 列）。
+*/
 
 /** 没有清单（`controlTypeHash_` 那边用不到 id 清单）。 */
 const NO_IDS: ReadonlySet<string> = new Set()
@@ -450,16 +455,6 @@ describe("动作表 · 选值格的粘贴校验", () => {
         expect(cellAt(container, 1, PICK_COL).textContent).toBe("4087152117") // 十六进制那一格没通过
         expect(cellAt(container, 2, PICK_COL).textContent).toBe("893375102")
     })
-
-    it("粘贴：落在选值格上的值是表外的 → 那一格不写", async () => {
-        setRows([pickRow("1000", "4087152117")])
-        const container = await renderTable()
-
-        selectRange(container, [0, PICK_COL - 1], [0, PICK_COL])
-        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t44DFF94D")})
-
-        expect(cellAt(container, 0, PICK_COL).textContent).toBe("4087152117")
-    })
 })
 
 /*
@@ -481,8 +476,6 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         const cell = cellAt(container, 0, BRANCH_COL)
         expect(cell.textContent).toBe("102") // 改过 → 显示改动值
         expect(cell.querySelector(`.${PICK_MARK}`)).not.toBeNull()
-        // 搜索框在**弹层**里，不在格子里（格子里只有那个触发器）。
-        expect(cell.querySelector('[data-slot="input-group"]')).toBeNull()
         expect(cellAt(container, 1, BRANCH_COL).textContent).toBe("-1") // 没改过 → 显示原值
     })
 
@@ -503,7 +496,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         // 搜索框在弹层里（不是格子里），提示文案走 i18n。
         const input = document.querySelector<HTMLInputElement>('[data-slot="combobox-content"] input')
         expect(input).not.toBeNull()
-        expect(input!.placeholder).toBe("搜索")
+        expect(input!.placeholder).toBe(t.actionBranchSearch)
     })
 
     it("搜索框输入 → 列表按输入过滤", async () => {

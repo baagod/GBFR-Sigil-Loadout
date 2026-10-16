@@ -88,7 +88,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         ‼️ 行块**就是**一条"整行宽的区"（统一模型），所以只选一行时 Ctrl+C = **复制整行**（Excel 的行为）。
         顺带钉住另一件事：这种情形**不能**弹"不能对多重选定区域使用此命令" —— 那句话只给"多片跨行又跨列"。
     */
-    it("只选一行时 Ctrl+C：复制整行（87 个值），且不弹多区域提示", async () => {
+    it("只选一行时 Ctrl+C：复制整行（每个数据列一个值），且不弹多区域提示", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()
 

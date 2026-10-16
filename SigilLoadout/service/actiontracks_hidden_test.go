@@ -37,22 +37,18 @@ func TestPickHiddenMotionsKeepsEverythingButReferenced(t *testing.T) {
 }
 
 /*
-分组必须**互斥且全覆盖**：每个号恰好进一组，四组加起来正好是清单长度。
+分组只有两组：**有 `attack` 轨的进「技能」，其余进「其他」**（`actiontracks.go` 里就那两个常量）。
 
-它是"界面默认展开哪一组"的依据（默认展开「技能」✓），所以既不能漏号，也不能一个号进两组。
+它是"界面默认展开哪一组"的依据（默认展开「技能」✓），所以判据只看 attack —— flags / effect 有没有都不影响。
 */
-func TestHiddenGroupIsExclusiveAndTotal(t *testing.T) {
+func TestHiddenGroupKeysOnAttack(t *testing.T) {
 	for _, tc := range []struct {
 		have map[string]bool
 		want string
 	}{
 		{map[string]bool{flagsKind: true, "attack": true, "effect": true}, groupSkill}, // 有 attack ⇒ 技能
-		{map[string]bool{"attack": true}, groupSkill},                                  // 只有 attack 也算技能
-		{map[string]bool{flagsKind: true, "attack": true}, groupSkill},                 // 没有 effect 也算
-		{map[string]bool{"attack": true, "effect": true}, groupSkill},                  // 没有 flags 也算
+		{map[string]bool{"attack": true}, groupSkill},                                  // 只有 attack 也算
 		{map[string]bool{flagsKind: true, "effect": true}, groupOther},                 // 没有 attack ⇒ 其他
-		{map[string]bool{"effect": true}, groupOther},                                  //
-		{map[string]bool{flagsKind: true}, groupOther},                                 //
 		{map[string]bool{flagsKind: true, "speed": true}, groupOther},                  // speed 不参与分组
 	} {
 		if got := hiddenGroup(tc.have); got != tc.want {

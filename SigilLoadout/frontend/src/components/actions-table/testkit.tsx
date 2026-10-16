@@ -30,8 +30,14 @@ import {messages} from "@/lib/messages"
  */
 export const t: ActionsTableMessages = messages.zh
 
-/** 87 列：前两个是真字段名（内置只读那一列、与动作表那一列），其余凑数。 */
-export const KEYS = ["id_", "abilityTag_", ...Array.from({length: 85}, (_, i) => `actionFreeWork${i}_`)]
+/**
+ * **8 列就够**：前两个是真字段名（内置只读那一列、与动作表那一列），其余凑数。
+ *
+ * ‼️ 以前凑到 87 列，那是"跟生产同宽"的直觉产物 —— 但列宽测量那一趟是**按格数线性**的
+ * （放开成 max-content、逐格读属性、再写回），于是每个用例每次渲染都在白跑 80 列的账。
+ * 全文件的断言只用到前 7 列（最大下标 6），"最后一列"一律走 `KEYS.length - 1`。
+ */
+export const KEYS = ["id_", "abilityTag_", ...Array.from({length: 6}, (_, i) => `actionFreeWork${i}_`)]
 
 /** 拿来试"长值截断"的那一列（取值时用它定位）。 */
 export const LongField = "actionFreeWork0_"

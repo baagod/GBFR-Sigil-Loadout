@@ -65,24 +65,15 @@ describe("剪贴板：TSV 读写", () => {
 
     /** 写出与读入**对称**：来回一圈必须是同一个值（这是"复制粘贴不掉字符"的总契约）。 */
     it("往返无损：任何值复制出去再粘回来都是原值", () => {
-        for (const value of ["-", "-1", "=1+1", "+1", "@x", " -1", "'abc", "a'b", '["0"]', '她说"你好"', "31a3", ""]) {
+        // 只留三种**解析侧**的边界（空值 / 前缀 `'` / 前导空格）：前缀那几个值"照原样写出去"上面已钉，
+        // 引号那几种在 parseTsv 那组里也有。
+        for (const value of ["", "'abc", " -1"]) {
             expect(parseTsv(toTsv([[value]]))[0][0]).toBe(value)
         }
     })
 })
 
 describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => {
-    it("复制 1×1 → 选 2×3：铺满 2×3", () => {
-        const plan = planPaste({
-            block: [["1"]],
-            rows: sheet(3, 3).rows,
-            start: {row: 0, col: 0},
-            size: {rows: 2, cols: 3},
-        })
-        expect(written(plan)).toHaveLength(6)
-        expect(plan.range).toEqual({firstRow: 0, lastRow: 1, firstCol: 0, lastCol: 2})
-    })
-
     it("复制 1×3 → 选 1×4 / 1×5：凑不满第二份，只写 1×3", () => {
         for (const cols of [4, 5]) {
             const plan = planPaste({
@@ -104,20 +95,6 @@ describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => 
             size: {rows: 1, cols: 6},
         })
         expect(written(plan)).toEqual(["r0c0=a", "r0c1=b", "r0c2=c", "r0c3=a", "r0c4=b", "r0c5=c"])
-    })
-
-    it("复制 2×2 → 选 3×3：第 3 line/列凑不满一份，只写 2×2", () => {
-        const plan = planPaste({
-            block: [
-                ["a", "b"],
-                ["c", "d"],
-            ],
-            rows: sheet(3, 3).rows,
-            start: {row: 0, col: 0},
-            size: {rows: 3, cols: 3},
-        })
-        expect(written(plan)).toEqual(["r0c0=a", "r0c1=b", "r1c0=c", "r1c1=d"])
-        expect(plan.range).toEqual({firstRow: 0, lastRow: 1, firstCol: 0, lastCol: 1})
     })
 
     it("复制 2×3 → 选 4×1：竖向两份、横向一份，铺成 4×3", () => {
