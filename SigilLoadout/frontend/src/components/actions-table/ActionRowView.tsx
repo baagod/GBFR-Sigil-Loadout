@@ -173,8 +173,14 @@ export const ActionRowView = memo(function ActionRowView({
     copySource: CopySource | null
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
     draggedRef: RefObject<boolean>
-    /** **活动格**的键（`snapshotKey` 格式，`""` = 没有）—— 决定哪一格绑滚动 ref。 */
-    activeCellKey: string
+    /**
+     * **活动格**的键（`snapshotKey` 格式）—— 只有活动格**所在那一行**收得到，其余行是 `null`。
+     *
+     * ‼️ 别改成"所有行都传真实值"：它一变（首次拖选、点任意格）就让 `memo` 的比较全表失配，
+     * 138 行 × 87 格一起重渲（真机实测：首次拖选那一下 +91ms）。非活动行拿到 `null` 时
+     * `isActiveCell` 恒 false，行为等价。
+     */
+    activeCellKey: string | null
     /** 把活动格滚进视野（稳定引用，只在活动格上绑）。 */
     scrollActiveIntoView: (el: HTMLTableCellElement | null) => void
     edit: (rowId: string, key: string, value: string | null) => void

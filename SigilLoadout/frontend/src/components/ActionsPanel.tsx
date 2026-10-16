@@ -421,15 +421,11 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                 = 全部记录之后（菲迪埃尔那张表 51 条），"只看得见 8 条"就成了"显示不全"。
             */}
             <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4">
-                {/* 这一行（角色选择 + 记录清单 + 提示 + 保存 + 部署）。部署用 ml-auto 顶到最右边，其余靠左。
-                    shrink-0：表格该滚就滚，这一行不跟着压缩。
-
-                    ‼️ **整行是一个 `fieldset`**：读表期间（`pageBusy` = 正在读写 / 部署 / 还没就位）一次把里面的
-                    控件**全**禁用 —— 切角色、记录清单、三块切换、保存，全由浏览器原生的 `fieldset[disabled]` 兜住。
-                    原来是逐个控件传 `disabled`（只有 combobox 与保存传了，输入框与三块切换漏在外面 = 能点却没用的
-                    按钮）。逐个传要人盯着改，漏一个就是一个静默的坏交互；原生属性天生不会漏。
-                    样式上要清掉 fieldset 自带的边框 / 外边距，以及那条 `min-inline-size: min-content`
-                    （不清掉它，`flex-1` 的搜索框就收缩不了）。 */}
+                {/* 这一行（角色选择 + 记录清单 + 三块切换 + 保存），部署用 ml-auto 顶到最右。
+                    ‼️ **整行是一个 `fieldset`**：读表期间（`pageBusy`）由浏览器原生的 `fieldset[disabled]`
+                    一次禁用里面所有控件 —— 逐个传 `disabled` 漏一个就是一个静默的坏交互。
+                    样式清掉 fieldset 自带的 border / margin 与 `min-inline-size: min-content`（不清它，
+                    `flex-1` 的搜索框就收缩不了）。 */}
                 <fieldset
                     disabled={pageBusy}
                     className="m-0 flex min-w-0 shrink-0 flex-wrap items-center gap-2.5 border-0 p-0"

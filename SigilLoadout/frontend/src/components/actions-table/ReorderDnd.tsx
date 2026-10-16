@@ -7,6 +7,7 @@
 import {useMemo, type ReactNode} from "react"
 import {DndContext, PointerSensor, closestCenter, useSensor, useSensors, type Modifier} from "@dnd-kit/core"
 import {restrictToVerticalAxis} from "@dnd-kit/modifiers"
+import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 
 /**
  * ‼️ 它必须包在 **`<table>` 之外**（调用点是整个组件的根）。dnd-kit 会**就地**渲染两个辅助 `<div>`
@@ -32,9 +33,20 @@ export function ReorderDnd({reorder, rows, bound, children}: {
     children: ReactNode
 }) {
     const sensors = useSensors(useSensor(PointerSensor, {activationConstraint: {distance: 4}}))
-    const ids = rows.map((row) => row.id)
-    /* 数组本身要稳定引用（每次渲染新建会让 DndContext 认成新配置）。 */
+    /* 数组本身要稳定引用（每次渲染新建会让 DndContext / SortableContext 认成新配置）。 */
     const modifiers = useMemo(() => (bound ? [restrictToVerticalAxis, bound] : [restrictToVerticalAxis]), [bound])
+    /*
+        ‼️ `SortableContext` 与 `DndContext` 是同一件事（行序能拖才需要）的两半，就该住同一个文件：
+        不传 `reorder` 时整块透传 children —— 动作表因此一根 dnd-kit 的线都不接（原来它挂着排序上下文、
+        却没有拖拽上下文，138 行 `useSortable` 订阅着一个永远不变的清单）。
+        `items` 还必须稳定引用：dnd-kit 把它原样塞进 context，引用一变所有 `useSortable` 全部重渲
+        （context 变化**穿透 memo**）。`rows` 每次渲染都是新数组，所以按 id 串缓存。
+    */
+    const ids = useMemo(
+        () => rows.map((row) => row.id),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [rows.map((row) => row.id).join("\u0000")],
+    )
     if (!reorder) return children
     return (
         <DndContext
@@ -48,7 +60,9 @@ export function ReorderDnd({reorder, rows, bound, children}: {
                 if (from >= 0 && to >= 0) reorder(from, to)
             }}
         >
-            {children}
+            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+                {children}
+            </SortableContext>
         </DndContext>
     )
 }
