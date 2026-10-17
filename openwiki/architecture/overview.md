@@ -270,4 +270,4 @@ flowchart LR
 
 真正的例外是**装错了**，而且两处都不带走游戏进程：原生 DLL 缺失或 ABI/布局不符时，托管侧把它当致命——`NativeCore.Initialize` 抛异常、`Mod.QueueStart` 记一行 `Initialization failed:` 后转 `Dispose()`；由于配装读取、热键、因子编辑与能力强化都排在这一步之后，它们根本不会启动（这次运行的文件日志也随 `Dispose()` 收掉），只有游戏进程照常。各单元的责任划分、宿主契约的逐字段后果、以及出问题时该读的日志行分别在 [托管 mod（C# Reloaded 外壳）](/openwiki/architecture/managed-mod.md)、[宿主与依赖边界](/openwiki/integrations/host-and-dependencies.md) 与 [日志与故障定位](/openwiki/operations/logging-and-diagnostics.md)。
 
-术语以 `CONTEXT.md` 的术语表为准：本页只用「扩展槽」「活表」「可视工具」「数据管理器」「能力」这几个词，不另造同义词。
+术语以 `../../GLOSSARY.md` 的术语表为准：本页只用「扩展槽」「活表」「可视工具」「数据管理器」「能力」这几个词，不另造同义词。

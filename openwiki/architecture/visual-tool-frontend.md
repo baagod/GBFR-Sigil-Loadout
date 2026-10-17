@@ -524,7 +524,7 @@ sequenceDiagram
 - **切换键的文字用它自己的语言写**（`LANG_LABEL` = `中` / `EN` / `日` / `한`），并且每个按钮带 `lang={option}`。用文字而不是国旗 emoji，因为 Windows 不带国旗字形。
 - **四种语言一种都不能漏是编译期检查**：`messages: Record<Lang, Messages>`——加一种语言只改 `lang.ts` 而忘了 `messages.ts`，`tsc` 当场报错，四语齐备不靠人眼。
 - **语言集在 Go 侧有两份手抄的副本**：`loadAssetsFrom` 里的 `assetLangCodes()`（`[]string{LangZH, "en", "ja", "ko"}`，读四份 `skill.<lang>.json`）与 `limitBonusLangCodes()`（读四份 `limit_bonus.<lang>.json`）。两处刻意不复用同一份，但启动时会用 `slices.Equal` 对拍，不一致就起不来。加第五种语言要同时动 `lang.ts` 与这两行；只动前端的话，界面文字是新语言而因子名会经 `pick` 回落到中文。
-- **界面文案与术语表是两回事**：`CONTEXT.md` 约束代码、文档与注释的用词，但玩家看到的界面按游戏自己的说法——「主因子 / 副因子 / 专属因子 / 因子编辑」。`messages.ts` 的文件头把这条写明了，而且「因子」那三种语言用的是游戏自己的译名（英文 sigil、日文 ジーン、韩文 진），不是音译。
+- **界面文案与术语表是两回事**：`../../GLOSSARY.md` 约束代码、文档与注释的用词，但玩家看到的界面按游戏自己的说法——「主因子 / 副因子 / 专属因子 / 因子编辑」。`messages.ts` 的文件头把这条写明了，而且「因子」那三种语言用的是游戏自己的译名（英文 sigil、日文 ジーン、韩文 진），不是音译。
 
 ### 托盘那一条：唯一由前端推给 Go 的文案
 

@@ -52,7 +52,7 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 
 # skill_status 表与活表写入闸门
 
-`skill_status` 是第一张被这套 mod 真正改写的游戏数据表——词表 `CONTEXT.md` 里的**活表**指的就是它：「游戏已经解析好、正在用的那份技能表。不是文件里的那一份」。本页全篇只用这个词义：从归档读出来的那份是候选，游戏手里那份才是活表。写游戏内存的地方除这两张活表之外，只剩两条技能循环上限立即数与钩子字节（见 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）。它的形状是：
+`skill_status` 是第一张被这套 mod 真正改写的游戏数据表——词表 `../../GLOSSARY.md` 里的**活表**指的就是它：「游戏已经解析好、正在用的那份技能表。不是文件里的那一份」。本页全篇只用这个词义：从归档读出来的那份是候选，游戏手里那份才是活表。写游戏内存的地方除这两张活表之外，只剩两条技能循环上限立即数与钩子字节（见 [工作流：游戏侧注入运行期](/openwiki/workflows/skill-injection-runtime.md)）。它的形状是：
 
 ```
 system/table/skill_status.tbl

@@ -108,7 +108,7 @@ generated: { by: "openwiki/0.6.0", at: "2026-09-27T21:57:50.417Z" }
 
 ## 一分钟版本
 
-1. **先认词**。`CONTEXT.md` 是本项目的术语表：散落在文档、代码与日志里的说法在那里**各只有一条**，它约束**代码、文档与注释**的用词，唯一例外是可视工具面向玩家的文案（界面仍按游戏的「因子」措辞，写「主因子 / 副因子 / 搜索因子」）。词条是 `CONTEXT.md:13-42` 的 `## Language` 段里这十二条：「原版」「本体」「因子」「能力」「参槽」「扩展槽」「因子组合」「固定副」「活表」「可见」「可视工具」「数据管理器」；其中「扩展槽」明确把「虚拟槽」「额外槽」列为 _Avoid_，「参槽」把「数值槽」列为 _Avoid_。
+1. **先认词**。`../GLOSSARY.md` 是本项目的术语表：散落在文档、代码与日志里的说法在那里**各只有一条**，它约束**代码、文档与注释**的用词，唯一例外是可视工具面向玩家的文案（界面仍按游戏的「因子」措辞，写「主因子 / 副因子 / 搜索因子」）。词条是 `CONTEXT.md:13-42` 的 `## Language` 段里这十二条：「原版」「本体」「因子」「能力」「参槽」「扩展槽」「因子组合」「固定副」「活表」「可见」「可视工具」「数据管理器」；其中「扩展槽」明确把「虚拟槽」「额外槽」列为 _Avoid_，「参槽」把「数值槽」列为 _Avoid_。
 2. **再认仓库约束**。`AGENTS.md` 有两条硬要求：**未经用户明确要求严禁执行 `git add` / `git commit`**（只有用户明说「提交」时才能提交）；每次**精确修改（字符串替换）**改文件，**禁止覆盖重建**。同一文件还要求始终中文回复、动手前暴露假设而不是猜，以及「改完即部署」（`build-release.ps1` → `deploy.ps1`）。
 3. **认清三个交付单元与它们的边界**：[系统总览：三个交付单元、三条通道与状态归属](/openwiki/architecture/overview.md)。先读这一页——它讲清"谁在哪个进程里、哪份状态归谁、两侧靠什么通信"；嵌在工具里的那棵 React 树不是第四个二进制，但它有自己的系统页（[可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md)）。
 4. **按任务路由**：见下面的[路由表](#按任务路由)，以及[六个目录分别有什么](#六个目录分别有什么)。
@@ -235,7 +235,7 @@ flowchart TD
 
 ## 推荐的阅读顺序（想整体搞懂）
 
-1. `CONTEXT.md` —— 词。
+1. `../GLOSSARY.md` —— 词。
 2. [系统总览](/openwiki/architecture/overview.md) —— 三个单元、三条通道、状态归属。
 3. [托管 mod](/openwiki/architecture/managed-mod.md) → [原生核心](/openwiki/architecture/native-core.md) —— 进程内那两半（谁驱动谁、initialize 失败会回滚成什么样）。
 4. [可视工具（Go + Wails）](/openwiki/architecture/visual-tool.md) → [可视工具前端（React）](/openwiki/architecture/visual-tool-frontend.md) + [三份配置文件与跨语言常量契约](/openwiki/concepts/config-file-contracts.md) —— 进程外那一半（外壳与界面）以及磁盘契约。
@@ -282,4 +282,4 @@ flowchart TD
 - **原生 DLL 不是 Reloaded-II 加载的**。`ModConfig.json` 的 `ModNativeDll64` 是空的，托管侧在运行期按 mod 目录自己解析 `GBFR.SigilLoadout.Native.dll`——别为了"看起来完整"去补那个字段。
 - **托管侧不持有游戏地址、也不维护按角色的槽表**。模板表、选择表、两张活表（`skill_status` 与 `limit_bonus_param`）的定位槽与扩展槽位计数全归原生核心所有，专属开关以 **skill hash** 传递，"缓存失效"这个概念在这里不存在；改之前先回看 [系统总览](/openwiki/architecture/overview.md) 的「状态归属」一节。
 
-术语一律以 `CONTEXT.md` 为准：本页只用「扩展槽」「因子」「能力」「参槽」「活表」「可视工具」「数据管理器」这几个词，不另造同义词。
+术语一律以 `../GLOSSARY.md` 为准：本页只用「扩展槽」「因子」「能力」「参槽」「活表」「可视工具」「数据管理器」这几个词，不另造同义词。

@@ -13,7 +13,7 @@
 
 ## 快速上手
 
-1. 领域术语查 `CONTEXT.md`；
+1. 领域术语查 `GLOSSARY.md`；
 2. 符号与调用链查 `mcp:codegraph`。
 
 ## 约束
