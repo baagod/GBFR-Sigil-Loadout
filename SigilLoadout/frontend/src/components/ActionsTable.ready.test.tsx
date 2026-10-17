@@ -33,12 +33,18 @@ const fewColumns = () => {
     return {rows, keys: keys.slice(0, 3)}
 }
 
-/** 表格自己那个滚动容器（离屏与否都看它）。 */
-const scroller = (container: HTMLElement) => container.querySelector<HTMLElement>("div[aria-busy]")!
+/**
+ * 那张表。
+ *
+ * ‼️ "离屏 / 忙"的状态**挂在 `<table>` 上**（`is-offscreen` / `is-busy` + `aria-busy`）：外壳那层 div 是
+ * shadcn `Table` 渲染的（`ui/table.tsx` 零改动），它没有 props 入口，所以状态只能从 `<table>` 上标出来，
+ * 由 `style.css` 的 `div:has(> table.base-table.is-offscreen)` 翻译成"整块离屏"。
+ */
+const table = (container: HTMLElement) => container.querySelector<HTMLElement>("table.base-table")!
 
 /** 等到"就位"：不再离屏。 */
 const ready = (container: HTMLElement) =>
-    waitFor(() => expect(scroller(container).className).not.toContain("-left-[99999px]"))
+    waitFor(() => expect(table(container).className).not.toContain("is-offscreen"))
 
 describe("动作表 · 就位与骨架的契约", () => {
     it("还没就位（loading）：量完了也整块离屏 —— 面板那边正顶着骨架", async () => {
@@ -46,9 +52,9 @@ describe("动作表 · 就位与骨架的契约", () => {
         try {
             const {container} = render(<ActionsTable t={t} loading {...fewColumns()} />)
             // 先让它**真的量完**（否则"离屏"只是因为没量好，测不出 loading 的作用）。
-            await waitFor(() => expect(container.querySelector("table")!.className).toContain("table-fixed"))
-            expect(scroller(container).className).toContain("-left-[99999px]")
-            expect(scroller(container).getAttribute("aria-busy")).toBe("true")
+            await waitFor(() => expect(table(container).className).toContain("table-fixed"))
+            expect(table(container).className).toContain("is-offscreen")
+            expect(table(container).getAttribute("aria-busy")).toBe("true")
         } finally {
             vi.restoreAllMocks()
         }
@@ -61,9 +67,8 @@ describe("动作表 · 就位与骨架的契约", () => {
             const {container} = render(<ActionsTable t={t} onReady={onReady} {...fewColumns()} />)
             await ready(container)
             expect(onReady).toHaveBeenCalled()
-            expect(scroller(container).className).toContain("min-h-0 flex-1")
-            expect(scroller(container).className).not.toContain("pointer-events-none")
-            expect(scroller(container).getAttribute("aria-busy")).toBe("false")
+            expect(table(container).className).not.toContain("is-busy")
+            expect(table(container).getAttribute("aria-busy")).toBe("false")
         } finally {
             vi.restoreAllMocks()
         }
@@ -74,9 +79,8 @@ describe("动作表 · 就位与骨架的契约", () => {
         try {
             const {container} = render(<ActionsTable t={t} busy {...fewColumns()} />)
             await ready(container)
-            expect(scroller(container).className).toContain("min-h-0 flex-1")
-            expect(scroller(container).className).toContain("pointer-events-none")
-            expect(scroller(container).getAttribute("aria-busy")).toBe("true")
+            expect(table(container).className).toContain("is-busy")
+            expect(table(container).getAttribute("aria-busy")).toBe("true")
         } finally {
             vi.restoreAllMocks()
         }

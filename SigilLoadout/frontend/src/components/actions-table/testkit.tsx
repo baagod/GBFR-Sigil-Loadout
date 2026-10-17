@@ -264,6 +264,17 @@ export function stubRowRects(container: HTMLElement, height = 20) {
 }
 
 /**
+ * **本表的滚动框** = `<table>` 的父元素。
+ *
+ * ‼️ 它就是 shadcn `Table` 渲染的那层壳（`BaseTable` 把它当滚动框，样式在 `style.css` 的
+ * `div:has(> table.base-table)` 里）。所以它**没有自己的类名**可以认 —— 只能从 `<table>` 反推，
+ * 这也正是生产代码（`useColumnMeasure` / `useArrowKeys`）拿它的方式。
+ */
+export function scrollBoxOf(container: HTMLElement): HTMLElement {
+    return container.querySelector<HTMLElement>("table.base-table")!.parentElement as HTMLElement
+}
+
+/**
  * 把容器与**所有**数据格桩成"格子远在可见矩形右下之外" —— 让"跟随可视"**确实要走滚动那一趟**。
  *
  * 为什么必须有它：happy-dom 不做布局，所有 rect 都是 0，于是 `revealActiveCell` 会认定"这一格
@@ -275,7 +286,7 @@ export function stubRowRects(container: HTMLElement, height = 20) {
  * ⚠️ 返回的恢复函数要放进 `finally`。
  */
 export function stubRevealGeometry(container: HTMLElement) {
-    const box = container.querySelector<HTMLElement>(".overflow-auto")!
+    const box = scrollBoxOf(container)
     const boxRect = box.getBoundingClientRect
     const boxH = Object.getOwnPropertyDescriptor(box, "clientHeight")
     const boxW = Object.getOwnPropertyDescriptor(box, "clientWidth")

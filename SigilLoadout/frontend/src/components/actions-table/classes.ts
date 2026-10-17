@@ -51,11 +51,11 @@ export const HANDLE_WIDTH = 40
 export const GRIP_WIDTH = 32
 
 /**
- * **行头那两格**（行号列 / 握把列）的类。两格共用一份：假删除的行整行暗红，整行选中时叠同一层选中底色
- * —— 分头写的话，两格迟早会有一处漏掉（它们本来就该看着是一块）。
+ * **行头那两格**（行号列 / 握把列）的类 —— 两格共用一份（分头写的话迟早有一处漏掉，它们本来就该看着是一块）。
+ *
+ * ‼️ 假删除**不在这里**：它是整行的事，只在行上标一次 `row-removed`，底色归 `style.css` 的 `.row-removed`。
  */
-export const handleCellClass = (removed: boolean, selected: boolean) =>
-    `${removed ? "bg-[#542526]" : HEAD_BG} ${HANDLE_CELL} ${selected ? HANDLE_SELECTED_BG : ""}`
+export const handleCellClass = (selected: boolean) => `${HEAD_BG} ${HANDLE_CELL} ${selected ? HANDLE_SELECTED_BG : ""}`
 
 /**
  * 行号格的类：横向钉在最左（纵向吸顶由表头那行自己给），层高与别的冻结列同一档（见 `PINNED_CELL`）。

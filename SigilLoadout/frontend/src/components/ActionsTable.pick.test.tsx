@@ -17,7 +17,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {CellPick} from "@/components/actions-table/CellPick"
-import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, selectCell, stubRevealGeometry, t, tick, useTableHarness} from "@/components/actions-table/testkit"
+import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, scrollBoxOf, selectCell, stubRevealGeometry, t, tick, useTableHarness} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -203,12 +203,12 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
                ‼️ 这一条问的是"**没**被收起"，所以要**确定性地**判：`waitFor` 会在 1 秒里反复轮询，
                "关掉又重开"也算通过 —— 那是把负向断言写成恒真。给它一拍落地（真关了的话这一拍之后
                弹层就没了），再同步断言。 */
-            container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
+            scrollBoxOf(container).dispatchEvent(new Event("scroll"))
             await tick()
             expect(isPickOpen()).toBe(true)
 
             /* ③ 用户真滚：规则照旧生效。 */
-            container.querySelector(".overflow-auto")!.dispatchEvent(new Event("scroll"))
+            scrollBoxOf(container).dispatchEvent(new Event("scroll"))
             await waitFor(() => expect(isPickOpen()).toBe(false))
         } finally {
             restore()
@@ -233,7 +233,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         /* 格子在可视矩形**里面**（容器视口 0,0–400,800；格子 10,10–110,30）。 */
         cell.getBoundingClientRect = () =>
             ({top: 10, bottom: 30, height: 20, left: 10, right: 110, width: 100, x: 10, y: 10}) as DOMRect
-        const box = container.querySelector<HTMLElement>(".overflow-auto")!
+        const box = scrollBoxOf(container)
         box.getBoundingClientRect = () =>
             ({top: 0, bottom: 800, left: 0, right: 400, width: 400, height: 800, x: 0, y: 0}) as DOMRect
         Object.defineProperty(box, "clientHeight", {configurable: true, get: () => 800})

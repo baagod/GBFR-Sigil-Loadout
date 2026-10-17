@@ -54,8 +54,13 @@ const track = () => ({
 /* ⚠️ 弹层是挂在 **`document.body`** 上的（base-ui 的 portal），所以查询要问 `document`，
    不能问 `render()` 给的那个 container（它里面只有空壳）。 */
 const rowsOf = () => [...document.querySelectorAll("tbody tr")]
-/** 假删除那一行带暗红底（见 ActionRowView 的 `removed`）—— "Del 真的落到数据上了"的凭据。 */
-const removedRows = () => rowsOf().filter((tr) => tr.className.includes("bg-[#542526]"))
+/**
+ * 假删除那一行（`ActionRowView` 按行数据的 `removed` 挂的 `row-removed`）—— "Del 真的落到数据上了"的凭据。
+ *
+ * ⚠️ 认**标记类**，不认某个具体的底色工具类：底色是 `style.css` 的 `.row-removed` 画的，类名里不该出现
+ * 颜色（认颜色的话，改一次配色这条用例就红，而它要守的是"哪一行被假删除了"）。
+ */
+const removedRows = () => rowsOf().filter((tr) => tr.className.includes("row-removed"))
 
 describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     afterEach(cleanup)

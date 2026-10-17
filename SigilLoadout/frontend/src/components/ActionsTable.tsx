@@ -5,6 +5,13 @@
     列名与长值截断 / 单元格选区 + Excel 口径的复制粘贴 / 行号列选行 / 方向键 / Ctrl+Z /
     保存交给外面那排按钮。**数据也是外面给的**（受控视图，自己不读，见下面 `rows` 那段）。
 
+    **全部 DOM 用 shadcn 的表格组件**（`components/ui/table.tsx`）：外壳 + `<table>` 由基表 `BaseTable`
+    包（它就是 `Table`；`Table` 自带的外壳就是本表的滚动框，见 `BaseTable.tsx` 文件头），表体 `TableBody`、
+    行与格子 `TableRow` / `TableCell`（在 `ActionRowView` 里）、表头 `TableHeader` / `TableRow` /
+    `TableHead`（在 `ActionsTableHead` 里）。本文件**不写任何一个原生表格标签**。
+    **类名仍然归 `actions-table/classes.ts`**：那些组件只是"结构 + 默认长相"，几何与选区样式一律由我们
+    传下去的类名压过去（`cn` 是 tailwind-merge 口径，写在后面的赢）。
+
     数据模型照搬后端（见 service/actionedits.go）：每格两栏 —— `originals` 是随包资产里的只读原值，
     `values` 是玩家的改动（空 = 没改过）。两栏必须分开：混成一栏，保存时就分不出「没改过」与「改成了空」。
 
@@ -56,6 +63,8 @@ import {
 } from "@tanstack/react-table"
 
 import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
+import {BaseTable} from "@/components/BaseTable"
+import {TableBody} from "@/components/ui/table"
 import {ActionRowView} from "@/components/actions-table/ActionRowView"
 import {ActionsTableHead} from "@/components/actions-table/ActionsTableHead"
 import {CopyRejectedDialog} from "@/components/actions-table/CopyRejectedDialog"
@@ -299,6 +308,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     /** **Shift 连选的锚点**（上一次点/拖的起点行）。库内部那个锚点只服务它自己的复选框 handler。 */
     const rowAnchorRef = useRef<string | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
+    /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
+    const scrollRef = useRef<HTMLDivElement>(null)
     /** 调用方钉死宽度的列（`ColumnSpec.width`）—— 测量跳过它们（见那个字段的说明）。 */
     const fixedWidths = useMemo(() => {
         const out: Record<string, number> = {}
@@ -325,8 +336,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     useEffect(() => {
         if (measured) onReady?.()
     }, [measured, onReady])
-    /** 滚动容器：`revealActiveCell` 要靠它去查当前活动格（`td.cell-active`）。 */
-    const scrollRef = useRef<HTMLDivElement>(null)
     /**
      * **拖动行的位移只许落在表格的可视框里**（传给 `ReorderDnd` 的 modifier）。
      * 几何（为什么要夹、上边界为什么是表头下沿、那 1px 余量的来路）都在 `drag.ts` —— 与 `reveal.ts`
@@ -761,7 +770,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
 
     return (
         /*
-            外框画在**这一层**（滚动视口），不画在 `<table>` 上：它才是滚动的那一层，框得钉住不跟内容跑。
+            外框画在**滚动视口那一层**（`BaseTable` 的外壳，见它文件头），不画在 `<table>` 上：
+            它才是滚动的那一层，框得钉住不跟内容跑。
 
             `border-separate border-spacing-0`：格线是每格自己的 `border-r/border-b`，不是 collapse 共享的。
             `:last-child` 只收最右那一列的右边框（最后一行的**下边框留着**，用户口径）。
@@ -780,55 +790,25 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 onClose={() => setCopyHint("")}
             />
             {/*
-                **表格自己的壳**。骨架**不在这里**、也不是它的父级：骨架是 `ActionsPanel` 平级渲染的
-                另一个独立视图（见 `TableSkeleton`），这一层只管表格自己。
-
-                ‼️ 还没就位（`hidden`）之前整块**离屏**（不是 `display: none`）：量列宽靠表格自己的 rect
-                与列的自然宽度，`display: none` 会让 rect 归零 → 那趟永远等不到尺寸 → 表格再也不显示。
-                挪到屏幕外（`absolute` + 负 `left` + 定宽）：仍在 DOM、仍量得到，但不参与排版 —— 否则它
-                那一万两千多像素的宽会先撑出滚动条、还跟骨架叠在一起（用户实测："骨架旁边还是冒出滚动条"）。
-
-                ⚠️ 只挪表格不够：绝对定位的子元素照样被算进滚动容器的可滚动区，所以**容器自己也一起让开**。
+                **表格**。外壳（shadcn `Table` 那层 div = 滚动框）与离屏/点不动的状态全归 `BaseTable`；
+                骨架不在这里（`ActionsPanel` 平级渲染 `TableSkeleton`）。
             */}
-            <div
-                ref={scrollRef}
-                /* `aria-busy` 与"点不动"同一判据：还没就位、或者这一页在忙。 */
-                aria-busy={hidden || busy}
-                className={`${hidden || busy ? "pointer-events-none " : ""}${hidden ? "absolute top-0 -left-[99999px] w-[1200px]" : "min-h-0 flex-1"} overflow-auto border table-border`}
-            >
-            <table
-                ref={tableRef}
-                /*
-                    ‼️ 按下就**收掉页面上残留的文字选区**（捕获阶段，先于任何格子的 handler）。
-
-                    为什么需要（真机实测，别删）：表头的文字选区**不会**被表体的拖拽自动收掉 —— 我们自己的
-                    mousedown handler 会 `preventDefault`，浏览器那套"点别处就收起选区"的默认行为因此不发生。
-                    于是有这样的序列：复制列名 → 拖一片格子（格子确实选中了）→ Ctrl+C ⇒
-                    **copy 事件仍然认表头当源**（事件跟着"页面选区"走，不是跟着刚拖出来的单元格选区走），
-                    表格那一记复制就**静默失效**：剪贴板没变、虚线也不出。
-                    实测：不收选区时那一步剪贴板仍是上一次的列名；捕获阶段收掉后立刻正常。
-
-                    （这与"复制判据"是两件事：判据只看事件从哪儿发起，见 `handleCopy` 里 `closest("thead")` 那段。）
-                */
-                onMouseDownCapture={() => window.getSelection()?.removeAllRanges()}
+            <BaseTable
+                tableRef={tableRef}
+                scrollRef={scrollRef}
+                offscreen={hidden}
+                busy={busy}
                 /*
                     量完列宽之后才锁布局：`table-fixed` + 显式总宽 = 每列宽度**完全照着 state 走**
                     （整数，边界落在整像素上）。没量之前保持 `table-auto` —— 那时得让浏览器先按内容
                     排一遍，我们才知道每列该多宽。
-                */
-                style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
-                /*
                     ⚠️ 表宽必须**自己把行头那几格加上**（见 `rowHeadWidth`）：`getTotalSize()` 只算数据列
                     （行号列与握把列都不入列模型）。漏了它，`table-fixed` 下浏览器会把这点宽度从各数据列里
-                    摊走 —— 每列比量出来的整数窄一点点，表头列名又被截成 `…`（就是当初非要用 `Math.ceil`
-                    的那件事，换个入口再来一遍）。
+                    摊走 —— 每列比量出来的整数窄一点点，表头列名又被截成 `…`。
+                    ‼️ 量完之前表格**隐身**：仍留在 DOM 里（量列宽靠它的 rect 与列的自然宽度），但不占版面。
                 */
-                /*
-                    ‼️ 量完之前表格**隐身**：仍留在 DOM 里（量列宽靠它的 rect 与列的自然宽度），
-                    但不占版面 —— 否则它那一万两千多像素的宽会先把滚动条撑出来、还跟骨架叠在一起。
-                    容器 meanwhile 整块离屏（见上面那段）。
-                */
-                className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 text-sm [&_tr>*:last-child]:border-r-0`}
+                className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
+                style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
             >
                 <ActionsTableHead
                     table={table}
@@ -836,7 +816,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     measured={measured}
                     rowHeadWidth={rowHeadWidth}
                 />
-                <tbody>
+                <TableBody>
                     {/*
                         ‼️ `getRowModel()` **只在这里取一次**（`modelRows`），别再在 map 里取第二遍 ——
                         那等于每行都问一次库，51 行就是 51 次多余调用，而拖拽选区时每次 mousemove 都要
@@ -894,9 +874,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     </BranchPickContext.Provider>
                     </EnterEditContext.Provider>
                     </RevealContext.Provider>
-                </tbody>
-            </table>
-            </div>
+                </TableBody>
+            </BaseTable>
         </div>
         </ReorderDnd>
     )

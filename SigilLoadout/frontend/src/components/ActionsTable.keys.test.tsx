@@ -17,7 +17,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {CONTROL_TYPES} from "@/lib/controltypes"
 import {PICK_MARK} from "@/components/actions-table/classes"
-import {KEYS, LongField, captureScrolls, cellAt, clickToEdit, handleAt, openPick, pressHandle, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
+import {KEYS, LongField, captureScrolls, cellAt, clickToEdit, handleAt, openPick, pressHandle, scrollBoxOf, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -236,7 +236,7 @@ describe("动作表 · 方向键移动活动格", () => {
                 再摆一次（那会多一步冗余滚动，而且它不知道表头/冻结列的遮挡）。
             */
             expect(scrolled).toHaveLength(1)
-            expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
+            expect(scrolled[0]).toBe(scrollBoxOf(container))
             // 滚完之后活动格是**新**那一格
             expect(container.querySelector("td.cell-active")?.getAttribute("data-col-id")).toBe(colIdAt(container, 0, 1))
         } finally {
@@ -268,7 +268,7 @@ describe("动作表 · 方向键移动活动格", () => {
             scrolled.length = 0
 
             /* ② 把可视位置挪走，模拟"它现在只露一半"（这一步不点任何东西，所以不该触发滚动）。 */
-            const box = container.querySelector<HTMLElement>(".overflow-auto")!
+            const box = scrollBoxOf(container)
             box.scrollTop = 300
             box.scrollLeft = 999
             expect(scrolled).toHaveLength(0)
@@ -281,7 +281,7 @@ describe("动作表 · 方向键移动活动格", () => {
 
             expect(cell.querySelector("input")).not.toBeNull() // 确实进了编辑态
             expect(scrolled).toHaveLength(1)
-            expect(scrolled[0].classList.contains("overflow-auto")).toBe(true)
+            expect(scrolled[0]).toBe(scrollBoxOf(container))
         } finally {
             restore()
             restoreGeometry()
@@ -438,7 +438,7 @@ describe("动作表 · 方向键移动活动格", () => {
     */
     it("Ctrl+方向键跳到边缘：滚动条跟着走到那一头", async () => {
         const container = await renderTable()
-        const box = container.querySelector<HTMLElement>(".overflow-auto")!
+        const box = scrollBoxOf(container)
         const stub = (name: "scrollWidth" | "scrollHeight" | "clientWidth" | "clientHeight", value: number) =>
             Object.defineProperty(box, name, {configurable: true, get: () => value})
         stub("scrollWidth", 1000)

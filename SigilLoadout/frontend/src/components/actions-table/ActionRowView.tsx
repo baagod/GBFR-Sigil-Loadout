@@ -5,6 +5,7 @@
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
 import type {Cell, Row} from "@tanstack/react-table"
 
+import {TableCell, TableRow} from "@/components/ui/table"
 import {CellContent} from "./Cell"
 import {useSortable} from "@dnd-kit/sortable"
 import {
@@ -24,7 +25,8 @@ import {
 import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, snapshotKey} from "./model"
 
 /**
- * 一格里那层 `<td>` —— **第二道 memo 命门**（第一道是外面的 `ActionRowView`）。
+ * 一格里那层**格子**（shadcn 的 `TableCell`，DOM 上仍是 `<td>`）—— **第二道 memo 命门**
+ * （第一道是外面的 `ActionRowView`）。
  *
  * 拖选时矩形一横向变宽，**夹在它竖向范围里的每一行**都要重渲（那些行的左右边界格换了类）：实测一次
  * 移动约 19 行 × 42 格 ≈ 800 个 `<td>`，而外观真变了的只有几十个 —— 剩下的不该进 render。
@@ -87,7 +89,7 @@ const RowCell = memo(function RowCell({
     children?: ReactNode
 }) {
     return (
-        <td
+        <TableCell
             ref={cellRef}
             /* 列身份写在 DOM 上：量列宽那一趟按 `th[data-col-id]` 挑列，少了它会悄悄退化成量全部列。 */
             data-col-id={fieldKey}
@@ -123,7 +125,7 @@ const RowCell = memo(function RowCell({
                     onEnterEdit={onEnterEdit}
                 />
             )}
-        </td>
+        </TableCell>
     )
 })
 
@@ -221,7 +223,7 @@ export const ActionRowView = memo(function ActionRowView({
     return (
         /* `data-row-id`：行拖拽时要按"光标在哪一行"找 row id（见 `ActionsTable.rowIdAtY`）—— */
         /* DOM 拿得到，不用再往库那边问一遍。 */
-        <tr
+        <TableRow
             data-row-id={row.id}
             ref={drag.setNodeRef}
             style={{
@@ -230,8 +232,8 @@ export const ActionRowView = memo(function ActionRowView({
             }}
             className={
                 removed
-                    ? // 假删除：底色刷在行上，格子自己的底色让开（吸顶那几格不让，见下面 RowCell）。
-                      "bg-[#542526] [&>td:not(.sticky)]:bg-transparent!"
+                    ? // 假删除：只挂一个标记类，暗红怎么刷、为什么不刷在行上 —— 见 style.css 的 `.row-removed`。
+                      "row-removed"
                     : drag.isDragging
                       ? "relative z-10 opacity-50"
                       : undefined
@@ -253,8 +255,8 @@ export const ActionRowView = memo(function ActionRowView({
                 给了 `sortable` 时右边多出**握把**那半截：序号照旧管选行，**只有握把接拖动**
                 （按下先 `stopPropagation`，这一下只搬行、不选行）。
             */}
-            <td
-                className={handleCellClass(removed, rowSelected)}
+            <TableCell
+                className={handleCellClass(rowSelected)}
                 style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
@@ -262,7 +264,7 @@ export const ActionRowView = memo(function ActionRowView({
                 }}
             >
                 <div className={HANDLE_INNER}>{rowNumber}</div>
-            </td>
+            </TableCell>
             {/*
                 **拖动握把自成一条**（行号列右边）。为什么不塞在行号格里：那一格要同时装序号与握把，而
                 `table-fixed` 的列宽只认**表头那格** —— 塞在一起时表体写下的宽度不算数（真机：序号被 flex
@@ -271,7 +273,7 @@ export const ActionRowView = memo(function ActionRowView({
                 （不再靠 `stopPropagation` 拦）。
             */}
             {sortable && (
-                <td
+                <TableCell
                     ref={drag.setActivatorNodeRef}
                     /*
                         ⚠️ **只铺 `listeners`，不铺 `drag.attributes`**：那包里是 `role="button"` + `tabIndex=0`
@@ -288,13 +290,13 @@ export const ActionRowView = memo(function ActionRowView({
                         所以有环时把 `cell-selectable` 一起带上；光标用**行内**写死 `grab`（那张表里的
                         `cursor: cell` 特异性高过 Tailwind 的 `cursor-grab`，不写死就会被改成交叉光标）。
                     */
-                    className={`${handleCellClass(removed, rowSelected)} relative touch-none cursor-grab active:cursor-grabbing ${
+                    className={`${handleCellClass(rowSelected)} relative touch-none cursor-grab active:cursor-grabbing ${
                         gripRing ? `${gripRing} cell-selectable` : ""
                     } ${drag.isDragging ? "opacity-40" : ""}`}
                     style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
                 >
                     <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
-                </td>
+                </TableCell>
             )}
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
@@ -352,6 +354,6 @@ export const ActionRowView = memo(function ActionRowView({
                     </RowCell>
                 )
             })}
-        </tr>
+        </TableRow>
     )
 })

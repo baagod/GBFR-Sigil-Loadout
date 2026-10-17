@@ -374,6 +374,8 @@ tbody tr {
 table {
     /* 可编辑列的底色（`classes.ts` 的 `EDITABLE_BG` 引用它）—— 垫底层也要用同一份，别再各写一个 hex。 */
     --cell-editable: #1a1a1a;
+    /* "假删除"那一行的底色（唯一的消费者是下面 `.row-removed`）。 */
+    --cell-removed: #542526;
     /*
         选区实线的线宽 + 四条边的默认宽度。⚠️ 必须落在**格子也能看到**的地方（`table`）：`cell-edge-*`
         是在 **td** 上赋值 `var(--edge-w)` 的，若把它写在 `::before` 里，td 取不到 → guaranteed-invalid →
@@ -392,6 +394,24 @@ table {
 table td.cell-pinned,
 table th.cell-pinned {
     z-index: var(--z-pinned);
+}
+
+/*
+    **假删除**（轨表："这一行不写进游戏"，行数据里的 `removed`）。
+
+    状态只由行上的 `.row-removed` 标记**一次**（`ActionRowView`），底色全在这一处。
+
+    ‼️ 不刷在 `<tr>` 上：`TableRow` 自带 `hover:bg-muted/50`，而 `hover:bg-*` 的特异性高过行自己的
+    `bg-*` —— 一悬停整行暗红就被顶掉（真机量过；调用点写 `hover:bg-transparent` 只是把"变灰"换成
+    "变透明"）。刷在格子上，行那层就永远被不透明的格子盖着。
+
+    ⚠️ 数据格带 `:not(.cell-pinned)`：**吸顶的数据列保持自己的底色**（不透明是"冻结"的前提）。
+    ⚠️ `:where()` 把行标记的特异性压成 0：数据格 (0,2,1) 压过格子自己的 `bg-*`（0,1,0），而行号/握把格
+    (0,1,1) 仍输给 `.cell-handle.cell-row-selected`（0,2,0）—— 选中的行头照旧是选中底色，与改动前同。
+*/
+:where(.row-removed) > td:not(.cell-pinned),
+:where(.row-removed) > td.cell-handle {
+    background-color: var(--cell-removed);
 }
 
 /*
@@ -486,29 +506,47 @@ table th.cell-pinned {
 .cell-edge-left { --edge-left: var(--edge-w); }
 
 /*
-    ============ 表格右沿与滚动条之间那 1px（横向滚到头时的一条黑线） ============
+    ============ 基表的外壳（`div:has(> table.base-table)`）============
 
-    现象（用户标的）：横向滚到最右，选中行右侧、紧贴滚动条左边有一条 1px 的黑线（`x=863`）。
+    `Table`（shadcn）在 `<table>` 外面渲染一层 div。**这张表的滚动框必须就是它**：`useColumnMeasure`
+    的 ResizeObserver、`useReveal`、行拖拽夹取、方向键跳边缘，四处读的都是 `table.parentElement`。
 
-    已确证的部分：这条缝是"表格右沿与滚动条之间的 1px 空隙"。表格宽度 = 各列整数宽度之和
-    （`table-fixed`，写 `width` / `min-width` 都长不出去 —— 实测各试过一次，像素无变化），
-    而滚动容器的内容区比它宽一点点，那 1px 于是露在外面。
+    ‼️ 那层 div 没有 props 入口，所以在这里反选它，锚点是 `.base-table`（`BaseTable` 挂在 `<table>` 上）。
+    不能改成"直接改 ui/table.tsx"：那是 shadcn 的源码，`shadcn add table --overwrite` 会整份覆盖回去，
+    改在上面的东西全部归零（外壳一没，表格就不滚）；而这个类它冲不掉。
+    锚点在 `<table>` 上顺带还解决"两个继承者外壳不同"：各挂各的标记类、各写一条 `:has()` 规则即可。
 
-    已排除：**不是**容器那条 `border-r` 画的。对照实验：把 `border-right-color` 改成任何颜色，
-    `x=863` 的像素都不变（`getComputedStyle` 却显示改成功了）—— 说明画它的是别的东西
-    （滚动条槽那一侧），不是这条边框。
-
-    所以这里只做一件有实证的事：给容器铺**页面底色**。容器背景本来是 `transparent`，
-    缝里透出的是更外层的底色，深浅与"表格之外"不一致；铺上底色之后，
-    缝里与四周同色，横向滚到头时不再有一条突兀的浅色断口。
-
-    ⚠️ 容器是共享的（`overflow-auto border table-border`），所以用 `.cell-handle`（渲染那层挂在
-    行号格上的语义类）把它限定在"这张表所在的容器"，不碰轨道表、也不碰别的滚动区。
-    `:has()` 在 WebView2（Chromium 154）上没问题。
+    ⚠️ `flex` + `min-height` 别删：外壳是 flex 列里的一项，没有确定高度它就永远不滚（内容多高就多高）。
+    ⚠️ 外框画在这层、不画在 `<table>` 上：框要钉住不跟内容跑（`--input` 与 `table-border` 同一个来路）。
+    ⚠️ `background-color` 修的是"横向滚到头时表格右沿与滚动条之间那条 1px 缝"：容器背景本来是
+       `transparent`，缝里透出的是更外层的底色、深浅与四周不一致；铺上页面底色就同色了。
+       （已排除"这条缝是容器那条 `border-r` 画的"：把 `border-right-color` 改成任何颜色，那个像素都不变。）
 */
-.overflow-auto:has(> table .cell-handle) {
-    /* 与全站底同一个来路（`--background`）：别在这里再写一遍 hex —— 改主题时那一处会漏。 */
+div:has(> table.base-table) {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid var(--input);
     background-color: var(--background);
+}
+
+/*
+    还没就位（数据已作废 / 列宽还没量出来）：整块**离屏**，不是 `display: none` —— 量列宽靠表格自己的
+    rect 与列的自然宽度，`display: none` 会让 rect 归零，那趟就永远等不到尺寸、表格再也不显示。
+    离屏（`absolute` + 负 `left` + 定宽）仍在 DOM、仍量得到，但不参与排版；否则它那一万两千多像素的宽
+    会先撑出滚动条、还跟骨架叠在一起（用户实测："骨架旁边还是冒出滚动条"）。
+    ⚠️ 只挪表格不够：绝对定位的子元素照样被算进滚动容器的可滚动区，所以**外壳自己也一起让开**。
+*/
+div:has(> table.base-table.is-offscreen) {
+    position: absolute;
+    top: 0;
+    left: -99999px;
+    width: 1200px;
+}
+
+/* 这一页在忙（保存部署那一段）：点不动，但表格照旧显示 —— 别把好好的表藏起来。 */
+div:has(> table.base-table.is-busy) {
+    pointer-events: none;
 }
 
 /*

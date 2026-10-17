@@ -164,7 +164,7 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
 
         if (insideEditorOrList) return
 
-        e.preventDefault() // 表格在 `.overflow-auto` 里，不拦住方向键会顺手滚容器
+        e.preventDefault() // 表格在滚动框（`table.parentElement`）里，不拦住方向键会顺手滚它
 
         /*
             ‼️ 把**上一个格子那层焦点交出去**：鼠标点过的格子会真的拿到焦点（那层 `tabIndex=0` 的 DIV），
