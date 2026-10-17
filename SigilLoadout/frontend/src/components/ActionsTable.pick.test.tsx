@@ -18,6 +18,7 @@ import {acceptPaste, UNSET} from "@/components/actions-table/model"
 import {PICK_CELL, PICK_MARK} from "@/components/actions-table/classes"
 import {CellPick} from "@/components/actions-table/CellPick"
 import {captureScrolls, cellAt, clickItem, clipboardStub, isPickOpen, openPick, pickItems, pressPick, scrollBoxOf, selectCell, stubRevealGeometry, t, tick, useTableHarness} from "@/components/actions-table/testkit"
+import {isSelected} from "@/components/actions-table/testkit"
 import {CONTROL_TYPES} from "@/lib/controltypes"
 
 /** 选值格那一列：字段名是真的，位置固定在数据列第 5 个（`cellAt` 要的数据列下标 = 4）。 */
@@ -110,7 +111,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         pressPick(cell)
         await tick()
         // 选中态与别的格子同一个类（`cell-selected` 由库给，行号/数据格共用那一套）。
-        expect(cell.className).toContain("cell-selected")
+        expect(isSelected(cell)).toBe(true)
         // 单击这一下**只算选中**：列表不出现。
         expect(isPickOpen()).toBe(false)
 

@@ -334,18 +334,80 @@ export function selectCell(cell: HTMLElement) {
     fireEvent.mouseUp(document)
 }
 
-/**
- * 复制区那圈虚线 = **复制区外圈那排格子**上的 `cell-copy-*` 类（每格只挂自己那几条边）。
- * 复制区**内部**的格子一个类都不挂 —— 所以"内部没有线"是结构上必然的。
- * 样式用伪元素画的（`inset: 0`，压在格线上）；happy-dom 不做布局，像素的事归真机。
- */
-export function copyCellsOf(container: HTMLElement): HTMLElement[] {
-    return [...container.querySelectorAll<HTMLElement>("tbody td")].filter((td) => /cell-copy-/.test(td.className))
+/*
+    ==================== 选区投影（测试用） ====================
+
+    选区外观改由 overlay 画之后，单元格上不再有 `cell-selected` / `cell-edge-*`；
+    `ActionsTable` 在 DOM 里留了一个 `[data-selection-bounds]` 投影（行列下标 JSON），
+    这些助手把"格元素"换算成行列下标再断言 —— 断的是**选区语义**，不是画法。
+*/
+
+type ProjectedBounds = [number, number, number, number] // minRow, maxRow, minCol, maxCol
+
+const projectedBounds = (container: HTMLElement): ProjectedBounds[] => {
+    const el = container.querySelector<HTMLElement>("[data-selection-bounds]")
+    return el?.dataset.selectionBounds ? (JSON.parse(el.dataset.selectionBounds) as ProjectedBounds[]) : []
 }
 
-/** 有没有那圈虚线（任意一格挂了就算有）。 */
+/** 一格在**选区坐标系**里的行/列下标（列不含行号列与握把列；不在表体里返回 null）。 */
+function cellIndexes(cell: HTMLElement): {row: number; col: number} | null {
+    const tr = cell.closest("tr")
+    const tbody = tr?.parentElement
+    if (!tr || !tbody) return null
+    const row = [...tbody.querySelectorAll("tr")].indexOf(tr)
+    const col = [...tr.querySelectorAll("td[data-col-id]")].indexOf(cell)
+    return row >= 0 && col >= 0 ? {row, col} : null
+}
+
+/** 一格是不是在选区里（行号格/握把格不在选区坐标系里，恒 false）。 */
+export function isSelected(cell: HTMLElement): boolean {
+    const at = cellIndexes(cell)
+    if (!at) return false
+    return projectedBounds(cell.ownerDocument.body).some(
+        ([minR, maxR, minC, maxC]) => at.row >= minR && at.row <= maxR && at.col >= minC && at.col <= maxC,
+    )
+}
+
+/** 选区覆盖的格数（按投影里的区间面积求和；多片不重叠，直接加）。 */
+export function selectedCount(container: HTMLElement): number {
+    return projectedBounds(container).reduce((sum, [minR, maxR, minC, maxC]) => sum + (maxR - minR + 1) * (maxC - minC + 1), 0)
+}
+
+/** 一格落在选区外圈的哪几条边上（与旧 `cell-edge-*` 类同口径；不在选区 → 空）。 */
+export function selectionEdgesOf(cell: HTMLElement): string[] {
+    const at = cellIndexes(cell)
+    if (!at) return []
+    const colCount = cell.closest("tr")!.querySelectorAll("td[data-col-id]").length
+    const edges = new Set<string>()
+    for (const [minR, maxR, minC, maxC] of projectedBounds(cell.ownerDocument.body)) {
+        if (at.row < minR || at.row > maxR || at.col < minC || at.col > maxC) continue
+        if (at.row === minR) edges.add("cell-edge-top")
+        if (at.row === maxR) edges.add("cell-edge-bottom")
+        if (at.col === minC) edges.add("cell-edge-left")
+        // 整行选区（0..最后一列）不画右边缘 —— 末列没有格线，与 overlay 几何同一条口径。
+        if (at.col === maxC && !(minC === 0 && maxC === colCount - 1)) edges.add("cell-edge-right")
+    }
+    return [...edges].sort()
+}
+
+/** 活动格（锚点）下标 —— 从投影的 `data-active-cell` 读。 */
+export function activeCellIndices(container: HTMLElement): [number, number] | null {
+    const el = container.querySelector<HTMLElement>("[data-active-cell]")
+    const raw = el?.dataset.activeCell
+    if (!raw) return null
+    const [row, col] = raw.split(",").map(Number)
+    return [row!, col!]
+}
+
+/** 复制源区间（显示顺序下标；空 = 还没有复制区）。 */
+export function copyBoundsOf(container: HTMLElement): number[][] {
+    const el = container.querySelector<HTMLElement>("[data-copy-bounds]")
+    return el?.dataset.copyBounds ? (JSON.parse(el.dataset.copyBounds) as number[][]) : []
+}
+
+/** 有没有那圈虚线（任一复制区就算有）。 */
 export function copyBoxOf(container: HTMLElement): HTMLElement | null {
-    return copyCellsOf(container)[0] ?? null
+    return copyBoundsOf(container).length > 0 ? (container.querySelector<HTMLElement>("[data-copy-bounds]") ?? null) : null
 }
 
 /* ==================== 按行号选行：点 / Shift / Ctrl / 拖 ==================== */

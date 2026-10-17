@@ -68,11 +68,10 @@
     --cell-fill-solid:      color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
 
     /* 层高刻度（页面级）：别的页（专精技能吸顶行）也用 `var(--z-focus)`；写在 `table` 里只有表格
-       子树解析得到，别的页会整条 `z-index` 失效、被吸顶行压住。 */
+       子树解析得到，别的页会整条 `z-index` 失效、被吸顶行压住。
+       ⚠️ 选区 overlay 两层用内联 `z-41` / `z-52`（见 `SelectionOverlay.tsx`），与下面那段阶梯对齐。 */
     --z-focus:              30;
-    --z-edge:               41;
     --z-pinned:             50;
-    --z-pinned-edge:        calc(var(--z-pinned) + 1);
 }
 
 @layer base {
@@ -187,7 +186,7 @@
 @utility cell-focus {
     position: relative;
 
-    &:is(.cell-selected:focus-within, :has(.cell-pick-mark[data-popup-open])) {
+    &:is(:focus-within, :has(.cell-pick-mark[data-popup-open])) {
         z-index: var(--z-focus);
 
         &::after {
@@ -248,14 +247,15 @@ table.base-table tbody tr:hover {
 }
 
 /*
-    ============ 提层阶梯（唯一一份；别处只引用 token，不写裸数字） ============
+    ============ 提层阶梯（唯一一份） ============
 
-      焦点环 --z-focus(30)  <  滚动区选区轮廓 --z-edge(41)  <  冻结层 --z-pinned(50)
-                            <  冻结区轮廓 --z-pinned-edge(51)  <  吸顶表头行 60  <  弹窗分节标题 70
+      焦点环 --z-focus(30)  <  选区 overlay 滚动层 41  <  冻结层 --z-pinned(50)
+                            <  选区 overlay 钉住层 52  <  吸顶表头行 60  <  弹窗分节标题 70
 
-    · 虚线压实线只靠格内顺序（本格 `::before` < `::after`）；**复制区整格不许提层**（会咬掉邻格边框 2px）。
-    · 冻结区必须压过横滚内容（否则点击被抢）；冻结区轮廓再高一档（邻格也在冻结层，否则实线右边/下边各少 1px）。
-    · 吸顶表头 60 是**表格内部**最高层；弹窗标题在表之外，必须更高，否则表头穿透标题。
+    · 选区外观由 `SelectionOverlay` 画：滚动层 z-41 在普通格之上、冻结列之下；钉住层 z-52 在冻结列之上、
+      吸顶表头之下。
+    · 冻结区必须压过横滚内容（否则点击被抢）；吸顶表头 60 是**表格内部**最高层；弹窗标题在表之外，
+      必须更高，否则表头穿透标题。
     ‼️ `th` 与 `td` 都要覆盖，且必须用 `table td.cell-pinned`（(0,1,2)）—— 只写 `td.cell-pinned` 会与提层
       规则同权重、靠源序决定胜负，表头冻结格会掉到 20 被横滚内容盖住。
 */
@@ -280,49 +280,6 @@ table td.cell-pinned, table th.cell-pinned {
 }
 
 /*
-    **三个装饰的伪元素归属定死**：选区实线 → `td::before`；复制区虚线、焦点环 → `td::after`
-    （重合处复制区赢，虚线是用户正在用的标记）。两套规则别抢同一个伪元素、别用 `border:` 简写，
-    否则会互相清掉 `border-*`、表现为"某条边整条消失"。
-
-    轮廓不能用 inset 阴影画（会被 padding box 裁剪，每个格线连接处缺 1px）；用 `inset: -2px` 的伪元素
-    直接盖住格线，四条边才连成一条。
-
-    ‼️ **每格都要有 `::before`**，不要按"有没有边类"建/删：伪元素创建/销毁本身就算布局变化 →
-    每跨一步整表重排（实测 20 步累计 148ms）。常驻伪元素只切颜色，拖 20 行 0 次 Layout。
-*/
-.cell-selectable::before {
-    content:        "";
-    position:       absolute;
-    /*
-        向外撑 **2px**（= 3px 线宽 − 1）：正好是「格内 1px + 与格线重合 1px + 格外 1px」
-        （用户口径；上/左两条另有提层规则，见下面那段）。
-    */
-    inset:          -2px;
-
-    pointer-events: none;
-    /* 线宽**按边给**（0 或 3px）、颜色统一选区绿：
-       ‼️ 不要写成"四边都 3px、只在边上换颜色"—— 3px 绿边与 3px 透明边在拐角会做 45° 颜色斜切，
-       把绿边咬出一个 V 形缺口（行交界处逐行出现，DPR2 放大截图复现过）。宽度 0 的邻边是直角、不切；
-       同色两条边（角格）斜切也看不出来。伪元素是 absolute，宽度变化不影响表格布局。 */
-    border:         0 solid var(--cell-select);
-    /*
-        ⚠️ 要盖在**焦点环**（`cell-focus` 的 `::after`）之上：拖拽的 mousedown 会把焦点落到起始格，
-        而可编辑格带着 `cell-focus`，两个伪元素于是在同一格上打架 —— `::after` 后画，不压住的话灰环
-        盖掉起始格那两条边，看着就是"第一个格子没被选区框包围"。只压重叠的那两条边，其余边照旧可见。
-
-        ⚠️ 伪元素要 `position: absolute`，所以所在格子必须是定位元素：非钉住的格子由渲染那层带
-        `relative`，钉住的本身就是 `sticky`。
-    */
-    z-index:        1;
-}
-
-/* 每边一条叶子规则：类挂在 td 上，直接选中它的伪元素给那一侧加 3px。角格两个类各有 3px、同色斜接。 */
-td.cell-edge-top::before { border-top-width: 3px; }
-td.cell-edge-right::before { border-right-width: 3px; }
-td.cell-edge-bottom::before { border-bottom-width: 3px; }
-td.cell-edge-left::before { border-left-width: 3px; }
-
-/*
     基表外壳（shadcn `Table` 在 `<table>` 外面那层 div）—— **它就是滚动框**：`useColumnMeasure` /
     `useReveal` / 行拖夹取 / 方向键跳边都读 `table.parentElement`。
     那层 div 没有 props 入口，所以用 `.base-table` 反选；不能改 `ui/table.tsx`（`shadcn add --overwrite`
@@ -330,6 +287,8 @@ td.cell-edge-left::before { border-left-width: 3px; }
     `background-color` 修的是横滚到头时表格右沿与滚动条之间那条 1px 缝。
 */
 div:has(> table.base-table) {
+    /* 选区 overlay 的 portal 宿主：绝对定位的 overlay 要以滚动框为坐标原点（滚动时跟着内容走）。 */
+    position:          relative;
     flex:             1 1 0%;
     min-height:       0;
     overflow:         auto;
@@ -351,91 +310,9 @@ div:has(> table.base-table.is-busy) {
     pointer-events: none;
 }
 
-/*
-    选区轮廓的几何：每条边都压在格线上、外沿 2px。格子只有右/下格线 → 左边线属于左邻、上边线属于上一行；
-    后画的盖先画的。所以右/下自己画（`inset:-2px`），左/上把本格提到轮廓档（冻结列再高一档）。
-    ⚠️ 第一行上边会被吸顶表头吃掉 1px —— 接受，不为一条边开特例。
-*/
-
-/*
-    左/右边界格提到轮廓档：邻格的 `border` 与不透明底色画在本格撑出去的那 1px 上，不提层就缺一截。
-    ⚠️ 只写 `z-index`、绝不写 `position`：会把冻结列的 `sticky` 顶掉 → 冻结失效、点击被下面列抢走。
-    代价（已知）：滚动区边界格那 1px 滚到冻结列底下会被盖住，只在滚动经过时可见。
-*/
-td:is(.cell-edge-right, .cell-edge-left) {
-    z-index: var(--z-edge);
-}
-
-/* 末列右边框 / 末行下边框收回格内：末列/末行没有格线，
-   `inset: -2px` 撑出去的 1px 会悬在表外（末行那 1px 还会撑出滚动条）。 */
-tbody tr > td:last-child.cell-edge-right::before {
-    right: 0;
-}
-
-tbody tr:last-child > td.cell-edge-bottom::before {
-    bottom: 0;
-}
-
-/*
-    复制源虚线（"行军蚁"）：只给复制区**外圈**的格子挂 `cell-copy-*`，每格只画自己那几条边，
-    内部格一个类都不挂。画在 `::after` 上（`::before` 归选区实线）。
-    虚线缝是透明的，底下要垫一层该格自己的底色（否则缝里透出选区绿实线、整圈看着还是实线）——
-    垫底不再是四条渐变带，而是 `mask` 挖掉 content-box：背景色只留在**边框那一圈**，天然跟着四条边宽走。
-*/
-td.cell-copy-top::after, td.cell-copy-right::after,
-td.cell-copy-bottom::after, td.cell-copy-left::after {
-    content:          "";
-    position:         absolute;
-    /* 超出 1px：配 2px 边宽 → 「与格线重合 1px + 格内 1px」。 */
-    inset:            -1px;
-    border-style:     dashed;
-    border-color:     var(--cell-select);
-    border-width:     0; /* 各 side 类只加自己那条边（longhand，不会互相清掉） */
-    pointer-events:   none;
-    /* 压在选区实线（`::before` z-index:1）之上：虚线缝是透明的，不压就会透出实线色。 */
-    z-index:          2;
-    /* 垫底 = 该格自己的底色（`--cell-under`，拿不到退回表格底色） */
-    background-color: var(--cell-under, var(--background));
-    /* 只在边框那一圈铺：两层 mask，content-box 与整框 XOR（= exclude），内部挖空。 */
-    mask:             linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    mask-composite:   exclude;
-}
-
-td.cell-copy-top::after {
-    border-top-width: 2px;
-}
-
-td.cell-copy-right::after {
-    border-right-width: 2px;
-}
-
-td.cell-copy-bottom::after {
-    border-bottom-width: 2px;
-}
-
-td.cell-copy-left::after {
-    border-left-width: 2px;
-}
-
-/* 冻结区的边界格要再高一档：邻格也在冻结层，否则实线右边/下边各少 1px（见上面的提层表）。 */
-table td.cell-pinned:is(.cell-edge-top, .cell-edge-right, .cell-edge-bottom, .cell-edge-left) {
-    z-index: var(--z-pinned-edge);
-}
-
-/* ======================== 复制源边框（完） ======================== */
-
-/*
-    选中的格子不画焦点环（起点格在 mousedown 就拿到焦点，两圈框叠着不统一）；
-    但**复制区格子要豁免**：它的虚线也画在 `::after` 上，被 `content:none` 抹掉虚线就没了。
-    特异性 (0,2,1) 必须压过 `cell-focus` 的 `.cell-focus:focus-within::after`，别依赖样式表顺序。
-*/
-td.cell-selected:not(:is(.cell-copy-top, .cell-copy-right, .cell-copy-bottom, .cell-copy-left)):focus-within::after {
-    content: none;
-}
-
 /* 选中底色用 `inset box-shadow`（另一个槽位）：不占 `background-image`，不会把复制虚线/格线底色顶掉。
    颜色来自 `:root` 的派生变量；行号格与数据格共用同一档色。 */
-.cell-selected, .cell-row-selected {
+.cell-row-selected {
     box-shadow: inset 0 0 0 9999px var(--cell-fill-overlay);
 }
 
@@ -444,11 +321,6 @@ td.cell-selected:not(:is(.cell-copy-top, .cell-copy-right, .cell-copy-bottom, .c
     background-color: var(--cell-fill-solid);
     box-shadow:       none;
     color:            var(--cell-select);
-}
-
-/* **活动格不填底色**（Excel 约定）：拖选/点击的起点那一格保持原底色，只画轮廓。 */
-td.cell-selected.cell-active {
-    box-shadow: none;
 }
 
 /* 「全局参数」表：一行里任意一格拿焦点时，整行下沿画 2px 线（`--ring`）。

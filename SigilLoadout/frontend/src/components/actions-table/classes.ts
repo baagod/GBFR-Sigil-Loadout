@@ -1,17 +1,15 @@
 /*
-    动作表的**类名与几何**：Tailwind 类常量，以及「这一格在外圈的哪几条边上 → 挂哪些类」。
+    动作表的**类名与几何**：Tailwind 类常量，以及单元格/行头用到的类名。
 
-    纯字符串与纯函数，不碰 React —— 渲染那两层（`ActionRowView` / `Cell`）从这里取类名。
+    选区（底色/轮廓/活动格）与复制虚线都由 `SelectionOverlay` 一层 overlay 统一画，单元格上不挂任何
+    选区类名。纯字符串，不碰 React —— 渲染那两层（`ActionRowView` / `Cell`）从这里取类名。
 */
-import type {Cell} from "@tanstack/react-table"
-
 import {CELL_TEXT} from "@/lib/classnames"
-import {features, type ActionRow, type CopySource} from "./model"
 
 /** 只读格的底色：与页面同色（= 看起来"不上色"）。**必须是不透明的** —— 钉住的列要挡住滚过来的列。 */
 export const READ_ONLY_BG = "bg-background"
 /** 可编辑格的底色：比页面亮一档，一眼看出"这一格能改"。 */
-export const EDITABLE_BG = "bg-[var(--cell-editable)] [--cell-under:var(--cell-editable)]"
+export const EDITABLE_BG = "bg-[var(--cell-editable)]"
 
 /**
  * 整行选中时**行号格**要叠的底纹类。
@@ -208,7 +206,7 @@ export const HEAD_FIELD = "truncate text-[11px] leading-tight font-normal opacit
  * 钉住的列 / 行号格：**只负责"吸顶 + 层高"**（底色由调用点按"只读 / 可编辑"给 —— 两个只读列恰好
  * 都是钉住的，埋进常量里它们就没法用别的底色）。
  *
- * ‼️ 这里**不能出现任何 `position`**（除了 `sticky` 本身）：`td.cell-edge-*` 那几条提层规则特异性
+ * ‼️ 这里**不能出现任何 `position`**（除了 `sticky` 本身）：提层规则里 `table td.cell-pinned` 特异性
  * 比工具类高，顺手写个 `relative` 会把 `sticky` 顶掉，冻结列就跟着横向滚动跑走、底下滚过来的列
  * 连点击一起接管（用户报的"拖冻结列却选中了别的列"）。
  * 层高也不写工具类，由 `style.css` 的 `table td.cell-pinned` 定（那里写了为什么）。
@@ -224,100 +222,10 @@ export const PINNED_CELL = "cell-pinned sticky"
 export const HEAD_CELL = `sticky top-0 z-20 ${HEAD_HEIGHT} border-r border-b ${HEAD_BG} ${HEAD_PADDING} text-center font-medium whitespace-nowrap ${FONT}`
 
 /**
- * 表体每一格都带的类（格线 + 选中那套的**基底**）。
+ * 表体每一格都带的类（格线 + 可选中基底）。
  *
  * `cell-selectable` 必须**每格都有**（不是选中了才加）：它给出 `cursor: cell`（表格的十字光标）
- * 与 `user-select: none`（拖拽划过时别把文字选蓝），并且是选区轮廓那层伪元素的定位基准。
- * 选中态与本格落在选区哪条边上，由 `selectionClass` 另外给类名（样式在 style.css）。
+ * 与 `user-select: none`（拖拽划过时别把文字选蓝）。
+ * 选区外观（底色/轮廓/活动格）由 overlay 画，这里不再有任何选区类名。
  */
 export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
-
-/**
- * 这一格**选中相关**的类（具体样式在 `style.css`）。
- *
- *   · `cell-selected` —— 底色
- *   · `cell-edge-*`   —— **只画"落在外边界上"的那几条边**（`getSelectionEdges()` 告诉我们哪几条）。
- *     这样任意多个矩形拼起来是**一条连续轮廓**，而不是每格一圈框。这块几何判断是库替我们算的。
- *   · `cell-active`   —— **活动格**（拖选/点击的起点）：底色让掉（Excel 的约定 —— 选区里那一格保持原底色，
- *     一眼看出"从哪一格开始拖的"）。换一格重新拖选时它不再是活动格，底色自然回来。
- *     行号选行也走这一条：行手势把区的锚点列设成第一格**数据列**（`id_`，序号列不在列模型里），
- *     于是"开始拖的那一行第一格"就是活动格 —— 与拖选单元格同一套逻辑，没有第二种规则。
- *
- * **行末那一格照画右边**：轮廓 `inset: -1px` 会外扩 1px，而表格用 `[&_tr>*:last-child]:border-r-0`
- * 去掉了末列的格线 —— 撑出去的那 1px 会悬在表格外沿。这个几何问题**由样式表把右边框收回格内**解决
- * （见 `style.css` 的 `tbody tr > td:last-child.cell-edge-right`），不再在这里摘掉 `right` 类：
- * 摘掉的后果是"末列选中时右边框整条消失"（真机逐像素实测 `border-right-width: 0px`）。
- *
- * 没选中时**提前返回**：`getSelectionEdges()` 会再解析一遍位置，只为发现"没选中"不值当
- * （大表里绝大多数格子都没选中）。
- */
-export function selectionClass(cell: Cell<typeof features, ActionRow>, hide: {right?: boolean; left?: boolean} = {}): string {
-    if (!cell.getIsSelected()) return ""
-    const edges = cell.getSelectionEdges()
-    /*
-        ‼️ 有两条边**不该由这一格画**（判据由调用方给，都是"这条边界已经归别人了"）：
-        `hide.right` = 整行选中时行末那格（末列没有格线，那条边只剩轮廓意义，看着像表格右缘多一道竖线）；
-        `hide.left`  = 左边界交接给了握把列（不在列模型里，见 `ActionRowView`）。
-        ⚠️ 用具名选项而不是两个同型位置参数 —— 相邻同型参数是错位隐患。
-    */
-    const ring = {...edges, ...(hide.right ? {right: false} : {}), ...(hide.left ? {left: false} : {})}
-    return ["cell-selected", cell.getIsFocused() && "cell-active", ringClasses(ring, "cell-edge")].filter(Boolean).join(" ")
-}
-
-/** 一格在外圈的哪几条边上 —— 两条来路（库的选区 / 我们自己的复制区）都归成这个形状。 */
-type RingEdges = {top: boolean; right: boolean; bottom: boolean; left: boolean}
-
-/**
- * `RingEdges` → 类名字符串（`prefix` 是 `cell-edge` 或 `cell-copy`）。**两个装饰共用这一条**：
- * 选区轮廓与复制区虚线是同一套写法（逐格挂"自己有哪几条边"，样式表按类名画线），
- * 分开写两份的话，哪天加第五条边就会只改一处。
- */
-export const ringClasses = (edges: RingEdges, prefix: "cell-edge" | "cell-copy") =>
-    (["top", "right", "bottom", "left"] as const)
-        .filter((side) => edges[side])
-        .map((side) => `${prefix}-${side}`)
-        .join(" ")
-
-/**
- * 一格在**复制区外圈**的哪几条边上（不在任何一片里 → `null`）。
- *
- * 每一片的外圈**就是它那两串 id 之间的行列区间**：某一侧为真 ⟺ 那一侧的邻格不在**同一片**里 ——
- * 与库自己的 `cell.getSelectionEdges()` 同一个思路，只是把"同一片"换成"复制源那几片 id"
- * （那份虚线是"复制那一刻那片"的**快照**：之后选区会换、会扩、会没，而虚线得一直指着源区）。
- *
- * ‼️ **逐片判**：每片各自成圈 —— 拿所有片的外接矩形去圈，会把中间没选的格子也圈进来。
- * 片与片互不重叠（`getCellSelectionBounds()` 给的就是归一化、互不相交的正面区域），所以一格
- * 至多落在一片里，命中即可返回。
- *
- * ‼️ **两个装饰都画**：选区那圈实线（`::before`）与复制区那圈虚线（`::after`）是两条线同时存在，
- * 重合处由样式表的归属表定（复制区赢）。所以这里**不扣**选区的边 —— 扣了就永远看不到重合处的虚线。
- *
- * ⚠️ 判据只用 `rowIds` / `columnIds` 的下标（**别**拿 `getAllCells()` 的 index 去套）：这两串是
- * `handleCopy` 直接从 `getCellSelectionBounds()` 那套下标里取出来的，本身就是**选区坐标系**
- * （行号列不在列模型里，所以两套相差 1）。混用会让"复制一格"变成"第一行/第一列"。
- */
-function copyRingEdge(copy: CopySource | null, rowId: string, columnId: string): RingEdges | null {
-    if (!copy) return null
-    for (const area of copy.areas) {
-        const rowIndex = area.rowIds.indexOf(rowId)
-        const colIndex = area.columnIds.indexOf(columnId)
-        if (rowIndex < 0 || colIndex < 0) continue
-        return {
-            top: rowIndex === 0,
-            bottom: rowIndex === area.rowIds.length - 1,
-            left: colIndex === 0,
-            right: colIndex === area.columnIds.length - 1,
-        }
-    }
-    return null
-}
-
-/**
- * 一格在复制区外圈要画的边 → **类名字符串**（不在那片里就是空串）。
- *
- * 于是"复制区内部没有线"是结构上必然的 —— 内部的格子一个类都不挂。
- */
-export const cellCopyRing = (copy: CopySource | null, rowId: string, columnId: string) => {
-    const edge = copyRingEdge(copy, rowId, columnId)
-    return edge ? ringClasses(edge, "cell-copy") : ""
-}

@@ -13,6 +13,8 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {HANDLE_WIDTH} from "@/components/actions-table/classes"
 import {KEYS, cellAt, clipboardStub, handleAt, stubRowRects, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
+import {selectionEdgesOf} from "@/components/actions-table/testkit"
+import {isSelected} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -236,12 +238,11 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         pressHandle(container, 2, {shiftKey: true}) // 连选第 2、3 line
         fireEvent.mouseUp(window)
 
-        /** 这一格挂了哪些边类。 */
-        const edges = (r: number, c: number) =>
-            (cellAt(container, r, c).className.match(/cell-edge-\w+/g) ?? []).sort().join(" ")
+        /** 这一格落在选区外圈的哪几条边上（来自选区投影）。 */
+        const edges = (r: number, c: number) => selectionEdgesOf(cellAt(container, r, c)).join(" ")
 
-        // 行号格自己不带任何边类（那圈框不画在序号列上）
-        expect(handleAt(container, 1).className).not.toContain("cell-edge-")
+        // 行号格不在选区坐标系里，没有任何边
+        expect(selectionEdgesOf(handleAt(container, 1))).toEqual([])
 
         const lastCol = KEYS.length - 1
         // 段首那行的第一格：上 + 左
@@ -279,7 +280,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         fireEvent.mouseUp(window)
 
         for (const col of [KEYS.indexOf("id_"), KEYS.indexOf("abilityTag_")]) {
-            expect(cellAt(container, 0, col).className).toContain("cell-selected")
+            expect(isSelected(cellAt(container, 0, col))).toBe(true)
         }
         expect(handleAt(container, 0).className).toContain("cell-row-selected")
         // 不选中的行不带
@@ -303,8 +304,8 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         fireEvent.mouseEnter(cellAt(container, 1, 3), {ctrlKey: true})
         fireEvent.mouseUp(document)
 
-        expect(cellAt(container, 1, 2).className).toContain("cell-selected")
-        expect(cellAt(container, 1, 3).className).toContain("cell-selected")
+        expect(isSelected(cellAt(container, 1, 2))).toBe(true)
+        expect(isSelected(cellAt(container, 1, 3))).toBe(true)
         // 行块还在（两套并存）
         expect(rowSelectedAt(container, 0)).toBe(true)
     })

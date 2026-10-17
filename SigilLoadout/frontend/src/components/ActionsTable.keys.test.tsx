@@ -18,6 +18,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {CONTROL_TYPES} from "@/lib/controltypes"
 import {PICK_MARK} from "@/components/actions-table/classes"
 import {KEYS, LongField, captureScrolls, cellAt, clickToEdit, handleAt, openPick, pressHandle, scrollBoxOf, selectCell, stubRevealGeometry, useTableHarness} from "@/components/actions-table/testkit"
+import {isSelected, selectedCount} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -42,11 +43,11 @@ const colIdAt = (container: HTMLElement, row: number, col: number) => cellAt(con
 const arrowOn = (cell: HTMLElement, key: string, mods: {shiftKey?: boolean; ctrlKey?: boolean} = {}) =>
     fireEvent.keyDown(cell, {key, ...mods})
 
-/** 一格是不是在选区里（`cell-selected` 是**整个选区**那层填色；活动格只是少画底色，仍在选区里）。 */
-const isPainted = (cell: HTMLElement) => cell.className.includes("cell-selected")
+/** 一格是不是在选区里（选区投影的区间判断；活动格只是少画底色，仍在选区里）。 */
+const isPainted = (cell: HTMLElement) => isSelected(cell)
 
 /** 当前**被选中**的数据格数 —— 多格选区与"收成单格"用它数。 */
-const paintedCount = (container: HTMLElement) => container.querySelectorAll("tbody td.cell-selected").length
+const paintedCount = (container: HTMLElement) => selectedCount(container)
 
 describe("动作表 · 方向键移动活动格", () => {
     /*
@@ -91,7 +92,7 @@ describe("动作表 · 方向键移动活动格", () => {
         selectCell(cellAt(container, 0, 0))
         arrowOn(cellAt(container, 0, 0), "ArrowLeft") // 左边是行号列 → 停
         expect(activeColIdOf(container)).toBe(colIdAt(container, 0, 0))
-        expect(handle.className).not.toContain("cell-selected")
+        expect(isSelected(handle)).toBe(false)
 
         arrowOn(cellAt(container, 0, 0), "ArrowUp") // 第 0 行之上没有数据行 → 停
         expect(activeColIdOf(container)).toBe(colIdAt(container, 0, 0))

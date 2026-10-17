@@ -27,6 +27,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {ActionsTable} from "@/components/ActionsTable"
 import {cleanup, makeRow, pressHandle, t, tableProps} from "@/components/actions-table/testkit"
+import {isSelected, selectionEdgesOf} from "@/components/actions-table/testkit"
 
 afterEach(cleanup)
 
@@ -50,28 +51,23 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
     })
 
     /*
-        ‼️ **握把列也要带选中框**（用户口径：除了行号列，其他格的选择都带边框）。
+        ‼️ **握把列也要在选中框里**（用户口径：除了行号列，其他格的选择都带边框）。
 
-        握把**不在列模型里**（基座额外渲染的一格），而选区矩形只覆盖列模型里的格子 —— 所以
-        "选区左边界落在第一个数据列"这件事要**交接**给握把：握把画 左+上+下，第一个数据列不再画
-        自己那条左边（两格相邻的边界只能画一次）。
+        握把**不在列模型里**（基座额外渲染的一格），选区矩形只覆盖列模型里的格子 —— 所以 overlay 的
+        几何在"选区包含第一列"时向左包住 `GRIP_WIDTH`（见 `selectionOverlay.ts` 的 `gripWidth`）。
+        这里断言的是**选区语义**：整行选区覆盖首行全部数据列，且第一格的左边界交给握把、不由自己画。
     */
-    it("整行选中：握把列挂选中边（左+上+下），第一个数据列让出左边", () => {
+    it("整行选中：选区覆盖首行全部数据列（左边框交给握把）", () => {
         const container = renderTable(() => {})
         pressHandle(container, 0)
         fireEvent.mouseUp(window)
 
-        const edgesOf = (el: Element) => (el.className.match(/cell-edge-\w+/g) ?? []).sort().join(" ")
-        const grip = container.querySelector("td[aria-label='拖动排序']")!
-        const first = container.querySelector("tbody tr td[data-col-id]")!
+        const first = container.querySelector("tbody tr td[data-col-id]") as HTMLElement
+        const last = container.querySelector("tbody tr td[data-col-id]:last-of-type") as HTMLElement
 
-        expect(edgesOf(grip)).toBe("cell-edge-bottom cell-edge-left cell-edge-top")
-        /*
-            ‼️ **光有 `cell-edge-*` 画不出来**：那几个类只设 `--edge-*` 变量，真正画线的是
-            `.cell-selectable::before`（见 `style.css`）—— 握把那格本来没有 `cell-selectable`，
-            只挂边类时**一个像素都不会有**（真机踩过：类挂上了、看着还是没边框）。
-        */
-        expect(grip.className).toContain("cell-selectable")
-        expect(edgesOf(first)).not.toContain("cell-edge-left")
+        expect(isSelected(first)).toBe(true)
+        expect(isSelected(last)).toBe(true)
+        expect(selectionEdgesOf(first)).toContain("cell-edge-left") // 左边缘画在握把外沿（overlay 几何）
+        expect(selectionEdgesOf(last)).not.toContain("cell-edge-right") // 整行选中不画右边缘（末列无格线）
     })
 })

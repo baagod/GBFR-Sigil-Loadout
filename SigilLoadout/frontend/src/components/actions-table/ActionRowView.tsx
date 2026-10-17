@@ -17,12 +17,9 @@ import {
     HANDLE_WIDTH,
     PINNED_CELL,
     READ_ONLY_BG,
-    cellCopyRing,
     handleCellClass,
-    ringClasses,
-    selectionClass,
 } from "./classes"
-import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, type CopySource, snapshotKey} from "./model"
+import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, snapshotKey} from "./model"
 
 /**
  * 一格里那层**格子**（shadcn 的 `TableCell`，DOM 上仍是 `<td>`）—— **第二道 memo 命门**
@@ -136,7 +133,8 @@ const RowCell = memo(function RowCell({
  * 把关的话，51 行 × 88 列 **四千多格每格都要重算一遍**，每行几十毫秒而一帧只有 16ms，
  * 拖起来明显掉帧。有了它，一次写入只重渲"外观真的变了"的那几行。
  *
- * `edgeKey` 只作比较、不参与渲染，所以**不解构**它。
+ * 选区外观（底色/轮廓/复制虚线）**不在这里画**：由 `SelectionOverlay` 一层 overlay 负责，
+ * 所以本组件的 `memo` 也不再需要"选中态指纹"来触发重渲。
  */
 export const ActionRowView = memo(function ActionRowView({
     row,
@@ -144,7 +142,6 @@ export const ActionRowView = memo(function ActionRowView({
     rowNumber,
     measured,
     rowHeadWidth,
-    copySource,
     draggedRef,
     activeCellKey,
     scrollActiveIntoView,
@@ -157,22 +154,17 @@ export const ActionRowView = memo(function ActionRowView({
     columnOf,
 }: {
     row: Row<typeof features, ActionRow>
-    /** 这一行外观的指纹：只参与 `memo` 比较，渲染不用。 */
-    edgeKey: string
     /** 行号列里显示的数字（从 1 数起）。 */
     rowNumber: number
     /**
      * 这一行是不是**整行都在选区里**（由 `ActionsTable` 按选区矩形算出来，见 `rowFullySelected`）。
-     * 只用来点亮**行号格**自己 —— 数据格的选中/边框全部由库的 `cell.getIsSelected()` /
-     * `getSelectionEdges()` 给（整行选区就是一条普通的区）。
+     * 只用来点亮**行号格**自己 —— 数据格的底色/轮廓由 `SelectionOverlay` 统一画（整行选区就是一条普通的区）。
      */
     rowSelected: boolean
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */
     measured: boolean
     /** **行头那几格的总宽**（行号列 40，能拖的表再加握把列 32）—— 钉住列的 `left` 从它之后起算。 */
     rowHeadWidth: number
-    /** 复制源：算"这一格在不在复制区外圈、在哪几条边上"（见 `cellCopyRing`）。 */
-    copySource: CopySource | null
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
     draggedRef: RefObject<boolean>
     /**
@@ -201,18 +193,7 @@ export const ActionRowView = memo(function ActionRowView({
 }) {
     /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
     const rowCells = row.getAllCells()
-    /*
-        ‼️ **握把列也要算进选中框**（用户口径：除了行号列，其他格的选择都带边框）。
-
-        为什么不能"直接不实现"：握把不在**列模型**里（基座额外渲染的一格），而选区矩形只覆盖模型里的
-        格子 —— 它天生盖不到握把。做法：把左边界**交接**给握把（画 左+上+下），第一个数据列那条左边
-        不画（`selectionClass(cell, {left: true})`）—— 两格相邻的边界只能画一次。
-    */
-    const firstData = rowCells[0]
-    /* `sortable` 先短路：没开拖动的表（动作表）每行都不必去问库要边信息。 */
-    const firstEdges = sortable && firstData?.getIsSelected() ? firstData.getSelectionEdges() : null
-    /* 握把画的 = 那一圈去掉右边；线由 `.cell-selectable::before` 画，所以挂环时得连它一起带上。 */
-    const gripRing = firstEdges ? ringClasses({...firstEdges, right: false}, "cell-edge") : ""
+    /* 握把列也在选区轮廓里：overlay 的几何在“选区包含第一列”时向左包住 `GRIP_WIDTH`（见 `selectionOverlay.ts`）。 */
     /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
     const removed = row.original.removed === true
     /**
@@ -282,17 +263,10 @@ export const ActionRowView = memo(function ActionRowView({
                     */
                     aria-label="拖动排序"
                     {...drag.listeners}
-                    /*
-                        ‼️ 选中环那一圈**靠 `.cell-selectable::before` 画**（`cell-edge-*` 那几个类只设
-                        `--edge-*` 变量，自己不画线，见 `style.css`）。握把这一格用的是 `handleCellClass`、
-                        本来没有 `cell-selectable` —— 只挂 `cell-edge-*` 的话**一个像素都不会有**（用户报的
-                        "还是没边框"就是这么来的：类挂上了，选择器匹配不到）。
-                        所以有环时把 `cell-selectable` 一起带上；光标用**行内**写死 `grab`（那张表里的
-                        `cursor: cell` 特异性高过 Tailwind 的 `cursor-grab`，不写死就会被改成交叉光标）。
-                    */
+                    /* 选中轮廓由 overlay 统一画；这里只保留拖拽光标与拖动中的半透明反馈。 */
                     className={`${handleCellClass(rowSelected)} relative touch-none cursor-grab active:cursor-grabbing ${
-                        gripRing ? `${gripRing} cell-selectable` : ""
-                    } ${drag.isDragging ? "opacity-40" : ""}`}
+                        drag.isDragging ? "opacity-40" : ""
+                    }`}
                     style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
                 >
                     <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
@@ -303,8 +277,6 @@ export const ActionRowView = memo(function ActionRowView({
                 const key = cell.column.id
                 /** 这一格**上屏的字**（`accessorFn` 给的：与排序、**复制**同一个来源 —— 复制读的就是它）。 */
                 const shown = String(cell.getValue() ?? "")
-                /* 行末那一格（DOM 顺序 = 列模型顺序）—— 整行选中时它不画右边缘（用户口径，见 `selectionClass`）。 */
-                const isRowEnd = cell.id === rowCells[rowCells.length - 1]?.id
                 const pinned = cell.column.getIsPinned()
                 const kind = columnKind(key)
                 /*
@@ -331,9 +303,8 @@ export const ActionRowView = memo(function ActionRowView({
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={shown}
-                        /* ‼️ 选择相关的**结果**在行这层算好再传（理由见 `RowCell` 那段）；`rowSelected` 一并交给
-                           `selectionClass`：整行选中时行末那一格不画右边缘（用户口径，理由见那个函数）。 */
-                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${selectionClass(cell, {right: rowSelected && isRowEnd, left: gripRing !== "" && cell.id === firstData?.id})} ${cellCopyRing(copySource, row.id, key)} ${columnCellClass}`}
+                        /* 选区底色/轮廓由 overlay 统一画；这里只剩列底色、焦点、活动格标记与复制虚线。 */
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${isActiveCell ? "cell-active" : ""} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}
                         /*

@@ -46,33 +46,21 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
     })
 
     /*
-        ‼️ 护的是"**活动格不填底色**"（Excel 的约定）：拖选起点那一格即使带 `.cell-selected` 也要让掉底色，
-        别的格子照旧。少了这条，用户要的"第一格无选区白底"就会退回"所有格子一个色"。
+        ‼️ 护的是"选区两层夹在正确的位置"：滚动层在冻结列之下（横滚时被冻结列盖住），
+        钉住层在冻结列之上、吸顶表头之下。层号写在 `SelectionOverlayView.tsx`（内联 `z-[41]` / `z-[52]`），
+        这里把**关系**钉住：焦点环 < 滚动层 < 冻结层 < 钉住层 < 表头行。
+        活动格"不填底色"由 overlay 几何挖洞保证（`selectionOverlay.test.ts` 有单测），不再靠 CSS 规则。
     */
-    it("活动格（cell-active）让掉选中底色", () => {
-        expect(code).toMatch(/td\.cell-selected\.cell-active\s*\{[^}]*box-shadow:\s*none/)
-    })
-
-    /*
-        ‼️ 护的是一次**真实事故**（1:1 截图像素实测）：实线"格外那 1px"落在邻格身上，而冻结列的邻格
-        同层且 DOM 在后，于是被盖掉 —— 表现为"`id_` 右边/下边、`abilityTag_` 下边各少 1px"。
-        关系钉在 token 的 `calc()` 上：改关系即变红，改基础值时关系仍被守住。
-    */
-    it("层高阶梯：冻结区轮廓压冻结层一级；虚线靠格内顺序压住实线（复制格不提层）", () => {
-        expect(usesRule("var(--z-pinned-edge)").some((sel) => sel.includes("td.cell-pinned") && sel.includes("cell-edge"))).toBe(true)
-        /*
-            阶梯只断言**关系**（焦点 < 轮廓 < 冻结），不断言那几个裸数字：具体取 41 还是 42 与行为无关，
-            钉死它只会让"调一档层高"变成改测试（与上面 `usesRule` 那段的说明同一个口径）。
-        */
+    it("层高阶梯：焦点环 < overlay 滚动层(41) < 冻结层(50) < overlay 钉住层(52) < 表头(60)", () => {
         const z = (name: string) => Number(code.match(new RegExp(`--${name}:\\s*(\\d+)`))?.[1])
-        expect(z("z-focus")).toBeLessThan(z("z-edge"))
-        expect(z("z-edge")).toBeLessThan(z("z-pinned"))
-        expect(code).toMatch(/--z-pinned-edge:\s*calc\(var\(--z-pinned\)\s*\+\s*1\)/)
-        // 格内顺序：实线 ::before(1) < 虚线 ::after(2)
-        expect(code).toMatch(/\.cell-selectable::before\s*\{[^}]*z-index:\s*1/)
-        expect(code).toMatch(/td\.cell-copy-[^{]*::after[^{]*\{[^}]*z-index:\s*2/)
-        // ‼️ 复制区**整格不许提层**：一提就把邻格的选区边框咬掉 2px（同坐标差分实测 96 个绿像素）
-        expect(code).not.toMatch(/--z-(copy|pinned-copy)/)
+        const overlay = readFileSync(new URL("./components/actions-table/SelectionOverlayView.tsx", import.meta.url), "utf8")
+        const layers = [...overlay.matchAll(/z-\[(\d+)\]/g)].map((m) => Number(m[1]))
+        expect(layers).toContain(41)
+        expect(layers).toContain(52)
+        expect(z("z-focus")).toBeLessThan(41)
+        expect(41).toBeLessThan(z("z-pinned"))
+        expect(z("z-pinned")).toBeLessThan(52)
+        expect(52).toBeLessThan(60)
     })
 
     /* ‼️ "拖拽 = 拉选区"的前提；也是只读格可选态只能走**行内样式**的原因（未分层压过 utilities 层）。 */

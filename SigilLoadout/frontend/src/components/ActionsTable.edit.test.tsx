@@ -16,6 +16,7 @@ import {ActionsTable} from "@/components/ActionsTable"
 
 import {CELL_PADDING, INPUT_PADDING} from "@/components/actions-table/classes"
 import {KEYS, LongField, cellAt, clickToEdit, cleanup, selectCell, t, tableProps, useTableHarness} from "@/components/actions-table/testkit"
+import {isSelected, selectedCount} from "@/components/actions-table/testkit"
 
 const {renderTable, renderWithSave, rows} = useTableHarness()
 
@@ -84,14 +85,14 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
 
         expect(layer.style.userSelect).toBe("text")
         expect(cell.querySelector("input")).toBeNull() // 不进编辑态
-        expect(cell.className).toContain("cell-selected")
+        expect(isSelected(cell)).toBe(true)
 
         /*
             ‼️ 进了态，按下就归"划文字"：**格选区手势让位** —— Ctrl 点在已选中的格上本该是"减选"，
             这一下不该发生（与下面编辑态那条同一条职责划分，Excel 同款）。
         */
         fireEvent.mouseDown(layer, {ctrlKey: true})
-        expect(cell.className, "可选态里按下不该动选区").toContain("cell-selected")
+        expect(isSelected(cell), "可选态里按下不该动选区").toBe(true)
 
         /*
             ‼️ 真机踩到的坑：Chromium 里按在格内那个 `span` 上时，焦点会**先离开这一层再回来**
@@ -113,15 +114,15 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         const cell = cellAt(container, 0, 2)
         clickToEdit(cell)
         const input = cell.querySelector("input")!
-        expect(cell.className).toContain("cell-selected")
+        expect(isSelected(cell)).toBe(true)
 
         fireEvent.mouseDown(input, {ctrlKey: true})
-        expect(cell.className, "编辑态里按下不该动选区").toContain("cell-selected")
+        expect(isSelected(cell), "编辑态里按下不该动选区").toBe(true)
 
         /* 反面：同一格退出编辑之后，Ctrl 点它就是正常的"减选"。 */
         fireEvent.keyDown(input, {key: "Escape"})
         fireEvent.mouseDown(cell, {ctrlKey: true})
-        expect(cell.className, "退出编辑后 Ctrl 点仍该减选").not.toContain("cell-selected")
+        expect(isSelected(cell), "退出编辑后 Ctrl 点仍该减选").toBe(false)
     })
 
     /*
@@ -331,7 +332,7 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         fireEvent.click(cell.firstElementChild!, {ctrlKey: true})
 
         expect(cell.querySelector("input")).toBeNull() // 没进编辑
-        expect(container.querySelectorAll("td.cell-selected").length).toBe(0) // 而且真的减选了
+        expect(selectedCount(container)).toBe(0) // 而且真的减选了
     })
 
     it("Cell 在渲染期同步外部值，不触发 React 的警告", async () => {
