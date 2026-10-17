@@ -805,9 +805,11 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     ⚠️ 表宽必须**自己把行头那几格加上**（见 `rowHeadWidth`）：`getTotalSize()` 只算数据列
                     （行号列与握把列都不入列模型）。漏了它，`table-fixed` 下浏览器会把这点宽度从各数据列里
                     摊走 —— 每列比量出来的整数窄一点点，表头列名又被截成 `…`。
-                    ‼️ 量完之前表格**隐身**：仍留在 DOM 里（量列宽靠它的 rect 与列的自然宽度），但不占版面。
+                    ‼️ 没量好时这里**不用**再写 `invisible` / `absolute`：那时 `offscreen` 必为真
+                    （`hidden = loading || !measured`），整块外壳已经被挪到屏幕外 —— 表格隐不隐身无关紧要，
+                    写上就是一条永远单独生效不了的冗余分支。
                 */
-                className={`${measured ? "table-fixed " : "invisible absolute "}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
+                className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
                 style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
             >
                 <ActionsTableHead
