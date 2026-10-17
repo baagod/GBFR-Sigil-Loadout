@@ -203,15 +203,15 @@ try {
     }
     # vite 只抹掉类型，后面的步骤都不会发现类型错误：所以先跑编译器。测试也是一道门禁——带着
     # 红的测试集发出去的就是没检查过的版本。
-    & npm --prefix (Join-Path $toolDir 'frontend') run typecheck
+    & pnpm --dir (Join-Path $toolDir 'frontend') run typecheck
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend typecheck failed with exit code $LASTEXITCODE."
     }
-    & npm --prefix (Join-Path $toolDir 'frontend') test
+    & pnpm --dir (Join-Path $toolDir 'frontend') test
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend tests failed with exit code $LASTEXITCODE."
     }
-    & npm --prefix (Join-Path $toolDir 'frontend') run build
+    & pnpm --dir (Join-Path $toolDir 'frontend') run build
     if ($LASTEXITCODE -ne 0) {
         throw "Tool frontend build failed with exit code $LASTEXITCODE."
     }

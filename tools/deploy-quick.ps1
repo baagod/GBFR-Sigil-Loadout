@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 # 快速迭代：**只**重编前端 + exe，连 assets\ 一起盖到已经部署好的 mod 目录并重启工具。约 20 秒。
 #
-# 为什么快：前端是 go:embed 进 SigilLoadout.exe 的，所以前端改动也只需要 npm build + go build 两步 ——
+# 为什么快：前端是 go:embed 进 SigilLoadout.exe 的，所以前端改动也只需要 pnpm build + go build 两步 ——
 # build-release.ps1 那条约 1.5 分钟的链里，C++（原生 dll）、dotnet（mod dll）、ZIP、以及整套 -race
 # 测试，改界面时一个都不用跑。
 #
@@ -55,10 +55,10 @@ $beforeExeMtime = if (Test-Path -LiteralPath $exe) { (Get-Item -LiteralPath $exe
 Push-Location $toolDir
 try {
     if (-not $NoTypecheck) {
-        & npm --prefix frontend run typecheck
+        & pnpm --dir frontend run typecheck
         if ($LASTEXITCODE -ne 0) { throw '前端 typecheck 没过。' }
     }
-    & npm --prefix frontend run build
+    & pnpm --dir frontend run build
     if ($LASTEXITCODE -ne 0) { throw '前端构建失败。' }
     # 与 build-release.ps1 用同一组 flags，产物除了代码之外没有别的差别。
     & go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o $exe .
