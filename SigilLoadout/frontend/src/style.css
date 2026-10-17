@@ -6,177 +6,130 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-        --color-background:           var(--background);
-        --color-foreground:           var(--foreground);
-        --color-popover:              var(--popover);
-        --color-popover-foreground:   var(--popover-foreground);
-        --color-primary:              var(--primary);
-        --color-primary-foreground:   var(--primary-foreground);
-        --color-secondary:            var(--secondary);
-        --color-secondary-foreground: var(--secondary-foreground);
-        --color-muted:                var(--muted);
-        --color-muted-foreground:     var(--muted-foreground);
-        --color-accent:               var(--accent);
-        --color-accent-foreground:    var(--accent-foreground);
-        --color-destructive:          var(--destructive);
-        --color-border:               var(--border);
-        --color-input:                var(--input);
-        --color-ring:                 var(--ring);
-        --radius-sm:                  calc(var(--radius) * 0.6);
-        --radius-md:                  calc(var(--radius) * 0.8);
-        --radius-lg:                  var(--radius);
-        --radius-xl:                  calc(var(--radius) * 1.4);
-        --radius-2xl:                 calc(var(--radius) * 1.8);
-        --radius-3xl:                 calc(var(--radius) * 2.2);
-        --radius-4xl:                 calc(var(--radius) * 2.6);
-        --font-heading:               var(--font-sans);
-        /*
-            中文一对一指定，不再靠 sans-serif 撞。
-
-            Geist 只有拉丁/西里尔/越南字形（构建产物里就是 geist-latin / -cyrillic / -vietnamese
-            那几个 woff2），所以中文一直是走 sans-serif 兜底、字体不受控。这里把 Noto Sans SC
-            排进第二顺位：它和游戏里那种 CJK 黑体同源（思源黑体），本机已装
-            （C:\Windows\Fonts\NotoSansSC-VF.ttf），零下载；没装的机器退到微软雅黑，仍可用。
-            拉丁数字仍由 Geist 出字（排在最前），于是数字是 Geist 的等宽感。
-        */
-        --font-sans:                  'Geist Variable', 'Noto Sans SC', 'Microsoft YaHei UI', sans-serif;
+    --color-background:           var(--background);
+    --color-foreground:           var(--foreground);
+    --color-popover:              var(--popover);
+    --color-popover-foreground:   var(--popover-foreground);
+    --color-primary:              var(--primary);
+    --color-primary-foreground:   var(--primary-foreground);
+    --color-secondary:            var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted:                var(--muted);
+    --color-muted-foreground:     var(--muted-foreground);
+    --color-accent:               var(--accent);
+    --color-accent-foreground:    var(--accent-foreground);
+    --color-destructive:          var(--destructive);
+    --color-border:               var(--border);
+    --color-input:                var(--input);
+    --color-ring:                 var(--ring);
+    --radius-sm:                  calc(var(--radius) * 0.6);
+    --radius-md:                  calc(var(--radius) * 0.8);
+    --radius-lg:                  var(--radius);
+    --radius-xl:                  calc(var(--radius) * 1.4);
+    --radius-2xl:                 calc(var(--radius) * 1.8);
+    --radius-3xl:                 calc(var(--radius) * 2.2);
+    --radius-4xl:                 calc(var(--radius) * 2.6);
+    --font-heading:               var(--font-sans);
+    /* 中文一对一指定：Geist 没有 CJK 字形，Noto Sans SC（思源黑体同源、本机已装）排第二顺位，
+       没装退微软雅黑；拉丁/数字仍由 Geist 出字。 */
+    --font-sans:                  'Geist Variable', 'Noto Sans SC', 'Microsoft YaHei UI', sans-serif;
 }
 
+/* **单主题（只有深色）**：`index.html` 的 `<html>` 恒带 `class="dark"`，应用没有主题切换 ——
+   所以只保留一份深色值在 `:root`，并用 `color-scheme: dark` 让原生控件（滚动条/输入框）也是深色。
+   以后要加浅色主题再拆 `:root` / `.dark`（或用 `light-dark()`），别在这份上叠覆盖。 */
 :root {
-        --radius:               0.625rem;
-        --background:           oklch(1 0 0);
-        --foreground:           oklch(0.145 0 0);
-        --popover:              oklch(1 0 0);
-        --popover-foreground:   oklch(0.145 0 0);
-        --primary:              oklch(0.205 0 0);
-        --primary-foreground:   oklch(0.985 0 0);
-        --secondary:            oklch(0.97 0 0);
-        --secondary-foreground: oklch(0.205 0 0);
-        --muted:                oklch(0.97 0 0);
-        --muted-foreground:     oklch(0.556 0 0);
-        --accent:               oklch(0.97 0 0);
-        --accent-foreground:    oklch(0.205 0 0);
-        --destructive:          oklch(0.577 0.245 27.325);
-        --border:               oklch(0.922 0 0);
-        --input:                oklch(0.922 0 0);
-        --ring:                 oklch(0.708 0 0);
+    color-scheme:           dark;
 
-        /*
-            **层高刻度（页面级，不只是表格）**。
+    --radius:               0.625rem;
+    --background:           #0a0a0a;
+    --foreground:           #f9f9f9;
+    --popover:              #171717;
+    --popover-foreground:   oklch(0.985 0 0);
+    --primary:              oklch(0.922 0 0);
+    --primary-foreground:   oklch(0.205 0 0);
+    --secondary:            #272727;
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted:                #272727;
+    --muted-foreground:     oklch(0.708 0 0);
+    --accent:               #272727;
+    --accent-foreground:    oklch(0.985 0 0);
+    --destructive:          #ff6568;
+    --border:               oklch(1 0 0 / 10%);
+    --input:                #404040;
+    --ring:                 oklch(0.556 0 0);
 
-            ‼️ 必须是 **全局** 的。原先它们写在 `table { }` 里 —— 只有表格子树解析得到；别的页
-            （专精技能页的吸顶角色行）写 `z-index: var(--z-focus)` 时变量解析不出来，
-            **整条 `z-index` 会被丢弃**、回落到 `auto`，于是被下面类型行的 `z-index: 20` 压住
-            （实测：角色行 computed `z-index` 是 `auto`，吸顶被"穿透"）。
-        */
-        --z-focus:              30;
-        --z-edge:               41;
-        --z-pinned:             50;
-        --z-pinned-edge:        calc(var(--z-pinned) + 1);
-}
+    /* 选区那套色（轮廓 / 复制虚线 / 行号列选中文字 / 底色基色）—— 改一处即可。 */
+    --cell-select:          #007a55;
+    --cell-fill:            color-mix(in oklab, var(--cell-select) 50%, #8a8a8a);
+    --cell-fill-alpha:      8%;
+    /* 由基色派生的两层：半透明叠色（区外露底色）/ 行号列需要的实色。 */
+    --cell-fill-overlay:    color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent);
+    --cell-fill-solid:      color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
 
-.dark {
-        --background:           #0a0a0a;
-        --foreground:           #f9f9f9;
-        --popover:              #171717;
-        --popover-foreground:   oklch(0.985 0 0);
-        --primary:              oklch(0.922 0 0);
-        --primary-foreground:   oklch(0.205 0 0);
-        --secondary:            #272727;
-        --secondary-foreground: oklch(0.985 0 0);
-        --muted:                #272727;
-        --muted-foreground:     oklch(0.708 0 0);
-        --accent:               #272727;
-        --accent-foreground:    oklch(0.985 0 0);
-        --destructive:          #ff6568;
-        --border:               oklch(1 0 0 / 10%);
-        --input:                #404040;
-        --ring:                 oklch(0.556 0 0);
+    /* 层高刻度（页面级）：别的页（专精技能吸顶行）也用 `var(--z-focus)`；写在 `table` 里只有表格
+       子树解析得到，别的页会整条 `z-index` 失效、被吸顶行压住。 */
+    --z-focus:              30;
+    --z-edge:               41;
+    --z-pinned:             50;
+    --z-pinned-edge:        calc(var(--z-pinned) + 1);
 }
 
 @layer base {
-        * {
-                @apply border-border outline-ring/50;
-        }
+    * {
+        @apply border-border outline-ring/50;
+    }
 
-        /*
-            cursor：可选中文字默认给 I 形光标（cursor: auto 在文字上解析成 text）。整棵树收回箭头，
-            只给输入框显式要回 I 形光标——页面上的文字标签因此不必一个个加 cursor-default。
-        */
-        body {
-                @apply bg-background text-foreground cursor-default;
-        }
+    /* cursor：文字默认是 I 形光标。整棵树收回箭头，只给输入框显式要回 I 形。 */
+    body {
+        @apply bg-background text-foreground cursor-default;
+    }
 
-        input, textarea {
-                cursor: text;
-        }
+    input, textarea {
+        cursor: text;
+    }
 
-        html {
-                @apply font-sans;
-                color-scheme: dark;
-        }
+    html {
+        @apply font-sans;
+    }
 
-        /*
-            外壳钉在窗口上，只有列表滚动。
-
-            否则文档也会跟着滚：一个落在折线以下、而滚轮还在转的 tooltip 会短暂撑大可滚动区域，
-            于是窗口自己的滚动条从右边冒出来——它要从视口里拿走宽度，整个外壳就被推得向左一跳，
-            等它消失才弹回来。指针停在列表上快速上滚时能看到。
-        */
-        html, body {
-                overflow: hidden;
-        }
+    /* 外壳钉在窗口上，只有列表滚动：否则 tooltip 短暂撑大可滚动区域会冒出窗口滚动条。 */
+    html, body {
+        overflow: hidden;
+    }
 }
 
-/*
-    因子编辑那一页的行：勾选框是 `shadcn add` 放进 components/ui 的原样组件，这些行需要它多出来
-    的两件事写在下面，由列表上的 `.skill-rows` 限定作用范围。
-
-    用 class 而不是 data-slot：行的点击处理会把任何带 data-slot 的祖先当成控件（勾选框与数值框上
-    的点击就是靠这个保住自己的点击的），所以列表上挂 data-slot 会让点在行上的点击全被吞掉，
-    因子就展不开了。
-*/
+/* 因子编辑页的行：勾选框（shadcn 原样组件）只需这两处额外样式，作用域由 `.skill-rows` 限定。
+   用 class 不用 data-slot：行的点击处理会把带 data-slot 的祖先当控件，挂在列表上会吞掉行点击。 */
 @layer utilities {
-        /* 勾一下会让那一行移位，而组件自带的 transition 会在行已经跳走之后还在填充颜色，
-             看起来像是原地填的——那就是闪一下的来源。 */
-        .skill-rows [data-slot="checkbox"] {
-                transition: none;
-        }
+    /* 行会在勾选后移位；组件自带的过渡会拖到移位之后才填色，看起来像闪一下。 */
+    .skill-rows [data-slot="checkbox"] {
+        transition: none;
+    }
 
-        /* 勾选框是行的第一个子元素，而 focus ring 是向外长的，会被容器边缘切掉。行在左边留了 2px
-             给它，而 ring 正好是 2px。 */
-        .skill-rows [data-slot="checkbox"]:focus-visible {
-                box-shadow: 0 0 0 2px var(--ring);
-        }
+    /* focus ring 向外长 2px，会被容器边缘切掉：行左边留了 2px 给它。 */
+    .skill-rows [data-slot="checkbox"]:focus-visible {
+        box-shadow: 0 0 0 2px var(--ring);
+    }
 
-        /* 半选：盒子用选中态那套填充。那根横杠由行自己画——base-ui 只给 data-indeterminate，
-             而组件的 indicator 永远画的是对勾。 */
-        .skill-rows [data-slot="checkbox"][data-indeterminate] {
-                background-color: var(--primary);
-                border-color:     var(--primary);
-                color:            var(--primary-foreground);
-        }
+    /* 半选：盒子用选中态填充；横杠由行自己画（base-ui 只给 data-indeterminate）。 */
+    .skill-rows [data-slot="checkbox"][data-indeterminate] {
+        background-color: var(--primary);
+        border-color:     var(--primary);
+        color:            var(--primary-foreground);
+    }
 
-        .skill-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
-                display: none;
-        }
+    .skill-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
+        display: none;
+    }
 
-        /*
-            窗口失活时伪类会被判掉（指示灭），而 DOM 焦点还在框里。App 在那一刻给该元素挂上
-            data-focus-hold，这里把那套指示补齐；值必须与 components/ui 里的聚焦类一致。
-        */
-        [data-slot="input-group"]:has([data-focus-hold]) {
-                @apply border-ring ring-3 ring-ring/50;
-        }
+    /* 窗口失活时伪类失效、DOM 焦点还在：App 给该元素挂 data-focus-hold，这里补齐聚焦指示。 */
+    [data-slot="input-group"]:has([data-focus-hold]) {
+        @apply border-ring ring-3 ring-ring/50;
+    }
 
-        /*
-            数值框（因子编辑页与角色强化页那些数字框）**不在这里补**，因为它们**根本没有聚焦底色**：
-            原先那条 focus:bg-muted/50 在编译产物里排在 dark:bg-transparent 之前、被它压掉，只有浅色
-            主题下才看得见；既然本项目只跑深色，两页就一起把它删了，于是没有"聚焦时该显示什么"要补。
-
-            所以这里也不需要一条 data-focus-hold 规则：没有底色可保住。哪天要给回聚焦底色，记得连
-            这条规则一起补（否则窗口失活那一刻底色会留下）。
-        */
+    /* 数值框没有聚焦底色（深色下那条 focus:bg 被 dark:bg-transparent 压掉了），所以也不需要
+       data-focus-hold 规则；哪天补回聚焦底色，记得同时补那条。 */
 }
 
 /* 四个页签共用的页面内边距 ( 左右=20 上=16 下=24) */
@@ -184,38 +137,23 @@
     @apply px-5 pt-4 pb-6;
 }
 
-/*
-    行号格里那条分隔线（数字 | 握把）。
-
-    ⚠️ 别改回"给握把那半截加 border-l"：那两半的高度靠 `h-full`（百分比），而**表格里百分比高度
-    解析不可靠** —— 行高正好由行号格自己撑（24px）时看着是通的；一旦行高由别处撑起（flags 表现在是
-    两行格子撑 45px），那半截还是 24px，线就断成一段段（实测：tr/td 45px、内层与两半都是 24px）。
-    画在 td 的伪元素上就没有这个问题：`inset: 0` 跟着整格走，也不参与排版。
-
-    left: 36px = w-9（数字那半截的宽度，见 RowHandle）；表头那一格用同一个宽度对齐。
-*/
+/* 行号格里那条分隔线（数字 | 握把）。别改回"给握把那半截加 border-l"：表格里百分比高度不可靠，
+   行高一旦由别处撑起线就断成一段段；画在 td 的伪元素上跟着整格走、也不参与排版。 */
 @utility handle-divider {
     &::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 36px;
-        width: 1px;
+        content:          "";
+        position:         absolute;
+        top:              0;
+        bottom:           0;
+        left:             36px;
+        width:            1px;
         background-color: var(--input);
-        pointer-events: none;
+        pointer-events:   none;
     }
 }
 
-/*
-    表格外框、格线与表头的颜色，全站只写在这一处：统一用 `--input`（深色下 #404040）。
-
-    不用默认那颗 `--border`：表内输入框没有底色，格子之间只靠这几条线分开，而 `--border`（10% 白
-    ≈ #222323）在满屏密线里太淡。浅色主题下 `--input` 与 `--border` 本来就是同一个值，那边等于没变。
-
-    ⚠️ `& *` 同权重（0,1,0）压住表内所有元素：**表内任何单独的边框色都会被它吃掉**（同权重看先后，
-    这条通常在后）。要给某一格单独上色，得先把它改成更精确的选择器。
-*/
+/* 表格外框 / 格线 / 表头颜色只写这一处：统一 `--input`（深色下 #404040；`--border` 太淡）。
+   ⚠️ `& *` 同权重吃掉了表内所有单独的边框色，要给某格上色得用更精确的选择器。 */
 @utility table-border {
     border-color: var(--input);
 
@@ -224,84 +162,43 @@
     }
 }
 
-/*
-    ⚠️ 角色动作页这三张表**不做悬停反馈** —— 用户明确要求、永久不做：不要再往 td/tr 上挂 `hover:`
-    底色或任何悬停叠加层。
+/* ⚠️ 角色动作页三张表**永久不做悬停反馈**：不要再往 td/tr 挂 `hover:` 底色或悬停叠加层。
+   （行/格背景色只有一份，占了会顶掉假删除的红与选中层；要两全就得多一层伪元素，不值得。） */
 
-    技术上也没有坑位：行 / 格的**背景色只有一份**，占了会顶掉假删除那行的红、也会顶掉选中那层
-    （`bg-linear-to-b from-white/14`，走背景图）；要同时成立就得再开一层伪元素 —— 为一件用户不要的
-    东西加复杂度。
-*/
+/* 选值格箭头由 `ComboboxTrigger` 自带；弹层保持组件默认光标（别再整层设 crosshair）。 */
 
-/* 选值格的箭头不在这里画：`ComboboxTrigger` 自带（原先那个 12px 的 mask `::after` 已删）。 */
-
-/*
-    选值格的**弹层不覆盖光标** —— 列表里保持组件默认的箭头（⛔ 别再整层设成表格那根十字）。
-
-    早先这里写的是 `.cell-pick-list, .cell-pick-list * { cursor: cell }`，为了消掉"指针停在格子
-    下边缘点开时光标跳一下"；代价是列表項的箭头也变成了十字 —— 不划算，已撤。
-*/
-
-/*
-    选值格弹层**不带动画**。
-
-    为什么：弹层基类带 `data-open:animate-in fade-in zoom-in-95` + `duration-100`，而展开的同一瞬间
-    库会把第一项设成高亮（`useListNavigation` 的 `focusItemOnOpen`）—— 两者叠在一起时高亮会在动画期间
-    "冒出来又撤掉"，看着就是闪一下。把这个标记类的动画停掉即可，不需要任何"闸门/延迟"。
-
-    ⚠️ 只覆盖这一层，`ui/combobox` 基类一个字不动；别的下拉照旧带动画。
-*/
+/* 选值格弹层**不带动画**：弹层自带的 fade/zoom 会与"展开瞬间第一项被高亮"叠成闪一下。
+   只覆盖这一层，`ui/combobox` 基类不动。 */
 .cell-pick-list {
-    animation: none !important;
+    animation:  none !important;
     transition: none !important;
 }
 
 /*
-    聚焦 / 编辑中的格子那一圈线：**从格子外沿往里画 2px**，画在 `::after` 上（`::before` 留给选区框）。
+    聚焦 / 编辑中格子的那圈线：画在 `::after` 上（`::before` 归选区框），从格子外沿往里 2px。
+    用伪元素 `inset: -1px` 正好盖住"格子 + 一圈 1px 格线"；末列/末行没有格线，右/下各收回 1px，
+    否则会越过表格边缘、撑出滚动条。
 
-    不用 ring：ring 画在输入框**外面**（box-shadow），2px 会越出格子 —— 上沿顶进表头、左右顶进邻格；
-    改成 inset 又紧贴格线，2px 环 + 1px 格线连成一条 3px 的带子，看着像加粗。伪元素用 `inset: -1px`
-    正好铺满"格子 + 那一圈 1px 格线"，边框朝里画 2px —— 正好压住这一格的四条格线，且一点都不越界。
-    最后一行 / 最后一列那两条边没有格线（表格上有 `[&_tr>*:last-child]:border-r-0`），`inset: -1px`
-    会越过表格边缘 1px（点一下最后一列，容器就平白冒出一条横向滚动条），所以右 / 下各收回 1px。
-
-    ‼️ **环出现的两种情形合成一条**（`环要画` 与 `末列/末行收起 1px` 是同一件事的两半，拆成两组写就会漏）：
-      · `:focus-within` —— 焦点就在这一格（显示态 / 编辑框）；
-      · `:has(.cell-pick-mark[data-popup-open])` —— **列表真的开着**（base-ui 给触发器挂的属性）：
-        那时焦点跑进了 portal（弹层不在这一格里面），`:focus-within` 不成立，只能靠它。
-      原来后一种单独写了一组、**没带上末行/末列的收回** —— 末行的值格一点开，环的下边框就撑出格底
-      1px，轨表那个"高度刚好等于内容"的滚动盒于是冒出纵向滚动条（用户截图）。
-      z-index 与环两处都要带，否则环会被吸顶列盖住。
-
-    ⚠️ **聚焦环必须排在冻结层之下**（`--z-focus` < `--z-pinned`，整条阶梯见下面那份唯一的表）：否则一聚焦，
-    那格的内容就画到吸顶列上面（实测穿过动作表第一列 `id_`）。
+    ‼️ 两种出现情形必须写在同一条规则里（环本身 + 末行/末列收回是同一件事的两半）：
+      · `:focus-within`：焦点在这一格；
+      · `:has(.cell-pick-mark[data-popup-open])`：选值格列表开着（焦点在 portal 里，`focus-within` 不成立）。
+    ⚠️ 聚焦环必须排在冻结层之下（`--z-focus` < `--z-pinned`），否则聚焦时内容会画到吸顶列上面。
 */
 @utility cell-focus {
     position: relative;
 
-    /*
-        ‼️ **环出现的两种情形只在这里写一遍**（判据见上）：环本身与"末列/末行收起 1px"全吃这一份 ——
-        拆开写就会漏（漏过一次：第三种情形单独成组、没带上收起，末行值格一点开就冒出纵向滚动条）。
-    */
-    /*
-        ‼️ **聚焦态那一支必须要求"这一格还在选中区里"**（`.cell-selected`）：Ctrl 点一下是**减选**，
-        浏览器却仍把焦点留在格子上（`focus` 只跟着 `mousedown` 走），于是 `:focus-within` 一直为真、
-        环就留成一道厚边框（用户报的"取消选择后多出厚边框"）。
-        "焦点在格子里"与"这一格被选中"本来就是同一件事（点一下同时给两样），
-        所以这条判据不会误伤；选值格开着列表那一支（`:has(...)`）照旧不受影响。
-    */
     &:is(.cell-selected:focus-within, :has(.cell-pick-mark[data-popup-open])) {
         z-index: var(--z-focus);
 
         &::after {
-            content: "";
-            position: absolute;
-            inset: -1px;
-            border: 2px solid var(--ring);
+            content:        "";
+            position:       absolute;
+            inset:          -1px;
+            border:         2px solid var(--ring);
             pointer-events: none;
         }
 
-        /* 末列 / 末行那两条边没有格线，`inset: -1px` 会越过表格边缘 1px（末行那 1px 还会撑出滚动条）。 */
+        /* 末列 / 末行没有格线：`inset: -1px` 会越过表格边缘 1px（末行那 1px 还会撑出滚动条）。 */
         &:last-child::after {
             right: 0;
         }
@@ -312,594 +209,292 @@
     }
 }
 
-/*
-    单元格选择（`cellSelectionFeature`）：选中的格子上一层底色，并**只画落在外边界上的那几条边**
-    （`cell.getSelectionEdges()` 说哪条在外围）—— 于是任意多个矩形拼起来是**一条连续轮廓**，而不是
-    每格一圈框。那块几何判断是库替我们算的：自己写要逐格看四个方向的邻格。
-*/
+/* 拖拽划过一片时别把文字选蓝；十字光标是表格通用语（xlsx 同款）。 */
 .cell-selectable {
-    /* 拖拽划过一片时别把文字选蓝；十字光标是表格的通用语（xlsx 同款）。 */
-    cursor: cell;
+    cursor:      cell;
     user-select: none;
 }
 
-/*
-    拖选性能：屏幕外的行不参与重算。
-
-    动作表最大那张（主人公）138 行 × 87 列 = 12006 格。拖选每跨一行让 React 提交一次，而浏览器要为
-    **整张表**重算样式与布局（真机实测：拖 20 行 = 18 个 >100ms 长帧、最长 183ms，中位帧只有 4ms）。
-    `content-visibility: auto` 让浏览器跳过屏幕外那些行的样式/布局/绘制；`contain-intrinsic-size`
-    给出行高，免得跳过布局之后滚动条长度乱跳（行高跟着 `ROW_HEIGHT` 的 `h-6` = 1.5rem 走）。
-*/
+/* 拖选性能：屏幕外的行不参与重算（全局参数表用）。⚠️ 基表不用（见下一条，实测它反而是拖选/悬停卡顿主因）。 */
 tbody tr {
-    content-visibility: auto;
-    /* ⚠️ 27px 是**实测行高**（`h-6` 的 24 + 上下格线），不是 `h-6` 那个 24 —— 估算值写小了，浏览器每次
-       都要把跳过布局的行按错的尺寸重算一遍（首次拖选因此多花几百毫秒）。 */
+    content-visibility:     auto;
+    /* 27px = 实测行高（h-6 的 24 + 上下格线），写错会让滚动条长度乱跳。 */
     contain-intrinsic-size: auto 27px;
 }
 
 /*
-    ============ 提层阶梯：**唯一的一份**（别处只引用，不再写裸数字） ============
-    层高全部走下面几个 token，关系用 `calc()` 表达 —— 改基础值即整体跟着走：
+    ============ 基表行：两条"别让浏览器每次指针移动重算整表"的硬约束 ============
 
-      焦点环 --z-focus(30)  <  滚动区的选区轮廓 --z-edge(41)  <  冻结层 --z-pinned(50)
-                            <  冻结区的轮廓 --z-pinned-edge(51)  <  吸顶表头行 60
-                            <  弹窗里的分节标题 70（在表之外，见 AnimationDetail）
+    1. **不要 `content-visibility`**：它把每行变成 display-lock，指针每移动一格都要在"锁定/解锁"树上
+       做命中测试（`LayoutView::HitTest`）与 PrePaint。主角表（138 × 88 = 12,144 格）实测：
+       带 CV → HitTest 570ms（单次最大 106ms）/ PrePaint 584ms；关掉 → 77ms / 134ms；只悬停不按下
+       也从 22 个 >100ms 长帧降到 1 个。
 
-    · **虚线压住实线只靠格内顺序**：本格 `::before`（实线，z-index: 1）< 本格 `::after`（虚线，z-index: 2）。
-      ‼️ **复制区整格不许提层**：一提就压过邻格的选区边框，把人家 3px 咬掉 2px（1:1 同坐标差分实测：
-      相邻场景丢 96 个绿像素；不提层则为 0，而"虚线压实线"的效果**逐像素不变**）。
-    · 冻结区 = 滚动区 + 9：冻结列必须压过横滚过来的内容 —— 掉下去连点击都会被抢走（见下）；
-    · 冻结区的轮廓比冻结层再高一级（`--z-pinned-edge` = 50 + 1）：冻结列的**邻格也在冻结层**，
-      实线"格外那 1px"落在邻格身上、而邻格 DOM 在后 → 会被盖掉，表现为"冻结格上实线的右边、
-      下边各少 1px"（1:1 截图像素实测）。
-    · 吸顶表头行那个 60 在渲染层（`ActionsTable.tsx` 的 `<tr className="sticky top-0 z-60">`）——
-      表头是整张表体之上的独立一层，不参与上面这条链。
-      ⚠️ 它是**表格内部**的最高层；弹窗里那些分节标题（AnimationDetail 的 `z-[70]`）在表**之外**，
-      必须再高一档 —— 两边都写 60 时，表格在 DOM 里排在标题后面，同层"后画的上" → 表头穿透标题。
+    2. **不要 hover 底色 / 颜色过渡**：shadcn `TableRow` 自带 `transition-colors hover:bg-muted/50`，
+       而基表格子都有不透明底色 → 这层 hover 一个像素也看不见，却让"指针换一行"变成整行重绘
+       （行宽 9369px）。实测：20 行拖选 `>16ms` 帧 47 → 24；滚轮滚动中位帧 **25ms → 4.2ms**。
 
-    ‼️ **`th` 与 `td` 都要覆盖**（踩过，别再漏）：这条规则一开始只写了 `table td.cell-pinned`，
-    于是**表头**的冻结格拿不到冻结层、只剩 `HEAD_CELL` 里的 `z-20` —— 与滚动过来的表头格**同为 20**，
-    谁后画谁在上面，横滚之后冻结的那几列表头被盖住，看着像"表头没冻结"。实测：表头 z=20、表体 z=50。
-
-    ‼️ **为什么不能写 Tailwind 的 `z-50`，也不能只写 `td.cell-pinned`**：
-      · `.z-50` 特异性 (0,1,0) —— 工具类，压不过提层那几条；
-      · `td.cell-pinned` 是 (0,1,1)，与 `td.cell-edge-left` 那几条**完全相同**，只能靠"谁写在后面"决定胜负；
-      · `table td.cell-pinned` / `table th.cell-pinned` 是 (0,1,2) —— **确切地高过提层那几条**，不依赖源序。
-    冻结列一旦掉到轮廓那一档（或表头的 20），横滚过来的列就盖在它上面、**连点击都抢走**
-    （用户报的"拖冻结列却选中了别的列"：按下时库收到的格是底下那一列）。
-
-    `sticky` 与 `left` 由渲染那层给，这里只管层高。
+    ⚠️ 只动基表（动作表 / 轨迹表）。全局参数表保留 CV 与 shadcn 默认 hover（那张表每行只有两格、看得见）。
 */
-table {
-    /* 可编辑列的底色（`classes.ts` 的 `EDITABLE_BG` 引用它）—— 垫底层也要用同一份，别再各写一个 hex。 */
-    --cell-editable: #1a1a1a;
-    /* "假删除"那一行的底色（唯一的消费者是下面 `.row-removed`）。 */
-    --cell-removed: #542526;
-    /*
-        选区实线的线宽 + 四条边的默认宽度。⚠️ 必须落在**格子也能看到**的地方（`table`）：`cell-edge-*`
-        是在 **td** 上赋值 `var(--edge-w)` 的，若把它写在 `::before` 里，td 取不到 → guaranteed-invalid →
-        整条 `border-width` 失效、回落 `medium`(3px) → 每个边界格四条边全亮（实测 `[3,3,3,3]`）。
-    */
-    --edge-w: 3px;
-    --edge-top: 0px;
-    --edge-right: 0px;
-    --edge-bottom: 0px;
-    --edge-left: 0px;
-
-    /* 层高刻度（`--z-focus` / `--z-edge` / `--z-pinned` / `--z-pinned-edge`）在 **`:root`** ——
-       它是页面级的，别的页也要用；写在 `table` 里只有表格解析得到（踩过，见 `:root` 那段）。 */
+table.base-table tbody tr {
+    content-visibility:     visible;
+    contain-intrinsic-size: none;
+    transition:             none;
+    background-color:       transparent;
 }
 
-table td.cell-pinned,
-table th.cell-pinned {
-    z-index: var(--z-pinned);
+table.base-table tbody tr:hover {
+    background-color: transparent;
 }
 
 /*
-    **假删除**（轨表："这一行不写进游戏"，行数据里的 `removed`）。
+    ============ 提层阶梯（唯一一份；别处只引用 token，不写裸数字） ============
 
-    状态只由行上的 `.row-removed` 标记**一次**（`ActionRowView`），底色全在这一处。
+      焦点环 --z-focus(30)  <  滚动区选区轮廓 --z-edge(41)  <  冻结层 --z-pinned(50)
+                            <  冻结区轮廓 --z-pinned-edge(51)  <  吸顶表头行 60  <  弹窗分节标题 70
 
-    ‼️ 不刷在 `<tr>` 上：`TableRow` 自带 `hover:bg-muted/50`，而 `hover:bg-*` 的特异性高过行自己的
-    `bg-*` —— 一悬停整行暗红就被顶掉（真机量过；调用点写 `hover:bg-transparent` 只是把"变灰"换成
-    "变透明"）。刷在格子上，行那层就永远被不透明的格子盖着。
-
-    ⚠️ 数据格带 `:not(.cell-pinned)`：**吸顶的数据列保持自己的底色**（不透明是"冻结"的前提）。
-    ⚠️ `:where()` 把行标记的特异性压成 0：数据格 (0,2,1) 压过格子自己的 `bg-*`（0,1,0），而行号/握把格
-    (0,1,1) 仍输给 `.cell-handle.cell-row-selected`（0,2,0）—— 选中的行头照旧是选中底色，与改动前同。
+    · 虚线压实线只靠格内顺序（本格 `::before` < `::after`）；**复制区整格不许提层**（会咬掉邻格边框 2px）。
+    · 冻结区必须压过横滚内容（否则点击被抢）；冻结区轮廓再高一档（邻格也在冻结层，否则实线右边/下边各少 1px）。
+    · 吸顶表头 60 是**表格内部**最高层；弹窗标题在表之外，必须更高，否则表头穿透标题。
+    ‼️ `th` 与 `td` 都要覆盖，且必须用 `table td.cell-pinned`（(0,1,2)）—— 只写 `td.cell-pinned` 会与提层
+      规则同权重、靠源序决定胜负，表头冻结格会掉到 20 被横滚内容盖住。
 */
+table {
+    /* 可编辑列的底色（`classes.ts` 的 `EDITABLE_BG` 引用它）。 */
+    --cell-editable: #1a1a1a;
+    /* "假删除"那一行的底色（消费者是下面 `.row-removed`）。 */
+    --cell-removed:  #542526;
+}
+
+table td.cell-pinned, table th.cell-pinned {
+    z-index: var(--z-pinned);
+}
+
+/* **假删除**（轨表："这一行不写进游戏"）。状态只由行上的 `.row-removed` 标记一次。
+   ‼️ 底色刷在**格子上**而不是 `<tr>`：`TableRow` 的 `hover:bg-*` 特异性会顶掉行底色。
+   数据格带 `:not(.cell-pinned)`（冻结列保持不透明）；`:where()` 把行标记特异性压成 0，
+   行号/握把格仍输给 `.cell-handle.cell-row-selected`，选中行头照旧是选中底色。 */
 :where(.row-removed) > td:not(.cell-pinned),
 :where(.row-removed) > td.cell-handle {
     background-color: var(--cell-removed);
 }
 
 /*
-    选区轮廓（实线）与复制区虚线（"行军蚁"）是**两圈独立的线**，而同一个格子上还可能有**焦点环** ——
-    三个装饰会同时落在一格里，所以"谁画哪个伪元素"必须**定死**（用户连报多次缺边，根因就在这里）：
+    **三个装饰的伪元素归属定死**：选区实线 → `td::before`；复制区虚线、焦点环 → `td::after`
+    （重合处复制区赢，虚线是用户正在用的标记）。两套规则别抢同一个伪元素、别用 `border:` 简写，
+    否则会互相清掉 `border-*`、表现为"某条边整条消失"。
 
-      | 装饰          | 画在          | 唯一所有者            |
-      |--------------|--------------|----------------------|
-      | 选区轮廓 实线 | `td::before` | `.cell-edge-*`       |
-      | 复制区   虚线 | `td::after`  | `td.cell-copy-*`     |
-      | 焦点环   灰环 | `td::after`  | `cell-focus`（重合处让位给复制区）|
+    轮廓不能用 inset 阴影画（会被 padding box 裁剪，每个格线连接处缺 1px）；用 `inset: -2px` 的伪元素
+    直接盖住格线，四条边才连成一条。
 
-    三条规矩，缺一条就会重演"某条边整条消失"：
-
-      1. **一个伪元素只归一个所有者**。两套规则都写同一个 `::before`、优先级又相同（都是 0,2,1）时，
-         后写的那套会把另一套的 `border-*` **整段清掉** —— 实测：复制区那套排在后面，于是选区的
-         `border-right-width: 2px` 被清成 0，**选区右边框整条没了**（"选区落在复制区里"必现）。
-
-      2. **只用各管一个属性的写法**（`border-right-width` / `border-style` / `border-color`），
-         不要用 `border:` 简写 —— 简写会把同一个伪元素上别的属性一起重写。
-
-      3. **同一个像素只让一个装饰画**。焦点环也占 `::after`，与复制区虚线落在同一圈格子边沿上；
-         复制区那套排在后面、又更具体（`td.cell-copy-*` 0,2,1 > `.cell-focus:focus-within` 0,2,0），
-         所以重合处**复制区虚线赢、焦点环让位** —— 这正是想要的（"剪贴板里是哪一片"是用户正在用的
-         标记，焦点环只是"打字会打到哪一格"的弱提示），不需要额外规则去压它。
-
-    另外，轮廓**不能用 inset 阴影**画：inset 阴影被**裁剪在元素的 padding box 里**，而相邻格之间隔着
-    1px 格线（`border-b` / `border-r`）—— 每格的框画到格线就停、下一格从格线另一侧重新开始，
-    **每个连接处缺 1px**（加 `spread: -1px` 也救不回来：**裁剪先发生**）。伪元素用 `inset: -1px`
-    **直接盖住那 1px 格线**，四条边这才连成一条。
-
+    ‼️ **每格都要有 `::before`**，不要按"有没有边类"建/删：伪元素创建/销毁本身就算布局变化 →
+    每跨一步整表重排（实测 20 步累计 148ms）。常驻伪元素只切颜色，拖 20 行 0 次 Layout。
 */
-/*
-    ‼️ **只有"带边类的格子"才建那个 `::before`** —— 这是这张表最划算的一处性能优化（实测得来）。
-
-    下面那条基础规则把 `::before` 挂在 `.cell-selectable` 上，而**每一格都带这个类**：51 行 × 89 列
-    ≈ **5340 个格子各自创建一个** `position:absolute` + `inset:-1px` 的伪元素，可轮廓只对**选区/复制区
-    的外边界格**（`cell-edge-*`，实际只有几十个）才有意义。
-
-    实测（页面内逐帧改容器尺寸，模拟视口变化；真机 WebView2）：
-      · 基线           中位 39.1ms / **最大 93.4ms** / 3 帧超 50ms
-      · 本规则生效后   中位 30.0ms / **最大 36.0ms** / **0 帧超 50ms**
-    选区环自检：活动格 `::before` 的 `content` 与上/右边框宽度照旧（2px），环没少一条边。
-
-    写法说明：被否掉的那条也要带上 `.cell-selectable`，特异性 (0,1,1) 与基础规则**相同**、
-    只靠源序取胜（本规则在前）—— 与下面 `.cell-edge-*::before` 那几条的关系不变。
-*/
-.cell-selectable:not(:is(.cell-edge-top, .cell-edge-right, .cell-edge-bottom, .cell-edge-left))::before {
-    content: none;
-}
-
 .cell-selectable::before {
-    content: "";
-    position: absolute;
+    content:        "";
+    position:       absolute;
     /*
-        向外撑 **2px**（= `--edge-w` − 1）：配 3px 边宽 → 正好是「格内 1px + 与格线重合 1px + 格外 1px」
+        向外撑 **2px**（= 3px 线宽 − 1）：正好是「格内 1px + 与格线重合 1px + 格外 1px」
         （用户口径；上/左两条另有提层规则，见下面那段）。
     */
-    inset: -2px;
+    inset:          -2px;
 
     pointer-events: none;
-    /*
-        ⚠️ 只用**长写**、不写 `border:` 简写：简写会把同一个伪元素上别的属性一起重写，
-        而 `::before` 在复制区外圈那格上…**不会**被复制区抢了（复制区已改到 `::after`，见上表），
-        但焦点环（`::after`）与选区的 `z-index` 关系仍要靠这里定死。
-    */
-    border-style: solid;
-    border-color: var(--cell-select);
-    /* 四条边一次定完（与复制区同一套机制）：挂哪个 `cell-edge-*` 类，哪条边就有宽度。 */
-    border-width: var(--edge-top) var(--edge-right) var(--edge-bottom) var(--edge-left);
+    /* 线宽**按边给**（0 或 3px）、颜色统一选区绿：
+       ‼️ 不要写成"四边都 3px、只在边上换颜色"—— 3px 绿边与 3px 透明边在拐角会做 45° 颜色斜切，
+       把绿边咬出一个 V 形缺口（行交界处逐行出现，DPR2 放大截图复现过）。宽度 0 的邻边是直角、不切；
+       同色两条边（角格）斜切也看不出来。伪元素是 absolute，宽度变化不影响表格布局。 */
+    border:         0 solid var(--cell-select);
     /*
         ⚠️ 要盖在**焦点环**（`cell-focus` 的 `::after`）之上：拖拽的 mousedown 会把焦点落到起始格，
         而可编辑格带着 `cell-focus`，两个伪元素于是在同一格上打架 —— `::after` 后画，不压住的话灰环
-        盖掉起始格那两条边，看着就是"第一个格子没被选区框包围"（实测：从只读的冻结列起选就正常，
-        因为那两列没有 `cell-focus`、压根不画焦点环）。只压重叠的那两条边，其余边照旧可见。
+        盖掉起始格那两条边，看着就是"第一个格子没被选区框包围"。只压重叠的那两条边，其余边照旧可见。
 
         ⚠️ 伪元素要 `position: absolute`，所以所在格子必须是定位元素：非钉住的格子由渲染那层带
         `relative`，钉住的本身就是 `sticky`。
     */
-    z-index: 1;
+    z-index:        1;
 }
 
-/*
-    ‼️ 四条边各由**一个类给一个变量**（不是四条 `border-*-width` 规则）：角上的格子会同时挂两个类，
-    变量各管一条、互不覆盖；而基础规则里那条 `border-width` 只有**一处**，不存在"谁后写谁覆盖"的问题。
-    ⚠️ 别合并成 `:is(.cell-edge-top, …)::before { border-width: … }` —— 那会给**四条边一起**上色，
-    内部格只要挂了一个类就会长出一整圈实线。
-*/
-.cell-edge-top { --edge-top: var(--edge-w); }
-.cell-edge-right { --edge-right: var(--edge-w); }
-.cell-edge-bottom { --edge-bottom: var(--edge-w); }
-.cell-edge-left { --edge-left: var(--edge-w); }
+/* 每边一条叶子规则：类挂在 td 上，直接选中它的伪元素给那一侧加 3px。角格两个类各有 3px、同色斜接。 */
+td.cell-edge-top::before { border-top-width: 3px; }
+td.cell-edge-right::before { border-right-width: 3px; }
+td.cell-edge-bottom::before { border-bottom-width: 3px; }
+td.cell-edge-left::before { border-left-width: 3px; }
 
 /*
-    ============ 基表的外壳（`div:has(> table.base-table)`）============
-
-    `Table`（shadcn）在 `<table>` 外面渲染一层 div。**这张表的滚动框必须就是它**：`useColumnMeasure`
-    的 ResizeObserver、`useReveal`、行拖拽夹取、方向键跳边缘，四处读的都是 `table.parentElement`。
-
-    ‼️ 那层 div 没有 props 入口，所以在这里反选它，锚点是 `.base-table`（`BaseTable` 挂在 `<table>` 上）。
-    不能改成"直接改 ui/table.tsx"：那是 shadcn 的源码，`shadcn add table --overwrite` 会整份覆盖回去，
-    改在上面的东西全部归零（外壳一没，表格就不滚）；而这个类它冲不掉。
-    锚点在 `<table>` 上顺带还解决"两个继承者外壳不同"：各挂各的标记类、各写一条 `:has()` 规则即可。
-
-    ⚠️ `flex` + `min-height` 别删：外壳是 flex 列里的一项，没有确定高度它就永远不滚（内容多高就多高）。
-    ⚠️ 外框画在这层、不画在 `<table>` 上：框要钉住不跟内容跑（`--input` 与 `table-border` 同一个来路）。
-    ⚠️ `background-color` 修的是"横向滚到头时表格右沿与滚动条之间那条 1px 缝"：容器背景本来是
-       `transparent`，缝里透出的是更外层的底色、深浅与四周不一致；铺上页面底色就同色了。
-       （已排除"这条缝是容器那条 `border-r` 画的"：把 `border-right-color` 改成任何颜色，那个像素都不变。）
+    基表外壳（shadcn `Table` 在 `<table>` 外面那层 div）—— **它就是滚动框**：`useColumnMeasure` /
+    `useReveal` / 行拖夹取 / 方向键跳边都读 `table.parentElement`。
+    那层 div 没有 props 入口，所以用 `.base-table` 反选；不能改 `ui/table.tsx`（`shadcn add --overwrite`
+    会整份覆盖回去）。⚠️ `flex` + `min-height` 别删（外壳没确定高度就永远不滚）；外框画在这层才不跟内容跑；
+    `background-color` 修的是横滚到头时表格右沿与滚动条之间那条 1px 缝。
 */
 div:has(> table.base-table) {
-    flex: 1 1 0%;
-    min-height: 0;
-    overflow: auto;
-    border: 1px solid var(--input);
+    flex:             1 1 0%;
+    min-height:       0;
+    overflow:         auto;
+    border:           1px solid var(--input);
     background-color: var(--background);
 }
 
-/*
-    还没就位（数据已作废 / 列宽还没量出来）：整块**离屏**，不是 `display: none` —— 量列宽靠表格自己的
-    rect 与列的自然宽度，`display: none` 会让 rect 归零，那趟就永远等不到尺寸、表格再也不显示。
-    离屏（`absolute` + 负 `left` + 定宽）仍在 DOM、仍量得到，但不参与排版；否则它那一万两千多像素的宽
-    会先撑出滚动条、还跟骨架叠在一起（用户实测："骨架旁边还是冒出滚动条"）。
-    ⚠️ 只挪表格不够：绝对定位的子元素照样被算进滚动容器的可滚动区，所以**外壳自己也一起让开**。
-*/
+/* 还没就位（数据作废 / 列宽没量出来）：整块**离屏**（不是 `display:none`，否则 rect 归零、量不到列宽）。
+   `absolute` + 负 left + 定宽：仍在 DOM、量得到，但不参与排版；外壳也要一起让开（绝对定位子元素照样撑滚动区）。 */
 div:has(> table.base-table.is-offscreen) {
     position: absolute;
-    top: 0;
-    left: -99999px;
-    width: 1200px;
+    top:      0;
+    left:     -99999px;
+    width:    1200px;
 }
 
-/* 这一页在忙（保存部署那一段）：点不动，但表格照旧显示 —— 别把好好的表藏起来。 */
+/* 忙（保存部署那一段）：点不动，但表格照旧显示。 */
 div:has(> table.base-table.is-busy) {
     pointer-events: none;
 }
 
 /*
-    ============================ 选区轮廓的几何 ============================
-
-    规则只有一句：**每条边的选区框，都要正好落在"那条格子线"上，并且完整一条 `--edge-w`。**
-    难点全在"这条格线是谁画的、谁后画"，所以先把两句事实钉在这里（都是逐像素量出来的，别再靠猜）：
-
-      事实 ①：本格的格线只画在**右和下**两处（渲染那层给的是 `border-r border-b`，`border-t/l` 是 0）。
-              所以"右上角那一格"的左格线，其实是**它左邻的右格线**；上格线是**上一行的下格线**。
-      事实 ②：**后画的盖先画的**。邻格在 DOM 里排在本格后面 —— 它的格线与**不透明底色**都压在本格之上；
-              吸顶表头（渲染层给的 `z-60`）更是在整张表体之上。
-
-    由这两句推出来的四条边（一条规则，不再逐个打补丁）：
-
-      · 右、下：格线是**自己的**。把轮廓向外撑 2px（`inset: -2px`）就正好连同它一起盖住 —— 自己画自己，顺序无碍。
-      · 左：格线是**邻格**的（事实 ①），会被邻格后画盖掉（事实 ②）。
-        对策：把带 `cell-edge-left` 的格子提到**轮廓那一档**（`--z-edge`；冻结列的边界格再高一档 `--z-pinned-edge`），压过邻格那一像素。
-      · 上：格线是**上一行**的 —— 提到同样的档即可。
-        ⚠️ **第一行上面是吸顶表头**（渲染层 `z-60`，且必须吸顶），提层压不过、也不能压 ——
-        它撑出去的那 1px 会被表头吃掉，**就让它被吃**：和"冻结列右边那一列的左边框"同一个口径，
-        贴住时只剩 1px 是可接受的，不为一条边框给这一格开特例（不为它改 `top`、也不为它单独提层）。
-
-    于是"向外撑多少"**四边一律 2px**（不再有例外）：
+    选区轮廓的几何：每条边都压在格线上、外沿 2px。格子只有右/下格线 → 左边线属于左邻、上边线属于上一行；
+    后画的盖先画的。所以右/下自己画（`inset:-2px`），左/上把本格提到轮廓档（冻结列再高一档）。
+    ⚠️ 第一行上边会被吸顶表头吃掉 1px —— 接受，不为一条边开特例。
 */
 
 /*
-    ‼️ **右边也要提层**（与左边同一个原因，别再只提左边）。
-
-    轮廓的 `::before` 是 `inset: -2px`：右边那一条**最外 1px** 正好落在右邻格的地盘上。
-    而右邻格在 DOM 里排在本格**后面**（事实 ②），它的 `border-right` 与**不透明底色**会先画在那 1px 上
-    —— 于是选区的右边框缺一截（用户截图圈的就是它：**只要选区落在复制区里就必然看得见**，
-    因为复制区的格子背景层更多、盖得更实）。
-
-    左边那条对应的是**左**邻格（同样在后），所以早就提了层；右边当时漏掉了。
-    ‼️ **这里只能写 `z-index`，绝不能写 `position`**：本格本来就是定位元素（非冻结格由渲染那层给
-    `relative`、冻结列是 `sticky`），而 `td.cell-edge-right` 的特异性 (0,1,1) **高过** `.sticky` (0,1,0)
-    —— 顺手写个 `position: relative` 就会把冻结列的 `sticky` 顶掉，那列立刻跟着横向滚动一起走掉，
-    底下滚过来的列于是接管点击（用户报的"拖冻结列却选中了别的列"，根子就在这里）。
+    左/右边界格提到轮廓档：邻格的 `border` 与不透明底色画在本格撑出去的那 1px 上，不提层就缺一截。
+    ⚠️ 只写 `z-index`、绝不写 `position`：会把冻结列的 `sticky` 顶掉 → 冻结失效、点击被下面列抢走。
+    代价（已知）：滚动区边界格那 1px 滚到冻结列底下会被盖住，只在滚动经过时可见。
 */
-td.cell-edge-right {
+td:is(.cell-edge-right, .cell-edge-left) {
     z-index: var(--z-edge);
 }
 
-/*
-    ⚠️ **提层（`--z-edge`）是把左边框做成完整的代价**：左边外面那道格线属于**邻格**，而邻格在 DOM 里排在本格后面（事实 ②）。
-
-    为什么非得提层：邻格的 `border-right` 与**不透明底色**会先画在本格撑出去的那 1px 上，左边框就缺一截。
-    试过的替代都不行：`left: 0` 收回格内（那一条全落在**内容区**上，选中格的文字会平移）、让邻格把边界
-    让开（`border-color: transparent` 有效、但邻格**底色**照样盖住）、把表头或邻格降 z（毁掉吸顶与冻结
-    列本来的遮挡关系）—— 只剩提层这一条路。
-
-    代价（**已知且接受**）：**滚动区**的边界格，那 1px 撑到冻结列底下时会被冻结列盖住（冻结区自己的边界格
-    另有更高一档，不受此限）。这是"选区框要压过格线"的必然结果 —— 见上面「左」那条。只在滚动经过时可见。
-    但**冻结列本身的遮挡关系不能被破坏**（它要一直压住滚过来的列）：所以本格只提 `z-index`，不动
-    `position`（见 `td.cell-edge-right` 那段），冻结列的层高由 `--z-pinned` 定。
-*/
-td.cell-edge-left {
-    z-index: var(--z-edge);
-}
-
-/*
-    ‼️ **末列的右边框收回格内**。
-
-    轮廓的右边框整条画在**格子外面**（`right: -1px` + 2px 宽），而表格用
-    `[&_tr>*:last-child]:border-r-0` 去掉了末列的格线 —— 撑出去的那 1px 会悬在表格外沿。
-    历史解法是"干脆不画"（`selectionClass` 摘掉 `right` 类），代价是**末列选中时右边框整条消失**
-    （真机逐像素实测：`border-right-width: 0px`，用户报的"没看到右边框"）。
-
-    这里把右边框收回格内：2px 完整可见、也不悬在表外。与上面「第一行上边框 `top: 0`」同一个手法。
-*/
+/* 末列右边框 / 末行下边框收回格内：末列/末行没有格线，
+   `inset: -2px` 撑出去的 1px 会悬在表外（末行那 1px 还会撑出滚动条）。 */
 tbody tr > td:last-child.cell-edge-right::before {
     right: 0;
 }
 
-/*
-    ‼️ **末行的下边框收回格内**。
-
-    与上面「末列右边框」同源：轮廓的 `inset: -1px` 让下边框整条画在**格子外面**，而表格用
-    `[&_tbody_tr:last-child>*]:border-b-0` 去掉了末行的下格线 —— 撑出去的那 1px 悬在表外。
-
-    真机实测（选中末行）：末行的 `td` 下边框是 **0**、高度 24（比别的行**矮 1px**），而环的下边框
-    是 2px 且 `bottom: -1px` → 那 2px 里有 1px 落在格外。用户看到的就是"这一行被下边框拉高了一截"。
-
-    收进来：2px 完整画在格内，与「第一行上边框 `top: 0`」同一个手法。
-*/
 tbody tr:last-child > td.cell-edge-bottom::before {
     bottom: 0;
 }
 
-/* ======================== 选区轮廓的几何（完） ======================== */
-
 /*
-    ============================ 复制源那圈虚线（"行军蚁"） ============================
-
-    落地方式：**只给复制区外圈那排格子挂 `cell-copy-*` 类，每格只画自己那几条边**（渲染那层按
-    `copyRingEdge` 判 —— 与库的 `cell.getSelectionEdges()` 同一个思路）。复制区**内部**的格子
-    一个类都不挂，所以"内部没有线"是结构上必然的。
-
-    ‼️ 四条不变量（每条都对应一次真实故障，改动前先看这里）：
-
-      1. **画在 `::after` 上**：`::before` 归选区轮廓（见上面那张归属表）。两者挤同一个伪元素时
-         优先级相同、后写的把先写的 `border-*` 整段清掉 —— 选区的边会被复制区清成 0。
-
-      2. **每格只由 `--copy-*` 变量声明"自己那几条边"**，边框宽度与垫底渐变带的尺寸同吃这一份
-         （`border-width` / `background-size` 各读一次）—— 所以它不能退化成"单边四条 `border-*-width` 规则"。
-         注意当年踩的坑是**简写**：`border-width: 0 2px 0 0` 会整条覆盖别的类，四个类优先级相同、靠源序
-         决定，于是 `cell-copy-left` 必然盖掉 `cell-copy-right`（只挂 `right+left` 的行右边永远是 0，
-         实测 `borderRightWidth === "0px"`）。长写本身不冲突 —— 但长写喂不了垫底带，所以仍用变量。
-
-      3. **`inset: 0`**（正好是格子的 border box）：虚线因此与格线重合，不需要算任何高度；
-         且伪元素的边框**不参与布局**（不像 `border` 会撑大格子），也不像 `outline` 那样四边一起画
-         （`outline-width` 不支持四值）。
-
-      4. **`:focus-within` 时别把 `content` 去掉**：焦点环那套对 `::after` 有 `content: none`
-         的规则，若这里也沾上，重合处的虚线会整段消失。
+    复制源虚线（"行军蚁"）：只给复制区**外圈**的格子挂 `cell-copy-*`，每格只画自己那几条边，
+    内部格一个类都不挂。画在 `::after` 上（`::before` 归选区实线）。
+    虚线缝是透明的，底下要垫一层该格自己的底色（否则缝里透出选区绿实线、整圈看着还是实线）——
+    垫底不再是四条渐变带，而是 `mask` 挖掉 content-box：背景色只留在**边框那一圈**，天然跟着四条边宽走。
 */
-
-td.cell-copy-top,
-td.cell-copy-right,
-td.cell-copy-bottom,
-td.cell-copy-left {
-    /* 默认四条边都不画，各格按自己挂的类把对应变量置 2px */
-    --copy-top: 0px;
-    --copy-right: 0px;
-    --copy-bottom: 0px;
-    --copy-left: 0px;
+td.cell-copy-top::after, td.cell-copy-right::after,
+td.cell-copy-bottom::after, td.cell-copy-left::after {
+    content:          "";
+    position:         absolute;
+    /* 超出 1px：配 2px 边宽 → 「与格线重合 1px + 格内 1px」。 */
+    inset:            -1px;
+    border-style:     dashed;
+    border-color:     var(--cell-select);
+    border-width:     0; /* 各 side 类只加自己那条边（longhand，不会互相清掉） */
+    pointer-events:   none;
+    /* 压在选区实线（`::before` z-index:1）之上：虚线缝是透明的，不压就会透出实线色。 */
+    z-index:          2;
+    /* 垫底 = 该格自己的底色（`--cell-under`，拿不到退回表格底色） */
+    background-color: var(--cell-under, var(--background));
+    /* 只在边框那一圈铺：两层 mask，content-box 与整框 XOR（= exclude），内部挖空。 */
+    mask:             linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite:   exclude;
 }
 
+td.cell-copy-top::after {
+    border-top-width: 2px;
+}
+
+td.cell-copy-right::after {
+    border-right-width: 2px;
+}
+
+td.cell-copy-bottom::after {
+    border-bottom-width: 2px;
+}
+
+td.cell-copy-left::after {
+    border-left-width: 2px;
+}
+
+/* 冻结区的边界格要再高一档：邻格也在冻结层，否则实线右边/下边各少 1px（见上面的提层表）。 */
 table td.cell-pinned:is(.cell-edge-top, .cell-edge-right, .cell-edge-bottom, .cell-edge-left) {
     z-index: var(--z-pinned-edge);
-}
-
-td.cell-copy-top {
-    --copy-top: 2px;
-}
-
-td.cell-copy-right {
-    --copy-right: 2px;
-}
-
-td.cell-copy-bottom {
-    --copy-bottom: 2px;
-}
-
-td.cell-copy-left {
-    --copy-left: 2px;
-}
-
-td.cell-copy-top::after,
-td.cell-copy-right::after,
-td.cell-copy-bottom::after,
-td.cell-copy-left::after {
-    content: "";
-    position: absolute;
-    /* 超出 1px：配 2px 边宽 → 「与格线重合 1px + 格内 1px」（= 实线靠内那 2px，用户口径）。 */
-    inset: -1px;
-    border-style: dashed;
-    border-color: var(--cell-select);
-    border-width: var(--copy-top) var(--copy-right) var(--copy-bottom) var(--copy-left);
-    pointer-events: none;
-    /*
-        ‼️ 必须压在**本格选区实线**（`::before` 的 `z-index: 1`）之上：虚线的线段之间是透明的，
-        底下若压着那条绿实线，缝里透出来的就是实线色 —— 整圈看着仍然是实线（案例里的
-        "同单元格共存防透色"）。
-    */
-    z-index: 2;
-    /*
-        垫底层（案例那道 2px 纯白）：虚线缝是透明的，底下压着实线就会透出来 —— 先铺一层**该格自己的底色**
-        （`--cell-under`，由底色那几个类给出，见 `classes.ts`；拿不到才退回表格底色）。写死 `--background`
-        会在可编辑列上露一条更暗的 2px 槽（像素实测：缝里 10,10,10、格内 26,26,26）。四条边各一条渐变带，
-        宽度吃 `--copy-*` —— 没挂那条边的格子宽度为 0，带子自然不存在。
-    */
-    --copy-under: var(--cell-under, var(--background));
-    background-image: linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under));
-    background-repeat: no-repeat;
-    background-size: 100% var(--copy-top), var(--copy-right) 100%, 100% var(--copy-bottom), var(--copy-left) 100%;
-    background-position: top left, top right, bottom left, bottom left;
-    /* ‼️ 原点必须是 **border-box**：垫底要盖住的正是那圈 2px 边框（默认 `padding-box` 会落进格内、白垫）。 */
-    background-origin: border-box;
 }
 
 /* ======================== 复制源边框（完） ======================== */
 
 /*
-    ⚠️ 选中的格子**不画焦点环**：拖拽选区的起点格在 mousedown 时就会拿到焦点，于是同一格上同时有
-    选区框（`::before`，只画外边界那几条边）和焦点环（`::after`，**四边全画**）—— 外圈那两条被盖住，
-    剩下的右、下两条露出来，看着就是"第一格自己还有另一圈框、跟选区不统一"（用户圈出来的正是这两条）。
-    选中时那圈归选区框管，焦点环让位。
-
-    特异性必须压过 `@utility cell-focus` 生成的 `.cell-focus:focus-within::after`（0,2,0）：这里的
-    `td` 前缀凑到 (0,2,1)，**别改成 `.cell-selected::after`**，也别指望样式表顺序 —— utility 层和
-    普通 CSS 谁在后并不由我们写的位置决定。
-*/
-/*
-    ‼️ 但**复制区格子要豁免**：它的虚线也画在 `::after` 上，被这条 `content: none` 抹掉的话，
-    虚线整圈会消失（实测：注入洋红诊断，聚焦那格一条洋红都看不到，下一格就有）。
-    用户口径：虚线必须永远可见 —— 所以在复制区里焦点环让位（那一圈由选区实线 + 复制虚线表达）。
+    选中的格子不画焦点环（起点格在 mousedown 就拿到焦点，两圈框叠着不统一）；
+    但**复制区格子要豁免**：它的虚线也画在 `::after` 上，被 `content:none` 抹掉虚线就没了。
+    特异性 (0,2,1) 必须压过 `cell-focus` 的 `.cell-focus:focus-within::after`，别依赖样式表顺序。
 */
 td.cell-selected:not(:is(.cell-copy-top, .cell-copy-right, .cell-copy-bottom, .cell-copy-left)):focus-within::after {
     content: none;
 }
 
-/*
-    选中那层底色：**`inset box-shadow`**。
-
-    ‼️ 不用 `background-image`：那是**整段替换、不是叠加**的槽位，复制区虚线/格线底色都盯着它，
-    谁赢另一个就整层消失（实测过两次：虚线赢 → 外圈格子没有选中底色；底色赢 → 复制后虚线被顶掉）。
-    `box-shadow` 是**另一个槽位**，于是"有没有底色"只由 `.cell-selected` 决定，与别的装饰无关：
-    复制后选区清空 → 只剩虚线；重新在复制区里选 → 底色回来。
-
-    `inset 0 0 0 9999px`：把**那层选区色**的阴影铺满整个 border-box（颜色本身带透明度，多铺几层仍是那一层）。
-    它画在格子底色之上、内容之下（CSS 背景/阴影的绘制次序），文字照常在上面。
-
-    ‼️ 底色与选区**边框**同一色系（Excel / WPS 的口径）：即上面那个绿**掺灰去饱和**后的那一层 ——
-    配比与浓度见下面两个变量，别在这里另写颜色。
-
-    ⚠️ `.cell-row-selected` 是**行号格**那一层（它不在列模型里，拿不到 `.cell-selected`），
-    必须与这里**共用同一条规则** —— 用户报过"选行的背景色比选区亮"：以前行选中走独立的一档白，
-    比选区那档亮，两层不是一层。
-*/
-/*
-    选区那层**填充色**：边框那个绿**掺灰去饱和**（配比见下面变量）—— 用户口径：纯饱和绿在满屏
-    中性灰里太跳，也像"成功 / 通过"那类语义。**边框**仍用原色（见下面的 `--cell-select`），
-    只有填充降饱和。浓度单独一个变量：两处用法（半透明叠色 / 行号格的实色）必须同一档。
-*/
-:root {
-    /* 选区那套色 —— 轮廓 / 复制区虚线 / 行号列选中文字 / 填充的基色都用它，改一处即可。 */
-    --cell-select: #007a55;
-    --cell-fill: color-mix(in oklab, var(--cell-select) 50%, #8a8a8a);
-    --cell-fill-alpha: 8%;
+/* 选中底色用 `inset box-shadow`（另一个槽位）：不占 `background-image`，不会把复制虚线/格线底色顶掉。
+   颜色来自 `:root` 的派生变量；行号格与数据格共用同一档色。 */
+.cell-selected, .cell-row-selected {
+    box-shadow: inset 0 0 0 9999px var(--cell-fill-overlay);
 }
 
-.cell-selected,
-.cell-row-selected {
-    box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent);
-}
-
-/*
-    ‼️ 行号列是 **sticky**（`cell-pinned`）—— 它必须**不透明**，否则横向滚动时后面的列会透出来
-    （用户实测：滚过去看到 `id_` 的数字叠在行号上）。而通用那层选中底色是**半透明**的，叠在行号列
-    自己的底色上会比数据格亮一档 —— 所以这里直接给"数据格选中后的最终色"（**不透明**）并关掉叠色。
-*/
+/* 行号列是 sticky，必须不透明：直接给它"数据格选中后的最终色"，并关掉叠色、文字用选区绿。 */
 .cell-handle.cell-row-selected {
-    background-color: color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
-    box-shadow: none;
-    /* 选中的行号**文字色 = 选区边框那个绿**（用户口径）：一眼看出"这几行被选中了"。 */
-    color: var(--cell-select);
+    background-color: var(--cell-fill-solid);
+    box-shadow:       none;
+    color:            var(--cell-select);
 }
 
-/*
-    ‼️ **活动格不填底色**（Excel 的约定，用户实测要求）：拖选 / 点击的起点那一格保持原底色，只画轮廓 ——
-    一眼看出"从哪一格开始拖的"。换一格重新拖选时它不再是活动格，底色自然就回来了。
-    类由 classes.ts 的 selectionClass 给（`cell-active`：选中 + 聚焦时才挂；行号选行也走同一条）。
-*/
+/* **活动格不填底色**（Excel 约定）：拖选/点击的起点那一格保持原底色，只画轮廓。 */
 td.cell-selected.cell-active {
     box-shadow: none;
 }
 
-/*
-    「全局参数」表：一行里任意一格拿到焦点时，**整行**的下沿画一条 2px 的线（颜色 = 输入框聚焦时那个
-    `--ring`，见 ui/input.tsx 的 focus-visible:border-ring）。
-
-    为什么用伪元素而不是 `border-b-2`：**border 参与布局** —— 焦点一来那一行会高 1px，它下面每一行都跟着
-    跳一下，失焦再跳回来（那张表一千多行，点一格整片都在动）。伪元素绝对定位，只画不改布局。
-    为什么挂在 `<tr>` 上：那一行有**两格**（字段名 / 值），要一起变色才叫"覆盖这一行"；只有值那格能拿到
-    焦点，所以用行的 :focus-within 当触发点，两格各画自己那半截。
-
-    `bottom: -1px` 是**盖住格子自己那条 1px 下框线**（--input）用的：定位的包含块是内边距盒，`bottom: 0`
-    落在框线**上面**，会留下"亮线 + 暗线"两条；往下一像素正好压住它，于是整条就是纯 2px。
-    两格相接处没有缝：border-spacing 是 0，各画各的整宽。
-*/
+/* 「全局参数」表：一行里任意一格拿焦点时，整行下沿画 2px 线（`--ring`）。
+   用伪元素不用 `border-b-2`（border 参与布局，焦点会让整行跳 1px）；挂 `<tr>` 上让两格一起变色；
+   `bottom: -1px` 压住格子自己的 1px 下框线，避免"亮线 + 暗线"两条。 */
 @utility row-focus {
     &:focus-within > td {
         position: relative;
 
         &::after {
-            content: "";
-            position: absolute;
-            right: 0;
-            bottom: -1px;
-            left: 0;
-            height: 2px;
+            content:    "";
+            position:   absolute;
+            right:      0;
+            bottom:     -1px;
+            left:       0;
+            height:     2px;
             background: var(--ring);
         }
     }
 }
 
-/*
-    「专精技能」页的两级吸顶（角色行 + 专精类型名）。
-
-    为什么放在这里而不是组件里：这两条要做的事 Tailwind 的 utility 表达不出来 ——
-    它们靠"sticky 元素**不画**朝滚动方向那一侧的边框"。理由在下面每条上。
-
-    ⚠️ 前提：这两个 sticky 元素必须是**滚动容器的直接子元素/孙元素**。滚动祖先是最近的那个
-    `overflow-y: auto`；要是把类型名包进角色的 AccordionContent 里，它的滚动祖先就变成那个
-    面板盒子，滚到下一个角色就跟着走了。所以展开的内容在 JSX 里是平铺的，不在角色块内部。
-*/
+/* 「专精技能」页的两级吸顶（角色行 + 专精类型名）。两个 sticky 元素必须是滚动容器的直接子/孙元素，
+   否则滚动祖先会变成角色面板、滚到下一个角色就跟着走。
+   `top: 0` 不能写 -1（吸顶瞬间会跳 1px）；类型名 `top: 39px` 与 JSX 的 `-mt-[5px]` 成对
+   （44 − 5 = 39，改一处必须改另一处）。层级：角色行 > 类型名。 */
 @layer components {
-    /*
-        角色行。行高 44px（h-11）是 JSX 给的，这里只管吸顶与"顶掉上一块"的表现。
-
-        `top: 0`（不是 -1）：负偏移会让它在**吸顶那一瞬间整行往上跳 1px**
-        —— 未吸顶时偏移是 0，一旦被吸住就变成 -1，实测 st=0 时 0.00、st=1 起恒为 -1.00。
-        这个 -1 当初是为"收起时那条 border-b 不被裁"加的，可这个类**只在展开时挂**，
-        而展开态没有边框（见 JSX），所以它只剩跳一下这个副作用。
-
-        这一行只在展开时才会有这个类，展开态的它没有任何边框，所以这里不必处理
-        "朝上那侧的边框"。
-    */
     .skillboard-row {
-        position: sticky;
-        top: 0;
-        z-index: var(--z-focus); /* 高于类型名那一级：角色名永远压在类型名之上 */
+        position:         sticky;
+        top:              0;
+        z-index:          var(--z-focus); /* 高于类型名那一级：角色名永远压在类型名之上 */
         background-color: var(--background);
     }
 
-    /*
-        专精类型名。吸顶第二级。
-
-        阈值 **39px = 角色行行高 44px − 5px**，那 5px 是 JSX 上给**第一个类型块**的负上边距
-        （见 SkillboardPanel 里 `-mt-[5px]`）。两处必须成对：
-        第一个类型名的"自然位置"是 44 − 5 = 39，若阈值仍是 44，它会被判成"已经吸住"、
-        被强行推回 44 —— 间距白改。取 39 之后它停在自然位置，与后面几个类型名的间距一致
-        （都是 25px：上一条文字底 → 类型名文字顶）。
-
-        为什么是 5px：上一条文字的"下方余量"两档差 5px —— 角色行文字居中在 44px 里余 12px，
-        阶行是 `py-1.5` + 下边框余 7px。目标取的是**阶行那一档（更小）**，所以把第一个往下压。
-
-        滚到下一个专精类型时，新的那一行从下面升上来盖住它 —— 这是 sticky 自己的"顶掉上一块"
-        行为（同级元素、后面的盖前面的），不需要自己算滚动位置。z-index 小于角色行，
-        所以角色行始终在最上面：吸住时类型行上面那 5px 被角色行盖住，头部看上去就是紧挨着的两行。
-
-        这一行没有 padding，所以 sticky 盒子的整个 44px 都被不透明底色盖住，不需要再套一层包装
-        去补 padding 露出的那一段（当初那层包装就是为带 padding 的 sticky 盒子加的）。
-    */
     .skillboard-type {
-        position: sticky;
-        top: 39px;
-        z-index: 20;
+        position:         sticky;
+        top:              39px;
+        z-index:          20;
         background-color: var(--background);
-        border-top: 0;
+        border-top:       0;
     }
 }
 
-/*
-    base-ui 给每个 Checkbox / Combobox 挂的隐藏 `<input>` 自带行内 `position: fixed`
-    （不可见靠 `clip-path` 裁掉）。`fixed` 在可滚动容器里**每个元素各成一个图层**：
-    本页 435 个 → 367 个图层，拖选时每次移动都重建图层树（trace：`Layerize` 1345ms / 整次 2647ms）。
-    `absolute` 一样脱离文档流、一样被裁掉，但不带那条 fixed 合成理由 —— 实测拖选 2647 → 1294ms。
-
-    ⚠️ 只匹配"行内写了 `position: fixed` 的隐藏输入"，别扩大成所有 `input[id^=base-ui-]`。
-*/
+/* base-ui 给 Checkbox / Combobox 挂的隐藏 `<input>` 是行内 `position: fixed`：可滚动容器里每个都
+   各成一个图层（本页 435 个 → 367 层），拖选时每帧重建图层树（Layerize 1345ms）。`absolute` 同样
+   脱离文档流、同样被裁，但不带 fixed 的合成理由（实测拖选 2647 → 1294ms）。
+   ⚠️ 只匹配"行内写了 position: fixed"的隐藏输入，别扩大。 */
 input[aria-hidden="true"][style*="position: fixed"] {
     position: absolute !important;
 }
