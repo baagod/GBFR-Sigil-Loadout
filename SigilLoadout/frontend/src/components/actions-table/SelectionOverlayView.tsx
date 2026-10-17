@@ -8,6 +8,7 @@
       · scrolled 层 z-41：普通格之上、冻结列之下（冻结列会盖住滚过去的选区）；
       · pinned 层 z-52：冻结列之上、吸顶表头行（z-60）之下；横向滚动由 `sticky left-0` 原生跟随。
 */
+import type {CSSProperties} from "react"
 import {createPortal} from "react-dom"
 
 import type {LayerModel, OverlayModel, Rect} from "./selectionOverlay"
@@ -36,43 +37,40 @@ function Layer({model, layer}: {model: LayerModel; layer: "scrolled" | "pinned"}
             ))}
             {model.copy.map((cell, i) => {
                 const {edges} = cell
-                const bw = (on: boolean) => (on ? "2px" : "0")
+                const w = (on: boolean) => (on ? 2 : 0)
                 return (
                     /*
-                        复刻旧实现（td 的 `::after`）：盒子比格子大 1px（`inset:-1px`）、2px dashed、垫该格底色。
-                        ‼️ 右/下那 1px 在旧实现里被邻格盖住；overlay 没有邻格遮挡，所以外层裁掉右边/下边 1px，
-                        否则虚线会“画到格外”（真机反馈）。
+                        逐格复刻旧实现的 `td::after`（见 docs/单元格选区方案.md）：
+                        `inset:-1px` + 2px dashed + 四条与边等宽的底色渐变带（background-origin: border-box）。
+                        ‼️ 右/下那 1px 旧实现是被**邻格**盖住的；overlay 没有邻格，用 `clip-path` 裁掉
+                        右/下各 1px 复现同一效果（上/左那 1px 保留），所以看起来四边都“画在格内”。
                     */
                     <div
                         key={`c${i}`}
                         data-overlay={`${layer}-copy`}
                         data-rect={rectKey(cell)}
-                        style={{
-                            position: "absolute",
-                            left: `${cell.left - 1}px`,
-                            top: `${cell.top - 1}px`,
-                            width: `${cell.width + 1}px`,
-                            height: `${cell.height + 1}px`,
-                            overflow: "hidden",
-                            pointerEvents: "none",
-                        }}
-                    >
-                        <div
-                            style={{
+                        style={
+                            {
                                 position: "absolute",
-                                left: 0,
-                                top: 0,
+                                left: `${cell.left - 1}px`,
+                                top: `${cell.top - 1}px`,
                                 width: `${cell.width + 2}px`,
                                 height: `${cell.height + 2}px`,
                                 borderStyle: "dashed",
                                 borderColor: "var(--cell-select)",
-                                borderWidth: `${bw(edges.top)} ${bw(edges.right)} ${bw(edges.bottom)} ${bw(edges.left)}`,
-                                backgroundColor: cell.underlay ?? "var(--background)",
-                                mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
-                                maskComposite: "exclude",
-                            }}
-                        />
-                    </div>
+                                borderWidth: `${w(edges.top)}px ${w(edges.right)}px ${w(edges.bottom)}px ${w(edges.left)}px`,
+                                clipPath: "inset(0 1px 1px 0)",
+                                pointerEvents: "none",
+                                "--copy-under": cell.underlay ?? "var(--background)",
+                                backgroundImage:
+                                    "linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under)), linear-gradient(var(--copy-under), var(--copy-under))",
+                                backgroundRepeat: "no-repeat",
+                                backgroundSize: `100% ${w(edges.top)}px, ${w(edges.right)}px 100%, 100% ${w(edges.bottom)}px, ${w(edges.left)}px 100%`,
+                                backgroundPosition: "top left, top right, bottom left, bottom left",
+                                backgroundOrigin: "border-box",
+                            } as CSSProperties
+                        }
+                    />
                 )
             })}
         </>
