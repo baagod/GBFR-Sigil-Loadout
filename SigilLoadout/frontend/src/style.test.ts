@@ -63,6 +63,11 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
         expect(52).toBeLessThan(60)
     })
 
+    /* 活动格（拖选起点）不画焦点环：否则灰环只从选区实线的右/下侧露出来，像多了一圈灰边。 */
+    it("活动格不画焦点环", () => {
+        expect(code).toMatch(/td\.cell-active\.cell-focus:focus-within::after\s*\{[^}]*content:\s*none/)
+    })
+
     /* ‼️ "拖拽 = 拉选区"的前提；也是只读格可选态只能走**行内样式**的原因（未分层压过 utilities 层）。 */
     it("`.cell-selectable` 自己按住文字选择", () => {
         expect(code).toMatch(/\.cell-selectable\s*\{[^}]*user-select:\s*none/)

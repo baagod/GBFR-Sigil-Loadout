@@ -208,6 +208,16 @@
     }
 }
 
+/*
+    活动格（拖选起点）不画焦点环：mousedown 会把焦点落到起点格，灰环与选区实线重叠，
+    只在右/下两侧露出来，看着像"多了一圈灰边"（真机反馈）。旧实现靠 `.cell-selected` 压掉，
+    选区类名删除后由 `.cell-active` 承担同一职责。
+    ⚠️ 必须带 `.cell-focus` 提高特异性，压过上面 `:is(:focus-within, :has(...))` 那条。
+*/
+td.cell-active.cell-focus:focus-within::after {
+    content: none;
+}
+
 /* 拖拽划过一片时别把文字选蓝；十字光标是表格通用语（xlsx 同款）。 */
 .cell-selectable {
     cursor:      cell;
