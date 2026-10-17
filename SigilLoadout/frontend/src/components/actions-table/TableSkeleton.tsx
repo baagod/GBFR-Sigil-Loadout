@@ -1,3 +1,5 @@
+import {useLayoutEffect, useRef, useState} from "react"
+
 import {Skeleton} from "@/components/ui/skeleton"
 
 /**
@@ -14,20 +16,50 @@ import {Skeleton} from "@/components/ui/skeleton"
  * 空白不是"数据没到"，而是表格要量完列宽才敢显示（见 `ActionsTable` 的 `hidden`）—— 那 ~440ms
  * 正是这段骨架在顶班。
  *
- * ⚠️ 元素要少：它盖住的正是"整表布局还没落定"那一段，真按 111×88 去铺等于把这份开销再花一遍。
- * 固定 **6 列**（用户口径）、行高 `h-4`，24 行铺满可视高度。
+ * 行数按**容器高度**算，只铺**完整的行**：写死 24 行时，小窗口下最后一行会被裁掉半截
+ * （真机反馈）。列固定 **6 列**（用户口径），行高 `h-4`。
  *
  * `pointer-events-none`：纯占位，别让它截走鼠标事件。
  */
-export const TableSkeleton = () => (
-    <div
-        aria-hidden
-        data-table-skeleton=""
-        className="pointer-events-none grid min-h-0 flex-1 auto-rows-min content-start gap-5 overflow-hidden p-2"
-        style={{gridTemplateColumns: "repeat(6, minmax(0, 1fr))"}}
-    >
-        {Array.from({length: 24 * 6}).map((_, i) => (
-            <Skeleton key={i} className="h-4" />
-        ))}
-    </div>
-)
+const COLUMNS = 6
+/** `computedStyle` 拿不到行高时的兜底（`h-4` = 16px）。 */
+const FALLBACK_ROW_HEIGHT = 16
+/** 量不到容器高度时（happy-dom）先铺几行，别渲染空网格。 */
+const FALLBACK_ROWS = 12
+
+export function TableSkeleton() {
+    const ref = useRef<HTMLDivElement>(null)
+    const [rows, setRows] = useState(FALLBACK_ROWS)
+
+    useLayoutEffect(() => {
+        const el = ref.current
+        if (!el) return
+        const measure = () => {
+            const style = getComputedStyle(el)
+            const gap = Number.parseFloat(style.rowGap) || 0
+            const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0)
+            const rowHeight = el.firstElementChild?.clientHeight || FALLBACK_ROW_HEIGHT
+            const available = el.clientHeight - padding
+            if (available <= 0) return
+            setRows(Math.max(1, Math.floor((available + gap) / (rowHeight + gap))))
+        }
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [])
+
+    return (
+        <div
+            ref={ref}
+            aria-hidden
+            data-table-skeleton=""
+            className="pointer-events-none grid min-h-0 flex-1 auto-rows-min content-start gap-5 overflow-hidden p-2"
+            style={{gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))`}}
+        >
+            {Array.from({length: rows * COLUMNS}).map((_, i) => (
+                <Skeleton key={i} className="h-4" />
+            ))}
+        </div>
+    )
+}
