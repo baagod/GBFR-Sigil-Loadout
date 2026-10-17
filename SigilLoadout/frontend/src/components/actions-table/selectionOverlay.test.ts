@@ -104,19 +104,24 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(model.pinned.ring.filter((r) => r.height > r.width)).toHaveLength(1)
     })
 
-    it("复制源：2px 虚线框、外扩 1px", () => {
+    it("复制源：每格一个描述（四边标记 + 该格底色），虚线框由组件按旧 :after 复刻", () => {
         const model = buildOverlay({
             bounds: [],
             geo: geo(),
             activeCell: null,
             copyAreas: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2}],
+            copyUnderlay: () => "var(--cell-editable)",
         })
         expect(COPY_WIDTH).toBe(2)
         expect(model.scrolled.copy).toEqual([
-            {left: 139, top: 40, width: 62, height: 2},
-            {left: 139, top: 67, width: 62, height: 2},
-            {left: 139, top: 40, width: 2, height: 29},
-            {left: 199, top: 40, width: 2, height: 29},
+            {
+                left: 140,
+                top: 41,
+                width: 60,
+                height: 27,
+                edges: {top: true, right: true, bottom: true, left: true},
+                underlay: "var(--cell-editable)",
+            },
         ])
     })
 })

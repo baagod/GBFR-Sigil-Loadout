@@ -70,7 +70,7 @@ import {ActionRowView} from "@/components/actions-table/ActionRowView"
 import {ActionsTableHead} from "@/components/actions-table/ActionsTableHead"
 import {CopyRejectedDialog} from "@/components/actions-table/CopyRejectedDialog"
 import {GRIP_WIDTH, HANDLE_WIDTH, PINNED_COUNT} from "@/components/actions-table/classes"
-import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
+import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnKind, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {rowFullySelected} from "@/components/actions-table/selection"
 import {buildOverlay} from "@/components/actions-table/selectionOverlay"
@@ -642,9 +642,21 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         [copySource, modelRows, sheetColumns],
     )
 
+    /** 复制虚线缝里垫的底色：可编辑格用格底色、只读格用页面底色（与旧 cell-under 同口径）。 */
+    const copyUnderlay = useCallback(
+        (rowIndex: number, columnIndex: number) => {
+            const columnId = sheetColumns[columnIndex]
+            if (!columnId) return undefined
+            const row = modelRows[rowIndex]
+            if (row?.original.removed) return "var(--cell-removed)"
+            return columnKind(columnId) === "readonly" ? "var(--background)" : "var(--cell-editable)"
+        },
+        [sheetColumns, modelRows],
+    )
+
     const overlayModel = useMemo(
-        () => (overlayGeometry ? buildOverlay({bounds: selectionBounds, geo: overlayGeometry, activeCell: activeCellIndexes, copyAreas}) : null),
-        [overlayGeometry, selectionBounds, activeCellIndexes, copyAreas],
+        () => (overlayGeometry ? buildOverlay({bounds: selectionBounds, geo: overlayGeometry, activeCell: activeCellIndexes, copyAreas, copyUnderlay}) : null),
+        [overlayGeometry, selectionBounds, activeCellIndexes, copyAreas, copyUnderlay],
     )
     /**
      * **行级命令只有这一份**（添加/复制/剪切/粘贴/删除，实现在 `useRowCommands`）——

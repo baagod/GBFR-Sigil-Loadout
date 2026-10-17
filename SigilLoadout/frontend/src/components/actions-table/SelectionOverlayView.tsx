@@ -15,12 +15,6 @@ import type {LayerModel, OverlayModel, Rect} from "./selectionOverlay"
 const FILL = "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)"
 const RING = "var(--cell-select)"
 
-/** 复制区虚线：横线沿 x、竖线沿 y 铺 4px 实 / 4px 空。 */
-function dashBackground(rect: Rect): string {
-    const dir = rect.width >= rect.height ? "90deg" : "180deg"
-    return `repeating-linear-gradient(${dir}, var(--cell-select) 0 4px, var(--background) 4px 8px)`
-}
-
 const abs = (rect: Rect, extra: Record<string, unknown> = {}) => ({
     position: "absolute" as const,
     left: `${rect.left}px`,
@@ -40,9 +34,47 @@ function Layer({model, layer}: {model: LayerModel; layer: "scrolled" | "pinned"}
             {model.ring.map((rect, i) => (
                 <div key={`r${i}`} data-overlay={`${layer}-ring`} data-rect={rectKey(rect)} style={abs(rect, {background: RING})} />
             ))}
-            {model.copy.map((rect, i) => (
-                <div key={`c${i}`} data-overlay={`${layer}-copy`} data-rect={rectKey(rect)} style={abs(rect, {backgroundImage: dashBackground(rect)})} />
-            ))}
+            {model.copy.map((cell, i) => {
+                const {edges} = cell
+                const bw = (on: boolean) => (on ? "2px" : "0")
+                return (
+                    /*
+                        复刻旧实现（td 的 `::after`）：盒子比格子大 1px（`inset:-1px`）、2px dashed、垫该格底色。
+                        ‼️ 右/下那 1px 在旧实现里被邻格盖住；overlay 没有邻格遮挡，所以外层裁掉右边/下边 1px，
+                        否则虚线会“画到格外”（真机反馈）。
+                    */
+                    <div
+                        key={`c${i}`}
+                        data-overlay={`${layer}-copy`}
+                        data-rect={rectKey(cell)}
+                        style={{
+                            position: "absolute",
+                            left: `${cell.left - 1}px`,
+                            top: `${cell.top - 1}px`,
+                            width: `${cell.width + 1}px`,
+                            height: `${cell.height + 1}px`,
+                            overflow: "hidden",
+                            pointerEvents: "none",
+                        }}
+                    >
+                        <div
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                top: 0,
+                                width: `${cell.width + 2}px`,
+                                height: `${cell.height + 2}px`,
+                                borderStyle: "dashed",
+                                borderColor: "var(--cell-select)",
+                                borderWidth: `${bw(edges.top)} ${bw(edges.right)} ${bw(edges.bottom)} ${bw(edges.left)}`,
+                                backgroundColor: cell.underlay ?? "var(--background)",
+                                mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                                maskComposite: "exclude",
+                            }}
+                        />
+                    </div>
+                )
+            })}
         </>
     )
 }

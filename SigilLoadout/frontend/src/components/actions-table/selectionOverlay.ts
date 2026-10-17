@@ -17,6 +17,18 @@ export type Bounds = {
 }
 
 export type Rect = {left: number; top: number; width: number; height: number}
+/**
+ * 复制虚线的一格：按**旧实现**（td 的 ::after：inset -1px + 2px dashed + 垫该格底色）逐格描述。
+ * 上/左会探到格外 1px；右/下那 1px 在旧实现里被邻格盖住，组件侧用 1px 裁切复现。
+ */
+export type CopyCell = {
+    left: number
+    top: number
+    width: number
+    height: number
+    edges: Edges
+    underlay?: string
+}
 export type Edges = {top: boolean; right: boolean; bottom: boolean; left: boolean}
 
 export type GeometryInput = {
@@ -36,7 +48,7 @@ export type GeometryInput = {
     columnCount: number
 }
 
-export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: Rect[]}
+export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
 export type OverlayModel = {scrolled: LayerModel; pinned: LayerModel}
 
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
@@ -136,7 +148,7 @@ function fillSegments(bounds: Bounds, geo: GeometryInput, hole: Rect | null): {p
 /**
  * 选区 → overlay 模型（纯函数，可单测）。
  *
- * `copyAreas` 是复制源区间（与选区同坐标系）；复制虚线也按钉住列切段。
+ * `copyAreas` 是复制源区间（与选区同坐标系）；`copyUnderlay` 给每格虚线返回该格底色（虚线缝里垫它）。
  */
 export function buildOverlay(input: {
     bounds: Bounds[]
@@ -145,8 +157,10 @@ export function buildOverlay(input: {
     activeCell: {rowIndex: number; columnIndex: number} | null
     /** 复制源区间。 */
     copyAreas: Bounds[]
+    /** 复制虚线的垫底色（按行列下标）；不传就用页面底色。 */
+    copyUnderlay?: (rowIndex: number, columnIndex: number) => string | undefined
 }): OverlayModel {
-    const {bounds, geo, activeCell, copyAreas} = input
+    const {bounds, geo, activeCell, copyAreas, copyUnderlay} = input
     const model: OverlayModel = {scrolled: emptyLayer(), pinned: emptyLayer()}
     const lastColumnIndex = geo.columnCount - 1
     const lastRowIndex = geo.rowCount - 1
@@ -179,10 +193,28 @@ export function buildOverlay(input: {
     }
 
     for (const area of copyAreas) {
-        for (const {rect, edges, pinned} of splitByPinned(area, geo)) {
-            const clampRight = edges.right && area.maxColumnIndex === lastColumnIndex
-            const clampBottom = edges.bottom && area.maxRowIndex === lastRowIndex
-            ;(pinned ? model.pinned : model.scrolled).copy.push(...ringLines(rect, edges, COPY_WIDTH, clampRight, clampBottom))
+        const pinnedEnd = geo.pinnedColumnCount - 1
+        for (let rowIndex = area.minRowIndex; rowIndex <= area.maxRowIndex; rowIndex++) {
+            for (let columnIndex = area.minColumnIndex; columnIndex <= area.maxColumnIndex; columnIndex++) {
+                const edges: Edges = {
+                    top: rowIndex === area.minRowIndex,
+                    bottom: rowIndex === area.maxRowIndex,
+                    left: columnIndex === area.minColumnIndex,
+                    right: columnIndex === area.maxColumnIndex,
+                }
+                if (!edges.top && !edges.bottom && !edges.left && !edges.right) continue
+                const rect: Rect = {
+                    left: geo.columnLefts[columnIndex]!,
+                    top: geo.headerHeight + rowIndex * geo.rowHeight,
+                    width: geo.columnWidths[columnIndex]!,
+                    height: geo.rowHeight,
+                }
+                ;(columnIndex <= pinnedEnd ? model.pinned : model.scrolled).copy.push({
+                    ...rect,
+                    edges,
+                    underlay: copyUnderlay?.(rowIndex, columnIndex),
+                })
+            }
         }
     }
 
