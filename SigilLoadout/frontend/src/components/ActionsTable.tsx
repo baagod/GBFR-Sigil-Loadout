@@ -48,7 +48,6 @@
 import {
     useCallback,
     useEffect,
-    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -73,8 +72,8 @@ import {GRIP_WIDTH, HANDLE_WIDTH, PINNED_COUNT} from "@/components/actions-table
 import {BranchPickContext, EnterEditContext, NO_PICKER, PickerOfContext, type ActionsTableMessages, columnLabel, writableColumn, type EnterEditRegistry, type ColumnSpec, type PickerConfig, RevealContext, features, parseSnapshotKey, type ActionRow, snapshotKey, shownValue} from "@/components/actions-table/model"
 import {type Modifier} from "@dnd-kit/core"
 import {rowFullySelected} from "@/components/actions-table/selection"
-import {buildOverlay} from "@/components/actions-table/selectionOverlay"
 import {SelectionOverlay} from "@/components/actions-table/SelectionOverlayView"
+import {useSelectionOverlay} from "@/components/actions-table/useSelectionOverlay"
 import {clampDragY} from "@/components/actions-table/drag"
 import {ReorderDnd} from "@/components/actions-table/ReorderDnd"
 import {useArrowKeys} from "@/components/actions-table/useArrowKeys"
@@ -340,13 +339,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         if (measured) onReady?.()
     }, [measured, onReady])
 
-    /** overlay 的宿主 = 滚动框（portal 进去；`measured` 之前外壳在屏幕外，不挂）。 */
-    const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null)
-    /** 表头高 / 行高（overlay 几何的输入；happy-dom 量不到，测试里为 0，overlay 不渲染）。 */
-    const [tableMetrics, setTableMetrics] = useState({headerHeight: 0, rowHeight: 0})
-    useLayoutEffect(() => {
-        if (measured) setOverlayHost(scrollRef.current)
-    }, [measured])
     /**
      * **拖动行的位移只许落在表格的可视框里**（传给 `ReorderDnd` 的 modifier）。
      * 几何（为什么要夹、上边界为什么是表头下沿、那 1px 余量的来路）都在 `drag.ts` —— 与 `reveal.ts`
@@ -574,78 +566,22 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
     const activeRowIndex = activeRowId === null ? -1 : modelRows.findIndex((row) => row.id === activeRowId)
 
-    /**
-     * **overlay 几何**：选区 → 像素矩形（纯函数见 `selectionOverlay.ts`）。
-     *
-     * 表头高/行高实测一次；列左缘按显示顺序累加。单元格上不再挂选区类名，这里算出来的矩形就是
-     * 选区外观的**唯一**来源 —— 拖选时只改这层 overlay，不碰表格 DOM。
-     */
-    useLayoutEffect(() => {
-        if (!measured) return
-        const tableEl = tableRef.current
-        const header = tableEl?.querySelector("thead")
-        const body = tableEl?.querySelector("tbody")
-        if (!tableEl || !header || !body || modelRows.length === 0) return
-        const headerHeight = header.getBoundingClientRect().height
-        const rowHeight = body.getBoundingClientRect().height / modelRows.length
-        if (headerHeight <= 0 || rowHeight <= 0) return
-        setTableMetrics((prev) => (prev.headerHeight === headerHeight && prev.rowHeight === rowHeight ? prev : {headerHeight, rowHeight}))
-    }, [measured, modelRows.length])
+    /* 选区 overlay：量高度、算矩形、找 portal 宿主都在这个 hook 里（纯几何在 selectionOverlay.ts）。 */
+    const overlay = useSelectionOverlay({
+        tableRef,
+        scrollRef,
+        measured,
+        rows: modelRows,
+        sheetColumns,
+        columnSizing,
+        rowHeadWidth,
+        gripWidth: reorder !== undefined ? GRIP_WIDTH : 0,
+        pinnedColumnCount: pinning.start.length,
+        selectionBounds,
+        activeCellKey,
+        copySource,
+    })
 
-    /** 活动格下标（锚点格）：overlay 用它把底色挖掉。 */
-    const activeCellIndexes = (() => {
-        if (!activeCellKey) return null
-        const {rowId, columnId} = parseSnapshotKey(activeCellKey)
-        const rowIndex = modelRows.findIndex((row) => row.id === rowId)
-        const columnIndex = sheetColumns.indexOf(columnId)
-        return rowIndex >= 0 && columnIndex >= 0 ? {rowIndex, columnIndex} : null
-    })()
-
-    const overlayGeometry = useMemo(() => {        if (!measured || tableMetrics.headerHeight <= 0 || tableMetrics.rowHeight <= 0 || sheetColumns.length === 0) return null
-        let left = rowHeadWidth
-        const columnLefts: number[] = []
-        const columnWidths: number[] = []
-        for (const id of sheetColumns) {
-            const width = columnSizing[id] ?? 0
-            columnLefts.push(left)
-            columnWidths.push(width)
-            left += width
-        }
-        return {
-            columnLefts,
-            columnWidths,
-            headerHeight: tableMetrics.headerHeight,
-            rowHeight: tableMetrics.rowHeight,
-            gripWidth: reorder !== undefined ? GRIP_WIDTH : 0,
-            pinnedColumnCount: Math.min(pinning.start.length, sheetColumns.length),
-            rowCount: modelRows.length,
-            columnCount: sheetColumns.length,
-        }
-    }, [measured, tableMetrics, sheetColumns, columnSizing, rowHeadWidth, reorder, pinning.start.length, modelRows.length])
-
-    /** 复制源 → 显示顺序的区间（overlay 画虚线用；`copySource` 记的是 id，不是下标）。 */
-    const copyAreas = useMemo(
-        () =>
-            (copySource?.areas ?? [])
-                .map((area) => {
-                    const rows = area.rowIds.map((id) => modelRows.findIndex((row) => row.id === id)).filter((i) => i >= 0)
-                    const cols = area.columnIds.map((id) => sheetColumns.indexOf(id)).filter((i) => i >= 0)
-                    if (rows.length === 0 || cols.length === 0) return null
-                    return {
-                        minRowIndex: Math.min(...rows),
-                        maxRowIndex: Math.max(...rows),
-                        minColumnIndex: Math.min(...cols),
-                        maxColumnIndex: Math.max(...cols),
-                    }
-                })
-                .filter((area): area is NonNullable<typeof area> => area !== null),
-        [copySource, modelRows, sheetColumns],
-    )
-
-    const overlayModel = useMemo(
-        () => (overlayGeometry ? buildOverlay({bounds: selectionBounds, geo: overlayGeometry, activeCell: activeCellIndexes, copyAreas}) : null),
-        [overlayGeometry, selectionBounds, activeCellIndexes, copyAreas],
-    )
     /**
      * **行级命令只有这一份**（添加/复制/剪切/粘贴/删除，实现在 `useRowCommands`）——
      * 工具条那五个按钮由 `onRowsReady` 拿走，键盘那条也走它（见下面那段 keydown）。
@@ -956,12 +892,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 </TableBody>
             </BaseTable>
             {/* 选区外观全部由这一层画（见 `SelectionOverlay`）：不往单元格上挂类名，拖选不触发表格重排。 */}
-            {overlayHost && overlayModel && overlayGeometry ? (
+            {overlay.host && overlay.model ? (
                 <SelectionOverlay
-                    host={overlayHost}
-                    model={overlayModel}
+                    host={overlay.host}
+                    model={overlay.model}
                     width={table.getTotalSize() + rowHeadWidth}
-                    height={overlayGeometry.headerHeight + modelRows.length * overlayGeometry.rowHeight}
+                    height={overlay.height}
                 />
             ) : null}
             {/* 测试投影（happy-dom 量不到像素）：把选区的行列下标与活动格挂出来，测试据此断言，不依赖类名。 */}
@@ -970,9 +906,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 data-selection-bounds={JSON.stringify(
                     selectionBounds.map((b) => [b.minRowIndex, b.maxRowIndex, b.minColumnIndex, b.maxColumnIndex]),
                 )}
-                data-active-cell={activeCellIndexes ? `${activeCellIndexes.rowIndex},${activeCellIndexes.columnIndex}` : ""}
+                data-active-cell={overlay.activeCellIndexes ? `${overlay.activeCellIndexes.rowIndex},${overlay.activeCellIndexes.columnIndex}` : ""}
                 data-copy-bounds={JSON.stringify(
-                    copyAreas.map((b) => [b.minRowIndex, b.maxRowIndex, b.minColumnIndex, b.maxColumnIndex]),
+                    overlay.copyAreas.map((b) => [b.minRowIndex, b.maxRowIndex, b.minColumnIndex, b.maxColumnIndex]),
                 )}
             />
         </div>

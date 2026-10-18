@@ -17,6 +17,12 @@ export type Bounds = {
 }
 
 export type Rect = {left: number; top: number; width: number; height: number}
+/**
+ * 复制虚线的一格：整格一个盒子，用 border-style: dashed 画四边（浏览器按角对齐 dash 相位；
+ * 拆成四条独立线时只有左上角对得上，其余三角会“截断”）。
+ * 右/下要画进格内且保持 2px：盒子只向上/左各多 1px、右/下止于格线（宽高 = 格子 + 1）。
+ */
+export type CopyCell = Rect & {edges: Edges; underlay: string}
 export type Edges = {top: boolean; right: boolean; bottom: boolean; left: boolean}
 
 export type GeometryInput = {
@@ -36,12 +42,11 @@ export type GeometryInput = {
     columnCount: number
 }
 
-export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: Rect[]}
+export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
 export type OverlayModel = {scrolled: LayerModel; pinned: LayerModel}
 
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
 export const RING_WIDTH = 3
-export const COPY_WIDTH = 2
 
 const emptyLayer = (): LayerModel => ({fill: [], ring: [], copy: []})
 
@@ -145,8 +150,10 @@ export function buildOverlay(input: {
     activeCell: {rowIndex: number; columnIndex: number} | null
     /** 复制源区间。 */
     copyAreas: Bounds[]
+    /** 复制虚线空档露什么颜色（该格底色）；不传用页面底色（几何单测不关心颜色）。 */
+    copyUnderlay?: (rowIndex: number, columnIndex: number) => string
 }): OverlayModel {
-    const {bounds, geo, activeCell, copyAreas} = input
+    const {bounds, geo, activeCell, copyAreas, copyUnderlay} = input
     const model: OverlayModel = {scrolled: emptyLayer(), pinned: emptyLayer()}
     const lastColumnIndex = geo.columnCount - 1
     const lastRowIndex = geo.rowCount - 1
@@ -179,10 +186,29 @@ export function buildOverlay(input: {
     }
 
     for (const area of copyAreas) {
-        for (const {rect, edges, pinned} of splitByPinned(area, geo)) {
-            const clampRight = edges.right && area.maxColumnIndex === lastColumnIndex
-            const clampBottom = edges.bottom && area.maxRowIndex === lastRowIndex
-            ;(pinned ? model.pinned : model.scrolled).copy.push(...ringLines(rect, edges, COPY_WIDTH, clampRight, clampBottom))
+        const pinnedEnd = geo.pinnedColumnCount - 1
+        for (let rowIndex = area.minRowIndex; rowIndex <= area.maxRowIndex; rowIndex++) {
+            for (let columnIndex = area.minColumnIndex; columnIndex <= area.maxColumnIndex; columnIndex++) {
+                const edges: Edges = {
+                    top: rowIndex === area.minRowIndex,
+                    bottom: rowIndex === area.maxRowIndex,
+                    left: columnIndex === area.minColumnIndex,
+                    right: columnIndex === area.maxColumnIndex,
+                }
+                if (!edges.top && !edges.bottom && !edges.left && !edges.right) continue
+                const rect: Rect = {
+                    left: geo.columnLefts[columnIndex]!,
+                    top: geo.headerHeight + rowIndex * geo.rowHeight,
+                    width: geo.columnWidths[columnIndex]!,
+                    height: geo.rowHeight,
+                }
+                const layer = columnIndex <= pinnedEnd ? model.pinned : model.scrolled
+                layer.copy.push({
+                    ...rect,
+                    edges,
+                    underlay: copyUnderlay?.(rowIndex, columnIndex) ?? "var(--background)",
+                })
+            }
         }
     }
 

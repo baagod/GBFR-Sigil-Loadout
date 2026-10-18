@@ -8,18 +8,13 @@
       · scrolled 层 z-41：普通格之上、冻结列之下（冻结列会盖住滚过去的选区）；
       · pinned 层 z-52：冻结列之上、吸顶表头行（z-60）之下；横向滚动由 `sticky left-0` 原生跟随。
 */
+import type {CSSProperties} from "react"
 import {createPortal} from "react-dom"
 
-import type {LayerModel, OverlayModel, Rect} from "./selectionOverlay"
+import type {CopyCell, LayerModel, OverlayModel, Rect} from "./selectionOverlay"
 
 const FILL = "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)"
 const RING = "var(--cell-select)"
-
-/** 复制区虚线：横线沿 x、竖线沿 y 铺 4px 实 / 4px 空。 */
-function dashBackground(rect: Rect): string {
-    const dir = rect.width >= rect.height ? "90deg" : "180deg"
-    return `repeating-linear-gradient(${dir}, var(--cell-select) 0 4px, var(--background) 4px 8px)`
-}
 
 const abs = (rect: Rect, extra: Record<string, unknown> = {}) => ({
     position: "absolute" as const,
@@ -31,6 +26,42 @@ const abs = (rect: Rect, extra: Record<string, unknown> = {}) => ({
     ...extra,
 })
 
+/*
+    复制虚线：整格一个盒子、用 border-style: dashed 画四边 —— dash 相位由浏览器按**角**对齐，
+    四条边在四个角都接得上（拆成四条独立线时只有左上角对，其余三角会“截断”）。
+    盒子 left/top = 格子 - 1（上/左格外 1px）、宽高 = 格子 + 1（右/下止于格线，2px 全在格内）。
+    空档垫该格底色（既不露黑线也不露格线），颜色与格内一致 → 视觉上只剩虚线。
+*/
+function CopyBox({cell, layer}: {cell: CopyCell; layer: "scrolled" | "pinned"}) {
+    const side = (on: boolean) => (on ? "2px" : "0px")
+    const {edges} = cell
+    return (
+        <div
+            data-overlay={`${layer}-copy`}
+            data-rect={rectKey(cell)}
+            style={
+                abs(
+                    {left: cell.left - 1, top: cell.top - 1, width: cell.width + 1, height: cell.height + 1},
+                    {
+                        borderStyle: "dashed",
+                        borderColor: "var(--cell-select)",
+                        borderWidth: "var(--copy-top) var(--copy-right) var(--copy-bottom) var(--copy-left)",
+                        "--copy-top": side(edges.top),
+                        "--copy-right": side(edges.right),
+                        "--copy-bottom": side(edges.bottom),
+                        "--copy-left": side(edges.left),
+                        "--copy-under": cell.underlay,
+                        backgroundColor: "var(--copy-under)",
+                        /* 底色只留在边框那一圈（虚线缝里），内部挖空。 */
+                        mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                        maskComposite: "exclude",
+                    },
+                ) as CSSProperties
+            }
+        />
+    )
+}
+
 function Layer({model, layer}: {model: LayerModel; layer: "scrolled" | "pinned"}) {
     return (
         <>
@@ -40,8 +71,8 @@ function Layer({model, layer}: {model: LayerModel; layer: "scrolled" | "pinned"}
             {model.ring.map((rect, i) => (
                 <div key={`r${i}`} data-overlay={`${layer}-ring`} data-rect={rectKey(rect)} style={abs(rect, {background: RING})} />
             ))}
-            {model.copy.map((rect, i) => (
-                <div key={`c${i}`} data-overlay={`${layer}-copy`} data-rect={rectKey(rect)} style={abs(rect, {backgroundImage: dashBackground(rect)})} />
+            {model.copy.map((cell, i) => (
+                <CopyBox key={`c${i}`} cell={cell} layer={layer} />
             ))}
         </>
     )

@@ -67,9 +67,14 @@
     --cell-fill-overlay:    color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent);
     --cell-fill-solid:      color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
 
+    /* 格底色（`classes.ts` 的 `EDITABLE_BG` / `.row-removed` 用）。必须挂 :root：
+       选区 overlay 在 table **外面**，写 table 里它取不到 → 复制虚线空档会解析成透明（真机踩过）。 */
+    --cell-editable: #1a1a1a;
+    --cell-removed:  #542526;
+
     /* 层高刻度（页面级）：别的页（专精技能吸顶行）也用 `var(--z-focus)`；写在 `table` 里只有表格
        子树解析得到，别的页会整条 `z-index` 失效、被吸顶行压住。
-       ⚠️ 选区 overlay 两层用内联 `z-41` / `z-52`（见 `SelectionOverlay.tsx`），与下面那段阶梯对齐。 */
+       ⚠️ 选区 overlay 两层用内联 `z-41` / `z-52`（见 `SelectionOverlayView.tsx`），与下面那段阶梯对齐。 */
     --z-focus:              30;
     --z-pinned:             50;
 }
@@ -269,13 +274,6 @@ table.base-table tbody tr:hover {
     ‼️ `th` 与 `td` 都要覆盖，且必须用 `table td.cell-pinned`（(0,1,2)）—— 只写 `td.cell-pinned` 会与提层
       规则同权重、靠源序决定胜负，表头冻结格会掉到 20 被横滚内容盖住。
 */
-table {
-    /* 可编辑列的底色（`classes.ts` 的 `EDITABLE_BG` 引用它）。 */
-    --cell-editable: #1a1a1a;
-    /* "假删除"那一行的底色（消费者是下面 `.row-removed`）。 */
-    --cell-removed:  #542526;
-}
-
 table td.cell-pinned, table th.cell-pinned {
     z-index: var(--z-pinned);
 }

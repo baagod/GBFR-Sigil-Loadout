@@ -12,6 +12,16 @@ export const READ_ONLY_BG = "bg-background"
 export const EDITABLE_BG = "bg-[var(--cell-editable)]"
 
 /**
+ * 复制虚线空档要垫的“该格底色”（overlay 挂在 table 外面，拿不到行上的类，只能按同一套判据取色）。
+ * 格子在当前选区里时再叠一层选区填充色（否则空档比周围深，看着像黑色底线）。
+ * ‼️ 与上面的 `READ_ONLY_BG` / `EDITABLE_BG`、以及 `.row-removed` 必须同一口径 —— 改底色记得一起改。
+ */
+export const cellUnderlayColor = (readonlyTint: boolean, removed: boolean, selected: boolean) => {
+    const base = removed ? "var(--cell-removed)" : readonlyTint ? "var(--background)" : "var(--cell-editable)"
+    return selected ? `color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), ${base})` : base
+}
+
+/**
  * 整行选中时**行号格**要叠的底纹类。
  *
  * 只有行号格用得上它：它不在列模型里，拿不到 `.cell-selected`（数据格是"那个整行宽的区"里的一员，

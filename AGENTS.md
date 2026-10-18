@@ -366,7 +366,7 @@
 ## 技能：按需调用
 
 - 测试页面使用 `agent-browser` cli 工具（禁 `playwright`）。
-- 搜索使用 web-search 和 `skill:agent-reach`。
+- 内置搜索、抓取工具和 `skill:agent-reach`。
 
 <!-- OPENWIKI:START -->
 

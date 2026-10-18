@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest"
 
-import {buildOverlay, COPY_WIDTH, ringLines, RING_WIDTH, type GeometryInput} from "./selectionOverlay"
+import {buildOverlay, ringLines, RING_WIDTH, type GeometryInput} from "./selectionOverlay"
 
 const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
     columnLefts: [40, 80, 140, 200],
@@ -104,19 +104,16 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(model.pinned.ring.filter((r) => r.height > r.width)).toHaveLength(1)
     })
 
-    it("复制源：2px 虚线框、外扩 1px", () => {
+    it("复制源：每格一个盒子（四边标记 + 该格底色），上/左格外 1px、右/下止于格线", () => {
         const model = buildOverlay({
             bounds: [],
             geo: geo(),
             activeCell: null,
             copyAreas: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2}],
+            copyUnderlay: () => "var(--cell-editable)",
         })
-        expect(COPY_WIDTH).toBe(2)
         expect(model.scrolled.copy).toEqual([
-            {left: 139, top: 40, width: 62, height: 2},
-            {left: 139, top: 67, width: 62, height: 2},
-            {left: 139, top: 40, width: 2, height: 29},
-            {left: 199, top: 40, width: 2, height: 29},
+            {left: 140, top: 41, width: 60, height: 27, edges: {top: true, right: true, bottom: true, left: true}, underlay: "var(--cell-editable)"},
         ])
     })
 })
