@@ -46,7 +46,6 @@ export function useSelectionOverlay({
     host: HTMLDivElement | null
     model: OverlayModel | null
     height: number
-    activeCellIndexes: ActiveCellIndexes | null
     /** 复制源区间（测试投影用；渲染由 model 走）。 */
     copyAreas: Bounds[]
 } {
@@ -148,7 +147,6 @@ export function useSelectionOverlay({
         host,
         model,
         height: geometry ? geometry.headerHeight + rows.length * geometry.rowHeight : 0,
-        activeCellIndexes,
         copyAreas,
     }
 }

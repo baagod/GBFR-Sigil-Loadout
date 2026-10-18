@@ -12,9 +12,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {HANDLE_WIDTH} from "@/components/actions-table/classes"
-import {KEYS, cellAt, clipboardStub, handleAt, stubRowRects, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
-import {selectionEdgesOf} from "@/components/actions-table/testkit"
-import {isSelected} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, clipboardStub, handleAt, isSelected, stubRowRects, useTableHarness, makeRow, pressHandle, rowSelectedAt} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows} = useTableHarness()
 
@@ -70,7 +68,8 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         ============ 按行号选行（点 / Shift / Ctrl / 拖）============
 
         "点 / Shift 连选 / Ctrl 逐个加减"那套语义（行号手势的唯一实现就在 `ActionsTable` 里，line/格共用同一份
-        选区模型）；"按住划过一片"库里没有，由组件的 `extendRowSpanTo` 接。选中的标记 = 行号格上那圈框。
+        选区模型）；"按住划过一片"库里没有，由组件的 `extendFocusTo` 接。选中的标记 = 行号格上的
+        `cell-row-selected` 底纹。
     */
 
     it("点行号：选中那一行；再点一次仍是它（与单击单元格同一套语义，没有「再点取消」）", async () => {
@@ -226,52 +225,8 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
     })
 
     /*
-        **框从行号列后面开始**（用户要求：`| xx | xx |`）—— 行号格自己**不画框**，框由**数据格**挂
-        `cell-edge-*` 画：上下边只有段首/段尾那一行有，左右边只有第一格/最后一格有。
-    */
-    it("行号格不画框；框由数据格挂边类（段首/段尾 + 首列/末列）", async () => {
-        setRows([makeRow("1000"), makeRow("1001"), makeRow("1002")])
-        const container = await renderTable()
-
-        pressHandle(container, 1)
-        fireEvent.mouseUp(window)
-        pressHandle(container, 2, {shiftKey: true}) // 连选第 2、3 line
-        fireEvent.mouseUp(window)
-
-        /** 这一格落在选区外圈的哪几条边上（来自选区投影）。 */
-        const edges = (r: number, c: number) => selectionEdgesOf(cellAt(container, r, c)).join(" ")
-
-        // 行号格不在选区坐标系里，没有任何边
-        expect(selectionEdgesOf(handleAt(container, 1))).toEqual([])
-
-        const lastCol = KEYS.length - 1
-        // 段首那行的第一格：上 + 左
-        expect(edges(1, 0)).toBe("cell-edge-left cell-edge-top")
-        /*
-            段首那行的最后一格：**只有上**（用户口径：整行选中时，行末那一格不画右边缘）。
-
-            行手势选出来的区本来就在表格右端收口，而末列没有格线（`[&_tr>*:last-child]:border-r-0`），
-            那条右边线就只剩"选区轮廓"这一层意义 —— 看着像表格右边缘凭空多出一道竖线。
-            ⚠️ 只有**整行选中**才摘；任意矩形选区收在末列时那条边照挂（下一段用例验的就是它）。
-        */
-        expect(edges(1, lastCol)).toBe("cell-edge-top")
-        // 段尾那行的第一格：下 + 左
-        expect(edges(2, 0)).toBe("cell-edge-bottom cell-edge-left")
-        // 段首整行都带上边、段尾整行都带下边（行选中是"整行算一个块"，与单元格选区按格算不同）
-        expect(edges(1, 1)).toBe("cell-edge-top")
-        expect(edges(2, 1)).toBe("cell-edge-bottom")
-        // 没选中的行不挂
-        expect(edges(0, 0)).toBe("")
-    })
-
-    /*
-        **只读列也要算被选中**：选中一行时 `#` / `id_` / `abilityTag_` 三格都得带上那层浅色。
-        它们钉住、底色必须不透明（挡得住横向滚过来的列），所以叠加层是**逐格**加的，不能靠 tr 往下透。
-    */
-    /*
-        整行选中时**只读列也是选中的**（`id_` / `abilityTag_`）。
-        数据格（含只读列）走的是**同一条** `.cell-selected` —— 整行选区就是"一条普通的区"；
-        行号格不在列模型里、拿不到它，所以由 `cell-row-selected` 叠同一条底纹。
+        整行选中时**只读列也是选中的**（`id_` / `abilityTag_`）—— 整行选区就是"一条普通的区"，
+        选区外观由 `SelectionOverlay` 统一画；行号格不在列模型里，由 `cell-row-selected` 叠同一份底纹。
     */
     it("选行时只读的 id_ / abilityTag_ 同样被选中；行号格靠自己的底纹类", async () => {
         const container = await renderTable()
@@ -284,7 +239,7 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         }
         expect(handleAt(container, 0).className).toContain("cell-row-selected")
         // 不选中的行不带
-        expect(cellAt(container, 1, KEYS.indexOf("id_")).className).not.toContain("cell-selected")
+        expect(isSelected(cellAt(container, 1, KEYS.indexOf("id_")))).toBe(false)
     })
 
     /*

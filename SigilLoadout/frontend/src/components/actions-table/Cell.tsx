@@ -24,15 +24,11 @@ const builtinPick = (kind: ColumnKind, branch: BranchPickConfig) =>
           : undefined
 
 /**
- * 一格的**内容**（只读文本 / 可编辑格）—— **`memo` 就是这一层存在的理由**。
+ * 一格的**内容**（只读文本 / 可编辑格）—— **`memo` 就是这一层存在的理由**：格子的类由外层给，
+ * 内容只随"值真的改了"变；不拆的话，每次行重渲（活动格/拖拽态变化）都要把每行 88 个格子的子树
+ * 一起重建。
  *
- * 为什么把"内容"从"格子"里拆出来：拖拽选区时每穿过一格就写一次选中 state，那一行的 `<td>`
- * 必须重建（它的类要改：选中底色、选区轮廓），但**格子里装的东西一个字节都没变** ——
- * 只读就是一串文本、可编辑就是同一个 `Cell`。不拆的话，每行 88 个格子的子树跟着白重建，
- * 一次拖拽下来就是几千次无谓重渲（实测：20 次移动触发 357 次行重渲，覆盖全部 51 行）。
- *
- * 入参全是**稳定值**（`row.id` / 字段名 / 值 / 名字表 / `edit`），所以选中态一变它就被 `memo`
- * 挡住，只有"值真的改了"才重渲。
+ * 入参全是**稳定值**（`row.id` / 字段名 / 值 / 名字表 / `edit`），所以只有值变才重渲。
  */
 export const CellContent = memo(function CellContent({
     rowId,
@@ -325,13 +321,6 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                 ref={textRef}
                 text={shown}
                 muted={placeholder}
-                /*
-                    ‼️ **这一格在按下之前没被选中 → 这一次 focus 不许进编辑**（拖选的第一下、或者点一个
-                    没选中的格子，都只算"选中"）。不闸的话：`wasSelectedRef` 在 `td` 的 mousedown 里刚被
-                    改成 true，紧接着的 focus 就读成"已经选中"→ 直接进编辑（实测：在复制区里拖选第一下
-                    就进编辑，把复制区那圈虚线撤了）。
-                    `preSelected` 是渲染时从 `td` 那一刻的快照取下来的 —— 在这里现读 ref 只会读到"按下之后"。
-                */
                 /* ‼️ **双击**才进编辑：单击那一下归"选"（含 Ctrl 减选 / Shift 扩选 / 按住拖），
                    与它的意图不冲突。拖出去拉过选区（`dragged`）也一律不进编辑。 */
                 onDoubleClick={() => {

@@ -24,7 +24,7 @@
     兄弟模块（按职责拆开，**别再堆回这个文件**）：
       · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、列策略（`columnKind` / `writableColumn`）、纯取值助手；
       · `actions-table/classes.ts`    —— 类名常量、选区与复制区的「哪几条边」；
-      · `actions-table/selection.ts`  —— 选区的谓词与指纹（整行 / 单格 / 行外观指纹）；
+      · `actions-table/selection.ts`  —— 选区的谓词（整行 / 单格）；
       · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
       · `actions-table/useReveal.ts`  —— 「跟随可视」的 DOM 那一层（查活动格 / 排一帧 / 那条"这次滚动是我发的"契约）；
       · `actions-table/useArrowKeys.ts` —— 方向键与 Enter（三条移动路径 + 四道让路闸门）；
@@ -427,8 +427,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     }, [rows, onSaveReady])
 
     /**
-     * 选区解析出来的矩形边界（库**记忆化**过，一次渲染只算一遍）。
-     * `rowSelectionKey` 要用它判断"这一行在不在选区里、它的上下邻行在不在"。
+     * 选区解析出来的矩形边界（库**记忆化**过，一次渲染只算一遍）：行号格的选中态与
+     * 选区 overlay 的几何都从这里来。
      */
     const selectionBounds = table.getCellSelectionBounds()
 
@@ -653,7 +653,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      *   · 什么都不按 —— 整行替换成这一行；
      *   · **Ctrl/Cmd** —— 整行**追加**一段；这一行本来就整行选中了 → **减选**（`exclude`）；
      *   · **Shift** —— 把**当前那个区**改成"锚点行 → 这一行"的整行宽一段（其他区保留，与单元格 Shift 一致）；
-     *   · 按住拖动（上面 `extendRowSpanTo`）—— 把它拉成一段。
+     *   · 按住拖动（上面 `extendFocusTo`）—— 把它拉成一段。
      */
     const clickRowHandleImpl = (row: Row<typeof features, ActionRow>, mods: {shiftKey: boolean; ctrlKey: boolean; metaKey: boolean}) => {
         const id = row.id
@@ -829,7 +829,10 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     （`hidden = loading || !measured`），整块外壳已经被挪到屏幕外 —— 表格隐不隐身无关紧要，
                     写上就是一条永远单独生效不了的冗余分支。
                 */
-                className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
+                /* ‼️ **不许再加 `min-width`**：overlay 列几何由 `columnSizing` 推出，表宽必须恒等于
+                   行内 `width`（`getTotalSize()+rowHeadWidth`），否则容器更宽时列被摊宽、选区错位
+                   （headless 复现：400px 声明宽 + `min-w-full` → 实测 1000px；Speed 轨 5 列）。 */
+                className={`${measured ? "table-fixed " : ""}border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
                 style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
             >
                 <ActionsTableHead
@@ -858,7 +861,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                             ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
                             整行选中如今就是 `cellSelection` 里的一条区（见 `selectRowSpan`），不再有
                             `rowSelection` 那一档 —— 所以行块与单元格区**能同时存在**（Excel 就是这个模型）。
-                            边框不用这里画：库的 `cell.getSelectionEdges()` 会按那片区的边界逐格给边。
+                            边框不用这里画：选区外观（底色 / 轮廓 / 复制虚线）全由 `SelectionOverlay` 按区间画。
                         */
                         const rowSelected = rowFullySelected(selectionBounds, rowIndex, lastColumnIndex)
                         return (
@@ -900,13 +903,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     height={overlay.height}
                 />
             ) : null}
-            {/* 测试投影（happy-dom 量不到像素）：把选区的行列下标与活动格挂出来，测试据此断言，不依赖类名。 */}
+            {/* 测试投影（happy-dom 量不到像素）：把选区的行列下标与复制源挂出来，测试据此断言，不依赖类名。 */}
             <div
                 hidden
                 data-selection-bounds={JSON.stringify(
                     selectionBounds.map((b) => [b.minRowIndex, b.maxRowIndex, b.minColumnIndex, b.maxColumnIndex]),
                 )}
-                data-active-cell={overlay.activeCellIndexes ? `${overlay.activeCellIndexes.rowIndex},${overlay.activeCellIndexes.columnIndex}` : ""}
                 data-copy-bounds={JSON.stringify(
                     overlay.copyAreas.map((b) => [b.minRowIndex, b.maxRowIndex, b.minColumnIndex, b.maxColumnIndex]),
                 )}

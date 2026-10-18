@@ -110,7 +110,7 @@ describe("动作表 · 选值格（controlTypeHash_）", () => {
         const cell = cellAt(container, 0, PICK_COL)
         pressPick(cell)
         await tick()
-        // 选中态与别的格子同一个类（`cell-selected` 由库给，行号/数据格共用那一套）。
+        // 选中态走选区投影（选区外观由 SelectionOverlay 按投影区间画）。
         expect(isSelected(cell)).toBe(true)
         // 单击这一下**只算选中**：列表不出现。
         expect(isPickOpen()).toBe(false)

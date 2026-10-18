@@ -24,11 +24,10 @@ export const cellUnderlayColor = (readonlyTint: boolean, removed: boolean, selec
 /**
  * 整行选中时**行号格**要叠的底纹类。
  *
- * 只有行号格用得上它：它不在列模型里，拿不到 `.cell-selected`（数据格是"那个整行宽的区"里的一员，
- * 自己就带 `.cell-selected`）。
+ * 只有行号格用得上它：它不在列模型里，选区 overlay 从行头之后开始画，盖不到这一格。
  *
- * ‼️ 它与 `.cell-selected` **共用同一个来路**（`style.css` 里的 `--cell-fill` + `--cell-fill-alpha`）——
- * 用户报过"选行的背景色比选区亮"（当时两边各写各的：这边一条渐变、那边另一条），写成同一份才不漂。
+ * ‼️ 颜色与选区填充**共用同一份来路**（`style.css` 里的 `--cell-fill` + `--cell-fill-alpha`）——
+ * 用户报过"选行的背景色比选区亮"（当时两边各写各的：这边一条渐变、那边另一个色），写成同一份才不漂。
  */
 export const HANDLE_SELECTED_BG = "cell-row-selected"
 
@@ -49,12 +48,8 @@ export const PINNED_COUNT = 2
 export const HANDLE_WIDTH = 40
 
 /**
- * **拖动握把那一列**的宽度（只有行序能拖的表才有这一列）。
- *
- * 原来是塞在行号格里（序号 + `⠿` 挤同一格，靠 `HANDLE_WIDTH + 32` 拼宽度）—— 真机上是错的：
- * `table-fixed` 的列宽由**表头那一格**决定，表头只写了 `HANDLE_WIDTH`，于是表体那 72px **从来没生效**
- * （实宽 41.7），后果是序号被 flex 压到 ~20px、握把右侧 10px 被钉住的 `config` 列盖住、表头 `#` 与
- * 序号不共中线。拆成两格之后，每一格的宽度就是它写下的宽度。
+ * **拖动握把那一列**的宽度（只有行序能拖的表才有这一列）。表头与表体各占一格：`table-fixed` 的列宽
+ * 只认表头那格，塞进行号格里时表体写下的宽度不算数。
  */
 export const GRIP_WIDTH = 32
 
@@ -94,29 +89,17 @@ export const HEAD_BG = "bg-popover"
 export const HEAD_DRILL = "bg-primary! text-primary-foreground!"
 
 /**
- * 行号格的光标：**和 `➡` 一模一样的箭头**（Excel / WPS 行号上就是它）。
+ * 行号格 / 表头整行（表头那枚转 90° 朝下）的 **Excel 式箭头光标**：系统光标没有这一支，用内联 SVG 的
+ * data URI 画（白身黑边 —— 深色界面不糊、落到浅色格子上也看得见）。`4 12` / `12 4` 是**热点**（箭头尖端），
+ * 必须落在图形内，否则整条 `cursor` 声明作废；末尾的 `e-resize` / `s-resize` 是兜底。
  *
- * 系统光标里**没有**这一支 —— `e-resize` 是"左右双向箭头"（不是它），`default` 是那支斜的指针，
- * 所以只能自带图标。图标用**内联 SVG 的 data URI**画一个 ➡：不落文件、不用管打包路径与 2x 缩放，
- * 改形状/改色就在这一行里改。
- *
- * 配色是**白身 + 黑边**（用户定的）：本应用是深色界面，黑箭头会糊在底色里；而那圈黑边保证它落到
- * 浅色格子上也还看得见 —— 这正是 Excel / WPS 给自己那支黑箭头加白边的同一个理由，只是反过来用。
- *
- * `4 12` 是**热点**（箭头尖端），必须落在图形内，否则整条 `cursor` 声明作废。
- * 末尾的 `e-resize` 是**兜底**：万一哪天不吃 data URI 了，也还是个箭头而不是十字。
- *
- * ⚠️ 必须让**那个 `td` 自己**带上它，写在里层 div 上没用：`cell-selectable` 的 `cursor: cell`
- * （见 style.css）是**显式命中这个 td** 的规则，而 `cursor` 是继承属性 —— td 一旦定死 `cell`，
- * 里层写什么都没用（继承只在"没有规则命中"时才轮到）。
+ * ⚠️ 必须让**那个 `td` 自己**带上它：`cell-selectable` 的 `cursor: cell` 显式命中 td，而 `cursor` 是
+ * 继承属性 —— td 定死 `cell` 之后，里层写什么都没用。
  */
 export const HANDLE_CURSOR =
     'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M3 8.5h9V4l9 8-9 8v-4.5H3z" fill="%23fff" stroke="%23111" stroke-width="2" stroke-linejoin="round"/></svg>\') 4 12, e-resize'
 
-/**
- * **表头整行**的光标：与 `HANDLE_CURSOR` **同一枚箭头**、同一套配色与描边，只是转 90° 朝下
- * （热点与兜底一起转：`4 12` → `12 4`、`e-resize` → `s-resize`）。两枚是一套，改要一起改。
- */
+/** 表头整行那枚：与 `HANDLE_CURSOR` 同一图标转 90° 朝下（热点与兜底一起转）。两枚是一套，改要一起改。 */
 export const HANDLE_HEAD_CURSOR =
     'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M8.5 3h7v9h4.5l-8 9-8-9h4.5z" fill="%23fff" stroke="%23111" stroke-width="2" stroke-linejoin="round"/></svg>\') 12 4, s-resize'
 

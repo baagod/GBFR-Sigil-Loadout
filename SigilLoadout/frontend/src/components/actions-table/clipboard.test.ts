@@ -115,6 +115,20 @@ describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => 
         ])
     })
 
+    it("复制 2×2 → 选 3×3：竖向凑不满第二份，也按整份截断（只写 2×2）", () => {
+        const plan = planPaste({
+            block: [
+                ["a", "b"],
+                ["c", "d"],
+            ],
+            rows: sheet(3, 3).rows,
+            start: {row: 0, col: 0},
+            size: {rows: 3, cols: 3},
+        })
+        expect(written(plan)).toEqual(["r0c0=a", "r0c1=b", "r1c0=c", "r1c1=d"])
+        expect(plan.range).toEqual({firstRow: 0, lastRow: 1, firstCol: 0, lastCol: 1})
+    })
+
     it("落点是选区左上角：从 (1,1) 开始铺", () => {
         const plan = planPaste({
             block: [["x"]],

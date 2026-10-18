@@ -141,21 +141,6 @@
     @apply px-5 pt-4 pb-6;
 }
 
-/* 行号格里那条分隔线（数字 | 握把）。别改回"给握把那半截加 border-l"：表格里百分比高度不可靠，
-   行高一旦由别处撑起线就断成一段段；画在 td 的伪元素上跟着整格走、也不参与排版。 */
-@utility handle-divider {
-    &::before {
-        content:          "";
-        position:         absolute;
-        top:              0;
-        bottom:           0;
-        left:             36px;
-        width:            1px;
-        background-color: var(--input);
-        pointer-events:   none;
-    }
-}
-
 /* 表格外框 / 格线 / 表头颜色只写这一处：统一 `--input`（深色下 #404040；`--border` 太淡）。
    ⚠️ `& *` 同权重吃掉了表内所有单独的边框色，要给某格上色得用更精确的选择器。 */
 @utility table-border {
@@ -215,8 +200,8 @@
 
 /*
     活动格（拖选起点）不画焦点环：mousedown 会把焦点落到起点格，灰环与选区实线重叠，
-    只在右/下两侧露出来，看着像"多了一圈灰边"（真机反馈）。旧实现靠 `.cell-selected` 压掉，
-    选区类名删除后由 `.cell-active` 承担同一职责。
+    只在右/下两侧露出来，看着像"多了一圈灰边"（真机反馈）。选区外观已不挂在格子上，
+    这一条只负责把 `.cell-active` 那格的焦点环收掉。
     ⚠️ 必须带 `.cell-focus` 提高特异性，压过上面 `:is(:focus-within, :has(...))` 那条。
 */
 td.cell-active.cell-focus:focus-within::after {
@@ -316,12 +301,6 @@ div:has(> table.base-table.is-offscreen) {
 /* 忙（保存部署那一段）：点不动，但表格照旧显示。 */
 div:has(> table.base-table.is-busy) {
     pointer-events: none;
-}
-
-/* 选中底色用 `inset box-shadow`（另一个槽位）：不占 `background-image`，不会把复制虚线/格线底色顶掉。
-   颜色来自 `:root` 的派生变量；行号格与数据格共用同一档色。 */
-.cell-row-selected {
-    box-shadow: inset 0 0 0 9999px var(--cell-fill-overlay);
 }
 
 /* 行号列是 sticky，必须不透明：直接给它"数据格选中后的最终色"，并关掉叠色、文字用选区绿。 */

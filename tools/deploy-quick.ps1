@@ -54,6 +54,7 @@ $beforeExeMtime = if (Test-Path -LiteralPath $exe) { (Get-Item -LiteralPath $exe
 
 Push-Location $toolDir
 try {
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw '找不到 pnpm。先装 pnpm 12.3.4 并 pnpm install，见 README 的「从源码构建」。' }
     if (-not $NoTypecheck) {
         & pnpm --dir frontend run typecheck
         if ($LASTEXITCODE -ne 0) { throw '前端 typecheck 没过。' }

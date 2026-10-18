@@ -113,6 +113,46 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 	}
 }
 
+/*
+第二次保存要覆盖已经落盘的那一份：WriteAtomic 依赖 os.Rename 的"目标存在就替换"语义（Windows 上由
+MoveFileEx + REPLACE_EXISTING 保证），换成先删再 rename、或自己拼 CreateFile 都会退化成"第一次存得进、
+之后每次都失败"。用户看不到原因，所以留一条会红的用例。
+*/
+func TestSaveLoadoutOverwritesTheExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	svc := &LoadoutService{}
+
+	first := `{"lang":"zh","slots":[{"items":[{"gem":"9A60FBF0","hash":"B5FF9FD3","level":15}],"enabled":true}]}`
+	second := `{"lang":"en","slots":[{"items":[{"gem":"B5FF9FD3","hash":"9A60FBF0","level":10}],"enabled":false}]}`
+	if err := svc.SaveLoadout(first); err != nil {
+		t.Fatalf("first save: %v", err)
+	}
+	svc.FlushNow() // 先真的落一份，第二次才是在"已存在的文件"上覆盖
+
+	if err := svc.SaveLoadout(second); err != nil {
+		t.Fatalf("second save: %v", err)
+	}
+	svc.FlushNow()
+
+	path := filepath.Join(dir, appfiles.UserDirName, loadoutFileName)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if string(raw) != second {
+		t.Errorf("stored config = %q, want the second save %q", raw, second)
+	}
+	// 覆盖写不该留下中转文件（与 TestSaveLoadoutWritesAndLeavesNoTempFiles 同口径）。
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatalf("read dir: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != loadoutFileName {
+		t.Errorf("unexpected files beside loadout.json after an overwrite: %v", entries)
+	}
+}
+
 func TestSaveLoadoutRejectsInvalidWithoutTouchingDisk(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCALAPPDATA", dir)

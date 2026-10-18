@@ -20,10 +20,8 @@ const css = readFileSync(new URL("./style.css", import.meta.url), "utf8")
 const code = css.replace(/\/\*[\s\S]*?\*\//g, "")
 
 /**
- * 抓出所有"设了 `z-index: <值>`"的规则 → `{选择器, 值}`。
- *
- * ‼️ 值**原样**返回（数字 / `var(--z-*)` / `calc(...)`）：层高已经 token 化，断言要护的是**关系**
- * （谁压在谁之上、复制 = 轮廓 + 1），而不是某个裸数字 —— 只认数字的话，token 一改整份测例就哑了。
+ * 抓出所有"设了 `z-index: <值>`"的规则 → 选择器列表。值原样比较（数字 / `var(--z-*)` / `calc(...)`），
+ * 调用方自己决定护关系还是护裸数字。
  */
 const usesRule = (value: string) =>
     [...code.matchAll(/([^{}]+)\{[^}]*z-index:\s*([^;}]+)/g)]

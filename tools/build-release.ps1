@@ -194,6 +194,9 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Wails bindings generation failed with exit code $LASTEXITCODE."
     }
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+        throw '找不到 pnpm。先装 pnpm 12.3.4 并 pnpm install，见 README 的「从源码构建」。'
+    }
     # vite 只抹掉类型，后面的步骤都不会发现类型错误：所以先跑编译器。测试也是一道门禁——带着
     # 红的测试集发出去的就是没检查过的版本。
     & pnpm --dir (Join-Path $toolDir 'frontend') run typecheck

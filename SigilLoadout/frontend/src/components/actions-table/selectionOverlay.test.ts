@@ -133,4 +133,64 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             {left: 140, top: 41, width: 60, height: 27, edges: {top: true, right: true, bottom: true, left: true}, underlay: "var(--cell-editable)"},
         ])
     })
+
+    /*
+        复制区的虚线只画外圈：内部格四条边都不是复制区边界，因此不该进模型（`buildOverlay` 里那条短路）。
+        漏掉它 → 3×3 复制区会画出 9 个盒子，复制区内部重新出现格线。
+    */
+    it("复制源 3×3：只有外圈 8 格有盒子，内部那格不进模型", () => {
+        // 默认 geo 只有 4 列（下标 0..3），3×3 复制区要覆盖到列 4，所以补一列。
+        const g = geo({columnCount: 5, columnLefts: [40, 80, 140, 200, 260], columnWidths: [40, 60, 60, 60, 60]})
+        const model = buildOverlay({
+            bounds: [],
+            geo: g,
+            activeCell: null,
+            copyAreas: [{minRowIndex: 0, maxRowIndex: 2, minColumnIndex: 2, maxColumnIndex: 4}],
+            copyUnderlay: (rowIndex, columnIndex) => `u-${rowIndex}-${columnIndex}`,
+        })
+
+        expect(model.pinned.copy).toEqual([])
+        expect(model.scrolled.copy).toHaveLength(8) // 9 格 - 内部 1 格
+        // 内部格 (行 1, 列 3)：左缘 200、上缘 41+27 —— 没有盒子。
+        expect(model.scrolled.copy.some((c) => c.left === 200 && c.top === 41 + 27)).toBe(false)
+        // 每个盒子都至少有一条边可画；垫底色由调用方回调按格给出（内部 `u-1-3` 因此缺席）。
+        for (const cell of model.scrolled.copy) {
+            expect(cell.edges.top || cell.edges.bottom || cell.edges.left || cell.edges.right, JSON.stringify(cell)).toBe(true)
+        }
+        expect([...new Set(model.scrolled.copy.map((c) => c.underlay))].sort()).toEqual([
+            "u-0-2", "u-0-3", "u-0-4", "u-1-2", "u-1-4", "u-2-2", "u-2-3", "u-2-4",
+        ])
+    })
+
+    /*
+        复制区跨钉住列：虚线按钉住边界切成两段，各自进自己的层（与选区轮廓同一条切法）。
+        pinned 段是 0、1 列，scrolled 段是 2、3 列；横边只在首/尾行，竖边只在首/尾列。
+    */
+    it("复制源跨钉住列：切两段各进各自层，横边只在首/尾行、竖边只在首/尾列", () => {
+        const model = buildOverlay({
+            bounds: [],
+            geo: geo(),
+            activeCell: null,
+            copyAreas: [{minRowIndex: 0, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 3}],
+        })
+
+        /** 盒子的左上角，排序后比较：不依赖遍历顺序。 */
+        const corners = (cells: {left: number; top: number}[]) => cells.map((c) => `${c.left},${c.top}`).sort()
+        // 4 列 × 3 行，内部 (1,1)/(1,2) 两格没有边 → 每层各 5 个盒子。
+        expect(corners(model.pinned.copy)).toEqual(["40,41", "40,68", "40,95", "80,41", "80,95"])
+        expect(corners(model.scrolled.copy)).toEqual(["140,41", "140,95", "200,41", "200,68", "200,95"])
+
+        const all = [...model.pinned.copy, ...model.scrolled.copy]
+        expect(all.filter((c) => c.edges.top)).toHaveLength(4) // 首行 4 列
+        expect(all.filter((c) => c.edges.bottom)).toHaveLength(4) // 尾行 4 列
+        expect(all.filter((c) => c.edges.left)).toHaveLength(3) // 首列 3 行
+        expect(all.filter((c) => c.edges.right)).toHaveLength(3) // 尾列 3 行
+        for (const cell of all) {
+            if (cell.edges.top) expect(cell.top).toBe(41)
+            if (cell.edges.bottom) expect(cell.top).toBe(41 + 2 * 27)
+            if (cell.edges.left) expect(cell.left).toBe(40)
+            if (cell.edges.right) expect(cell.left).toBe(200)
+            expect(cell.edges.top || cell.edges.bottom || cell.edges.left || cell.edges.right).toBe(true)
+        }
+    })
 })

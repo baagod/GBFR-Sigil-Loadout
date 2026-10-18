@@ -13,13 +13,11 @@ import {createPortal} from "react-dom"
 
 import type {CopyCell, LayerModel, OverlayModel, Rect} from "./selectionOverlay"
 
-const FILL = "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)"
+const FILL = "var(--cell-fill-overlay)"
 const RING = "var(--cell-select)"
 
 /** overlay 的样式：标准 CSS 属性 + 自定义属性（`--copy-*` 这类）。 */
-type OverlayStyle = CSSProperties & {[key: `--${string}`]: string | number}
-
-const abs = (rect: Rect, extra: OverlayStyle = {}): CSSProperties => ({
+const abs = (rect: Rect, extra: CSSProperties = {}): CSSProperties => ({
     position: "absolute" as const,
     left: `${rect.left}px`,
     top: `${rect.top}px`,
@@ -35,26 +33,19 @@ const abs = (rect: Rect, extra: OverlayStyle = {}): CSSProperties => ({
     盒子 left/top = 格子 - 1（上/左格外 1px）、宽高 = 格子 + 1（右/下止于格线，2px 全在格内）。
     空档垫该格底色（既不露黑线也不露格线），颜色与格内一致 → 视觉上只剩虚线。
 */
-function CopyBox({cell, layer}: {cell: CopyCell; layer: "scrolled" | "pinned"}) {
+function CopyBox({cell}: {cell: CopyCell}) {
     const side = (on: boolean) => (on ? "2px" : "0px")
     const {edges} = cell
     return (
         <div
-            data-overlay={`${layer}-copy`}
-            data-rect={rectKey(cell)}
             style={
                 abs(
                     {left: cell.left - 1, top: cell.top - 1, width: cell.width + 1, height: cell.height + 1},
                     {
                         borderStyle: "dashed",
-                        borderColor: "var(--cell-select)",
-                        borderWidth: "var(--copy-top) var(--copy-right) var(--copy-bottom) var(--copy-left)",
-                        "--copy-top": side(edges.top),
-                        "--copy-right": side(edges.right),
-                        "--copy-bottom": side(edges.bottom),
-                        "--copy-left": side(edges.left),
-                        "--copy-under": cell.underlay,
-                        backgroundColor: "var(--copy-under)",
+                        borderColor: RING,
+                        borderWidth: `${side(edges.top)} ${side(edges.right)} ${side(edges.bottom)} ${side(edges.left)}`,
+                        backgroundColor: cell.underlay,
                         /* 底色只留在边框那一圈（虚线缝里），内部挖空。 */
                         mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
                         maskComposite: "exclude",
@@ -65,23 +56,21 @@ function CopyBox({cell, layer}: {cell: CopyCell; layer: "scrolled" | "pinned"}) 
     )
 }
 
-function Layer({model, layer}: {model: LayerModel; layer: "scrolled" | "pinned"}) {
+function Layer({model}: {model: LayerModel}) {
     return (
         <>
             {model.fill.map((rect, i) => (
-                <div key={`f${i}`} data-overlay={`${layer}-fill`} data-rect={rectKey(rect)} style={abs(rect, {background: FILL})} />
+                <div key={`f${i}`} style={abs(rect, {background: FILL})} />
             ))}
             {model.ring.map((rect, i) => (
-                <div key={`r${i}`} data-overlay={`${layer}-ring`} data-rect={rectKey(rect)} style={abs(rect, {background: RING})} />
+                <div key={`r${i}`} style={abs(rect, {background: RING})} />
             ))}
             {model.copy.map((cell, i) => (
-                <CopyBox key={`c${i}`} cell={cell} layer={layer} />
+                <CopyBox key={`c${i}`} cell={cell} />
             ))}
         </>
     )
 }
-
-const rectKey = (r: Rect) => `${r.left},${r.top},${r.width},${r.height}`
 
 /**
  * 把 overlay 挂到滚动容器里（`host` = BaseTable 的外壳 = 滚动框）。
@@ -110,7 +99,7 @@ export function SelectionOverlay({
                 style={{width: `${width}px`, height: `${height}px`}}
                 aria-hidden
             >
-                <Layer model={model.scrolled} layer="scrolled" />
+                <Layer model={model.scrolled} />
             </div>
             {/*
                 钉住层不用 JS 跟随（`scroll` 事件写 transform 会比合成器的原生滚动晚一帧 → 横滚时边框抖）。
@@ -124,7 +113,7 @@ export function SelectionOverlay({
                 aria-hidden
             >
                 <div className="pointer-events-none sticky left-0" style={{width: 0, height: 0}}>
-                    <Layer model={model.pinned} layer="pinned" />
+                    <Layer model={model.pinned} />
                 </div>
             </div>
         </>,

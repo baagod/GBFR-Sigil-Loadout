@@ -39,10 +39,10 @@
 - .NET 8 SDK
 - Go 1.27+
 - Wails v3 CLI ( `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` )
-- Node.js 20.19+
+- Node.js 20.19+ 与 pnpm 12.3.4 ( Node ≥25 起不再随附 corepack：`npm i -g pnpm@12.3.4`，或自行 `corepack enable` )
 - pwsh 7
 
-从仓库根目录运行 ( 产出 `dist/GBFR-Sigil-Loadout-<版本>.zip` )：
+首次构建先在 `SigilLoadout/frontend` 跑一次 `pnpm install` ( 依赖不入库 )，再从仓库根目录运行 ( 产出 `dist/GBFR-Sigil-Loadout-<版本>.zip` )：
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\tools\build-release.ps1

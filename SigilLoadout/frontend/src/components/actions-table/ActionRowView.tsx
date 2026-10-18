@@ -23,15 +23,9 @@ import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, t
 
 /**
  * 一格里那层**格子**（shadcn 的 `TableCell`，DOM 上仍是 `<td>`）—— **第二道 memo 命门**
- * （第一道是外面的 `ActionRowView`）。
+ * （第一道是外面的 `ActionRowView`）：这一行重渲（活动格变、拖拽态变）时别把行内每一格都带上。
  *
- * 拖选时矩形一横向变宽，**夹在它竖向范围里的每一行**都要重渲（那些行的左右边界格换了类）：实测一次
- * 移动约 19 行 × 42 格 ≈ 800 个 `<td>`，而外观真变了的只有几十个 —— 剩下的不该进 render。
- *
- * ‼️ 两条铁律，破任一条都静默出错：
- *   · 选择相关的**结果**（`className` / `selected` / `preSelected`）必须在行那层算好再传进来。让这一层
- *     自己调 `cell.getSelectionEdges()`，memo 就看不见变化 —— 轮廓会留在上一个位置。
- *   · 传进来的必须全是原始值或稳定引用：`style` 拆成 `width` / `left` 两个数就是这个原因。
+ * ‼️ 传进来的必须全是原始值或稳定引用：`style` 拆成 `width` / `left` 两个数就是这个原因。
  */
 const RowCell = memo(function RowCell({
     cell,
@@ -66,7 +60,7 @@ const RowCell = memo(function RowCell({
     original: string
     /** 显示值（`accessorFn` 给的，与排序同口径）。 */
     shown: string
-    /** 这一格选没选中（底色与轮廓都由它推出来）。 */
+    /** 这一格的类（列底色 / 焦点 / 活动格）—— 选区外观由 overlay 画，不在这里。 */
     className: string
     width: number | null
     left: number | null
@@ -193,12 +187,11 @@ export const ActionRowView = memo(function ActionRowView({
 }) {
     /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
     const rowCells = row.getAllCells()
-    /* 握把列也在选区轮廓里：overlay 的几何在“选区包含第一列”时向左包住 `GRIP_WIDTH`（见 `selectionOverlay.ts`）。 */
     /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
     const removed = row.original.removed === true
     /**
-     * 行序拖动（dnd-kit）。**无条件调用**（hook 不能条件调）—— `SortableContext` 由基座无条件提供，
-     * 不拖的表只是永远不触发；`disabled` 让不拖的表连监听都不挂。
+     * 行序拖动（dnd-kit）。**无条件调用**（hook 不能条件调）—— 不可拖的表没有 `dnd-kit` 的上下文，
+     * 靠 `disabled: !sortable` 关掉。
      */
     const drag = useSortable({id: row.id, disabled: !sortable})
     return (
@@ -224,10 +217,9 @@ export const ActionRowView = memo(function ActionRowView({
                 行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与**单元格**选区。
 
                 **它自己不画框** —— 用户要求：按行选中时框从行号列**后面**开始（`| xx | xx |`），
-                序号列保持原样。那圈框由下面的**数据格**挂 `cell-edge-*` 画 —— 整行选区就是一条普通的区，
-                四条边都由库的 `cell.getSelectionEdges()` 给（见下面那段）。
+                序号列保持原样；整行选区就是一条普通的区，外观统一由 `SelectionOverlay` 画。
 
-                行选中的三个手势（与旧表同一套手感）：
+                行选中的三个手势：
                   · 按下 —— 记下起始行（拖选用），再按修饰键点/Ctrl/Shift 改选中；
                   · 划过 —— 只有"正按着"时才把区间拉到这一行；
                   · 松手 —— 在 window 上收尾（鼠标常会跑出行号那一列）。
@@ -305,7 +297,7 @@ export const ActionRowView = memo(function ActionRowView({
                         raw={row.original.values[key] ?? ""}
                         original={row.original.originals[key] ?? ""}
                         shown={shown}
-                        /* 选区底色/轮廓由 overlay 统一画；这里只剩列底色、焦点、活动格标记与复制虚线。 */
+                        /* 选区外观全部由 overlay 画；这里只剩列底色、焦点与活动格标记。 */
                         className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${isActiveCell ? "cell-active" : ""} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}

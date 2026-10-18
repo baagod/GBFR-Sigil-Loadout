@@ -337,7 +337,7 @@ export function selectCell(cell: HTMLElement) {
 /*
     ==================== 选区投影（测试用） ====================
 
-    选区外观改由 overlay 画之后，单元格上不再有 `cell-selected` / `cell-edge-*`；
+    选区外观改由 overlay 画之后，单元格上不挂选区类名；
     `ActionsTable` 在 DOM 里留了一个 `[data-selection-bounds]` 投影（行列下标 JSON），
     这些助手把"格元素"换算成行列下标再断言 —— 断的是**选区语义**，不是画法。
 */
@@ -371,32 +371,6 @@ export function isSelected(cell: HTMLElement): boolean {
 /** 选区覆盖的格数（按投影里的区间面积求和；多片不重叠，直接加）。 */
 export function selectedCount(container: HTMLElement): number {
     return projectedBounds(container).reduce((sum, [minR, maxR, minC, maxC]) => sum + (maxR - minR + 1) * (maxC - minC + 1), 0)
-}
-
-/** 一格落在选区外圈的哪几条边上（与旧 `cell-edge-*` 类同口径；不在选区 → 空）。 */
-export function selectionEdgesOf(cell: HTMLElement): string[] {
-    const at = cellIndexes(cell)
-    if (!at) return []
-    const colCount = cell.closest("tr")!.querySelectorAll("td[data-col-id]").length
-    const edges = new Set<string>()
-    for (const [minR, maxR, minC, maxC] of projectedBounds(cell.ownerDocument.body)) {
-        if (at.row < minR || at.row > maxR || at.col < minC || at.col > maxC) continue
-        if (at.row === minR) edges.add("cell-edge-top")
-        if (at.row === maxR) edges.add("cell-edge-bottom")
-        if (at.col === minC) edges.add("cell-edge-left")
-        // 整行选区（0..最后一列）不画右边缘 —— 末列没有格线，与 overlay 几何同一条口径。
-        if (at.col === maxC && !(minC === 0 && maxC === colCount - 1)) edges.add("cell-edge-right")
-    }
-    return [...edges].sort()
-}
-
-/** 活动格（锚点）下标 —— 从投影的 `data-active-cell` 读。 */
-export function activeCellIndices(container: HTMLElement): [number, number] | null {
-    const el = container.querySelector<HTMLElement>("[data-active-cell]")
-    const raw = el?.dataset.activeCell
-    if (!raw) return null
-    const [row, col] = raw.split(",").map(Number)
-    return [row!, col!]
 }
 
 /** 复制源区间（显示顺序下标；空 = 还没有复制区）。 */

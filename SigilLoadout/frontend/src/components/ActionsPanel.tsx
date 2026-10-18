@@ -94,7 +94,7 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
      * 选中是**用户已经做完的决定**，弹层该当场收掉，剩下的读取在后台进行。
      */
     const [open, setOpen] = useState(false)
-    /** 这次关闭是**选完一项**引起的（不是点外面收起的）。 */
+    /** 这次关闭是**选完一项**引起的（不是点外面收起的）—— 每次打开时重置，见 `onOpenChange`。 */
     const [pickedClose, setPickedClose] = useState(false)
 
     return (
@@ -103,7 +103,10 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
             value={selected}
             autoHighlight
             open={open}
-            onOpenChange={setOpen}
+            onOpenChange={(next) => {
+                if (next) setPickedClose(false)
+                setOpen(next)
+            }}
             onValueChange={(item) => {
                 if (!item || item.value === value) return
                 setPickedClose(true) // 这一次关闭不走淡出（见下面弹层的类名）
@@ -134,11 +137,10 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
                         ‼️ **选完一项时不做淡出**（`duration-0` + 去掉 `animate-out`）。
                         库里那套 `data-closed:animate-out fade-out-0 zoom-out-95` 让收尾拖一拍 —— 点外面收起时
                         那点淡出好看，但"选完角色"是**用户已经做完的决定**，那一刻弹层该**当场消失**。
-                        默认类名带变体、权重比调用点高，所以这里用 `duration-0` + `data-closed:animate-none` 顶掉它。
+                        `pickedClose` 每次打开时重置（见 `onOpenChange`），所以只有选完那一记关闭走瞬间收起；
+                        `duration-0` + `data-closed:animate-none` 用来顶掉库默认（它带变体、权重比调用点高）。
 
-                        ⚠️ 实测注记：本机量到"弹层不可见"在**两种写法下都是 ~100ms**（那是 DOM 摘除的时机），
-                        所以这一条**没有**单独改变可观测时间 —— 它只是让意图明确（选中即关，不等动画）。
-                        真正的病根是上面那条：关闭原先跟着 `value` 走、要等异步读取回来。
+                        ⚠️ 实测：弹层"不可见"在两种写法下都是 ~100ms（那是 DOM 摘除的时机），这条只影响那一下的观感。
                     */
                     `min-w-(--anchor-width)! ${pickedClose ? "duration-0 data-closed:animate-none" : ""}`
                 }

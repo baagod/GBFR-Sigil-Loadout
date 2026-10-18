@@ -13,9 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {PINNED_COUNT} from "@/components/actions-table/classes"
 
-import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyBoundsOf, handleAt, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
-import {selectionEdgesOf} from "@/components/actions-table/testkit"
-import {isSelected, selectedCount} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyBoundsOf, handleAt, isSelected, selectedCount, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows, addRow} = useTableHarness()
 
@@ -239,9 +237,9 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
     })
 
     /*
-        ‼️ **活动格（拖选/点击的起点）不填底色** —— Excel 的约定（用户实测要求）：
-        起点的"底色让掉"由 CSS 管（`td.cell-selected.cell-active { box-shadow: none }`），
-        这里钉住**类**：只有起点那一格带 `cell-active`，换一格重新拖选后原来那格就不带了。
+        ‼️ **活动格（拖选/点击的起点）不填底色** —— Excel 的约定（用户实测要求）：底色让掉由 overlay 几何
+        挖洞（见 `selectionOverlay.ts` 的 `activeCell`）。这里只钉住**类**：只有起点那一格带 `cell-active`，
+        换一格重新拖选后原来那格就不带了。
     */
     it("活动格标记：只有拖选起点那一格带 cell-active，换格重拖后消失", async () => {
         const container = await renderTable()
@@ -754,10 +752,9 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         }
         fireEvent.mouseUp(document)
 
-        // 选区那圈：一个字没改（连复制区里那一格也照旧挂着自己的边类）
+        // 选区那圈：一个字没改（连复制区里那一格也照旧在选区里）
         expect(isSelected(cellAt(container, 0, 2))).toBe(true)
-        expect(selectionEdgesOf(cellAt(container, 0, 2))).toContain("cell-edge-top")
-        expect(selectionEdgesOf(cellAt(container, 1, 4))).toContain("cell-edge-right")
+        expect(isSelected(cellAt(container, 1, 4))).toBe(true)
         // 复制区那圈也在
         expect(copyBoxOf(container)).not.toBeNull()
     })
