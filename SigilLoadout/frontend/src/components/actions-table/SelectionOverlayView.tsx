@@ -16,7 +16,10 @@ import type {CopyCell, LayerModel, OverlayModel, Rect} from "./selectionOverlay"
 const FILL = "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)"
 const RING = "var(--cell-select)"
 
-const abs = (rect: Rect, extra: Record<string, unknown> = {}) => ({
+/** overlay 的样式：标准 CSS 属性 + 自定义属性（`--copy-*` 这类）。 */
+type OverlayStyle = CSSProperties & {[key: `--${string}`]: string | number}
+
+const abs = (rect: Rect, extra: OverlayStyle = {}): CSSProperties => ({
     position: "absolute" as const,
     left: `${rect.left}px`,
     top: `${rect.top}px`,
@@ -56,7 +59,7 @@ function CopyBox({cell, layer}: {cell: CopyCell; layer: "scrolled" | "pinned"}) 
                         mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
                         maskComposite: "exclude",
                     },
-                ) as CSSProperties
+                )
             }
         />
     )

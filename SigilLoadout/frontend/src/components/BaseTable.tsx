@@ -36,7 +36,7 @@ export function BaseTable({
     offscreen: boolean
     /** 这一页在忙：点不动，表格照旧显示。 */
     busy: boolean
-    /** 这一份表格自己的类（`table-fixed` / `invisible absolute` / 边框那套 —— 由调用方按状态给）。 */
+    /** 这一份表格自己的类（`table-fixed` / 边框那套 —— 由调用方按状态给）。 */
     className?: string
     style?: CSSProperties
     children: ReactNode
