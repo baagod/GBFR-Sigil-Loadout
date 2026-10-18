@@ -277,7 +277,7 @@ table td.cell-pinned, table th.cell-pinned {
     `useReveal` / 行拖夹取 / 方向键跳边都读 `table.parentElement`。
     那层 div 没有 props 入口，所以用 `.base-table` 反选；不能改 `ui/table.tsx`（`shadcn add --overwrite`
     会整份覆盖回去）。⚠️ `flex` + `min-height` 别删（外壳没确定高度就永远不滚）；外框画在这层才不跟内容跑；
-    `background-color` 修的是横滚到头时表格右沿与滚动条之间那条 1px 缝。
+    `background-color` 修的是横滚到头时表格右沿与滚动条之间那条 1px 缝（表本身 `min-w-full` 铺满，不留白）。
 */
 div:has(> table.base-table) {
     /* 选区 overlay 的 portal 宿主：绝对定位的 overlay 要以滚动框为坐标原点（滚动时跟着内容走）。 */

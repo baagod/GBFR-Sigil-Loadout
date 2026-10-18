@@ -573,9 +573,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         measured,
         rows: modelRows,
         sheetColumns,
-        columnSizing,
-        rowHeadWidth,
-        gripWidth: reorder !== undefined ? GRIP_WIDTH : 0,
         pinnedColumnCount: pinning.start.length,
         selectionBounds,
         activeCellKey,
@@ -829,10 +826,10 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     （`hidden = loading || !measured`），整块外壳已经被挪到屏幕外 —— 表格隐不隐身无关紧要，
                     写上就是一条永远单独生效不了的冗余分支。
                 */
-                /* ‼️ **不许再加 `min-width`**：overlay 列几何由 `columnSizing` 推出，表宽必须恒等于
-                   行内 `width`（`getTotalSize()+rowHeadWidth`），否则容器更宽时列被摊宽、选区错位
-                   （headless 复现：400px 声明宽 + `min-w-full` → 实测 1000px；Speed 轨 5 列）。 */
-                className={`${measured ? "table-fixed " : ""}border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
+                /* ‼️ `min-w-full` 是**铺满**容器的那一句（窄表不铺满时右侧留白很难看）。
+                   overlay 的列几何从**渲染后的表头实测宽度**取（见 `useSelectionOverlay`），
+                   所以这里让浏览器怎么摊宽都不会画错 —— 别再按 `columnSizing` 反推几何。 */
+                className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
                 style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
             >
                 <ActionsTableHead
@@ -899,7 +896,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 <SelectionOverlay
                     host={overlay.host}
                     model={overlay.model}
-                    width={table.getTotalSize() + rowHeadWidth}
+                    width={overlay.width}
                     height={overlay.height}
                 />
             ) : null}

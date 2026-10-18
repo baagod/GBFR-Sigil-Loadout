@@ -16,7 +16,7 @@ import type {CopyCell, LayerModel, OverlayModel, Rect} from "./selectionOverlay"
 const FILL = "var(--cell-fill-overlay)"
 const RING = "var(--cell-select)"
 
-/** overlay 的样式：标准 CSS 属性 + 自定义属性（`--copy-*` 这类）。 */
+/** overlay 矩形的内联样式（绝对定位 + 叠上各层的差异）。 */
 const abs = (rect: Rect, extra: CSSProperties = {}): CSSProperties => ({
     position: "absolute" as const,
     left: `${rect.left}px`,

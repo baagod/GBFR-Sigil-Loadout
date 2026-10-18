@@ -142,7 +142,7 @@ export const CellContent = memo(function CellContent({
  * 只设 `opacity-0`（透明、仍占位、且仍可聚焦 —— Esc 那条路要用），**绝不离开文档流** ——
  * 详见 `Cell` 里那段。
  */
-function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, selectable = false, tabIndex, onFocus, onBlur, trailing, ref}: {
+function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, hidden = false, selectable = false, tabIndex, onBlur, trailing, ref}: {
     text: string
     /** 这一格的内边距（默认 CELL_PADDING；表头那类不变成输入框的用 READONLY_PADDING，见那个常量）。 */
     padding?: string
@@ -162,7 +162,6 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
     selectable?: boolean
     /** 显示态 `0`（可聚焦）、编辑态 `-1`（避开 Tab 序列）—— Esc 退出编辑要把焦点交回这一层。 */
     tabIndex?: number
-    onFocus?: () => void
     /** 焦点走了（只读列据此还原文字选择）。⚠️ 看 `relatedTarget`，见调用点。 */
     onBlur?: (e: ReactFocusEvent<HTMLDivElement>) => void
     /** 右端的尾节点（详情靶子那类）：与文字**同一套 flex 布局**，不靠绝对定位 + 补偿内边距。 */
@@ -173,7 +172,6 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
         <div
             ref={ref}
             tabIndex={tabIndex}
-            onFocus={onFocus}
             onBlur={onBlur}
             onMouseDown={selectable ? (e) => e.stopPropagation() : undefined}
             style={selectable ? {userSelect: "text", cursor: "text"} : undefined}
@@ -266,18 +264,12 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
     const textRef = useRef<HTMLDivElement>(null)
     /** "跟随可视"：进编辑时喊一声（见 `enterEdit`）。走 context 下发，省掉穿三层的 prop。 */
     const {reveal} = useContext(RevealContext)
-    /**
-     * Esc 之后焦点还给文本层，而文本层的 `onFocus` 是"进来就编辑" —— 不给个开关就会**自己把自己
-     * 弹回编辑态**，Esc 看起来完全没反应。
-     */
-    const skipFocusRef = useRef(false)
     /** Esc 之后输入框紧接着会失焦：那一次 blur **不许提交**（Esc = 放弃草稿）。 */
     const skipCommitRef = useRef(false)
     /**
-     * ‼️ **一次点击只进一次编辑**：真机上一下点击会**先后**走 `onFocus` 与 `onClick` 两条路
-     * （两条都得进编辑，见下面那个 `onFocus`），而这里要做的三件事（播报、跟随可视、切状态）重复做
-     * 都是白费 —— 尤其"跟随可视"会为同一格排第二帧几何计算。用 ref 而不是 state 闸：同一事件里两次
-     * 调用读到的 `editing` 都还是旧值，闸不住。
+     * ‼️ **一次点击只进一次编辑**：`enterEdit` 要做三件事（播报、跟随可视、切状态），重复做都是白费 ——
+     * 尤其"跟随可视"会为同一格排第二帧几何计算。用 ref 而不是 state 闸：同一事件里的两次调用读到的
+     * `editing` 都还是旧值，闸不住。
      */
     const enteredRef = useRef(false)
     /**
@@ -330,10 +322,6 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                 hidden={editing}
                 // 编辑中别让它进 Tab 序列（上面已经压着输入框）；显示态可聚焦，Esc 才有地方落焦点。
                 tabIndex={editing ? -1 : 0}
-                onFocus={() => {
-                    // Esc 刚把焦点还回来：这一次什么都不做（焦点只是回来，不是要编辑）。
-                    skipFocusRef.current = false
-                }}
             />
 
             {editing && (
@@ -379,7 +367,6 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                         if (e.nativeEvent.isComposing) return
                         e.preventDefault()
                         e.stopPropagation()
-                        skipFocusRef.current = true // 紧接着的 focus 不算"用户要编辑"
                         skipCommitRef.current = true // 紧接着的 blur 不提交
                         /*
                             Esc = **只退出编辑**：草稿丢掉、不提交、焦点留在这一格。

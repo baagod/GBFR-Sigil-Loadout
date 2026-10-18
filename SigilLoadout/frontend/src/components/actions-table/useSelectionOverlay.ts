@@ -9,12 +9,16 @@ import type {RefObject} from "react"
 
 import {cellUnderlayColor} from "./classes"
 import {columnKind, parseSnapshotKey, type CopySource} from "./model"
-import {buildOverlay, type Bounds, type OverlayModel} from "./selectionOverlay"
+import {geometryFromHeaderCells, buildOverlay, type Bounds, type HeaderCellMetric, type OverlayModel} from "./selectionOverlay"
 
 /** 只需要行 id 与“是否假删除”，避免把 TanStack 的 Row 泛型带进来。 */
 type RowLike = {id: string; original: {removed?: boolean}}
 
 type ActiveCellIndexes = {rowIndex: number; columnIndex: number}
+
+/** 表头实测结果没变就不 setState（ResizeObserver 回调可能很密）。 */
+const sameCells = (a: readonly HeaderCellMetric[], b: readonly HeaderCellMetric[]) =>
+    a.length === b.length && a.every((cell, index) => cell.id === b[index]!.id && cell.width === b[index]!.width)
 
 export function useSelectionOverlay({
     tableRef,
@@ -22,9 +26,6 @@ export function useSelectionOverlay({
     measured,
     rows,
     sheetColumns,
-    columnSizing,
-    rowHeadWidth,
-    gripWidth,
     pinnedColumnCount,
     selectionBounds,
     activeCellKey,
@@ -35,9 +36,6 @@ export function useSelectionOverlay({
     measured: boolean
     rows: readonly RowLike[]
     sheetColumns: string[]
-    columnSizing: Record<string, number>
-    rowHeadWidth: number
-    gripWidth: number
     pinnedColumnCount: number
     selectionBounds: Bounds[]
     activeCellKey: string
@@ -46,13 +44,25 @@ export function useSelectionOverlay({
     host: HTMLDivElement | null
     model: OverlayModel | null
     height: number
+    /** 表格实际渲染宽度（`min-w-full` 拉伸后的宽度）—— overlay 两层都按它铺。 */
+    width: number
     /** 复制源区间（测试投影用；渲染由 model 走）。 */
     copyAreas: Bounds[]
 } {
     /** overlay 的宿主 = 滚动框（portal 进去；`measured` 之前外壳在屏幕外，不挂）。 */
     const [host, setHost] = useState<HTMLDivElement | null>(null)
-    /** 表头高 / 行高（几何输入；happy-dom 量不到，测试里为 0，overlay 不渲染）。 */
-    const [metrics, setMetrics] = useState({headerHeight: 0, rowHeight: 0})
+    /**
+     * 表头高 / 行高 / 表头各格实测宽度（几何输入）。happy-dom 量不到（全 0）→ overlay 不渲染。
+     *
+     * ‼️ 用 offset*（**布局像素**），不用 getBoundingClientRect：弹窗打开动画期间父级带
+     * `transform: scale(...)`，rect 会被缩放（真机：header≈38.95 / 行高≈25.65），offset* 不受影响。
+     */
+    const [metrics, setMetrics] = useState<{
+        headerHeight: number
+        rowHeight: number
+        cells: HeaderCellMetric[]
+        tableWidth: number
+    }>({headerHeight: 0, rowHeight: 0, cells: [], tableWidth: 0})
 
     useLayoutEffect(() => {
         if (measured) setHost(scrollRef.current)
@@ -64,16 +74,31 @@ export function useSelectionOverlay({
         const header = tableEl?.querySelector("thead")
         const body = tableEl?.querySelector("tbody")
         if (!tableEl || !header || !body || rows.length === 0) return
-        /*
-            ‼️ 用 offsetHeight（**布局像素**），不用 getBoundingClientRect（**渲染像素**）：
-            轨迹表的 ActionsTable 在弹窗打开动画里挂载，父级还带着 `transform: scale(...)`，
-            rect 会被缩放成 header≈38.95 / rowHeight≈25.65，且只在挂载时量一次 → 选区框整体缩 5%、
-            向上偏 ~8px（真机：框画在 y181/206，实际行是 y189/216）。offsetHeight 不受 transform 影响。
-        */
-        const headerHeight = header.offsetHeight
-        const rowHeight = body.offsetHeight / rows.length
-        if (headerHeight <= 0 || rowHeight <= 0) return
-        setMetrics((prev) => (prev.headerHeight === headerHeight && prev.rowHeight === rowHeight ? prev : {headerHeight, rowHeight}))
+        /* 列宽 / 表宽也在这里量：窄表被 `min-w-full` 拉伸后，只有渲染结果知道每列真正多宽。 */
+        const read = () => {
+            const headerHeight = header.offsetHeight
+            const rowHeight = body.offsetHeight / rows.length
+            if (headerHeight <= 0 || rowHeight <= 0) return
+            const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => ({
+                id: th.dataset.colId ?? null,
+                width: th.offsetWidth,
+            }))
+            const tableWidth = tableEl.offsetWidth
+            setMetrics((prev) =>
+                prev.headerHeight === headerHeight &&
+                prev.rowHeight === rowHeight &&
+                prev.tableWidth === tableWidth &&
+                sameCells(prev.cells, cells)
+                    ? prev
+                    : {headerHeight, rowHeight, cells, tableWidth},
+            )
+        }
+        read()
+        /* 窗口缩放 / 滚动条出现都会改表宽（`min-w-full` 按容器宽拉伸）→ 重新量，overlay 跟着走。 */
+        if (typeof ResizeObserver === "undefined") return
+        const observer = new ResizeObserver(read)
+        observer.observe(tableEl)
+        return () => observer.disconnect()
     }, [measured, tableRef, rows.length])
 
     /** 活动格下标（锚点格）：overlay 用它把底色挖掉。 */
@@ -85,28 +110,20 @@ export function useSelectionOverlay({
         return rowIndex >= 0 && columnIndex >= 0 ? {rowIndex, columnIndex} : null
     }, [activeCellKey, rows, sheetColumns])
 
-    const geometry = useMemo(() => {
-        if (!measured || metrics.headerHeight <= 0 || metrics.rowHeight <= 0 || sheetColumns.length === 0) return null
-        let left = rowHeadWidth
-        const columnLefts: number[] = []
-        const columnWidths: number[] = []
-        for (const id of sheetColumns) {
-            const width = columnSizing[id] ?? 0
-            columnLefts.push(left)
-            columnWidths.push(width)
-            left += width
-        }
-        return {
-            columnLefts,
-            columnWidths,
-            headerHeight: metrics.headerHeight,
-            rowHeight: metrics.rowHeight,
-            gripWidth,
-            pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
-            rowCount: rows.length,
-            columnCount: sheetColumns.length,
-        }
-    }, [measured, metrics, sheetColumns, columnSizing, rowHeadWidth, gripWidth, pinnedColumnCount, rows.length])
+    /** 渲染实测 → 几何：`columnSizing` 是拉伸前的值，不能拿来画 overlay。 */
+    const measuredGeometry = useMemo(
+        () =>
+            geometryFromHeaderCells({
+                cells: metrics.cells,
+                sheetColumns,
+                headerHeight: metrics.headerHeight,
+                rowHeight: metrics.rowHeight,
+                pinnedColumnCount,
+                rowCount: rows.length,
+            }),
+        [metrics, sheetColumns, pinnedColumnCount, rows.length],
+    )
+    const geometry = measuredGeometry?.geometry ?? null
 
     /** 复制源 → 显示顺序的区间（copySource 记的是 id，不是下标）。 */
     const copyAreas = useMemo(
@@ -147,6 +164,7 @@ export function useSelectionOverlay({
         host,
         model,
         height: geometry ? geometry.headerHeight + rows.length * geometry.rowHeight : 0,
+        width: metrics.tableWidth || measuredGeometry?.width || 0,
         copyAreas,
     }
 }

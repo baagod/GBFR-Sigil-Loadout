@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest"
 
-import {buildOverlay, ringLines, RING_WIDTH, type GeometryInput} from "./selectionOverlay"
+import {buildOverlay, geometryFromHeaderCells, ringLines, RING_WIDTH, type GeometryInput} from "./selectionOverlay"
 
 const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
     columnLefts: [40, 80, 140, 200],
@@ -192,5 +192,63 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             if (cell.edges.right) expect(cell.left).toBe(200)
             expect(cell.edges.top || cell.edges.bottom || cell.edges.left || cell.edges.right).toBe(true)
         }
+    })
+})
+
+describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
+    /*
+        ‼️ 窄表被 `min-w-full` 拉伸后，列宽不等于 `columnSizing`（实测：60px 的列会变成 170px+），
+        几何只能从表头实测宽度来。这条用例就是那个拉伸场景：行号 40→85、握把 32→69、5 列 80→170。
+    */
+    it("窄表拉伸：列左缘/列宽跟着渲染后的实测宽度走（不是 columnSizing）", () => {
+        const result = geometryFromHeaderCells({
+            cells: [
+                {id: null, width: 85}, // 行号列（被摊宽）
+                {id: null, width: 69}, // 握把列（被摊宽）
+                {id: "a", width: 170},
+                {id: "b", width: 170},
+                {id: "c", width: 170},
+                {id: "d", width: 170},
+                {id: "e", width: 170},
+            ],
+            sheetColumns: ["a", "b", "c", "d", "e"],
+            headerHeight: 41,
+            rowHeight: 27,
+            pinnedColumnCount: 2,
+            rowCount: 3,
+        })!
+        expect(result.geometry.columnWidths).toEqual([170, 170, 170, 170, 170])
+        expect(result.geometry.columnLefts).toEqual([154, 324, 494, 664, 834]) // 85+69 起算
+        expect(result.geometry.gripWidth).toBe(69) // 选区左缘要包住握把
+        expect(result.geometry.pinnedColumnCount).toBe(2)
+        expect(result.width).toBe(1004) // 85+69+5×170
+    })
+
+    it("没有握把列：gripWidth = 0；只有行号列时列左缘从行号宽起算", () => {
+        const result = geometryFromHeaderCells({
+            cells: [
+                {id: null, width: 40},
+                {id: "a", width: 80},
+                {id: "b", width: 60},
+            ],
+            sheetColumns: ["a", "b"],
+            headerHeight: 41,
+            rowHeight: 27,
+            pinnedColumnCount: 0,
+            rowCount: 1,
+        })!
+        expect(result.geometry.gripWidth).toBe(0)
+        expect(result.geometry.columnLefts).toEqual([40, 120])
+        expect(result.width).toBe(180)
+    })
+
+    it("还没量到（宽度 0 / 表头高 0）→ null，overlay 不渲染", () => {
+        const cells = [{id: null, width: 0}, {id: "a", width: 0}]
+        expect(
+            geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 0, rowHeight: 27, pinnedColumnCount: 0, rowCount: 1}),
+        ).toBeNull()
+        expect(
+            geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 41, rowHeight: 27, pinnedColumnCount: 0, rowCount: 1}),
+        ).toBeNull()
     })
 })

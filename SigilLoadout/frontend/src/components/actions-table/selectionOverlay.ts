@@ -45,6 +45,71 @@ export type GeometryInput = {
 export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
 export type OverlayModel = {scrolled: LayerModel; pinned: LayerModel}
 
+/** 表头一格的实测宽度；`id` = `data-col-id`（行号列 / 握把列没有）。 */
+export type HeaderCellMetric = {id: string | null; width: number}
+
+/**
+ * 表头实测宽度 → 几何输入。
+ *
+ * ‼️ 表宽与列宽都从**渲染结果**取，不从 `columnSizing` 反推：窄表上 `min-w-full` 会把列按比例拉宽
+ * （实测：合计 440px 的 5 列表放进 1007px 容器，60px 列变 183px、行号列 40px 变 93px），
+ * 按 state 画 overlay 会整块错位。非数据列按 DOM 顺序是「行号列 + 可选握把列」；握把宽度单独给
+ * overlay —— 选区左缘要包住握把、不包行号列。
+ */
+export function geometryFromHeaderCells({
+    cells,
+    sheetColumns,
+    headerHeight,
+    rowHeight,
+    pinnedColumnCount,
+    rowCount,
+}: {
+    cells: readonly HeaderCellMetric[]
+    sheetColumns: readonly string[]
+    headerHeight: number
+    rowHeight: number
+    pinnedColumnCount: number
+    rowCount: number
+}): {geometry: GeometryInput; width: number} | null {
+    const widths = new Map<string, number>()
+    let rowHeadWidth = 0
+    let gripWidth = 0
+    let nonDataCount = 0
+    for (const cell of cells) {
+        if (cell.id === null) {
+            rowHeadWidth += cell.width
+            if (nonDataCount === 1) gripWidth = cell.width
+            nonDataCount += 1
+        } else {
+            widths.set(cell.id, cell.width)
+        }
+    }
+    if (headerHeight <= 0 || rowHeight <= 0 || rowHeadWidth <= 0) return null
+    let left = rowHeadWidth
+    const columnLefts: number[] = []
+    const columnWidths: number[] = []
+    for (const id of sheetColumns) {
+        const width = widths.get(id)
+        if (!width) return null
+        columnLefts.push(left)
+        columnWidths.push(width)
+        left += width
+    }
+    return {
+        geometry: {
+            columnLefts,
+            columnWidths,
+            headerHeight,
+            rowHeight,
+            gripWidth,
+            pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
+            rowCount,
+            columnCount: sheetColumns.length,
+        },
+        width: left,
+    }
+}
+
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
 export const RING_WIDTH = 3
 

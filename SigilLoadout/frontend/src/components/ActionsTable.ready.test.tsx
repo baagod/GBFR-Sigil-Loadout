@@ -86,13 +86,14 @@ describe("动作表 · 就位与骨架的契约", () => {
         }
     })
 
-    /* ‼️ overlay 的列几何由 `columnSizing` 推出：`min-width` 会让表宽与它分叉（真机：Speed 轨 5 列错位）。 */
-    it("表宽只由行内 width 决定：class 里不许出现 min-w-* 档", async () => {
+    /* ‼️ 窄表必须**铺满**容器（用户口径）：去掉 `min-w-full` 会让表缩到内容宽、右侧留白。
+       overlay 的列几何是从渲染后的表头实测宽度算的，所以表被摊宽不影响选区。 */
+    it("表始终铺满容器：`<table>` 带 min-w-full", async () => {
         stubColumnGeometry()
         try {
             const {container} = render(<ActionsTable t={t} {...fewColumns()} />)
             await waitFor(() => expect(table(container).className).toContain("table-fixed"))
-            expect(table(container).className).not.toMatch(/(^|\s)min-w-/)
+            expect(table(container).className).toMatch(/(^|\s)min-w-full(\s|$)/)
         } finally {
             vi.restoreAllMocks()
         }

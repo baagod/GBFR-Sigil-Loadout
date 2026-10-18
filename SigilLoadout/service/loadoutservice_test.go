@@ -114,9 +114,9 @@ func TestSaveLoadoutWritesAndLeavesNoTempFiles(t *testing.T) {
 }
 
 /*
-第二次保存要覆盖已经落盘的那一份：WriteAtomic 依赖 os.Rename 的"目标存在就替换"语义（Windows 上由
-MoveFileEx + REPLACE_EXISTING 保证），换成先删再 rename、或自己拼 CreateFile 都会退化成"第一次存得进、
-之后每次都失败"。用户看不到原因，所以留一条会红的用例。
+第二次保存必须**生效**（读回第二份）且不留中转文件。覆盖写走 `appfiles.WriteAtomic` 的 `os.Rename`
+（Windows 上 MoveFileEx + REPLACE_EXISTING）—— 这条挡的是"覆盖没写进去"这类退化；rename 的原子性
+（目标文件任何时刻都不是半截/不存在）由 `WriteAtomic` 自身保证，不在本用例判据内。
 */
 func TestSaveLoadoutOverwritesTheExistingFile(t *testing.T) {
 	dir := t.TempDir()
