@@ -13,7 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {PINNED_COUNT} from "@/components/actions-table/classes"
 
-import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoxOf, copyBoundsOf, handleAt, isSelected, selectedCount, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
+import {KEYS, LongField, cellAt, clickToEdit, clipboardStub, copyBoundsOf, handleAt, hasCopyBounds, isSelected, selectedCount, stubRowRects, pressHandle, useTableHarness, makeRow, selectCell, t} from "@/components/actions-table/testkit"
 
 const {renderTable, setRows, addRow} = useTableHarness()
 
@@ -31,7 +31,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         // 先造一个复制区（选一格 → Ctrl+C），确认虚线在
         selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
 
         // ⚠️ 目标是表头**里面**那个 DIV（列名文字就在它里面），不是 th 本身
         const headerInner = container.querySelector("thead th > div")!
@@ -39,7 +39,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.copy(headerInner, {clipboardData: clipboard})
 
         expect(clipboard.data["text/plain"]).toBeUndefined() // 表格没抢（列名归浏览器）
-        expect(copyBoxOf(container)).toBeNull() // 复制区清空
+        expect(hasCopyBounds(container)).toBe(false) // 复制区清空
     })
 
     /*
@@ -670,7 +670,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
 
         expect(selectedCount(container)).toBe(2) // 底色不动
-        expect(copyBoxOf(container)).not.toBeNull() // 虚线照出
+        expect(hasCopyBounds(container)).toBe(true) // 虚线照出
     })
 
     /* 动到源区 → 虚线撤（rule②：判据是"动过"，不是"值跟复制时不一样"）。 */
@@ -679,13 +679,13 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
         // ‼️ 复制**不再**收掉选区（用户要求）：虚线出来了，选中的那格照样亮着 —— 所以直接原地粘
         expect(selectedCount(container)).toBeGreaterThan(0)
 
         fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-原值")})
 
-        expect(copyBoxOf(container)).toBeNull()
+        expect(hasCopyBounds(container)).toBe(false)
     })
 
     /* 粘到源区**外面** → 虚线留着（Excel 就是这条：连粘多处是常规用法）。 */
@@ -699,7 +699,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("别处")})
 
         expect(cellAt(container, 0, 6).textContent).toBe("别处")
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
     })
 
     /* Esc → 虚线撤（rule③）；滚动 / 点别处**不撤**。 */
@@ -708,11 +708,11 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
 
         fireEvent.keyDown(document, {key: "Escape"})
 
-        expect(copyBoxOf(container)).toBeNull()
+        expect(hasCopyBounds(container)).toBe(false)
     })
 
     /* rule①：再复制一片 → 换成新的那片。 */
@@ -756,7 +756,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(isSelected(cellAt(container, 0, 2))).toBe(true)
         expect(isSelected(cellAt(container, 1, 4))).toBe(true)
         // 复制区那圈也在
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
     })
 
     /* 进编辑就撤（rule②：不是等改完提交，进编辑那一瞬间就算"动过源区"）。 */
@@ -765,12 +765,12 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
 
         clickToEdit(cellAt(container, 0, 2)) // 第二下进编辑
 
         expect(cellAt(container, 0, 2).querySelector("input")).not.toBeNull()
-        expect(copyBoxOf(container)).toBeNull()
+        expect(hasCopyBounds(container)).toBe(false)
     })
 
     /*
@@ -782,7 +782,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         selectCell(cellAt(container, 0, 2))
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
-        expect(copyBoxOf(container)).not.toBeNull()
+        expect(hasCopyBounds(container)).toBe(true)
 
         // 从源区那一格按下、划到旁边一格再松手（= 拖选，不是点）
         fireEvent.mouseDown(cellAt(container, 0, 2))
@@ -790,7 +790,7 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.mouseUp(document)
 
         expect(container.querySelectorAll("tbody input")).toHaveLength(0) // 没进编辑
-        expect(copyBoxOf(container)).not.toBeNull() // 虚线还在
+        expect(hasCopyBounds(container)).toBe(true) // 虚线还在
     })
 
     /*

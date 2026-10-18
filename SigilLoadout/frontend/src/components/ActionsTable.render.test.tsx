@@ -38,6 +38,8 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const handle = container.querySelector("thead th") as HTMLElement
         expect(handle.textContent).toBe("#")
         expect(handle.getAttribute("data-col-id")).toBeNull()
+        // 角色必须显式挂在 DOM 上：overlay 的几何靠它区分行号列/握把列，不再靠"第几个非数据列"。
+        expect(handle.getAttribute("data-head")).toBe("handle")
         expect(handle.style.width).toBe(`${HANDLE_WIDTH}px`)
     })
 

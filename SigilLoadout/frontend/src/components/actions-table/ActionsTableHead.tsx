@@ -58,7 +58,11 @@ export function ActionsTableHead({
                         不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
                         宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
                     */}
-                    <TableHead className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0 font-medium`} style={{width: HANDLE_WIDTH}}>
+                    <TableHead
+                        data-head="handle"
+                        className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0 font-medium`}
+                        style={{width: HANDLE_WIDTH}}
+                    >
                         <div className={HANDLE_HEAD_INNER}>#</div>
                     </TableHead>
                     {/*
@@ -67,7 +71,12 @@ export function ActionsTableHead({
                         留空：这一列没有"名字"可言（拖动是手势，不是数据）。
                     */}
                     {sortable && (
-                        <TableHead aria-hidden className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`} style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}} />
+                        <TableHead
+                            aria-hidden
+                            data-head="grip"
+                            className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`}
+                            style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}}
+                        />
                     )}
                     {headerGroup.headers.map((header) => {
                         const pinned = header.column.getIsPinned()

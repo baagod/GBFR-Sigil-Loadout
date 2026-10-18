@@ -380,9 +380,9 @@ export function copyBoundsOf(container: HTMLElement): number[][] {
     return el?.dataset.copyBounds ? (JSON.parse(el.dataset.copyBounds) as number[][]) : []
 }
 
-/** 有没有那圈虚线（任一复制区就算有）。 */
-export function copyBoxOf(container: HTMLElement): HTMLElement | null {
-    return copyBoundsOf(container).length > 0 ? (container.querySelector<HTMLElement>("[data-copy-bounds]") ?? null) : null
+/** 有没有复制区（= 有没有那圈虚线）。 */
+export function hasCopyBounds(container: HTMLElement): boolean {
+    return copyBoundsOf(container).length > 0
 }
 
 /* ==================== 按行号选行：点 / Shift / Ctrl / 拖 ==================== */
@@ -453,7 +453,7 @@ export const pickItems = () => [...document.querySelectorAll<HTMLElement>('[data
 export const isPickOpen = () => pickItems().length > 0
 
 /** 一下完整的真实点击序列：pointerdown → mousedown → pointerup → mouseup → click（都落在触发器那层）。 */
-export function pressTrigger(trigger: Element) {
+function pressTrigger(trigger: Element) {
     fireEvent.pointerDown(trigger, {button: 0, pointerType: "mouse"})
     fireEvent.mouseDown(trigger, {button: 0})
     fireEvent.pointerUp(trigger, {button: 0, pointerType: "mouse"})

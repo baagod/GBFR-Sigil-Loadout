@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest"
 
-import {buildOverlay, geometryFromHeaderCells, ringLines, RING_WIDTH, type GeometryInput} from "./selectionOverlay"
+import {buildOverlay, geometryFromHeaderCells, ringLines, type GeometryInput} from "./selectionOverlay"
 
 const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
     columnLefts: [40, 80, 140, 200],
@@ -33,7 +33,6 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             {left: 38, top: 39, width: 3, height: 30},
             {left: 78, top: 39, width: 3, height: 30},
         ])
-        expect(RING_WIDTH).toBe(3)
     })
 
     it("跨钉住边界：切两段，切开处不画竖边", () => {
@@ -203,13 +202,13 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
     it("窄表拉伸：列左缘/列宽跟着渲染后的实测宽度走（不是 columnSizing）", () => {
         const result = geometryFromHeaderCells({
             cells: [
-                {id: null, width: 85}, // 行号列（被摊宽）
-                {id: null, width: 69}, // 握把列（被摊宽）
-                {id: "a", width: 170},
-                {id: "b", width: 170},
-                {id: "c", width: 170},
-                {id: "d", width: 170},
-                {id: "e", width: 170},
+                {kind: "handle", id: null, width: 85}, // 行号列（被摊宽）
+                {kind: "grip", id: null, width: 69}, // 握把列（被摊宽）
+                {kind: "column", id: "a", width: 170},
+                {kind: "column", id: "b", width: 170},
+                {kind: "column", id: "c", width: 170},
+                {kind: "column", id: "d", width: 170},
+                {kind: "column", id: "e", width: 170},
             ],
             sheetColumns: ["a", "b", "c", "d", "e"],
             headerHeight: 41,
@@ -223,12 +222,29 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
         expect(result.pinnedColumnCount).toBe(2)
     })
 
+    it("角色由 data-head 决定，不靠 DOM 顺序：握把放在行号列前面也算对", () => {
+        const result = geometryFromHeaderCells({
+            cells: [
+                {kind: "grip", id: null, width: 32},
+                {kind: "handle", id: null, width: 40},
+                {kind: "column", id: "a", width: 80},
+            ],
+            sheetColumns: ["a"],
+            headerHeight: 41,
+            rowHeight: 27,
+            pinnedColumnCount: 0,
+            rowCount: 1,
+        })!
+        expect(result.gripWidth).toBe(32)
+        expect(result.columnLefts).toEqual([72])
+    })
+
     it("没有握把列：gripWidth = 0；只有行号列时列左缘从行号宽起算", () => {
         const result = geometryFromHeaderCells({
             cells: [
-                {id: null, width: 40},
-                {id: "a", width: 80},
-                {id: "b", width: 60},
+                {kind: "handle", id: null, width: 40},
+                {kind: "column", id: "a", width: 80},
+                {kind: "column", id: "b", width: 60},
             ],
             sheetColumns: ["a", "b"],
             headerHeight: 41,
@@ -241,7 +257,10 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
     })
 
     it("还没量到（行头宽 0 / 表头高 0）→ null，overlay 不渲染", () => {
-        const cells = [{id: null, width: 0}, {id: "a", width: 0}]
+        const cells = [
+            {kind: "handle" as const, id: null, width: 0},
+            {kind: "column" as const, id: "a", width: 0},
+        ]
         expect(
             geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 0, rowHeight: 27, pinnedColumnCount: 0, rowCount: 1}),
         ).toBeNull()

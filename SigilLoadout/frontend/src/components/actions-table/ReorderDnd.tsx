@@ -30,13 +30,10 @@ export function ReorderDnd({reorder, rows, bound, children}: {
         不传 `reorder` 时整块透传 children —— 动作表因此一根 dnd-kit 的线都不接（原来它挂着排序上下文、
         却没有拖拽上下文，138 行 `useSortable` 订阅着一个永远不变的清单）。
         `items` 还必须稳定引用：dnd-kit 把它原样塞进 context，引用一变所有 `useSortable` 全部重渲
-        （context 变化**穿透 memo**）。`rows` 每次渲染都是新数组，所以按 id 串缓存。
+        （context 变化**穿透 memo**）。`rows` 每次渲染都是新数组，所以用 id 串当键、再从同一个串切回来。
     */
-    const ids = useMemo(
-        () => rows.map((row) => row.id),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [rows.map((row) => row.id).join("\u0000")],
-    )
+    const idKey = rows.map((row) => row.id).join("\u0000")
+    const ids = useMemo(() => (idKey === "" ? [] : idKey.split("\u0000")), [idKey])
     if (!reorder) return children
     return (
         <DndContext

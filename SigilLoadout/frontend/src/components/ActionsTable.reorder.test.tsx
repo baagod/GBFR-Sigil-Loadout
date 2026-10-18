@@ -40,6 +40,8 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
 
         // 末尾那个子元素只能是最后一行 —— 多出一个 `<div>`（dnd-kit 的 live region）就会让末行规则失配。
         expect(tbody.lastElementChild!.tagName).toBe("TR")
+        // 握把列的角色显式挂在 DOM 上（overlay 的几何靠它取握把宽度）。
+        expect(container.querySelector('thead th[data-head="grip"]')).not.toBeNull()
     })
 
     /*

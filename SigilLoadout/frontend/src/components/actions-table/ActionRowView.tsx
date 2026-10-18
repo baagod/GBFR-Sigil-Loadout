@@ -1,5 +1,5 @@
 /*
-    表体的一行：行号格 + 88 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
+    表体的一行：行号格 + 87 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
@@ -185,7 +185,7 @@ export const ActionRowView = memo(function ActionRowView({
     /** 一列的补充说明（见 `ColumnSpec`）—— 这里只用它的 `readonly`（决定这一格进不进编辑）。 */
     columnOf?: (key: string) => ColumnSpec | undefined
 }) {
-    /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 88 次多余调用）。 */
+    /* `row.getAllCells()` 只取一次，给下面的 map 共用（每格再取一遍就是 87 次多余调用）。 */
     const rowCells = row.getAllCells()
     /** 假删除（轨表）：整行暗红，一眼看出"这一行不写进游戏"。 */
     const removed = row.original.removed === true

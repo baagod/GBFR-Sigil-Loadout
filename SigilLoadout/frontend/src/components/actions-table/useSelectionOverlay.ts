@@ -88,10 +88,14 @@ export function useSelectionOverlay({
             const headerHeight = header.offsetHeight
             const rowHeight = body.offsetHeight / rows.length
             if (headerHeight <= 0 || rowHeight <= 0) return
-            const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => ({
-                id: th.dataset.colId ?? null,
-                width: th.offsetWidth,
-            }))
+            const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => {
+                const head = th.dataset.head
+                return {
+                    kind: head === "handle" || head === "grip" ? head : "column",
+                    id: th.dataset.colId ?? null,
+                    width: th.offsetWidth,
+                }
+            })
             const tableWidth = tableEl.offsetWidth
             setMetrics((prev) =>
                 prev.headerHeight === headerHeight &&

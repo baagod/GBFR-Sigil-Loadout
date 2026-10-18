@@ -12,7 +12,7 @@ pwsh -File tools\deploy-quick.ps1 -DebugPort 9222      # 它会把端口开好�
 
 # 2) 量 DOM / 截图
 node tools/debug/cdp-probe.mjs --page 角色动作 --shot out.png
-node tools/debug/cdp-probe.mjs --expr "document.querySelectorAll('td.cell-selected').length"
+node tools/debug/cdp-probe.mjs --expr "document.querySelectorAll('td.cell-active').length"
 node tools/debug/cdp-probe.mjs --clip 0,140,640,200 --scale 4 --shot zoom.png
 ```
 
