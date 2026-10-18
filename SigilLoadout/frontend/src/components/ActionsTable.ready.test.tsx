@@ -34,17 +34,17 @@ const fewColumns = () => {
 }
 
 /**
- * 那张表。
+ * 那张表 + 它的外壳（滚动框）。
  *
- * ‼️ "离屏 / 忙"的状态**挂在 `<table>` 上**（`is-offscreen` / `is-busy` + `aria-busy`）：外壳那层 div 是
- * shadcn `Table` 渲染的（`ui/table.tsx` 零改动），它没有 props 入口，所以状态只能从 `<table>` 上标出来，
- * 由 `style.css` 的 `div:has(> table.base-table.is-offscreen)` 翻译成"整块离屏"。
+ * ‼️ "离屏 / 忙"的状态挂在**外壳**上（`is-offscreen` / `is-busy`，由 `BaseTable` 自己渲染），
+ * `<table>` 上只有 `aria-busy`（与"点不动"同一判据）。
  */
 const table = (container: HTMLElement) => container.querySelector<HTMLElement>("table.base-table")!
+const shell = (container: HTMLElement) => container.querySelector<HTMLElement>(".base-table-shell")!
 
 /** 等到"就位"：不再离屏。 */
 const ready = (container: HTMLElement) =>
-    waitFor(() => expect(table(container).className).not.toContain("is-offscreen"))
+    waitFor(() => expect(shell(container).className).not.toContain("is-offscreen"))
 
 describe("动作表 · 就位与骨架的契约", () => {
     it("还没就位（loading）：量完了也整块离屏 —— 面板那边正顶着骨架", async () => {
@@ -53,7 +53,7 @@ describe("动作表 · 就位与骨架的契约", () => {
             const {container} = render(<ActionsTable t={t} loading {...fewColumns()} />)
             // 先让它**真的量完**（否则"离屏"只是因为没量好，测不出 loading 的作用）。
             await waitFor(() => expect(table(container).className).toContain("table-fixed"))
-            expect(table(container).className).toContain("is-offscreen")
+            expect(shell(container).className).toContain("is-offscreen")
             expect(table(container).getAttribute("aria-busy")).toBe("true")
         } finally {
             vi.restoreAllMocks()
@@ -67,7 +67,7 @@ describe("动作表 · 就位与骨架的契约", () => {
             const {container} = render(<ActionsTable t={t} onReady={onReady} {...fewColumns()} />)
             await ready(container)
             expect(onReady).toHaveBeenCalled()
-            expect(table(container).className).not.toContain("is-busy")
+            expect(shell(container).className).not.toContain("is-busy")
             expect(table(container).getAttribute("aria-busy")).toBe("false")
         } finally {
             vi.restoreAllMocks()
@@ -79,7 +79,7 @@ describe("动作表 · 就位与骨架的契约", () => {
         try {
             const {container} = render(<ActionsTable t={t} busy {...fewColumns()} />)
             await ready(container)
-            expect(table(container).className).toContain("is-busy")
+            expect(shell(container).className).toContain("is-busy")
             expect(table(container).getAttribute("aria-busy")).toBe("true")
         } finally {
             vi.restoreAllMocks()

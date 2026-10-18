@@ -273,35 +273,10 @@ table td.cell-pinned, table th.cell-pinned {
 }
 
 /*
-    基表外壳（shadcn `Table` 在 `<table>` 外面那层 div）—— **它就是滚动框**：`useColumnMeasure` /
-    `useReveal` / 行拖夹取 / 方向键跳边都读 `table.parentElement`。
-    那层 div 没有 props 入口，所以用 `.base-table` 反选；不能改 `ui/table.tsx`（`shadcn add --overwrite`
-    会整份覆盖回去）。⚠️ `flex` + `min-height` 别删（外壳没确定高度就永远不滚）；外框画在这层才不跟内容跑；
-    `background-color` 修的是横滚到头时表格右沿与滚动条之间那条 1px 缝（表本身 `min-w-full` 铺满，不留白）。
+    基表外壳（滚动框）的样式已归 `BaseTable` 的 utility 类（`.base-table-shell`）—— 不再用
+    `div:has(> table.base-table)` 反选。外壳 = `table.parentElement`：`useColumnMeasure` / `useReveal` /
+    行拖夹取 / 方向键跳边都这么读它。
 */
-div:has(> table.base-table) {
-    /* 选区 overlay 的 portal 宿主：绝对定位的 overlay 要以滚动框为坐标原点（滚动时跟着内容走）。 */
-    position:          relative;
-    flex:             1 1 0%;
-    min-height:       0;
-    overflow:         auto;
-    border:           1px solid var(--input);
-    background-color: var(--background);
-}
-
-/* 还没就位（数据作废 / 列宽没量出来）：整块**离屏**（不是 `display:none`，否则 rect 归零、量不到列宽）。
-   `absolute` + 负 left + 定宽：仍在 DOM、量得到，但不参与排版；外壳也要一起让开（绝对定位子元素照样撑滚动区）。 */
-div:has(> table.base-table.is-offscreen) {
-    position: absolute;
-    top:      0;
-    left:     -99999px;
-    width:    1200px;
-}
-
-/* 忙（保存部署那一段）：点不动，但表格照旧显示。 */
-div:has(> table.base-table.is-busy) {
-    pointer-events: none;
-}
 
 /* 行号列是 sticky，必须不透明：直接给它"数据格选中后的最终色"，并关掉叠色、文字用选区绿。 */
 .cell-handle.cell-row-selected {

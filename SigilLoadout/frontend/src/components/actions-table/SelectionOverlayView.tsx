@@ -9,7 +9,6 @@
       · pinned 层 z-52：冻结列之上、吸顶表头行（z-60）之下；横向滚动由 `sticky left-0` 原生跟随。
 */
 import type {CSSProperties} from "react"
-import {createPortal} from "react-dom"
 
 import type {CopyCell, LayerModel, OverlayModel, Rect} from "./selectionOverlay"
 
@@ -72,26 +71,19 @@ function Layer({model}: {model: LayerModel}) {
     )
 }
 
-/**
- * 把 overlay 挂到滚动容器里（`host` = BaseTable 的外壳 = 滚动框）。
- * 用 portal 而不是改 shadcn 的 `Table`（那层壳没有 children 入口，见 BaseTable 文件头）。
- */
+/** overlay 的两层：由 `BaseTable` 作为外壳的子节点渲染（外壳是滚动框 = 坐标原点）。 */
 export function SelectionOverlay({
-    host,
     model,
     width,
     height,
 }: {
-    host: HTMLElement | null
     model: OverlayModel
     /** 表格内容总宽（含行头）。 */
     width: number
     /** 表格内容总高（表头 + 所有行）。 */
     height: number
 }) {
-    if (!host) return null
-
-    return createPortal(
+    return (
         <>
             <div
                 className="pointer-events-none absolute top-0 left-0 z-[41] overflow-hidden"
@@ -114,7 +106,6 @@ export function SelectionOverlay({
                     <Layer model={model.pinned} />
                 </div>
             </div>
-        </>,
-        host,
+        </>
     )
 }

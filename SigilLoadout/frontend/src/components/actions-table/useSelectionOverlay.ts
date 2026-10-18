@@ -1,6 +1,6 @@
 /*
-    选区 overlay 的几何 / 宿主 / 复制区：把 ActionsTable 里“量高度 + 算矩形 + portal 宿主”这一坨
-    收成一个 hook。ActionsTable 只关心“什么时候渲染 <SelectionOverlay>”，不关心像素怎么算。
+    选区 overlay 的几何 / 复制区：把 ActionsTable 里“量高度 + 算矩形”这一坨收成一个 hook。
+    ActionsTable 只关心“什么时候渲染 <SelectionOverlay>”，不关心像素怎么算；外壳/宿主归 `BaseTable`。
 
     纯几何在 selectionOverlay.ts（有单测）；这里只做 React 侧的连接，不引入第二种坐标。
 */
@@ -18,11 +18,11 @@ type ActiveCellIndexes = {rowIndex: number; columnIndex: number}
 
 /** 表头实测结果没变就不 setState（ResizeObserver 回调可能很密）。 */
 const sameCells = (a: readonly HeaderCellMetric[], b: readonly HeaderCellMetric[]) =>
-    a.length === b.length && a.every((cell, index) => cell.id === b[index]!.id && cell.width === b[index]!.width)
+    a.length === b.length &&
+    a.every((cell, index) => cell.kind === b[index]!.kind && cell.id === b[index]!.id && cell.width === b[index]!.width)
 
 export function useSelectionOverlay({
     tableRef,
-    scrollRef,
     measured,
     rows,
     sheetColumns,
@@ -34,7 +34,6 @@ export function useSelectionOverlay({
     copySource,
 }: {
     tableRef: RefObject<HTMLTableElement | null>
-    scrollRef: RefObject<HTMLDivElement | null>
     measured: boolean
     rows: readonly RowLike[]
     sheetColumns: string[]
@@ -50,7 +49,6 @@ export function useSelectionOverlay({
     activeCellKey: string
     copySource: CopySource | null
 }): {
-    host: HTMLDivElement | null
     model: OverlayModel | null
     height: number
     /** 表格实际渲染宽度（被 `min-w-full` 铺满拉伸后的宽度）—— overlay 两层都按它铺。 */
@@ -58,8 +56,6 @@ export function useSelectionOverlay({
     /** 复制源区间（测试投影用；渲染由 model 走）。 */
     copyAreas: Bounds[]
 } {
-    /** overlay 的宿主 = 滚动框（portal 进去；`measured` 之前外壳在屏幕外，不挂）。 */
-    const [host, setHost] = useState<HTMLDivElement | null>(null)
     /**
      * 表头高 / 行高 / 表头各格实测宽度（几何输入）。happy-dom 量不到（全 0）→ overlay 不渲染。
      *
@@ -72,10 +68,6 @@ export function useSelectionOverlay({
         cells: HeaderCellMetric[]
         tableWidth: number
     }>({headerHeight: 0, rowHeight: 0, cells: [], tableWidth: 0})
-
-    useLayoutEffect(() => {
-        if (measured) setHost(scrollRef.current)
-    }, [measured, scrollRef])
 
     useLayoutEffect(() => {
         if (!measured) return
@@ -172,7 +164,6 @@ export function useSelectionOverlay({
     )
 
     return {
-        host,
         model,
         height: geometry ? geometry.headerHeight + rows.length * geometry.rowHeight : 0,
         width: Math.max(metrics.tableWidth, contentRight),

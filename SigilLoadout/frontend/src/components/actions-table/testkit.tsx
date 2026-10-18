@@ -264,15 +264,9 @@ export function stubRowRects(container: HTMLElement, height = 20) {
     return rows
 }
 
-/**
- * **本表的滚动框** = `<table>` 的父元素。
- *
- * ‼️ 它就是 shadcn `Table` 渲染的那层壳（`BaseTable` 把它当滚动框，样式在 `style.css` 的
- * `div:has(> table.base-table)` 里）。所以它**没有自己的类名**可以认 —— 只能从 `<table>` 反推，
- * 这也正是生产代码（`useColumnMeasure` / `useArrowKeys`）拿它的方式。
- */
+/** **本表的滚动框** = `BaseTable` 渲染的外壳（`.base-table-shell`，`<table>` 的父元素）。 */
 export function scrollBoxOf(container: HTMLElement): HTMLElement {
-    return container.querySelector<HTMLElement>("table.base-table")!.parentElement as HTMLElement
+    return container.querySelector<HTMLElement>(".base-table-shell")!
 }
 
 /**

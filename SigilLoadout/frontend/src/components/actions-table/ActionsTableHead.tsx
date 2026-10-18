@@ -5,7 +5,7 @@
     ⚠️ 两行都带 `data-head-line`：量宽按行分别量（见 `useColumnMeasure`）。
 
     行号列与握把列**不属于列模型**（见 `classes.ts` 的 HANDLE_WIDTH 那段），所以这两格是手写的。
-    外壳与 `<thead>` 由 shadcn 的 `TableHeader` 出（`ActionsTable` 那边是 `Table`）。
+    外壳由 `BaseTable` 出（滚动框 div + `<table>`），`<thead>` 由 shadcn 的 `TableHeader` 出。
 */
 import {useContext} from "react"
 import {flexRender, type Table} from "@tanstack/react-table"

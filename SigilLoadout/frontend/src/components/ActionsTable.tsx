@@ -5,10 +5,10 @@
     列名与长值截断 / 单元格选区 + Excel 口径的复制粘贴 / 行号列选行 / 方向键 / Ctrl+Z /
     保存交给外面那排按钮。**数据也是外面给的**（受控视图，自己不读，见下面 `rows` 那段）。
 
-    **全部 DOM 用 shadcn 的表格组件**（`components/ui/table.tsx`）：外壳 + `<table>` 由基表 `BaseTable`
-    包（它就是 `Table`；`Table` 自带的外壳就是本表的滚动框，见 `BaseTable.tsx` 文件头），表体 `TableBody`、
-    行与格子 `TableRow` / `TableCell`（在 `ActionRowView` 里）、表头 `TableHeader` / `TableRow` /
-    `TableHead`（在 `ActionsTableHead` 里）。本文件**不写任何一个原生表格标签**。
+    **表格原语用 shadcn 的组件**（`components/ui/table.tsx`）：外壳（滚动框）+ `<table>` 由基表
+    `BaseTable` 自己渲染（见 `BaseTable.tsx` 文件头），表体 `TableBody`、行与格子 `TableRow` /
+    `TableCell`（在 `ActionRowView` 里）、表头 `TableHeader` / `TableRow` / `TableHead`
+    （在 `ActionsTableHead` 里）。本文件**不写任何一个原生表格标签**。
     **类名仍然归 `actions-table/classes.ts`**：那些组件只是"结构 + 默认长相"，几何与选区样式一律由我们
     传下去的类名压过去（`cn` 是 tailwind-merge 口径，写在后面的赢）。
 
@@ -25,7 +25,7 @@
       · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、列策略（`columnKind` / `writableColumn`）、纯取值助手；
       · `actions-table/classes.ts`    —— 类名常量 + 复制虚线空档的垫底色口径（`cellUnderlayColor`）；
       · `actions-table/selectionOverlay.ts` —— 选区纯几何（区间 → 矩形 / 轮廓 / 复制虚线；`geometryFromHeaderCells` 把实测宽度换成几何）；
-      · `actions-table/useSelectionOverlay.ts` —— 选区 overlay 的 React 连接（量表头实测宽度 / 表高行高、算模型、找 portal 宿主）；
+      · `actions-table/useSelectionOverlay.ts` —— 选区 overlay 的 React 连接（量表头实测宽度 / 表高行高、算模型）；
       · `actions-table/SelectionOverlayView.tsx` —— overlay 的两层渲染（滚动层 / 钉住层）；
       · `actions-table/selection.ts`  —— 选区的谓词（整行 / 单格）；
       · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
@@ -569,10 +569,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
     const activeRowIndex = activeRowId === null ? -1 : modelRows.findIndex((row) => row.id === activeRowId)
 
-    /* 选区 overlay：量高度、算矩形、找 portal 宿主都在这个 hook 里（纯几何在 selectionOverlay.ts）。 */
+    /* 选区 overlay：量高度、算矩形都在这个 hook 里（纯几何在 selectionOverlay.ts；外壳/宿主归 BaseTable）。 */
     const overlay = useSelectionOverlay({
         tableRef,
-        scrollRef,
         measured,
         rows: modelRows,
         sheetColumns,
@@ -812,8 +811,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 onClose={() => setCopyHint("")}
             />
             {/*
-                **表格**。外壳（shadcn `Table` 那层 div = 滚动框）与离屏/点不动的状态全归 `BaseTable`；
-                骨架不在这里（`ActionsPanel` 平级渲染 `TableSkeleton`）。
+                **表格**。外壳（滚动框）与离屏/点不动的状态全归 `BaseTable`；骨架不在这里
+                （`ActionsPanel` 平级渲染 `TableSkeleton`）。
             */}
             <BaseTable
                 tableRef={tableRef}
@@ -836,6 +835,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                    表头实测宽度取，摊宽不影响选区。 */
                 className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
                 style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
+                /* 选区外观全部由这一层画（见 `SelectionOverlay`）：不往单元格上挂类名，拖选不触发表格重排。 */
+                overlay={
+                    overlay.model ? (
+                        <SelectionOverlay model={overlay.model} width={overlay.width} height={overlay.height} />
+                    ) : null
+                }
             >
                 <ActionsTableHead
                     table={table}
@@ -896,15 +901,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     </RevealContext.Provider>
                 </TableBody>
             </BaseTable>
-            {/* 选区外观全部由这一层画（见 `SelectionOverlay`）：不往单元格上挂类名，拖选不触发表格重排。 */}
-            {overlay.host && overlay.model ? (
-                <SelectionOverlay
-                    host={overlay.host}
-                    model={overlay.model}
-                    width={overlay.width}
-                    height={overlay.height}
-                />
-            ) : null}
             {/* 测试投影（happy-dom 量不到像素）：把选区的行列下标与复制源挂出来，测试据此断言，不依赖类名。 */}
             <div
                 hidden
