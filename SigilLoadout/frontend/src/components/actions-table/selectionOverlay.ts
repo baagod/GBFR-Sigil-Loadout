@@ -110,16 +110,23 @@ function subtractRect(rect: Rect, hole: Rect | null): Rect[] {
  */
 export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean): Rect[] {
     const inset = width - 1
+    /*
+        ‼️ `clamp*` 不只是把边线往里挪 1px，**线的长度也要减 1**：
+        竖线原本画到 `rect.bottom + 1`、横线画到 `rect.right + 1`，最后一行的竖线会超出表格 1px。
+        滚动层有 `overflow: hidden` 挡着，但握把段画在钉住层（`overflow: visible`）→ 撑出纵向滚动条（真机复现）。
+    */
+    const lineW = rect.width + inset + 1 - (clampRight ? 1 : 0)
+    const lineH = rect.height + inset + 1 - (clampBottom ? 1 : 0)
     const lines: Rect[] = []
-    if (edges.top) lines.push({left: rect.left - inset, top: rect.top - inset, width: rect.width + inset + 1, height: width})
+    if (edges.top) lines.push({left: rect.left - inset, top: rect.top - inset, width: lineW, height: width})
     if (edges.bottom) {
         const top = rect.top + rect.height - inset - (clampBottom ? 1 : 0)
-        lines.push({left: rect.left - inset, top, width: rect.width + inset + 1, height: width})
+        lines.push({left: rect.left - inset, top, width: lineW, height: width})
     }
-    if (edges.left) lines.push({left: rect.left - inset, top: rect.top - inset, width, height: rect.height + inset + 1})
+    if (edges.left) lines.push({left: rect.left - inset, top: rect.top - inset, width, height: lineH})
     if (edges.right) {
         const left = rect.left + rect.width - inset - (clampRight ? 1 : 0)
-        lines.push({left, top: rect.top - inset, width, height: rect.height + inset + 1})
+        lines.push({left, top: rect.top - inset, width, height: lineH})
     }
     return lines
 }

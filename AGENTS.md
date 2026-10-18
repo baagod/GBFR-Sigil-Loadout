@@ -363,6 +363,15 @@
 
 ---
 
+## 审查流程
+
+1. ponytail-review            → receiving 执行 
+2. thermo-nuclear             → receiving 执行 
+3. code-review-and-quality    → receiving 执行 
+4. ponytail-review            → receiving 执行（复检）
+
+---
+
 ## 技能：按需调用
 
 - 测试页面使用 `agent-browser` cli 工具（禁 `playwright`）。

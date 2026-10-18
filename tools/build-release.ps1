@@ -26,21 +26,14 @@ $root = Split-Path -Parent $PSScriptRoot
 $manifestVersion = (Get-Content -LiteralPath (
     Join-Path $root 'GBFR.SigilLoadout\ModConfig.json') -Raw | ConvertFrom-Json).ModVersion
 $Version = $manifestVersion
-$npmPackage = Get-Content -LiteralPath (
+$frontendPackage = Get-Content -LiteralPath (
     Join-Path $root 'SigilLoadout\frontend\package.json') -Raw | ConvertFrom-Json
-if ($npmPackage.version -ne $Version) {
-    throw "SigilLoadout\frontend\package.json declares $($npmPackage.version) but the release is $Version; bump it too."
+if ($frontendPackage.version -ne $Version) {
+    throw "SigilLoadout\frontend\package.json declares $($frontendPackage.version) but the release is $Version; bump it too."
 }
-# package-lock.json 不能 ConvertFrom-Json：它的 packages\ 映射有一个空字符串键，PowerShell 会为此
-# 报错（"名称为空字符串的属性"）。所以按文本数这个版本号出现几次——它要出现两处（根 version 与那个空键的条目）。
-$npmLockText = Get-Content -LiteralPath (
-    Join-Path $root 'SigilLoadout\frontend\package-lock.json') -Raw
-$npmLockHits = ([regex]::Matches(
-        $npmLockText, '"version":\s*"' + [regex]::Escape($Version) + '"')).Count
-if ($npmLockHits -lt 2) {
-    throw "SigilLoadout\frontend\package-lock.json carries version $Version $npmLockHits time(s); both the root entry and the root-package entry need it. Bump it together with package.json."
-}
-Write-Output "Release version: $Version (ModConfig.json; package.json + package-lock.json agree)."
+# 锁文件不再带版本号：npm 的 package-lock.json 有两处 version，换成 pnpm-lock.yaml 后没有这个约束
+# （它只钉依赖），所以版本一致性校验就只剩 ModConfig.json 与 package.json 这一对。
+Write-Output "Release version: $Version (ModConfig.json; package.json agree)."
 
 $nativeProject = Join-Path $root 'GBFR.SigilLoadout.Native\GBFR.SigilLoadout.Native.vcxproj'
 $managedProject = Join-Path $root 'GBFR.SigilLoadout\GBFR.SigilLoadout.csproj'

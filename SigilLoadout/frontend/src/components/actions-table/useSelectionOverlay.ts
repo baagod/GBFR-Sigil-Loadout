@@ -65,8 +65,14 @@ export function useSelectionOverlay({
         const header = tableEl?.querySelector("thead")
         const body = tableEl?.querySelector("tbody")
         if (!tableEl || !header || !body || rows.length === 0) return
-        const headerHeight = header.getBoundingClientRect().height
-        const rowHeight = body.getBoundingClientRect().height / rows.length
+        /*
+            ‼️ 用 offsetHeight（**布局像素**），不用 getBoundingClientRect（**渲染像素**）：
+            轨迹表的 ActionsTable 在弹窗打开动画里挂载，父级还带着 `transform: scale(...)`，
+            rect 会被缩放成 header≈38.95 / rowHeight≈25.65，且只在挂载时量一次 → 选区框整体缩 5%、
+            向上偏 ~8px（真机：框画在 y181/206，实际行是 y189/216）。offsetHeight 不受 transform 影响。
+        */
+        const headerHeight = header.offsetHeight
+        const rowHeight = body.offsetHeight / rows.length
         if (headerHeight <= 0 || rowHeight <= 0) return
         setMetrics((prev) => (prev.headerHeight === headerHeight && prev.rowHeight === rowHeight ? prev : {headerHeight, rowHeight}))
     }, [measured, tableRef, rows.length])

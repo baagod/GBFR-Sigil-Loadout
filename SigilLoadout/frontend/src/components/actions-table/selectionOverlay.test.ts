@@ -75,8 +75,9 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
     it("贴表格右/下边：轮廓收回 1px", () => {
         const lines = ringLines({left: 200, top: 41, width: 60, height: 27}, {top: false, bottom: true, left: false, right: true}, 3, true, true)
         expect(lines).toEqual([
-            {left: 198, top: 65, width: 63, height: 3},
-            {left: 257, top: 39, width: 3, height: 30},
+            // 贴边时横/竖线长度也各少 1px：否则末行竖线会超出表格 1px、撑出滚动条
+            {left: 198, top: 65, width: 62, height: 3},
+            {left: 257, top: 39, width: 3, height: 29},
         ])
     })
 
