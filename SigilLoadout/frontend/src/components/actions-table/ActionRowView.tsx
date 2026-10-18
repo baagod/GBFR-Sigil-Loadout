@@ -263,8 +263,10 @@ export const ActionRowView = memo(function ActionRowView({
                     */
                     aria-label="拖动排序"
                     {...drag.listeners}
-                    /* 选中轮廓由 overlay 统一画；这里只保留拖拽光标与拖动中的半透明反馈。 */
-                    className={`${handleCellClass(rowSelected)} relative touch-none cursor-grab active:cursor-grabbing ${
+                    /* 选中轮廓由 overlay 统一画；这里只保留拖拽光标与拖动中的半透明反馈。
+                       ‼️ 不能再挂 `relative`：它和 `HANDLE_CELL` 的 `sticky` 冲突（`relative` 后写会赢），
+                       inline 的 `left: HANDLE_WIDTH` 就变成相对偏移 +40px —— 握把列整个压到 `config` 列上（真机）。 */
+                    className={`${handleCellClass(rowSelected)} touch-none cursor-grab active:cursor-grabbing ${
                         drag.isDragging ? "opacity-40" : ""
                     }`}
                     style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
