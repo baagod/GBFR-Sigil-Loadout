@@ -86,14 +86,22 @@ describe("动作表 · 就位与骨架的契约", () => {
         }
     })
 
-    /* ‼️ 窄表必须**铺满**容器（用户口径）：去掉 `min-w-full` 会让表缩到内容宽、右侧留白。
-       overlay 的列几何是从渲染后的表头实测宽度算的，所以表被摊宽不影响选区。 */
-    it("表始终铺满容器：`<table>` 带 min-w-full", async () => {
-        stubColumnGeometry()
+    /* ‼️ 铺满靠 `min-w-full`；测量期必须清掉 min-width（理由见 `useColumnMeasure` 释放段），
+       否则离屏外壳会让自然宽被量成拉伸宽 —— 这条测试就是那个契约的可观测形式。 */
+    it("铺满靠 min-w-full，且测量期 `min-width` 被临时清掉", async () => {
+        const released: string[] = []
+        stubColumnGeometry((el) => {
+            /* 只在"测量形态"（表被放开成 max-content）下记录：那时 min-width 必须是 0。 */
+            if (el.tagName !== "TH") return
+            const tableEl = el.closest("table")
+            if (tableEl?.style.width === "max-content") released.push(tableEl.style.minWidth)
+        })
         try {
             const {container} = render(<ActionsTable t={t} {...fewColumns()} />)
             await waitFor(() => expect(table(container).className).toContain("table-fixed"))
             expect(table(container).className).toMatch(/(^|\s)min-w-full(\s|$)/)
+            await waitFor(() => expect(released.length).toBeGreaterThan(0))
+            expect(released.every((value) => value === "0px")).toBe(true)
         } finally {
             vi.restoreAllMocks()
         }

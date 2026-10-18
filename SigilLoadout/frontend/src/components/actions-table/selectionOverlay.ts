@@ -51,10 +51,10 @@ export type HeaderCellMetric = {id: string | null; width: number}
 /**
  * 表头实测宽度 → 几何输入。
  *
- * ‼️ 表宽与列宽都从**渲染结果**取，不从 `columnSizing` 反推：窄表上 `min-w-full` 会把列按比例拉宽
- * （实测：合计 440px 的 5 列表放进 1007px 容器，60px 列变 183px、行号列 40px 变 93px），
- * 按 state 画 overlay 会整块错位。非数据列按 DOM 顺序是「行号列 + 可选握把列」；握把宽度单独给
- * overlay —— 选区左缘要包住握把、不包行号列。
+ * ‼️ 表宽与列宽都从**渲染结果**取，不从 `columnSizing` 反推：铺满靠 `min-w-full`（测量期会临时清掉），
+ * 窄表会被浏览器按比例拉宽（实测：合计 440px 的 5 列表放进 1007px 容器，80px 列变 183px、
+ * 行号列 40px 变 93px），按 state 画 overlay 会整块错位。非数据列按 DOM 顺序是「行号列 + 可选握把列」；
+ * 握把宽度单独给 overlay —— 选区左缘要包住握把、不包行号列。
  */
 export function geometryFromHeaderCells({
     cells,
@@ -70,7 +70,7 @@ export function geometryFromHeaderCells({
     rowHeight: number
     pinnedColumnCount: number
     rowCount: number
-}): {geometry: GeometryInput; width: number} | null {
+}): GeometryInput | null {
     const widths = new Map<string, number>()
     let rowHeadWidth = 0
     let gripWidth = 0
@@ -96,17 +96,14 @@ export function geometryFromHeaderCells({
         left += width
     }
     return {
-        geometry: {
-            columnLefts,
-            columnWidths,
-            headerHeight,
-            rowHeight,
-            gripWidth,
-            pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
-            rowCount,
-            columnCount: sheetColumns.length,
-        },
-        width: left,
+        columnLefts,
+        columnWidths,
+        headerHeight,
+        rowHeight,
+        gripWidth,
+        pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
+        rowCount,
+        columnCount: sheetColumns.length,
     }
 }
 

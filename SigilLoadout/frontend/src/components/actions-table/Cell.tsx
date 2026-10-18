@@ -2,7 +2,7 @@
     一格的三个层次（由外到内）：`CellContent` 只负责「只读还是可编辑」的分发、`CellText` 是显示态、
     `Cell` 管编辑态。拆开是为了让拖拽选区时**只重建真正变了的东西**（见 `CellContent` 那段说明）。
 */
-import {memo, useCallback, useContext, useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type ReactNode, type Ref, type RefObject} from "react"
+import {memo, useCallback, useContext, useRef, useState, type FocusEvent as ReactFocusEvent, type ReactNode, type Ref, type RefObject} from "react"
 
 import {MoreHorizontal} from "lucide-react"
 import {CellPick} from "./CellPick"
@@ -267,29 +267,17 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
     /** Esc 之后输入框紧接着会失焦：那一次 blur **不许提交**（Esc = 放弃草稿）。 */
     const skipCommitRef = useRef(false)
     /**
-     * ‼️ **一次点击只进一次编辑**：`enterEdit` 要做三件事（播报、跟随可视、切状态），重复做都是白费 ——
-     * 尤其"跟随可视"会为同一格排第二帧几何计算。用 ref 而不是 state 闸：同一事件里的两次调用读到的
-     * `editing` 都还是旧值，闸不住。
-     */
-    const enteredRef = useRef(false)
-    /**
      * 进编辑的唯一入口：把"进编辑"这件事播出去（复制区那圈虚线要撤，见 `CopySource` 规则②），
-     * 再改自己的状态。**两条进编辑的路都得走它**，否则"从焦点进来"那条会漏掉播报。
+     * 再改自己的状态。
      *
      * ‼️ `reveal()` **必须在这条路上喊**：滚动原本只挂在"活动格换人"的 ref 回调上，而"点已选中的
      * 格子"选区没变、活动格没换人 —— 那个回调不跑，于是进了编辑却不跟随可视（用户报的）。
      */
     const enterEdit = useCallback(() => {
-        if (enteredRef.current) return
-        enteredRef.current = true
         onEnterEdit()
         reveal()
         setEditing(true)
     }, [onEnterEdit, reveal])
-    /* 退出编辑（Esc / 提交 / 外部改动）后把闸放开，否则这一格第二次点击进不了编辑。 */
-    useEffect(() => {
-        if (!editing) enteredRef.current = false
-    }, [editing])
 
     /** 登记"这一格的进编辑"（见 `useEnterEditHandler`）：Enter 据此切输入框。 */
     useEnterEditHandler(snapshotKey(rowId, fieldKey), enterEdit)

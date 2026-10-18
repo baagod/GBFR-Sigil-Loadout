@@ -23,7 +23,10 @@
 
     兄弟模块（按职责拆开，**别再堆回这个文件**）：
       · `actions-table/model.ts`      —— feature 登记、行/复制源的形状、列策略（`columnKind` / `writableColumn`）、纯取值助手；
-      · `actions-table/classes.ts`    —— 类名常量、选区与复制区的「哪几条边」；
+      · `actions-table/classes.ts`    —— 类名常量 + 复制虚线空档的垫底色口径（`cellUnderlayColor`）；
+      · `actions-table/selectionOverlay.ts` —— 选区纯几何（区间 → 矩形 / 轮廓 / 复制虚线；`geometryFromHeaderCells` 把实测宽度换成几何）；
+      · `actions-table/useSelectionOverlay.ts` —— 选区 overlay 的 React 连接（量表头实测宽度 / 表高行高、算模型、找 portal 宿主）；
+      · `actions-table/SelectionOverlayView.tsx` —— overlay 的两层渲染（滚动层 / 钉住层）；
       · `actions-table/selection.ts`  —— 选区的谓词（整行 / 单格）；
       · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
       · `actions-table/useReveal.ts`  —— 「跟随可视」的 DOM 那一层（查活动格 / 排一帧 / 那条"这次滚动是我发的"契约）；
@@ -325,7 +328,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * **每列多宽**（取整后的整数）与"量过了没有" —— 整趟测量（含历次真机的证据）在
      * `useColumnMeasure` 里：它是"DOM 测量 + 三个自洽 state"，与表的交互逻辑一刀两断。
      */
-    const {columnSizing, measured} = useColumnMeasure(tableRef, keys, rows, fixedWidths)
+    const {columnSizing, measured, layoutTick} = useColumnMeasure(tableRef, keys, rows, fixedWidths)
 
     /**
      * **"还没就位" = 这一份数据已作废，或者列宽还没量出来**：两种都要整块离屏 —— 面板那边同时顶着骨架。
@@ -383,7 +386,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
             粘完选中刚粘的那一片是用户明确要的（Excel 就是这个手感）。
 
             代价：真·换一份数据（父组件换角色）时选区会指向不存在的行 —— 但那条路是**整表重新挂载**
-            （`key={charCode}`，见 `ActionsPanel`），根本不会有旧选区留下来。理论上的另一种情况
+            （`key={dataVersion}`，见 `ActionsPanel`），根本不会有旧选区留下来。理论上的另一种情况
             （数据原地换掉而表没重挂）库对"角落解析不了"的选区是**跳过**（`getCellSelectionBounds`
             略掉解析不出的范围，不是崩），也可以接受。
         */
@@ -573,6 +576,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         measured,
         rows: modelRows,
         sheetColumns,
+        columnSizing,
+        layoutTick,
         pinnedColumnCount: pinning.start.length,
         selectionBounds,
         activeCellKey,
@@ -826,9 +831,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     （`hidden = loading || !measured`），整块外壳已经被挪到屏幕外 —— 表格隐不隐身无关紧要，
                     写上就是一条永远单独生效不了的冗余分支。
                 */
-                /* ‼️ `min-w-full` 是**铺满**容器的那一句（窄表不铺满时右侧留白很难看）。
-                   overlay 的列几何从**渲染后的表头实测宽度**取（见 `useSelectionOverlay`），
-                   所以这里让浏览器怎么摊宽都不会画错 —— 别再按 `columnSizing` 反推几何。 */
+                /* ‼️ `min-w-full` 是铺满容器那句；测量期必须临时放开 `min-width`，否则离屏外壳会把
+                   自然宽量成拉伸宽（理由与实测见 `useColumnMeasure` 的释放段）。overlay 列几何从渲染后的
+                   表头实测宽度取，摊宽不影响选区。 */
                 className={`${measured ? "table-fixed " : ""}min-w-full border-separate border-spacing-0 table-border [&_tr>*:last-child]:border-r-0`}
                 style={measured ? {width: table.getTotalSize() + rowHeadWidth} : undefined}
             >

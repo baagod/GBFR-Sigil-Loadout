@@ -174,7 +174,7 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(cell.textContent).toBe("actionFreeWork0_-原值")
     })
 
-    it("Esc 之后还能再点开（skipFocus 那个开关不许卡住）", async () => {
+    it("Esc 之后还能再点开（Esc 只放弃这一次，不是让这一格永久失效）", async () => {
         const container = await renderTable()
         const cell = cellAt(container, 0, 2)
 

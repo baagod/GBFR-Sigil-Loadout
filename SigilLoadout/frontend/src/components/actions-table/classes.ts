@@ -31,7 +31,12 @@ export const cellUnderlayColor = (readonlyTint: boolean, removed: boolean, selec
  */
 export const HANDLE_SELECTED_BG = "cell-row-selected"
 
-/** 默认钉住前几列。用**序号**不用字段名：字段名是数据给的，写死就等于把"有哪些列"抄了一份。 */
+/**
+ * 默认钉住前几列。用**序号**不用字段名：字段名是数据给的，写死就等于把"有哪些列"抄了一份。
+ *
+ * ‼️ 钉住列的 `left` 按 `columnSizing` 算，而铺满（`min-w-full`）会把窄表的列按比例拉宽 ——
+ * 两者互斥：**可被拉伸的表不许 pin 列**（当前 pin 只用在 87 列的动作大表上，它永远比容器宽）。
+ */
 export const PINNED_COUNT = 2
 
 /**

@@ -20,7 +20,6 @@ export function TableSkeleton() {
     return (
         <div
             aria-hidden
-            data-table-skeleton=""
             className="pointer-events-none grid auto-rows-min gap-5 p-2"
             style={{gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))`}}
         >

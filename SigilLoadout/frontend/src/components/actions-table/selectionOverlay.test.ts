@@ -197,8 +197,8 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
 
 describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
     /*
-        ‼️ 窄表被 `min-w-full` 拉伸后，列宽不等于 `columnSizing`（实测：60px 的列会变成 170px+），
-        几何只能从表头实测宽度来。这条用例就是那个拉伸场景：行号 40→85、握把 32→69、5 列 80→170。
+        ‼️ 窄表被铺满拉伸后，列宽不等于 `columnSizing`（真实实测：440px 的 5 列表在 1007px 容器里
+        变成 40→93、80→183），几何只能从表头实测宽度来。下面用示意值（行号 85 / 握把 69 / 5 列 170）。
     */
     it("窄表拉伸：列左缘/列宽跟着渲染后的实测宽度走（不是 columnSizing）", () => {
         const result = geometryFromHeaderCells({
@@ -217,11 +217,10 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
             pinnedColumnCount: 2,
             rowCount: 3,
         })!
-        expect(result.geometry.columnWidths).toEqual([170, 170, 170, 170, 170])
-        expect(result.geometry.columnLefts).toEqual([154, 324, 494, 664, 834]) // 85+69 起算
-        expect(result.geometry.gripWidth).toBe(69) // 选区左缘要包住握把
-        expect(result.geometry.pinnedColumnCount).toBe(2)
-        expect(result.width).toBe(1004) // 85+69+5×170
+        expect(result.columnWidths).toEqual([170, 170, 170, 170, 170])
+        expect(result.columnLefts).toEqual([154, 324, 494, 664, 834]) // 85+69 起算
+        expect(result.gripWidth).toBe(69) // 选区左缘要包住握把
+        expect(result.pinnedColumnCount).toBe(2)
     })
 
     it("没有握把列：gripWidth = 0；只有行号列时列左缘从行号宽起算", () => {
@@ -237,12 +236,11 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
             pinnedColumnCount: 0,
             rowCount: 1,
         })!
-        expect(result.geometry.gripWidth).toBe(0)
-        expect(result.geometry.columnLefts).toEqual([40, 120])
-        expect(result.width).toBe(180)
+        expect(result.gripWidth).toBe(0)
+        expect(result.columnLefts).toEqual([40, 120])
     })
 
-    it("还没量到（宽度 0 / 表头高 0）→ null，overlay 不渲染", () => {
+    it("还没量到（行头宽 0 / 表头高 0）→ null，overlay 不渲染", () => {
         const cells = [{id: null, width: 0}, {id: "a", width: 0}]
         expect(
             geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 0, rowHeight: 27, pinnedColumnCount: 0, rowCount: 1}),

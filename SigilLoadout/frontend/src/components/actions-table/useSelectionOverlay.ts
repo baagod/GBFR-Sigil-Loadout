@@ -26,6 +26,8 @@ export function useSelectionOverlay({
     measured,
     rows,
     sheetColumns,
+    columnSizing,
+    layoutTick,
     pinnedColumnCount,
     selectionBounds,
     activeCellKey,
@@ -36,6 +38,13 @@ export function useSelectionOverlay({
     measured: boolean
     rows: readonly RowLike[]
     sheetColumns: string[]
+    /**
+     * 只作**失效信号**（不参与几何）：列宽重测（字体就绪 / 某列被截断）后 `min-w-full` 会让表宽
+     * 恒等于容器宽、`ResizeObserver` 不响 —— 没有它 overlay 会继续按旧列宽画。
+     */
+    columnSizing: Record<string, number>
+    /** 布局变了（容器/表尺寸）；列宽变了看 `columnSizing`，两者都由 `useColumnMeasure` 提供。 */
+    layoutTick: number
     pinnedColumnCount: number
     selectionBounds: Bounds[]
     activeCellKey: string
@@ -44,7 +53,7 @@ export function useSelectionOverlay({
     host: HTMLDivElement | null
     model: OverlayModel | null
     height: number
-    /** 表格实际渲染宽度（`min-w-full` 拉伸后的宽度）—— overlay 两层都按它铺。 */
+    /** 表格实际渲染宽度（被 `min-w-full` 铺满拉伸后的宽度）—— overlay 两层都按它铺。 */
     width: number
     /** 复制源区间（测试投影用；渲染由 model 走）。 */
     copyAreas: Bounds[]
@@ -94,12 +103,7 @@ export function useSelectionOverlay({
             )
         }
         read()
-        /* 窗口缩放 / 滚动条出现都会改表宽（`min-w-full` 按容器宽拉伸）→ 重新量，overlay 跟着走。 */
-        if (typeof ResizeObserver === "undefined") return
-        const observer = new ResizeObserver(read)
-        observer.observe(tableEl)
-        return () => observer.disconnect()
-    }, [measured, tableRef, rows.length])
+    }, [measured, tableRef, rows.length, columnSizing, layoutTick])
 
     /** 活动格下标（锚点格）：overlay 用它把底色挖掉。 */
     const activeCellIndexes = useMemo<ActiveCellIndexes | null>(() => {
@@ -111,7 +115,7 @@ export function useSelectionOverlay({
     }, [activeCellKey, rows, sheetColumns])
 
     /** 渲染实测 → 几何：`columnSizing` 是拉伸前的值，不能拿来画 overlay。 */
-    const measuredGeometry = useMemo(
+    const geometry = useMemo(
         () =>
             geometryFromHeaderCells({
                 cells: metrics.cells,
@@ -123,7 +127,10 @@ export function useSelectionOverlay({
             }),
         [metrics, sheetColumns, pinnedColumnCount, rows.length],
     )
-    const geometry = measuredGeometry?.geometry ?? null
+    /* 层的宽度要同时盖住"表实际宽"和"列宽累计右缘"：`offsetWidth` 逐格取整，累计会多出 1~2px
+       （headless 实测：40→93 / 80×5→183 那组，th 之和 1008 vs 表 1007），用 tableWidth 会把这 1px
+       裁掉（`overflow-hidden`）。 */
+    const contentRight = geometry && geometry.columnLefts.length > 0 ? geometry.columnLefts[geometry.columnLefts.length - 1]! + geometry.columnWidths[geometry.columnWidths.length - 1]! : 0
 
     /** 复制源 → 显示顺序的区间（copySource 记的是 id，不是下标）。 */
     const copyAreas = useMemo(
@@ -164,7 +171,7 @@ export function useSelectionOverlay({
         host,
         model,
         height: geometry ? geometry.headerHeight + rows.length * geometry.rowHeight : 0,
-        width: metrics.tableWidth || measuredGeometry?.width || 0,
+        width: Math.max(metrics.tableWidth, contentRight),
         copyAreas,
     }
 }

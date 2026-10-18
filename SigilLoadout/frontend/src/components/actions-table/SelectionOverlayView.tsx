@@ -94,7 +94,6 @@ export function SelectionOverlay({
     return createPortal(
         <>
             <div
-                data-selection-overlay="scrolled"
                 className="pointer-events-none absolute top-0 left-0 z-[41] overflow-hidden"
                 style={{width: `${width}px`, height: `${height}px`}}
                 aria-hidden
@@ -107,7 +106,6 @@ export function SelectionOverlay({
                 内层宽高为 0，矩形用 `absolute` 按内容坐标画在它上面。
             */}
             <div
-                data-selection-overlay="pinned"
                 className="pointer-events-none absolute top-0 left-0 z-[52]"
                 style={{width: `${width}px`, height: 0}}
                 aria-hidden

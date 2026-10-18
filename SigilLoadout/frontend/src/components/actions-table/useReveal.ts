@@ -47,8 +47,8 @@ export function useReveal(scrollRef: RefObject<HTMLDivElement | null>) {
         if (!box) return
         /*
             ‼️ **同一帧里重复喊只滚一次**（幂等做在这里而不是各个调用点）：
-            一次点击会先后走 `onFocus` 与 `onClick` 两条进编辑的路，两边都会喊 —— 不去重就滚两趟。
-            判据是"已经为**这一格**排了一帧"：活动格换了人就不算重复（那一格确实需要重新摆）。
+            一次点击可能先后走"活动格的 ref 回调"与 `enterEdit` 里的 `reveal()` 两条来路，两边都会喊
+            —— 不去重就滚两趟。判据是"已经为**这一格**排了一帧"：活动格换了人就不算重复（那一格确实需要重新摆）。
         */
         const cell = box.querySelector<HTMLElement>("tbody td.cell-active")
         if (!cell || revealPendingRef.current === cell) return

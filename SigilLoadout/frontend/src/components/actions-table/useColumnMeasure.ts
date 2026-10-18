@@ -150,8 +150,16 @@ export function useColumnMeasure(
 
         const prevWidth = el.style.width
         const prevLayout = el.style.tableLayout
+        /*
+            ‼️ **`min-width` 也必须一起放开**：表上有 `min-w-full`（铺满容器的那一句），而测量发生在
+            离屏外壳（`width:1200px`）里 —— `min-width:100%` 会压过 `width:max-content`，量到的就成了
+            被拉伸后的列宽（真机：5 列窄表量出 ~1200，写进 sizing 后弹层横向溢出）。
+            重测发生在 `measured=true` 之后、`min-w-full` 仍生效，所以必须 imperative 清 inline 值。
+        */
+        const prevMinWidth = el.style.minWidth
         el.style.width = "max-content"
         el.style.tableLayout = "auto"
+        el.style.minWidth = "0px"
         const ths = [...el.querySelectorAll<HTMLElement>("thead th[data-col-id]")]
         /*
             ‼️ **还要先把每一列上一次写下的宽度清掉**。
@@ -321,6 +329,7 @@ export function useColumnMeasure(
         })
         el.style.width = prevWidth
         el.style.tableLayout = prevLayout
+        el.style.minWidth = prevMinWidth
 
         /*
             ‼️ **量到"稳定"为止**（连着两趟结果一样才收手）—— 不猜弹窗动画有多长。
@@ -422,8 +431,9 @@ export function useColumnMeasure(
     }, [])
 
     /*
-        ⚠️ 只交回"量出来的宽度"与"量过了没有"：**没有 setter**。列宽不归调用方改 —— 基座没注册
+        ⚠️ 只交回"量出来的宽度"、"量过了没有"与"布局变了"（`layoutTick`，给选区 overlay 当重读信号）：
+        **没有 setter**。列宽不归调用方改 —— 基座没注册
         `columnResizingFeature`（用户拖不了列宽），写它的只有上面那一趟测量。
     */
-    return {columnSizing, measured}
+    return {columnSizing, measured, layoutTick: shownTick}
 }

@@ -245,8 +245,9 @@ export function handleAt(container: HTMLElement, row: number) {
  *
  * ⚠️ 装完自己收：调用方 `vi.restoreAllMocks()`（通常写在 `finally` 里）—— 别把桩漏给下一个用例。
  */
-export function stubColumnGeometry() {
+export function stubColumnGeometry(onRect?: (el: HTMLElement) => void) {
     return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+        onRect?.(this)
         if (this.tagName === "TABLE") return {width: 900, height: 300} as DOMRect
         if (this.tagName === "TH") return {width: 77.4, height: 24} as DOMRect
         return {width: 0, height: 0} as DOMRect
