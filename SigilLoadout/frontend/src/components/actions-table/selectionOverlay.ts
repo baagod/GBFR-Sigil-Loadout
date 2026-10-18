@@ -175,12 +175,19 @@ export function buildOverlay(input: {
         const hideRight = b.minColumnIndex === 0 && b.maxColumnIndex === lastColumnIndex
         for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
             let r = rect
-            // 可拖行序的表：选区包含第一列时，轮廓向左包住握把（填充不包）。
-            if (geo.gripWidth > 0 && b.minColumnIndex === 0 && r.left === geo.columnLefts[0]) {
-                r = {...r, left: r.left - geo.gripWidth, width: r.width + geo.gripWidth}
-            }
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
+            // 可拖行序的表：选区包含第一列时，轮廓向左包住握把（填充不包）。
+            if (geo.gripWidth > 0 && b.minColumnIndex === 0 && r.left === geo.columnLefts[0]) {
+                const gripRect: Rect = {left: r.left - geo.gripWidth, top: r.top, width: geo.gripWidth, height: r.height}
+                r = {...r, left: gripRect.left, width: r.width + geo.gripWidth}
+                /*
+                    握把格是 `cell-pinned`（z-50），比 overlay 滚动层（z-41）高 —— 滚动层画到握把上的边框会被
+                    握把格的不透明底色盖住（真机：拖动列没有边框）。旧实现把轮廓画在握把 td 自己身上，所以可见；
+                    现在把**握把这一小段**画进钉住层（z-52、sticky 跟随，与握把同为固定列）。
+                */
+                model.pinned.ring.push(...ringLines(gripRect, {top: true, right: false, bottom: true, left: true}, RING_WIDTH, false, clampBottom))
+            }
             ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(r, edges, RING_WIDTH, clampRight, clampBottom))
         }
     }

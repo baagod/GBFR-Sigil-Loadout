@@ -92,6 +92,22 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(left.left).toBe(38) // 72 - 32 - 2
     })
 
+    it("不钉数据列（轨表）：握把那段轮廓画在钉住层，才压得住 cell-pinned 的握把格", () => {
+        const g = geo({gripWidth: 32, pinnedColumnCount: 0, columnLefts: [72, 112, 172, 232]})
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 1}],
+            geo: g,
+            activeCell: null,
+            copyAreas: [],
+        })
+        // 握把 (40..72) 的 左+上+下 在钉住层；右边缘不画（与数据列相邻的边界归数据列）
+        expect(model.pinned.ring).toHaveLength(3)
+        expect(model.pinned.ring.filter((r) => r.height > r.width)).toEqual([{left: 38, top: 39, width: 3, height: 30}])
+        expect(model.pinned.ring.filter((r) => r.width > r.height).map((r) => r.top)).toEqual([39, 66])
+        // 滚动层那圈仍从数据列左缘开始（握把段只是叠在钉住层）
+        expect(model.scrolled.ring.some((r) => r.width === 3 && r.left === 38)).toBe(true)
+    })
+
     it("整行选区（0..最后一列）：右边缘不画（末列没有格线）", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 1, minColumnIndex: 0, maxColumnIndex: 3}],
