@@ -106,4 +106,18 @@ describe("动作表 · 就位与骨架的契约", () => {
             vi.restoreAllMocks()
         }
     })
+
+    /* ‼️ 这张表在别的 Tab 里也**常挂载**（`App.tsx` 的 keepMounted）：切走后 `<table>` 的 rect 恒为
+       0×0，测量那段**不许自续帧**，否则"等下一帧再看"就是每帧 setState + 整表重渲的死循环 ——
+       切到其他页持续吃满一个核（用户报的性能问题）。判据：隐藏着放 200ms，rAF 次数为常数级；
+       可见时由 ResizeObserver 叫醒这件事由上面几条用例覆盖。 */
+    it("隐藏（rect 0×0）时不自续帧空转", async () => {
+        const raf = vi.spyOn(window, "requestAnimationFrame")
+        const {unmount} = render(<ActionsTable t={t} {...fewColumns()} />)
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        const calls = raf.mock.calls.length
+        unmount()
+        raf.mockRestore()
+        expect(calls).toBeLessThan(10)
+    })
 })

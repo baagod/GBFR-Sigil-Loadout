@@ -106,10 +106,13 @@ export function useColumnMeasure(
             隐藏时 `<table>` 的 rect 是 0×0，显示出来才有宽高，这个判据干净且足够。
         */
         const rect = el.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) {
-            // 还没显示：等下一帧再看。
-            return remeasureNextFrame()
-        }
+        /*
+            ‼️ 看不见就**直接收手**，绝不"下一帧再看"：这张表在别的 Tab 里是常挂载的（App.tsx 里
+            `keepMounted`），切走后 `<table>` 的 rect 恒为 0×0 —— 自续 rAF 会把"等下一帧"变成
+            **每帧 setState + 整表重渲染**的死循环，切到其他页就持续吃满一个核（用户报的性能问题）。
+            显示回来的那一趟不用这里等：下面 ResizeObserver 那段盯着外壳与表格的尺寸，尺寸一变就叫醒。
+        */
+        if (rect.width === 0 || rect.height === 0) return
         /*
             ‼️ **只有"真有格子被截断"才值得跑这一整趟**：整趟要放开布局、量 87 列、再写回并锁上 ——
             真机实测约 100ms，而**每次提交**都会带着一份新的 `rows` 走进来（改一格 / 粘贴 / 撤销 /
