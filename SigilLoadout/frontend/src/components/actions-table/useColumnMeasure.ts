@@ -64,6 +64,8 @@ export function useColumnMeasure(
     data: unknown,
     /** 调用方钉死宽度的列（ColumnSpec.width）：测量跳过它们，直接照这个数写进 sizing。 */
     fixedWidths: Record<string, number>,
+    /** 列宽之外还会影响文字宽度的东西（界面语言 `t`）：引用变了就得重量。 */
+    signature: unknown,
 ) {
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
     /** 量过了没有 —— 没量之前用 `table-auto`（要量出**自然宽度**），量完切 `table-fixed`。 */
@@ -83,6 +85,18 @@ export function useColumnMeasure(
     const lastKeys = useRef("")
     /** 补量次数（上限，防打转）。 */
     const extraPasses = useRef(0)
+    /** `measured` 的镜像：ResizeObserver 的 effect 只挂一次，闭包里读不到最新的 state。 */
+    const measuredRef = useRef(false)
+    /** 上一次量完时用的**数据引用**：同一个引用 + 同一份 keys + 同一份签名 = 内容没变，切页回来不必重量。 */
+    const lastData = useRef<unknown>(undefined)
+    /** 上一次量完时的签名（界面语言等会影响文字宽度的东西）。 */
+    const lastSignature = useRef<unknown>(undefined)
+    /** 强制重量：字体就绪。 */
+    const needsRemeasure = useRef(true)
+    /** 上一次量完时外壳的布局宽：显示回来时拿它分辨"没变"与"隐藏期间窗口被缩放过"。 */
+    const lastMeasuredBoxWidth = useRef(0)
+    /** 藏在别的页时依赖变过（数据/列/语言）：显示回来那一趟必须补量，别把那一趟当"切页来回"省掉。 */
+    const pendingMeasure = useRef(false)
 
     useLayoutEffect(() => {
         /*
@@ -110,7 +124,11 @@ export function useColumnMeasure(
         ‼️ 看不见就**直接收手**：动作页常挂载（App.tsx 的 keepMounted），切走后 rect 恒为 0×0 ——
         "下一帧再看"会变成每帧 setState + 整表重渲的死循环。显示回来由下面 ResizeObserver 那段叫醒。
         */
-        if (rect.width === 0 || rect.height === 0) return
+        if (rect.width === 0 || rect.height === 0) {
+            /* 藏在别的页时依赖变了（数据/列/语言）：记账，显示回来补量。 */
+            pendingMeasure.current = true
+            return
+        }
         /*
         ‼️ **只有"真有格子被截断"才值得跑这一整趟**：整趟要放开布局、量 87 列、再写回并锁上 ——
         真机实测约 100ms，而**每次提交**都会带着一份新的 `rows` 走进来（改一格 / 粘贴 / 撤销 /
@@ -125,7 +143,25 @@ export function useColumnMeasure(
           · 调用方**钉死宽度**的列（`fixedWidths`，如轨表的「效果」列）截断是它自己的设计，不算数。
         */
         const keyPrint = keys.join("\u0000")
-        if (measured && lastKeys.current === keyPrint && !clippedColumn(el, fixedWidths)) return
+        /*
+        ‼️ 切页回来（隐藏↔显示）**不该重量**：内容没变、容器宽也由下面 ResizeObserver 那道
+        "变成 0 不收"的闸挡住，重量只会白付一趟强制布局。只有四种情况放行：
+          · 没量过（首帧）或 needsRemeasure（字体就绪）；
+          · 列清单变了（换轨/换列）；
+          · 签名变了（界面语言换了，表头文字宽度可能变）；
+          · 数据引用变了且**真有格子被截断**（改一格/粘贴/撤销，见下）。
+        */
+        if (!needsRemeasure.current && lastKeys.current === keyPrint && lastSignature.current === signature) {
+            if (lastData.current === data) {
+                pendingMeasure.current = false
+                return
+            }
+            if (!clippedColumn(el, fixedWidths)) {
+                lastData.current = data
+                pendingMeasure.current = false
+                return
+            }
+        }
         lastKeys.current = keyPrint
         /*
         ‼️ 量之前把表**放开成"按内容自然排"**：`width: max-content` + `table-layout: auto`。
@@ -148,6 +184,11 @@ export function useColumnMeasure(
         （`natural` 用除法而不是直接取 `offsetWidth`：后者是整数，会丢亚像素、少 1px。）
         */
         const layoutScale = el.offsetWidth > 0 ? el.getBoundingClientRect().width / el.offsetWidth : 1
+        /*
+        ⚠️ `offsetWidth` 是**整数**、rect 是小数，两者相除通常差个千分之几 —— 1 的判断必须带容差，
+        否则"没有动画"的顶层表也会被当成缩放过、白跑满 20 趟补量（真机：切到「角色动作」2.3s）。
+        */
+        const isScaled = Math.abs(layoutScale - 1) > 0.005
 
         const prevWidth = el.style.width
         const prevLayout = el.style.tableLayout
@@ -171,16 +212,22 @@ export function useColumnMeasure(
         动作表从没踩到，是因为它的宽度从来不需要变。清了才是"按内容重排"，两张表同一条路。
         React 会在下次渲染时按 `columnSizing` 重新写回宽度，所以清掉是安全的。
         */
-        const prevColWidths = ths.map((th) => th.style.width)
-        for (const th of ths) th.style.width = ""
-        /*
-        ‼️ **表体那些格的宽度也要清**：`<td>` 上的显式宽度同样压着列（`auto` 布局把它当"这一格要这么宽"），
-        只清表头就是**重测读到上一次写下的值** —— 真机：`layerFlag` 实际需要 96 却只量到 93、
-        `startTime` needed 74 却只量到 71，末尾那个字符被 `truncate` 吃掉（`4294967295` 少一位）。
-        清掉之后**不手动恢复**：React 下次渲染会按新的 `columnSizing` 写上（`RowCell` 的 style）；
-        万一 sizes 与现状相同（下面 bail out、不重渲），列宽仍由表头那份宽度说话，视觉一样。
-        */
-        for (const td of el.querySelectorAll<HTMLElement>("tbody td[data-col-id]")) td.style.width = ""
+        /* 首帧（还没量过）没有任何"我们写进去的宽度"要清：1.2 万次 style 写全省。 */
+        const prevColWidths: string[] = []
+        if (measured) {
+            for (const th of ths) {
+                prevColWidths.push(th.style.width)
+                th.style.width = ""
+            }
+            /*
+            ‼️ **表体那些格的宽度也要清**：`<td>` 上的显式宽度同样压着列（`auto` 布局把它当"这一格要这么宽"），
+            只清表头就是**重测读到上一次写下的值** —— 真机：`layerFlag` 实际需要 96 却只量到 93、
+            `startTime` needed 74 却只量到 71，末尾那个字符被 `truncate` 吃掉（`4294967295` 少一位）。
+            清掉之后**不手动恢复**：React 下次渲染会按新的 `columnSizing` 写上（`RowCell` 的 style）；
+            万一 sizes 与现状相同（下面 bail out、不重渲），列宽仍由表头那份宽度说话，视觉一样。
+            */
+            for (const td of el.querySelectorAll<HTMLElement>("tbody td[data-col-id]")) td.style.width = ""
+        }
         /*
         ‼️ 另备一把**尺子**：把表头文字放进一个离屏 `<span>` 里独立量它的真实宽度。
 
@@ -325,9 +372,11 @@ export function useColumnMeasure(
         ruler.remove()
 
         /* 清掉的那些宽度原样写回：DOM 不留中间态（React 下次渲染本来也会写回，但别指望它）。 */
-        ths.forEach((th, i) => {
-            th.style.width = prevColWidths[i] ?? ""
-        })
+        if (measured) {
+            ths.forEach((th, i) => {
+                th.style.width = prevColWidths[i] ?? ""
+            })
+        }
         el.style.width = prevWidth
         el.style.tableLayout = prevLayout
         el.style.minWidth = prevMinWidth
@@ -351,7 +400,12 @@ export function useColumnMeasure(
         const fingerprint = `${el.offsetWidth}:${keys.map((k) => sizes[k]).join(",")}`
         if (fingerprint !== lastSizes.current) {
             lastSizes.current = fingerprint
-            if (extraPasses.current < 20) {
+            /*
+            ⚠️ 补量只给"量的时候正被 transform 缩放"的表（弹窗展开动画，`layoutScale !== 1`）：
+            那是宽度会随动画收尾变化的唯一场景。顶层那张动作表 scale 恒为 1，一趟就是终值 ——
+            再补 5 趟只是把 12,144 个格子的强制布局重复 5 遍（真机：切到「角色动作」要 2.3s）。
+            */
+            if (isScaled && extraPasses.current < 20) {
                 extraPasses.current += 1
                 return remeasureNextFrame()
             }
@@ -363,10 +417,17 @@ export function useColumnMeasure(
         */
         /* 两趟一致：这一份尺寸就是定稿。落定之前表格一直 invisible，所以用户看不到中间那几帧。 */
         extraPasses.current = 0
+        /* 这一份尺寸定稿了：记下数据/列清单/外壳宽，切页回来与字体回调都靠它们判断要不要再量。 */
+        needsRemeasure.current = false
+        lastData.current = data
+        lastSignature.current = signature
+        lastMeasuredBoxWidth.current = el.parentElement?.clientWidth ?? 0
+        measuredRef.current = true
+        pendingMeasure.current = false
         /* 量出来与现在一模一样就别换（`rows` 一变就重量，编辑一格不该跟着重渲一遍）。 */
         setColumnSizing((prev) => (sameWidth(prev, sizes) ? prev : sizes))
         setMeasured(true)
-    }, [tableRef, keys, data, fixedWidths, shownTick])
+    }, [tableRef, keys, data, fixedWidths, signature, shownTick])
 
     /*
     ‼️ **滚动容器的尺寸一变就重量** —— 比"猜一个延迟"本质。
@@ -384,27 +445,34 @@ export function useColumnMeasure(
     useEffect(() => {
         const box = tableRef.current?.parentElement
         if (!box || typeof ResizeObserver === "undefined") return
-        let lastWidth = box.clientWidth
-        /*
-        ‼️ **也盯表格自己的布局宽**：弹窗展开动画是 `transform`，滚动容器的 `clientWidth` 期间一直不变，
-        但**表格自身的布局宽会变**（实测 1066 → 1122，数据与字体到位后才定）—— 那才是"能不能量准"的信号。
-        "连续两帧列宽相同"会被骗过：布局停在 1066 那段时间里连测两帧都是 73，于是提前落定、用户看到 73 → 74。
-        写列宽会反过来改表格宽，所以同样加一道"宽度真的变了"的闸断掉回环。
-        */
+        let lastBoxWidth = box.clientWidth
         const table = tableRef.current
         let lastTableWidth = table?.offsetWidth ?? 0
+        /*
+        ‼️ 尺寸变化只在**需要的时候**叫醒测量；**变成 0（切到别的页）绝不能 setState** —— 动作页
+        常挂载，那会叫醒整张 12,144 格的表重渲一遍。量过之后容器宽度变化也**不重量**：列宽是
+        "内容自然宽"、与容器宽无关，只需重算 overlay 几何（layoutTick）。
+        */
+        const wake = () => requestAnimationFrame(() => setShownTick((v) => v + 1))
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 if (entry.target === table) {
-                    const width = (entry.target as HTMLElement).offsetWidth
-                    if (width !== lastTableWidth) {
-                        lastTableWidth = width
-                        setShownTick((v) => v + 1)
-                    }
-                } else if (box.clientWidth !== lastWidth) {
-                    lastWidth = box.clientWidth
-                    setShownTick((v) => v + 1)
+                    const width = table!.offsetWidth
+                    if (width === lastTableWidth) continue
+                    lastTableWidth = width
+                    if (width === 0) continue
+                    /* 量过之后表宽的变化是我们自己写宽度引起的（回环），只剩"首次测量期间布局收尾"要叫醒。 */
+                    if (!measuredRef.current) wake()
+                    continue
                 }
+                const width = box.clientWidth
+                if (width === lastBoxWidth) continue
+                const previous = lastBoxWidth
+                lastBoxWidth = width
+                if (width === 0) continue
+                /* 显示回来、宽度没变、也没有"藏在别的页时改过东西"：切页来回，连 setState 都不发。 */
+                if (previous === 0 && measuredRef.current && width === lastMeasuredBoxWidth.current && !pendingMeasure.current) continue
+                wake()
             }
         })
         observer.observe(box)
@@ -412,6 +480,16 @@ export function useColumnMeasure(
         return () => observer.disconnect()
     }, [tableRef])
 
+
+    /*
+    量完之后外壳会从"离屏外壳（1200px）"切回正常宽度：把**渲染后**那一份宽记下来，
+    切页回来时才不会把它误判成"隐藏期间窗口被缩放过"、白叫醒一趟 overlay 重算。
+    */
+    useEffect(() => {
+        if (!measured) return
+        const width = tableRef.current?.parentElement?.clientWidth ?? 0
+        if (width > 0) lastMeasuredBoxWidth.current = width
+    }, [measured, columnSizing, shownTick, tableRef])
 
     /*
     ‼️ **字体加载完再量一次**。
@@ -424,7 +502,9 @@ export function useColumnMeasure(
     useEffect(() => {
         let alive = true
         void document.fonts?.ready.then(() => {
-            if (alive) setShownTick((v) => v + 1)
+            if (!alive) return
+            needsRemeasure.current = true
+            setShownTick((v) => v + 1)
         })
         return () => {
             alive = false

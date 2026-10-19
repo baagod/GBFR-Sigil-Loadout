@@ -328,7 +328,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * **每列多宽**（取整后的整数）与"量过了没有" —— 整趟测量（含历次真机的证据）在
      * `useColumnMeasure` 里：它是"DOM 测量 + 三个自洽 state"，与表的交互逻辑一刀两断。
      */
-    const {columnSizing, measured, layoutTick} = useColumnMeasure(tableRef, keys, rows, fixedWidths)
+    const {columnSizing, measured, layoutTick} = useColumnMeasure(tableRef, keys, rows, fixedWidths, t)
 
     /**
      * **"还没就位" = 这一份数据已作废，或者列宽还没量出来**：两种都要整块离屏 —— 面板那边同时顶着骨架。

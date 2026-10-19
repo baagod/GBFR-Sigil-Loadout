@@ -117,4 +117,26 @@ describe("动作表 · 就位与骨架的契约", () => {
         raf.mockRestore()
         expect(calls).toBeLessThan(10)
     })
+
+    /* ‼️ 列宽按**表头文字**量：换语言（`t` 引用变）必须重量，否则表头会被截成 `…`。
+       判据：测量那趟会建一把离屏 `<span>` 尺子 —— 同一份 `t` 重渲不建，换了 `t` 必须建。 */
+    it("t（界面语言）变了要重量，t 没变的重渲不重量", async () => {
+        stubColumnGeometry()
+        try {
+            const props = fewColumns()
+            const {container, rerender} = render(<ActionsTable t={t} {...props} />)
+            await waitFor(() => expect(table(container).className).toContain("table-fixed"))
+
+            const create = vi.spyOn(document, "createElement")
+            rerender(<ActionsTable t={t} {...props} />)
+            expect(create.mock.calls.some((call) => call[0] === "span")).toBe(false)
+
+            create.mockClear()
+            rerender(<ActionsTable t={{...t}} {...props} />)
+            await waitFor(() => expect(create.mock.calls.some((call) => call[0] === "span")).toBe(true))
+            create.mockRestore()
+        } finally {
+            vi.restoreAllMocks()
+        }
+    })
 })
