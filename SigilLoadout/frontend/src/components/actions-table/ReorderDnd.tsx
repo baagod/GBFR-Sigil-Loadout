@@ -41,11 +41,13 @@ export function ReorderDnd({reorder, rows, bound, children}: {
             collisionDetection={closestCenter}
             modifiers={modifiers}
             /*
-                ‼️ **关掉 dnd-kit 的 autoScroll**：拖拽行靠 modifier（`clampDragY`）夹在表格可视框里，
-                行本身不会撑大可滚动区域；但 autoScroll 还会去滚**外层的滚动容器**（弹窗内容区）——
+                ‼️ **关掉 dnd-kit 的 autoScroll**：位移由 `clampDragY` 夹在"表头下沿 ~ 视口底"之间，
+                行不会撑大可滚动区域；但 autoScroll 还会去滚**外层的滚动容器**（弹窗内容区）——
                 真机：按住握把往下拖到面板外，弹窗内容被滚下去（`scrollTop` 34→86）且松手不还原，
-                看起来就是"行能一直拖到下面/表格被推上去、上面一片空白"。夹取已经保证了落点在可视区内，
-                这里不需要任何自动滚动。
+                看起来就是"行能一直拖到下面/表格被推上去、上面一片空白"。
+
+                ⚠️ 取舍：跨屏拖排序（拖到当前看不见的位置）因此不支持 —— 轨表短，行始终留在视口里；
+                要支持长表跨屏，得让 autoScroll 只滚这个表自己的盒，而不是弹窗。
             */
             autoScroll={false}
             onDragEnd={({active, over}) => {

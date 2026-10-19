@@ -19,8 +19,14 @@ import type {Modifier} from "@dnd-kit/core"
  * 免得直接依赖它内部那个没在 `@dnd-kit/core` 导出的 `Transform`。
  *
  * 上边界取的是**表头下沿**、不是滚动盒顶：表头是吸顶的，夹到盒顶等于让这一行钻到表头底下去
- * （用户截图：行压在表头下沿、上半截被切掉）。下边界取**行区域底**（`tbody` 底）与滚动盒底的较小者：
- * 拖到滚动盒底会把这一行拖进底部那条横向滚动条的缝里（真机：行压在滚动条上 / 看着"拖到表下面去了"）。
+ * （用户截图：行压在表头下沿、上半截被切掉）。下边界取**视口底 / `tbody` 底 / 滚动盒底**三者的较小者：
+ *   · 拖到滚动盒底会把这一行拖进底部那条横向滚动条的缝里（真机：行压在滚动条上 / "拖到表下面去了"）；
+ *   · 轨表的容器**不限高**：表一长，滚动盒底就跑到窗口外，夹到盒底等于允许把行拖出屏幕
+ *     （落点看不见）。所以可见性边界按**视口**算。
+ *
+ * ⚠️ 跨屏拖排序（把行拖到当前看不见的位置）现在**不支持**：`autoScroll` 已关（见 `ReorderDnd`，
+ * 否则会滚外层弹窗、松手不还原）。这条夹取保证的是"行始终停在看得见的区域"。
+ *
  * 各留 1px 余量：rect 是浮点、浏览器判"溢出"却按布局盒算，贴到边那一下正好多出 1px 可滚动区域
  * （真机实测：夹到 250 时 324/**325**，滚动条照旧冒出来）。
  */
@@ -32,7 +38,8 @@ export function clampDragY(
     const view = box.getBoundingClientRect()
     const top = box.querySelector("thead")?.getBoundingClientRect().bottom ?? view.top
     const bodyBottom = box.querySelector("tbody")?.getBoundingClientRect().bottom ?? view.bottom
-    const maxY = Math.min(view.bottom, bodyBottom) - draggingNodeRect.bottom - 1
+    const bottom = Math.min(window.innerHeight, view.bottom, bodyBottom)
+    const maxY = bottom - draggingNodeRect.bottom - 1
     const minY = top - draggingNodeRect.top + 1
     return {...transform, y: Math.min(Math.max(transform.y, minY), maxY)}
 }
