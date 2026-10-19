@@ -7,7 +7,6 @@ const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
     columnWidths: [40, 60, 60, 60],
     headerHeight: 41,
     rowHeight: 27,
-    gripWidth: 0,
     pinnedColumnCount: 2,
     rowCount: 100,
     columnCount: 4,
@@ -78,34 +77,6 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             {left: 198, top: 65, width: 62, height: 3},
             {left: 257, top: 39, width: 3, height: 29},
         ])
-    })
-
-    it("可拖行序：选区包含第一列时轮廓向左包住握把", () => {
-        const g = geo({gripWidth: 32, columnLefts: [72, 112, 172, 232]})
-        const model = buildOverlay({
-            bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 0}],
-            geo: g,
-            activeCell: null,
-            copyAreas: [],
-        })
-        const left = model.pinned.ring.find((l) => l.width === 3 && l.height > 3)!
-        expect(left.left).toBe(38) // 72 - 32 - 2
-    })
-
-    it("不钉数据列（轨表）：握把那段轮廓画在钉住层，才压得住 cell-pinned 的握把格", () => {
-        const g = geo({gripWidth: 32, pinnedColumnCount: 0, columnLefts: [72, 112, 172, 232]})
-        const model = buildOverlay({
-            bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 1}],
-            geo: g,
-            activeCell: null,
-            copyAreas: [],
-        })
-        // 握把 (40..72) 的 左+上+下 在钉住层；右边缘不画（与数据列相邻的边界归数据列）
-        expect(model.pinned.ring).toHaveLength(3)
-        expect(model.pinned.ring.filter((r) => r.height > r.width)).toEqual([{left: 38, top: 39, width: 3, height: 30}])
-        expect(model.pinned.ring.filter((r) => r.width > r.height).map((r) => r.top)).toEqual([39, 66])
-        // 滚动层那圈仍从数据列左缘开始（握把段只是叠在钉住层）
-        expect(model.scrolled.ring.some((r) => r.width === 3 && r.left === 38)).toBe(true)
     })
 
     it("整行选区（0..最后一列）：右边缘不画（末列没有格线）", () => {
@@ -218,28 +189,10 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
         })!
         expect(result.columnWidths).toEqual([170, 170, 170, 170, 170])
         expect(result.columnLefts).toEqual([154, 324, 494, 664, 834]) // 85+69 起算
-        expect(result.gripWidth).toBe(69) // 选区左缘要包住握把
         expect(result.pinnedColumnCount).toBe(2)
     })
 
-    it("角色由 data-head 决定，不靠 DOM 顺序：握把放在行号列前面也算对", () => {
-        const result = geometryFromHeaderCells({
-            cells: [
-                {kind: "grip", id: null, width: 32},
-                {kind: "handle", id: null, width: 40},
-                {kind: "column", id: "a", width: 80},
-            ],
-            sheetColumns: ["a"],
-            headerHeight: 41,
-            rowHeight: 27,
-            pinnedColumnCount: 0,
-            rowCount: 1,
-        })!
-        expect(result.gripWidth).toBe(32)
-        expect(result.columnLefts).toEqual([72])
-    })
-
-    it("没有握把列：gripWidth = 0；只有行号列时列左缘从行号宽起算", () => {
+    it("只有行号列时列左缘从行号宽起算", () => {
         const result = geometryFromHeaderCells({
             cells: [
                 {kind: "handle", id: null, width: 40},
@@ -252,7 +205,6 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
             pinnedColumnCount: 0,
             rowCount: 1,
         })!
-        expect(result.gripWidth).toBe(0)
         expect(result.columnLefts).toEqual([40, 120])
     })
 

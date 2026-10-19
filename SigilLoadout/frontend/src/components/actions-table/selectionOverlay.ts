@@ -34,8 +34,6 @@ export type GeometryInput = {
     headerHeight: number
     /** 行高。 */
     rowHeight: number
-    /** 握把列宽（0 = 不能拖行序；选区包含第一列时轮廓向左包住它）。 */
-    gripWidth: number
     /** 钉住列个数（显示顺序最前面的几列）。 */
     pinnedColumnCount: number
     rowCount: number
@@ -45,7 +43,11 @@ export type GeometryInput = {
 export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
 export type OverlayModel = {scrolled: LayerModel; pinned: LayerModel}
 
-/** 表头一格的实测宽度；角色由 `data-head` 给（数据列另有 `data-col-id`）。 */
+/**
+ * 表头一格的实测宽度；角色由 `data-head` 给（数据列另有 `data-col-id`）。
+ *
+ * `grip` 与 `handle` 一样是**行头控件**（不在列模型里）：只把宽度算进行头总宽，选区永远不碰它们。
+ */
 export type HeaderCellMetric = {kind: "handle" | "grip" | "column"; id: string | null; width: number}
 
 /**
@@ -54,7 +56,7 @@ export type HeaderCellMetric = {kind: "handle" | "grip" | "column"; id: string |
  * ‼️ 表宽与列宽都从**渲染结果**取，不从 `columnSizing` 反推：铺满靠 `min-w-full`（测量期会临时清掉），
  * 窄表会被浏览器按比例拉宽（实测：合计 440px 的 5 列表放进 1007px 容器，80px 列变 183px、
  * 行号列 40px 变 93px），按 state 画 overlay 会整块错位。行号列 / 握把列的角色由 `data-head` 显式给，
- * 不靠 DOM 顺序；握把宽度单独给 overlay —— 选区左缘要包住握把、不包行号列。
+ * 只用来把行头那几格算进 `columnLefts` 的起点 —— 选区本身只覆盖数据列。
  */
 export function geometryFromHeaderCells({
     cells,
@@ -73,13 +75,12 @@ export function geometryFromHeaderCells({
 }): GeometryInput | null {
     const widths = new Map<string, number>()
     let rowHeadWidth = 0
-    let gripWidth = 0
     for (const cell of cells) {
         if (cell.kind === "column") {
             if (cell.id !== null) widths.set(cell.id, cell.width)
         } else {
+            // handle / grip 都在行头里（不计入列模型），只把宽度加进起点。
             rowHeadWidth += cell.width
-            if (cell.kind === "grip") gripWidth = cell.width
         }
     }
     if (headerHeight <= 0 || rowHeight <= 0 || rowHeadWidth <= 0) return null
@@ -98,7 +99,6 @@ export function geometryFromHeaderCells({
         columnWidths,
         headerHeight,
         rowHeight,
-        gripWidth,
         pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
         rowCount,
         columnCount: sheetColumns.length,
@@ -241,21 +241,9 @@ export function buildOverlay(input: {
 
         const hideRight = b.minColumnIndex === 0 && b.maxColumnIndex === lastColumnIndex
         for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
-            let r = rect
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
-            // 可拖行序的表：选区包含第一列时，轮廓向左包住握把（填充不包）。
-            if (geo.gripWidth > 0 && b.minColumnIndex === 0 && r.left === geo.columnLefts[0]) {
-                const gripRect: Rect = {left: r.left - geo.gripWidth, top: r.top, width: geo.gripWidth, height: r.height}
-                r = {...r, left: gripRect.left, width: r.width + geo.gripWidth}
-                /*
-                    握把格是 `cell-pinned`（z-50），比 overlay 滚动层（z-41）高 —— 滚动层画到握把上的边框会被
-                    握把格的不透明底色盖住（真机：拖动列没有边框）。旧实现把轮廓画在握把 td 自己身上，所以可见；
-                    现在把**握把这一小段**画进钉住层（z-52、sticky 跟随，与握把同为固定列）。
-                */
-                model.pinned.ring.push(...ringLines(gripRect, {top: true, right: false, bottom: true, left: true}, RING_WIDTH, false, clampBottom))
-            }
-            ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(r, edges, RING_WIDTH, clampRight, clampBottom))
+            ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom))
         }
     }
 

@@ -40,16 +40,15 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
 
         // 末尾那个子元素只能是最后一行 —— 多出一个 `<div>`（dnd-kit 的 live region）就会让末行规则失配。
         expect(tbody.lastElementChild!.tagName).toBe("TR")
-        // 握把列的角色显式挂在 DOM 上（overlay 的几何靠它取握把宽度）。
+        // 握把是行头控件（不在列模型里）：`data-head="grip"` 只让几何把它算进行头宽度。
         expect(container.querySelector('thead th[data-head="grip"]')).not.toBeNull()
     })
 
     /*
-        ‼️ **握把列也要在选中框里**（用户口径：除了行号列，其他格的选择都带边框）。
+        ‼️ 握把与行号列一样是**行头控件**：不参与单元格选区/键盘/复制，只负责拖排序。
 
-        握把**不在列模型里**（基座额外渲染的一格），选区矩形只覆盖列模型里的格子 —— overlay 的几何在
-        "选区包含第一列"时向左包住 `GRIP_WIDTH`（见 `selectionOverlay.ts` 的 `gripWidth`）。
-        这里断言的是**选区语义**：整行选区覆盖首行全部数据列。
+        握把**不在列模型里**（基座额外渲染的一格），选区矩形只覆盖列模型里的格子 —— 这里断言的是
+        选区语义：整行选区覆盖首行全部**数据列**（不包含握把格）。
     */
     it("整行选中：选区覆盖首行全部数据列", () => {
         const container = renderTable(() => {})
