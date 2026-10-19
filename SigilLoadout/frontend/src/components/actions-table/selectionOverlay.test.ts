@@ -79,6 +79,20 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         ])
     })
 
+    it("选区不越过行头：第 0 列的轮廓从行头之后开始（行号列/握把列不进框）", () => {
+        // 行头合计 72（行号 40 + 握把 32），第 0 列数据从 72 开始。
+        const g = geo({columnLefts: [72, 112, 172, 232]})
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 0}],
+            geo: g,
+            activeCell: null,
+            copyAreas: [],
+        })
+        // 左边缘 = 72 - 外扩 2；没有任何更靠左的轮廓（握把/行号列不被包进去）。
+        expect(model.pinned.ring.filter((r) => r.width === 3 && r.height > 3).map((r) => r.left)).toEqual([70, 110])
+        expect(model.pinned.ring.every((r) => r.left >= 70)).toBe(true)
+    })
+
     it("整行选区（0..最后一列）：右边缘不画（末列没有格线）", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 1, minColumnIndex: 0, maxColumnIndex: 3}],
@@ -173,8 +187,8 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
     it("窄表拉伸：列左缘/列宽跟着渲染后的实测宽度走（不是 columnSizing）", () => {
         const result = geometryFromHeaderCells({
             cells: [
-                {kind: "handle", id: null, width: 85}, // 行号列（被摊宽）
-                {kind: "grip", id: null, width: 69}, // 握把列（被摊宽）
+                {kind: "rowhead", id: null, width: 85}, // 行号列（被摊宽）
+                {kind: "rowhead", id: null, width: 69}, // 握把列（被摊宽）
                 {kind: "column", id: "a", width: 170},
                 {kind: "column", id: "b", width: 170},
                 {kind: "column", id: "c", width: 170},
@@ -195,7 +209,7 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
     it("只有行号列时列左缘从行号宽起算", () => {
         const result = geometryFromHeaderCells({
             cells: [
-                {kind: "handle", id: null, width: 40},
+                {kind: "rowhead", id: null, width: 40},
                 {kind: "column", id: "a", width: 80},
                 {kind: "column", id: "b", width: 60},
             ],
@@ -210,7 +224,7 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
 
     it("还没量到（行头宽 0 / 表头高 0）→ null，overlay 不渲染", () => {
         const cells = [
-            {kind: "handle" as const, id: null, width: 0},
+            {kind: "rowhead" as const, id: null, width: 0},
             {kind: "column" as const, id: "a", width: 0},
         ]
         expect(

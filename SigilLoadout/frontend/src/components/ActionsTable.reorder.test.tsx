@@ -61,4 +61,26 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
         expect(isSelected(first)).toBe(true)
         expect(isSelected(last)).toBe(true)
     })
+
+    /*
+        ‼️ 握把是**行头控件**（用户口径：它和行号列一样，不在单元格网格里）：
+        点它不产生选区；从数据格拖选划过它，选区也不扩到它 —— 它只负责拖排序。
+    */
+    it("握把不进选区：点它没有选区，拖选划过它也不扩进去", () => {
+        const container = renderTable(() => {})
+        const bounds = () =>
+            JSON.parse(container.querySelector("[data-selection-bounds]")!.getAttribute("data-selection-bounds")!)
+        const row = container.querySelector("tbody tr")!
+        const grip = row.querySelectorAll("td")[1] as HTMLElement
+        const cell = row.querySelectorAll("td[data-col-id]")[2] as HTMLElement
+
+        fireEvent.mouseDown(grip, {button: 0})
+        fireEvent.mouseUp(document)
+        expect(bounds()).toEqual([])
+
+        fireEvent.mouseDown(cell, {button: 0})
+        fireEvent.mouseEnter(grip)
+        expect(bounds()).toEqual([[0, 0, 2, 2]])
+        fireEvent.mouseUp(document)
+    })
 })

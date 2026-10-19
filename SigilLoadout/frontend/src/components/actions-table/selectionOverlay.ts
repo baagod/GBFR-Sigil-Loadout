@@ -44,19 +44,20 @@ export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
 export type OverlayModel = {scrolled: LayerModel; pinned: LayerModel}
 
 /**
- * 表头一格的实测宽度；角色由 `data-head` 给（数据列另有 `data-col-id`）。
+ * 表头一格的实测宽度；数据列靠 `data-col-id` 认，行头（行号列 / 握把列）靠 `data-head` 认。
  *
- * `grip` 与 `handle` 一样是**行头控件**（不在列模型里）：只把宽度算进行头总宽，选区永远不碰它们。
+ * `rowhead` 不区分行号与握把：两者都**不在列模型里**，几何只需要它们的宽度来算 `columnLefts` 起点，
+ * 选区永远不碰它们。
  */
-export type HeaderCellMetric = {kind: "handle" | "grip" | "column"; id: string | null; width: number}
+export type HeaderCellMetric = {kind: "rowhead" | "column"; id: string | null; width: number}
 
 /**
  * 表头实测宽度 → 几何输入。
  *
  * ‼️ 表宽与列宽都从**渲染结果**取，不从 `columnSizing` 反推：铺满靠 `min-w-full`（测量期会临时清掉），
  * 窄表会被浏览器按比例拉宽（实测：合计 440px 的 5 列表放进 1007px 容器，80px 列变 183px、
- * 行号列 40px 变 93px），按 state 画 overlay 会整块错位。行号列 / 握把列的角色由 `data-head` 显式给，
- * 只用来把行头那几格算进 `columnLefts` 的起点 —— 选区本身只覆盖数据列。
+ * 行号列 40px 变 93px），按 state 画 overlay 会整块错位。行头那几格由 `data-head` 显式给，
+ * 只用来算 `columnLefts` 的起点 —— 选区本身只覆盖数据列。
  */
 export function geometryFromHeaderCells({
     cells,
@@ -79,7 +80,7 @@ export function geometryFromHeaderCells({
         if (cell.kind === "column") {
             if (cell.id !== null) widths.set(cell.id, cell.width)
         } else {
-            // handle / grip 都在行头里（不计入列模型），只把宽度加进起点。
+            // 行号列 / 握把列都在行头里（不计入列模型），只把宽度加进起点。
             rowHeadWidth += cell.width
         }
     }

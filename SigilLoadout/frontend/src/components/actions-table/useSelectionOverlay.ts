@@ -83,7 +83,7 @@ export function useSelectionOverlay({
             const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => {
                 const head = th.dataset.head
                 return {
-                    kind: head === "handle" || head === "grip" ? head : "column",
+                    kind: head === "handle" || head === "grip" ? "rowhead" : "column",
                     id: th.dataset.colId ?? null,
                     width: th.offsetWidth,
                 }
