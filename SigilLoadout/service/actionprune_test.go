@@ -81,7 +81,7 @@ func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 	writeTrackAsset(t, cfg, "3400", "0", flagsKind, readFixture(t, "pl1000_3400_0_seq_edit_flags.bxm"))
 	deployed := deployTrackPath(cfg, "3400", "0", flagsKind)
 
-	rows, err := service.LoadFlags("3400")
+	rows, err := service.LoadFlags("3400", "0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 
 	// 先真的改一个值：产物该在。
 	setFlagValue(t, &rows[0], "flag0", "1")
-	if err := service.SaveFlags("3400", rows); err != nil {
+	if err := service.SaveFlags("3400", "0", rows); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(deployed); err != nil {
@@ -97,12 +97,12 @@ func TestSaveFlagsRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 	}
 
 	// 再改回原值：与原表逐字节一致了 —— 产物删掉。
-	rows, err = service.LoadFlags("3400")
+	rows, err = service.LoadFlags("3400", "0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	setFlagValue(t, &rows[0], "flag0", original)
-	if err := service.SaveFlags("3400", rows); err != nil {
+	if err := service.SaveFlags("3400", "0", rows); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(deployed); !os.IsNotExist(err) {

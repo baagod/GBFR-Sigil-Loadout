@@ -12,7 +12,7 @@ import {
     SaveFlags,
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
-import type {FlagRow, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
+import type {TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
@@ -62,14 +62,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。
     const [loaded, setLoaded] = useState(false)
     /*
-        ‼️ **flags 就是 `tables` 里的一条普通轨**（key 见下面的 `flagsKey`）—— 不再单独占一份 state。
+        ‼️ **flags 就是 `tables` 里的普通轨**（按 `trackKey` 存，一个动画可有多条 flags 子轨）—— 不单独占 state。
         行形状统一（`FlagRow` = `TrackRow`）之后，它没有任何理由与别的轨分开存；分开的代价是每个操作
-        都要写 `key === flagsKey` 的分支，以及原值也要单独存一份。
+        都要写"这是不是 flags"的分支，以及原值也要单独存一份。
 
-        `flags` 只是这一格容器的视图（派生）；写回去一律走 `setTables`，与别的轨同一条路。
+        `flags` 只是这些格子的视图（派生）；写回去一律走 `setTables`，与别的轨同一条路。
     */
     const [tables, setTables] = useState<Record<string, TrackTable>>({})
-    const flags: FlagRow[] = tables[flagsKey]?.rows ?? []
 
     const [fsmNames, setFsmNames] = useState<string[]>([])
     const [fsmName, setFsmName] = useState<string | null>(null)
@@ -114,18 +113,29 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 // 之后各读各的），逐条 await 只是白等一串串行的 IPC。
                 const [tracks, names] = await Promise.all([ListTracks(motion), ListFsm()])
                 const list = tracks ?? []
-                const hasFlags = list.some((info) => info.kind === "flags")
-                // 两批一起发：**当前**（改动合成后的，行上带着后端给的行身份）与**原版**（游戏原版数据，
-                // 只读、永远是比较基准）。见 baseline 的注释。
+                /*
+                    flags 与别的轨**各走各的解析**（列名大小写与位含义都不同），但取数仍是"一条轨一个请求"：
+                    flags 的子轨号不止 0（实测 001c 有 0 号 1 行、1 号 2 行，见 gen 解包出来的
+                    pl2900_001c_{0,1}_seq_edit_flags.xml），只读 0 号会让其余几条在弹层里是一片空白。
+                */
                 const others = list.filter((info) => info.kind !== "flags")
-                const [read, flagRows, primal, primalFlags] = await Promise.all([
+                const flagTracks = list.filter((info) => info.kind === "flags")
+                // 一批一起发：**当前**（改动合成后的，行上带着后端给的行身份）与**原版**（游戏原版数据，
+                // 只读、永远是比较基准）。见 baseline 的注释。
+                const [read, primal, flagRead, flagPrimal] = await Promise.all([
                     Promise.all(others.map((info) => LoadTrack(motion, info.sub, info.kind))),
-                    hasFlags ? LoadFlags(motion) : Promise.resolve([]),
                     Promise.all(others.map((info) => LoadTrackOriginal(motion, info.sub, info.kind))),
-                    hasFlags ? LoadFlagsOriginal(motion) : Promise.resolve([]),
+                    Promise.all(flagTracks.map((info) => LoadFlags(motion, info.sub))),
+                    Promise.all(flagTracks.map((info) => LoadFlagsOriginal(motion, info.sub))),
                 ])
                 const loaded: Record<string, TrackTable> = {}
                 const original: Record<string, TrackTable> = {}
+                flagTracks.forEach((info, i) => {
+                    const key = trackKey(info)
+                    const columns = [...FLAG_KEYS]
+                    loaded[key] = {sub: info.sub, kind: "flags", columns, rows: flagRead[i] ?? []} as TrackTable
+                    original[key] = {sub: info.sub, kind: "flags", columns, rows: flagPrimal[i] ?? []} as TrackTable
+                })
                 let next = 0
                 for (const info of list) {
                     if (info.kind === "flags") continue
@@ -136,11 +146,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 }
                 if (!alive) return
                 setInfos(list)
-                if (hasFlags) {
-                    const columns = [...FLAG_KEYS]
-                    loaded[flagsKey] = {sub: "0", kind: "flags", columns, rows: flagRows ?? []} as TrackTable
-                    original[flagsKey] = {sub: "0", kind: "flags", columns, rows: primalFlags ?? []} as TrackTable
-                }
                 setTables(loaded)
                 setFsmNames(names ?? [])
                 // 原表 = **游戏原版**（后端从随包 data.zip 里读的，只读）：灰/亮全靠拿当前行和它比。
@@ -236,8 +241,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         const columns: readonly string[] = tables[key]?.columns ?? []
         /*
             ‼️ **flags 与普通轨走的是同一条路**：行形状统一（都是 `TrackRow`，字段收在 `values`），容器也统一
-            （flags 就是 `tables[flagsKey]`）。以前这里既有两份几乎逐字相同的造行代码，末尾还要按 `flagsKey`
-            分开落点 —— 现在两样都没有了。
+            （`tables` 按 `trackKey` 存，flags 的每一条子轨各占一格）。
         */
         const toRow = (row: ActionRow, index: number): TrackRow => ({
             index,
@@ -287,10 +291,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             // 而"哪些该搬进 mod"由**账本**回答（见 commitTracks）。界面自己再记一本"动过哪几块"是重复
             // 状态 —— 撤销、重排、换号都得跟着维护它，迟早对不上。
             //
-            // ⚠️ 这两句**必须顺序发**，别看着"互不相干"就并成 Promise.all：它们写的是**同一本账**
+            // ⚠️ 这几句**必须顺序发**，别看着"互不相干"就并成 Promise.all：它们写的是**同一本账**
             //（track_edits.json 的读-改-写），并行就是其中一次的改动被另一次覆盖掉。
-            if (tables[flagsKey]) {
-                await SaveFlags(motion, flags)
+            // flags 每条子轨一份（同一本账，所以同样一条一条发）。
+            for (const info of infos) {
+                if (info.kind !== "flags") continue
+                const rows = tables[trackKey(info)]?.rows
+                if (rows) await SaveFlags(motion, info.sub, rows)
             }
             const tracks = infos
                 .filter((info) => info.kind !== "flags")
@@ -329,7 +336,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         <>
         {infos.map((info) => {
             const key = trackKey(info)
-            /* flags 也在 `tables` 里（key 就是 `flagsKey`），所以行数与别的轨同一个问法。 */
+            /* flags 也在 `tables` 里（同一条 `trackKey`），所以行数与别的轨同一个问法。 */
             const count = tables[key]?.rows.length ?? 0
             // ⚠️ 标题**不能包在分区那个 div 里**：sticky 只在自己父元素的范围内吸顶 —— 包进去的话，
             // 分区一结束标题就被自己的分区顶着往上走，上半截被滚动容器上沿切掉，露出一行半截字 ✗。
@@ -535,8 +542,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     )
 }
 
-/** flags 那条轨的 key：不属于任何 `sub`（`0`），种类是 `flags` —— 由 `trackKey` 派生，别在这里写魔数。 */
-const flagsKey = trackKey({sub: "0", kind: "flags"})
+/** 一条轨的 key：子轨号 + 种类（`TrackInfo` 的 `Sub` 与 `Kind`）—— 从数据里派生，别在别处写魔数。 */
 function trackKey(info: {sub: string; kind: string}): string {
     return info.sub + info.kind
 }

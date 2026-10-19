@@ -2,6 +2,8 @@ package service
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +19,7 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleFlags(t, cfg, "3400")
 
-	rows, err := service.LoadFlags("3400")
+	rows, err := service.LoadFlags("3400", "0")
 	if err != nil {
 		t.Fatalf("LoadFlags: %v", err)
 	}
@@ -130,14 +132,14 @@ func TestSaveFlagsRoundTripsTheSourceAndDeploysABXM(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rows, err := service.LoadFlags("3400")
+	rows, err := service.LoadFlags("3400", "0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// 先改一行再保存：与原表一致的那种保存**不留产物**了（见 actionprune.go），
 	// 所以下面那把尺子量的是"改过的那份 XML"。
 	rows[0].Values["flag0"] = "8192"
-	if err := service.SaveFlags("3400", rows); err != nil {
+	if err := service.SaveFlags("3400", "0", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}
 
@@ -213,4 +215,65 @@ func toolForTest(t *testing.T) string {
 		t.Skipf("没有 GBFRDataTools（设 GBFR_DATA_TOOLS 指过去就能跑这几条对照），跳过")
 	}
 	return devPath
+}
+
+/*
+flags 轨不止 0 号：同一个动画可以有 0 与 1 两条（实测 001c 就是 0 号 1 行、1 号 2 行）。
+
+以前界面只认 0 号，而 ListTracks 把 1 号也列了出来 —— 于是弹窗里"Flags #1"那一段是一片空白。
+两条必须各读各的、各存各的：改 1 号不许碰 0 号，账本里也只许出现 1 号。
+*/
+func TestFlagsTrackIsPerSub(t *testing.T) {
+	service, cfg, modDir := actionsFixture(t)
+	sampleFlags(t, cfg, "3400")
+	writeFile(t, filepath.Join(cfg.FlagsDir, "pl1000_3400_1_seq_edit_flags.xml"), `<SeqRoot>
+  <FlagsTrack SeqNum="2">
+    <Seq LayerFlag="4294967295" StartTime="0.000000" EndTime="8.333333" Config="0" Flag0="8206" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+    <Seq LayerFlag="4294967295" StartTime="0.666667" EndTime="16.933334" Config="0" Flag0="1" Flag1="0" SysFlag="0" FreeArg="0 0 0 0" />
+  </FlagsTrack>
+</SeqRoot>`)
+
+	infos, err := service.ListTracks("3400")
+	if err != nil {
+		t.Fatalf("ListTracks: %v", err)
+	}
+	if len(infos) != 2 || infos[0].Sub != "0" || infos[0].Rows != 9 || infos[1].Sub != "1" || infos[1].Rows != 2 {
+		t.Fatalf("ListTracks 给出 %+v，want 0 号 9 行 + 1 号 2 行", infos)
+	}
+
+	rows, err := service.LoadFlags("3400", "1")
+	if err != nil {
+		t.Fatalf("LoadFlags(1): %v", err)
+	}
+	if len(rows) != 2 || rows[0].Values["flag0"] != "8206" {
+		t.Fatalf("1 号读出来 %d 行、第一行 Flag0=%q，want 2 行 / 8206", len(rows), rows[0].Values["flag0"])
+	}
+
+	rows[0].Values["flag0"] = "1"
+	if err := service.SaveFlags("3400", "1", rows); err != nil {
+		t.Fatalf("SaveFlags(1): %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(modDir, "pl", "pl1000", "pl1000_3400_1_seq_edit_flags.bxm")); err != nil {
+		t.Fatalf("1 号改过之后没部署: %v", err)
+	}
+	// 0 号一次都没碰：与原表一致的东西不留产物（见 actionprune.go）。
+	if _, err := os.Stat(filepath.Join(modDir, "pl", "pl1000", "pl1000_3400_0_seq_edit_flags.bxm")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("改 1 号却把 0 号也部署了（err=%v）", err)
+	}
+	edits, err := loadTrackEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, edit := range edits {
+		if edit.Motion == "3400" && edit.Kind == flagsKind && edit.Sub != "1" {
+			t.Fatalf("账本里混进了别的子轨: %+v", edit)
+		}
+	}
+	again, err := service.LoadFlags("3400", "1")
+	if err != nil {
+		t.Fatalf("改动后 LoadFlags(1): %v", err)
+	}
+	if again[0].Values["flag0"] != "1" {
+		t.Fatalf("改动后 1 号读回来第一行 Flag0=%q，want 1", again[0].Values["flag0"])
+	}
 }

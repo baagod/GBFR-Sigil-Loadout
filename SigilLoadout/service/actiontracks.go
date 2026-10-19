@@ -72,11 +72,7 @@ type TrackChild struct {
 	Values map[string]string `json:"values"`
 }
 
-const (
-	flagsKind = "flags"
-	// flagSub 是 flags 轨的子轨号：界面上的 flags 一直是 0 号（老代码也是这么拼的），保留不动。
-	flagSub = "0"
-)
+const flagsKind = "flags"
 
 // trackKinds 是这一页认的四种轨。它们会被拼进文件名，所以**只认这几种**（同 isMotion 的道理：
 // 别让界面给一段带斜杠的文本把文件指到别处去）。

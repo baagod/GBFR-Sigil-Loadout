@@ -441,15 +441,16 @@ func mergeActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) 
 	return encodeMsgpack(original), true, nil
 }
 
-// LoadFlags 读某个 motion 的 flags 轨并解析成行（改过就是这个角色的改动，没改过就是随包的原始数据）；
-// 被"假删除"的行会从原版插回来（标记 Removed），界面上一直看得见。
-func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
+// LoadFlags 读某个 motion 的某条 flags 轨（sub 是子轨号：同一个动画可以有好几条，见 ListTracks）并解析成行
+// （改过就是这个角色的改动，没改过就是随包的原始数据）；被"假删除"的行会从原版插回来（标记 Removed），
+// 界面上一直看得见。
+func (s *ActionsService) LoadFlags(motion, sub string) ([]FlagRow, error) {
 	cfg := s.config()
 	edits, err := loadTrackEdits()
 	if err != nil {
 		return nil, err
 	}
-	raw, err := trackSourceXML(cfg, edits, motion, flagSub, flagsKind)
+	raw, err := trackSourceXML(cfg, edits, motion, sub, flagsKind)
 	if err != nil {
 		return nil, err
 	}
@@ -457,40 +458,40 @@ func (s *ActionsService) LoadFlags(motion string) ([]FlagRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	ref := trackRef{motion: motion, sub: flagSub, kind: flagsKind}
+	ref := trackRef{motion: motion, sub: sub, kind: flagsKind}
 	marks := marksOf(edits, charCode(cfg), ref, len(rows))
 	// 原版读不到也不该让这一页打不开：那就退回"位置对齐"。
-	if prim, err := s.LoadFlagsOriginal(motion); err == nil {
+	if prim, err := s.LoadFlagsOriginal(motion, sub); err == nil {
 		return mergeFlagRows(marks, rows, prim), nil
 	}
 	return mergeFlagRows(marks, rows, nil), nil
 }
 
-// LoadFlagsOriginal 读这个 motion 的 flags 轨**原版**（随包那份，只读），界面拿它当比较基准。
-func (s *ActionsService) LoadFlagsOriginal(motion string) ([]FlagRow, error) {
+// LoadFlagsOriginal 读这个 motion 的某条 flags 轨**原版**（随包那份，只读），界面拿它当比较基准。
+func (s *ActionsService) LoadFlagsOriginal(motion, sub string) ([]FlagRow, error) {
 	cfg := s.config()
-	xmlPath, err := trackXMLPath(cfg, motion, flagSub, flagsKind)
+	xmlPath, err := trackXMLPath(cfg, motion, sub, flagsKind)
 	if err != nil {
 		return nil, err
 	}
-	raw, err := trackPrimalXML(cfg, motion, flagSub, flagsKind, xmlPath)
+	raw, err := trackPrimalXML(cfg, motion, sub, flagsKind, xmlPath)
 	if err != nil {
 		return nil, err
 	}
 	return parseFlagsXML(raw)
 }
 
-// SaveFlags 记下这个 motion 的 flags 轨改动，并部署到 Mods。
+// SaveFlags 记下这个 motion 的某条 flags 轨（sub 是子轨号）改动，并部署到 Mods。
 //
 // **不写源文件**：改动进用户目录的 track_edits.json（原始数据永远只读，见 actiontrackedits.go），
 // 部署时"改动 → BXM"写进 mod。写改动与部署共用一把锁——它们是一段"读一份、改、整份写出去"。
-func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
+func (s *ActionsService) SaveFlags(motion, sub string, rows []FlagRow) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cfg := s.config()
 	// 身份先校验（它们都会被拼进文件名）：不认的写法不该有机会进改动表。
-	if _, err := trackXMLPath(cfg, motion, flagSub, flagsKind); err != nil {
+	if _, err := trackXMLPath(cfg, motion, sub, flagsKind); err != nil {
 		return err
 	}
 	// 行身份跟着改动一起存；被"假删除"的行不进 XML（所以不部署），但身份留着（界面上看得见、能恢复）。
@@ -516,7 +517,7 @@ func (s *ActionsService) SaveFlags(motion string, rows []FlagRow) error {
 	if err != nil {
 		return err
 	}
-	ref := trackRef{motion: motion, sub: flagSub, kind: flagsKind}
+	ref := trackRef{motion: motion, sub: sub, kind: flagsKind}
 	edits = setTrackEdit(edits, charCode(cfg), ref, string(raw), marks)
 	return s.commitTracks(cfg, edits, motion)
 }

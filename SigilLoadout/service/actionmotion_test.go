@@ -11,9 +11,9 @@ import "testing"
 func TestEveryMotionEntryPointRejectsBadMotions(t *testing.T) {
 	service, _, _ := actionsFixture(t)
 	calls := map[string]func(motion string) error{
-		"LoadFlags":           func(m string) error { _, err := service.LoadFlags(m); return err },
-		"LoadFlagsOriginal":   func(m string) error { _, err := service.LoadFlagsOriginal(m); return err },
-		"SaveFlags":           func(m string) error { return service.SaveFlags(m, nil) },
+		"LoadFlags":           func(m string) error { _, err := service.LoadFlags(m, "0"); return err },
+		"LoadFlagsOriginal":   func(m string) error { _, err := service.LoadFlagsOriginal(m, "0"); return err },
+		"SaveFlags":           func(m string) error { return service.SaveFlags(m, "0", nil) },
 		"ListTracks":          func(m string) error { _, err := service.ListTracks(m); return err },
 		"SaveTracks":          func(m string) error { return service.SaveTracks(m, nil) },
 		"DeployMissingTracks": func(m string) error { return service.DeployMissingTracks(m) },

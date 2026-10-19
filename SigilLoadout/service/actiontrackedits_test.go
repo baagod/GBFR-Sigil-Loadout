@@ -36,7 +36,7 @@ func TestTracksReadFromTheAssetAndSaveIntoTheEditStore(t *testing.T) {
 		t.Fatalf("ListTracks 给出 %+v，want 一条 flags / 子轨 0 / 9 行", infos)
 	}
 
-	rows, err := service.LoadFlags("3400")
+	rows, err := service.LoadFlags("3400", "0")
 	if err != nil {
 		t.Fatalf("LoadFlags: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestTracksReadFromTheAssetAndSaveIntoTheEditStore(t *testing.T) {
 	}
 
 	rows[0].Values["flag0"] = "1"
-	if err := service.SaveFlags("3400", rows); err != nil {
+	if err := service.SaveFlags("3400", "0", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}
 
@@ -62,7 +62,7 @@ func TestTracksReadFromTheAssetAndSaveIntoTheEditStore(t *testing.T) {
 	}
 
 	// 3. 读回来是改动，部署出去的也是改动
-	again, err := service.LoadFlags("3400")
+	again, err := service.LoadFlags("3400", "0")
 	if err != nil {
 		t.Fatalf("改动后 LoadFlags: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestListTracksKeepsTracksThatOnlyExistAsAnEdit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref := trackRef{motion: "3400", sub: flagSub, kind: flagsKind}
+	ref := trackRef{motion: "3400", sub: "0", kind: flagsKind}
 	if err := saveTrackEdits(setTrackEdit(nil, charCode(cfg), ref, string(source), nil)); err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestListTracksKeepsTracksThatOnlyExistAsAnEdit(t *testing.T) {
 // 一条来路都没有时说清楚，别给个空表让人以为"这个动画没有轨"。
 func TestTrackWithoutAnyOriginalSaysSo(t *testing.T) {
 	service, _, _ := actionsFixture(t)
-	if _, err := service.LoadFlags("3400"); err == nil {
+	if _, err := service.LoadFlags("3400", "0"); err == nil {
 		t.Fatal("资产、解包 .bxm、解包 .xml 三条来路都没有，却读成功了")
 	}
 }
@@ -537,14 +537,14 @@ func BenchmarkReadTrackFromTheAsset(b *testing.B) {
 	})
 	b.Run("原始 XML（一条轨）", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if _, err := trackPrimalXML(cfg, "3400", flagSub, flagsKind, xmlPath); err != nil {
+			if _, err := trackPrimalXML(cfg, "3400", "0", flagsKind, xmlPath); err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
 	b.Run("一直到界面上的表（一条轨）", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			body, err := trackPrimalXML(cfg, "3400", flagSub, flagsKind, xmlPath)
+			body, err := trackPrimalXML(cfg, "3400", "0", flagsKind, xmlPath)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -582,7 +582,7 @@ func TestDeployMissingTracksFillsOnlyWhatIsGone(t *testing.T) {
 	}
 
 	// 改动表里三条轨：3400 的 flags 与 attack，外加**别的动画** 0b11 的 attack。
-	edits := setTrackEdit(nil, char, trackRef{motion: "3400", sub: flagSub, kind: flagsKind},
+	edits := setTrackEdit(nil, char, trackRef{motion: "3400", sub: "0", kind: flagsKind},
 		testdata("pl1000_3400_0_seq_edit_flags.xml"), nil)
 	edits = setTrackEdit(edits, char, trackRef{motion: "3400", sub: "0", kind: "attack"},
 		testdata("pl1000_0b11_0_seq_edit_attack.xml"), nil)
@@ -593,7 +593,7 @@ func TestDeployMissingTracksFillsOnlyWhatIsGone(t *testing.T) {
 	}
 
 	// mod 目录里**已经**有 3400 的 flags（内容故意不是 BXM，好看出有没有被重写）。
-	kept := deployTrackPath(cfg, "3400", flagSub, flagsKind)
+	kept := deployTrackPath(cfg, "3400", "0", flagsKind)
 	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -629,7 +629,7 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 		t.Fatal("一次都没改过，却搬了 flags 轨过去")
 	}
 
-	rows, err := service.LoadFlags("3451")
+	rows, err := service.LoadFlags("3451", "0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,7 +640,7 @@ func TestDeployCopiesTheActionTableAndOnlyTheTouchedMotions(t *testing.T) {
 	} else {
 		setFlagValue(t, &rows[0], "flag0", "0")
 	}
-	if err := service.SaveFlags("3451", rows); err != nil {
+	if err := service.SaveFlags("3451", "0", rows); err != nil {
 		t.Fatalf("SaveFlags: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(modDir, "pl", "pl1000", "pl1000_3451_0_seq_edit_flags.bxm")); err != nil {
