@@ -2,7 +2,7 @@
     "name": "frontend",
     "private": true,
     "packageManager": "pnpm@12.3.4",
-    "version": "0.9.5",
+    "version": "0.9.6",
     "type": "module",
     "scripts": {
         "dev": "vite",
