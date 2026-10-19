@@ -17,6 +17,56 @@ const area = (r: {width: number; height: number}) => r.width * r.height
 const sumArea = (rs: {width: number; height: number}[]) => rs.reduce((a, r) => a + area(r), 0)
 
 describe("selectionOverlay（选区 → 像素几何）", () => {
+    it("行高不等（轨表「效果」列换行）：跨行选区按每行真实高度叠，从正确的顶边起", () => {
+        const g = geo({rowHeight: 0, rowHeights: [27, 41, 27], rowTops: [41, 68, 109], rowCount: 3})
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 0, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 0}],
+            geo: g,
+            activeCell: {rowIndex: 1, columnIndex: 0},
+            copyAreas: [],
+        })
+        /* 选区顶 41、总高 27+41+27 = 95；活动格（第 1 行）挖掉 41 高 → 面积 = 40 × 54。 */
+        expect(sumArea(model.pinned.fill)).toBe(40 * (95 - 41))
+        const ringTop = model.pinned.ring[0]!
+        expect(ringTop.top).toBe(41 - 2)
+        expect(ringTop.height).toBe(3)
+    })
+
+    it("geometryFromHeaderCells：给了每行行高就按累计顶边建几何；给了不合法长度则退回均匀行高", () => {
+        const cells = [
+            {kind: "rowhead" as const, id: null, width: 40},
+            {kind: "column" as const, id: "a", width: 100},
+        ]
+        const variable = geometryFromHeaderCells({
+            cells,
+            sheetColumns: ["a"],
+            headerHeight: 30,
+            rowHeight: 27,
+            rowHeights: [20, 30, 40],
+            pinnedColumnCount: 0,
+            rowCount: 3,
+        })!
+        expect(variable.rowTops).toEqual([30, 50, 80])
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 0, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 0}],
+            geo: variable,
+            activeCell: null,
+            copyAreas: [],
+        })
+        expect(model.scrolled.fill).toEqual([{left: 40, top: 30, width: 100, height: 90}])
+
+        const fallback = geometryFromHeaderCells({
+            cells,
+            sheetColumns: ["a"],
+            headerHeight: 30,
+            rowHeight: 27,
+            rowHeights: [20],
+            pinnedColumnCount: 0,
+            rowCount: 3,
+        })!
+        expect(fallback.rowHeights).toBeUndefined()
+    })
+
     it("单格：底色就是那一格，轮廓外扩 2px、线宽 3px", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 0}],

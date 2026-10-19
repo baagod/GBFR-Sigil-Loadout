@@ -2,7 +2,8 @@
     选区几何：把「选区的区间（行/列下标）」换算成 overlay 的像素矩形。
 
     为什么单独一个纯模块：选区改由一层 overlay 画之后，唯一容易错的就是几何；而 happy-dom 量不到像素，
-    只能靠纯函数单测锁住。行的像素位置 = 表头高 + 行下标 × 行高，列的像素位置 = 行头宽 + 前面列宽累加，
+    只能靠纯函数单测锁住。行的像素位置 = 表头高 + 前面各行行高累加（行**可以不等高**：轨表「效果」列
+    换行后那几行会更高；全部等高时退化成 行下标 × 行高），列的像素位置 = 行头宽 + 前面列宽累加，
     都是渲染期已有数据，不读 DOM。
 
     坐标系（唯一一套）：
@@ -32,12 +33,30 @@ export type GeometryInput = {
     columnWidths: number[]
     /** 表头高度（数据行从这里开始）。 */
     headerHeight: number
-    /** 行高。 */
+    /** 行高（**均匀**时用它；给了 `rowHeights` 时它只是兜底）。 */
     rowHeight: number
+    /** 每行的行高（可变量行高：轨表「效果」列换行后行会变高）。与 `rowTops` 成对给。 */
+    rowHeights?: number[]
+    /** 每行顶边（内容坐标）。与 `rowHeights` 成对给。 */
+    rowTops?: number[]
     /** 钉住列个数（显示顺序最前面的几列）。 */
     pinnedColumnCount: number
     rowCount: number
     columnCount: number
+}
+
+/** 第 `i` 行的顶边（内容坐标）。 */
+export const rowTopOf = (geo: GeometryInput, i: number): number =>
+    geo.rowTops ? geo.rowTops[i]! : geo.headerHeight + i * geo.rowHeight
+
+/** 第 `i` 行的高度。 */
+export const rowHeightOf = (geo: GeometryInput, i: number): number => (geo.rowHeights ? geo.rowHeights[i]! : geo.rowHeight)
+
+/** 一段行区间（含首尾）的顶边与总高。 */
+const rowsSpan = (geo: GeometryInput, minRow: number, maxRow: number) => {
+    const top = rowTopOf(geo, minRow)
+    const bottom = rowTopOf(geo, maxRow) + rowHeightOf(geo, maxRow)
+    return {top, height: bottom - top}
 }
 
 export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
@@ -64,6 +83,7 @@ export function geometryFromHeaderCells({
     sheetColumns,
     headerHeight,
     rowHeight,
+    rowHeights,
     pinnedColumnCount,
     rowCount,
 }: {
@@ -71,6 +91,8 @@ export function geometryFromHeaderCells({
     sheetColumns: readonly string[]
     headerHeight: number
     rowHeight: number
+    /** 每行的实测行高（可变量行高）；长度必须等于 `rowCount`，否则退回均匀 `rowHeight`。 */
+    rowHeights?: readonly number[]
     pinnedColumnCount: number
     rowCount: number
 }): GeometryInput | null {
@@ -84,7 +106,19 @@ export function geometryFromHeaderCells({
             rowHeadWidth += cell.width
         }
     }
-    if (headerHeight <= 0 || rowHeight <= 0 || rowHeadWidth <= 0) return null
+    const variableHeights =
+        rowHeights && rowHeights.length === rowCount && rowCount > 0 && rowHeights.every((height) => height > 0) ? [...rowHeights] : undefined
+    if (headerHeight <= 0 || rowHeadWidth <= 0) return null
+    if (!variableHeights && rowHeight <= 0) return null
+    let rowTops: number[] | undefined
+    if (variableHeights) {
+        rowTops = []
+        let top = headerHeight
+        for (const height of variableHeights) {
+            rowTops.push(top)
+            top += height
+        }
+    }
     let left = rowHeadWidth
     const columnLefts: number[] = []
     const columnWidths: number[] = []
@@ -100,6 +134,8 @@ export function geometryFromHeaderCells({
         columnWidths,
         headerHeight,
         rowHeight,
+        rowHeights: variableHeights,
+        rowTops,
         pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
         rowCount,
         columnCount: sheetColumns.length,
@@ -125,9 +161,8 @@ function splitByPinned(bounds: Bounds, geo: GeometryInput, hideRight = false): {
             pinned,
             rect: {
                 left,
-                top: geo.headerHeight + bounds.minRowIndex * geo.rowHeight,
+                ...rowsSpan(geo, bounds.minRowIndex, bounds.maxRowIndex),
                 width: right - left,
-                height: (bounds.maxRowIndex - bounds.minRowIndex + 1) * geo.rowHeight,
             },
             edges: {top: true, bottom: true, left: from === minC, right: to === maxC && !hideRight},
         })
@@ -143,9 +178,8 @@ function boundsRect(bounds: Bounds, geo: GeometryInput): Rect {
     const right = geo.columnLefts[bounds.maxColumnIndex]! + geo.columnWidths[bounds.maxColumnIndex]!
     return {
         left,
-        top: geo.headerHeight + bounds.minRowIndex * geo.rowHeight,
+        ...rowsSpan(geo, bounds.minRowIndex, bounds.maxRowIndex),
         width: right - left,
-        height: (bounds.maxRowIndex - bounds.minRowIndex + 1) * geo.rowHeight,
     }
 }
 
@@ -229,9 +263,9 @@ export function buildOverlay(input: {
     const hole: Rect | null = activeCell
         ? {
               left: geo.columnLefts[activeCell.columnIndex]!,
-              top: geo.headerHeight + activeCell.rowIndex * geo.rowHeight,
+              top: rowTopOf(geo, activeCell.rowIndex),
               width: geo.columnWidths[activeCell.columnIndex]!,
-              height: geo.rowHeight,
+              height: rowHeightOf(geo, activeCell.rowIndex),
           }
         : null
 
@@ -261,9 +295,9 @@ export function buildOverlay(input: {
                 if (!edges.top && !edges.bottom && !edges.left && !edges.right) continue
                 const rect: Rect = {
                     left: geo.columnLefts[columnIndex]!,
-                    top: geo.headerHeight + rowIndex * geo.rowHeight,
+                    top: rowTopOf(geo, rowIndex),
                     width: geo.columnWidths[columnIndex]!,
-                    height: geo.rowHeight,
+                    height: rowHeightOf(geo, rowIndex),
                 }
                 const layer = columnIndex <= pinnedEnd ? model.pinned : model.scrolled
                 layer.copy.push({

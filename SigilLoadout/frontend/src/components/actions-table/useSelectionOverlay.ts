@@ -21,6 +21,9 @@ const sameCells = (a: readonly HeaderCellMetric[], b: readonly HeaderCellMetric[
     a.length === b.length &&
     a.every((cell, index) => cell.kind === b[index]!.kind && cell.id === b[index]!.id && cell.width === b[index]!.width)
 
+/** 每行行高没变就不 setState：轨表「效果」列换行后行高不再均匀，得按行记。 */
+const sameRowHeights = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((height, index) => height === b[index])
+
 export function useSelectionOverlay({
     tableRef,
     measured,
@@ -65,9 +68,10 @@ export function useSelectionOverlay({
     const [metrics, setMetrics] = useState<{
         headerHeight: number
         rowHeight: number
+        rowHeights: number[]
         cells: HeaderCellMetric[]
         tableWidth: number
-    }>({headerHeight: 0, rowHeight: 0, cells: [], tableWidth: 0})
+    }>({headerHeight: 0, rowHeight: 0, rowHeights: [], cells: [], tableWidth: 0})
 
     useLayoutEffect(() => {
         if (!measured) return
@@ -78,8 +82,18 @@ export function useSelectionOverlay({
         /* 列宽 / 表宽也在这里量：窄表被 `min-w-full` 拉伸后，只有渲染结果知道每列真正多宽。 */
         const read = () => {
             const headerHeight = header.offsetHeight
-            const rowHeight = body.offsetHeight / rows.length
-            if (headerHeight <= 0 || rowHeight <= 0) return
+            /*
+            ‼️ 行高按**每一行**量：轨表「效果」列换行后，行数多的那几行会比别的行高；只记一个平均值
+            会让选区 overlay 从第一行不等高的位置起全部错位。
+            */
+            const rowEls = [...body.querySelectorAll<HTMLTableRowElement>("tr")]
+            const rowHeights =
+                rowEls.length === rows.length
+                    ? rowEls.map((tr) => (tr.firstElementChild as HTMLElement | null)?.offsetHeight ?? tr.offsetHeight)
+                    : []
+            const uniform = rowHeights.length !== rows.length || rowHeights.some((height) => height <= 0)
+            const rowHeight = uniform ? body.offsetHeight / rows.length : 0
+            if (headerHeight <= 0 || (uniform && rowHeight <= 0)) return
             const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => {
                 const head = th.dataset.head
                 return {
@@ -92,14 +106,15 @@ export function useSelectionOverlay({
             setMetrics((prev) =>
                 prev.headerHeight === headerHeight &&
                 prev.rowHeight === rowHeight &&
+                sameRowHeights(prev.rowHeights, uniform ? [] : rowHeights) &&
                 prev.tableWidth === tableWidth &&
                 sameCells(prev.cells, cells)
                     ? prev
-                    : {headerHeight, rowHeight, cells, tableWidth},
+                    : {headerHeight, rowHeight, rowHeights: uniform ? [] : rowHeights, cells, tableWidth},
             )
         }
         read()
-    }, [measured, tableRef, rows.length, columnSizing, layoutTick])
+    }, [measured, tableRef, rows, columnSizing, layoutTick])
 
     /** 活动格下标（锚点格）：overlay 用它把底色挖掉。 */
     const activeCellIndexes = useMemo<ActiveCellIndexes | null>(() => {
@@ -118,6 +133,7 @@ export function useSelectionOverlay({
                 sheetColumns,
                 headerHeight: metrics.headerHeight,
                 rowHeight: metrics.rowHeight,
+                rowHeights: metrics.rowHeights,
                 pinnedColumnCount,
                 rowCount: rows.length,
             }),
@@ -163,9 +179,10 @@ export function useSelectionOverlay({
         [geometry, selectionBounds, activeCellIndexes, copyAreas, copyUnderlay],
     )
 
+    const bodyHeight = geometry ? (geometry.rowHeights ? geometry.rowHeights.reduce((sum, height) => sum + height, 0) : rows.length * geometry.rowHeight) : 0
     return {
         model,
-        height: geometry ? geometry.headerHeight + rows.length * geometry.rowHeight : 0,
+        height: geometry ? geometry.headerHeight + bodyHeight : 0,
         width: Math.max(metrics.tableWidth, contentRight),
         copyAreas,
     }
