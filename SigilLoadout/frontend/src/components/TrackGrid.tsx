@@ -200,8 +200,8 @@ function FlagEffects({row}: {row: ActionRow}) {
  */
 const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
     if (key === "config")
-        // 值就一个词（"触发" / "持续"），**居中**看着才稳：内容那层是 flex 容器，所以居中给的是
-        // `[&>div]:justify-center`（`text-center` 对 flex 容器无效）。
+        // 值就一个词（"触发" / "持续"），**居中**看着才稳：内容那层是 flex 容器，居中给
+        // `[&>div]:justify-center`（文字盒不撑满才有效，见 `CellText` 里 span 那段）。
         //
         // 类型按**文档定义**翻（`1` = 触发 / `0` = 持续，见 docs/action/Flags轨位定义与FSM接口.md）；
         // ⚠️ 别当位域：数据里还有 `32769` 这种意外值 —— 除了 0/1 一律**把原值显示出来**，

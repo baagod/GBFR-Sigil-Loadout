@@ -185,9 +185,12 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
             } ${hidden ? "opacity-0" : ""}`}
             onDoubleClick={onDoubleClick}
         >
-            {/* ‼️ 文字自己 `truncate min-w-0 flex-1`（`PICK_CELL` / `PICK_TEXT` 那套：flex 容器的
-                `truncate` 对裸文字节点不生效，得包一层）。尾节点因此自然占它自己那点宽度。 */}
-            <span className="min-w-0 flex-1 truncate">{text}</span>
+            {/* ‼️ 文字自己 `truncate min-w-0`（`PICK_CELL` / `PICK_TEXT` 那套：flex 容器的
+                `truncate` 对裸文字节点不生效，得包一层）。
+                **没有 trailing 时别给 `flex-1`**：那一撑满，父层的 `justify-center` 就没有可居中的
+                余量了（配置列居中的 bug 就是这么来的）；`min-w-0` 仍够长文本压缩出省略号。
+                有 trailing（详情靶子）时才 `flex-1`，把它顶到格右端。 */}
+            <span className={trailing ? "min-w-0 flex-1 truncate" : "min-w-0 truncate"}>{text}</span>
             {trailing}
         </div>
     )
