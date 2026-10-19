@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 /*
-    动作表 · "就位"与骨架的契约（`loading` / 列宽 / `onReady`）
+动作表 · "就位"与骨架的契约（`loading` / 列宽 / `onReady`）
 
-    ‼️ **骨架不属于这张表**：`TableSkeleton` 由 `ActionsPanel` 平级渲染（两个独立视图，互不包含）。
-    这张表这边只负责两件事，也就是本文件钉住的东西：
+‼️ **骨架不属于这张表**：`TableSkeleton` 由 `ActionsPanel` 平级渲染（两个独立视图，互不包含）。
+这张表这边只负责两件事，也就是本文件钉住的东西：
 
-      · `loading`（这一份数据已作废）或列宽没量好 → 整块**离屏** —— 用户看到的就是"表格消失了"；
-      · 量好之后回一次 `onReady` → 面板据此撤掉骨架。
+  · `loading`（这一份数据已作废）或列宽没量好 → 整块**离屏** —— 用户看到的就是"表格消失了"；
+  · 量好之后回一次 `onReady` → 面板据此撤掉骨架。
 
-    `busy`（换角色 / 改清单 / 保存部署）只是"点不动"，**不**把表格藏起来。
+`busy`（换角色 / 改清单 / 保存部署）只是"点不动"，**不**把表格藏起来。
 */
 import {describe, expect, it, vi} from "vitest"
 import {render, waitFor} from "@testing-library/react"
@@ -107,10 +107,7 @@ describe("动作表 · 就位与骨架的契约", () => {
         }
     })
 
-    /* ‼️ 这张表在别的 Tab 里也**常挂载**（`App.tsx` 的 keepMounted）：切走后 `<table>` 的 rect 恒为
-       0×0，测量那段**不许自续帧**，否则"等下一帧再看"就是每帧 setState + 整表重渲的死循环 ——
-       切到其他页持续吃满一个核（用户报的性能问题）。判据：隐藏着放 200ms，rAF 次数为常数级；
-       可见时由 ResizeObserver 叫醒这件事由上面几条用例覆盖。 */
+    /* 隐藏着（rect 0×0）放 200ms：rAF 必须是常数级 —— 自续帧就是切页后的空转。 */
     it("隐藏（rect 0×0）时不自续帧空转", async () => {
         const raf = vi.spyOn(window, "requestAnimationFrame")
         const {unmount} = render(<ActionsTable t={t} {...fewColumns()} />)
