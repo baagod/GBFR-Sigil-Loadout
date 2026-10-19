@@ -40,6 +40,14 @@ export function ReorderDnd({reorder, rows, bound, children}: {
             sensors={sensors}
             collisionDetection={closestCenter}
             modifiers={modifiers}
+            /*
+                ‼️ **关掉 dnd-kit 的 autoScroll**：拖拽行靠 modifier（`clampDragY`）夹在表格可视框里，
+                行本身不会撑大可滚动区域；但 autoScroll 还会去滚**外层的滚动容器**（弹窗内容区）——
+                真机：按住握把往下拖到面板外，弹窗内容被滚下去（`scrollTop` 34→86）且松手不还原，
+                看起来就是"行能一直拖到下面/表格被推上去、上面一片空白"。夹取已经保证了落点在可视区内，
+                这里不需要任何自动滚动。
+            */
+            autoScroll={false}
             onDragEnd={({active, over}) => {
                 if (!over || active.id === over.id) return
                 const from = ids.indexOf(String(active.id))
