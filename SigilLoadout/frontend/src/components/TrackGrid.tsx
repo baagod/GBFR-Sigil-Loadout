@@ -73,7 +73,7 @@ const toRow = (
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
-export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionChange, onCopyReady, onRowsReady, onRowsChange}: {
+export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCopyReady, onPasteReady, onRowsReady, onRowsChange}: {
     table: TrackTableData | undefined
     t: Messages
     /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
@@ -81,11 +81,13 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
     /** 改了一格（`null` = 回原值）：草稿归基座，这里收回来更新本层状态（工具条与保存照旧）。 */
     onEdit?: (rowId: string, column: string, value: string | null) => void
     onReorder: (from: number, to: number) => void
-    /** 整行选中的行变了（工具条按它决定按钮亮不亮、Ctrl+C/X 复制哪几行）—— 由基座算好上报。 */
-    onSelectionChange?: (rowIds: string[]) => void
+    /** 这张表有没有选区（任意单元格选区）：工具条「复制 / 剪切 / 删除」与键盘快捷键用同一个判据。 */
+    onSelectionPresenceChange?: (hasSelection: boolean) => void
     /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
     onCopyReady?: (copy: () => void) => void
-    /** 基座那份**行级命令**（添加/复制/剪切/粘贴/删除）：接给工具条，见 `useRowCommands`。 */
+    /** 把"粘贴单元格区域"交回上层（工具条「粘贴」按钮用）—— 见基座的 `onPasteReady`。 */
+    onPasteReady?: (paste: () => void) => void
+    /** 基座那份**行级命令**（添加/复制/剪切/插入/删除）：接给工具条，见 `useRowCommands`。 */
     onRowsReady?: (commands: RowCommands) => void
     /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
@@ -123,8 +125,9 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionCh
             initialPinnedCount={0}
             onEdit={onEdit}
             reorder={onReorder}
-            onSelectionChange={onSelectionChange}
+            onSelectionPresenceChange={onSelectionPresenceChange}
             onCopyReady={onCopyReady}
+            onPasteReady={onPasteReady}
             onRowsReady={onRowsReady}
             onRowsChange={onRowsChange}
         />

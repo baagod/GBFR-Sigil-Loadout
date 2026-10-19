@@ -112,6 +112,8 @@ const zh = {
     colBulletFreeWork: (no: string) => `子弹参数 ${no}`,
     // 哈希 + 6 个值的数组：Flag1:2 被调用时据此给角色/队友挂 Buff（字段表 74 行 / 文档 §4.1）。
     colSupportEffectList: "附加效果",
+    // 「子弹类型」（`bulletType_`，与 bulletFreeWorkNN_ 同族）。
+    colBulletType: "子弹类型",
     // 冷却消耗时机的小枚举（实测 0/1/2/3，其中 2 = 一次性，如 Seofon 7SB / Tweyen 2CS）。
     colSaveActionType: "动作类型",
     // 位标记（实测 1/2/4/8/16/128 各种组合）：决定这条动作怎么被游戏处理、能不能接招。
@@ -169,7 +171,8 @@ const zh = {
     colEffects: "效果",
     copySelected: "复制",
     cutSelected: "剪切",
-    pasteBelow: "插入",
+    pasteBelow: "粘贴",
+    insertRow: "插入行",
 };
 
 export type Messages = typeof zh;
@@ -258,6 +261,7 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `Bullet Param ${no}`,
         // 哈希 + 6 个值的数组：挂 Buff 用（见文档 §4.1）。
         colSupportEffectList: "Additional Effect",
+    colBulletType: "Bullet Type",
         // 冷却消耗时机的小枚举（2 = 一次性）。
         colSaveActionType: "Action Type",
         // 位标记：决定这条动作怎么被游戏处理、能不能接招。
@@ -299,7 +303,8 @@ export const messages: Record<Lang, Messages> = {
         colEffects: "Effects",
         copySelected: "Copy",
     cutSelected: "Cut",
-        pasteBelow: "Insert",
+        pasteBelow: "Paste",
+    insertRow: "Insert Rows",
     },
     ja: {
         tabGeneral: "汎用装備構成",
@@ -381,6 +386,7 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `弾パラメータ ${no}`,
         // ハッシュ + 6 値の配列：Flag1:2 でバフを付ける。
         colSupportEffectList: "追加効果",
+    colBulletType: "弾種",
         // クールダウンを消費するタイミングの小さな列挙（2 = 一回限り）。
         colSaveActionType: "アクション種類",
         // ビットフラグ：このアクションの扱い・派生の可否を決める。
@@ -422,7 +428,8 @@ export const messages: Record<Lang, Messages> = {
         colEffects: "効果",
         copySelected: "コピー",
     cutSelected: "切り取り",
-        pasteBelow: "挿入",
+        pasteBelow: "貼り付け",
+    insertRow: "行を挿入",
     },
     ko: {
         tabGeneral: "일반 장비 구성",
@@ -504,6 +511,7 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `탄환 파라미터 ${no}`,
         // 해시 + 값 6개짜리 배열：Flag1:2 로 버프를 건다.
         colSupportEffectList: "추가 효과",
+    colBulletType: "탄 종류",
         // 쿨다운을 소비하는 시점을 정하는 작은 열거형(2 = 1회용).
         colSaveActionType: "액션 종류",
         // 비트 플래그：이 액션을 게임이 어떻게 다룰지·파생 가능 여부를 정한다.
@@ -545,6 +553,7 @@ export const messages: Record<Lang, Messages> = {
         colEffects: "효과",
         copySelected: "복사",
     cutSelected: "잘라내기",
-        pasteBelow: "삽입",
+        pasteBelow: "붙여넣기",
+    insertRow: "행 삽입",
     },
 };

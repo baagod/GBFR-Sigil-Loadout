@@ -425,6 +425,18 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         ⚠️ 这条是**旧规则的墓碑**：以前粘贴要拿"复制时留下的源列"逐个核对列名，对不上就整次拒绝。
         现在口径是"跟 Excel / WPS 一样，只看位置、不看列名"，所以同样的动作**必须写进去**。
     */
+    /* 用户口径：粘一个**等于原值**的值 = 没设置过 —— 当场回灰字，而且保存时不会带上这一格。 */
+    it("粘贴：粘成与原值相同 → 归一成没改过（灰字）", async () => {
+        const container = await renderTable()
+        const target = cellAt(container, 1, 2) // 这一格原本是改过的（actionFreeWork0_-改过），原值是 …-原值
+        selectCell(target)
+
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-原值")})
+
+        expect(target.textContent).toBe("actionFreeWork0_-原值")
+        expect(target.firstElementChild!.className).toContain("text-muted-foreground")
+    })
+
     it("粘贴：不校验列名（粘到别的列上照样写）", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()

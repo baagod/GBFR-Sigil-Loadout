@@ -1,5 +1,7 @@
 /*
-    **方向键与 Enter**：活动格在数据格里走一格 / 进编辑（Excel 手感）。
+    **方向键、Enter、Delete 与 Insert**：活动格在数据格里走一格 / 进编辑（Excel 手感）/ Delete 清掉
+    选区里每一格的改动（回到表格默认值，见 `clearSelectedCells`）/ Ctrl+Delete 删掉**选区压到的行**
+    （不必整行选中）/ Insert 把复制的行插到活动格下方。
 
     为什么单独一个 hook：这是"键盘那一层"的全部规则（三条移动路径 + 四道让路闸门），
     与选区手势、渲染、列宽都无关；而它要读的都是**渲染期最新值**，所以在这里统一成
@@ -35,7 +37,7 @@ const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
 /** 修饰键按位组合：`SHIFT` 扩选、`CTRL` 跳边，两者都不按就是走一步。 */
 const SHIFT = 1
 const CTRL = 2
-export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey}: {
+export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection}: {
     tableInstanceRef: RefObject<ArrowTable>
     tableRef: RefObject<HTMLTableElement | null>
     /** 活动格的"进编辑"登记表（见 `EnterEditRegistry`）：Enter 按活动格的键取那一个句柄。 */
@@ -47,6 +49,12 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
     sheetColumns: string[]
     /** 活动格的键（`snapshotKey` 格式，`""` = 没有）。 */
     activeCellKey: string
+    /** Delete 的落点：清掉选区里每一格的改动（回到默认值）。实现在 `useClipboardHistory`。 */
+    clearSelectedCells: () => void
+    /** Insert 的落点：把行剪贴板里的行插到活动格下方（无活动格时它自己落末行）。 */
+    insertCopiedRows: () => void
+    /** Ctrl+Delete 的落点：删掉选区压到的行（不必整行选中）。 */
+    removeRowsInSelection: () => void
 }) {
     /**
      * **渲染期最新值的镜像**：处理器与那两个监听引用恒定（挂一次），事件里读到的是**最新那一拍**。
@@ -54,8 +62,8 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
      * ‼️ 与表里别处（`tableInstanceRef` / `rowsRef` / `clickRowHandleRef`）同一个机制 —— 原来这里是
      * "无依赖 effect + 每渲染重挂"，同一个文件里两套机制并存，读的人得先猜"这个闭包是不是新的"。
      */
-    const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey})
-    fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey}
+    const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection})
+    fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection}
     /** 选区边界（走表实例那份记忆化，引用稳定）。 */
     const getSelectionBounds = () => tableInstanceRef.current.getCellSelectionBounds()
 
@@ -87,7 +95,11 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         const {cellSelection, modelRows, sheetColumns, activeCellKey} = fresh.current
         const direction = ARROW_KEYS[e.key]
         const isEnter = e.key === "Enter" || e.key === "F2"
-        if ((!direction && !isEnter) || e.defaultPrevented) return
+        /* Delete 裸键 = 清改动；Ctrl+Delete = 删选区行。Insert 同理只认裸键。 */
+        const isDelete = e.key === "Delete" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
+        const isRemoveRow = e.key === "Delete" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey
+        const isInsert = e.key === "Insert" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
+        if ((!direction && !isEnter && !isDelete && !isInsert && !isRemoveRow) || e.defaultPrevented) return
         /*
             ‼️ **同一时刻只有"当前那一层"的表响应用户的按键**。
 
@@ -134,6 +146,36 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         const insideEditorOrList = (e.target as HTMLElement | null)?.closest?.(
             "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
         )
+        /*
+            ---- Ctrl+Delete：删掉**选区压到的行**（不必整行选中）----
+            与 Delete / Insert 同一套闸门；在编辑框里是"删到行首"之类的浏览器行为，不让路会误删表格行。
+        */
+        if (isRemoveRow) {
+            if (insideEditorOrList) return
+            e.preventDefault()
+            fresh.current.removeRowsInSelection()
+            return
+        }
+        /*
+            ---- Insert：把复制的行插到活动格下方（落点与工具条那个「插入行」是同一个命令）----
+            与 Delete 同一套闸门：编辑框里的 Insert 是覆盖输入、列表里是别的东西，都不动表格。
+        */
+        if (isInsert) {
+            if (insideEditorOrList) return
+            e.preventDefault()
+            fresh.current.insertCopiedRows()
+            return
+        }
+        /*
+            ---- Delete：清掉选区里每一格的改动（回到表格默认值）----
+            与方向键同一套闸门：编辑框里删的是那几个字，列表里删的是搜索词，都不能动表格。
+        */
+        if (isDelete) {
+            if (insideEditorOrList) return
+            e.preventDefault()
+            fresh.current.clearSelectedCells()
+            return
+        }
         if (!direction) {
             // ---- Enter / F2：进编辑（与"双击格子"同一条口径）----
             /*

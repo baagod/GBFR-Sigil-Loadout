@@ -13,25 +13,27 @@ import {Plus} from "@phosphor-icons/react/Plus"
 import {CopySimple} from "@phosphor-icons/react/CopySimple"
 import {Scissors} from "@phosphor-icons/react/Scissors"
 import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
+import {RowsPlusBottom} from "@phosphor-icons/react/RowsPlusBottom"
 import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import type {Messages} from "@/lib/messages"
 
 /*
-    一条轨那排按钮（加行 / 复制 / 粘贴 / 剪切 / 删除）。它从 TrackGrid.tsx 拆出来：那是"表格 + 行 +
-    拖拽"，这只是"一排按钮" —— 120 行的图标、Tooltip、禁用态与悬停色不值得和表格挤在一个文件里。
+    一条轨那排按钮（加行 / 复制 / 粘贴单元格 / 插入行 / 剪切 / 删除）。它从 TrackGrid.tsx 拆出来：
+    那是"表格 + 行 + 拖拽"，这只是"一排按钮" —— 120 行的图标、Tooltip、禁用态与悬停色不值得和表格挤在一个文件里。
 */
 
 /** 一条轨那排按钮：压在标题行右侧，谁被选中就删谁。 */
-export function TrackToolbar({t, canCopy, canCut, canPaste, canRemove, onAdd, onCopy, onCut, onPaste, onRemove}: {
+export function TrackToolbar({t, canCopy, canCut, canRemove, onAdd, onCopy, onCut, onPaste, onInsert, onRemove}: {
     t: Messages
     canCopy: boolean
     canCut: boolean
-    canPaste: boolean
     canRemove: boolean
     onAdd: () => void
     onCopy: () => void
     onCut: () => void
     onPaste: () => void
+    /** 把行剪贴板里的全部行插到活动格所在行之后（无活动格 → 末行之后）。 */
+    onInsert: () => void
     onRemove: () => void
 }) {
     return (
@@ -81,7 +83,7 @@ export function TrackToolbar({t, canCopy, canCut, canPaste, canRemove, onAdd, on
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.copySelected}</TooltipContent>
                 </Tooltip>
-                <Tooltip disabled={!canPaste}>
+                <Tooltip>
                     <TooltipTrigger
                         render={
                             <Button
@@ -89,7 +91,6 @@ export function TrackToolbar({t, canCopy, canCut, canPaste, canRemove, onAdd, on
                                 variant="ghost"
                                 className="hover:bg-[#262626]!"
                                 aria-label={t.pasteBelow}
-                                disabled={!canPaste}
                                 onClick={onPaste}
                             />
                         }
@@ -97,6 +98,22 @@ export function TrackToolbar({t, canCopy, canCut, canPaste, canRemove, onAdd, on
                         <ClipboardText />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.pasteBelow}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger
+                        render={
+                            <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                className="hover:bg-[#262626]!"
+                                aria-label={t.insertRow}
+                                onClick={onInsert}
+                            />
+                        }
+                    >
+                        <RowsPlusBottom />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t.insertRow}</TooltipContent>
                 </Tooltip>
                 <Tooltip disabled={!canCut}>
                     <TooltipTrigger

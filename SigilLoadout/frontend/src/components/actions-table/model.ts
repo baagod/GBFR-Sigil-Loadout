@@ -33,6 +33,7 @@ const PLAIN_COLUMNS = {
     branchYAtk_Hold_: "colBranchYHold",
     branchAtkHit_: "colBranchHit",
     supportEffectList_: "colSupportEffectList", // 哈希 + 6 个值的数组：Flag1:2 被调用时据此挂 Buff
+    bulletType_: "colBulletType", // 子弹类型（与 bulletFreeWorkNN_ 那批子弹参数同族）
     saveActionType_: "colSaveActionType", // 冷却消耗时机的小枚举（2 = 一次性）
     straddleFlagBit_: "colStraddleFlagBit", // 位标记：这条动作怎么被游戏处理、能不能接招
     usePoint_: "colUsePoint", // 该动作给这场战斗贡献多少分

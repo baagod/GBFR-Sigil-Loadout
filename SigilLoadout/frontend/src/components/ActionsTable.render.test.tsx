@@ -157,6 +157,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
             ["自由参数 06", "freeWork06_"],
             ["子弹参数 04", "bulletFreeWork04_"],
             ["附加效果", "supportEffectList_"],
+            ["子弹类型", "bulletType_"],
             ["伤害上限类型", "damageLimitType_"],
             // 没认出来的列：两行都是字段名本身（兜底）。`0_` 只有一位数字，不该被模板吞掉。
             ["actionFreeWork0_", "actionFreeWork0_"],

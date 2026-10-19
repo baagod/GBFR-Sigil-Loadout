@@ -28,6 +28,9 @@ import {
     type CopySource,
 } from "./model"
 
+/** 当前**有选区**的那几张表（DOM）—— 给"事件/焦点不在任何表里"时的归属判断用（见 `isMyEvent`）。 */
+const tablesWithSelection = new Set<HTMLTableElement>()
+
 /**
  * 这里用到的表 API。**故意只声明用得到的那几个**，而不是 import 库的整个表类型：
  * 本模块只消费这一小块（选区边界 / 行模型 / 写回选区），声明宽了反而看不出契约。
@@ -50,6 +53,8 @@ export function useClipboardHistory({
     write,
     rowsRef,
     tableRef,
+    tableElementRef,
+    hasSelection,
     branchIds,
     writable,
     multiAreaCopyText,
@@ -66,6 +71,10 @@ export function useClipboardHistory({
     rowsRef: {current: ActionRow[]}
     /** 表实例的镜像（渲染期不碰它，只在事件处理器里用）。 */
     tableRef: {current: ClipboardTable}
+    /** 这张表的 DOM 元素 —— 用来挡"弹窗背后那张表 / 同一弹窗里别的表"的 copy/paste/键盘事件。 */
+    tableElementRef: {current: HTMLTableElement | null}
+    /** 这张表当前**有没有选区**：注册到模块级集合里，焦点不在表里时靠它判断该由哪张表接事件。 */
+    hasSelection: boolean
     /** 分支列那份清单（粘贴校验用）；不做分支列时传空集即可。 */
     branchIds: ReadonlySet<string>
     /**
@@ -77,6 +86,40 @@ export function useClipboardHistory({
     multiAreaCopyText: string
 }) {
     const [copyHint, setCopyHint] = useState("")
+
+    /* 维护"有选区的表"集合（DOM 级）：`isMyEvent` 在事件/焦点都不落在表里时用它兜底。 */
+    useEffect(() => {
+        const el = tableElementRef.current
+        if (!el) return
+        if (hasSelection) tablesWithSelection.add(el)
+        else tablesWithSelection.delete(el)
+        return () => {
+            tablesWithSelection.delete(el)
+        }
+    }, [hasSelection, tableElementRef])
+
+    /**
+     * **这次 copy/paste/键盘事件是不是该由这张表接**：
+     *   · 只认**最上层弹窗**里的表（弹窗背后的动作表不许跟着粘贴/复制 —— 用户报的"轨表里粘贴，动作表所有格都变"）；
+     *   · 同一个弹窗里有多张表时，只认**事件/焦点落在的那张**；两样都不在表里时，
+     *     只在"当前层里唯一有选区的表"上放行（两张表都有选区就不猜，谁都别动）。
+     */
+    const isMyEvent = useCallback(
+        (e: Event): boolean => {
+            const el = tableElementRef.current
+            if (!el) return true
+            const myLayer = el.closest("[role=dialog]")
+            const dialogs = document.querySelectorAll("[role=dialog]")
+            const topLayer = dialogs.length > 0 ? dialogs[dialogs.length - 1] : null
+            if (myLayer !== topLayer) return false
+            const target = e.target instanceof Element ? e.target : null
+            const active = document.activeElement instanceof Element ? document.activeElement : null
+            const owner = target?.closest("table") ?? active?.closest("table") ?? null
+            if (owner) return owner === el
+            return ![...tablesWithSelection].some((table) => table !== el && table.closest("[role=dialog]") === topLayer)
+        },
+        [tableElementRef],
+    )
     /**
      * **复制源**（剪贴板里那份是从哪儿复制的）—— 画那圈虚线用；`null` = 没有（复制过又被撤掉了）。
      *
@@ -114,6 +157,8 @@ export function useClipboardHistory({
     const undoingRef = useRef(false)
     /** **正在粘贴**：这期间不记账，由粘贴那一处把整片当**一步**记下来。 */
     const batchingRef = useRef(false)
+    /** 上一次**复制出去的那片文本**（TSV）。工具条「粘贴」用它 —— 不走系统剪贴板，粘的就是本应用刚复制的那片。 */
+    const cellClipboardRef = useRef("")
 
     /**
      * 改一格：判重、记账、撤虚线，然后交给数据层（`write`）。
@@ -127,9 +172,10 @@ export function useClipboardHistory({
      */
     const edit = useCallback(
         /**
-         * @param normalise 值打成与原值一模一样时，是否归一成"没改过"（**默认是**）。粘贴那条路要关掉它：
-         *   用户口径是"往源区里粘一个跟原来一模一样的值，**虚线照样撤**"（见 `CopySource` 规则②）——
-         *   归一之后那一格连写都不写，那一记粘贴就什么痕迹都没有了。
+         * @param normalise 值打成与原值一模一样时，是否归一成"没改过"（**默认是**）。
+         *   用户口径：编辑与粘贴都归一 —— 粘一个等于原值的值 = 没设置过，界面回灰字。
+         *   "往源区里粘一个一样的值，虚线照样撤"那条改由 `handlePaste` 按落点显式判，
+         *   不再靠这里写一次空改动（归一之后那一格不会走写路径）。
          */
         (rowId: string, columnId: string, value: string | null, normalise = true) => {
             const row = rowsRef.current.find((one) => one.id === rowId)
@@ -157,6 +203,41 @@ export function useClipboardHistory({
     )
 
     /**
+     * **Delete：清掉选区里每一格的改动**（"回到表格默认值"）。只动**可写列**；整行选区就是整行清空。
+     *
+     * 一步撤销（与粘贴同一条口径）：`batchingRef` 让这批量 `edit` 各自不记账，收尾整体 push 成一步。
+     * 已经没有改动（`before === ""`）的格子直接跳过 —— 它们本来就在显示原值。
+     */
+    const clearSelectedCells = useCallback(() => {
+        const bounds = tableRef.current.getCellSelectionBounds()
+        if (bounds.length === 0) return
+        const modelRows = tableRef.current.getRowModel().rows
+        const byId = new Map(rowsRef.current.map((row) => [row.id, row]))
+        const step: UndoEntry[] = []
+        batchingRef.current = true
+        try {
+            for (const b of bounds) {
+                for (let r = b.minRowIndex; r <= b.maxRowIndex; r++) {
+                    const row = modelRows[r]
+                    if (!row) continue
+                    const cells = row.getAllCells()
+                    for (let c = b.minColumnIndex; c <= b.maxColumnIndex; c++) {
+                        const columnId = cells[c]?.column.id
+                        if (!columnId || !writable(columnId)) continue
+                        const before = byId.get(row.id)?.values[columnId] ?? ""
+                        if (before === "") continue
+                        step.push({rowId: row.id, columnId, before})
+                        edit(row.id, columnId, "")
+                    }
+                }
+            }
+        } finally {
+            batchingRef.current = false
+        }
+        if (step.length > 0) undoRef.current.push(step)
+    }, [edit, rowsRef, tableRef, writable])
+
+    /**
      * 撤销一步（Ctrl+Z）：把这一步记下的"改前值"倒着写回去。
      *
      * 倒着写是**必须的**：一步里同一个格子被写过两次时（粘贴块自己叠到自己上），只有"后写的那条
@@ -167,8 +248,9 @@ export function useClipboardHistory({
      * 那一刻挂在容器上的 `onKeyDown` 根本收不到，表现就是"提交完按 Ctrl+Z 没反应"（用户报的）。
      */
     const handleUndo = useCallback(
-        (e: KeyboardEvent | React.KeyboardEvent) => {
+        (e: KeyboardEvent) => {
             if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return
+            if (!isMyEvent(e)) return
             /*
                 编辑框里的 Ctrl+Z 归浏览器（撤的是这一次输入），跟表格的历史不是一回事。
                 判据用**当前焦点**而不是 `e.target`：键盘事件两个通常一致，但焦点在别的输入框
@@ -190,7 +272,7 @@ export function useClipboardHistory({
                 undoingRef.current = false
             }
         },
-        [edit],
+        [edit, isMyEvent],
     )
 
     /**
@@ -305,7 +387,9 @@ export function useClipboardHistory({
             }
             setCopyHint("")
             if (plan.grid.length === 0) return
-            emit(toTsv(plan.grid))
+            const text = toTsv(plan.grid)
+            cellClipboardRef.current = text
+            emit(text)
             /*
                 顺手把"这片是从哪儿复制的"记下来：那圈虚线靠它画，撤不撤也靠它判（规则见 `CopySource` 那段）。
                 新一次复制就是**覆盖**旧的（规则①），所以这里直接重建、不用先清。
@@ -327,6 +411,7 @@ export function useClipboardHistory({
 
     const handleCopy = useCallback(
         (e: ClipboardEvent) => {
+            if (!isMyEvent(e)) return
             const target = e.target as HTMLElement | null
             /*
                 ‼️ **表头不参与表格复制**（列名归浏览器）：从表头发起的这一记 Ctrl+C 直接让过去 ——
@@ -352,7 +437,7 @@ export function useClipboardHistory({
             e.preventDefault()
             copyArea((text) => e.clipboardData?.setData("text/plain", text))
         },
-        [copyArea],
+        [copyArea, isMyEvent],
     )
 
     /**
@@ -362,10 +447,8 @@ export function useClipboardHistory({
      *   · `block[r % blockRows][c % blockCols]` 就是"铺不满一份就丢掉那一格"；
      *   · 只读列 / 越界都是"这一格不写"，但**位置照占**（不然整块会左移）。
      */
-    const handlePaste = useCallback(
-        (e: ClipboardEvent) => {
-            if ((e.target as HTMLElement).tagName === "INPUT") return
-            const text = e.clipboardData?.getData("text/plain") ?? ""
+    const pasteText = useCallback(
+        (text: string, e?: ClipboardEvent) => {
             /*
                 ‼️ 落点用选区的**外接矩形**（多片时逐片给的）：本表的铺块规则
                 （`floor(选区 / 块)`、落点 = 左上角）本来就是按一个矩形定义的；多片时取外接矩形是唯一
@@ -381,7 +464,7 @@ export function useClipboardHistory({
                 maxColumnIndex: Math.max(box.maxColumnIndex, b.maxColumnIndex),
             }))
             setCopyHint("")
-            e.preventDefault()
+            e?.preventDefault()
 
             const modelRows = tableRef.current.getRowModel().rows
             const startRow = bounds.minRowIndex
@@ -411,14 +494,19 @@ export function useClipboardHistory({
             if (writes.length === 0) return
 
             /*
+                粘一个等于原值的值 = **没设置过**（用户口径）：`edit` 的归一会把那几格写回空串、
+                界面当场回灰字。代价是"动过源区 → 撤虚线"不能只靠 `edit` 的写路径（归一之后它不会走），
+                所以这里按**落点**先判一次：粘贴碰到复制源 → 虚线照样撤。
+            */
+            const source = copySourceRef.current
+            if (source && writes.some((w) => source.snapshot.has(snapshotKey(w.rowId, w.columnId)))) clearCopySource()
+            /*
                 整次粘贴 = **一步撤销**（规则③）：`batchingRef` 让这一批 `edit` 各自不记账，
                 下面再把这批整体 push 成一步。被校验挡掉的那几格不在里面。
             */
             batchingRef.current = true
             try {
-                // `normalise = false`：粘贴不归一（理由见 `edit` 的参数说明）—— 粘一个与原值相同的值
-                // 也要**真的写进去**，好让"动过源区 → 撤虚线"这条规则成立。
-                for (const w of writes) edit(w.rowId, w.columnId, w.value, false)
+                for (const w of writes) edit(w.rowId, w.columnId, w.value)
             } finally {
                 batchingRef.current = false
             }
@@ -433,6 +521,33 @@ export function useClipboardHistory({
         },
         [branchIds, edit, tableRef, writable],
     )
+
+    /** 系统粘贴事件（Ctrl+V）：编辑框里的粘贴归浏览器，其余走上面那份。 */
+    const handlePaste = useCallback(
+        (e: ClipboardEvent) => {
+            if (!isMyEvent(e)) return
+            if ((e.target as HTMLElement).tagName === "INPUT") return
+            pasteText(e.clipboardData?.getData("text/plain") ?? "", e)
+        },
+        [pasteText, isMyEvent],
+    )
+
+    /** 工具条「粘贴」：优先粘本应用上一次复制的那片（与 Ctrl+C 同源）；本应用没复制过就退回系统剪贴板。 */
+    const pasteClipboard = useCallback(() => {
+        if (cellClipboardRef.current) {
+            pasteText(cellClipboardRef.current)
+            return
+        }
+        const read = navigator.clipboard?.readText?.()
+        if (!read) return
+        void read
+            .then((text) => {
+                if (text) pasteText(text)
+            })
+            .catch(() => {
+                /* 读系统剪贴板被拒（权限/非安全上下文）：静默不做，Ctrl+V 那条路仍可用。 */
+            })
+    }, [pasteText])
 
     /**
      * 复制源那圈虚线的两条**外部**退出路径（规则②③④，见 `CopySource` 那段）。
@@ -459,10 +574,11 @@ export function useClipboardHistory({
     const handleEscape = useCallback(
         (e: KeyboardEvent) => {
             if (e.key !== "Escape") return
+            if (!isMyEvent(e)) return
             if ((e.target as HTMLElement).tagName === "INPUT") return
             clearCopySource()
         },
-        [clearCopySource],
+        [clearCopySource, isMyEvent],
     )
 
     /*
@@ -509,5 +625,5 @@ export function useClipboardHistory({
         [copyArea],
     )
 
-    return {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit}
+    return {copyHint, setCopyHint, copySource, clearCopySource, copySelection, pasteClipboard, edit, clearSelectedCells}
 }

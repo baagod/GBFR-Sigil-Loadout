@@ -75,16 +75,19 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
     const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
     /**
-     * 当前分区里选中的行（**下标**，升序）。`key` 是分区身份 —— **一次只认一个分区**，切到别的分区就等于换了个选区。
+     * **最近一次有选区的那张表**（分区 key）—— 键盘 Ctrl+C/X/V 的落点。
      *
-     * ‼️ 这份状态**由基座上报**（`onSelectionChange`，见 `ActionsTable`）：行号点 / Shift 拖 / Ctrl 加选
-     * 那套手势现在只有基座那一份实现（tanstack 的 cellSelection），这里只留"哪几行被整行选中"这一个事实。
-     * （以前这里自己养了一套 `useRowSelection` 状态机，但改基座之后它的两个入口再没人调用 —— 那套已经删了。）
+     * ‼️ 与工具条按钮**同一套判据**：按钮亮不亮看 `hasSelection`，按键落点看它；都不要求"整行选中"。
+     * （以前这里维护的是"哪几行被整行选中"，于是键盘一套、按钮另一套，两边经常对不上。）
      */
-    const [sel, setSel] = useState<string | null>(null)
-    /** 基座交回来的**复制动作**（行剪贴板 + 区域剪贴板 + 虚线，合成一次；见基座的 `onCopyReady`）。 */
+    const [activeKey, setActiveKey] = useState<string | null>(null)
+    /** 每张表**有没有选区**（任意格子，不要求整行）—— 工具条按钮与键盘快捷键共用这一个判据。 */
+    const [hasSelection, setHasSelection] = useState<Record<string, boolean>>({})
+    /** 基座交回来的**复制动作**（行剪贴板 + 区域复制 + 虚线，合成一次；见基座的 `onCopyReady`）。 */
     const copyEntry = useRef<Record<string, (() => void) | undefined>>({})
-    /** 基座交回来的**行级命令**（添加/复制/剪切/粘贴/删除，一份实现见 `useRowCommands`）。 */
+    /** 基座交回来的**粘贴动作**（粘单元格区域；工具条「粘贴」用）。 */
+    const pasteEntry = useRef<Record<string, (() => void) | undefined>>({})
+    /** 基座交回来的**行级命令**（添加/复制/剪切/插入/删除，一份实现见 `useRowCommands`）。 */
     const rowCommands = useRef<Record<string, RowCommands | undefined>>({})
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
@@ -105,7 +108,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         // 换号（隐藏 mot 里展开另一行）等于换一份数据：先清掉上一号的草稿与选中，
         // 否则它们会跟着新号一起被交出去（保存时写错号）。
         setLoaded(false)
-        setSel(null)
+        setActiveKey(null)
+        setHasSelection({})
         let alive = true
         void (async () => {
             try {
@@ -175,14 +179,16 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         })
     }
 
-    // ---- 每块那排按钮：添加 / 复制 / 插入（选区与剪贴板按分区隔离）----
+    // ---- 每块那排按钮：行列命令与单元格复制/粘贴都交给基座 ----
 
     /**
-     * 键盘：Del = 删除选中行、Ctrl+X = 剪切、Ctrl+V = 粘贴、Ctrl+C = 复制 —— 都调基座交回来的行命令
-     * （`rowCommands`，与工具条那几个按钮同一条路径）。**Ctrl+C 故意不 preventDefault**：复制区那圈虚线
-     * 是基座画的（它监听表格的 copy 事件），这里拦下按键基座就永远收不到，虚线也就没了。
-     * 在输入框/文本域里打字时不抢按键（`[data-copy-own]` = 格子自己收下 Ctrl+C）；没有选中行就什么都
-     * 不做 —— 删哪儿、粘到哪儿必须由人指定，别猜。
+     * 键盘：**Ctrl+X = 剪切、Ctrl+C = 复制** —— 都走基座那份。
+     * ‼️ **Ctrl+V 不在这里接**：那是"粘单元格区域"，交给浏览器的 paste 事件（基座 `useClipboardHistory` 听）；
+     * 这里拦截会把原生粘贴吞掉，变成"插一行"（用户报的 Ctrl+V 变插入行）。
+     * Ctrl+Delete 删行归**基座的键盘层**（删的是选区压到的行，不必整行选中）。
+     * **Ctrl+C 故意不 preventDefault**：复制区那圈虚线是基座画的（它监听表格的 copy 事件），这里拦下
+     * 按键基座就永远收不到，虚线也就没了。裸 Del 归基座（清选区里每一格的改动）。
+     * 在输入框/文本域里打字时不抢按键（`[data-copy-own]` = 格子自己收下 Ctrl+C）；没有选区就什么都不做。
      */
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -190,33 +196,26 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             // 输入框里打字时不抢按键；`[data-copy-own]` 是**格子自己收下 Ctrl+C** 的意思（值格那一格
             // 复制的是自己的值，不是选中的行）—— 与 App.tsx 那记"Esc 收托盘"用的 `data-esc-own` 同一套约定。
             if ((event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable], [data-copy-own]")) return
-            const key = sel
+            const key = activeKey
             const info = infos.find((one) => trackKey(one) === key)
-            if (event.key === "Delete" && !event.ctrlKey && !event.metaKey) {
-                if (!key || !info) return
-                event.preventDefault()
-                rowCommands.current[key]?.remove()
-                return
-            }
             if (!(event.ctrlKey || event.metaKey)) return
             if (!key || !info) return
             if (event.key === "c") {
                 // ‼️ **不 preventDefault**：这一记 Ctrl+C 还要让**基座**那条路跑 —— 复制区那圈虚线是基座
                 // 画的（它监听表格的 copy 事件）。以前这里拦下按键、自己复制整行，于是基座永远收不到 copy，
                 // 轨表就一直没有虚线，也谈不上"再复制一次把旧区换掉"。
-                // 这里只管"行进行剪贴板"（跨表粘行）；工具条那个按钮走基座的组合动作（行 + 区域 + 虚线）。
+                // 这里只管"行进行剪贴板"（给 Insert 用）；单元格那片由基座的 copy 事件负责。
                 rowCommands.current[key]?.copy()
             } else if (event.key === "x") {
                 event.preventDefault()
+                // 剪切 = 复制这一片（单元格区域 + 行剪贴板）+ 删掉选区行（"假删除"落库那一层照旧）。
+                copyEntry.current[key]?.()
                 rowCommands.current[key]?.cut()
-            } else if (event.key === "v") {
-                event.preventDefault()
-                rowCommands.current[key]?.paste()
             }
         }
         window.addEventListener("keydown", onKey)
         return () => window.removeEventListener("keydown", onKey)
-    }, [sel, infos])
+    }, [activeKey, infos])
 
     /**
      * 打开弹层时把主窗口那边的焦点收掉。
@@ -236,6 +235,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
      *
      * ‼️ **假删除在这一层做**：基座只会真删（它不认识"原行"），所以"本来有原身份、又被删掉"的那些要
      * 加回来标红 —— 那才是轨表的保存语义（原行留着但不部署）。
+     *
+     * ‼️ **再删一次假删除行 = 解除假删除**（用户口径）：它本来就在原表里、只是被标成不部署；
+     * 再按一次删除/ Ctrl+Del 就把它放回原位（`removed` 清掉），保存时重新部署。
      */
     const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) => {
         const columns: readonly string[] = tables[key]?.columns ?? []
@@ -250,8 +252,27 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             orig: row.orig ?? null,
             removed: undefined,
         })
-        const restored = deleted.filter((row) => row.orig != null).map((row, i) => ({...toRow(row, next.length + i), removed: true}))
-        const rows = [...next.map(toRow), ...restored]
+        const restored = deleted
+            .filter((row) => row.orig != null)
+            .map((row, i) => {
+                const back = toRow(row, next.length + i)
+                /* 已经是假删除的：这次是"解除"；否则标成假删除。 */
+                return row.removed ? back : {...back, removed: true}
+            })
+        const rows = next.map(toRow)
+        /*
+            解除假删除的那几行要**插回原位**（按 `orig` 找第一个更大的原行），不能一律 append ——
+            轨的顺序就是内容（写入时按数组顺序），塞到末尾等于把这一行挪到最后。
+            新行（`orig == null`）不参与定序；仍被假删除的行照旧排在末尾。
+        */
+        for (const row of [...restored].sort((a, b) => (a.orig ?? 0) - (b.orig ?? 0))) {
+            if (row.removed) {
+                rows.push(row)
+                continue
+            }
+            const at = rows.findIndex((one) => one.orig != null && one.orig > (row.orig ?? 0))
+            rows.splice(at === -1 ? rows.length : at, 0, row)
+        }
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
@@ -265,8 +286,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             if (!table) return prev
             return {...prev, [key]: {...table, rows: arrayMove(table.rows, from, to)}}
         })
-        // 行序变了，原来记的号码全错位：清掉重选。
-        setSel(null)
     }
 
     const showFsm = async (name: string) => {
@@ -336,8 +355,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         <>
         {infos.map((info) => {
             const key = trackKey(info)
-            /* flags 也在 `tables` 里（同一条 `trackKey`），所以行数与别的轨同一个问法。 */
-            const count = tables[key]?.rows.length ?? 0
             // ⚠️ 标题**不能包在分区那个 div 里**：sticky 只在自己父元素的范围内吸顶 —— 包进去的话，
             // 分区一结束标题就被自己的分区顶着往上走，上半截被滚动容器上沿切掉，露出一行半截字 ✗。
             // 提出来做**滚动容器的直接子元素**（Fragment 不生成节点），标题就永远钉在顶部；下一个标题
@@ -372,18 +389,22 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         <div className="absolute inset-y-0 right-0 flex items-center">
                             <TrackToolbar
                                 t={t}
-                                canCopy={count > 0}
-                                canCut={sel === key}
-                                canPaste={sel !== null}
-                                canRemove={sel === key}
+                                canCopy={hasSelection[key] === true}
+                                canCut={hasSelection[key] === true}
+                                canRemove={hasSelection[key] === true}
                                 onAdd={() => rowCommands.current[key]?.add()}
                                 onCopy={() => {
                                     // 两条路：行剪贴板（跨表粘行）+ 基座那条区域复制（画虚线）。
                                     copyEntry.current[key]?.()
                                 }}
-                                onCut={() => rowCommands.current[key]?.cut()}
-                                onPaste={() => rowCommands.current[key]?.paste()}
-                                onRemove={() => rowCommands.current[key]?.remove()}
+                                onCut={() => {
+                                    // 剪切与 Ctrl+X 同一条路：复制这片（单元格 + 行剪贴板）+ 删掉选区行。
+                                    copyEntry.current[key]?.()
+                                    rowCommands.current[key]?.cut()
+                                }}
+                                onPaste={() => pasteEntry.current[key]?.()}
+                                onInsert={() => rowCommands.current[key]?.insert()}
+                                onRemove={() => rowCommands.current[key]?.removeRowsInSelection()}
                             />
                         </div>
                     </div>
@@ -400,9 +421,15 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                             onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
                             onReorder={(from, to) => reorder(key, from, to)}
                             /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
-                            onSelectionChange={(rowIds) => setSel(rowIds.length ? key : null)}
+                            onSelectionPresenceChange={(has) => {
+                                setHasSelection((prev) => (prev[key] === has ? prev : {...prev, [key]: has}))
+                                if (has) setActiveKey(key)
+                            }}
                             onCopyReady={(copy) => {
                                 copyEntry.current[key] = copy
+                            }}
+                            onPasteReady={(paste) => {
+                                pasteEntry.current[key] = paste
                             }}
                             onRowsReady={(commands) => {
                                 rowCommands.current[key] = commands

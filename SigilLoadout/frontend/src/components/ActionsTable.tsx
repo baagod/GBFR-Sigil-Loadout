@@ -37,7 +37,7 @@
       · `actions-table/clipboard.ts`  —— TSV 读写 + 粘贴铺块规则；
       · `actions-table/useClipboardHistory.ts` —— 复制粘贴 / 复制源虚线 / 撤销栈，**以及 `edit`**
         （撤销栈的记账规则长在 `edit` 里，所以它们必须同居）；
-      · `actions-table/useRowCommands.ts` —— 行级命令（添加/复制/剪切/粘贴/删除）；
+      · `actions-table/useRowCommands.ts` —— 行级命令（添加/复制/剪切/粘贴/插入/删除）；
       · `actions-table/ActionRowView.tsx` —— 表体一行（memo 那一层）；
       · `actions-table/Cell.tsx`      —— 一格的显示态 / 编辑态；
       · `actions-table/ActionsTableHead.tsx`   —— 表头那一行的渲染（两行表头 / 钉住 / 握把占位）；
@@ -118,7 +118,7 @@ import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionChange, onCopyReady, onRowsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
+export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCopyReady, onPasteReady, onRowsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -163,19 +163,18 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      */
     onEdit?: (rowId: string, key: string, value: string | null) => void
     /**
-     * **整行选中的那些行变了**（行 id，按显示顺序；空数组 = 一行都没整行选中）。
-     *
-     * 基座只有"单元格选区"一个模型 —— 整行就是"一个整行宽的区"（见 `selectRowSpan`）。调用方
-     * （轨表弹层）的工具条要按"选中了哪几行"决定按钮亮不亮、Ctrl+C/X 复制的又是哪几行，
-     * 所以这里把那个判断**算好上报**，别让调用方自己去啃 `cellSelection` 的几何。
+     * **这张表有没有选区**（任意单元格选区，不必整行）—— 工具条据此决定"删除行"亮不亮：
+     * `Ctrl+Delete` 删的是**选区压到的行**，按钮跟它同一个命令，所以判据也同一份。
      */
-    onSelectionChange?: (rowIds: string[]) => void
+    onSelectionPresenceChange?: (hasSelection: boolean) => void
     /**
      * **把"复制当前选区"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮用它 ——
      * 按钮手里没有 Ctrl+C 那个事件对象，但"进剪贴板的是哪片、虚线画在哪儿"必须与键盘那条完全一致。
      */
     onCopyReady?: (copy: () => void) => void
-    /** 行级命令（添加/复制/剪切/粘贴/删除，一份实现在 `useRowCommands`）：交给调用方接到工具条上。 */
+    /** **把"粘贴单元格区域"交给调用方**（工具条「粘贴」按钮用）：粘的是本应用上一次复制的那片。 */
+    onPasteReady?: (paste: () => void) => void
+    /** 行级命令（添加/复制/剪切/粘贴/插入/删除，一份实现在 `useRowCommands`）：交给调用方接到工具条上。 */
     onRowsReady?: (commands: RowCommands) => void
     /**
      * 行数据变了（增/删/插）：**新版的一整份** + **被删掉的那几行**。
@@ -462,22 +461,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     const lastColumnIndex = sheetColumns.length - 1
 
     /**
-     * **把"整行选中的那几行"上报给调用方**（见 `onSelectionChange`）。
-     *
-     * ⚠️ 指纹去重（用 id 串比，不靠依赖数组的引用）：`modelRows` / `selectionBounds` 每次渲染都可能是
-     * 新对象，没有这道闸就会渲染一次报一次 → 调用方 setState → 再渲染 → **打转**。
-     */
-    const lastFullSelection = useRef("")
-    useEffect(() => {
-        if (!onSelectionChange) return
-        const ids = modelRows.filter((_, index) => rowFullySelected(selectionBounds, index, lastColumnIndex)).map((row) => row.id)
-        const fingerprint = ids.join(",")
-        if (fingerprint === lastFullSelection.current) return
-        lastFullSelection.current = fingerprint
-        onSelectionChange(ids)
-    }, [onSelectionChange, modelRows, selectionBounds, lastColumnIndex])
-
-    /**
      * **活动格**（`cell-active` = 选区最新那片的锚点）的键 —— 与 `snapshotKey` 同格式，给
      * "把活动格滚进视野"那个回调 ref 当判据（只有它那一格会拿到 ref）。
      *
@@ -533,11 +516,8 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     const tableInstanceRef = useRef(table)
     tableInstanceRef.current = table
 
-    /**
-     * **方向键 / Enter**（实现在 `actions-table/useArrowKeys.ts`）：三条移动路径 + 四道让路闸门，
-     * 监听挂在 `document` 的捕获阶段。它要读的都是**渲染期最新值**，在那个 hook 里统一成一份 ref 镜像。
-     */
-    useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey})
+    /** 这张表有没有选区（任意格子）—— 剪贴板归属判断与工具条按钮亮不亮共用。 */
+    const hasSelection = cellSelection.length > 0
 
     /**
      * **剪贴板 + 撤销栈 + 改一格** —— Excel 口径的复制粘贴、复制区那圈虚线、Ctrl+Z，全在
@@ -548,10 +528,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * `tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids` 由 `useMemo` 按数据给），
      * 所以它内部那段全局监听**只挂一次**。
      */
-    const {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit} = useClipboardHistory({
+    const {copyHint, setCopyHint, copySource, clearCopySource, copySelection, pasteClipboard, edit, clearSelectedCells} = useClipboardHistory({
         write,
         rowsRef,
         tableRef: tableInstanceRef,
+        tableElementRef: tableRef,
+        hasSelection,
         branchIds: branchPick.ids,
         writable,
         multiAreaCopyText: t.multiAreaCopy,
@@ -564,8 +546,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 走了另一条路，**那圈虚线就不会画**（用户报的轨表"复制了却没有虚线、也没法再复制"就是这个）。
      * 有了它，按钮与键盘走的是**同一条**"哪片进剪贴板、虚线画在哪儿"。
      */
-    /* 整行选中的那些行**下标**（升序）—— 行级命令读它，与"整行选中"那条上报是同一份判据。 */
-    const selectedRowIndexes = modelRows.map((_, index) => index).filter((index) => rowFullySelected(selectionBounds, index, lastColumnIndex))
+    /* 选区**压到的行**（不必整行选中）—— 行级命令（复制/剪切/删除）用的就是这些行。 */
+    const selectionRowIndexes = (() => {
+        const hit = new Set<number>()
+        for (const bounds of selectionBounds) for (let index = bounds.minRowIndex; index <= bounds.maxRowIndex; index++) hit.add(index)
+        return [...hit].sort((a, b) => a - b)
+    })()
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
     const activeRowIndex = activeRowId === null ? -1 : modelRows.findIndex((row) => row.id === activeRowId)
 
@@ -584,20 +570,49 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     })
 
     /**
-     * **行级命令只有这一份**（添加/复制/剪切/粘贴/删除，实现在 `useRowCommands`）——
-     * 工具条那五个按钮由 `onRowsReady` 拿走，键盘那条也走它（见下面那段 keydown）。
+     * **行级命令只有这一份**（添加/复制/剪切/插入/删除，实现在 `useRowCommands`）——
+     * 工具条那几个按钮由 `onRowsReady` 拿走，键盘那条也走它。
      */
-    const rowCommands = useRowCommands({rows: modelRows.map((row) => row.original), keys, selectedRowIndexes, activeRowIndex, onChange: onRowsChange})
+    const rowCommands = useRowCommands({rows: modelRows.map((row) => row.original), keys, selectionRowIndexes, activeRowIndex, onChange: onRowsChange})
     /*
-        ‼️ 命令**用 ref 转发**：`rowCommands` 每渲染都是新对象（它是一包闭包），塞进依赖的话这个 effect
-        就每渲染都跑一次 —— 而调用方拿到命令通常会写自己的 ref 或 setState。ref 里永远是最新那一份，
-        effect 只在回调本身变化时才跑。
+        ‼️ 命令**用 ref 转发**：`rowCommands` 是一包闭包（每渲染都是新对象），里面带着 `rows` /
+        `selectionRowIndexes` —— 它们**只活在本表的 state 里**，父组件不因选区变化而重渲。所以这里
+        每渲染把最新一份转给 `onRowsReady`；挂在"回调变化"上会漏更新（真机症状：选中一行再点工具条
+        删除，删的是上一次选中的那行）。调用方只是写 ref，没有额外渲染。
     */
     const commandsRef = useRef(rowCommands)
     commandsRef.current = rowCommands
+    const onRowsReadyRef = useRef(onRowsReady)
+    onRowsReadyRef.current = onRowsReady
     useEffect(() => {
-        onRowsReady?.(commandsRef.current)
-    }, [onRowsReady])
+        onRowsReadyRef.current?.(commandsRef.current)
+    })
+
+    /* 选区在不在：只在"有/没有"翻转时上报（工具条按钮亮不亮 + 剪贴板归属判断）。 */
+    const onSelectionPresenceRef = useRef(onSelectionPresenceChange)
+    onSelectionPresenceRef.current = onSelectionPresenceChange
+    useEffect(() => {
+        onSelectionPresenceRef.current?.(hasSelection)
+    }, [hasSelection])
+
+    /**
+     * **方向键 / Enter / Delete / Insert**（实现在 `actions-table/useArrowKeys.ts`）：三条移动路径 + 四道
+     * 让路闸门，监听挂在 `document` 的捕获阶段。它要读的都是**渲染期最新值**，在那个 hook 里统一成
+     * 一份 ref 镜像。Delete 的落点（清选区改动）由 `useClipboardHistory` 给；Insert / Ctrl+Delete
+     * 的落点就是上面那份行级命令 —— 与工具条按钮走同一个命令。
+     */
+    useArrowKeys({
+        tableInstanceRef,
+        tableRef,
+        enterEditRegistry,
+        cellSelection,
+        modelRows,
+        sheetColumns,
+        activeCellKey,
+        clearSelectedCells,
+        insertCopiedRows: rowCommands.insert,
+        removeRowsInSelection: rowCommands.removeRowsInSelection,
+    })
 
     /**
      * **把"复制"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮与键盘 Ctrl+C 都走它。
@@ -612,6 +627,11 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
             copySelection()
         })
     }, [onCopyReady, copySelection])
+
+    /* 工具条「粘贴」与 Ctrl+V 同一条路：都粘单元格区域（Ctrl+V 走系统剪贴板，按钮走内部上次复制的那片）。 */
+    useEffect(() => {
+        onPasteReady?.(pasteClipboard)
+    }, [onPasteReady, pasteClipboard])
 
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */

@@ -273,6 +273,24 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(cell.firstElementChild!.className).toContain("text-muted-foreground")
     })
 
+    /* Delete：清掉选区里每一格的改动（"回到表格默认值"）。 */
+    it("Delete：选中改过的格子按 Del，改动清空、当场回灰色原值", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 0, 2) // 可编辑列（actionFreeWork0_）
+
+        clickToEdit(cell)
+        fireEvent.change(cell.querySelector("input")!, {target: {value: "临时改过"}})
+        fireEvent.blur(cell.querySelector("input")!)
+        expect(cell.firstElementChild!.className).not.toContain("text-muted-foreground")
+
+        selectCell(cell)
+        fireEvent.keyDown(document.body, {key: "Delete", code: "Delete", windowsVirtualKeyCode: 46})
+
+        await waitFor(() => expect(cell.firstElementChild!.className).toContain("text-muted-foreground"))
+        expect(cell.textContent).toBe("actionFreeWork0_-原值")
+        expect(cell.querySelector("input")).toBeNull()
+    })
+
     it("改过又清空之后，界面上退回显示**原值**（占位符）", async () => {
         const container = await renderTable()
         const cell = cellAt(container, 1, 2)
