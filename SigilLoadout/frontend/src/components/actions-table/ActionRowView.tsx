@@ -151,8 +151,8 @@ export const ActionRowView = memo(function ActionRowView({
     /** 行号列里显示的数字（从 1 数起）。 */
     rowNumber: number
     /**
-     * 这一行是不是**整行都在选区里**（由 `ActionsTable` 按选区矩形算出来，见 `rowFullySelected`）。
-     * 只用来点亮**行号格**自己 —— 数据格的底色/轮廓由 `SelectionOverlay` 统一画（整行选区就是一条普通的区）。
+     * 行号 / 握把列要不要高亮：**整行选中**，或**选区压到本行**（Excel 口径：选了格子行号也亮）。
+     * 数据格的底色 / 轮廓仍由 `SelectionOverlay` 统一画。
      */
     rowSelected: boolean
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */

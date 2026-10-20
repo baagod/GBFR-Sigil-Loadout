@@ -126,8 +126,8 @@ describe("动作表 · 方向键移动活动格", () => {
         expect(paintedCount(container)).toBe(1) // 其余 7 格全卸任
     })
 
-    /* 行号拉出来的整行块也是"一片"，方向键照样收成单格（且不碰行号格）。 */
-    it("整行块选中时按方向键：收成单格，行号格不再点亮", async () => {
+    /* 行号拉出来的整行块也是"一片"，方向键照样收成单格；**行号格继续亮**（选区压到这一行，Excel 口径）。 */
+    it("整行块选中时按方向键：收成单格，行号格仍亮（该行还在选区里）", async () => {
         const container = await renderTable()
 
         pressHandle(container, 0)
@@ -138,7 +138,7 @@ describe("动作表 · 方向键移动活动格", () => {
 
         expect(activeColIdOf(container)).toBe(colIdAt(container, 0, 1))
         expect(paintedCount(container)).toBe(1)
-        expect(handleAt(container, 0).className).not.toContain("cell-row-selected")
+        expect(handleAt(container, 0).className).toContain("cell-row-selected")
     })
 
     /*

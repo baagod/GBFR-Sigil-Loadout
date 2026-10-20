@@ -59,7 +59,7 @@ const rowsSpan = (geo: GeometryInput, minRow: number, maxRow: number) => {
     return {top, height: bottom - top}
 }
 
-export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]}
+export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]; rowHead: Rect[]}
 export type OverlayModel = {scrolled: LayerModel; pinned: LayerModel}
 
 /**
@@ -145,7 +145,7 @@ export function geometryFromHeaderCells({
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
 const RING_WIDTH = 3
 
-const emptyLayer = (): LayerModel => ({fill: [], ring: [], copy: []})
+const emptyLayer = (): LayerModel => ({fill: [], ring: [], copy: [], rowHead: []})
 
 /** 一段选区按钉住列边界切成 1~2 段；切开处不是选区边界，那条竖边不画。
  * `hideRight`：整行选区（覆盖 0..最后一列）不画右边缘 —— 用户口径：末列没有格线，画了像表外多一道竖线。 */
@@ -280,6 +280,36 @@ export function buildOverlay(input: {
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
             ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom))
         }
+    }
+
+    /*
+        行号 / 握把列的**右缘边框**（Excel 行头）：选区压到的行，在行头右缘画 2px 竖线。
+        与底色/轮廓同一套覆盖层 —— 不写 `<td>` 的 border，避免改 border 宽度触发表格布局，
+        且钉住层 `sticky left-0` 让它在横滚时原生跟随行头。
+        相邻行合并成一段（几十行选中时只多几个 div）；行头宽度 = 第一数据列的左缘。
+    */
+    const headRight = geo.columnLefts[0]
+    if (headRight !== undefined && bounds.length > 0) {
+        const rows = new Set<number>()
+        for (const b of bounds) for (let index = b.minRowIndex; index <= b.maxRowIndex; index++) rows.add(index)
+        const sorted = [...rows].sort((a, b) => a - b)
+        let start: number | null = null
+        let prev = -1
+        const flush = () => {
+            if (start === null) return
+            const {top, height} = rowsSpan(geo, start, prev)
+            model.pinned.rowHead.push({left: headRight - 2, top, width: 2, height})
+            start = null
+        }
+        for (const index of sorted) {
+            if (start === null) start = index
+            else if (index !== prev + 1) {
+                flush()
+                start = index
+            }
+            prev = index
+        }
+        flush()
     }
 
     for (const area of copyAreas) {

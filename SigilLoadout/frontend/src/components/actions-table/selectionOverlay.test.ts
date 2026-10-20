@@ -84,6 +84,34 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         ])
     })
 
+    it("行号列右缘边框：选区压到的行在钉住层画 2px 竖线（相邻行合并成一段）", () => {
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 1, maxRowIndex: 2, minColumnIndex: 1, maxColumnIndex: 2}],
+            geo: geo(),
+            activeCell: null,
+            copyAreas: [],
+        })
+        // 行头右缘 = 第一数据列左缘 40；线在它内侧 2px；第 1~2 行顶 68、总高 27×2。
+        expect(model.pinned.rowHead).toEqual([{left: 38, top: 68, width: 2, height: 54}])
+        expect(model.scrolled.rowHead).toEqual([])
+    })
+
+    it("行号列右缘边框：不相邻的行各画一段", () => {
+        const model = buildOverlay({
+            bounds: [
+                {minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2},
+                {minRowIndex: 2, maxRowIndex: 2, minColumnIndex: 2, maxColumnIndex: 2},
+            ],
+            geo: geo(),
+            activeCell: null,
+            copyAreas: [],
+        })
+        expect(model.pinned.rowHead).toEqual([
+            {left: 38, top: 41, width: 2, height: 27},
+            {left: 38, top: 95, width: 2, height: 27},
+        ])
+    })
+
     it("跨钉住边界：切两段，切开处不画竖边", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 1, minColumnIndex: 0, maxColumnIndex: 2}],

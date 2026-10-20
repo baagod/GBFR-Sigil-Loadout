@@ -885,17 +885,17 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                     <PickerOfContext.Provider value={pickerOf ?? NO_PICKER}>
                     {modelRows.map((row, rowIndex) => {
                         /*
-                            ‼️ 行号格自己的选中态：**整行宽的那个区**盖住这一行没有。
-                            整行选中如今就是 `cellSelection` 里的一条区（见 `selectRowSpan`），不再有
-                            `rowSelection` 那一档 —— 所以行块与单元格区**能同时存在**（Excel 就是这个模型）。
-                            边框不用这里画：选区外观（底色 / 轮廓 / 复制虚线）全由 `SelectionOverlay` 按区间画。
+                            ‼️ 行号格的高亮：**整行选中** 或 **选区压到这一行**（Excel 口径：选了一片格子，行号
+                            也跟着亮；不再要求先整行选中）。边框不用这里画：选区外观（底色 / 轮廓 / 复制虚线）
+                            全由 `SelectionOverlay` 按区间画。
                         */
                         const rowSelected = rowFullySelected(selectionBounds, rowIndex, lastColumnIndex)
+                        const rowTouched = selectionBounds.some((bounds) => rowIndex >= bounds.minRowIndex && rowIndex <= bounds.maxRowIndex)
                         return (
                             <ActionRowView
                                 key={row.id}
                                 row={row}
-                                rowSelected={rowSelected}
+                                rowSelected={rowSelected || rowTouched}
                                 /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）。 */
                                 rowNumber={rowIndex + 1}
                                 measured={measured}

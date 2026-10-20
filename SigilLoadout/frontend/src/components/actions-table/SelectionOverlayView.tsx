@@ -67,6 +67,10 @@ function Layer({model}: {model: LayerModel}) {
             {model.copy.map((cell, i) => (
                 <CopyBox key={`c${i}`} cell={cell} />
             ))}
+            {/* 行号列右缘的 2px 边框（Excel 行头；与选区其它部分同一层画）。 */}
+            {model.rowHead.map((rect, i) => (
+                <div key={`h${i}`} style={abs(rect, {background: RING})} />
+            ))}
         </>
     )
 }

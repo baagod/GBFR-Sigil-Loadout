@@ -265,4 +265,18 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
         expect(rowSelectedAt(container, 0)).toBe(true)
     })
 
+    /* ‼️ 用户口径：**选了单元格，行号列也高亮**（Excel 的行头；不必先整行选中）。 */
+    it("只选一片单元格：选区压到的行号格也高亮", async () => {
+        setRows([makeRow("1000"), makeRow("1001")])
+        const container = await renderTable()
+
+        // 只选第 2 行的两格（不是整行）
+        const cell = cellAt(container, 1, 2)
+        fireEvent.mouseDown(cell, {ctrlKey: true})
+        fireEvent.mouseEnter(cellAt(container, 1, 3), {ctrlKey: true})
+        fireEvent.mouseUp(document)
+
+        expect(rowSelectedAt(container, 1)).toBe(true)
+        expect(rowSelectedAt(container, 0)).toBe(false)
+    })
 })
