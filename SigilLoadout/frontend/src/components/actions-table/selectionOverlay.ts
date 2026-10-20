@@ -271,10 +271,20 @@ export function buildOverlay(input: {
         model.scrolled.fill.push(...fills.scrolled)
 
         const hideRight = b.minColumnIndex === 0 && b.maxColumnIndex === lastColumnIndex
+        /* 左竖线外扩 2px 会压进 z-50 的 sticky 行头/冻结格；从层边界起时收进格内，四边都留在滚动层。 */
+        const leftAtPinned = b.minColumnIndex === geo.pinnedColumnCount
         for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
-            ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom))
+            const layer = pinned ? model.pinned : model.scrolled
+            if (pinned || !edges.left || !leftAtPinned) {
+                layer.ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom))
+                continue
+            }
+            model.scrolled.ring.push(...ringLines(rect, {...edges, left: false}, RING_WIDTH, clampRight, clampBottom))
+            model.scrolled.ring.push(
+                ...ringLines({...rect, left: rect.left + RING_WIDTH - 1}, {top: false, right: false, bottom: false, left: true}, RING_WIDTH, false, clampBottom),
+            )
         }
     }
 

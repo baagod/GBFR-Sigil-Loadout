@@ -83,6 +83,28 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         ])
     })
 
+    it("选区从行头后的第一列起：左竖线收进格内，不被行头格盖出缺角", () => {
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 1, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 1}],
+            geo: geo({pinnedColumnCount: 0}),
+            activeCell: null,
+            copyAreas: [],
+        })
+        expect(model.pinned.ring).toEqual([])
+        expect(model.scrolled.ring).toContainEqual({left: 40, top: 66, width: 3, height: 57})
+        expect(model.scrolled.ring).toHaveLength(4)
+
+        const afterPinned = buildOverlay({
+            bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2}],
+            geo: geo(),
+            activeCell: null,
+            copyAreas: [],
+        })
+        expect(afterPinned.pinned.ring).toEqual([])
+        expect(afterPinned.scrolled.ring).toContainEqual({left: 140, top: 39, width: 3, height: 30})
+        expect(afterPinned.scrolled.ring).toHaveLength(4)
+    })
+
     it("行号列右缘边框：选区压到的行在钉住层画 2px 竖线（相邻行合并成一段）", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 1, maxRowIndex: 2, minColumnIndex: 1, maxColumnIndex: 2}],
