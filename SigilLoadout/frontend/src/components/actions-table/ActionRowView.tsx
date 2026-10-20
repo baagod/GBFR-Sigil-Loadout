@@ -17,7 +17,6 @@ import {
     HANDLE_WIDTH,
     PINNED_CELL,
     READ_ONLY_BG,
-    ROWHEAD_WIDTH,
     handleCellClass,
 } from "./classes"
 import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, snapshotKey} from "./model"
@@ -215,42 +214,36 @@ export const ActionRowView = memo(function ActionRowView({
             }
         >
             {/*
-                行头单格：# 区居中显示序号，能拖的表右侧再放握把区（总宽 `ROWHEAD_WIDTH`）。
-                点 # 区选行；握把区拦下 mousedown，只交给 dnd-kit 搬行。
+                行号格：固定 40px、数字居中，不入列模型、不参与小区选区。
+                行选中的三个手势：按下 / 划过 / 松手（在 window 上收尾）。
             */}
             <TableCell
                 className={handleCellClass(rowSelected)}
-                style={{width: sortable ? ROWHEAD_WIDTH : HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
+                style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
                     clickRowHandle(row, e)
                 }}
             >
-                <div className="flex h-full w-full">
-                    <div className={HANDLE_INNER} style={{width: HANDLE_WIDTH}}>
-                        {rowNumber}
-                    </div>
-                    {sortable && (
-                        <div
-                            ref={drag.setActivatorNodeRef}
-                            /*
-                                ⚠️ **只铺 `listeners`，不铺 `drag.attributes`**：那包里是 `role="button"` + `tabIndex=0`
-                                （键盘拖拽用的），而基座只注册了 `PointerSensor` —— 铺上去就是个"Tab 能停、回车空格
-                                什么都不干"的假按钮。真要支持键盘拖拽，得连 `KeyboardSensor` 与它的文案一起做。
-                            */
-                            {...drag.listeners}
-                            aria-label="拖动排序"
-                            className={`flex touch-none cursor-grab items-center justify-center active:cursor-grabbing ${
-                                drag.isDragging ? "opacity-40" : ""
-                            }`}
-                            style={{width: GRIP_WIDTH, cursor: "grab"}}
-                            onMouseDown={(e) => e.stopPropagation()}
-                        >
-                            <span className="leading-none text-muted-foreground/60">⠿</span>
-                        </div>
-                    )}
-                </div>
+                <div className={HANDLE_INNER}>{rowNumber}</div>
             </TableCell>
+            {/*
+                拖动握把自成一条（行号列右边）：固定 32px、图标居中。
+                这里只铺 dnd-kit 的 listeners，不铺 attributes（没有键盘拖拽，别造一个假按钮）。
+            */}
+            {sortable && (
+                <TableCell
+                    ref={drag.setActivatorNodeRef}
+                    {...drag.listeners}
+                    aria-label="拖动排序"
+                    className={`${handleCellClass(rowSelected)} touch-none cursor-grab active:cursor-grabbing ${
+                        drag.isDragging ? "opacity-40" : ""
+                    }`}
+                    style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
+                >
+                    <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
+                </TableCell>
+            )}
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
                 const key = cell.column.id

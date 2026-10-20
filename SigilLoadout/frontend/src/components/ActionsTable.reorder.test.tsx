@@ -19,7 +19,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
-import {ROWHEAD_WIDTH} from "@/components/actions-table/classes"
+import {GRIP_WIDTH, HANDLE_WIDTH} from "@/components/actions-table/classes"
 import {cleanup, isSelected, makeRow, pressHandle, t, tableProps} from "@/components/actions-table/testkit"
 
 afterEach(cleanup)
@@ -41,10 +41,11 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
 
         // 末尾那个子元素只能是最后一行 —— 多出一个 `<div>`（dnd-kit 的 live region）就会让末行规则失配。
         expect(tbody.lastElementChild!.tagName).toBe("TR")
-        // 行头是单格（行号区 + 握把区）：不在列模型里，几何按实测宽度算进行头宽度。
-        const head = container.querySelector('thead th[data-head="handle"]') as HTMLElement
-        expect(head).not.toBeNull()
-        expect(head.style.width).toBe(`${ROWHEAD_WIDTH}px`)
+        // 行头两格：行号 40 + 握把 32，都不在列模型里；选区左边框画在最后一格（握把）的右缘。
+        const handleHead = container.querySelector('thead th[data-head="handle"]') as HTMLElement
+        const gripHead = container.querySelector('thead th[data-head="grip"]') as HTMLElement
+        expect(handleHead.style.width).toBe(`${HANDLE_WIDTH}px`)
+        expect(gripHead.style.width).toBe(`${GRIP_WIDTH}px`)
     })
 
     /*

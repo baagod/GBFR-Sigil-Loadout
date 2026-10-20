@@ -24,7 +24,6 @@ import {
     HEAD_HEIGHT,
     HEAD_LABEL,
     PINNED_CELL,
-    ROWHEAD_WIDTH,
 } from "@/components/actions-table/classes"
 import {DrillContext, features, type ActionRow} from "@/components/actions-table/model"
 
@@ -55,21 +54,30 @@ export function ActionsTableHead({
                 */
                 <TableRow key={headerGroup.id} className="sticky top-0 z-60" style={{cursor: HANDLE_HEAD_CURSOR}}>
                     {/*
-                        行头单格（行号区 + 握把区）—— **不属于列模型**（见 HANDLE_WIDTH 那段）。
+                        行号列 —— **不属于列模型**（见 HANDLE_WIDTH 那段）。
                         不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
+                        宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
                     */}
                     <TableHead
                         data-head="handle"
                         className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0 font-medium`}
-                        style={{width: sortable ? ROWHEAD_WIDTH : HANDLE_WIDTH}}
+                        style={{width: HANDLE_WIDTH}}
                     >
-                        <div className="flex h-full w-full">
-                            <div className={`${HANDLE_HEAD_INNER} shrink-0`} style={{width: HANDLE_WIDTH}}>
-                                #
-                            </div>
-                            {sortable && <div aria-hidden style={{width: GRIP_WIDTH}} />}
-                        </div>
+                        <div className={HANDLE_HEAD_INNER}>#</div>
                     </TableHead>
+                    {/*
+                        **握把列的占位表头**：表体那一格有它，表头必须有对应的一格 —— 否则
+                        `table-fixed` 的列宽还是按表头算，握把那 32px 又要被摊到别的列上去。
+                        留空：这一列没有"名字"可言（拖动是手势，不是数据）。
+                    */}
+                    {sortable && (
+                        <TableHead
+                            aria-hidden
+                            data-head="grip"
+                            className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`}
+                            style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}}
+                        />
+                    )}
                     {headerGroup.headers.map((header) => {
                         const pinned = header.column.getIsPinned()
                         return (
