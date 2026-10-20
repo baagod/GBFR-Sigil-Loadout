@@ -136,14 +136,8 @@ export function useClipboardHistory({
     const cellClipboardRef = useRef("")
 
     /**
-     * 值归一：打成与原值一模一样 = **没改过**（空串）。`edit` 与"粘贴只记真正改过的格"共用这一份 ——
-     * 两处各写一遍判据，迟早一边归一一边不归一。
-     */
-    const normalised = (row: ActionRow | undefined, columnId: string, raw: string) =>
-        raw === (row?.originals[columnId] ?? "") ? "" : raw
-
-    /**
-     * 改一格：判重、记账、撤虚线，然后交给数据层（`write`）。
+     * 改一格：判重、记账、撤虚线，然后交给数据层（`write`）。**返回是否真的写了** ——
+     * 粘贴那边靠它只把"真正改过"的格记进撤销步（不再自己复制一份判重逻辑）。
      *
      * ⚠️ 撤销栈的 push **不能**写在数据层的 updater 里：updater 允许被 React 重跑（StrictMode 就会），
      * 跑一次记一笔 = 一次编辑要按两下 Ctrl+Z。所以"变没变 / 改前值"先用 `rowsRef` 判完、记完，再交。
@@ -159,7 +153,7 @@ export function useClipboardHistory({
          *   "往源区里粘一个一样的值，虚线照样撤"那条改由 `handlePaste` 按落点显式判，
          *   不再靠这里写一次空改动（归一之后那一格不会走写路径）。
          */
-        (rowId: string, columnId: string, value: string | null, normalise = true) => {
+        (rowId: string, columnId: string, value: string | null, normalise = true): boolean => {
             const row = rowsRef.current.find((one) => one.id === rowId)
             const raw = value ?? ""
             /*
@@ -169,9 +163,9 @@ export function useClipboardHistory({
 
                 归一之后再判重：原来的值就是空串时等于什么都没发生（不写 state、也不进撤销栈）。
             */
-            const next = normalise ? normalised(row, columnId, raw) : raw
+            const next = normalise && raw === (row?.originals[columnId] ?? "") ? "" : raw
             const before = row?.values[columnId] ?? ""
-            if (before === next) return // 值没变不是一步：不写 state、也不进撤销栈
+            if (before === next) return false // 值没变不是一步：不写 state、也不进撤销栈
             if (!undoingRef.current && !batchingRef.current) undoRef.current.push([{rowId, columnId, before}])
             /*
                 动到复制源那一片 → 那圈虚线撤掉（规则①）。
@@ -180,6 +174,7 @@ export function useClipboardHistory({
             const source = copySourceRef.current
             if (source?.snapshot.has(snapshotKey(rowId, columnId))) clearCopySource()
             write(rowId, columnId, next)
+            return true
         },
         [write, clearCopySource, rowsRef],
     )
@@ -208,7 +203,7 @@ export function useClipboardHistory({
                     for (let c = b.minColumnIndex; c <= b.maxColumnIndex; c++) {
                         const columnId = cells[c]?.column.id
                         if (!columnId || !writable(columnId)) continue
-                        const key = `${row.id}\u0000${columnId}`
+                        const key = snapshotKey(row.id, columnId)
                         if (seen.has(key)) continue
                         seen.add(key)
                         const before = byId.get(row.id)?.values[columnId] ?? ""
@@ -500,21 +495,16 @@ export function useClipboardHistory({
 
                 ‼️ 只记**真正改过**的格：粘一个等于原值（或等于当前值）的值会被 `edit` 归一成 no-op，
                 那种格既没写也没变；若照样 push，用户下一次 Ctrl+Z 会"按了没反应"（白耗一步）。
+                判据直接用 `edit` 的返回值 —— 不在这里复制第二份"归一等价于什么"。
             */
-            const byId = new Map(rowsRef.current.map((row) => [row.id, row]))
-            const changed = writes.filter((w) => {
-                const row = byId.get(w.rowId)
-                return (row?.values[w.columnId] ?? "") !== normalised(row, w.columnId, w.value)
-            })
-            if (changed.length > 0) {
-                batchingRef.current = true
-                try {
-                    for (const w of changed) edit(w.rowId, w.columnId, w.value)
-                } finally {
-                    batchingRef.current = false
-                }
-                undoRef.current.push(changed)
+            const changed: typeof writes = []
+            batchingRef.current = true
+            try {
+                for (const w of writes) if (edit(w.rowId, w.columnId, w.value)) changed.push(w)
+            } finally {
+                batchingRef.current = false
             }
+            if (changed.length > 0) undoRef.current.push(changed)
             // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
             tableRef.current.selectCellRange({
                 anchorRowId: modelRows[plan.range.firstRow].id,
@@ -523,7 +513,7 @@ export function useClipboardHistory({
                 focusColumnId: modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
             })
         },
-        [branchIds, edit, rowsRef, tableRef, writable],
+        [branchIds, edit, tableRef, writable],
     )
 
     /** 系统粘贴事件（Ctrl+V）：编辑框里的粘贴归浏览器，其余走上面那份。 */
