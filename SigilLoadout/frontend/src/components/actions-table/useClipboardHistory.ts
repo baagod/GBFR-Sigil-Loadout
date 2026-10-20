@@ -136,6 +136,13 @@ export function useClipboardHistory({
     const cellClipboardRef = useRef("")
 
     /**
+     * 值归一：打成与原值一模一样 = **没改过**（空串）。`edit` 与"粘贴只记真正改过的格"共用这一份 ——
+     * 两处各写一遍判据，迟早一边归一一边不归一。
+     */
+    const normalised = (row: ActionRow | undefined, columnId: string, raw: string) =>
+        raw === (row?.originals[columnId] ?? "") ? "" : raw
+
+    /**
      * 改一格：判重、记账、撤虚线，然后交给数据层（`write`）。
      *
      * ⚠️ 撤销栈的 push **不能**写在数据层的 updater 里：updater 允许被 React 重跑（StrictMode 就会），
@@ -162,7 +169,7 @@ export function useClipboardHistory({
 
                 归一之后再判重：原来的值就是空串时等于什么都没发生（不写 state、也不进撤销栈）。
             */
-            const next = normalise && raw === (row?.originals[columnId] ?? "") ? "" : raw
+            const next = normalise ? normalised(row, columnId, raw) : raw
             const before = row?.values[columnId] ?? ""
             if (before === next) return // 值没变不是一步：不写 state、也不进撤销栈
             if (!undoingRef.current && !batchingRef.current) undoRef.current.push([{rowId, columnId, before}])
@@ -188,6 +195,8 @@ export function useClipboardHistory({
         if (bounds.length === 0) return
         const modelRows = tableRef.current.getRowModel().rows
         const byId = new Map(rowsRef.current.map((row) => [row.id, row]))
+        /* 多片选区可以互相重叠：同一格只记、只写一次（否则撤销步里出现重复项）。 */
+        const seen = new Set<string>()
         const step: UndoEntry[] = []
         batchingRef.current = true
         try {
@@ -199,6 +208,9 @@ export function useClipboardHistory({
                     for (let c = b.minColumnIndex; c <= b.maxColumnIndex; c++) {
                         const columnId = cells[c]?.column.id
                         if (!columnId || !writable(columnId)) continue
+                        const key = `${row.id}\u0000${columnId}`
+                        if (seen.has(key)) continue
+                        seen.add(key)
                         const before = byId.get(row.id)?.values[columnId] ?? ""
                         if (before === "") continue
                         step.push({rowId: row.id, columnId, before})
@@ -485,14 +497,24 @@ export function useClipboardHistory({
             /*
                 整次粘贴 = **一步撤销**（规则③）：`batchingRef` 让这一批 `edit` 各自不记账，
                 下面再把这批整体 push 成一步。被校验挡掉的那几格不在里面。
+
+                ‼️ 只记**真正改过**的格：粘一个等于原值（或等于当前值）的值会被 `edit` 归一成 no-op，
+                那种格既没写也没变；若照样 push，用户下一次 Ctrl+Z 会"按了没反应"（白耗一步）。
             */
-            batchingRef.current = true
-            try {
-                for (const w of writes) edit(w.rowId, w.columnId, w.value)
-            } finally {
-                batchingRef.current = false
+            const byId = new Map(rowsRef.current.map((row) => [row.id, row]))
+            const changed = writes.filter((w) => {
+                const row = byId.get(w.rowId)
+                return (row?.values[w.columnId] ?? "") !== normalised(row, w.columnId, w.value)
+            })
+            if (changed.length > 0) {
+                batchingRef.current = true
+                try {
+                    for (const w of changed) edit(w.rowId, w.columnId, w.value)
+                } finally {
+                    batchingRef.current = false
+                }
+                undoRef.current.push(changed)
             }
-            undoRef.current.push(writes)
             // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
             tableRef.current.selectCellRange({
                 anchorRowId: modelRows[plan.range.firstRow].id,
@@ -501,7 +523,7 @@ export function useClipboardHistory({
                 focusColumnId: modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
             })
         },
-        [branchIds, edit, tableRef, writable],
+        [branchIds, edit, rowsRef, tableRef, writable],
     )
 
     /** 系统粘贴事件（Ctrl+V）：编辑框里的粘贴归浏览器，其余走上面那份。 */

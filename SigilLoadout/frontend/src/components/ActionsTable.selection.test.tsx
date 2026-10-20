@@ -3,7 +3,7 @@
     动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤销 / 复制区生命周期 / 单击/双击口径）
 */
 import {describe, expect, it, vi} from "vitest"
-import {fireEvent, screen} from "@testing-library/react"
+import {fireEvent, screen, waitFor} from "@testing-library/react"
 
 // vi.mock 会被提升到这个文件最前面，所以工厂函数不能引用外面的变量（React 19 的 act 环境警告）。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -446,6 +446,28 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
 
         expect(target.textContent).toBe("actionFreeWork0_-原值")
         expect(target.firstElementChild!.className).toContain("text-muted-foreground")
+    })
+
+    /*
+        ‼️ 粘成 no-op（值等于原值、那一格本来也没改）不该占一步撤销 —— 否则下一次 Ctrl+Z
+        会"按了没反应"（白耗一步）。判据：Ctrl+Z 要能撤回到上一个真正的改动。
+    */
+    it("粘贴是 no-op 时不占撤销步：Ctrl+Z 撤的是上一次真改动", async () => {
+        const container = await renderTable()
+        const edited = cellAt(container, 1, 2) // 这一格原本是改过的（…-改过）
+        clickToEdit(edited)
+        fireEvent.change(edited.querySelector("input")!, {target: {value: "又改了一次"}})
+        fireEvent.blur(edited.querySelector("input")!)
+
+        // 没改过的格子 + 粘它的原值 = no-op（不写、也不该进撤销栈）。
+        const idle = cellAt(container, 0, 2)
+        selectCell(idle)
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-原值")})
+        expect(idle.firstElementChild!.className).toContain("text-muted-foreground")
+
+        fireEvent.keyDown(document.body, {key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, ctrlKey: true})
+
+        await waitFor(() => expect(edited.textContent).toBe("actionFreeWork0_-改过"))
     })
 
     it("粘贴：不校验列名（粘到别的列上照样写）", async () => {
