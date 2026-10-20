@@ -30,7 +30,7 @@
       · `actions-table/selection.ts`  —— 选区的谓词（整行 / 单格）；
       · `actions-table/reveal.ts`     —— 「跟随可视」的**纯几何**（该滚到哪儿，不碰 DOM）；
       · `actions-table/useReveal.ts`  —— 「跟随可视」的 DOM 那一层（查活动格 / 排一帧 / 那条"这次滚动是我发的"契约）；
-      · `actions-table/useArrowKeys.ts` —— 方向键与 Enter（三条移动路径 + 四道让路闸门）；
+      · `actions-table/useTableKeys.ts` —— 键盘那一层（方向键 / Enter / Delete / Insert / Ctrl+C / Ctrl+X）；
       · `actions-table/drag.ts`       —— 「行序拖动」的夹取几何（最多能拖到哪儿，与 `reveal.ts` 对称）；
       · `actions-table/ReorderDnd.tsx` —— dnd-kit 的装配（**必须包在 `<table>` 之外**，理由在那个文件里）；
       · `actions-table/useColumnMeasure.ts` —— 列宽测量（DOM 测量 + sizing / measured / 重试计数三个 state）；
@@ -79,15 +79,30 @@ import {SelectionOverlay} from "@/components/actions-table/SelectionOverlayView"
 import {useSelectionOverlay} from "@/components/actions-table/useSelectionOverlay"
 import {clampDragY} from "@/components/actions-table/drag"
 import {ReorderDnd} from "@/components/actions-table/ReorderDnd"
-import {useArrowKeys} from "@/components/actions-table/useArrowKeys"
+import {useTableKeys} from "@/components/actions-table/useTableKeys"
+import {markActiveTable} from "@/components/actions-table/tableOwnership"
+import {rowIndexesInBounds} from "@/components/actions-table/selectionOverlay"
 import {useReveal} from "@/components/actions-table/useReveal"
 import {useClipboardHistory} from "@/components/actions-table/useClipboardHistory"
 import {useRowCommands, type RowCommands} from "@/components/actions-table/useRowCommands"
 import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
 
+/**
+ * 一张表交给调用方的动作包（工具条用）：**一个对象**，不是三个回调 —— 它们本来就绑在同一张表、
+ * 同一份选区上；分三次交接只会让调用方维护三张并行 ref 映射。
+ */
+export type TableCommands = {
+    /** 复制当前选区：行剪贴板 + 系统剪贴板 + 那圈虚线，合成一次（与键盘 Ctrl+C 同一条路）。 */
+    copy: () => void
+    /** 工具条「粘贴」：与 Ctrl+V 同一条系统剪贴板路径（读不到时退回本应用上次复制的那片）。 */
+    paste: () => void
+    /** 行级命令：添加 / 复制 / 剪切 / 插入 / 删除（与键盘同一条实现）。 */
+    rows: RowCommands
+}
+
 /*
-    ‼️ 方向键与 Enter 那一段已搬到 `actions-table/useArrowKeys.ts`（连同 `ARROW_KEYS` / `SHIFT` / `CTRL`
-    与四道让路闸门的说明）。
+    ‼️ 键盘那一层（方向键 / Enter / Delete / Insert / Ctrl+C / Ctrl+X）已搬到 `actions-table/useTableKeys.ts`
+    （连同 `ARROW_KEYS` / `SHIFT` / `CTRL` 与让路闸门的说明）。
 */
 /**
  * **复制源那圈虚线，什么时候消失**（用户拿 Excel / WPS 实测出来的规矩，别按"想当然"改）：
@@ -118,7 +133,7 @@ import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCopyReady, onPasteReady, onRowsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
+export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -168,14 +183,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      */
     onSelectionPresenceChange?: (hasSelection: boolean) => void
     /**
-     * **把"复制当前选区"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮用它 ——
-     * 按钮手里没有 Ctrl+C 那个事件对象，但"进剪贴板的是哪片、虚线画在哪儿"必须与键盘那条完全一致。
+     * **把这张表的动作交给调用方**（工具条那几个按钮用）：复制 / 粘贴 / 行级命令。
+     *
+     * 一份对象而不是三个回调：它们本来就绑在同一张表上（同一份 `copySelection` / 同一份行命令），
+     * 分三次交接只会让调用方维护三张并行的 ref 映射（以前就是，漏一个就出问题）。
      */
-    onCopyReady?: (copy: () => void) => void
-    /** **把"粘贴单元格区域"交给调用方**（工具条「粘贴」按钮用）：粘的是本应用上一次复制的那片。 */
-    onPasteReady?: (paste: () => void) => void
-    /** 行级命令（添加/复制/剪切/粘贴/插入/删除，一份实现在 `useRowCommands`）：交给调用方接到工具条上。 */
-    onRowsReady?: (commands: RowCommands) => void
+    onCommandsReady?: (commands: TableCommands) => void
     /**
      * 行数据变了（增/删/插）：**新版的一整份** + **被删掉的那几行**。
      *
@@ -546,12 +559,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 走了另一条路，**那圈虚线就不会画**（用户报的轨表"复制了却没有虚线、也没法再复制"就是这个）。
      * 有了它，按钮与键盘走的是**同一条**"哪片进剪贴板、虚线画在哪儿"。
      */
-    /* 选区**压到的行**（不必整行选中）—— 行级命令（复制/剪切/删除）用的就是这些行。 */
-    const selectionRowIndexes = (() => {
-        const hit = new Set<number>()
-        for (const bounds of selectionBounds) for (let index = bounds.minRowIndex; index <= bounds.maxRowIndex; index++) hit.add(index)
-        return [...hit].sort((a, b) => a - b)
-    })()
+    /* 选区**压到的行**（不必整行选中）—— 行级命令（复制/剪切/删除）与行号高亮共用这一份。 */
+    const selectionRows = useMemo(() => rowIndexesInBounds(selectionBounds), [selectionBounds])
+    const selectionRowIndexes = useMemo(() => [...selectionRows].sort((a, b) => a - b), [selectionRows])
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
     const activeRowIndex = activeRowId === null ? -1 : modelRows.findIndex((row) => row.id === activeRowId)
 
@@ -571,22 +581,27 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
 
     /**
      * **行级命令只有这一份**（添加/复制/剪切/插入/删除，实现在 `useRowCommands`）——
-     * 工具条那几个按钮由 `onRowsReady` 拿走，键盘那条也走它。
+     * 工具条那几个按钮由 `onCommandsReady` 拿走，键盘那条也走它。
      */
     const rowCommands = useRowCommands({rows: modelRows.map((row) => row.original), keys, selectionRowIndexes, activeRowIndex, onChange: onRowsChange})
     /*
-        ‼️ 命令**用 ref 转发**：`rowCommands` 是一包闭包（每渲染都是新对象），里面带着 `rows` /
-        `selectionRowIndexes` —— 它们**只活在本表的 state 里**，父组件不因选区变化而重渲。所以这里
-        每渲染把最新一份转给 `onRowsReady`；挂在"回调变化"上会漏更新（真机症状：选中一行再点工具条
-        删除，删的是上一次选中的那行）。调用方只是写 ref，没有额外渲染。
+        ‼️ 交给调用方的是**稳定对象**：方法每次被点/被按下时才去读 `commandsRef` 的最新一份。
+        `rowCommands` 本身每渲染都是新闭包（带着最新的 rows / 选区），直接上报就得每渲染回调一次；
+        延迟到"用那一刻"读 ref，回调只在挂载（或调用方换实现）时交一次 —— 也不会再出现
+        "选中一行再点工具条删除，删的是上一次那行"那种漏更新。
     */
     const commandsRef = useRef(rowCommands)
     commandsRef.current = rowCommands
-    const onRowsReadyRef = useRef(onRowsReady)
-    onRowsReadyRef.current = onRowsReady
-    useEffect(() => {
-        onRowsReadyRef.current?.(commandsRef.current)
-    })
+    const liveCommands = useMemo<RowCommands>(
+        () => ({
+            add: () => commandsRef.current.add(),
+            copy: () => commandsRef.current.copy(),
+            cut: () => commandsRef.current.cut(),
+            insert: () => commandsRef.current.insert(),
+            removeRowsInSelection: () => commandsRef.current.removeRowsInSelection(),
+        }),
+        [],
+    )
 
     /* 选区在不在：只在"有/没有"翻转时上报（工具条按钮亮不亮 + 剪贴板归属判断）。 */
     const onSelectionPresenceRef = useRef(onSelectionPresenceChange)
@@ -596,12 +611,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     }, [hasSelection])
 
     /**
-     * **方向键 / Enter / Delete / Insert**（实现在 `actions-table/useArrowKeys.ts`）：三条移动路径 + 四道
-     * 让路闸门，监听挂在 `document` 的捕获阶段。它要读的都是**渲染期最新值**，在那个 hook 里统一成
-     * 一份 ref 镜像。Delete 的落点（清选区改动）由 `useClipboardHistory` 给；Insert / Ctrl+Delete
-     * 的落点就是上面那份行级命令 —— 与工具条按钮走同一个命令。
+     * **键盘那一层**（实现在 `actions-table/useTableKeys.ts`）：方向键 / Enter / Delete / Insert /
+     * Ctrl+C / Ctrl+X，监听挂在 `document` 的捕获阶段。它要读的都是**渲染期最新值**，在那个 hook 里
+     * 统一成一份 ref 镜像。落点全在这里给：Delete 清选区改动（`useClipboardHistory`）、Insert /
+     * Ctrl+Delete / Ctrl+X 走行级命令、Ctrl+X 同时复制单元格区域 —— 与工具条按钮同一份命令。
      */
-    useArrowKeys({
+    useTableKeys({
         tableInstanceRef,
         tableRef,
         enterEditRegistry,
@@ -610,28 +625,36 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         sheetColumns,
         activeCellKey,
         clearSelectedCells,
-        insertCopiedRows: rowCommands.insert,
-        removeRowsInSelection: rowCommands.removeRowsInSelection,
+        insertCopiedRows: liveCommands.insert,
+        removeRowsInSelection: liveCommands.removeRowsInSelection,
+        /* 只有能改行的表（轨表）才接 Ctrl+C/X；动作表没有行级命令，让给浏览器那条 copy 事件。 */
+        copyRows: onRowsChange ? liveCommands.copy : undefined,
+        cutRows: onRowsChange ? liveCommands.cut : undefined,
+        copySelection,
     })
 
     /**
-     * **把"复制"交给调用方**（与 `onSaveReady` 同一个模式）：调用方那个「复制」按钮与键盘 Ctrl+C 都走它。
+     * **把这张表的动作整包交给调用方**（工具条那几个按钮）—— 与键盘同一条实现：
+     * 复制 = 行剪贴板 + 区域复制 + 虚线（`copySelection` 已含后两样）；粘贴 = 与 Ctrl+V 同一条系统剪贴板路径。
      *
-     * ‼️ 交出去的是**一个动作**，不是两个开关：整行选中时要"行进行剪贴板"（供跨表粘行），任何选区又要
-     * "区域进系统剪贴板 + 画那圈虚线"（`copySelection`）。以前调用方得自己把两件事都调一遍、手里还攥着
-     * 一个 `copyEntry` ref —— 漏一个就出问题（用户报的"复制了却没虚线"正是漏了后一件）。这里合成一次。
+     * `pasteRef`：系统剪贴板读取动作会随数据变化重新生成，用 ref 兜住它，动作包本身在挂载后保持稳定。
      */
+    const pasteRef = useRef(pasteClipboard)
+    pasteRef.current = pasteClipboard
+    const tableCommands = useMemo<TableCommands>(
+        () => ({
+            copy: () => {
+                commandsRef.current.copy()
+                copySelection()
+            },
+            paste: () => pasteRef.current(),
+            rows: liveCommands,
+        }),
+        [copySelection, liveCommands],
+    )
     useEffect(() => {
-        onCopyReady?.(() => {
-            commandsRef.current.copy()
-            copySelection()
-        })
-    }, [onCopyReady, copySelection])
-
-    /* 工具条「粘贴」与 Ctrl+V 同一条路：都粘单元格区域（Ctrl+V 走系统剪贴板，按钮走内部上次复制的那片）。 */
-    useEffect(() => {
-        onPasteReady?.(pasteClipboard)
-    }, [onPasteReady, pasteClipboard])
+        onCommandsReady?.(tableCommands)
+    }, [onCommandsReady, tableCommands])
 
 
     /** 数据格按下：交给库的开始处理器（它自己按 Shift/Ctrl 决定扩展/追加/减选）。 */
@@ -787,6 +810,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         const rememberDown = (e: MouseEvent) => {
             downAtRef.current = {x: e.clientX, y: e.clientY}
             draggedRef.current = false
+            /* 记下"用户刚在这张表上按过"：方向键 blur 掉焦点之后，键盘层靠它认人（见 tableOwnership）。 */
+            const el = tableRef.current
+            if (el && (e.target as Element | null)?.closest?.("table") === el) markActiveTable(el)
         }
         const markDragged = (e: MouseEvent) => {
             const from = downAtRef.current
@@ -890,7 +916,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                             全由 `SelectionOverlay` 按区间画。
                         */
                         const rowSelected = rowFullySelected(selectionBounds, rowIndex, lastColumnIndex)
-                        const rowTouched = selectionBounds.some((bounds) => rowIndex >= bounds.minRowIndex && rowIndex <= bounds.maxRowIndex)
+                        const rowTouched = selectionRows.has(rowIndex)
                         return (
                             <ActionRowView
                                 key={row.id}

@@ -2,16 +2,33 @@ import {describe, expect, it} from "vitest"
 
 import {buildOverlay, geometryFromHeaderCells, ringLines, type GeometryInput} from "./selectionOverlay"
 
-const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
-    columnLefts: [40, 80, 140, 200],
-    columnWidths: [40, 60, 60, 60],
-    headerHeight: 41,
-    rowHeight: 27,
-    pinnedColumnCount: 2,
-    rowCount: 100,
-    columnCount: 4,
-    ...over,
-})
+/** 用例里搭几何：可变量行高时 `rowHeights` / `rowTops` 必须成对，所以覆盖项各自可选、由这里配对。 */
+type GeoOverrides = Partial<{
+    columnLefts: number[]
+    columnWidths: number[]
+    headerHeight: number
+    rowHeight: number
+    pinnedColumnCount: number
+    rowCount: number
+    columnCount: number
+    rowHeights: readonly number[]
+    rowTops: readonly number[]
+}>
+const geo = (over: GeoOverrides = {}): GeometryInput => {
+    const base = {
+        columnLefts: [40, 80, 140, 200],
+        columnWidths: [40, 60, 60, 60],
+        headerHeight: 41,
+        rowHeight: 27,
+        pinnedColumnCount: 2,
+        rowCount: 100,
+        columnCount: 4,
+        ...over,
+    }
+    return base.rowHeights !== undefined && base.rowTops !== undefined
+        ? {...base, rowHeights: base.rowHeights, rowTops: base.rowTops}
+        : {...base, rowHeights: undefined, rowTops: undefined}
+}
 
 const area = (r: {width: number; height: number}) => r.width * r.height
 const sumArea = (rs: {width: number; height: number}[]) => rs.reduce((a, r) => a + area(r), 0)
@@ -109,6 +126,22 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(model.pinned.rowHead).toEqual([
             {left: 38, top: 41, width: 2, height: 27},
             {left: 38, top: 95, width: 2, height: 27},
+        ])
+    })
+
+    it("行号列右缘边框：行高不等时也按每行真实高度画（不相邻的行各一段）", () => {
+        const model = buildOverlay({
+            bounds: [
+                {minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 1, maxColumnIndex: 1},
+                {minRowIndex: 2, maxRowIndex: 2, minColumnIndex: 1, maxColumnIndex: 1},
+            ],
+            geo: geo({rowHeight: 0, rowHeights: [27, 41, 27, 25], rowTops: [41, 68, 109, 136], rowCount: 4}),
+            activeCell: null,
+            copyAreas: [],
+        })
+        expect(model.pinned.rowHead).toEqual([
+            {left: 38, top: 41, width: 2, height: 27},
+            {left: 38, top: 109, width: 2, height: 27},
         ])
     })
 

@@ -1,8 +1,8 @@
 import {Button} from "@/components/ui/button"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
-// 这一排四个图标用 Phosphor —— **全仓只有这一处换库**，其余（含 components/ui/ 的基础组件、
+// 这一排图标用 Phosphor —— **全仓只有这一处换库**，其余（含 components/ui/ 的基础组件、
 // 以及 DisclosureChevron / SkillPicker / SigilEditorPanel 这些自带图标的组件）一律保持 lucide。
-// 四个都用 regular，只有加号用 **bold**：
+// 都用 regular，只有加号用 **bold**：
 // Phosphor 是 256 栅格、缩到 16px 时缩放因子 0.0625，regular 的加号笔画只有 1px 宽、
 // 又正好落在半像素边界上（x=7.5px），于是被抗锯齿对半摊开 —— 峰值不透明度只有 192、
 // 亮像素 256 个，所以看着"发灰"（实测）。bold 笔画 12 单位 = 0.75px 以上，能跨满一个像素列，
@@ -48,6 +48,8 @@ export function TrackToolbar({t, canCopy, canCut, canRemove, onAdd, onCopy, onCu
         // title —— 那种用户明确不要）。**不给 svg 写 size 类**：Button 基类的
         // `[&_svg:not([class*='size-'])]:size-4` 会把图标钉在 16px，换 size 档也不会跟着变大。
         // 按钮禁用时 Tooltip 也一起 disabled（SkillRow 的惯例）：禁用的按钮收不到指针事件。
+        // 只有"复制 / 剪切 / 删除"有禁用态（都看本表有没有选区）；粘贴 / 插入行没有可观察的"剪贴板空"
+        // 信号（系统剪贴板读不到、行剪贴板是模块级单例），所以恒亮、空剪贴板时点一下什么也不做。
         <TooltipProvider>
             <div className="flex items-center gap-2">
                 <Tooltip>

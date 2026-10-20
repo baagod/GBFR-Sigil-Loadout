@@ -27,9 +27,7 @@ import {
     type CopyArea,
     type CopySource,
 } from "./model"
-
-/** 当前**有选区**的那几张表（DOM）—— 给"事件/焦点不在任何表里"时的归属判断用（见 `isMyEvent`）。 */
-const tablesWithSelection = new Set<HTMLTableElement>()
+import {isEventForTable, setTableHasSelection} from "./tableOwnership"
 
 /**
  * 这里用到的表 API。**故意只声明用得到的那几个**，而不是 import 库的整个表类型：
@@ -87,39 +85,16 @@ export function useClipboardHistory({
 }) {
     const [copyHint, setCopyHint] = useState("")
 
-    /* 维护"有选区的表"集合（DOM 级）：`isMyEvent` 在事件/焦点都不落在表里时用它兜底。 */
+    /* 登记"这张表有没有选区"：归属判断的兜底（焦点不在任何表里时靠它认人，见 `isEventForTable`）。 */
     useEffect(() => {
         const el = tableElementRef.current
         if (!el) return
-        if (hasSelection) tablesWithSelection.add(el)
-        else tablesWithSelection.delete(el)
-        return () => {
-            tablesWithSelection.delete(el)
-        }
+        setTableHasSelection(el, hasSelection)
+        return () => setTableHasSelection(el, false)
     }, [hasSelection, tableElementRef])
 
-    /**
-     * **这次 copy/paste/键盘事件是不是该由这张表接**：
-     *   · 只认**最上层弹窗**里的表（弹窗背后的动作表不许跟着粘贴/复制 —— 用户报的"轨表里粘贴，动作表所有格都变"）；
-     *   · 同一个弹窗里有多张表时，只认**事件/焦点落在的那张**；两样都不在表里时，
-     *     只在"当前层里唯一有选区的表"上放行（两张表都有选区就不猜，谁都别动）。
-     */
-    const isMyEvent = useCallback(
-        (e: Event): boolean => {
-            const el = tableElementRef.current
-            if (!el) return true
-            const myLayer = el.closest("[role=dialog]")
-            const dialogs = document.querySelectorAll("[role=dialog]")
-            const topLayer = dialogs.length > 0 ? dialogs[dialogs.length - 1] : null
-            if (myLayer !== topLayer) return false
-            const target = e.target instanceof Element ? e.target : null
-            const active = document.activeElement instanceof Element ? document.activeElement : null
-            const owner = target?.closest("table") ?? active?.closest("table") ?? null
-            if (owner) return owner === el
-            return ![...tablesWithSelection].some((table) => table !== el && table.closest("[role=dialog]") === topLayer)
-        },
-        [tableElementRef],
-    )
+    /** 这次 copy/paste/键盘事件是不是该由这张表接（判据只有 `tableOwnership` 一份）。 */
+    const isMyEvent = useCallback((e: Event) => isEventForTable(e, tableElementRef.current), [tableElementRef])
     /**
      * **复制源**（剪贴板里那份是从哪儿复制的）—— 画那圈虚线用；`null` = 没有（复制过又被撤掉了）。
      *
@@ -251,6 +226,8 @@ export function useClipboardHistory({
         (e: KeyboardEvent) => {
             if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return
             if (!isMyEvent(e)) return
+            /* 选值格列表里的 Ctrl+Z 归它自己（搜索框的输入历史）。 */
+            if ((e.target as Element | null)?.closest?.("[data-slot=combobox-content]")) return
             /*
                 编辑框里的 Ctrl+Z 归浏览器（撤的是这一次输入），跟表格的历史不是一回事。
                 判据用**当前焦点**而不是 `e.target`：键盘事件两个通常一致，但焦点在别的输入框
@@ -414,6 +391,11 @@ export function useClipboardHistory({
             if (!isMyEvent(e)) return
             const target = e.target as HTMLElement | null
             /*
+                选值格的列表弹层自己处理复制 / Esc（它的搜索框选文字归浏览器）：这一层不让路的话，
+                列表里按 Ctrl+C 会去复制背后的单元格区域。判据是"事件发生在列表容器里"。
+            */
+            if (target?.closest?.("[data-slot=combobox-content]")) return
+            /*
                 ‼️ **表头不参与表格复制**（列名归浏览器）：从表头发起的这一记 Ctrl+C 直接让过去 ——
                 列名本来就是可以自由选、自由复制的。顺带把**复制区那圈虚线撤掉**：剪贴板里已经不是那片格子了，
                 再圈着"剪贴板内容来自这里"就是假的（用户要求：复制列名时清空复制区）。
@@ -527,26 +509,35 @@ export function useClipboardHistory({
         (e: ClipboardEvent) => {
             if (!isMyEvent(e)) return
             if ((e.target as HTMLElement).tagName === "INPUT") return
+            if ((e.target as HTMLElement | null)?.closest?.("[data-slot=combobox-content]")) return
             pasteText(e.clipboardData?.getData("text/plain") ?? "", e)
         },
         [pasteText, isMyEvent],
     )
 
-    /** 工具条「粘贴」：优先粘本应用上一次复制的那片（与 Ctrl+C 同源）；本应用没复制过就退回系统剪贴板。 */
+    /**
+     * 工具条「粘贴」：**优先读系统剪贴板**（与 Ctrl+V 同一条路，外部复制进来的内容也能粘）；
+     * 读不到（权限 / 非安全上下文 / WebView 不支持）才退回"本应用上一次复制的那片文本"。
+     *
+     * ‼️ 不能反过来"内部优先"：内部 ref 只在**本应用复制**时更新，永不失效 —— 用户从别的程序复制后
+     * 再点按钮，会粘回旧内容，而 Ctrl+V 粘的是新内容（两个入口语义分叉）。系统剪贴板读不到时才用
+     * 内部那份兜底，两个入口对"板上有什么"的判断就一致了。
+     */
     const pasteClipboard = useCallback(() => {
-        if (cellClipboardRef.current) {
-            pasteText(cellClipboardRef.current)
+        const pasteInternal = () => {
+            if (cellClipboardRef.current) pasteText(cellClipboardRef.current)
+        }
+        let read: Promise<string> | undefined
+        try {
+            read = navigator.clipboard?.readText?.()
+        } catch {
+            read = undefined
+        }
+        if (!read) {
+            pasteInternal()
             return
         }
-        const read = navigator.clipboard?.readText?.()
-        if (!read) return
-        void read
-            .then((text) => {
-                if (text) pasteText(text)
-            })
-            .catch(() => {
-                /* 读系统剪贴板被拒（权限/非安全上下文）：静默不做，Ctrl+V 那条路仍可用。 */
-            })
+        void read.then((text) => (text ? pasteText(text) : pasteInternal())).catch(pasteInternal)
     }, [pasteText])
 
     /**
@@ -576,6 +567,8 @@ export function useClipboardHistory({
             if (e.key !== "Escape") return
             if (!isMyEvent(e)) return
             if ((e.target as HTMLElement).tagName === "INPUT") return
+            /* 选值格列表开着时 Esc 是"关列表"（base-ui 自己处理），这里不抢。 */
+            if ((e.target as HTMLElement | null)?.closest?.("[data-slot=combobox-content]")) return
             clearCopySource()
         },
         [clearCopySource, isMyEvent],
@@ -617,11 +610,11 @@ export function useClipboardHistory({
         `copySelection` 也交出去：调用方那个「复制」按钮要靠它走**同一条路**（否则按钮复制出来的东西
         没有那圈虚线 —— 用户报的轨表问题就是这个）。Ctrl+C 那条走 `handleCopy`（它拿得到事件对象）。
 
-        ‼️ 引用必须**稳**（`useCallback` 按 `copyArea`）：调用方把它塞进 effect 的依赖里
-        （见 `ActionsTable` 交 `onCopyReady` 那一段）—— 每渲染换个新函数就等于每渲染回调一次调用方。
+        ‼️ 引用必须**稳**（`useCallback` 按 `copyArea`）：调用方把它塞进 `TableCommands` 的依赖里
+        （见 `ActionsTable` 的 `tableCommands`）—— 每渲染换个新函数就等于每渲染回调一次调用方。
     */
     const copySelection = useCallback(
-        () => copyArea((text) => void navigator.clipboard?.writeText(text)),
+        () => copyArea((text) => void navigator.clipboard?.writeText(text).catch(() => {})),
         [copyArea],
     )
 

@@ -2,7 +2,7 @@
 /*
     动画详情弹窗的**键盘那条路**（Ctrl+Del 删行 / Ctrl+X 剪切 / Insert 插行）与工具条按钮的同口径。
 
-    Del 本身不再是"删行"：裸 Del 归基座（清选区里每一格的改动，见 `useArrowKeys`），删行统一要 Ctrl+Del。
+    Del 本身不再是"删行"：裸 Del 归基座（清选区里每一格的改动，见 `useTableKeys`），删行统一要 Ctrl+Del。
 
     ‼️ 为什么单独立一条：这条 effect 曾经被一个**没闭合的块注释开头**整个吞进注释里（改动删掉了它
     的结束标记，见 AnimationDetail 里那段键盘说明），而当时整套用例全绿 —— 因为**没有任何一条用例
@@ -36,6 +36,7 @@ import {
 } from "../../bindings/sigilloadout/service/actionsservice"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {clearRowClipboard} from "@/components/actions-table/useRowCommands"
+import {clipboardStub} from "@/components/actions-table/testkit"
 import {messages} from "@/lib/messages"
 
 /** 一条轨行：基座要 `values` + 行身份 `orig`（见 TrackGrid 的 `toRow`）。 */
@@ -141,6 +142,32 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         fireEvent.mouseUp(handle)
         await waitFor(() => expect(handle.className).toContain("cell-row-selected"))
     }
+
+    /** 两条轨（attack / effect）各一张表：多表归属的用例都从这里起手。 */
+    const openTwoTrackTables = async () => {
+        vi.mocked(ListTracks).mockResolvedValue([
+            {sub: "0", kind: "attack"},
+            {sub: "0", kind: "effect"},
+        ])
+        vi.mocked(ListFsm).mockResolvedValue([])
+        vi.mocked(LoadTrack).mockResolvedValue(track())
+        vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        await waitFor(() => expect(document.querySelectorAll("[role=dialog] tbody")).toHaveLength(2))
+        return () => [...document.querySelectorAll("[role=dialog] tbody")]
+    }
+
+    /** 点某张表里的一个数据格：单格选区（不要求整行选中），活动格落在它上面。 */
+    const selectCell = async (body: Element, rowIndex: number, tdIndex = 2) => {
+        const cell = body.querySelectorAll("tr")[rowIndex].querySelectorAll("td")[tdIndex] as HTMLElement
+        fireEvent.mouseDown(cell, {button: 0})
+        fireEvent.mouseUp(cell)
+        await waitFor(() => expect(cell.className).toContain("cell-active"))
+        return cell
+    }
+
+    /** 某张表里被假删除的行。 */
+    const removedIn = (body: Element) => [...body.querySelectorAll("tr")].filter((tr) => tr.className.includes("row-removed"))
 
     /* ‼️ 用户口径：非原表的行（新增 / 粘贴出来的，`orig == null`）删除后**立刻从界面消失**，
        不标假删除 —— 假删除只属于"原表里有的行"。是否落盘仍看「保存动画」。 */
@@ -254,6 +281,90 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         press("Insert", "Insert", 45)
 
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
+    })
+
+    /*
+        ‼️ **同一弹层里两张表都有选区**：键盘归属必须看"用户在操作哪张"（事件目标 / 最近按过），
+        不能由挂载顺序决定 —— 这条钉住"在效果表里按 Ctrl+Del，删掉的是攻击表的行"那个回归。
+    */
+    it("两张轨表都有选区：Ctrl+Del 只删刚操作的那张表", async () => {
+        const bodies = await openTwoTrackTables()
+        await selectCell(bodies()[0], 0)
+        await selectCell(bodies()[1], 0) // 最后操作的是第二张
+
+        press("Delete", "Delete", 46, true)
+
+        await waitFor(() => expect(removedIn(bodies()[1])).toHaveLength(1))
+        expect(removedIn(bodies()[0])).toHaveLength(0)
+    })
+
+    /* ‼️ 同一回归的另一条入口：回到"本来就有选区"的表（hasSelection 没翻转），Ctrl+X 也要落到它。 */
+    it("回到已经选过的轨表：Ctrl+X 剪的是这张表", async () => {
+        const bodies = await openTwoTrackTables()
+        await selectCell(bodies()[0], 0)
+        await selectCell(bodies()[1], 0)
+        await selectCell(bodies()[0], 1) // 回第一张再点一格（还是"有选区"，不会重新上报）
+
+        press("x", "KeyX", 88, true)
+
+        await waitFor(() => expect(removedIn(bodies()[0])).toHaveLength(1))
+        expect(removedIn(bodies()[1])).toHaveLength(0)
+    })
+
+    /* ‼️ 假删除标记要**随行保留**：删第二行时，先前标红的那条不能被重建成"未删除"（保存时会重新部署）。 */
+    it("连续假删除两行：先前那条保持标红，不会被下一次行操作复活", async () => {
+        await openAndSelectRow()
+        press("Delete", "Delete", 46, true)
+        await waitFor(() => expect(removedRows()).toHaveLength(1))
+
+        // 剩下那条还在原位（第 1 行）：接着删它。
+        await selectRow(rowsOf()[0])
+        press("Delete", "Delete", 46, true)
+
+        await waitFor(() => expect(removedRows()).toHaveLength(2))
+    })
+
+    /* ‼️ 轨表里的原生 Ctrl+V = 粘**单元格区域**（不是插行）；只测"粘贴事件到了基座、值写进去了"。 */
+    it("轨表里的 Ctrl+V：把一格的值粘到另一格", async () => {
+        await openAndSelectRow()
+        const target = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement // startTime = 1
+        fireEvent.mouseDown(target, {button: 0})
+        fireEvent.mouseUp(target)
+        await waitFor(() => expect(target.className).toContain("cell-active"))
+
+        fireEvent.paste(document.body, {clipboardData: clipboardStub("0")})
+
+        await waitFor(() => expect(target.textContent).toBe("0"))
+        expect(rowsOf()).toHaveLength(2) // 不是插行
+    })
+
+    /* ‼️ Ctrl+C 的落点也是"当前表"：两张表都有选区时，复制进行剪贴板的必须是刚操作那张。 */
+    it("两张轨表都有选区：Ctrl+C 复制的行来自刚操作的那张表", async () => {
+        vi.mocked(ListTracks).mockResolvedValue([
+            {sub: "0", kind: "attack"},
+            {sub: "0", kind: "effect"},
+        ])
+        vi.mocked(ListFsm).mockResolvedValue([])
+        vi.mocked(LoadTrack).mockImplementation(async (_motion, _sub, kind) =>
+            kind === "attack"
+                ? track() // startTime 0 / 1
+                : {...track(), kind: "effect", rows: [row(8), row(9)]}, // startTime 8 / 9
+        )
+        vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        await waitFor(() => expect(document.querySelectorAll("[role=dialog] tbody")).toHaveLength(2))
+        const bodies = () => [...document.querySelectorAll("[role=dialog] tbody")]
+
+        await selectRow(bodies()[0].querySelectorAll("tr")[0]) // attack 第 1 行（startTime 0）
+        await selectRow(bodies()[1].querySelectorAll("tr")[0]) // effect 第 1 行（startTime 8）
+        await selectRow(bodies()[0].querySelectorAll("tr")[0]) // 回到第一张（仍有选区，不触发重新上报）
+
+        press("c", "KeyC", 67, true)
+        press("Insert", "Insert", 45)
+
+        await waitFor(() => expect(bodies()[0].querySelectorAll("tr")).toHaveLength(3))
+        // 插进来的行 startTime 是 attack 的值 0（若复制错成 effect，会是 8）。
+        expect((bodies()[0].querySelectorAll("tr")[1].querySelectorAll("td")[2] as HTMLElement).textContent).toBe("0")
     })
 
     it("Ctrl+X 剪切：同样把那一行标成假删除（剪切 = 复制 + 删）", async () => {

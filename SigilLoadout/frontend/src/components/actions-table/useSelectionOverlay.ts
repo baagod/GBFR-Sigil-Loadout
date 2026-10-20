@@ -85,8 +85,14 @@ export function useSelectionOverlay({
             /*
             ‼️ 行高按**每一行**量：轨表「效果」列换行后，行数多的那几行会比别的行高；只记一个平均值
             会让选区 overlay 从第一行不等高的位置起全部错位。
+
+            ⚠️ 但**别无条件逐行读**：动作表常驻 1.2 万行，每次编辑/粘贴都会换一份 `rows`；逐行读
+            `offsetHeight` 等于每次提交多做 1.2 万次布局读。先用"首行高 × 行数 == tbody 总高"判均匀，
+            均匀就用老的均速路径，只有真的不等高（轨表的「效果」列换行）才逐行收集。
             */
-            const rowEls = [...body.querySelectorAll<HTMLTableRowElement>("tr")]
+            const firstRowHeight = (body.querySelector("tr")?.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0
+            const uniformByTotal = firstRowHeight > 0 && body.offsetHeight === rows.length * firstRowHeight
+            const rowEls = uniformByTotal ? [] : [...body.querySelectorAll<HTMLTableRowElement>("tr")]
             const rowHeights =
                 rowEls.length === rows.length
                     ? rowEls.map((tr) => (tr.firstElementChild as HTMLElement | null)?.offsetHeight ?? tr.offsetHeight)
@@ -114,7 +120,7 @@ export function useSelectionOverlay({
             )
         }
         read()
-    }, [measured, tableRef, rows, columnSizing, layoutTick])
+    }, [measured, tableRef, rows, sheetColumns, columnSizing, layoutTick])
 
     /** 活动格下标（锚点格）：overlay 用它把底色挖掉。 */
     const activeCellIndexes = useMemo<ActiveCellIndexes | null>(() => {

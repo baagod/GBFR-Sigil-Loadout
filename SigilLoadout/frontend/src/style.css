@@ -266,18 +266,20 @@ table td.cell-pinned, table th.cell-pinned {
 /* **假删除**（轨表："这一行不写进游戏"）。状态只由行上的 `.row-removed` 标记一次。
    ‼️ 底色刷在**格子上**而不是 `<tr>`：`TableRow` 的 `hover:bg-*` 特异性会顶掉行底色。
    数据格带 `:not(.cell-pinned)`（冻结列保持不透明）；`:where()` 把行标记特异性压成 0，
-   行号/握把格仍输给 `.cell-handle.cell-row-selected`，选中行头照旧是选中底色。 */
+   行号/握把格交给下面那条更具体的规则（选中时也保持假删除底色）。 */
 :where(.row-removed) > td:not(.cell-pinned) {
     background-color: var(--cell-removed);
 }
 
 /*
-    行号 / 握把那两格（0-1 列）单独再压一次：它们同时带 `.cell-handle` 与 `.cell-pinned`，
-    而 `table td.cell-pinned`（(0,1,2)）与 `.cell-handle.cell-row-selected`（(0,2,1)）都比上面
-    `:where()` 那条高 —— 不压的话假删除行点一下（整行选中）这两格就退回正常底色。
+    行号 / 握把那两格单独再压一次：它们同时带 `.cell-handle` 与 `.cell-pinned`，
+    而 `.cell-handle.cell-row-selected`（(0,2,1)）比上面 `:where()` 那条高 —— 不压的话假删除行
+    点一下（整行选中 / 选区压到）这两格就退回选中底色。
+    `color` 一起改：否则选中态那行绿字留在暗红底上（实测对比度 2.34:1），行号几乎看不清。
 */
 table tr.row-removed > td.cell-handle {
     background-color: var(--cell-removed);
+    color:            var(--foreground);
 }
 
 /*

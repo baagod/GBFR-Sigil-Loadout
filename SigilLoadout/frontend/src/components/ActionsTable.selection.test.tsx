@@ -43,6 +43,17 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
     })
 
     /*
+        ‼️ 没有单元格选区时，表格**不许**拦 copy 事件：否则在表格外选一段文字按 Ctrl+C 会被静默吞掉
+        （表还"接"了这次事件、却因为没选区什么都不复制）。归属兜底：一张表都没选区 → 谁都不接。
+    */
+    it("没有选区时 Ctrl+C：不拦浏览器默认行为", async () => {
+        await renderTable()
+        const clipboard = clipboardStub()
+        expect(fireEvent.copy(document.body, {clipboardData: clipboard})).toBe(true)
+        expect(clipboard.data["text/plain"]).toBeUndefined()
+    })
+
+    /*
         ‼️ **复制不许给值套引号包裹**（用户报的）：值里带引号（如 `["0"]` 这种 JSON 数组）时，
         复制出来不能变成 `[""0""]`。这条**不只针对某一列** —— 转换只在 `toTsv` 那一处做，
         所以这里用一个**普通字符串格**造出带引号的值来验，任何列都覆盖到。

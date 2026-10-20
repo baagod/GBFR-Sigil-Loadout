@@ -35,15 +35,17 @@ export type GeometryInput = {
     headerHeight: number
     /** 行高（**均匀**时用它；给了 `rowHeights` 时它只是兜底）。 */
     rowHeight: number
-    /** 每行的行高（可变量行高：轨表「效果」列换行后行会变高）。与 `rowTops` 成对给。 */
-    rowHeights?: number[]
-    /** 每行顶边（内容坐标）。与 `rowHeights` 成对给。 */
-    rowTops?: number[]
     /** 钉住列个数（显示顺序最前面的几列）。 */
     pinnedColumnCount: number
     rowCount: number
     columnCount: number
-}
+} & (
+    /* 均匀行高：两样都没有。 */
+    | {rowHeights?: undefined; rowTops?: undefined}
+    /* 可变量行高：每行的行高与顶边**必须成对**给 —— 只给一半会静默错位（`rowTopOf` 与 `rowHeightOf`
+       各读各的，能把间隔算成行高，甚至 NaN）。`geometryFromHeaderCells` 是唯一的生产来路，它成对产出。 */
+    | {rowHeights: readonly number[]; rowTops: readonly number[]}
+)
 
 /** 第 `i` 行的顶边（内容坐标）。 */
 export const rowTopOf = (geo: GeometryInput, i: number): number =>
@@ -57,6 +59,18 @@ const rowsSpan = (geo: GeometryInput, minRow: number, maxRow: number) => {
     const top = rowTopOf(geo, minRow)
     const bottom = rowTopOf(geo, maxRow) + rowHeightOf(geo, maxRow)
     return {top, height: bottom - top}
+}
+
+/**
+ * 选区**压到的行下标**（去重，显示顺序坐标）。
+ *
+ * 行号高亮、行级命令（复制/剪切/删除）、行号列右缘边框都问"哪些行被选区碰到"——
+ * 以前三处各写一遍 `for (min..max)`，改一处漏两处。算法只留在这里。
+ */
+export function rowIndexesInBounds(bounds: readonly Bounds[]): Set<number> {
+    const rows = new Set<number>()
+    for (const b of bounds) for (let index = b.minRowIndex; index <= b.maxRowIndex; index++) rows.add(index)
+    return rows
 }
 
 export type LayerModel = {fill: Rect[]; ring: Rect[]; copy: CopyCell[]; rowHead: Rect[]}
@@ -129,17 +143,17 @@ export function geometryFromHeaderCells({
         columnWidths.push(width)
         left += width
     }
-    return {
+    const base = {
         columnLefts,
         columnWidths,
         headerHeight,
         rowHeight,
-        rowHeights: variableHeights,
-        rowTops,
         pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
         rowCount,
         columnCount: sheetColumns.length,
     }
+    /* 成对给：只给一半的 `GeometryInput` 已由类型拦掉，这里只负责把已算好的两份一起挂上。 */
+    return variableHeights ? {...base, rowHeights: variableHeights, rowTops: rowTops!} : base
 }
 
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
@@ -290,8 +304,7 @@ export function buildOverlay(input: {
     */
     const headRight = geo.columnLefts[0]
     if (headRight !== undefined && bounds.length > 0) {
-        const rows = new Set<number>()
-        for (const b of bounds) for (let index = b.minRowIndex; index <= b.maxRowIndex; index++) rows.add(index)
+        const rows = rowIndexesInBounds(bounds)
         const sorted = [...rows].sort((a, b) => a - b)
         let start: number | null = null
         let prev = -1

@@ -81,7 +81,7 @@ export function useColumnMeasure(
     }, [])
     /** 上一趟量出来的列宽指纹（"稳定了没有"的判据：两趟一样就收手，见测量末尾那段）。 */
     const lastSizes = useRef("")
-    /** 上一次量的是**哪一份列清单** —— 换轨/换列时旧宽度与新列没有对应关系，必须放行重量。 */
+    /** 上一次量的是**哪一份列清单**（列 id + 钉死宽度）—— 换轨/换列/换钉死宽度时旧宽度没有对应关系，必须放行重量。 */
     const lastKeys = useRef("")
     /** 补量次数（上限，防打转）。 */
     const extraPasses = useRef(0)
@@ -91,12 +91,10 @@ export function useColumnMeasure(
     const lastData = useRef<unknown>(undefined)
     /** 上一次量完时的签名（界面语言等会影响文字宽度的东西）。 */
     const lastSignature = useRef<unknown>(undefined)
-    /** 强制重量：字体就绪。 */
+    /** 强制重量：字体就绪，或"藏在别的页时依赖变过"（见测量 effect 的隐藏分支）。 */
     const needsRemeasure = useRef(true)
     /** 上一次量完时外壳的布局宽：显示回来时拿它分辨"没变"与"隐藏期间窗口被缩放过"。 */
     const lastMeasuredBoxWidth = useRef(0)
-    /** 藏在别的页时依赖变过（数据/列/语言）：显示回来那一趟必须补量，别把那一趟当"切页来回"省掉。 */
-    const pendingMeasure = useRef(false)
 
     useLayoutEffect(() => {
         /*
@@ -125,8 +123,8 @@ export function useColumnMeasure(
         "下一帧再看"会变成每帧 setState + 整表重渲的死循环。显示回来由下面 ResizeObserver 那段叫醒。
         */
         if (rect.width === 0 || rect.height === 0) {
-            /* 藏在别的页时依赖变了（数据/列/语言）：记账，显示回来补量。 */
-            pendingMeasure.current = true
+            /* 藏在别的页时依赖变了（数据/列/语言）：记成"待重量"，显示回来那一趟必须补。 */
+            needsRemeasure.current = true
             return
         }
         /*
@@ -142,23 +140,23 @@ export function useColumnMeasure(
           · **还没量过**（首帧）必须放行 —— 那时是 `table-auto`、谁都不会被截断，跳过就永远量不出来；
           · 调用方**钉死宽度**的列（`fixedWidths`，如轨表的「效果」列）截断是它自己的设计，不算数。
         */
-        const keyPrint = keys.join("\u0000")
+        /*
+            ‼️ **钉死宽度也要进缓存键**：`fixedWidths` 直接决定 `sizes`（见下面 `sizes[id] = fixedWidths[id]`），
+            只比 keys 的话，"列没变、钉的宽度变了"会命中早退、宽度停在旧值。拼进 keyPrint 一起比。
+        */
+        const keyPrint = keys.map((key) => `${key}:${fixedWidths[key] ?? ""}`).join("\u0000")
         /*
         ‼️ 切页回来（隐藏↔显示）**不该重量**：内容没变、容器宽也由下面 ResizeObserver 那道
         "变成 0 不收"的闸挡住，重量只会白付一趟强制布局。只有四种情况放行：
-          · 没量过（首帧）或 needsRemeasure（字体就绪）；
+          · 没量过（首帧）或 needsRemeasure（字体就绪 / 藏在别的页时依赖变过）；
           · 列清单变了（换轨/换列）；
           · 签名变了（界面语言换了，表头文字宽度可能变）；
           · 数据引用变了且**真有格子被截断**（改一格/粘贴/撤销，见下）。
         */
         if (!needsRemeasure.current && lastKeys.current === keyPrint && lastSignature.current === signature) {
-            if (lastData.current === data) {
-                pendingMeasure.current = false
-                return
-            }
+            if (lastData.current === data) return
             if (!clippedColumn(el, fixedWidths)) {
                 lastData.current = data
-                pendingMeasure.current = false
                 return
             }
         }
@@ -189,6 +187,14 @@ export function useColumnMeasure(
         否则"没有动画"的顶层表也会被当成缩放过、白跑满 20 趟补量（真机：切到「角色动作」2.3s）。
         */
         const isScaled = Math.abs(layoutScale - 1) > 0.005
+        /*
+        ‼️ **弹层里的表要多给首趟补量**：弹层的展开动画与容器尺寸收尾都可能比首帧晚（动画尾段 scale 已在
+        0.5% 容差内、但布局还没定），首趟量到的偏小值此后没有任何一帧会再量 —— 正是"首帧少 3px、列名被截"
+        那条真机 bug。顶层动作表不在弹层里：布局首帧即终值，补量只是把 12k 格的强制布局重复一遍（2.3s），
+        所以只给弹层表补。
+        */
+        const inDialog = el.closest("[role=dialog]") !== null
+        const firstMeasurement = !measuredRef.current
 
         const prevWidth = el.style.width
         const prevLayout = el.style.tableLayout
@@ -382,13 +388,17 @@ export function useColumnMeasure(
         el.style.minWidth = prevMinWidth
 
         /*
-        ‼️ **量到"稳定"为止**（连着两趟结果一样才收手）—— 不猜弹窗动画有多长。
+        ‼️ **量到"稳定"为止**（两趟结果一致才收手）—— 不猜弹窗动画有多长。
 
         真机：弹窗内容挂载的首帧量出来**普遍少 3px**（`startTime` 72/该75、`layerFlag` 94/该97、
         `flag1` 79/该82），末尾那个字符正好被 `truncate` 吃掉。此后 `keys` / data / 字体都不再变，
         **没有任何一帧会再量** —— 偏小的值就固化了。手工在 1.2 秒后重做同一趟测量，每列都更宽，
-        可见"晚一点量就对"；但晚多久没法猜（展开动画、字体就绪时间都不定），
-        所以判据用**结果**：这一趟与上一趟不同，就下一帧再来一趟，直到两趟一致（上限 20 帧防打转）。
+        可见"晚一点量就对"；但晚多久没法猜（展开动画、字体就绪时间都不定），所以判据用**结果**：
+        这一趟与上一趟不同，就下一帧再来一趟。
+
+        补量的额度按"会不会自己收尾"分档（见下面 `cap`）：弹层里首趟最多补 2 趟（动画尾段 / 布局收尾
+        都比首帧晚），正在被 transform 缩放时沿用原来的 20 趟上限；顶层动作表不在弹层、首帧即终值，
+        不补 —— 否则 12k 格的强制布局要重复好几遍（真机 2.3s）。
         */
         /*
         ‼️ 指纹里**必须带上表格自己的布局宽**（`offsetWidth`，免疫 transform）：
@@ -400,20 +410,16 @@ export function useColumnMeasure(
         const fingerprint = `${el.offsetWidth}:${keys.map((k) => sizes[k]).join(",")}`
         if (fingerprint !== lastSizes.current) {
             lastSizes.current = fingerprint
-            /*
-            ⚠️ 补量只给"量的时候正被 transform 缩放"的表（弹窗展开动画，`layoutScale !== 1`）：
-            那是宽度会随动画收尾变化的唯一场景。顶层那张动作表 scale 恒为 1，一趟就是终值 ——
-            再补 5 趟只是把 12,144 个格子的强制布局重复 5 遍（真机：切到「角色动作」要 2.3s）。
-            */
-            if (isScaled && extraPasses.current < 20) {
+            const cap = isScaled ? 20 : firstMeasurement && inDialog ? 2 : 0
+            if (extraPasses.current < cap) {
                 extraPasses.current += 1
                 return remeasureNextFrame()
             }
         }
         /*
-        ‼️ **收敛了就归零**：上面那个 20 是"这一轮还能补几次"，不是组件整个生命周期的总额。
-        不归零的话，一个长命表格累计用满 20 次之后，指纹补测就**永久失效**（真机表现：
-        此后换动作、换数据都不再补测，列宽停在旧值上）。
+        ‼️ **收敛了就归零**：上面那个上限是"这一轮还能补几次"，不是组件整个生命周期的总额。
+        不归零的话，一个长命表格累计用满之后就**永久失效**（真机表现：此后换动作、换数据都不再补测，
+        列宽停在旧值上）。
         */
         /* 两趟一致：这一份尺寸就是定稿。落定之前表格一直 invisible，所以用户看不到中间那几帧。 */
         extraPasses.current = 0
@@ -423,21 +429,20 @@ export function useColumnMeasure(
         lastSignature.current = signature
         lastMeasuredBoxWidth.current = el.parentElement?.clientWidth ?? 0
         measuredRef.current = true
-        pendingMeasure.current = false
         /* 量出来与现在一模一样就别换（`rows` 一变就重量，编辑一格不该跟着重渲一遍）。 */
         setColumnSizing((prev) => (sameWidth(prev, sizes) ? prev : sizes))
         setMeasured(true)
     }, [tableRef, keys, data, fixedWidths, signature, shownTick])
 
     /*
-    ‼️ **滚动容器的尺寸一变就重量** —— 比"猜一个延迟"本质。
+    ‼️ **尺寸变化只负责"叫醒"，量不量由上面那段的缓存键决定**。
 
     真机：弹窗刚挂载那一帧量出来**普遍少 3px**（`startTime` 72/该75、`layerFlag` 94/该97、`flag1` 79/该82），
     末尾那个字符正好被 `truncate` 吃掉；而此后 `keys` / data / 字体都不再变，**没有任何一帧会再量** ——
     偏小的值就被固化了（编辑一格触发的重量立刻自愈，可见"只要晚一点量就对"）。
     "晚一点"猜不出来（弹窗展开动画多长、字体何时就绪都说不准），但**尺寸变了**是个确定信号：
-    动画期间滚动容器的宽度一直在变，它停下来之后必然还有一次回调 —— 那次量到的就是最终布局。
-    （顺带把"窗口缩放 / 侧栏开合"也接上了。）
+    动画期间滚动容器的宽度一直在变，它停下来之后必然还有一次回调 —— 那次就是上面补量触发的那一趟。
+    量过之后容器宽变化只重算 overlay 几何（`layoutTick`），不再重量：列宽是"内容自然宽"、与容器宽无关。
 
     observe **滚动容器**而不是 `<table>`：表格自己的宽度会被列宽反过来影响，那样会自己触发自己；
     再加一道"宽度真的变了"的闸，彻底断掉回环。
@@ -471,14 +476,14 @@ export function useColumnMeasure(
                 lastBoxWidth = width
                 if (width === 0) continue
                 /* 显示回来、宽度没变、也没有"藏在别的页时改过东西"：切页来回，连 setState 都不发。 */
-                if (previous === 0 && measuredRef.current && width === lastMeasuredBoxWidth.current && !pendingMeasure.current) continue
+                if (previous === 0 && measuredRef.current && width === lastMeasuredBoxWidth.current && !needsRemeasure.current) continue
                 wake()
             }
         })
         observer.observe(box)
         if (table) observer.observe(table)
         return () => observer.disconnect()
-    }, [tableRef])
+    }, [tableRef, keys.length])
 
 
     /*

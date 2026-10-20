@@ -4,10 +4,9 @@ import type {SortingState} from "@tanstack/react-table"
 import type {TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
 import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
-import {ActionsTable} from "@/components/ActionsTable"
+import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
 import {Badge} from "@/components/ui/badge"
 import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/components/actions-table/model"
-import type {RowCommands} from "@/components/actions-table/useRowCommands"
 
 /*
     两张轨表 = **基座表 + 数据**。
@@ -73,7 +72,7 @@ const toRow = (
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
-export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCopyReady, onPasteReady, onRowsReady, onRowsChange}: {
+export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
     table: TrackTableData | undefined
     t: Messages
     /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
@@ -83,12 +82,8 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
     onReorder: (from: number, to: number) => void
     /** 这张表有没有选区（任意单元格选区）：工具条「复制 / 剪切 / 删除」与键盘快捷键用同一个判据。 */
     onSelectionPresenceChange?: (hasSelection: boolean) => void
-    /** 把"复制当前选区"交回上层（工具条的「复制」按钮要用它出虚线）—— 见基座的 `onCopyReady`。 */
-    onCopyReady?: (copy: () => void) => void
-    /** 把"粘贴单元格区域"交回上层（工具条「粘贴」按钮用）—— 见基座的 `onPasteReady`。 */
-    onPasteReady?: (paste: () => void) => void
-    /** 基座那份**行级命令**（添加/复制/剪切/插入/删除）：接给工具条，见 `useRowCommands`。 */
-    onRowsReady?: (commands: RowCommands) => void
+    /** 基座交回来的**动作包**（复制 / 粘贴 / 行级命令）：工具条那几个按钮接它，见 `ActionsTable`。 */
+    onCommandsReady?: (commands: TableCommands) => void
     /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
 }) {
@@ -126,9 +121,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
             onEdit={onEdit}
             reorder={onReorder}
             onSelectionPresenceChange={onSelectionPresenceChange}
-            onCopyReady={onCopyReady}
-            onPasteReady={onPasteReady}
-            onRowsReady={onRowsReady}
+            onCommandsReady={onCommandsReady}
             onRowsChange={onRowsChange}
         />
     )

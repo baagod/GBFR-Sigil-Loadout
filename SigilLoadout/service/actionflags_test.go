@@ -277,3 +277,26 @@ func TestFlagsTrackIsPerSub(t *testing.T) {
 		t.Fatalf("改动后 1 号读回来第一行 Flag0=%q，want 1", again[0].Values["flag0"])
 	}
 }
+
+/*
+子轨号是**文件名与包内条目名的一片**（`<角色>_<动画号>_<子轨号>_seq_edit_flags.*`），
+三个入口都必须先过 `isSubTrack`（1–3 位十进制）。放宽校验就是路径穿越/写错文件，
+所以拿畸形值逐一钉住 —— 只测"报错"，不关心错误文案的其余部分。
+*/
+func TestEveryFlagsEntryPointRejectsBadSubs(t *testing.T) {
+	service, _, _ := actionsFixture(t)
+	bad := []string{"", "..", "../1", ".", "0/../1", `0\..\1`, "0:1", "1_", " 1", "1 ", "0000", "-1", "١٢٣"}
+	calls := map[string]func(sub string) error{
+		"LoadFlags":         func(sub string) error { _, err := service.LoadFlags("3400", sub); return err },
+		"LoadFlagsOriginal": func(sub string) error { _, err := service.LoadFlagsOriginal("3400", sub); return err },
+		"SaveFlags":         func(sub string) error { return service.SaveFlags("3400", sub, nil) },
+	}
+	for name, call := range calls {
+		for _, sub := range bad {
+			err := call(sub)
+			if err == nil || !strings.Contains(err.Error(), "子轨号") {
+				t.Errorf("%s(%q) = %v，want 子轨号 校验错误", name, sub, err)
+			}
+		}
+	}
+}

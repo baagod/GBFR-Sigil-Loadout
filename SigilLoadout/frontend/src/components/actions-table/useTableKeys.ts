@@ -1,9 +1,10 @@
 /*
-    **方向键、Enter、Delete 与 Insert**：活动格在数据格里走一格 / 进编辑（Excel 手感）/ Delete 清掉
-    选区里每一格的改动（回到表格默认值，见 `clearSelectedCells`）/ Ctrl+Delete 删掉**选区压到的行**
-    （不必整行选中）/ Insert 把复制的行插到活动格下方。
+    **键盘那一层**：方向键与 Enter（活动格在数据格里走一格 / 进编辑，Excel 手感）、Delete 清掉
+    选区里每一格的改动（回到表格默认值，见 `clearSelectedCells`）、Ctrl+Delete 删掉**选区压到的行**
+    （不必整行选中）、Insert 把复制的行插到活动格下方、Ctrl+C / Ctrl+X 的行与区域复制（与工具条
+    同一份命令，见 `useRowCommands` / `useClipboardHistory`）。
 
-    为什么单独一个 hook：这是"键盘那一层"的全部规则（三条移动路径 + 四道让路闸门），
+    为什么单独一个 hook：这是"键盘那一层"的全部规则（三条移动路径 + 让路闸门 + 事件归属），
     与选区手势、渲染、列宽都无关；而它要读的都是**渲染期最新值**，所以在这里统一成
     一份 ref 镜像（见下面 `fresh`）—— 监听因此只挂一次，不再每渲染摘挂一遍。
 
@@ -14,6 +15,7 @@ import {useCallback, useEffect, useRef, type RefObject} from "react"
 import type {CellSelectionBounds, CellSelectionDirection, CellSelectionState, Row} from "@tanstack/react-table"
 
 import {isSingleCellBounds} from "./selection"
+import {isEventForTable} from "./tableOwnership"
 import {features, type ActionRow, type EnterEditRegistry} from "./model"
 
 /**
@@ -37,7 +39,7 @@ const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
 /** 修饰键按位组合：`SHIFT` 扩选、`CTRL` 跳边，两者都不按就是走一步。 */
 const SHIFT = 1
 const CTRL = 2
-export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection}: {
+export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection}: {
     tableInstanceRef: RefObject<ArrowTable>
     tableRef: RefObject<HTMLTableElement | null>
     /** 活动格的"进编辑"登记表（见 `EnterEditRegistry`）：Enter 按活动格的键取那一个句柄。 */
@@ -55,6 +57,12 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
     insertCopiedRows: () => void
     /** Ctrl+Delete 的落点：删掉选区压到的行（不必整行选中）。 */
     removeRowsInSelection: () => void
+    /** Ctrl+C 的落点：选区压到的行进**行剪贴板**（单元格那片由浏览器的 copy 事件负责）。 */
+    copyRows?: () => void
+    /** Ctrl+X 的落点：行剪贴板 + 删掉选区行（"假删除"落库那层照旧）。 */
+    cutRows?: () => void
+    /** Ctrl+X 同时把**单元格那片**放上系统剪贴板（与 Ctrl+C 同一条 `copyArea`）。 */
+    copySelection?: () => void
 }) {
     /**
      * **渲染期最新值的镜像**：处理器与那两个监听引用恒定（挂一次），事件里读到的是**最新那一拍**。
@@ -62,8 +70,8 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
      * ‼️ 与表里别处（`tableInstanceRef` / `rowsRef` / `clickRowHandleRef`）同一个机制 —— 原来这里是
      * "无依赖 effect + 每渲染重挂"，同一个文件里两套机制并存，读的人得先猜"这个闭包是不是新的"。
      */
-    const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection})
-    fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection}
+    const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection})
+    fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection}
     /** 选区边界（走表实例那份记忆化，引用稳定）。 */
     const getSelectionBounds = () => tableInstanceRef.current.getCellSelectionBounds()
 
@@ -99,21 +107,21 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         const isDelete = e.key === "Delete" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
         const isRemoveRow = e.key === "Delete" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey
         const isInsert = e.key === "Insert" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
-        if ((!direction && !isEnter && !isDelete && !isInsert && !isRemoveRow) || e.defaultPrevented) return
+        /* Ctrl+C / Ctrl+X：行剪贴板 + 区域复制（落点见下面那两段；只有能改行的表才接，见 ActionsTable）。 */
+        const isCopy = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "c"
+        const isCut = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "x"
+        if ((!direction && !isEnter && !isDelete && !isInsert && !isRemoveRow && !isCopy && !isCut) || e.defaultPrevented) return
+        /* 按住键产生的重复事件不接"插行 / 删行"：那种后果不可逆（一次长按能删掉一整段）。 */
+        if (e.repeat && (isInsert || isRemoveRow)) return
         /*
-            ‼️ **同一时刻只有"当前那一层"的表响应用户的按键**。
+            ‼️ **同一时刻只有"当前那张表"响应用户的按键**。
 
-            每张表都往 `document`（捕获）挂了这一条，而弹窗打开时**底下的表并没有卸载** —— 它们照样收得到
-            事件。以前靠"自己有没有选区"分派，于是"底下那张表刚好选过东西"时按键被它接走（它还
-            `preventDefault` 了）：弹窗里那张表一记都收不到，表现就是"方向键要按两次才动一格"（用户报的）。
-
-            判据用**层的归属**：表在哪个 [role=dialog] 里，就只认那一层是当前层；不在任何弹窗里的表，
-            只在"确实没有弹窗"时响应。与"是哪张表、有几个值格列"无关 —— 所有表同一套。
+            每张表都往 `document`（捕获）挂了这一条，而弹窗打开时**底下的表并没有卸载**，同一个弹窗里也可能
+            同时挂着攻击 / 效果 / flags 好几张表。归属判断只有一份（`tableOwnership.isEventForTable`）：
+            只认最上层弹窗、事件/焦点落在那张表、其次最近按过的表 —— 以前这里只看"层"，于是两张表都有选区时
+            按键固定落到先挂载的那张（真机：在效果表里按 Ctrl+Del，删的是攻击表的行）。
         */
-        const myLayer = tableRef.current?.closest("[role=dialog]") ?? null
-        const dialogs = document.querySelectorAll("[role=dialog]")
-        const topLayer = dialogs.length > 0 ? dialogs[dialogs.length - 1] : null
-        if (myLayer !== topLayer) return
+        if (!isEventForTable(e, tableRef.current)) return
         // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
         const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
         const shift = mods === SHIFT
@@ -146,6 +154,30 @@ export function useArrowKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         const insideEditorOrList = (e.target as HTMLElement | null)?.closest?.(
             "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
         )
+        /* Ctrl+C 还多一类让路：值格自己收下 Ctrl+C（`data-copy-own` = 复制这一格的值，不是整行）。 */
+        const ownsCopy = (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [data-copy-own]")
+        /*
+            ---- Ctrl+C：行剪贴板（给 Insert 用）----
+            ‼️ **不 preventDefault**：单元格那片要留给浏览器的 copy 事件（`useClipboardHistory` 听它，
+            复制区那圈虚线就是那条路画的）。这里只管"行"。
+            只有能改行的表（`copyRows` 有值）才接；动作表没有行级命令，Ctrl+C 照旧归 copy 事件。
+        */
+        if (isCopy) {
+            if (ownsCopy || insideEditorOrList) return
+            fresh.current.copyRows?.()
+            return
+        }
+        /*
+            ---- Ctrl+X：剪切 = 复制这片（单元格区域 + 行剪贴板）+ 删掉选区行（"假删除"落库那层照旧）----
+            没有行级命令的表不接（不 preventDefault，交给浏览器默认行为）。
+        */
+        if (isCut) {
+            if (ownsCopy || insideEditorOrList || !fresh.current.cutRows) return
+            e.preventDefault()
+            fresh.current.copySelection?.()
+            fresh.current.cutRows()
+            return
+        }
         /*
             ---- Ctrl+Delete：删掉**选区压到的行**（不必整行选中）----
             与 Delete / Insert 同一套闸门；在编辑框里是"删到行首"之类的浏览器行为，不让路会误删表格行。

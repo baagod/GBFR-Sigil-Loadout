@@ -4,7 +4,7 @@
 
     ‼️ 为什么单独立一条：这个模块是动作表与轨表**共用**的行增删改（工具条那几个按钮与 Ctrl+C / Ctrl+X /
     Ctrl+Del / Insert 都走它），却一条用例都没有 —— 而它每条命令都有真实分支（插在活动行之后 / 落在行末、
-    没选中就什么都不做、跨表插入按**位置**对列（列不够留空、超出裁掉）、`children` 必须随行带走
+    没选中就什么都不做、跨表插入按**列名**对列（目标缺的留空、源多的忽略）、`children` 必须随行带走
     而 `orig` 必须留空 —— 新行不是原表那一行）。
     这里只测这个 hook 本身，不渲染表格。
 */
@@ -82,22 +82,34 @@ describe("行级命令（添加 / 复制 / 剪切 / 插入 / 删除）", () => {
         expect(inserted.some((r: ActionRow) => r.values.a === "A1")).toBe(true)
     })
 
-    it("插入：**按位置**照搬列值，不认列名（源表第 1 列的值给目标第 1 列）", () => {
-        // 源表列 [a,b]、值 [A0,B0]；目标表列 [b,a] → 目标 b 拿第 1 个值 A0、a 拿第 2 个值 B0。
+    it("插入：**按列名**映射（目标列序不同也不串列；目标缺的列留空、源多的列忽略）", () => {
+        // 源表列 [a,b]、值 A0/B0；目标表列 [b,a] → 仍按名字落：目标 b = B0、a = A0（不按位置）。
         const first = setup([row("0", {a: "A0", b: "B0"})], [0], 0, ["a", "b"])
         act(() => first.view.result.current.copy())
 
         const second = setup([row("9")], [], -1, ["b", "a"])
         act(() => second.view.result.current.insert())
         const [next] = second.onChange.mock.calls[0]
-        expect(next[1].values).toEqual({b: "A0", a: "B0"})
+        expect(next[1].values).toEqual({b: "B0", a: "A0"})
 
-        // 换一份"列更少"的剪贴板（只有 a）→ 目标列更多时，不够的留空。
-        const third = setup([row("7", {a: "A7"})], [0], 0, ["a"])
+        // 源表多一列（只有 a、c）→ 目标多余的列留空、源多余的值丢掉。
+        const third = setup([row("7", {a: "A7", c: "C7"})], [0], 0, ["a", "c"])
         act(() => third.view.result.current.copy())
         const fourth = setup([row("6")], [], -1, ["a", "b"])
         act(() => fourth.view.result.current.insert())
         expect(fourth.onChange.mock.calls[0][0][1].values).toEqual({a: "A7", b: ""})
+    })
+
+    it("插入：children 随行带走（攻击行的 <AilmentNN> 不丢），orig 仍留空", () => {
+        const source = row("0", {a: "A0"}, {}, {orig: 0, children: [{tag: "Ailment00", values: {rate: "100"}}]})
+        const first = setup([source], [0], 0)
+        act(() => first.view.result.current.copy())
+
+        const second = setup([row("9")], [], -1)
+        act(() => second.view.result.current.insert())
+        const inserted = second.onChange.mock.calls[0][0][1]
+        expect(inserted.children).toEqual([{tag: "Ailment00", values: {rate: "100"}}])
+        expect(inserted.orig).toBeUndefined()
     })
 
     it("插入：行剪贴板里的**全部行**插到活动格所在行之后（复制两行就插两行）", () => {

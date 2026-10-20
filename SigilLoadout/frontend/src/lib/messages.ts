@@ -195,7 +195,7 @@ export const messages: Record<Lang, Messages> = {
         trayExit: "Exit",
         searchSigil: "Search Sigil | Hex",
         noMatch: "No Matching Sigils",
-    noMatchItems: "No items found.",
+        noMatchItems: "No items found.",
 
         headerPrimary: "Primary Sigil",
         headerSecondary: "Secondary Sigil",
@@ -263,7 +263,7 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `Bullet Param ${no}`,
         // 哈希 + 6 个值的数组：挂 Buff 用（见文档 §4.1）。
         colSupportEffectList: "Additional Effect",
-    colBulletType: "Bullet Type",
+        colBulletType: "Bullet Type",
         // 冷却消耗时机的小枚举（2 = 一次性）。
         colSaveActionType: "Action Type",
         // 位标记：决定这条动作怎么被游戏处理、能不能接招。
@@ -306,7 +306,7 @@ export const messages: Record<Lang, Messages> = {
         copySelected: "Copy",
     cutSelected: "Cut",
         pasteBelow: "Paste",
-    insertRow: "Insert Rows",
+        insertRow: "Insert Rows",
     },
     ja: {
         tabGeneral: "汎用装備構成",
@@ -321,7 +321,7 @@ export const messages: Record<Lang, Messages> = {
         trayExit: "終了",
         searchSigil: "ジーン | Hex で検索",
         noMatch: "一致するジーンがありません",
-    noMatchItems: "一致する項目がありません",
+        noMatchItems: "一致する項目がありません",
 
         headerPrimary: "メインジーン",
         headerSecondary: "サブジーン",
@@ -389,7 +389,7 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `弾パラメータ ${no}`,
         // ハッシュ + 6 値の配列：Flag1:2 でバフを付ける。
         colSupportEffectList: "追加効果",
-    colBulletType: "弾種",
+        colBulletType: "弾種",
         // クールダウンを消費するタイミングの小さな列挙（2 = 一回限り）。
         colSaveActionType: "アクション種類",
         // ビットフラグ：このアクションの扱い・派生の可否を決める。
@@ -432,7 +432,7 @@ export const messages: Record<Lang, Messages> = {
         copySelected: "コピー",
     cutSelected: "切り取り",
         pasteBelow: "貼り付け",
-    insertRow: "行を挿入",
+        insertRow: "行を挿入",
     },
     ko: {
         tabGeneral: "일반 장비 구성",
@@ -447,7 +447,7 @@ export const messages: Record<Lang, Messages> = {
         trayExit: "종료",
         searchSigil: "진 | Hex 검색",
         noMatch: "일치하는 진이 없습니다",
-    noMatchItems: "일치하는 항목이 없습니다",
+        noMatchItems: "일치하는 항목이 없습니다",
 
         headerPrimary: "메인 진",
         headerSecondary: "서브 진",
@@ -515,7 +515,7 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `탄환 파라미터 ${no}`,
         // 해시 + 값 6개짜리 배열：Flag1:2 로 버프를 건다.
         colSupportEffectList: "추가 효과",
-    colBulletType: "탄 종류",
+        colBulletType: "탄 종류",
         // 쿨다운을 소비하는 시점을 정하는 작은 열거형(2 = 1회용).
         colSaveActionType: "액션 종류",
         // 비트 플래그：이 액션을 게임이 어떻게 다룰지·파생 가능 여부를 정한다.
@@ -558,6 +558,6 @@ export const messages: Record<Lang, Messages> = {
         copySelected: "복사",
     cutSelected: "잘라내기",
         pasteBelow: "붙여넣기",
-    insertRow: "행 삽입",
+        insertRow: "행 삽입",
     },
 };
