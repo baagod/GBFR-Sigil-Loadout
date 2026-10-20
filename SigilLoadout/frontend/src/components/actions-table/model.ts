@@ -248,13 +248,25 @@ export const NO_PICKER = (): PickerConfig | undefined => undefined
 export const PickerOfContext = createContext<(key: string) => PickerConfig | undefined>(NO_PICKER)
 
 /**
+ * mot 格要不要给 `···` 详情入口：列是 `saveMotIdNN_`，且这格值不是 `-`（`-` = 没有对应动作，
+ * 点了也没东西可开，也不加任何提示）。表头不传 `shown` → 仍按列判断（列级配色）。
+ *
+ * 放 model 而不是放 `ActionsPanel`：它只是一条纯列级判据；放在页面组件里会让单测为了这一行
+ * 把整个页面（连 Wails 运行时）拉进来。
+ */
+export const showMotDrill = (key: string, shown?: string): boolean => /^saveMotId\d{2}_$/.test(key) && shown !== "-"
+
+/**
  * 一列的"**详情**"入口（格右端那个 `···` 靶子走它）。
  *
  * ‼️ 与 `PickerOfContext` 同构：基座只问"**这一列**有没有详情"，**不知道**哪个列是 mot 之类 ——
  * 领域知识留在调用方（`ActionsPanel`）。`label` 由调用方给（它有 `t`），基座不做文案。
+ *
+ * `shown` = 这一格**当前显示值**：调用方据此决定"这格值不值得给详情入口"（如 mot 格是 `-` 就不给）。
+ * 表头调它时不传 `shown`（列级配色仍按列判断）。
  */
 export type DrillSpec = {label: string; open: (shown: string) => void}
-export const DrillContext = createContext<(key: string) => DrillSpec | undefined>(() => undefined)
+export const DrillContext = createContext<(key: string, shown?: string) => DrillSpec | undefined>(() => undefined)
 
 
 /**

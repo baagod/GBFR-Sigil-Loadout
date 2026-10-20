@@ -129,7 +129,7 @@ export const CellContent = memo(function CellContent({
             onCommit={(value) => edit(rowId, fieldKey, value)}
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
-            drill={drillOf(fieldKey)}
+            drill={drillOf(fieldKey, shown)}
         />
     )
 })

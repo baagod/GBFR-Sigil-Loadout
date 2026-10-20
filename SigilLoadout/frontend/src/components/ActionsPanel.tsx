@@ -22,7 +22,7 @@ import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
 import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import type {ActionRow} from "@/components/actions-table/model"
-import {DrillContext, columnsOf, toActionRow} from "@/components/actions-table/model"
+import {DrillContext, columnsOf, showMotDrill, toActionRow} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
@@ -244,10 +244,14 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
         ‼️ **provider 的 `value` 必须是稳定引用**：`CellContent` 是 `memo` 的，而 **context 一变就绕过 memo**
         —— 每次面板重渲都新建一个函数的话，整张表（88 列 × 111 行）会跟着全部重渲，正是 `ActionRowView`
         那套 memo 想避免的事（用户对这表的拖选手感有真机口径）。依赖只有文案与当前角色。
+
+        ‼️ 值是 `-` 的 mot 格**没有对应动作**：不给 `···` 靶子（点不出来，也不加任何提示）——
+        判据在 `model.showMotDrill`（纯列级判据，单测不为此拉进整个页面）。
+        表头调它时不传 `shown`（列级配色仍按列判断）。
     */
     const drillOf = useMemo(
-        () => (key: string) =>
-            /^saveMotId\d{2}_$/.test(key) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined,
+        () => (key: string, shown?: string) =>
+            showMotDrill(key, shown) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined,
         [t.generalTracks, charCode],
     )
 

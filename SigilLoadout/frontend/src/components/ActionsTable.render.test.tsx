@@ -13,7 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
-import {DrillContext} from "@/components/actions-table/model"
+import {DrillContext, showMotDrill} from "@/components/actions-table/model"
 
 import {KEYS, cellAt, tableProps, useTableHarness, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
 
@@ -254,10 +254,18 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         用户口径：**不挂原生悬停提示**（与上面表头列名那条同一条 —— 截断了/说不清就让它那样）。
         那个 `···` 留着 `aria-label` 给读屏即可，hover 弹一个小方块反而碍事。
     */
+    it("mot 详情规则：只有 `saveMotIdNN_` 且值不是 `-` 才有入口", () => {
+        expect(showMotDrill("saveMotId01_", "3400")).toBe(true)
+        expect(showMotDrill("saveMotId01_", "-")).toBe(false)
+        expect(showMotDrill("saveMotId01_")).toBe(true) // 表头/列级：不传 shown 仍按列判断
+        expect(showMotDrill("id_", "3400")).toBe(false)
+    })
+
     it("详情靶子（`···`）：有 aria-label，但**不挂** title 悬停提示", async () => {
         const line = {id: "1000", values: {}, originals: {id_: "1000", saveMotId01_: "3400"}}
+        const open = vi.fn()
         const {container} = render(
-            <DrillContext.Provider value={() => ({label: "通用轨", open: () => undefined})}>
+            <DrillContext.Provider value={(key, shown) => (showMotDrill(key, shown) ? {label: "通用轨", open} : undefined)}>
                 <ActionsTable t={t} rows={[line]} keys={["id_", "saveMotId01_"]} />
             </DrillContext.Provider>,
         )
@@ -265,6 +273,22 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const target = container.querySelector("button[data-drill]")
         expect(target?.getAttribute("aria-label")).toBe("通用轨")
         expect(target?.getAttribute("title")).toBeNull()
+
+        fireEvent.click(target!)
+        expect(open).toHaveBeenCalledWith("3400")
+    })
+
+    /* ‼️ 值是 `-` 的 mot 格：没有对应动作 → 不渲染 `···`（点不出来），也不挂任何提示。 */
+    it("详情靶子：值为 `-` 的格不渲染靶子", async () => {
+        const line = {id: "1000", values: {}, originals: {id_: "1000", saveMotId01_: "-"}}
+        const {container} = render(
+            <DrillContext.Provider value={(key, shown) => (showMotDrill(key, shown) ? {label: "通用轨", open: () => undefined} : undefined)}>
+                <ActionsTable t={t} rows={[line]} keys={["id_", "saveMotId01_"]} />
+            </DrillContext.Provider>,
+        )
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        expect(container.querySelector("button[data-drill]")).toBeNull()
+        expect(container.textContent).toContain("-")
     })
 
     /*
