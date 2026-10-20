@@ -21,15 +21,15 @@ import {useRef} from "react"
 
 import {shownValue, type ActionRow} from "./model"
 
-/** 行剪贴板里的一行：**按列 id 存值**（行剪贴板只由本应用写，列名一直在），外加子节点。 */
-type RowSnapshot = {values: Record<string, string>; children?: ActionRow["children"]}
+/** 行剪贴板里的一行：**按复制时那一行的列顺序**存值（不保存列名），外加子节点。 */
+type RowSnapshot = {values: string[]; children?: ActionRow["children"]}
 
 /**
  * **全应用一份行剪贴板**（与系统剪贴板同一个心智模型）：在一张表复制，任何允许插入的表都能用 ——
  * 跨表、跨弹窗都通；后一次复制覆盖前一次。
  *
- * 粘贴按**列名**映射：目标表没有的列 → 留空；源表多出来的列 → 忽略。不能按位置硬塞：
- * 攻击与效果两条轨的列不一样（效果没有 `EndTime`），按位置会把值写进错字段、再存进 XML。
+ * 粘贴按**位置**对列（Excel 口径：源表第 N 列 → 目标表第 N 列，不保存也不比较列名）：
+ * 目标列不够 → 留空；复制来的值多余 → 裁掉。
  */
 const sharedRowClipboard: {current: RowSnapshot[] | null} = {current: null}
 
@@ -51,7 +51,7 @@ export type RowCommands = {
 
 /**
  * @param rows 当前的行（基座算完的那份）
- * @param keys 列清单（= 目标表的列；行剪贴板按**列名**对列，目标缺的留空、源多的忽略）
+ * @param keys 列清单（= 目标表的列；插入按**位置**对列，目标不够留空、源多出来的裁掉）
  * @param selectionRowIndexes 选区**压到的行**（含只选了一格的行；复制/剪切/删除都用它）
  * @param activeRowIndex 活动格所在的行（`-1` = 没有）
  * @param onChange 行数据变了（增/删/插）—— 基座本身是受控的，所以只能把**新的一整份**交回去
@@ -74,11 +74,11 @@ export function useRowCommands({
     /** 新行的 id：只需要在这张表里唯一（调用方要自己的 id 口径就在 `onChange` 里改）。 */
     const nextId = useRef(1)
 
-    /** 一行的**完整值**（改动值优先），按列 id 收 —— 复制出去、抄给新行都用它，而不是 delta。 */
-    const rowValues = (row: ActionRow): Record<string, string> => Object.fromEntries(keys.map((key) => [key, shownValue(row, key)]))
+    /** 一行的**完整值**（改动值优先），按本表列顺序排 —— 复制出去、抄给新行都用它，而不是 delta。 */
+    const rowValues = (row: ActionRow): string[] => keys.map((key) => shownValue(row, key))
 
     /**
-     * 造一行新行：值**按列 id** 从快照里取（目标表没有的列 → 空串；源表多出来的列 → 忽略）。
+     * 造一行新行：值**按本表的列顺序**从快照里按下标取（目标列不够 → 空串；值多余 → 裁掉）。
      * 行身份是"新"（`originals` 空 = 没有原值可回落）。
      *
      * ‼️ **`orig` 不能带**：它表示"这一行是原版第几行"。新行（添加 / 插入出来的复制行）不是原表里
@@ -89,7 +89,7 @@ export function useRowCommands({
      */
     const makeRow = (snapshot: RowSnapshot): ActionRow => ({
         id: `newRows${nextId.current++}`,
-        values: Object.fromEntries(keys.map((key) => [key, snapshot.values[key] ?? ""])),
+        values: Object.fromEntries(keys.map((key, index) => [key, snapshot.values[index] ?? ""])),
         originals: {},
         orig: undefined,
         children: snapshot.children,
@@ -120,9 +120,9 @@ export function useRowCommands({
         /** 添加：插在活动行之后（没有活动行 → 行末），值照抄那一行（没有活动行 → 末行）；子节点一起抄。 */
         add: () => {
             const source = rows[activeRowIndex >= 0 ? activeRowIndex : rows.length - 1]
-            insertRows(activeRowIndex, [makeRow(source ? snapshotOf(source) : {values: {}})])
+            insertRows(activeRowIndex, [makeRow(source ? snapshotOf(source) : {values: []})])
         },
-        /** 复制：**选区压到的行**进剪贴板（按列 id 存值 + 子节点；不带行身份）。单元格那圈虚线由 `useClipboardHistory` 负责。 */
+        /** 复制：**选区压到的行**进剪贴板（只存值数组 + 子节点；不保存列名、不带行身份）。单元格那圈虚线由 `useClipboardHistory` 负责。 */
         copy: () => {
             if (selectionRowIndexes.length === 0) return
             clipboard.current = selectionRowIndexes.flatMap((index) => (rows[index] ? [snapshotOf(rows[index])] : []))
@@ -135,7 +135,7 @@ export function useRowCommands({
         },
         /**
          * 插入：行剪贴板里的**全部行**（复制了几行就插几行）插到**活动格所在行之后**；
-         * 没有活动格（`activeRowIndex < 0`）→ 插到末行之后。值**按列名**映射（目标缺的列留空、源多的列忽略）。
+         * 没有活动格（`activeRowIndex < 0`）→ 插到末行之后。值**按位置**对列（目标不够留空、多出来的裁掉）。
          */
         insert: () => {
             const clip = clipboard.current
