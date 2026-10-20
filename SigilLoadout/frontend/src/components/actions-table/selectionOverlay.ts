@@ -33,26 +33,23 @@ export type GeometryInput = {
     columnWidths: number[]
     /** 表头高度（数据行从这里开始）。 */
     headerHeight: number
-    /** 行高（**均匀**时用它；给了 `rowHeights` 时它只是兜底）。 */
-    rowHeight: number
-    /** 每行的行高（可变量行高：轨表「效果」列换行后行会变高）。给它就按每行真实高度画。 */
-    rowHeights?: readonly number[]
+    /** 每行的行高（轨表「效果」列换行后行会变高）。行顶边由它累加。 */
+    rowHeights: readonly number[]
     /** 钉住列个数（显示顺序最前面的几列）。 */
     pinnedColumnCount: number
     rowCount: number
     columnCount: number
 }
 
-/** 第 `i` 行的顶边（内容坐标）：可变量行高时由 `rowHeights` 累加。 */
+/** 第 `i` 行的顶边（内容坐标）。 */
 export const rowTopOf = (geo: GeometryInput, i: number): number => {
-    if (!geo.rowHeights) return geo.headerHeight + i * geo.rowHeight
     let top = geo.headerHeight
     for (let n = 0; n < i; n++) top += geo.rowHeights[n]!
     return top
 }
 
 /** 第 `i` 行的高度。 */
-export const rowHeightOf = (geo: GeometryInput, i: number): number => (geo.rowHeights ? geo.rowHeights[i]! : geo.rowHeight)
+export const rowHeightOf = (geo: GeometryInput, i: number): number => geo.rowHeights[i]!
 
 /** 一段行区间（含首尾）的顶边与总高。 */
 const rowsSpan = (geo: GeometryInput, minRow: number, maxRow: number) => {
@@ -96,7 +93,6 @@ export function geometryFromHeaderCells({
     cells,
     sheetColumns,
     headerHeight,
-    rowHeight,
     rowHeights,
     pinnedColumnCount,
     rowCount,
@@ -104,9 +100,8 @@ export function geometryFromHeaderCells({
     cells: readonly HeaderCellMetric[]
     sheetColumns: readonly string[]
     headerHeight: number
-    rowHeight: number
-    /** 每行的实测行高（可变量行高）；长度必须等于 `rowCount`，否则退回均匀 `rowHeight`。 */
-    rowHeights?: readonly number[]
+    /** 每行的实测行高；长度必须等于 `rowCount`，否则不画 overlay。 */
+    rowHeights: readonly number[]
     pinnedColumnCount: number
     rowCount: number
 }): GeometryInput | null {
@@ -120,10 +115,8 @@ export function geometryFromHeaderCells({
             rowHeadWidth += cell.width
         }
     }
-    const variableHeights =
-        rowHeights && rowHeights.length === rowCount && rowCount > 0 && rowHeights.every((height) => height > 0) ? [...rowHeights] : undefined
+    if (rowHeights.length !== rowCount || rowCount === 0 || rowHeights.some((height) => height <= 0)) return null
     if (headerHeight <= 0 || rowHeadWidth <= 0) return null
-    if (!variableHeights && rowHeight <= 0) return null
     let left = rowHeadWidth
     const columnLefts: number[] = []
     const columnWidths: number[] = []
@@ -138,8 +131,7 @@ export function geometryFromHeaderCells({
         columnLefts,
         columnWidths,
         headerHeight,
-        rowHeight,
-        rowHeights: variableHeights,
+        rowHeights,
         pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
         rowCount,
         columnCount: sheetColumns.length,

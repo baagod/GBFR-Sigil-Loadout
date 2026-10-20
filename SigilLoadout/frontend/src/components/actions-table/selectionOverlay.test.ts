@@ -6,7 +6,7 @@ const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
     columnLefts: [40, 80, 140, 200],
     columnWidths: [40, 60, 60, 60],
     headerHeight: 41,
-    rowHeight: 27,
+    rowHeights: Array.from({length: 100}, () => 27),
     pinnedColumnCount: 2,
     rowCount: 100,
     columnCount: 4,
@@ -18,7 +18,7 @@ const sumArea = (rs: {width: number; height: number}[]) => rs.reduce((a, r) => a
 
 describe("selectionOverlay（选区 → 像素几何）", () => {
     it("行高不等（轨表「效果」列换行）：跨行选区按每行真实高度叠，从正确的顶边起", () => {
-        const g = geo({rowHeight: 0, rowHeights: [27, 41, 27], rowCount: 3})
+        const g = geo({rowHeights: [27, 41, 27], rowCount: 3})
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 0}],
             geo: g,
@@ -32,7 +32,7 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(ringTop.height).toBe(3)
     })
 
-    it("geometryFromHeaderCells：给了每行行高就按累计顶边建几何；给了不合法长度则退回均匀行高", () => {
+    it("geometryFromHeaderCells：按每行实测行高建几何；行高不合法则不画 overlay", () => {
         const cells = [
             {kind: "rowhead" as const, id: null, width: 40},
             {kind: "column" as const, id: "a", width: 100},
@@ -41,7 +41,6 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             cells,
             sheetColumns: ["a"],
             headerHeight: 30,
-            rowHeight: 27,
             rowHeights: [20, 30, 40],
             pinnedColumnCount: 0,
             rowCount: 3,
@@ -55,16 +54,16 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         })
         expect(model.scrolled.fill).toEqual([{left: 40, top: 30, width: 100, height: 90}])
 
-        const fallback = geometryFromHeaderCells({
-            cells,
-            sheetColumns: ["a"],
-            headerHeight: 30,
-            rowHeight: 27,
-            rowHeights: [20],
-            pinnedColumnCount: 0,
-            rowCount: 3,
-        })!
-        expect(fallback.rowHeights).toBeUndefined()
+        expect(
+            geometryFromHeaderCells({
+                cells,
+                sheetColumns: ["a"],
+                headerHeight: 30,
+                rowHeights: [20],
+                pinnedColumnCount: 0,
+                rowCount: 3,
+            }),
+        ).toBeNull()
     })
 
     it("单格：底色就是那一格，轮廓外扩 2px、线宽 3px", () => {
@@ -118,7 +117,7 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
                 {minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 1, maxColumnIndex: 1},
                 {minRowIndex: 2, maxRowIndex: 2, minColumnIndex: 1, maxColumnIndex: 1},
             ],
-            geo: geo({rowHeight: 0, rowHeights: [27, 41, 27, 25], rowCount: 4}),
+            geo: geo({rowHeights: [27, 41, 27, 25], rowCount: 4}),
             activeCell: null,
             copyAreas: [],
         })
@@ -291,7 +290,7 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
             ],
             sheetColumns: ["a", "b", "c", "d", "e"],
             headerHeight: 41,
-            rowHeight: 27,
+            rowHeights: [27, 27, 27],
             pinnedColumnCount: 2,
             rowCount: 3,
         })!
@@ -309,7 +308,7 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
             ],
             sheetColumns: ["a", "b"],
             headerHeight: 41,
-            rowHeight: 27,
+            rowHeights: [27],
             pinnedColumnCount: 0,
             rowCount: 1,
         })!
@@ -322,10 +321,10 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
             {kind: "column" as const, id: "a", width: 0},
         ]
         expect(
-            geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 0, rowHeight: 27, pinnedColumnCount: 0, rowCount: 1}),
+            geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 0, rowHeights: [27], pinnedColumnCount: 0, rowCount: 1}),
         ).toBeNull()
         expect(
-            geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 41, rowHeight: 27, pinnedColumnCount: 0, rowCount: 1}),
+            geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 41, rowHeights: [27], pinnedColumnCount: 0, rowCount: 1}),
         ).toBeNull()
     })
 })

@@ -132,7 +132,6 @@ export function useSelectionOverlay({
                 cells: metrics.cells,
                 sheetColumns,
                 headerHeight: metrics.headerHeight,
-                rowHeight: 0, // 行高一律走 rowHeights（每行都实测）
                 rowHeights: metrics.rowHeights,
                 pinnedColumnCount,
                 rowCount: rows.length,
@@ -179,7 +178,7 @@ export function useSelectionOverlay({
         [geometry, selectionBounds, activeCellIndexes, copyAreas, copyUnderlay],
     )
 
-    const bodyHeight = geometry ? (geometry.rowHeights ? geometry.rowHeights.reduce((sum, height) => sum + height, 0) : rows.length * geometry.rowHeight) : 0
+    const bodyHeight = geometry ? geometry.rowHeights.reduce((sum, height) => sum + height, 0) : 0
     return {
         model,
         height: geometry ? geometry.headerHeight + bodyHeight : 0,
