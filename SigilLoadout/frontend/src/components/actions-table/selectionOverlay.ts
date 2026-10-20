@@ -140,9 +140,6 @@ export function geometryFromHeaderCells({
 
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
 const RING_WIDTH = 3
-/** 贴在行头/冻结列边界时，滚动层内收线要留的缝。 */
-const BOUNDARY_LEFT_GAP = 2
-const BOUNDARY_LEFT_SHIFT = RING_WIDTH - 1 + BOUNDARY_LEFT_GAP
 
 const emptyLayer = (): LayerModel => ({fill: [], ring: [], copy: [], rowHead: []})
 
@@ -203,26 +200,25 @@ function subtractRect(rect: Rect, hole: Rect | null): Rect[] {
  * 左/上边落在 `x-2..x+1`，右/下边落在 `x+w-2..x+w+1`；贴表格右/下边时各收回 1px。
  * `leftShift` 把左缘的三条线（上/下/左）一起右移，用于在行头边界留缝；右缘不受影响。
  */
-export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean, leftShift = 0): Rect[] {
+export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean): Rect[] {
     const inset = width - 1
     /*
         ‼️ `clamp*` 不只是把边线往里挪 1px，**线的长度也要减 1**：
         竖线原本画到 `rect.bottom + 1`、横线画到 `rect.right + 1`，最后一行的竖线会超出表格 1px。
         滚动层有 `overflow: hidden` 挡着，但握把段画在钉住层（`overflow: visible`）→ 撑出纵向滚动条（真机复现）。
     */
-    const lineW = rect.width + inset + 1 - (clampRight ? 1 : 0) - leftShift
+    const lineW = rect.width + inset + 1 - (clampRight ? 1 : 0)
     const lineH = rect.height + inset + 1 - (clampBottom ? 1 : 0)
-    const left = rect.left - inset + leftShift
     const lines: Rect[] = []
-    if (edges.top) lines.push({left, top: rect.top - inset, width: lineW, height: width})
+    if (edges.top) lines.push({left: rect.left - inset, top: rect.top - inset, width: lineW, height: width})
     if (edges.bottom) {
         const top = rect.top + rect.height - inset - (clampBottom ? 1 : 0)
-        lines.push({left, top, width: lineW, height: width})
+        lines.push({left: rect.left - inset, top, width: lineW, height: width})
     }
-    if (edges.left) lines.push({left, top: rect.top - inset, width, height: lineH})
+    if (edges.left) lines.push({left: rect.left - inset, top: rect.top - inset, width, height: lineH})
     if (edges.right) {
-        const rightLeft = rect.left + rect.width - inset - (clampRight ? 1 : 0)
-        lines.push({left: rightLeft, top: rect.top - inset, width, height: lineH})
+        const left = rect.left + rect.width - inset - (clampRight ? 1 : 0)
+        lines.push({left, top: rect.top - inset, width, height: lineH})
     }
     return lines
 }
@@ -242,41 +238,6 @@ function fillSegments(bounds: Bounds, geo: GeometryInput, hole: Rect | null): {p
 }
 
 /**
- * 一段选区轮廓 → 各层的线矩形。通常整段一层；左缘贴在行头/冻结列边界时按两套策略拆层：
- *   · 未横滚：左竖线进钉住层（正常外扩，盖住行头右边框，和钉住列选区同观感）；
- *   · 已横滚：整段留在滚动层并右移 `BOUNDARY_LEFT_SHIFT`（线随列滚走，不留残影）。
- */
-function segmentRing({
-    rect,
-    edges,
-    pinned,
-    atBoundary,
-    boundaryLeftAtPinned,
-    clampRight,
-    clampBottom,
-}: {
-    rect: Rect
-    edges: Edges
-    pinned: boolean
-    atBoundary: boolean
-    boundaryLeftAtPinned: boolean
-    clampRight: boolean
-    clampBottom: boolean
-}): {pinned: Rect[]; scrolled: Rect[]} {
-    if (!atBoundary) {
-        const lines = ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom)
-        return pinned ? {pinned: lines, scrolled: []} : {pinned: [], scrolled: lines}
-    }
-    if (boundaryLeftAtPinned) {
-        return {
-            pinned: ringLines(rect, {top: false, right: false, bottom: false, left: true}, RING_WIDTH, false, clampBottom),
-            scrolled: ringLines(rect, {...edges, left: false}, RING_WIDTH, clampRight, clampBottom),
-        }
-    }
-    return {pinned: [], scrolled: ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom, BOUNDARY_LEFT_SHIFT)}
-}
-
-/**
  * 选区 → overlay 模型（纯函数，可单测）。
  *
  * `copyAreas` 是复制源区间（与选区同坐标系）；复制虚线也按钉住列切段。
@@ -290,10 +251,8 @@ export function buildOverlay(input: {
     copyAreas: Bounds[]
     /** 复制虚线空档露什么颜色（该格底色）；不传用页面底色（几何单测不关心颜色）。 */
     copyUnderlay?: (rowIndex: number, columnIndex: number) => string
-    /** 横向未滚动时，行头边界的左竖线画到钉住层（盖住行头的右边框，和钉住列选区的观感一致）。 */
-    boundaryLeftAtPinned?: boolean
 }): OverlayModel {
-    const {bounds, geo, activeCell, copyAreas, copyUnderlay, boundaryLeftAtPinned = false} = input
+    const {bounds, geo, activeCell, copyAreas, copyUnderlay} = input
     const model: OverlayModel = {scrolled: emptyLayer(), pinned: emptyLayer()}
     const lastColumnIndex = geo.columnCount - 1
     const lastRowIndex = geo.rowCount - 1
@@ -313,17 +272,16 @@ export function buildOverlay(input: {
         model.scrolled.fill.push(...fills.scrolled)
 
         const hideRight = b.minColumnIndex === 0 && b.maxColumnIndex === lastColumnIndex
-        const leftAtPinned = b.minColumnIndex === geo.pinnedColumnCount
-        for (const segment of splitByPinned(b, geo, hideRight)) {
-            const ring = segmentRing({
-                ...segment,
-                atBoundary: !segment.pinned && segment.edges.left && leftAtPinned,
-                boundaryLeftAtPinned,
-                clampRight: segment.edges.right && b.maxColumnIndex === lastColumnIndex,
-                clampBottom: segment.edges.bottom && b.maxRowIndex === lastRowIndex,
-            })
-            model.pinned.ring.push(...ring.pinned)
-            model.scrolled.ring.push(...ring.scrolled)
+        /*
+            第一数据列紧贴行头：左缘不画选区线，由行头右缘的指示边框充当（见下面 `rowHead`；
+            选区含第一列时那条指示线会加宽到 3px 并补上下外扩）。
+        */
+        const firstColumn = b.minColumnIndex === 0
+        for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
+            const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
+            const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
+            const ringEdges = firstColumn ? {...edges, left: false} : edges
+            ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(rect, ringEdges, RING_WIDTH, clampRight, clampBottom))
         }
     }
 
@@ -337,12 +295,18 @@ export function buildOverlay(input: {
     if (headRight !== undefined && bounds.length > 0) {
         const rows = rowIndexesInBounds(bounds)
         const sorted = [...rows].sort((a, b) => a - b)
+        /* 选区含第一列时，这条指示线就是选区的左边框：加宽到 3px，并补上上/下外扩。 */
+        const isLeftEdge = bounds.some((b) => b.minColumnIndex === 0)
         let start: number | null = null
         let prev = -1
         const flush = () => {
             if (start === null) return
             const {top, height} = rowsSpan(geo, start, prev)
-            model.pinned.rowHead.push({left: headRight - 2, top, width: 2, height})
+            model.pinned.rowHead.push(
+                isLeftEdge
+                    ? {left: headRight - 2, top: top - 2, width: 3, height: height + 3 - (prev === lastRowIndex ? 1 : 0)}
+                    : {left: headRight - 2, top, width: 2, height},
+            )
             start = null
         }
         for (const index of sorted) {

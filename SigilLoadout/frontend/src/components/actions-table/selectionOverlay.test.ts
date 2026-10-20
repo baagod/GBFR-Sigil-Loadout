@@ -66,7 +66,7 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         ).toBeNull()
     })
 
-    it("单格：底色就是那一格，轮廓外扩 2px、线宽 3px", () => {
+    it("单格：底色 + 上/右/下三边；第一列的左边由行头指示线充当", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 0}],
             geo: geo(),
@@ -78,44 +78,43 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(model.pinned.ring).toEqual([
             {left: 38, top: 39, width: 43, height: 3},
             {left: 38, top: 66, width: 43, height: 3},
-            {left: 38, top: 39, width: 3, height: 30},
             {left: 78, top: 39, width: 3, height: 30},
         ])
+        expect(model.pinned.rowHead).toEqual([{left: 38, top: 39, width: 3, height: 30}])
     })
 
-    it("选区从行头后的第一列起：左竖线收进格内，不被行头格盖出缺角", () => {
+    it("第一列：行头指示线加宽成 3px 并补上下外扩，充当选区左边框（无横滚切换）", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 1, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 1}],
             geo: geo({pinnedColumnCount: 0}),
             activeCell: null,
             copyAreas: [],
         })
-        /* 左缘三条线一起右移 2px 留缝：左竖线从 42 起（列边界 40 + 2），四边都在滚动层。 */
         expect(model.pinned.ring).toEqual([])
-        expect(model.scrolled.ring).toContainEqual({left: 42, top: 66, width: 3, height: 57})
-        expect(model.scrolled.ring).toHaveLength(4)
+        expect(model.scrolled.ring).toHaveLength(3)
+        expect(model.pinned.rowHead).toEqual([{left: 38, top: 66, width: 3, height: 57}])
+    })
 
-        const afterPinned = buildOverlay({
+    it("从第二列起仍然画左边框", () => {
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 1, maxColumnIndex: 1}],
+            geo: geo({pinnedColumnCount: 0}),
+            activeCell: null,
+            copyAreas: [],
+        })
+        expect(model.scrolled.ring).toContainEqual({left: 78, top: 39, width: 3, height: 30})
+        expect(model.scrolled.ring).toHaveLength(4)
+    })
+
+    it("冻结列之后的第一列（非第一数据列）照常画左边框", () => {
+        const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2}],
             geo: geo(),
             activeCell: null,
             copyAreas: [],
         })
-        expect(afterPinned.pinned.ring).toEqual([])
-        expect(afterPinned.scrolled.ring).toContainEqual({left: 142, top: 39, width: 3, height: 30})
-        expect(afterPinned.scrolled.ring).toHaveLength(4)
-    })
-
-    it("横向未滚动：行头边界左竖线画到钉住层，盖住行头右边框（和钉住列选区同观感）", () => {
-        const model = buildOverlay({
-            bounds: [{minRowIndex: 1, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 1}],
-            geo: geo({pinnedColumnCount: 0}),
-            activeCell: null,
-            copyAreas: [],
-            boundaryLeftAtPinned: true,
-        })
-        expect(model.pinned.ring).toEqual([{left: 38, top: 66, width: 3, height: 57}])
-        expect(model.scrolled.ring).toHaveLength(3)
+        expect(model.scrolled.ring).toContainEqual({left: 138, top: 39, width: 3, height: 30})
+        expect(model.scrolled.ring).toHaveLength(4)
     })
 
     it("行号列右缘边框：选区压到的行在钉住层画 2px 竖线（相邻行合并成一段）", () => {
@@ -169,7 +168,7 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             activeCell: null,
             copyAreas: [],
         })
-        expect(model.pinned.ring.length).toBe(3) // top/bottom/left
+        expect(model.pinned.ring.length).toBe(2) // top/bottom（第一列左边由 rowHead 充当）
         expect(model.scrolled.ring.length).toBe(3) // top/bottom/right
         expect(model.pinned.ring.filter((r) => r.height > r.width && r.left === 138)).toEqual([])
         expect(model.scrolled.ring.filter((r) => r.height > r.width && r.left === 138)).toEqual([])
@@ -216,8 +215,8 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             activeCell: null,
             copyAreas: [],
         })
-        // 左边缘 = 72 - 外扩 2；没有任何更靠左的轮廓（握把/行号列不被包进去）。
-        expect(model.pinned.ring.filter((r) => r.width === 3 && r.height > 3).map((r) => r.left)).toEqual([70, 110])
+        // 第一列：没有 3px 左竖线，左边由加宽的 rowHead 指示线充当。
+        expect(model.pinned.ring.filter((r) => r.width === 3 && r.height > 3).map((r) => r.left)).toEqual([110])
         expect(model.pinned.ring.every((r) => r.left >= 70)).toBe(true)
     })
 
@@ -228,9 +227,9 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             activeCell: null,
             copyAreas: [],
         })
-        // 滚动区只剩上/下两条横线；钉住区有左边缘一条竖线（右边缘被整行规则压掉）。
+        // 整行选区从第一列起：只剩上下横线（左边由 rowHead 指示线、右边按整行规则不画）。
         expect(model.scrolled.ring.filter((r) => r.height > r.width)).toEqual([])
-        expect(model.pinned.ring.filter((r) => r.height > r.width)).toHaveLength(1)
+        expect(model.pinned.ring.filter((r) => r.height > r.width)).toEqual([])
     })
 
     it("复制源：每格一个盒子（四边标记 + 该格底色），上/左格外 1px、右/下止于格线", () => {
