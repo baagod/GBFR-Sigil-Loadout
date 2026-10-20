@@ -4,7 +4,7 @@
     表头两行：译名在上、原始字段名在下（字段名是"这一列对应哪个字段"的钥匙）。
     ⚠️ 两行都带 `data-head-line`：量宽按行分别量（见 `useColumnMeasure`）。
 
-    行头（行号区 + 握把区）**不属于列模型**（见 `classes.ts` 的 HANDLE_WIDTH 那段），所以这一格是手写的。
+    行号列与握把列**不属于列模型**（见 `classes.ts` 的 HANDLE_WIDTH 那段），所以这两格是手写的。
     外壳由 `BaseTable` 出（滚动框 div + `<table>`），`<thead>` 由 shadcn 的 `TableHeader` 出。
 */
 import {useContext} from "react"

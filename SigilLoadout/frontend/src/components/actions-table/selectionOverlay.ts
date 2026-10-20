@@ -198,7 +198,6 @@ function subtractRect(rect: Rect, hole: Rect | null): Rect[] {
 /**
  * 一个矩形 → 轮廓的四个线矩形（每条边一条，`width` = 线宽）。
  * 左/上边落在 `x-2..x+1`，右/下边落在 `x+w-2..x+w+1`；贴表格右/下边时各收回 1px。
- * `leftShift` 把左缘的三条线（上/下/左）一起右移，用于在行头边界留缝；右缘不受影响。
  */
 export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean): Rect[] {
     const inset = width - 1

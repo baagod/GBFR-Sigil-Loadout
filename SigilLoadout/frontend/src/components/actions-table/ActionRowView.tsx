@@ -1,5 +1,5 @@
 /*
-    表体的一行：行头格（行号区 + 握把区）+ 87 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
+    表体的一行：行号格 + 可选握把格 + 87 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
