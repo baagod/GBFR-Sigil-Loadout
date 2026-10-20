@@ -117,7 +117,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     /* ‼️ 工具条「删除」与 Ctrl+Del 走**同一个命令**：只选一格也能删它所在行（不必整行选中）。 */
     it("工具条「删除」：只选一格也能删掉它所在那一行", async () => {
         await openAndSelectRow()
-        const cell = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement
+        const cell = rowsOf()[1].querySelectorAll("td")[1] as HTMLElement
         fireEvent.mouseDown(cell, {button: 0})
         fireEvent.mouseUp(cell)
         await waitFor(() => expect(cell.className).toContain("cell-active"))
@@ -212,7 +212,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     it("Ctrl+Del：只选一格也能删掉它所在那一行（假删除）", async () => {
         await openAndSelectRow()
         // 选第 2 行的一个数据格（单格选区，不是整行）。
-        const cell = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement
+        const cell = rowsOf()[1].querySelectorAll("td")[1] as HTMLElement
         fireEvent.mouseDown(cell, {button: 0})
         fireEvent.mouseUp(cell)
         await waitFor(() => expect(cell.className).toContain("cell-active"))
@@ -327,7 +327,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     /* ‼️ 轨表里的原生 Ctrl+V = 粘**单元格区域**（不是插行）；只测"粘贴事件到了基座、值写进去了"。 */
     it("轨表里的 Ctrl+V：把一格的值粘到另一格", async () => {
         await openAndSelectRow()
-        const target = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement // startTime = 1
+        const target = rowsOf()[1].querySelectorAll("td")[1] as HTMLElement // startTime = 1
         fireEvent.mouseDown(target, {button: 0})
         fireEvent.mouseUp(target)
         await waitFor(() => expect(target.className).toContain("cell-active"))
@@ -364,7 +364,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
 
         await waitFor(() => expect(bodies()[0].querySelectorAll("tr")).toHaveLength(3))
         // 插进来的行 startTime 是 attack 的值 0（若复制错成 effect，会是 8）。
-        expect((bodies()[0].querySelectorAll("tr")[1].querySelectorAll("td")[2] as HTMLElement).textContent).toBe("0")
+        expect((bodies()[0].querySelectorAll("tr")[1].querySelectorAll("td")[1] as HTMLElement).textContent).toBe("0")
     })
 
     it("Ctrl+X 剪切：同样把那一行标成假删除（剪切 = 复制 + 删）", async () => {
@@ -386,12 +386,12 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     /* ‼️ 粘贴 = **单元格区域**（与 Ctrl+V 同一条路），不是插行：复制一格 → 选另一格 → 粘贴。 */
     it("工具条「复制」「粘贴」：把一格的值粘到另一格（粘的是单元格，不插行）", async () => {
         await openAndSelectRow()
-        const from = rowsOf()[0].querySelectorAll("td")[2] as HTMLElement // startTime = 0
+        const from = rowsOf()[0].querySelectorAll("td")[1] as HTMLElement // startTime = 0
         fireEvent.mouseDown(from, {button: 0})
         fireEvent.mouseUp(from)
         clickToolbar(messages.zh.copySelected)
 
-        const to = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement // startTime = 1
+        const to = rowsOf()[1].querySelectorAll("td")[1] as HTMLElement // startTime = 1
         fireEvent.mouseDown(to, {button: 0})
         fireEvent.mouseUp(to)
         clickToolbar(messages.zh.pasteBelow)
@@ -400,3 +400,4 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         expect(rowsOf()).toHaveLength(2) // 不是插行
     })
 })
+

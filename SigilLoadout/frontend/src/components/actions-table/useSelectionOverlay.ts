@@ -71,6 +71,20 @@ export function useSelectionOverlay({
         tableWidth: number
     }>({headerHeight: 0, rowHeights: [], cells: [], tableWidth: 0})
 
+    /*
+        横向未滚动时，行头边界的左竖线画到钉住层（和钉住列选区同一观感，盖住行头右边框）；
+        一旦横向滚动，改回滚动层内收线，避免列藏到行头后面时残留一条悬空竖线。
+    */
+    const [boundaryLeftAtPinned, setBoundaryLeftAtPinned] = useState(true)
+    useLayoutEffect(() => {
+        const box = tableRef.current?.parentElement
+        if (!box) return
+        const update = () => setBoundaryLeftAtPinned(box.scrollLeft === 0)
+        update()
+        box.addEventListener("scroll", update, {passive: true})
+        return () => box.removeEventListener("scroll", update)
+    }, [tableRef, measured])
+
     useLayoutEffect(() => {
         if (!measured) return
         const tableEl = tableRef.current
@@ -98,7 +112,7 @@ export function useSelectionOverlay({
             const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => {
                 const head = th.dataset.head
                 return {
-                    kind: head === "handle" || head === "grip" ? "rowhead" : "column",
+                    kind: head ? "rowhead" : "column",
                     id: th.dataset.colId ?? null,
                     width: th.offsetWidth,
                 }
@@ -174,8 +188,11 @@ export function useSelectionOverlay({
     )
 
     const model = useMemo(
-        () => (geometry ? buildOverlay({bounds: selectionBounds, geo: geometry, activeCell: activeCellIndexes, copyAreas, copyUnderlay}) : null),
-        [geometry, selectionBounds, activeCellIndexes, copyAreas, copyUnderlay],
+        () =>
+            geometry
+                ? buildOverlay({bounds: selectionBounds, geo: geometry, activeCell: activeCellIndexes, copyAreas, copyUnderlay, boundaryLeftAtPinned})
+                : null,
+        [geometry, selectionBounds, activeCellIndexes, copyAreas, copyUnderlay, boundaryLeftAtPinned],
     )
 
     const bodyHeight = geometry ? geometry.rowHeights.reduce((sum, height) => sum + height, 0) : 0

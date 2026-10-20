@@ -1,5 +1,5 @@
 /*
-    表体的一行：行号格 + 87 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
+    表体的一行：行头格（行号区 + 握把区）+ 87 个数据格。**`memo` 是这里的性能命门**（见下面 `ActionRowView` 那段），
     所以它从 `ActionsTable` 里单独拆出来，props 全是稳定值或 ref。
 */
 import {memo, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject} from "react"
@@ -17,6 +17,7 @@ import {
     HANDLE_WIDTH,
     PINNED_CELL,
     READ_ONLY_BG,
+    ROWHEAD_WIDTH,
     handleCellClass,
 } from "./classes"
 import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, snapshotKey} from "./model"
@@ -214,58 +215,42 @@ export const ActionRowView = memo(function ActionRowView({
             }
         >
             {/*
-                行号格：与表头那个 `#` **同一个宽度**（否则两行对不齐），不入列模型、不参与**单元格**选区。
-
-                **它自己不画框** —— 用户要求：按行选中时框从行号列**后面**开始（`| xx | xx |`），
-                序号列保持原样；整行选区就是一条普通的区，外观统一由 `SelectionOverlay` 画。
-
-                行选中的三个手势：
-                  · 按下 —— 记下起始行（拖选用），再按修饰键点/Ctrl/Shift 改选中；
-                  · 划过 —— 只有"正按着"时才把区间拉到这一行；
-                  · 松手 —— 在 window 上收尾（鼠标常会跑出行号那一列）。
-                ⚠️ 这只格子不在列模型里，所以 `cell.getSelectionStartHandler()` 那套与它无关，两者不打架。
-
-                给了 `sortable` 时右边多出**握把**那半截：序号照旧管选行，**只有握把接拖动**
-                （按下先 `stopPropagation`，这一下只搬行、不选行）。
+                行头单格：# 区居中显示序号，能拖的表右侧再放握把区（总宽 `ROWHEAD_WIDTH`）。
+                点 # 区选行；握把区拦下 mousedown，只交给 dnd-kit 搬行。
             */}
             <TableCell
                 className={handleCellClass(rowSelected)}
-                style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
+                style={{width: sortable ? ROWHEAD_WIDTH : HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
                     clickRowHandle(row, e)
                 }}
             >
-                <div className={HANDLE_INNER}>{rowNumber}</div>
+                <div className="flex h-full w-full">
+                    <div className={HANDLE_INNER} style={{width: HANDLE_WIDTH}}>
+                        {rowNumber}
+                    </div>
+                    {sortable && (
+                        <div
+                            ref={drag.setActivatorNodeRef}
+                            /*
+                                ⚠️ **只铺 `listeners`，不铺 `drag.attributes`**：那包里是 `role="button"` + `tabIndex=0`
+                                （键盘拖拽用的），而基座只注册了 `PointerSensor` —— 铺上去就是个"Tab 能停、回车空格
+                                什么都不干"的假按钮。真要支持键盘拖拽，得连 `KeyboardSensor` 与它的文案一起做。
+                            */
+                            {...drag.listeners}
+                            aria-label="拖动排序"
+                            className={`flex touch-none cursor-grab items-center justify-center active:cursor-grabbing ${
+                                drag.isDragging ? "opacity-40" : ""
+                            }`}
+                            style={{width: GRIP_WIDTH, cursor: "grab"}}
+                            onMouseDown={(e) => e.stopPropagation()}
+                        >
+                            <span className="leading-none text-muted-foreground/60">⠿</span>
+                        </div>
+                    )}
+                </div>
             </TableCell>
-            {/*
-                **拖动握把自成一条**（行号列右边）。为什么不塞在行号格里：那一格要同时装序号与握把，而
-                `table-fixed` 的列宽只认**表头那格** —— 塞在一起时表体写下的宽度不算数（真机：序号被 flex
-                压到 ~20px、握把右侧 10px 被钉住的 `config` 列盖住、表头 `#` 与序号不共中线）。
-                拆开之后每一格的宽度各归各的，"点行号 = 选行 / 按握把 = 搬行"也从**结构**上分开了
-                （不再靠 `stopPropagation` 拦）。
-            */}
-            {sortable && (
-                <TableCell
-                    ref={drag.setActivatorNodeRef}
-                    /*
-                        ⚠️ **只铺 `listeners`，不铺 `drag.attributes`**：那包里是 `role="button"` + `tabIndex=0`
-                        （键盘拖拽用的），而基座只注册了 `PointerSensor` —— 铺上去就是个"Tab 能停、回车空格
-                        什么都不干"的假按钮。真要支持键盘拖拽，得连 `KeyboardSensor` 与它的文案一起做。
-                    */
-                    aria-label="拖动排序"
-                    {...drag.listeners}
-                    /* 选中轮廓由 overlay 统一画；这里只保留拖拽光标与拖动中的半透明反馈。
-                       ‼️ 不能再挂 `relative`：它和 `HANDLE_CELL` 的 `sticky` 冲突（`relative` 后写会赢），
-                       inline 的 `left: HANDLE_WIDTH` 就变成相对偏移 +40px —— 握把列整个压到 `config` 列上（真机）。 */
-                    className={`${handleCellClass(rowSelected)} touch-none cursor-grab active:cursor-grabbing ${
-                        drag.isDragging ? "opacity-40" : ""
-                    }`}
-                    style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
-                >
-                    <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
-                </TableCell>
-            )}
             {/* `getAllCells` 是 core 给的；`getVisibleCells` 属于列可见性 feature（没注册）。 */}
             {rowCells.map((cell) => {
                 const key = cell.column.id

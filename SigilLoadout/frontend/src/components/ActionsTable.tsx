@@ -448,10 +448,9 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     const selectionBounds = table.getCellSelectionBounds()
 
     /**
-     * **行头那几格的总宽**：行号列恒定 `HANDLE_WIDTH`，行序能拖的表再跟一条**握把列**（`GRIP_WIDTH`）。
+     * **行头单格的总宽**：行号区 `HANDLE_WIDTH`，行序能拖的表再加握把区 `GRIP_WIDTH`。
      *
-     * 它是"行号列之后从哪儿开始"的**唯一**出处：表格总宽、表头那两格、钉住列的 `left`（表头与表体）
-     * 全用这一个数 —— 以前这里是三处各写一遍 `HANDLE_WIDTH`，而握把那 32px 谁都没算进去。
+     * 它是"行头之后从哪儿开始"的**唯一**出处：表格总宽、表头、钉住列的 `left`（表头与表体）全用这一个数。
      */
     const rowHeadWidth = HANDLE_WIDTH + (reorder !== undefined ? GRIP_WIDTH : 0)
 

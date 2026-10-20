@@ -19,6 +19,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
+import {ROWHEAD_WIDTH} from "@/components/actions-table/classes"
 import {cleanup, isSelected, makeRow, pressHandle, t, tableProps} from "@/components/actions-table/testkit"
 
 afterEach(cleanup)
@@ -40,8 +41,10 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
 
         // 末尾那个子元素只能是最后一行 —— 多出一个 `<div>`（dnd-kit 的 live region）就会让末行规则失配。
         expect(tbody.lastElementChild!.tagName).toBe("TR")
-        // 握把是行头控件（不在列模型里）：`data-head="grip"` 只让几何把它算进行头宽度。
-        expect(container.querySelector('thead th[data-head="grip"]')).not.toBeNull()
+        // 行头是单格（行号区 + 握把区）：不在列模型里，几何按实测宽度算进行头宽度。
+        const head = container.querySelector('thead th[data-head="handle"]') as HTMLElement
+        expect(head).not.toBeNull()
+        expect(head.style.width).toBe(`${ROWHEAD_WIDTH}px`)
     })
 
     /*
@@ -71,7 +74,7 @@ describe("动作表 · 可拖排序（轨表那条路）", () => {
         const bounds = () =>
             JSON.parse(container.querySelector("[data-selection-bounds]")!.getAttribute("data-selection-bounds")!)
         const row = container.querySelector("tbody tr")!
-        const grip = row.querySelectorAll("td")[1] as HTMLElement
+        const grip = row.querySelector('[aria-label="拖动排序"]') as HTMLElement
         const cell = row.querySelectorAll("td[data-col-id]")[2] as HTMLElement
 
         fireEvent.mouseDown(grip, {button: 0})

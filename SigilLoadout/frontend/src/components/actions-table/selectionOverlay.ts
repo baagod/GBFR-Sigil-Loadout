@@ -198,26 +198,28 @@ function subtractRect(rect: Rect, hole: Rect | null): Rect[] {
 /**
  * 一个矩形 → 轮廓的四个线矩形（每条边一条，`width` = 线宽）。
  * 左/上边落在 `x-2..x+1`，右/下边落在 `x+w-2..x+w+1`；贴表格右/下边时各收回 1px。
+ * `leftShift` 把左缘的三条线（上/下/左）一起右移，用于在行头边界留缝；右缘不受影响。
  */
-export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean): Rect[] {
+export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean, leftShift = 0): Rect[] {
     const inset = width - 1
     /*
         ‼️ `clamp*` 不只是把边线往里挪 1px，**线的长度也要减 1**：
         竖线原本画到 `rect.bottom + 1`、横线画到 `rect.right + 1`，最后一行的竖线会超出表格 1px。
         滚动层有 `overflow: hidden` 挡着，但握把段画在钉住层（`overflow: visible`）→ 撑出纵向滚动条（真机复现）。
     */
-    const lineW = rect.width + inset + 1 - (clampRight ? 1 : 0)
+    const lineW = rect.width + inset + 1 - (clampRight ? 1 : 0) - leftShift
     const lineH = rect.height + inset + 1 - (clampBottom ? 1 : 0)
+    const left = rect.left - inset + leftShift
     const lines: Rect[] = []
-    if (edges.top) lines.push({left: rect.left - inset, top: rect.top - inset, width: lineW, height: width})
+    if (edges.top) lines.push({left, top: rect.top - inset, width: lineW, height: width})
     if (edges.bottom) {
         const top = rect.top + rect.height - inset - (clampBottom ? 1 : 0)
-        lines.push({left: rect.left - inset, top, width: lineW, height: width})
+        lines.push({left, top, width: lineW, height: width})
     }
-    if (edges.left) lines.push({left: rect.left - inset, top: rect.top - inset, width, height: lineH})
+    if (edges.left) lines.push({left, top: rect.top - inset, width, height: lineH})
     if (edges.right) {
-        const left = rect.left + rect.width - inset - (clampRight ? 1 : 0)
-        lines.push({left, top: rect.top - inset, width, height: lineH})
+        const rightLeft = rect.left + rect.width - inset - (clampRight ? 1 : 0)
+        lines.push({left: rightLeft, top: rect.top - inset, width, height: lineH})
     }
     return lines
 }
@@ -250,8 +252,10 @@ export function buildOverlay(input: {
     copyAreas: Bounds[]
     /** 复制虚线空档露什么颜色（该格底色）；不传用页面底色（几何单测不关心颜色）。 */
     copyUnderlay?: (rowIndex: number, columnIndex: number) => string
+    /** 横向未滚动时，行头边界的左竖线画到钉住层（盖住行头的右边框，和钉住列选区的观感一致）。 */
+    boundaryLeftAtPinned?: boolean
 }): OverlayModel {
-    const {bounds, geo, activeCell, copyAreas, copyUnderlay} = input
+    const {bounds, geo, activeCell, copyAreas, copyUnderlay, boundaryLeftAtPinned = false} = input
     const model: OverlayModel = {scrolled: emptyLayer(), pinned: emptyLayer()}
     const lastColumnIndex = geo.columnCount - 1
     const lastRowIndex = geo.rowCount - 1
@@ -271,25 +275,29 @@ export function buildOverlay(input: {
         model.scrolled.fill.push(...fills.scrolled)
 
         const hideRight = b.minColumnIndex === 0 && b.maxColumnIndex === lastColumnIndex
-        /* 左竖线外扩 2px 会压进 z-50 的 sticky 行头/冻结格；从层边界起时收进格内，四边都留在滚动层。 */
+        /*
+            选区从行头/冻结列后的第一列起时，左缘正常外扩会压进 sticky 格；把左缘三条线一起右移
+            2px 留缝，避免和行头的右边框贴成一条。
+        */
         const leftAtPinned = b.minColumnIndex === geo.pinnedColumnCount
         for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
             const layer = pinned ? model.pinned : model.scrolled
-            if (pinned || !edges.left || !leftAtPinned) {
-                layer.ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom))
+            const atBoundary = !pinned && edges.left && leftAtPinned
+            if (atBoundary && boundaryLeftAtPinned) {
+                /* 和钉住列选区同一观感：左竖线在钉住层、按正常外扩盖住行头右边框；横向滚动后改成滚动层内收线。 */
+                model.scrolled.ring.push(...ringLines(rect, {...edges, left: false}, RING_WIDTH, clampRight, clampBottom))
+                model.pinned.ring.push(...ringLines(rect, {top: false, right: false, bottom: false, left: true}, RING_WIDTH, false, clampBottom))
                 continue
             }
-            model.scrolled.ring.push(...ringLines(rect, {...edges, left: false}, RING_WIDTH, clampRight, clampBottom))
-            model.scrolled.ring.push(
-                ...ringLines({...rect, left: rect.left + RING_WIDTH - 1}, {top: false, right: false, bottom: false, left: true}, RING_WIDTH, false, clampBottom),
-            )
+            const leftShift = atBoundary ? RING_WIDTH - 1 + 2 : 0
+            layer.ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom, leftShift))
         }
     }
 
     /*
-        行号 / 握把列的**右缘边框**（Excel 行头）：选区压到的行，在行头右缘画 2px 竖线。
+        行头右缘的**2px 边框**（Excel 行头）：选区压到的行，在行头右缘画 2px 竖线。
         与底色/轮廓同一套覆盖层 —— 不写 `<td>` 的 border，避免改 border 宽度触发表格布局，
         且钉住层 `sticky left-0` 让它在横滚时原生跟随行头。
         相邻行合并成一段（几十行选中时只多几个 div）；行头宽度 = 第一数据列的左缘。

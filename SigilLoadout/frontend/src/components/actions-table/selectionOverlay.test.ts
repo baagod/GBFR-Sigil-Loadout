@@ -90,8 +90,9 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             activeCell: null,
             copyAreas: [],
         })
+        /* 左缘三条线一起右移 2px 留缝：左竖线从 42 起（列边界 40 + 2），四边都在滚动层。 */
         expect(model.pinned.ring).toEqual([])
-        expect(model.scrolled.ring).toContainEqual({left: 40, top: 66, width: 3, height: 57})
+        expect(model.scrolled.ring).toContainEqual({left: 42, top: 66, width: 3, height: 57})
         expect(model.scrolled.ring).toHaveLength(4)
 
         const afterPinned = buildOverlay({
@@ -101,8 +102,20 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             copyAreas: [],
         })
         expect(afterPinned.pinned.ring).toEqual([])
-        expect(afterPinned.scrolled.ring).toContainEqual({left: 140, top: 39, width: 3, height: 30})
+        expect(afterPinned.scrolled.ring).toContainEqual({left: 142, top: 39, width: 3, height: 30})
         expect(afterPinned.scrolled.ring).toHaveLength(4)
+    })
+
+    it("横向未滚动：行头边界左竖线画到钉住层，盖住行头右边框（和钉住列选区同观感）", () => {
+        const model = buildOverlay({
+            bounds: [{minRowIndex: 1, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 1}],
+            geo: geo({pinnedColumnCount: 0}),
+            activeCell: null,
+            copyAreas: [],
+            boundaryLeftAtPinned: true,
+        })
+        expect(model.pinned.ring).toEqual([{left: 38, top: 66, width: 3, height: 57}])
+        expect(model.scrolled.ring).toHaveLength(3)
     })
 
     it("行号列右缘边框：选区压到的行在钉住层画 2px 竖线（相邻行合并成一段）", () => {
