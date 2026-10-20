@@ -248,9 +248,13 @@ export function handleAt(container: HTMLElement, row: number) {
 export function stubColumnGeometry(onRect?: (el: HTMLElement) => void) {
     return vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
         onRect?.(this)
-        if (this.tagName === "TABLE") return {width: 900, height: 300} as DOMRect
-        if (this.tagName === "TH") return {width: 77.4, height: 24} as DOMRect
-        return {width: 0, height: 0} as DOMRect
+        /*
+            ⚠️ 必须给**完整** DOMRect（top/bottom 也要）：真实浏览器永远有，而选区 overlay 现在按
+            `body.top - table.top` 的小数坐标算行高；只给 width/height 会让它算出 NaN。
+        */
+        if (this.tagName === "TABLE") return {width: 900, height: 300, top: 0, bottom: 300, left: 0, right: 900, x: 0, y: 0} as DOMRect
+        if (this.tagName === "TH") return {width: 77.4, height: 24, top: 0, bottom: 24, left: 0, right: 77.4, x: 0, y: 0} as DOMRect
+        return {width: 0, height: 0, top: 0, bottom: 0, left: 0, right: 0, x: 0, y: 0} as DOMRect
     })
 }
 

@@ -82,7 +82,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
 
     /* 反过来的那一半：容器还藏着（rect 0×0）时**不许**锁死列宽，否则切过去就是一列一个字母。 */
     it("列宽：容器还没显示出来时不测量（不锁成默认宽度）", async () => {
-        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({width: 0, height: 0} as DOMRect)
+        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({width: 0, height: 0, top: 0, bottom: 0, left: 0, right: 0, x: 0, y: 0} as DOMRect)
         try {
             const container = await renderTable()
             const table = container.querySelector("table") as HTMLTableElement

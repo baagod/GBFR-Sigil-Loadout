@@ -81,24 +81,28 @@ export function useSelectionOverlay({
         if (!tableEl || !header || !body || rows.length === 0) return
         /* 列宽 / 表宽也在这里量：窄表被 `min-w-full` 拉伸后，只有渲染结果知道每列真正多宽。 */
         const read = () => {
-            const headerHeight = header.offsetHeight
             /*
-            ‼️ 行高按**每一行**量：轨表「效果」列换行后，行数多的那几行会比别的行高；只记一个平均值
-            会让选区 overlay 从第一行不等高的位置起全部错位。
+                ‼️ **行几何一律用 `getBoundingClientRect()` 的小数坐标**（再除弹窗 transform 的 scale），
+                不能拿 `offsetHeight` 去累加：`offsetHeight` 是**四舍五入后的整数**，而行高在
+                DPI 缩放 / 页面缩放 / 字体度量不同的机器上是**小数**（真机反馈：Windows 10 上选到第 40 行
+                左右，选区整体偏移约 20px）。按整数累计等于每行抹掉零点几像素，越往下漂得越多。
 
-            ⚠️ 但**别无条件逐行读**：动作表常驻 1.2 万行，每次编辑/粘贴都会换一份 `rows`；逐行读
-            `offsetHeight` 等于每次提交多做 1.2 万次布局读。先用"首行高 × 行数 == tbody 总高"判均匀，
-            均匀就用老的均速路径，只有真的不等高（轨表的「效果」列换行）才逐行收集。
+                ⚠️ 曾用"首行高 × 行数 == tbody 总高"的整数快路径省逐行读；但行高是小数时这个等式本来就
+                不成立（它正是偏移的来源），所以删掉——每次数据变化逐行读一遍 rect，动作表也就百来行。
             */
-            const firstRowHeight = (body.querySelector("tr")?.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0
-            const uniformByTotal = firstRowHeight > 0 && body.offsetHeight === rows.length * firstRowHeight
-            const rowEls = uniformByTotal ? [] : [...body.querySelectorAll<HTMLTableRowElement>("tr")]
-            const rowHeights =
-                rowEls.length === rows.length
-                    ? rowEls.map((tr) => (tr.firstElementChild as HTMLElement | null)?.offsetHeight ?? tr.offsetHeight)
-                    : []
+            const tableRect = tableEl.getBoundingClientRect()
+            const bodyRect = body.getBoundingClientRect()
+            const layoutScale = tableEl.offsetWidth > 0 ? tableRect.width / tableEl.offsetWidth : 1
+            const headerHeight = (bodyRect.top - tableRect.top) / layoutScale
+            const rowEls = [...body.querySelectorAll<HTMLTableRowElement>("tr")]
+            let rowHeights: number[] = []
+            if (rowEls.length === rows.length) {
+                const tops = rowEls.map((tr) => (tr.getBoundingClientRect().top - tableRect.top) / layoutScale)
+                const bodyBottom = (bodyRect.bottom - tableRect.top) / layoutScale
+                rowHeights = tops.map((top, i) => (i + 1 < tops.length ? tops[i + 1] : bodyBottom) - top)
+            }
             const uniform = rowHeights.length !== rows.length || rowHeights.some((height) => height <= 0)
-            const rowHeight = uniform ? body.offsetHeight / rows.length : 0
+            const rowHeight = uniform ? bodyRect.height / layoutScale / rows.length : 0
             if (headerHeight <= 0 || (uniform && rowHeight <= 0)) return
             const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => {
                 const head = th.dataset.head
