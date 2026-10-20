@@ -584,24 +584,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 工具条那几个按钮由 `onCommandsReady` 拿走，键盘那条也走它。
      */
     const rowCommands = useRowCommands({rows: modelRows.map((row) => row.original), keys, selectionRowIndexes, activeRowIndex, onChange: onRowsChange})
-    /*
-        ‼️ 交给调用方的是**稳定对象**：方法每次被点/被按下时才去读 `commandsRef` 的最新一份。
-        `rowCommands` 本身每渲染都是新闭包（带着最新的 rows / 选区），直接上报就得每渲染回调一次；
-        延迟到"用那一刻"读 ref，回调只在挂载（或调用方换实现）时交一次 —— 也不会再出现
-        "选中一行再点工具条删除，删的是上一次那行"那种漏更新。
-    */
-    const commandsRef = useRef(rowCommands)
-    commandsRef.current = rowCommands
-    const liveCommands = useMemo<RowCommands>(
-        () => ({
-            add: () => commandsRef.current.add(),
-            copy: () => commandsRef.current.copy(),
-            cut: () => commandsRef.current.cut(),
-            insert: () => commandsRef.current.insert(),
-            removeRowsInSelection: () => commandsRef.current.removeRowsInSelection(),
-        }),
-        [],
-    )
 
     /* 选区在不在：只在"有/没有"翻转时上报（工具条按钮亮不亮 + 剪贴板归属判断）。 */
     const onSelectionPresenceRef = useRef(onSelectionPresenceChange)
@@ -625,33 +607,27 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         sheetColumns,
         activeCellKey,
         clearSelectedCells,
-        insertCopiedRows: liveCommands.insert,
-        removeRowsInSelection: liveCommands.removeRowsInSelection,
+        insertCopiedRows: rowCommands.insert,
+        removeRowsInSelection: rowCommands.removeRowsInSelection,
         /* 只有能改行的表（轨表）才接 Ctrl+C/X；动作表没有行级命令，让给浏览器那条 copy 事件。 */
-        copyRows: onRowsChange ? liveCommands.copy : undefined,
-        cutRows: onRowsChange ? liveCommands.cut : undefined,
+        copyRows: onRowsChange ? rowCommands.copy : undefined,
+        cutRows: onRowsChange ? rowCommands.cut : undefined,
         copySelection,
     })
 
     /**
      * **把这张表的动作整包交给调用方**（工具条那几个按钮）—— 与键盘同一条实现：
      * 复制 = 行剪贴板 + 区域复制 + 虚线（`copySelection` 已含后两样）；粘贴 = 与 Ctrl+V 同一条系统剪贴板路径。
-     *
-     * `pasteRef`：系统剪贴板读取动作会随数据变化重新生成，用 ref 兜住它，动作包本身在挂载后保持稳定。
+     * 调用方（`AnimationDetail` / `TrackGrid`）存进 ref，点按钮时读最新一份，不需要稳定对象。
      */
-    const pasteRef = useRef(pasteClipboard)
-    pasteRef.current = pasteClipboard
-    const tableCommands = useMemo<TableCommands>(
-        () => ({
-            copy: () => {
-                commandsRef.current.copy()
-                copySelection()
-            },
-            paste: () => pasteRef.current(),
-            rows: liveCommands,
-        }),
-        [copySelection, liveCommands],
-    )
+    const tableCommands: TableCommands = {
+        copy: () => {
+            rowCommands.copy()
+            copySelection()
+        },
+        paste: pasteClipboard,
+        rows: rowCommands,
+    }
     useEffect(() => {
         onCommandsReady?.(tableCommands)
     }, [onCommandsReady, tableCommands])
