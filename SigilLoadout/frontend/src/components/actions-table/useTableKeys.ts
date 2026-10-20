@@ -67,7 +67,7 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
     const getSelectionBounds = () => tableInstanceRef.current.getCellSelectionBounds()
 
     /**
-     * 方向键 → **活动格在数据格里走一格**（Excel 手感）。
+     * 键盘分派：方向键 → **活动格在数据格里走一格**（Excel 手感）；Delete / Insert / Ctrl+Delete / C/X 见下方分支。
      *
      * ‼️ 范围天然钳在数据格里：库只按可见列（按钉住重排）与行模型走，**行号列与表头根本不在候选里**
      * —— 所以"不要选到行号列 / 表头"不用自己写判据，到边就停。
@@ -90,7 +90,7 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
      * 挂**文档捕获阶段**（在下面那个 effect 里）：键事件跟着**焦点**走，而焦点可能在 `<body>` 上
      * （点了格子再 blur、或刚部署完页面还没点过）—— 挂在容器上的 React `onKeyDown` 那时收不到。
      */
-    const handleArrowKey = useCallback((e: KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
         const {cellSelection, modelRows, sheetColumns, activeCellKey} = fresh.current
         const direction = ARROW_KEYS[e.key]
         const isEnter = e.key === "Enter" || e.key === "F2"
@@ -276,9 +276,9 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
     }, [tableInstanceRef, tableRef, enterEditRegistry])
 
     useEffect(() => {
-        document.addEventListener("keydown", handleArrowKey, true)
+        document.addEventListener("keydown", handleKeyDown, true)
         return () => {
-            document.removeEventListener("keydown", handleArrowKey, true)
+            document.removeEventListener("keydown", handleKeyDown, true)
         }
-    }, [handleArrowKey])
+    }, [handleKeyDown])
 }
