@@ -60,18 +60,16 @@ export function useSelectionOverlay({
     copyAreas: Bounds[]
 } {
     /**
-     * 表头高 / 行高 / 表头各格实测宽度（几何输入）。happy-dom 量不到（全 0）→ overlay 不渲染。
+     * 表头高 / 每行行高 / 表头各格实测宽度（几何输入）。happy-dom 量不到（全 0）→ overlay 不渲染。
      *
-     * ‼️ 用 offset*（**布局像素**），不用 getBoundingClientRect：弹窗打开动画期间父级带
-     * `transform: scale(...)`，rect 会被缩放（真机：header≈38.95 / 行高≈25.65），offset* 不受影响。
+     * 行高是 `rowHeights` 的**唯一来源**：行顶边由它累加（见 `selectionOverlay.rowTopOf`），不再另存一份。
      */
     const [metrics, setMetrics] = useState<{
         headerHeight: number
-        rowHeight: number
         rowHeights: number[]
         cells: HeaderCellMetric[]
         tableWidth: number
-    }>({headerHeight: 0, rowHeight: 0, rowHeights: [], cells: [], tableWidth: 0})
+    }>({headerHeight: 0, rowHeights: [], cells: [], tableWidth: 0})
 
     useLayoutEffect(() => {
         if (!measured) return
@@ -86,24 +84,17 @@ export function useSelectionOverlay({
                 不能拿 `offsetHeight` 去累加：`offsetHeight` 是**四舍五入后的整数**，而行高在
                 DPI 缩放 / 页面缩放 / 字体度量不同的机器上是**小数**（真机反馈：Windows 10 上选到第 40 行
                 左右，选区整体偏移约 20px）。按整数累计等于每行抹掉零点几像素，越往下漂得越多。
-
-                ⚠️ 曾用"首行高 × 行数 == tbody 总高"的整数快路径省逐行读；但行高是小数时这个等式本来就
-                不成立（它正是偏移的来源），所以删掉——每次数据变化逐行读一遍 rect，动作表也就百来行。
             */
             const tableRect = tableEl.getBoundingClientRect()
             const bodyRect = body.getBoundingClientRect()
             const layoutScale = tableEl.offsetWidth > 0 ? tableRect.width / tableEl.offsetWidth : 1
             const headerHeight = (bodyRect.top - tableRect.top) / layoutScale
             const rowEls = [...body.querySelectorAll<HTMLTableRowElement>("tr")]
-            let rowHeights: number[] = []
-            if (rowEls.length === rows.length) {
-                const tops = rowEls.map((tr) => (tr.getBoundingClientRect().top - tableRect.top) / layoutScale)
-                const bodyBottom = (bodyRect.bottom - tableRect.top) / layoutScale
-                rowHeights = tops.map((top, i) => (i + 1 < tops.length ? tops[i + 1] : bodyBottom) - top)
-            }
-            const uniform = rowHeights.length !== rows.length || rowHeights.some((height) => height <= 0)
-            const rowHeight = uniform ? bodyRect.height / layoutScale / rows.length : 0
-            if (headerHeight <= 0 || (uniform && rowHeight <= 0)) return
+            if (rowEls.length !== rows.length) return
+            const tops = rowEls.map((tr) => (tr.getBoundingClientRect().top - tableRect.top) / layoutScale)
+            const bodyBottom = (bodyRect.bottom - tableRect.top) / layoutScale
+            const rowHeights = tops.map((top, i) => (i + 1 < tops.length ? tops[i + 1] : bodyBottom) - top)
+            if (headerHeight <= 0 || rowHeights.some((height) => height <= 0)) return
             const cells: HeaderCellMetric[] = [...header.querySelectorAll("th")].map((th) => {
                 const head = th.dataset.head
                 return {
@@ -115,12 +106,11 @@ export function useSelectionOverlay({
             const tableWidth = tableEl.offsetWidth
             setMetrics((prev) =>
                 prev.headerHeight === headerHeight &&
-                prev.rowHeight === rowHeight &&
-                sameRowHeights(prev.rowHeights, uniform ? [] : rowHeights) &&
+                sameRowHeights(prev.rowHeights, rowHeights) &&
                 prev.tableWidth === tableWidth &&
                 sameCells(prev.cells, cells)
                     ? prev
-                    : {headerHeight, rowHeight, rowHeights: uniform ? [] : rowHeights, cells, tableWidth},
+                    : {headerHeight, rowHeights, cells, tableWidth},
             )
         }
         read()
@@ -142,7 +132,7 @@ export function useSelectionOverlay({
                 cells: metrics.cells,
                 sheetColumns,
                 headerHeight: metrics.headerHeight,
-                rowHeight: metrics.rowHeight,
+                rowHeight: 0, // 行高一律走 rowHeights（每行都实测）
                 rowHeights: metrics.rowHeights,
                 pinnedColumnCount,
                 rowCount: rows.length,
