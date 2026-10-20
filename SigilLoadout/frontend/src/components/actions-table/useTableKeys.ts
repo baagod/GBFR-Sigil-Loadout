@@ -63,8 +63,6 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
      */
     const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection})
     fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection}
-    /** 选区边界（走表实例那份记忆化，引用稳定）。 */
-    const getSelectionBounds = () => tableInstanceRef.current.getCellSelectionBounds()
 
     /**
      * 键盘分派：方向键 → **活动格在数据格里走一格**（Excel 手感）；Delete / Insert / Ctrl+Delete / C/X 见下方分支。
@@ -188,7 +186,7 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         if (!direction) {
             // ---- Enter / F2：进编辑（与"双击格子"同一条口径）----
             e.preventDefault() /* 压掉触发器自己那一次 click；只有单个单元格才进编辑（多格/整行语义不明）。 */
-            if (!isSingleCellBounds(getSelectionBounds())) return
+            if (!isSingleCellBounds(tableInstanceRef.current.getCellSelectionBounds())) return
             /*
                 ‼️ **喊活动格自己的进编辑句柄**（`EnterEditContext` 登记的那一个）：普通格切输入框、
                 选值格展开列表 —— 两边实现不同，本层不该知道细节。只读列不登记 → 这里什么都不做。
