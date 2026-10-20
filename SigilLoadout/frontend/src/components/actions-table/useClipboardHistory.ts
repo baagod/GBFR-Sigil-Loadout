@@ -1,18 +1,6 @@
 /*
-    **剪贴板 + 撤销栈 + 改一格**这一整套（Excel 口径的复制粘贴、复制区虚线、Ctrl+Z）。
-
-    为什么抽出来：它原来长在 `ActionsTable` 里 —— 一份 `planCopy`（60 行多片拼块规则）、两个全局
-    `copy`/`paste` 处理器、一个撤销栈、一个复制源 state 与它的失效核对，全都挤在同一个函数作用域里。
-    这套东西与"怎么渲染一行""怎么量列宽"没有任何关系。
-
-    ‼️ **`edit` 也归这里**，不是顺手：撤销栈的"记不记账"正是 `edit` 里的两条判断
-    （`undoingRef` / `batchingRef`），把它们分在两个地方就等于"记账规则"与"记账本"异地而居 ——
-    那正是这段代码原来最难读的地方（组件里那段 ⚠️ 注释有一半在解释这个耦合）。
-
-    三条**用户拿 Excel / WPS 实测出来的**规矩，每一条都在代码里对应一段 ‼️（别按"想当然"改）：
-      ① 复制源那圈虚线什么时候撤（见 `clearCopySource` 的四个调用点）；
-      ② 多片选区**必须能沿同一根轴排成一条**才允许复制，否则拒绝并提示（见 `planCopy`）；
-      ③ 一次粘贴 = **一步撤销**（见 `batchingRef`）。
+    剪贴板 + 撤销栈 + 改一格（Excel 口径）。`edit` 归这里：唯一数据出口与撤销记账必须同处。
+    三条用户实测规则：复制源的虚线何时撤、多片选区必须同轴才能复制、一次粘贴 = 一步撤销。
 */
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {CellSelectionBounds} from "@tanstack/react-table"

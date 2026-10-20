@@ -1,17 +1,7 @@
 /*
-    **这一记事件/按键归哪张表** —— 键盘层（`useTableKeys`）与剪贴板层（`useClipboardHistory`）
-    共用同一份判断。分成两份就会分叉：一边按"层"分、另一边按"焦点"分，两张表都有选区时按键
-    落到错的那张（真机：在效果表里按 Ctrl+Del，删掉的是攻击表的行）。
-
-    判据（从确定到兜底）：
-      ① 只认**最上层弹窗**里的表 —— 弹窗背后的表不参与；
-      ② 事件目标 / 焦点落在哪张表里就是哪张（点过格子、copy/paste 事件都走这条）；
-      ③ 都不在表里（方向键会把焦点 blur 掉、Ctrl+C 的 copy 事件也可能落在 body）→
-         **最近一次按下的表**（`markActiveTable`，`ActionsTable` 的 mousedown 捕获里记）；
-      ④ 再不行 → 当前层里**唯一有选区**的表；两张都有选区就不猜，谁都别动。
-
-    模块级状态的理由：归属是"页面上谁在用键盘/剪贴板"的全局事实，不随 React 树重渲而变；
-    每个表在挂载/选区变化时登记自己，卸载时注销。
+    事件/按键归哪张表 —— 键盘层与剪贴板层共用这一份判断。
+    ① 只认最上层弹窗里的表；② 事件目标 / 焦点落在哪张表就哪张；③ 都不在表里 → 最近按过、且当前有选区的表；
+    再不行谁也不接（不猜）。
 */
 
 let activeTable: HTMLTableElement | null = null
@@ -22,7 +12,7 @@ export function markActiveTable(el: HTMLTableElement): void {
     activeTable = el
 }
 
-/** 这张表当前有没有选区（只有"有"的那些才参与第 ④ 条兜底）。 */
+/** 这张表当前有没有选区（第 ③ 条只认"有选区"的最近表）。 */
 export function setTableHasSelection(el: HTMLTableElement, hasSelection: boolean): void {
     if (hasSelection) tablesWithSelection.add(el)
     else tablesWithSelection.delete(el)

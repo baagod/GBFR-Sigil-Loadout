@@ -1,15 +1,6 @@
 /*
-    **键盘那一层**：方向键与 Enter（活动格在数据格里走一格 / 进编辑，Excel 手感）、Delete 清掉
-    选区里每一格的改动（回到表格默认值，见 `clearSelectedCells`）、Ctrl+Delete 删掉**选区压到的行**
-    （不必整行选中）、Insert 把复制的行插到活动格下方、Ctrl+C / Ctrl+X 的行与区域复制（与工具条
-    同一份命令，见 `useRowCommands` / `useClipboardHistory`）。
-
-    为什么单独一个 hook：这是"键盘那一层"的全部规则（三条移动路径 + 让路闸门 + 事件归属），
-    与选区手势、渲染、列宽都无关；而它要读的都是**渲染期最新值**，所以在这里统一成
-    一份 ref 镜像（见下面 `fresh`）—— 监听因此只挂一次，不再每渲染摘挂一遍。
-
-    挂在 `document` 的**捕获阶段**：键盘事件跟着焦点走，而焦点可能在 `<body>` 上
-    （点过格子再 blur、或刚部署完页面还没点过），挂在容器上的 React `onKeyDown` 那时收不到。
+    键盘那一层：方向键 / Enter（编辑）/ Delete / Ctrl+Delete / Insert / Ctrl+C / Ctrl+X。
+    监听挂 `document` 捕获阶段（焦点可能在 `<body>`）；处理器只挂一次，读渲染期最新值走 `fresh` 镜像。
 */
 import {useCallback, useEffect, useRef, type RefObject} from "react"
 import type {CellSelectionBounds, CellSelectionDirection, CellSelectionState, Row} from "@tanstack/react-table"
