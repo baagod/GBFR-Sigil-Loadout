@@ -140,6 +140,9 @@ export function geometryFromHeaderCells({
 
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */
 const RING_WIDTH = 3
+/** 贴在行头/冻结列边界时，滚动层内收线要留的缝。 */
+const BOUNDARY_LEFT_GAP = 2
+const BOUNDARY_LEFT_SHIFT = RING_WIDTH - 1 + BOUNDARY_LEFT_GAP
 
 const emptyLayer = (): LayerModel => ({fill: [], ring: [], copy: [], rowHead: []})
 
@@ -239,6 +242,41 @@ function fillSegments(bounds: Bounds, geo: GeometryInput, hole: Rect | null): {p
 }
 
 /**
+ * 一段选区轮廓 → 各层的线矩形。通常整段一层；左缘贴在行头/冻结列边界时按两套策略拆层：
+ *   · 未横滚：左竖线进钉住层（正常外扩，盖住行头右边框，和钉住列选区同观感）；
+ *   · 已横滚：整段留在滚动层并右移 `BOUNDARY_LEFT_SHIFT`（线随列滚走，不留残影）。
+ */
+function segmentRing({
+    rect,
+    edges,
+    pinned,
+    atBoundary,
+    boundaryLeftAtPinned,
+    clampRight,
+    clampBottom,
+}: {
+    rect: Rect
+    edges: Edges
+    pinned: boolean
+    atBoundary: boolean
+    boundaryLeftAtPinned: boolean
+    clampRight: boolean
+    clampBottom: boolean
+}): {pinned: Rect[]; scrolled: Rect[]} {
+    if (!atBoundary) {
+        const lines = ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom)
+        return pinned ? {pinned: lines, scrolled: []} : {pinned: [], scrolled: lines}
+    }
+    if (boundaryLeftAtPinned) {
+        return {
+            pinned: ringLines(rect, {top: false, right: false, bottom: false, left: true}, RING_WIDTH, false, clampBottom),
+            scrolled: ringLines(rect, {...edges, left: false}, RING_WIDTH, clampRight, clampBottom),
+        }
+    }
+    return {pinned: [], scrolled: ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom, BOUNDARY_LEFT_SHIFT)}
+}
+
+/**
  * 选区 → overlay 模型（纯函数，可单测）。
  *
  * `copyAreas` 是复制源区间（与选区同坐标系）；复制虚线也按钉住列切段。
@@ -275,24 +313,17 @@ export function buildOverlay(input: {
         model.scrolled.fill.push(...fills.scrolled)
 
         const hideRight = b.minColumnIndex === 0 && b.maxColumnIndex === lastColumnIndex
-        /*
-            选区从行头/冻结列后的第一列起时，左缘正常外扩会压进 sticky 格；把左缘三条线一起右移
-            2px 留缝，避免和行头的右边框贴成一条。
-        */
         const leftAtPinned = b.minColumnIndex === geo.pinnedColumnCount
-        for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
-            const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
-            const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
-            const layer = pinned ? model.pinned : model.scrolled
-            const atBoundary = !pinned && edges.left && leftAtPinned
-            if (atBoundary && boundaryLeftAtPinned) {
-                /* 和钉住列选区同一观感：左竖线在钉住层、按正常外扩盖住行头右边框；横向滚动后改成滚动层内收线。 */
-                model.scrolled.ring.push(...ringLines(rect, {...edges, left: false}, RING_WIDTH, clampRight, clampBottom))
-                model.pinned.ring.push(...ringLines(rect, {top: false, right: false, bottom: false, left: true}, RING_WIDTH, false, clampBottom))
-                continue
-            }
-            const leftShift = atBoundary ? RING_WIDTH - 1 + 2 : 0
-            layer.ring.push(...ringLines(rect, edges, RING_WIDTH, clampRight, clampBottom, leftShift))
+        for (const segment of splitByPinned(b, geo, hideRight)) {
+            const ring = segmentRing({
+                ...segment,
+                atBoundary: !segment.pinned && segment.edges.left && leftAtPinned,
+                boundaryLeftAtPinned,
+                clampRight: segment.edges.right && b.maxColumnIndex === lastColumnIndex,
+                clampBottom: segment.edges.bottom && b.maxRowIndex === lastRowIndex,
+            })
+            model.pinned.ring.push(...ring.pinned)
+            model.scrolled.ring.push(...ring.scrolled)
         }
     }
 
