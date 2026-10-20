@@ -91,7 +91,7 @@ type ActionsTableLabels = Pick<Messages, PlainLabelKey | "colSaveMotId" | "colAc
  * ⚠️ 类型必须住在这里、不能住在 `testkit.tsx`：生产代码不能 import 测试台架（且 testkit 反过来
  * import `ActionsTable`，会成环）。
  */
-export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch"> & ActionsTableLabels
+export type ActionsTableMessages = Pick<Messages, "multiAreaCopy" | "multiAreaCopyTitle" | "ok" | "actionBranchSearch" | "noMatchItems"> & ActionsTableLabels
 
 
 /**
@@ -218,9 +218,11 @@ export type BranchPickConfig = {
     ids: ReadonlySet<string>
     /** 下拉搜索框的提示文案（i18n）。 */
     searchPlaceholder: string
+    /** 搜不到任何项时显示的文案（i18n）；空串 = 不显示。 */
+    emptyLabel: string
 }
 
-export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: ""})
+export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: "", emptyLabel: ""})
 
 /**
  * **值格参数**（哪一列是哪种值格、带不带搜索框、位名表）—— 由**各表自己给**。
@@ -236,6 +238,8 @@ export type PickerConfig = {
     names?: readonly string[]
     /** 给了就挂搜索框（值就是提示文案）。多选那档不给：位就那么几位，搜索框是噪音。 */
     searchPlaceholder?: string
+    /** 搜不到结果时的文案（i18n）；不给 = 不显示空态（与官方示例默认行为一致）。 */
+    emptyLabel?: string
 }
 
 /** 不给值格参数时用它（导出是为了让基座在 provider 里当默认值用 —— 常量引用才不会让 memo 失效）。 */

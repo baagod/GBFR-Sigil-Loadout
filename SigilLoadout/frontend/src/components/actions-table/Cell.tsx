@@ -18,7 +18,7 @@ import {CELL_CHOICES} from "@/lib/controltypes"
  */
 const builtinPick = (kind: ColumnKind, branch: BranchPickConfig) =>
     kind === "branch"
-        ? {choices: branch.ids, optional: UNSET, searchPlaceholder: branch.searchPlaceholder}
+        ? {choices: branch.ids, optional: UNSET, searchPlaceholder: branch.searchPlaceholder, emptyLabel: branch.emptyLabel}
         : kind === "pick"
           ? {choices: CELL_CHOICES}
           : undefined

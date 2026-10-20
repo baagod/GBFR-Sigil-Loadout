@@ -1,5 +1,5 @@
 import {useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject} from "react"
-import {Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
+import {Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
 import {RevealContext, useEnterEditHandler} from "@/components/actions-table/model"
 import {flagHasBit, flagMask} from "@/lib/actionflags"
@@ -41,6 +41,7 @@ export function CellPick({
     choices,
     optional,
     searchPlaceholder,
+    emptyLabel,
     multiple,
     names,
     onCommit,
@@ -60,6 +61,8 @@ export function CellPick({
     optional?: string
     /** 给了就挂搜索框（项多时才需要；`branchXAtk_` 用，53 项那一列不挂）。 */
     searchPlaceholder?: string
+    /** 搜不到结果时的文案（i18n）；不给 = 不显示空态。 */
+    emptyLabel?: string
     /** **多选**（按位开关的掩码）：列表项是**每一位**，勾中的位权相加写回那一格。不给 = 单选。 */
     multiple?: boolean
     /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位，显示成 `bit<号>`）。 */
@@ -232,6 +235,8 @@ export function CellPick({
                 再展开，列表里就只剩那一项 —— 实测 53 → 1）。
             */
             filter={searchPlaceholder ? undefined : null}
+            /* 搜索时**始终高亮第一项**（Enter 直接选它）—— 与「通用配装」页的 combobox 同一个内置属性。 */
+            autoHighlight={searchPlaceholder ? true : undefined}
             /* 多选：值是"勾中的那几位"（数组）；单选：值就是格子里的那个值。 */
             value={multiple ? selected : inChoices(shown) ? shown : null}
             /* 多选：勾中的位权相加写回格子；单选：`-1` 是清单里的一项照原样提交，其余挑回原值就把改动清掉（交 `null`）。 */
@@ -326,6 +331,8 @@ export function CellPick({
                         showTrigger={false}
                     />
                 )}
+                {/* 空态：与官方示例一致（`ComboboxEmpty` 自带居中灰字，靠 content 的 data-empty 显隐）。 */}
+                {searchPlaceholder && emptyLabel ? <ComboboxEmpty>{emptyLabel}</ComboboxEmpty> : null}
                 <ComboboxList
                     ref={(el) => {
                         /* 有搜索框时焦点归**输入框**（上面那一处）—— 列表这一层不许抢，否则打字没人接。 */

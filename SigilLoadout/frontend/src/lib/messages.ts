@@ -27,6 +27,7 @@ const zh = {
     /** 两个因子下拉的搜索框：写 Hex 也能搜。 */
     searchSigil: "搜索因子 | Hex",
     noMatch: "无匹配因子",
+    noMatchItems: "无匹配项",
 
     headerPrimary: "主因子",
     headerSecondary: "副因子",
@@ -194,6 +195,7 @@ export const messages: Record<Lang, Messages> = {
         trayExit: "Exit",
         searchSigil: "Search Sigil | Hex",
         noMatch: "No Matching Sigils",
+    noMatchItems: "No items found.",
 
         headerPrimary: "Primary Sigil",
         headerSecondary: "Secondary Sigil",
@@ -319,6 +321,7 @@ export const messages: Record<Lang, Messages> = {
         trayExit: "終了",
         searchSigil: "ジーン | Hex で検索",
         noMatch: "一致するジーンがありません",
+    noMatchItems: "一致する項目がありません",
 
         headerPrimary: "メインジーン",
         headerSecondary: "サブジーン",
@@ -444,6 +447,7 @@ export const messages: Record<Lang, Messages> = {
         trayExit: "종료",
         searchSigil: "진 | Hex 검색",
         noMatch: "일치하는 진이 없습니다",
+    noMatchItems: "일치하는 항목이 없습니다",
 
         headerPrimary: "메인 진",
         headerSecondary: "서브 진",

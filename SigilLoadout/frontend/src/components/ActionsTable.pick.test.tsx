@@ -605,4 +605,50 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
         const selected = [...document.querySelectorAll('[data-slot="combobox-item"]')].find((el) => el.getAttribute("aria-selected") === "true")
         expect(selected?.textContent).toBe(UNSET)
     })
+
+    it("搜不到结果：显示官方空态文案（ComboboxEmpty），不是一片空白", async () => {
+        render(
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" emptyLabel="无匹配项" onCommit={() => {}} {...openGate} />
+                        </td>
+                    </tr>
+                </tbody>
+            </table>,
+        )
+        fireEvent.doubleClick(document.querySelector(`.${PICK_MARK}`) as HTMLElement)
+        await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
+        const input = document.querySelector('[data-slot="combobox-content"] input') as HTMLInputElement
+        fireEvent.change(input, {target: {value: "zzz"}})
+
+        await waitFor(() => expect(document.querySelector('[data-slot="combobox-empty"]')?.textContent).toBe("无匹配项"))
+        expect(document.querySelector('[data-slot="combobox-content"]')?.hasAttribute("data-empty")).toBe(true)
+        expect(pickItems()).toHaveLength(0) // 列表里确实一项都不剩
+    })
+
+    it("搜索时自动高亮第一项：输入后按 Enter 直接选它（与通用配装的 combobox 同一条内置行为）", async () => {
+        const onCommit = vi.fn()
+        render(
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" emptyLabel="无匹配项" onCommit={onCommit} {...openGate} />
+                        </td>
+                    </tr>
+                </tbody>
+            </table>,
+        )
+        fireEvent.doubleClick(document.querySelector(`.${PICK_MARK}`) as HTMLElement)
+        await waitFor(() => expect(document.querySelectorAll('[data-slot="combobox-item"]').length).toBeGreaterThan(0))
+        const input = document.querySelector('[data-slot="combobox-content"] input') as HTMLInputElement
+        fireEvent.change(input, {target: {value: "10"}})
+        await waitFor(() => expect(pickItems().map((el) => el.textContent)).toEqual(["100", "101"]))
+
+        fireEvent.keyDown(input, {key: "Enter", code: "Enter", windowsVirtualKeyCode: 13})
+
+        await waitFor(() => expect(onCommit).toHaveBeenCalledWith("100"))
+    })
 })

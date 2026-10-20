@@ -251,7 +251,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
      */
     const branchPick = useMemo(
-        () => ({ids: new Set(rows.map((row) => row.id)), searchPlaceholder: t.actionBranchSearch}),
+        () => ({ids: new Set(rows.map((row) => row.id)), searchPlaceholder: t.actionBranchSearch, emptyLabel: t.noMatchItems}),
         [rows, t],
     )
     /**
