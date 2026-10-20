@@ -125,26 +125,15 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         if (!anchor) return
 
         /*
-            ‼️ **让路闸门（只给方向键）**：编辑框 / 列表导航优先 —— 方向键在它们手里是"移光标 / 选下一项"。
-            只认这两类（语义各不相同）：
-              · `input / textarea / [contenteditable]` —— 焦点真的在打字（含列表里的搜索框）；
-              · `[data-pick-open]` —— 选值格列表开着，方向键归 base-ui 的列表导航。
-            ‼️ **不能拿 `[role=combobox]` 当判据**：选值格的触发器（`CellPick` 那层 `div`）**本身就是
-            `role=combobox`**，而鼠标点过格子后焦点就停在它上面 —— 那样写等于"焦点在选值格上时方向键
-            一律失效、单元格不动"（用户报的）。判据只认"**正在打字**"与"**列表开着**"这两种真的该让路的
-            状态；触发器被聚焦属于"就是这一格"，方向键该走格子。
-
-            ⚠️ 这道闸门**只管方向键**，Enter 必须穿过去：穿过去才会走到下面那个 `preventDefault()`，
-            而正是它压住了"Enter 落在按钮型的触发器上会再产生一次自己的 click"—— 那一下 click 会把刚
-            由 Enter 打开的列表又关掉（实测）。
-        */
-        /*
-            ‼️ 判据要把**列表容器**也算进来：列表开着时焦点在列表里，那时 `[data-pick-open]`（挂在触发器上）已经
-            不在事件路径上了 —— 只认它的话，弹层里的上下键与 Enter 都会被本表抢走（用户报的"列表里选不了"）。
+            编辑框 / 选值列表优先：方向键、Enter、Delete、Insert、Ctrl+Delete 都让路。判据要包含列表容器
+            （焦点在弹层里时触发器上的 `data-pick-open` 不在事件路径上）；不能拿 `[role=combobox]` 当判据
+            —— 选值格触发器本身就是 combobox，聚焦它属于"就是这一格"。
         */
         const insideEditorOrList = (e.target as HTMLElement | null)?.closest?.(
             "input, textarea, [contenteditable], [data-pick-open], [data-slot=combobox-content]",
         )
+        /* 编辑框 / 选值列表优先：C/X 要各自判断"值格自己收下"，其余表格命令一律让路。 */
+        if (!isCopy && !isCut && insideEditorOrList) return
         /* Ctrl+C 还多一类让路：值格自己收下 Ctrl+C（`data-copy-own` = 复制这一格的值，不是整行）。 */
         const ownsCopy = (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [data-copy-own]")
         /*
@@ -174,7 +163,6 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             与 Delete / Insert 同一套闸门；在编辑框里是"删到行首"之类的浏览器行为，不让路会误删表格行。
         */
         if (isRemoveRow) {
-            if (insideEditorOrList) return
             e.preventDefault()
             fresh.current.removeRowsInSelection()
             return
@@ -184,7 +172,6 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             与 Delete 同一套闸门：编辑框里的 Insert 是覆盖输入、列表里是别的东西，都不动表格。
         */
         if (isInsert) {
-            if (insideEditorOrList) return
             e.preventDefault()
             fresh.current.insertCopiedRows()
             return
@@ -194,25 +181,13 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             与方向键同一套闸门：编辑框里删的是那几个字，列表里删的是搜索词，都不能动表格。
         */
         if (isDelete) {
-            if (insideEditorOrList) return
             e.preventDefault()
             fresh.current.clearSelectedCells()
             return
         }
         if (!direction) {
             // ---- Enter / F2：进编辑（与"双击格子"同一条口径）----
-            /*
-                ‼️ `preventDefault` 见上面那段闸门说明：压掉触发器自己那一次 click。
-                （编辑框里按 Enter = 提交，那种情况上面那道闸门原本就该让路，这里只在"不在编辑框里"时按下。）
-            */
-            if (insideEditorOrList) return
-            e.preventDefault()
-            /*
-                ⚠️ 只在**单个单元格**选中时进编辑：多格选中按 Enter 语义不明（Excel 是"填满选区"，
-                那是另一个功能），整行块同理 —— 不做比做错好。
-                判据就在下面这一行（`isSingleCellBounds`，见 `selection.ts`）：多格 / 整行选中时按 Enter 的
-                语义不明（Excel 是"填满选区"，那是另一个功能），不做比做错好。
-            */
+            e.preventDefault() /* 压掉触发器自己那一次 click；只有单个单元格才进编辑（多格/整行语义不明）。 */
             if (!isSingleCellBounds(getSelectionBounds())) return
             /*
                 ‼️ **喊活动格自己的进编辑句柄**（`EnterEditContext` 登记的那一个）：普通格切输入框、
@@ -226,8 +201,6 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             enterEditRegistry.get(activeCellKey)?.()
             return
         }
-
-        if (insideEditorOrList) return
 
         e.preventDefault() // 表格在滚动框（`table.parentElement`）里，不拦住方向键会顺手滚它
 
