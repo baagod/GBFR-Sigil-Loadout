@@ -92,8 +92,8 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
 
     /* 发在 `body` 上：监听挂在 `window`（事件冒泡上去），而目标要是**元素** —— 真机上按键盘时
        目标也永远是个元素（`event.target.closest` 那一条闸门就是这么写的）。 */
-    const press = (key: string, code: string, vk: number, ctrl = false) =>
-        fireEvent.keyDown(document.body, {key, code, windowsVirtualKeyCode: vk, ...(ctrl ? {ctrlKey: true} : {})})
+    const press = (key: string, code: string, vk: number, ctrl = false, repeat = false) =>
+        fireEvent.keyDown(document.body, {key, code, windowsVirtualKeyCode: vk, repeat, ...(ctrl ? {ctrlKey: true} : {})})
 
     it("按行号选中一行后按 Ctrl+Del：那一行被删掉（假删除，界面上标红留着）", async () => {
         await openAndSelectRow()
@@ -372,6 +372,15 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         press("x", "KeyX", 88, true)
 
         await waitFor(() => expect(removedRows()).toHaveLength(1))
+    })
+
+    it("按住 Ctrl+X 的重复事件不再继续剪（一次按键只剪一次）", async () => {
+        await openAndSelectRow()
+        press("x", "KeyX", 88, true, true)
+        await new Promise((resolve) => setTimeout(resolve, 30))
+
+        expect(removedRows()).toHaveLength(0)
+        expect(rowsOf()).toHaveLength(2)
     })
 
     /* ‼️ 粘贴 = **单元格区域**（与 Ctrl+V 同一条路），不是插行：复制一格 → 选另一格 → 粘贴。 */

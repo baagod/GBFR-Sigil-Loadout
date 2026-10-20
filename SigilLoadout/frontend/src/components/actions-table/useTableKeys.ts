@@ -102,8 +102,8 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         const isCopy = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "c"
         const isCut = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "x"
         if ((!direction && !isEnter && !isDelete && !isInsert && !isRemoveRow && !isCopy && !isCut) || e.defaultPrevented) return
-        /* 按住键产生的重复事件不接"插行 / 删行"：那种后果不可逆（一次长按能删掉一整段）。 */
-        if (e.repeat && (isInsert || isRemoveRow)) return
+        /* 按住键产生的重复事件不接"插行 / 删行 / 剪切"：后果不可逆（一次长按能删掉一整段）。 */
+        if (e.repeat && (isInsert || isRemoveRow || isCut)) return
         /*
             ‼️ **同一时刻只有"当前那张表"响应用户的按键**。
 
