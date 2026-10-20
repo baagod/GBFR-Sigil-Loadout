@@ -35,21 +35,21 @@ export type GeometryInput = {
     headerHeight: number
     /** 行高（**均匀**时用它；给了 `rowHeights` 时它只是兜底）。 */
     rowHeight: number
+    /** 每行的行高（可变量行高：轨表「效果」列换行后行会变高）。给它就按每行真实高度画。 */
+    rowHeights?: readonly number[]
     /** 钉住列个数（显示顺序最前面的几列）。 */
     pinnedColumnCount: number
     rowCount: number
     columnCount: number
-} & (
-    /* 均匀行高：两样都没有。 */
-    | {rowHeights?: undefined; rowTops?: undefined}
-    /* 可变量行高：每行的行高与顶边**必须成对**给 —— 只给一半会静默错位（`rowTopOf` 与 `rowHeightOf`
-       各读各的，能把间隔算成行高，甚至 NaN）。`geometryFromHeaderCells` 是唯一的生产来路，它成对产出。 */
-    | {rowHeights: readonly number[]; rowTops: readonly number[]}
-)
+}
 
-/** 第 `i` 行的顶边（内容坐标）。 */
-export const rowTopOf = (geo: GeometryInput, i: number): number =>
-    geo.rowTops ? geo.rowTops[i]! : geo.headerHeight + i * geo.rowHeight
+/** 第 `i` 行的顶边（内容坐标）：可变量行高时由 `rowHeights` 累加。 */
+export const rowTopOf = (geo: GeometryInput, i: number): number => {
+    if (!geo.rowHeights) return geo.headerHeight + i * geo.rowHeight
+    let top = geo.headerHeight
+    for (let n = 0; n < i; n++) top += geo.rowHeights[n]!
+    return top
+}
 
 /** 第 `i` 行的高度。 */
 export const rowHeightOf = (geo: GeometryInput, i: number): number => (geo.rowHeights ? geo.rowHeights[i]! : geo.rowHeight)
@@ -124,15 +124,6 @@ export function geometryFromHeaderCells({
         rowHeights && rowHeights.length === rowCount && rowCount > 0 && rowHeights.every((height) => height > 0) ? [...rowHeights] : undefined
     if (headerHeight <= 0 || rowHeadWidth <= 0) return null
     if (!variableHeights && rowHeight <= 0) return null
-    let rowTops: number[] | undefined
-    if (variableHeights) {
-        rowTops = []
-        let top = headerHeight
-        for (const height of variableHeights) {
-            rowTops.push(top)
-            top += height
-        }
-    }
     let left = rowHeadWidth
     const columnLefts: number[] = []
     const columnWidths: number[] = []
@@ -143,17 +134,16 @@ export function geometryFromHeaderCells({
         columnWidths.push(width)
         left += width
     }
-    const base = {
+    return {
         columnLefts,
         columnWidths,
         headerHeight,
         rowHeight,
+        rowHeights: variableHeights,
         pinnedColumnCount: Math.min(pinnedColumnCount, sheetColumns.length),
         rowCount,
         columnCount: sheetColumns.length,
     }
-    /* 成对给：只给一半的 `GeometryInput` 已由类型拦掉，这里只负责把已算好的两份一起挂上。 */
-    return variableHeights ? {...base, rowHeights: variableHeights, rowTops: rowTops!} : base
 }
 
 /** 线宽与向外扩张量：轮廓 3px / 外扩 2px；复制虚线 2px / 外扩 1px。 */

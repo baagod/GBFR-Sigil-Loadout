@@ -54,10 +54,6 @@ export function isEventForTable(e: Event, el: HTMLTableElement | null): boolean 
     const owner = target?.closest("table") ?? focused?.closest("table") ?? null
     if (owner) return owner === el
     if (activeTable && activeTable.isConnected && layerOf(activeTable) === top && tablesWithSelection.has(activeTable)) return activeTable === el
-    /*
-        ‼️ 兜底只在"当前层里唯一有选区的表"上放行；**一张都没选就谁也别接** ——
-        `every([])` 会返回 true，那会让没选区的表也把 copy 事件吞掉（用户在表格外复制文字会失效）。
-    */
-    const selectedInLayer = [...tablesWithSelection].filter((table) => layerOf(table) === top)
-    return selectedInLayer.length === 1 && selectedInLayer[0] === el
+    /* 归属不明（事件/焦点都不在表里、最近按过的表也已失效）：谁都不接，别猜。 */
+    return false
 }
