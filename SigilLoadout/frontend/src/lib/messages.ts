@@ -89,7 +89,6 @@ const zh = {
     hmGroupOther: "其他",
     // 动画详情页
     trackNone: "这个动画没有轨文件",
-    fsmScope: "FSM（本角色可用，与当前动画无关）",
     saveFailedText: (detail: string) => `保存失败：${detail}`,
     colConfig: "配置",
     colStart: "开始",
@@ -172,9 +171,6 @@ const zh = {
     colIsChangeAttackInputPriority: "更改攻击输入优先级",
     colFrame: "帧",
     colEffects: "效果",
-    copySelected: "复制",
-    cutSelected: "剪切",
-    pasteBelow: "粘贴",
     insertRow: "插入行",
 };
 
@@ -240,7 +236,6 @@ export const messages: Record<Lang, Messages> = {
         hmRangeSkill: "Skills",
         hmGroupOther: "Other",
         trackNone: "No track files for this animation",
-        fsmScope: "FSM (available to this character, unrelated to this animation)",
         saveFailedText: (detail: string) => `Could not save: ${detail}`,
         colConfig: "Type",
         colStart: "Start",
@@ -306,9 +301,6 @@ export const messages: Record<Lang, Messages> = {
         colIsChangeAttackInputPriority: "Change Attack Input Priority",
         colFrame: "Frame",
         colEffects: "Effects",
-        copySelected: "Copy",
-    cutSelected: "Cut",
-        pasteBelow: "Paste",
         insertRow: "Insert Rows",
     },
     ja: {
@@ -367,7 +359,6 @@ export const messages: Record<Lang, Messages> = {
         hmRangeSkill: "スキル",
         hmGroupOther: "その他",
         trackNone: "このアニメには軌ファイルがありません",
-        fsmScope: "FSM（このキャラで使用可・このアニメとは無関係）",
         saveFailedText: (detail: string) => `保存に失敗しました：${detail}`,
         colConfig: "種類",
         colStart: "開始",
@@ -433,9 +424,6 @@ export const messages: Record<Lang, Messages> = {
         colIsChangeAttackInputPriority: "攻撃入力優先度変更",
         colFrame: "フレーム",
         colEffects: "効果",
-        copySelected: "コピー",
-    cutSelected: "切り取り",
-        pasteBelow: "貼り付け",
         insertRow: "行を挿入",
     },
     ko: {
@@ -494,7 +482,6 @@ export const messages: Record<Lang, Messages> = {
         hmRangeSkill: "스킬",
         hmGroupOther: "기타",
         trackNone: "이 애니메이션에는 트랙 파일이 없습니다",
-        fsmScope: "FSM(이 캐릭터 사용 가능, 이 애니메이션과 무관)",
         saveFailedText: (detail: string) => `저장에 실패했습니다: ${detail}`,
         colConfig: "종류",
         colStart: "시작",
@@ -560,9 +547,6 @@ export const messages: Record<Lang, Messages> = {
         colIsChangeAttackInputPriority: "공격 입력 우선순위 변경",
         colFrame: "프레임",
         colEffects: "효과",
-        copySelected: "복사",
-    cutSelected: "잘라내기",
-        pasteBelow: "붙여넣기",
         insertRow: "행 삽입",
     },
 };

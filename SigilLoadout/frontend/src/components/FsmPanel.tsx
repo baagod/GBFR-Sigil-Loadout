@@ -7,6 +7,7 @@ import type {ActionField} from "../../bindings/sigilloadout/service/models"
     key.path = 值。与「全员参数」同一套左右分栏、同一套表格线（只读，这里没有编辑）。
 
     清单跟着角色走：换角色后 `charCode` 变，整份重读；选中项按名字保留（还在清单里就不跳走）。
+    共享层（带 `目录/` 前缀的，如 pl_base/snd_auto_type_2）排在最前面。
 */
 export function FsmPanel({charCode}: {charCode: string}) {
     const [names, setNames] = useState<string[]>([])
@@ -18,7 +19,7 @@ export function FsmPanel({charCode}: {charCode: string}) {
         let alive = true
         void (async () => {
             try {
-                const list = (await ListFsm()) ?? []
+                const list = orderSharedFirst((await ListFsm()) ?? [])
                 if (!alive) return
                 setNames(list)
                 setSelected((cur) => (list.includes(cur) ? cur : (list[0] ?? "")))
@@ -95,4 +96,9 @@ export function FsmPanel({charCode}: {charCode: string}) {
             </div>
         </div>
     )
+}
+
+// 共享层（名字里带 "/"）排前面；两边各自保持后端给的字典序。
+function orderSharedFirst(names: string[]): string[] {
+    return [...names.filter((name) => name.includes("/")), ...names.filter((name) => !name.includes("/"))]
 }

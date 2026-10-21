@@ -4,10 +4,8 @@ import {
     DeployMissingTracks,
     LoadFlags,
     LoadFlagsOriginal,
-    LoadFsm,
     LoadTrack,
     LoadTrackOriginal,
-    ListFsm,
     ListTracks,
     SaveFlags,
     SaveTracks,
@@ -38,11 +36,6 @@ const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: numb
 Attack（判定盒，伤害在这）、Effect（特效调用，火柱在这）、Speed（播放速度，多数动画没有）；
 没有这条轨就不显示这一块。每块自带一排按钮（添加 / 复制 / 插入），不用切焦点去找页面顶上的那套。
 
-FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，与当前动画无关」：这几个技能是按**角色**
-列出来的，跟当前动画没有对应关系——游戏数据里根本没有 motion → FSM 的映射（查过 7 个方向，全否定）。
-"本动画会调用 FSM" 是另一码事，它**能从数据里扫出来**：这个动画所有轨的 Flag1 第 4 位（bit4 = 调用FSM技能）。
-炎帝 211 个动画里只有 3470（赤焰旋涡）有，t=0.7333。
-
 选中：点行号选一行、按着 Shift 点选一段、Ctrl / Cmd 点逐个增删（**一次只认一个分区**，切到别的分区就等于
 换了个选区）。行剪贴板**全应用一份**（跨轨、甚至跨弹层都能插）；插入按**位置**对列 —— 不保存列名，
 源表第 N 列的值给目标第 N 列（Excel 口径；目标列不够留空、源多出来的裁掉）。
@@ -51,7 +44,7 @@ FSM 是**另一回事**，所以单独一块、标题写全「本角色可用，
  * 动画详情页。
  *
  * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「轨迹表」的清单里点一个号。
- * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨 + FSM。
+ * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨。
  */
 export function AnimationDetail({motion, charCode, t, onClose}: {
     motion: string
@@ -71,10 +64,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     */
     const [tables, setTables] = useState<Record<string, TrackTable>>({})
 
-    const [fsmNames, setFsmNames] = useState<string[]>([])
-    const [fsmName, setFsmName] = useState<string | null>(null)
-    // FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。
-    const [fsmFields, setFsmFields] = useState<{key: string; original: string; value: string | null}[]>([])
     /**
      * **每张表有没有选区**（任意格子，不要求整行）—— 工具条按钮亮不亮用它。
      *
@@ -110,7 +99,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             try {
                 // 两次往返，不是七次：这几份数据之间**没有依赖**（每条的轨由 ListTracks 给出名字，
                 // 之后各读各的），逐条 await 只是白等一串串行的 IPC。
-                const [tracks, names] = await Promise.all([ListTracks(motion), ListFsm()])
+                const tracks = await ListTracks(motion)
                 const list = tracks ?? []
                 /*
                     flags 与别的轨**各走各的解析**（列名大小写与位含义都不同），但取数仍是"一条轨一个请求"：
@@ -146,7 +135,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 if (!alive) return
                 setInfos(list)
                 setTables(loaded)
-                setFsmNames(names ?? [])
                 // 原表 = **游戏原版**（后端从随包 data.zip 里读的，只读）：灰/亮全靠拿当前行和它比。
                 // 它不随保存变化 —— "我一直知道原表的值"就是靠这个。
                 setBaseline({tables: original})
@@ -252,15 +240,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         })
     }
 
-    const showFsm = async (name: string) => {
-        setFsmName(name)
-        try {
-            setFsmFields((await LoadFsm(name)) ?? [])
-        } catch (e) {
-            setFailure(String(e))
-        }
-    }
-
     /** 一次把改过的轨全写完并部署：flags 走它自己的接口，其余三条走通用轨的批量接口。 */
     const save = async () => {
         if (busy) return
@@ -313,7 +292,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     if (!loaded && !failure) return null
 
     /*
-    三条轨（flags / effect / attack …）+ FSM：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
+    三条轨（flags / effect / attack …）：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
     */
     const sections = (
         <>
@@ -353,17 +332,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         <div className="absolute inset-y-0 right-0 flex items-center">
                             <TrackToolbar
                                 t={t}
-                                canCopy={hasSelection[key] === true}
-                                canCut={hasSelection[key] === true}
                                 canRemove={hasSelection[key] === true}
                                 onAdd={() => tableCommands.current[key]?.rows.add()}
-                                onCopy={() => tableCommands.current[key]?.copy()}
-                                onCut={() => {
-                                    // 与 Ctrl+X 同一条路：复制这片（单元格 + 行剪贴板）+ 删掉选区行。
-                                    tableCommands.current[key]?.copy()
-                                    tableCommands.current[key]?.rows.cut()
-                                }}
-                                onPaste={() => tableCommands.current[key]?.paste()}
                                 onInsert={() => tableCommands.current[key]?.rows.insert()}
                                 onRemove={() => tableCommands.current[key]?.rows.removeRowsInSelection()}
                             />
@@ -394,60 +364,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 </Fragment>
             )
         })}
-
-        {/* FSM：单独一块，标题必须写全——被误导过一次（以为 FSM 是跟动画走的）。
-            标题与内容**不包一层 div**（同上面几条轨）：包起来 sticky 就只能在那一块里吸顶、离场时露半截。 */}
-        {/* 吸顶的 FSM 标题：底色同上面几条轨，走 bg-popover（弹层自己的底色），不铺 #0a0a0a。
-            层级同上面那条轨标题（70）：它同样是"表之外"的一层，要盖过表头的 60。 */}
-        <div className="sticky top-0 z-[70] bg-popover">
-                <div className="flex w-full items-start py-2 text-sm font-medium">{t.fsmScope}</div>
-            </div>
-            <div className="pt-1 pb-0">
-                <div className="flex flex-wrap gap-2">
-                    {fsmNames.map((name) => (
-                        <Button
-                            key={name}
-                            size="sm"
-                            variant={name === fsmName ? "default" : "outline"}
-                            onClick={() => void showFsm(name)}
-                        >
-                            {name}
-                        </Button>
-                    ))}
-                </div>
-                {fsmFields.length > 0 && (
-                    <div className="mt-2 overflow-x-auto overflow-y-hidden">
-                        {/* 表**不套外框**，只剩下每一行下面那条线（用户要求，全局参数表同样）：
-                            外框与竖线都去掉；`[&_tr:last-child>*]:border-b-0` 把**最后一行的下边框也去掉**
-                            （用户要求）—— 表到那里就结束了，留着那条线等于给表画了一条多余的收尾线。
-                            格线颜色仍走全站那一个来路（table-border）。
-                            字段名**不换行**（用户要求）：整串显示，装不下就由外面那个 overflow-x-auto 横向滚。
-                            值那一格给 `w-full`，让它吃掉剩下的宽度（左边那列因此正好等于最长那个字段名）。 */}
-                        <table className="w-full table-border border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0">
-                            <tbody>
-                                {fsmFields.map((field, i) => (
-                                    <tr key={i}>
-                                        <td className="border-b px-2 py-1 whitespace-nowrap">
-                                            {field.key}
-                                        </td>
-                                        {/* 值这一格的字号与全局参数表那格的**一模一样**（用户要求）：那边是
-                                            EditableCell 的显示层，字号类就是 `text-base md:text-sm` ——
-                                            本窗口宽度下 = 14px，所以这里抄同一对（不写死 text-sm，两处才不会漂）。
-                                            `/4` 是**行高 1rem**：text-sm 默认给 1.25rem，比字段名那格
-                                            （text-xs，1rem）高 4px —— 值非空的行会被它撑成 29px，空格子仍是
-                                            25px，同一张表里就出现两种行高 ✗。压回 1rem 两格一样高，行高恒为 25px。
-                                            字段名那格仍是表上那个 text-xs（12px）：值和名字差一档，与全局参数表一致。 */}
-                                        <td className="w-full border-b px-2 py-1 align-top break-all text-base/4 md:text-sm/4">
-                                            {/* FSM 字段是只读的：值一律在 original 里（Value 恒为 nil，见后端 flattenMsg）。 */}
-                                            {field.value ?? field.original}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
         </>
     )
 
@@ -466,7 +382,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 {loaded && infos.length === 0 && (
                     <p className="text-xs text-muted-foreground">{t.trackNone}</p>
                 )}
-                {/* 三条轨（flags/effect/attack…）+ FSM：常开、直接铺开，右侧没有折叠箭头。
+                {/* 三条轨（flags/effect/attack…）：常开、直接铺开，右侧没有折叠箭头。
                     整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
                 {loaded && sections}
             </div>

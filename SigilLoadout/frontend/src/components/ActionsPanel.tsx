@@ -494,8 +494,8 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                     >
                         <ToggleGroupItem value="actions">{t.actionsSection}</ToggleGroupItem>
                         <ToggleGroupItem value="general">{t.generalTracks}</ToggleGroupItem>
-                        <ToggleGroupItem value="globals">{t.globalParams}</ToggleGroupItem>
                         <ToggleGroupItem value="fsm">{t.fsmSection}</ToggleGroupItem>
+                        <ToggleGroupItem value="globals">{t.globalParams}</ToggleGroupItem>
                     </ToggleGroup>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而

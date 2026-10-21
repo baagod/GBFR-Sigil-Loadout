@@ -382,23 +382,6 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         expect(removedRows()).toHaveLength(0)
         expect(rowsOf()).toHaveLength(2)
     })
-
-    /* ‼️ 粘贴 = **单元格区域**（与 Ctrl+V 同一条路），不是插行：复制一格 → 选另一格 → 粘贴。 */
-    it("工具条「复制」「粘贴」：把一格的值粘到另一格（粘的是单元格，不插行）", async () => {
-        await openAndSelectRow()
-        const from = rowsOf()[0].querySelectorAll("td")[2] as HTMLElement // startTime = 0
-        fireEvent.mouseDown(from, {button: 0})
-        fireEvent.mouseUp(from)
-        clickToolbar(messages.zh.copySelected)
-
-        const to = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement // startTime = 1
-        fireEvent.mouseDown(to, {button: 0})
-        fireEvent.mouseUp(to)
-        clickToolbar(messages.zh.pasteBelow)
-
-        await waitFor(() => expect(to.textContent).toBe("0"))
-        expect(rowsOf()).toHaveLength(2) // 不是插行
-    })
 })
 
 

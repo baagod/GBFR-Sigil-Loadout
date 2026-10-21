@@ -6,32 +6,24 @@ import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/compon
 // Phosphor 是 256 栅格、缩到 16px 时缩放因子 0.0625，regular 的加号笔画只有 1px 宽、
 // 又正好落在半像素边界上（x=7.5px），于是被抗锯齿对半摊开 —— 峰值不透明度只有 192、
 // 亮像素 256 个，所以看着"发灰"（实测）。bold 笔画 12 单位 = 0.75px 以上，能跨满一个像素列，
-// 峰值到 240（复制是 250），浓度就对上了；而 0.75px 仍远细于复制/插入/删除的 2px，不会显得更粗。
-// 复制/删除取的是 **Simple** 变体（只有"两张纸/一个桶"的主体轮廓，没有内侧的复制线、桶盖提手
-// 那些细节）—— 16px 下细节会糊成一团，Simple 在这么小的尺寸里更清楚。
+// 峰值到 240，浓度就对上了；而 0.75px 仍远细于插入/删除的 2px，不会显得更粗。
+// 删除取的是 **Simple** 变体（只有"一个桶"的主体轮廓，没有桶盖提手那些细节）—— 16px 下细节会糊成
+// 一团，Simple 在这么小的尺寸里更清楚。
 import {Plus} from "@phosphor-icons/react/Plus"
-import {CopySimple} from "@phosphor-icons/react/CopySimple"
-import {Scissors} from "@phosphor-icons/react/Scissors"
-import {ClipboardText} from "@phosphor-icons/react/ClipboardText"
 import {RowsPlusBottom} from "@phosphor-icons/react/RowsPlusBottom"
 import {TrashSimple} from "@phosphor-icons/react/TrashSimple"
 import type {Messages} from "@/lib/messages"
 
 /*
-    一条轨那排按钮（加行 / 复制 / 粘贴单元格 / 插入行 / 剪切 / 删除）。它从 TrackGrid.tsx 拆出来：
+    一条轨那排按钮（加行 / 插入行 / 删除）。它从 TrackGrid.tsx 拆出来：
     那是"表格 + 行 + 拖拽"，这只是"一排按钮" —— 120 行的图标、Tooltip、禁用态与悬停色不值得和表格挤在一个文件里。
 */
 
 /** 一条轨那排按钮：压在标题行右侧，谁被选中就删谁。 */
-export function TrackToolbar({t, canCopy, canCut, canRemove, onAdd, onCopy, onCut, onPaste, onInsert, onRemove}: {
+export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
     t: Messages
-    canCopy: boolean
-    canCut: boolean
     canRemove: boolean
     onAdd: () => void
-    onCopy: () => void
-    onCut: () => void
-    onPaste: () => void
     /** 把行剪贴板里的全部行插到活动格所在行之后（无活动格 → 末行之后）。 */
     onInsert: () => void
     onRemove: () => void
@@ -48,8 +40,8 @@ export function TrackToolbar({t, canCopy, canCut, canRemove, onAdd, onCopy, onCu
         // title —— 那种用户明确不要）。**不给 svg 写 size 类**：Button 基类的
         // `[&_svg:not([class*='size-'])]:size-4` 会把图标钉在 16px，换 size 档也不会跟着变大。
         // 按钮禁用时 Tooltip 也一起 disabled（SkillRow 的惯例）：禁用的按钮收不到指针事件。
-        // 只有"复制 / 剪切 / 删除"有禁用态（都看本表有没有选区）；粘贴 / 插入行没有可观察的"剪贴板空"
-        // 信号（系统剪贴板读不到、行剪贴板是模块级单例），所以恒亮、空剪贴板时点一下什么也不做。
+        // 只有"删除"有禁用态（看本表有没有选区）；插入行没有可观察的"剪贴板空"信号
+        //（系统剪贴板读不到、行剪贴板是模块级单例），所以恒亮、空剪贴板时点一下什么也不做。
         <TooltipProvider>
             <div className="flex items-center gap-2">
                 <Tooltip>
@@ -68,39 +60,6 @@ export function TrackToolbar({t, canCopy, canCut, canRemove, onAdd, onCopy, onCu
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.addRow}</TooltipContent>
                 </Tooltip>
-                <Tooltip disabled={!canCopy}>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                className="hover:bg-[#262626]!"
-                                aria-label={t.copySelected}
-                                disabled={!canCopy}
-                                onClick={onCopy}
-                            />
-                        }
-                    >
-                        <CopySimple />
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{t.copySelected}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                className="hover:bg-[#262626]!"
-                                aria-label={t.pasteBelow}
-                                onClick={onPaste}
-                            />
-                        }
-                    >
-                        <ClipboardText />
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{t.pasteBelow}</TooltipContent>
-                </Tooltip>
                 <Tooltip>
                     <TooltipTrigger
                         render={
@@ -116,23 +75,6 @@ export function TrackToolbar({t, canCopy, canCut, canRemove, onAdd, onCopy, onCu
                         <RowsPlusBottom />
                     </TooltipTrigger>
                     <TooltipContent side="top">{t.insertRow}</TooltipContent>
-                </Tooltip>
-                <Tooltip disabled={!canCut}>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                size="icon-sm"
-                                variant="ghost"
-                                className="hover:bg-[#262626]!"
-                                aria-label={t.cutSelected}
-                                disabled={!canCut}
-                                onClick={onCut}
-                            />
-                        }
-                    >
-                        <Scissors />
-                    </TooltipTrigger>
-                    <TooltipContent side="top">{t.cutSelected}</TooltipContent>
                 </Tooltip>
                 <Tooltip disabled={!canRemove}>
                     <TooltipTrigger
