@@ -735,6 +735,13 @@ func (s *ActionsService) ListFsm() ([]string, error) {
 		}
 		names = append(names, name)
 	}
+	// 参数表 fsmParam_ 里引用、但不在角色自己目录下的层（pl_base 等）也要列 —— 它们是这个角色
+	// 实际加载的 FSM，只是文件放在共享目录里。
+	shared, err := fsmSharedNames(cfg)
+	if err != nil {
+		return nil, err
+	}
+	names = append(names, shared...)
 	sort.Strings(names) // 目录顺序不保证，界面上要稳
 	return names, nil
 }
@@ -763,14 +770,15 @@ func fsmFileNames(cfg actionConfig) ([]string, error) {
 }
 
 // LoadFsm 读一个 FSM 的 .msg，把嵌套结构拍平成 key.path = 值 的行：够在界面上一行一格地看就行。
+//
+// 名字有两种形状：角色自己的 FSM 是 `<名>`；共享层的 FSM 是 `<目录>/<名>`（如 pl_base/snd_auto_type_2，
+// 由 ListFsm 从参数表 fsmParam_ 里列出来）。
 func (s *ActionsService) LoadFsm(name string) ([]ActionField, error) {
 	cfg := s.config()
-	path, err := fsmPath(cfg, name) // 名字由界面给，先当校验过一遍（它要拼进路径与条目名）
+	entry, path, err := fsmEntryPath(cfg, name) // 名字由界面给，先当校验过一遍（它要拼进路径与条目名）
 	if err != nil {
 		return nil, err
 	}
-	char := charCode(cfg)
-	entry := fsmEntry(char, name)
 
 	raw, found, err := readOriginal(entry)
 	if err != nil {
@@ -789,6 +797,115 @@ func (s *ActionsService) LoadFsm(name string) ([]ActionField, error) {
 	fields := []ActionField{}
 	flattenMsg(root, "", &fields)
 	return fields, nil
+}
+
+// fsmEntryPath 把界面给的名字翻成"容器条目名 + 解包目录兜底路径"。
+func fsmEntryPath(cfg actionConfig, name string) (entry, path string, err error) {
+	char := charCode(cfg)
+	if folder, base, ok := strings.Cut(name, "/"); ok {
+		if !validFsmPart(folder) || !validFsmPart(base) {
+			return "", "", fmt.Errorf("FSM 名 %q 不合法", name)
+		}
+		return fsmEntry(folder, base),
+			filepath.Join(filepath.Dir(cfg.FsmDir), folder, folder+"_"+base+"_fsm_ingame.msg"),
+			nil
+	}
+	path, err = fsmPath(cfg, name)
+	if err != nil {
+		return "", "", err
+	}
+	return fsmEntry(char, name), path, nil
+}
+
+// fsmSharedNames 是参数表 fsmParam_ 里引用、但不在角色自己目录下的 FSM（pl_base 等）。
+// 参数表是唯一来源；容器里没有（开发机上没打资产）就退回解包目录。
+// 只列**真的存在**的条目——界面上点开要读它，指向不存在的文件没有意义（wpXXXX 目前没进容器）。
+func fsmSharedNames(cfg actionConfig) ([]string, error) {
+	char := charCode(cfg)
+	raw, found, err := readOriginal(parameterEntry(char))
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		raw, err = os.ReadFile(parameterFallbackPath(cfg))
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("读角色参数表 %s: %w", parameterFallbackPath(cfg), err)
+		}
+	}
+	root, err := decodeMsgpack(raw)
+	if err != nil {
+		return nil, fmt.Errorf("解析角色参数表 %s: %w", parameterEntry(char), err)
+	}
+
+	var param *msgValue
+	for _, e := range root.entries {
+		if e.value.format == msgMap && e.value.entry("fsmParam_") != nil {
+			param = e.value
+			break
+		}
+	}
+	if param == nil {
+		return nil, nil
+	}
+	fsm := param.entry("fsmParam_")
+	folders, names := fsm.entry("folderName_"), fsm.entry("fsmName_")
+	if folders == nil || names == nil {
+		return nil, nil
+	}
+
+	out := []string{}
+	seen := map[string]bool{}
+	for i := 0; i < len(folders.items) && i < len(names.items); i++ {
+		folder, name := elementString(folders.items[i]), elementString(names.items[i])
+		key := folder + "/" + name
+		if folder == "" || name == "" || folder == char || seen[key] {
+			continue
+		}
+		if _, ok, err := readOriginal(fsmEntry(folder, name)); err != nil {
+			return nil, err
+		} else if ok {
+			seen[key] = true
+			out = append(out, key)
+			continue
+		}
+		fallback := filepath.Join(filepath.Dir(cfg.FsmDir), folder, folder+"_"+name+"_fsm_ingame.msg")
+		if _, err := os.Stat(fallback); err == nil {
+			seen[key] = true
+			out = append(out, key)
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// elementString 取 msgpack 数组里那种 `{Element: "x"}` 包装的值。
+func elementString(v *msgValue) string {
+	if v == nil || v.format != msgMap {
+		return ""
+	}
+	if e := v.entry("Element"); e != nil {
+		return e.scalar()
+	}
+	return ""
+}
+
+// parameterEntry 是角色参数表在容器里的条目名（与部署路径同一份）。
+func parameterEntry(char string) string {
+	return "system/player/parameter/" + char + "/" + char + "_parameter.msg"
+}
+
+// parameterFallbackPath 是开发机上参数表的落点：从动作表路径往上推（system\player\parameter\<角色>\...）。
+func parameterFallbackPath(cfg actionConfig) string {
+	char := charCode(cfg)
+	return filepath.Join(filepath.Dir(cfg.Path), "..", "..", "parameter", char, char+"_parameter.msg")
+}
+
+// validFsmPart 校验名字里的一段（它要拼进路径与条目名）。
+func validFsmPart(part string) bool {
+	return part != "" && !strings.ContainsAny(part, `/\:`) && !strings.Contains(part, "..")
 }
 
 // fsmPath 拼 FSM 的路径。名字由界面给，同样当校验（它也要拼进文件名）。

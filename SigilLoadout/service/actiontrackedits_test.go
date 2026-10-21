@@ -230,7 +230,7 @@ func readZipEntry(entry *zip.File) ([]byte, error) {
 */
 func TestDataAssetEntriesAreTheDeployPaths(t *testing.T) {
 	entries := readDataAsset(t)
-	tracks, tables, fsms, globals := 0, 0, 0, 0
+	tracks, tables, params, fsms, globals := 0, 0, 0, 0, 0
 	var failures []string
 	for entry := range entries {
 		slash := filepath.ToSlash(entry)
@@ -270,6 +270,16 @@ func TestDataAssetEntriesAreTheDeployPaths(t *testing.T) {
 			if got := relToMod(deployActionPath(configFor(char))); got != slash {
 				failures = append(failures, fmt.Sprintf("%s: deployActionPath 拼出来是 %s", slash, got))
 			}
+		case len(parts) == 5 && parts[0] == "system" && parts[1] == "player" && parts[2] == "parameter":
+			// 参数表只读（FSM 页按 fsmParam_ 找共享层），没有部署路径。
+			char, file := parts[3], parts[4]
+			params++
+			if got := parameterEntry(char); got != slash {
+				failures = append(failures, fmt.Sprintf("%s: parameterEntry 拼出来是 %s", slash, got))
+			}
+			if file != char+"_parameter.msg" {
+				failures = append(failures, fmt.Sprintf("%s: 文件名不是 <角色码>_parameter.msg", slash))
+			}
 		case len(parts) == 3 && parts[0] == "system" && parts[1] == "player":
 			// 全局参数：**平铺**在 player\ 下（没有角色那一段 —— 它们本来就不分角色）。
 			globals++
@@ -295,11 +305,11 @@ func TestDataAssetEntriesAreTheDeployPaths(t *testing.T) {
 	for _, failure := range failures {
 		t.Error(failure)
 	}
-	if tracks == 0 || tables == 0 || fsms == 0 || globals == 0 {
-		t.Fatalf("容器里轨 %d 条、动作表 %d 份、FSM %d 份、全局参数 %d 份，四类都该有", tracks, tables, fsms, globals)
+	if tracks == 0 || tables == 0 || params == 0 || fsms == 0 || globals == 0 {
+		t.Fatalf("容器里轨 %d 条、动作表 %d 份、参数表 %d 份、FSM %d 份、全局参数 %d 份，五类都该有", tracks, tables, params, fsms, globals)
 	}
-	t.Logf("容器里 %d 条轨 + %d 份动作表 + %d 份全局参数（条目名与部署路径逐条相同）+ %d 份 FSM（条目名与读取路径相同）",
-		tracks, tables, globals, fsms)
+	t.Logf("容器里 %d 条轨 + %d 份动作表 + %d 份参数表 + %d 份全局参数（条目名与部署路径逐条相同）+ %d 份 FSM（条目名与读取路径相同）",
+		tracks, tables, params, globals, fsms)
 }
 
 // configFor 造一份"角色码是这个"的最小配置（charCode 只看动作表所在目录的名字）。

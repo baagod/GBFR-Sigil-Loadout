@@ -79,8 +79,10 @@ const zh = {
     multiAreaCopy: "请选择同一行或同一列中的单元格。",
     /** 复制被拒对话框的**标题**（说明那句见 multiAreaCopy）。 */
     multiAreaCopyTitle: "无法复制选中区域",
-    /** 工具栏上那个切换按钮：「全局参数」那张 16 张表的清单（system\player\*.msg，不分角色）。 */
-    globalParams: "全局参数",
+    /** 工具栏上那个切换按钮：「全员参数」那张 16 张表的清单（system\player\*.msg，不分角色）。 */
+    globalParams: "全员参数",
+    /** 工具栏上那个切换按钮：「FSM」—— 本角色的 FSM + 参数表 fsmParam_ 引用的共享层（如 pl_base）。 */
+    fsmSection: "FSM",
     /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨的那组。 */
     hmRangeSkill: "技能",
     /** 组标题。「技能」那一组直接复用 hmRangeSkill。 */
@@ -233,7 +235,8 @@ export const messages: Record<Lang, Messages> = {
         actionsSection: "Action table",
         multiAreaCopy: "Select cells in the same row or column.",
         multiAreaCopyTitle: "Can't copy the selected areas",
-        globalParams: "Global Params",
+        globalParams: "All-Character Params",
+        fsmSection: "FSM",
         hmRangeSkill: "Skills",
         hmGroupOther: "Other",
         trackNone: "No track files for this animation",
@@ -359,7 +362,8 @@ export const messages: Record<Lang, Messages> = {
         actionsSection: "アクション表",
         multiAreaCopy: "同じ行または同じ列のセルを選んでください。",
         multiAreaCopyTitle: "選択範囲をコピーできません",
-        globalParams: "全体パラメータ",
+        globalParams: "全キャラパラメータ",
+        fsmSection: "FSM",
         hmRangeSkill: "スキル",
         hmGroupOther: "その他",
         trackNone: "このアニメには軌ファイルがありません",
@@ -485,7 +489,8 @@ export const messages: Record<Lang, Messages> = {
         actionsSection: "액션 표",
         multiAreaCopy: "같은 행이나 같은 열의 셀을 선택하세요.",
         multiAreaCopyTitle: "선택한 영역을 복사할 수 없습니다",
-        globalParams: "전역 파라미터",
+        globalParams: "전체 캐릭터 파라미터",
+        fsmSection: "FSM",
         hmRangeSkill: "스킬",
         hmGroupOther: "기타",
         trackNone: "이 애니메이션에는 트랙 파일이 없습니다",

@@ -28,6 +28,7 @@ import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
 import {GlobalParamList} from "@/components/GlobalParamList"
 import {GlobalParamPanel} from "@/components/GlobalParamPanel"
+import {FsmPanel} from "@/components/FsmPanel"
 import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf} from "@/lib/actionflags"
@@ -227,11 +228,11 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
     const [idsText, setIdsText] = useState("")
     const [idsApplied, setIdsApplied] = useState("")
 
-    // 下方那块地方归谁：顶栏那个 ToggleGroup 在「动作表 / 轨迹表 / 全局参数」三块之间单选切换
+    // 下方那块地方归谁：顶栏那个 ToggleGroup 在「动作表 / 通用轨 / 全员参数 / FSM」四块之间单选切换
     //（**默认动作表**，即 "actions"）。
-    // 三块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
+    // 四块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
     // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
-    const [section, setSection] = useState<"general" | "actions" | "globals">("actions")
+    const [section, setSection] = useState<"general" | "actions" | "globals" | "fsm">("actions")
     /** 新表的保存动作（它自己持有数据与草稿，外面只负责在「保存」时喊它一声）。 */
     const ttSaveRef = useRef<(() => Promise<void>) | null>(null)
     // 「动画详情」：正在看哪个 motion（null = 没开）。
@@ -470,17 +471,16 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                             <Search />
                         </InputGroupAddon>
                     </InputGroup>
-                    {/* 三块地方（动作表 / 轨迹表 / 全局参数）的切换：**单一选中态**的 ToggleGroup。
+                    {/* 四块地方（动作表 / 通用轨 / 全员参数 / FSM）的切换：**单一选中态**的 ToggleGroup。
                         原来是两个"开关式"按钮，各有一个毛病：
                           · 「通用轨 / 动作表」那个按钮，文字写的是**点一下会去的那一块**（目标），不是当前
                             看着的那一块 ✗ —— 看着动作表时它写着「通用轨」。
-                          · 「全局参数」那个要靠 beforeGlobals 记住"进去之前看的是哪块" ✗。
-                        单选之后两个毛病一起没了：三个标签就是三块自己的名字，选中态就是 section 本身。
+                          · 「全员参数」那个要靠 beforeGlobals 记住"进去之前看的是哪块" ✗。
+                        单选之后两个毛病一起没了：四个标签就是四块自己的名字，选中态就是 section 本身。
                         `multiple={false}` 必须**显式**给（Base UI 的 ToggleGroup 默认是多选）；`value` 是数组，
                         取第一个。与「保存」同属右边那一组（用户要求：紧挨保存）—— 搜索框现在 flex-1 吃掉剩余
                         空间，`ml-auto` 只是兜底（外面那一行 flex-wrap 一旦换行，它仍把这组顶到最右）。
-                        「全局参数」是**临时的第三块地方**、不是第四个页签：那些表不分角色（路径里没有角色码），
-                        做成页签就等于把它和"当前角色"摆在同一层，看着像跟着角色走的东西。 */}
+                        「全员参数」是**不分角色**的一层（路径里没有角色码）；「FSM」反过来，跟着当前角色走。 */}
                     <ToggleGroup
                         className="ml-auto"
                         variant="outline"
@@ -488,13 +488,14 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         value={[section]}
                         onValueChange={(next) => {
                             const picked = next[0]
-                            // 取到的就是下面三个 Item 的 value（TS 只把它们当 string，这里收回联合类型）。
+                            // 取到的就是下面四个 Item 的 value（TS 只把它们当 string，这里收回联合类型）。
                             if (picked) setSection(picked as typeof section)
                         }}
                     >
                         <ToggleGroupItem value="actions">{t.actionsSection}</ToggleGroupItem>
                         <ToggleGroupItem value="general">{t.generalTracks}</ToggleGroupItem>
                         <ToggleGroupItem value="globals">{t.globalParams}</ToggleGroupItem>
+                        <ToggleGroupItem value="fsm">{t.fsmSection}</ToggleGroupItem>
                     </ToggleGroup>
                     {/* 保存即部署：一次点击把没落盘的改动写回游戏数据（原来分成"保存"+"保存并部署"两步，
                         现在只留这一个）。**宽度不写死**：由"保存"这两个字撑出来（原先 w-16 会随语言长短而
@@ -504,11 +505,11 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         {t.saveAndDeploy}
                     </Button>
                 </fieldset>
-                {/* 下方那块地方：三块由顶栏那两个按钮切换 —— 不再用手风琴，也不再有那两行标题。
-                    三块都留在 DOM 里，没在看的那块压成 h-0 + overflow-hidden（与原来 keepMounted 一个效果）：
+                {/* 下方那块地方：四块由顶栏那组按钮切换 —— 不再用手风琴，也不再有那两行标题。
+                    四块都留在 DOM 里，没在看的那块压成 h-0 + overflow-hidden（与原来 keepMounted 一个效果）：
                     切回来时 ids 输入框的内容与滚动位置都还在。
                     ⚠️ 压成 h-0 的那块**仍占一个 flex gap**（外层是 gap-4），所以要 -mt-4 把这 16px 抵掉，
-                    否则顶栏与表格之间会多出一段空白。三块都写：谁在下面时它都是那一侧的邻居。
+                    否则顶栏与表格之间会多出一段空白。四块都写：谁在下面时它都是那一侧的邻居。
                     「通用轨」= 有轨、但动作表里任何记录的 saveMotId01_~12_ 都没提到的号（见后端
                     ListHiddenMotions）；在清单里点一行就弹出那个号的轨表。 */}
                 <div
@@ -610,6 +611,15 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                             }}
                         />
                     )}
+                </div>
+                {/* 「FSM」：本角色的 FSM（自己目录 + 参数表 fsmParam_ 引用的共享层），
+                    左右分栏与「全员参数」同一套，右栏只读。 */}
+                <div
+                    className={`flex min-h-0 ${
+                        section === "fsm" ? "flex-1" : "h-0 overflow-hidden -mt-4"
+                    }`}
+                >
+                    <FsmPanel charCode={charCode} />
                 </div>
             </div>
 

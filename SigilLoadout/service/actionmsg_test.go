@@ -90,10 +90,43 @@ func TestLoadFsmFlattensTheMessage(t *testing.T) {
 		}
 	}
 
-	// 名字要拼进文件名，带路径的写法一律不收。
-	for _, name := range []string{"", "../x", `a\b`, "a/b"} {
+	// 名字里每一段都要拼进路径与文件名，带路径的写法一律不收（共享层的 a/b 是另一种合法形状）
+	for _, name := range []string{"", "../x", `a\b`, "a/b/c"} {
 		if _, err := service.LoadFsm(name); err == nil {
 			t.Fatalf("FSM 名 %q 被收下了", name)
 		}
+	}
+}
+
+// 参数表 fsmParam_ 引用、但不在角色自己目录下的共享层（pl_base）也要列出来；容器里不存在的引用跳过。
+func TestListFsmIncludesTheSharedLayersFromTheParameter(t *testing.T) {
+	service, _, _ := actionsFixture(t)
+
+	elem := func(s string) *msgValue { return gpMap(gpEntry("Element", gpStr(s))) }
+	param := gpMap(gpEntry("Pl1000Param", gpMap(gpEntry("fsmParam_", gpMap(
+		gpEntry("folderName_", gpArray(elem("pl_base"), elem("pl1000"), elem("wp9999"))),
+		gpEntry("fsmName_", gpArray(elem("snd_auto_type_2"), elem("baseattack"), elem("missing"))),
+	)))))
+	shared := gpMap(gpEntry("layerNo", &msgValue{format: msgUint, num: 3}))
+	writeDataAsset(t, map[string][]byte{
+		"system/player/parameter/pl1000/pl1000_parameter.msg": encodeMsgpack(param),
+		fsmEntry("pl1000", "aaa"):                             {},
+		fsmEntry("pl_base", "snd_auto_type_2"):                encodeMsgpack(shared),
+	})
+
+	names, err := service.ListFsm()
+	if err != nil {
+		t.Fatalf("ListFsm: %v", err)
+	}
+	if want := []string{"aaa", "pl_base/snd_auto_type_2"}; !slices.Equal(names, want) {
+		t.Fatalf("ListFsm = %v，want %v", names, want)
+	}
+
+	fields, err := service.LoadFsm("pl_base/snd_auto_type_2")
+	if err != nil {
+		t.Fatalf("LoadFsm: %v（说明它没去容器里读）", err)
+	}
+	if len(fields) != 1 || fields[0].Key != "layerNo" || fields[0].Original != "3" {
+		t.Fatalf("LoadFsm = %+v", fields)
 	}
 }
