@@ -83,6 +83,8 @@ const zh = {
     globalParams: "全员参数",
     /** 工具栏上那个切换按钮：「FSM」—— 本角色的 FSM + 参数表 fsmParam_ 引用的共享层（如 pl_base）。 */
     fsmSection: "FSM",
+    /** FSM 清单里共享层（pl_base/...）后面那个小标签。 */
+    sharedLayer: "共享",
     /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨的那组。 */
     hmRangeSkill: "技能",
     /** 组标题。「技能」那一组直接复用 hmRangeSkill。 */
@@ -233,6 +235,7 @@ export const messages: Record<Lang, Messages> = {
         multiAreaCopyTitle: "Can't copy the selected areas",
         globalParams: "All-Character Params",
         fsmSection: "FSM",
+        sharedLayer: "Shared",
         hmRangeSkill: "Skills",
         hmGroupOther: "Other",
         trackNone: "No track files for this animation",
@@ -356,6 +359,7 @@ export const messages: Record<Lang, Messages> = {
         multiAreaCopyTitle: "選択範囲をコピーできません",
         globalParams: "全キャラパラメータ",
         fsmSection: "FSM",
+        sharedLayer: "共有",
         hmRangeSkill: "スキル",
         hmGroupOther: "その他",
         trackNone: "このアニメには軌ファイルがありません",
@@ -479,6 +483,7 @@ export const messages: Record<Lang, Messages> = {
         multiAreaCopyTitle: "선택한 영역을 복사할 수 없습니다",
         globalParams: "전체 캐릭터 파라미터",
         fsmSection: "FSM",
+        sharedLayer: "공유",
         hmRangeSkill: "스킬",
         hmGroupOther: "기타",
         trackNone: "이 애니메이션에는 트랙 파일이 없습니다",

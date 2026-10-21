@@ -5,7 +5,7 @@ import type {TrackRow, TrackTable as TrackTableData} from "../../bindings/sigill
 import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
 import type {Messages} from "@/lib/messages"
 import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
-import {Badge} from "@/components/ui/badge"
+import {InfoBadge} from "@/components/InfoBadge"
 import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/components/actions-table/model"
 
 /*
@@ -180,9 +180,7 @@ function FlagEffects({row}: {row: ActionRow}) {
         */
         <div className="flex w-full flex-wrap items-center gap-x-1 gap-y-0.5 px-1 py-0.75 text-xs">
             {items.map(({name, bit}) => (
-                <Badge key={bit} className="shrink-0 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                    {name === "" ? `bit${bit}` : name}
-                </Badge>
+                <InfoBadge key={bit}>{name === "" ? `bit${bit}` : name}</InfoBadge>
             ))}
         </div>
     )

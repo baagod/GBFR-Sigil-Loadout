@@ -619,7 +619,7 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                         section === "fsm" ? "flex-1" : "h-0 overflow-hidden -mt-4"
                     }`}
                 >
-                    <FsmPanel charCode={charCode} />
+                    <FsmPanel charCode={charCode} t={t} />
                 </div>
             </div>
 

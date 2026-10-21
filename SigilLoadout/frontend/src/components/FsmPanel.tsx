@@ -1,6 +1,8 @@
 import {useEffect, useState} from "react"
 import {ListFsm, LoadFsm} from "../../bindings/sigilloadout/service/actionsservice"
 import type {ActionField} from "../../bindings/sigilloadout/service/models"
+import {InfoBadge} from "@/components/InfoBadge"
+import type {Messages} from "@/lib/messages"
 
 /*
     「FSM」：左栏是本角色的 FSM 清单（自己目录 + 参数表 fsmParam_ 引用的共享层），右栏是选中那份的
@@ -9,7 +11,7 @@ import type {ActionField} from "../../bindings/sigilloadout/service/models"
     清单跟着角色走：换角色后 `charCode` 变，整份重读；选中项按名字保留（还在清单里就不跳走）。
     共享层（带 `目录/` 前缀的，如 pl_base/snd_auto_type_2）排在最前面。
 */
-export function FsmPanel({charCode}: {charCode: string}) {
+export function FsmPanel({charCode, t}: {charCode: string; t: Messages}) {
     const [names, setNames] = useState<string[]>([])
     const [selected, setSelected] = useState("")
     const [fields, setFields] = useState<ActionField[]>([])
@@ -59,26 +61,31 @@ export function FsmPanel({charCode}: {charCode: string}) {
             <div className="min-h-0 w-max shrink-0 overflow-y-auto overflow-x-hidden border-r pr-3">
                 {failure && <p className="p-2 text-xs text-destructive">{failure}</p>}
                 <div className="flex flex-col gap-1.5">
-                    {names.map((name) => (
-                        <div
-                            key={name}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setSelected(name)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault()
-                                    setSelected(name)
+                    {names.map((name) => {
+                        const shared = name.includes("/")
+                        const label = shared ? name.slice(name.indexOf("/") + 1) : name
+                        return (
+                            <div
+                                key={name}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setSelected(name)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault()
+                                        setSelected(name)
+                                    }
+                                }}
+                                className={
+                                    "flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-hidden select-text " +
+                                    (selected === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
                                 }
-                            }}
-                            className={
-                                "flex w-full cursor-default items-center rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-hidden select-text " +
-                                (selected === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
-                            }
-                        >
-                            {name}
-                        </div>
-                    ))}
+                            >
+                                <span>{label}</span>
+                                {shared && <InfoBadge>{t.sharedLayer}</InfoBadge>}
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
             {/* 右栏：只读的 key.path = 值。与 GlobalParamPanel 同一套表格线（最后一行不要下边框）。 */}
