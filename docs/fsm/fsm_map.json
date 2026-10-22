@@ -1,0 +1,681 @@
+{
+  "exe": {
+    "path": "D:\\Programs\\Steam\\steamapps\\common\\Granblue Fantasy Relink\\granblue_fantasy_relink.exe",
+    "sha256": "4b3ace0fd03df5d3d08c6453e12df2279c6259abf7d2fb3622921fcbea775145",
+    "image_base": "0x140000000"
+  },
+  "loader": {
+    "va": "0x142757690",
+    "rva": "0x2757690",
+    "args": {
+      "rdx": "folder",
+      "r8": "name",
+      "r9": "mask (常见 0x4e020)"
+    },
+    "note": "统一 FSM 加载器；各角色在 PlXXXX 类的虚函数里硬编码 folder/name 后调用"
+  },
+  "action_id_field": {
+    "offset": "0x1b690",
+    "note": "动作对象上的当前动作 id；用于运行时 hook 关联动作与 FSM"
+  },
+  "updated": "2026-10-22",
+  "chars": {
+    "pl0000": [
+      {
+        "name": "regin_tutorial",
+        "source": "name-xref",
+        "confidence": "low"
+      }
+    ],
+    "pl0100": [
+      {
+        "name": "regin_tutorial",
+        "source": "name-xref",
+        "confidence": "low"
+      }
+    ],
+    "pl0200": [
+      {
+        "name": "abilityshot",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "abilityshot_ares",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "abilityshot_ares_sub",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "abilityshot_ares_sub1",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "abilityshot_ares_sub2",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "abilityshot_ares_sub3",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "abilityshot_ares_sub4",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "assist_mode_unique",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "assist_mode_unique_atk_new",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "baseattack",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "fallaresshot",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "heal",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "heal_ares",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "sb_barrier",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "sb_barrier_ares",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "snd_auto_base_1",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "snd_auto_stage_1",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "snd_auto_unique_1",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "winters_rain",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      },
+      {
+        "name": "winters_rain_ares",
+        "source": "dynamic-name-pattern",
+        "confidence": "medium"
+      }
+    ],
+    "pl0300": [
+      {
+        "name": "plunging_fire",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "air_pow_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "airshot_fin",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "charge_lv_max",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "collateral",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "special_arts",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "spit_fire",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl0400": [
+      {
+        "name": "areaeffect_burn",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "explosion",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "orb",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "barrier",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "healwind",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "specialartsstartshot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl0500": [
+      {
+        "name": "ab_back_step_bomb_just_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_back_step_bomb_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_charge_lv1",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_charge_lv2",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_charge_max",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_dispel",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_heal",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_heal_short",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_paralysis",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ab_poison",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "airshot_fin",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "link_atk_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl0600": [
+      {
+        "name": "rose_finish",
+        "source": "folder-func-scan",
+        "confidence": "medium"
+      }
+    ],
+    "pl0700": [
+      {
+        "name": "areaeffect_slow",
+        "source": "folder-func-scan",
+        "confidence": "medium"
+      },
+      {
+        "name": "benediction",
+        "source": "folder-func-scan",
+        "confidence": "medium"
+      }
+    ],
+    "pl0800": [
+      {
+        "name": "vogen_loop_a",
+        "source": "name-xref",
+        "confidence": "medium"
+      },
+      {
+        "name": "vogen_loop_b",
+        "source": "name-xref",
+        "confidence": "medium"
+      }
+    ],
+    "pl0900": [
+      {
+        "name": "assist_mode_unique",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "baseattack",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "snd_auto_base_1",
+        "source": "inferred",
+        "confidence": "low"
+      }
+    ],
+    "pl1000": [
+      {
+        "name": "ab_atk_short_cyclon",
+        "source": "loader-call",
+        "confidence": "high"
+      }
+    ],
+    "pl1100": [
+      {
+        "name": "assist_mode_unique",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "baseattack",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "snd_auto_base_1",
+        "source": "inferred",
+        "confidence": "low"
+      }
+    ],
+    "pl1200": [
+      {
+        "name": "ability_jump_shot",
+        "source": "name-xref",
+        "confidence": "medium"
+      }
+    ],
+    "pl1300": [
+      {
+        "name": "sparts_bonus_damage",
+        "source": "name-xref",
+        "confidence": "medium"
+      }
+    ],
+    "pl1400": [
+      {
+        "name": "slip_damage_area",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "genzi_just_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl1500": [
+      {
+        "name": "ability01_explosion",
+        "source": "loader-call",
+        "confidence": "high"
+      }
+    ],
+    "pl1600": [
+      {
+        "name": "areaeffect_dispel",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "ability_laser",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl1700": [
+      {
+        "name": "assist_mode_unique",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "baseattack",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "snd_auto_base_1",
+        "source": "inferred",
+        "confidence": "low"
+      },
+      {
+        "name": "snd_auto_unique_1",
+        "source": "inferred",
+        "confidence": "low"
+      }
+    ],
+    "pl1800": [
+      {
+        "name": "areaeffect_revive",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "barrier",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "disraption",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "heal",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "mehen",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "spare_body",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl1900": [
+      {
+        "name": "super_finish_fire",
+        "source": "name-xref",
+        "confidence": "medium"
+      }
+    ],
+    "pl2000": [
+      {
+        "name": "horming",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "regin_last",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "singleshot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2100": [
+      {
+        "name": "explosion",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "areaeffect_weakelement_transform",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "slash",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "slash_npc",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "slash_step",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2200": [
+      {
+        "name": "ability01_explosion",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability01_explosion_god",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability02_enhanced",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability02_god",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability03_god",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability06_god",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2300": [
+      {
+        "name": "ab_straight_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "air_fall_shot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "link_attack",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "shot_1",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "shot_air_1",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2400": [
+      {
+        "name": "ability3",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability4_1",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability4_2",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability4_3",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "ability4_4",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "daigassen",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2500": [
+      {
+        "name": "turnshot",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2600": [
+      {
+        "name": "ability02",
+        "source": "name-xref",
+        "confidence": "medium"
+      }
+    ],
+    "pl2700": [
+      {
+        "name": "linkattack",
+        "source": "name-xref",
+        "confidence": "medium"
+      }
+    ],
+    "pl2800": [
+      {
+        "name": "areaeffect_debuff_area",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "reverse_finish",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "ability02",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ],
+    "pl2900": [
+      {
+        "name": "linkattack",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "ability01",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "ability02",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "ability07",
+        "source": "loader-call",
+        "confidence": "high"
+      },
+      {
+        "name": "ability05",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "finish_ball",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "finish_ball_add",
+        "source": "slot118-string",
+        "confidence": "medium"
+      },
+      {
+        "name": "finish_ball_fin",
+        "source": "slot118-string",
+        "confidence": "medium"
+      }
+    ]
+  },
+  "missing": [],
+  "partial": [
+    "pl0000",
+    "pl0100"
+  ],
+  "generic_only": [
+    "pl0000",
+    "pl0100",
+    "pl0900",
+    "pl1100",
+    "pl1700"
+  ],
+  "notes": {
+    "pl0200": "基名 abilityshot / sb_barrier / heal / winters_rain 由内联常量拼出，再追加 _ares 或 _sub{0}；FSM 名集合已确认，动作对应仍未展开",
+    "pl0000/pl0100": "FSM 以通用能力/道具类为主（regin、heal、areaeffect 等），与角色专属技能无关",
+    "pl0900/pl1100/pl1700": "角色本身只有通用 FSM（assist_mode/baseattack/snd_auto），没有专属技能 FSM，视为完整"
+  }
+}

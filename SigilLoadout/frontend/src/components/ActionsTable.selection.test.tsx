@@ -33,10 +33,13 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
         expect(hasCopyBounds(container)).toBe(true)
 
-        // ⚠️ 目标是表头**里面**那个 DIV（列名文字就在它里面），不是 th 本身
+        // ⚠️ 目标是表头**里面**那个 DIV（列名文字就在它里面），不是 th 本身；
+        // 真实情况是浏览器里已经选中了列名文字（DOM Selection 非空），复制交给浏览器。
         const headerInner = container.querySelector("thead th > div")!
         const clipboard = clipboardStub()
+        const selection = vi.spyOn(window, "getSelection").mockReturnValue({toString: () => "列名"} as unknown as Selection)
         fireEvent.copy(headerInner, {clipboardData: clipboard})
+        selection.mockRestore()
 
         expect(clipboard.data["text/plain"]).toBeUndefined() // 表格没抢（列名归浏览器）
         expect(hasCopyBounds(container)).toBe(false) // 复制区清空

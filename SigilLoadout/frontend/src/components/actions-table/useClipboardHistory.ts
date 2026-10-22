@@ -373,48 +373,23 @@ export function useClipboardHistory({
         [changeCopySource, multiAreaCopyText, planCopy, tableRef],
     )
 
-    /**
-     * 光标所在的输入框里**选中了文字**没有（编辑框 vs 表格，见 `handleCopy` 那道闸）。
-     */
-    const hasSelectedText = () => {
-        const el = document.activeElement
-        return el instanceof HTMLInputElement && el.selectionStart !== el.selectionEnd
-    }
-
     const handleCopy = useCallback(
         (e: ClipboardEvent) => {
             if (!isMyEvent(e)) return
-            const target = e.target as HTMLElement | null
             /*
-                选值格的列表弹层自己处理复制 / Esc（它的搜索框选文字归浏览器）：这一层不让路的话，
-                列表里按 Ctrl+C 会去复制背后的单元格区域。判据是"事件发生在列表容器里"。
+                有文本选区：用户选了什么就复制什么，浏览器负责；顺带撤掉复制区虚线（剪贴板已不是那片格子）。
             */
-            if (target?.closest?.("[data-slot=combobox-content]")) return
-            /*
-                ‼️ **表头不参与表格复制**（列名归浏览器）：从表头发起的这一记 Ctrl+C 直接让过去 ——
-                列名本来就是可以自由选、自由复制的。顺带把**复制区那圈虚线撤掉**：剪贴板里已经不是那片格子了，
-                再圈着"剪贴板内容来自这里"就是假的（用户要求：复制列名时清空复制区）。
-
-                判据用**事件从哪儿发起**（`closest("thead")`），不用"页面上有没有文字选区"：后者是全局状态，
-                会残留（选过列名再拖选格子时未必被收掉），于是还得额外在每次按下时清一次选区才能保证判据确定。
-                发起方是**这一记事件自己的事实**，没有那个问题。实测：表头选区下 copy 的 target 就在 `thead` 里。
-            */
-            if (target?.closest("thead")) {
+            const textSelection = window.getSelection()
+            if (textSelection && textSelection.toString().length > 0) {
                 clearCopySource()
                 return
             }
-            /*
-                ‼️ 编辑框里**只有选中了文字**才让给浏览器（复制那几个字）；**没选中文字就别静默什么都不做**。
-
-                这里原来是一句 `target.tagName === "INPUT"` 就 `return`：用户在编辑框里按 Ctrl+C（比如只想复制
-                这一格的值），因为框里没有选区，浏览器什么也不复制、表格又直接早退 —— 表现就是**按 Ctrl+C 毫无反应**，
-                而且剪贴板里还留着上一次的内容（用户报的"选区选好了、Ctrl+C 没反应"，探针命中的正是这一条）。
-            */
-            if (target?.tagName === "INPUT" && hasSelectedText()) return
+            // 没有文本选区，本表又有单元格选区：才轮到表格写 TSV。
+            if (tableRef.current.getCellSelectionBounds().length === 0) return
             e.preventDefault()
             copyArea((text) => e.clipboardData?.setData("text/plain", text))
         },
-        [copyArea, isMyEvent],
+        [clearCopySource, copyArea, isMyEvent, tableRef],
     )
 
     /**

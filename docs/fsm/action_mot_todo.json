@@ -1,0 +1,1536 @@
+{
+  "updated": "2026-10-22",
+  "total": 170,
+  "rows": [
+    {
+      "char": "pl0000",
+      "mot": "3412",
+      "actionId": 2110,
+      "name": "ディレイ I",
+      "tag": "",
+      "bullet": "13",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3420",
+      "actionId": 1301,
+      "name": "アローレイン I",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3452",
+      "actionId": 1601,
+      "name": "ミゼラブルミストLv1",
+      "tag": "AB_PL0000_01",
+      "bullet": "17",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3462",
+      "actionId": 1410,
+      "name": "ヒール I 発動",
+      "tag": "",
+      "bullet": "9",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3480",
+      "actionId": 1201,
+      "name": "ディストリーム I",
+      "tag": "",
+      "bullet": "33",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "34a0",
+      "actionId": 2001,
+      "name": "レギンレイブ I",
+      "tag": "",
+      "bullet": "5",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3512",
+      "actionId": 2410,
+      "name": "ディスペル I 発動",
+      "tag": "",
+      "bullet": "29",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3562",
+      "actionId": 2210,
+      "name": "クリアオール I 発動",
+      "tag": "",
+      "bullet": "21",
+      "candidates": []
+    },
+    {
+      "char": "pl0000",
+      "mot": "3572",
+      "actionId": 2310,
+      "name": "リバイブ I 発動",
+      "tag": "",
+      "bullet": "25",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3412",
+      "actionId": 2110,
+      "name": "ディレイ I",
+      "tag": "",
+      "bullet": "13",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3420",
+      "actionId": 1301,
+      "name": "アローレイン I",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3452",
+      "actionId": 1601,
+      "name": "ミゼラブルミストLv1",
+      "tag": "AB_PL0000_01",
+      "bullet": "17",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3462",
+      "actionId": 1410,
+      "name": "ヒール I 発動",
+      "tag": "",
+      "bullet": "9",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3480",
+      "actionId": 1201,
+      "name": "ディストリーム I",
+      "tag": "",
+      "bullet": "33",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "34a0",
+      "actionId": 2001,
+      "name": "レギンレイブ I",
+      "tag": "",
+      "bullet": "5",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3512",
+      "actionId": 2410,
+      "name": "ディスペル I 発動",
+      "tag": "",
+      "bullet": "29",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3562",
+      "actionId": 2210,
+      "name": "クリアオール I 発動",
+      "tag": "",
+      "bullet": "21",
+      "candidates": []
+    },
+    {
+      "char": "pl0100",
+      "mot": "3572",
+      "actionId": 2310,
+      "name": "リバイブ I 発動",
+      "tag": "",
+      "bullet": "25",
+      "candidates": []
+    },
+    {
+      "char": "pl0200",
+      "mot": "3440",
+      "actionId": 7,
+      "name": "マイティライド",
+      "tag": "AB_PL0200_07",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3102",
+      "actionId": 200,
+      "name": "チャージショットガン",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "320a",
+      "actionId": 300,
+      "name": "空中射撃コンボ1段目",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "321a",
+      "actionId": 301,
+      "name": "空中射撃コンボ2段目",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "322a",
+      "actionId": 302,
+      "name": "空中射撃コンボ3段目",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3300",
+      "actionId": 410,
+      "name": "空中△チャージショット",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3410",
+      "actionId": 2,
+      "name": "バレットヘイル",
+      "tag": "AB_PL0300_02",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3440",
+      "actionId": 5,
+      "name": "コフィンメーカー",
+      "tag": "AB_PL0300_05",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3441",
+      "actionId": 5,
+      "name": "コフィンメーカー",
+      "tag": "AB_PL0300_05",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3442",
+      "actionId": 5,
+      "name": "コフィンメーカー",
+      "tag": "AB_PL0300_05",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3450",
+      "actionId": 8,
+      "name": "コラテラルダメージ",
+      "tag": "AB_PL0300_08",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0300",
+      "mot": "3470",
+      "actionId": 7,
+      "name": "スラッグショット",
+      "tag": "AB_PL0300_07",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3004",
+      "actionId": 100,
+      "name": "□コンボ1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3005",
+      "actionId": 100,
+      "name": "□コンボ1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3014",
+      "actionId": 110,
+      "name": "□コンボ2段目",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3015",
+      "actionId": 110,
+      "name": "□コンボ2段目",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3024",
+      "actionId": 120,
+      "name": "□コンボ3段目",
+      "tag": "",
+      "bullet": "15",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3025",
+      "actionId": 120,
+      "name": "□コンボ3段目",
+      "tag": "",
+      "bullet": "15",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3103",
+      "actionId": 210,
+      "name": "範囲魔法 Lv0",
+      "tag": "",
+      "bullet": "3",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3113",
+      "actionId": 211,
+      "name": "範囲魔法 Lv1",
+      "tag": "",
+      "bullet": "4",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3123",
+      "actionId": 212,
+      "name": "範囲魔法 Lv2",
+      "tag": "",
+      "bullet": "5",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3133",
+      "actionId": 213,
+      "name": "範囲魔法 Lv3",
+      "tag": "",
+      "bullet": "6",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3143",
+      "actionId": 214,
+      "name": "範囲魔法 Lv4",
+      "tag": "",
+      "bullet": "7",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3200",
+      "actionId": 300,
+      "name": "空中■攻撃 1段目",
+      "tag": "",
+      "bullet": "17",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3201",
+      "actionId": 301,
+      "name": "空中■攻撃 2段目",
+      "tag": "",
+      "bullet": "18",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3202",
+      "actionId": 302,
+      "name": "空中■攻撃 3段目",
+      "tag": "",
+      "bullet": "19",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3300",
+      "actionId": 410,
+      "name": "打ち下ろし攻撃",
+      "tag": "",
+      "bullet": "16",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3420",
+      "actionId": 2000,
+      "name": "【アビリティ】アイス",
+      "tag": "AB_PL0400_02",
+      "bullet": "9",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3442",
+      "actionId": 1001,
+      "name": "【アビリティ】ヒールウィンドLv0",
+      "tag": "",
+      "bullet": "20",
+      "candidates": []
+    },
+    {
+      "char": "pl0400",
+      "mot": "3472",
+      "actionId": 8200,
+      "name": "【アビリティ】ライトニング発生Lv0",
+      "tag": "",
+      "bullet": "24",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3000",
+      "actionId": 100,
+      "name": "射撃",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3001",
+      "actionId": 101,
+      "name": "射撃（2回目以降）",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3102",
+      "actionId": 200,
+      "name": "爆弾バックショット",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3110",
+      "actionId": 200,
+      "name": "爆弾バックショット",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3111",
+      "actionId": 200,
+      "name": "爆弾バックショット",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "320a",
+      "actionId": 300,
+      "name": "空中□コンボ1",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "321a",
+      "actionId": 301,
+      "name": "空中□コンボ2",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "322a",
+      "actionId": 302,
+      "name": "空中□コンボ3",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3300",
+      "actionId": 410,
+      "name": "空中△打ち下ろし",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0500",
+      "mot": "3480",
+      "actionId": 3,
+      "name": "インターセプト",
+      "tag": "AB_PL0500_03",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl0800",
+      "mot": "3420",
+      "actionId": 1200,
+      "name": "【アビリティ】ラヴィーナシュトローム",
+      "tag": "AB_PL0800_03",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0800",
+      "mot": "3421",
+      "actionId": 1200,
+      "name": "【アビリティ】ラヴィーナシュトローム",
+      "tag": "AB_PL0800_03",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl0800",
+      "mot": "3422",
+      "actionId": 1200,
+      "name": "【アビリティ】ラヴィーナシュトローム",
+      "tag": "AB_PL0800_03",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl1000",
+      "mot": "3470",
+      "actionId": 8,
+      "name": "【アビリティ】縮小版ローエン",
+      "tag": "AB_PL1000_08",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1200",
+      "mot": "3470",
+      "actionId": 1700,
+      "name": "ホーリーラダー",
+      "tag": "AB_PL1200_08",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1300",
+      "mot": "3464",
+      "actionId": 7,
+      "name": "閃空",
+      "tag": "AB_PL1300_07",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1400",
+      "mot": "31f3",
+      "actionId": 1201,
+      "name": "構え変更・コンボ1段目・源氏→神楽",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1400",
+      "mot": "31fc",
+      "actionId": 3000,
+      "name": "神楽→神楽ジャスト□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1400",
+      "mot": "3460",
+      "actionId": 4,
+      "name": "繊月(回避→斬撃飛ばし)",
+      "tag": "AB_PL1400_04",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1800",
+      "mot": "3106",
+      "actionId": 200,
+      "name": "△攻撃",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl1800",
+      "mot": "3400",
+      "actionId": 1000,
+      "name": "ミミックドール発動",
+      "tag": "AB_PL1800_01",
+      "bullet": "6",
+      "candidates": []
+    },
+    {
+      "char": "pl1900",
+      "mot": "3420",
+      "actionId": 1,
+      "name": "レギンレイヴ・レシディーヴ",
+      "tag": "AB_PL1900_01",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1900",
+      "mot": "3452",
+      "actionId": 3,
+      "name": "アトメント",
+      "tag": "AB_PL1900_03",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1900",
+      "mot": "4104",
+      "actionId": 510,
+      "name": "□コンボFin・パターン1(スーパーイド)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl1900",
+      "mot": "4105",
+      "actionId": 511,
+      "name": "□コンボFin・パターン2(スーパーイド)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3100",
+      "actionId": 200,
+      "name": "△コンボ1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3101",
+      "actionId": 200,
+      "name": "△コンボ1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3104",
+      "actionId": 200,
+      "name": "△コンボ1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3105",
+      "actionId": 200,
+      "name": "△コンボ1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3110",
+      "actionId": 202,
+      "name": "△コンボ連打1段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3114",
+      "actionId": 201,
+      "name": "△コンボ2段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3115",
+      "actionId": 201,
+      "name": "△コンボ2段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3116",
+      "actionId": 204,
+      "name": "△コンボ連打3段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3117",
+      "actionId": 205,
+      "name": "△コンボ連打4段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "3118",
+      "actionId": 206,
+      "name": "△コンボ連打5段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "311c",
+      "actionId": 226,
+      "name": "△コンボ連打1段目(△連打後)",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2000",
+      "mot": "341f",
+      "actionId": 1011,
+      "name": "レギンレイブから▲連打1段目",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2100",
+      "mot": "3462",
+      "actionId": 2600,
+      "name": "アビリティ：閃空",
+      "tag": "AB_PL2100_07",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2100",
+      "mot": "3472",
+      "actionId": 2701,
+      "name": "アビリティ：ロウ・プリズン発動",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2100",
+      "mot": "3510",
+      "actionId": 1100,
+      "name": "NPCアビリティ:遠距離",
+      "tag": "AB_PL2100_10",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2100",
+      "mot": "3672",
+      "actionId": 3701,
+      "name": "変身後アビリティ：ロウ・プリズン発動",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3000",
+      "actionId": 100,
+      "name": "X",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3001",
+      "actionId": 101,
+      "name": "XX",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3002",
+      "actionId": 102,
+      "name": "XXX",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3003",
+      "actionId": 103,
+      "name": "XXXX",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3080",
+      "actionId": 900,
+      "name": "剣神 X",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3081",
+      "actionId": 901,
+      "name": "剣神 XX",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3082",
+      "actionId": 902,
+      "name": "剣神 XXX",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3083",
+      "actionId": 903,
+      "name": "剣神 XXXX",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "311a",
+      "actionId": 140,
+      "name": "XYX",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "313a",
+      "actionId": 141,
+      "name": "XXYX",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3170",
+      "actionId": 104,
+      "name": "XXXXY",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "319a",
+      "actionId": 940,
+      "name": "剣神 XYX",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "31ba",
+      "actionId": 941,
+      "name": "剣神 XXYX",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3200",
+      "actionId": 300,
+      "name": "空中□攻撃１段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3201",
+      "actionId": 301,
+      "name": "空中□攻撃２段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3202",
+      "actionId": 302,
+      "name": "空中□攻撃３段目",
+      "tag": "",
+      "bullet": "1",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3205",
+      "actionId": 303,
+      "name": "空中フィニッシュ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3302",
+      "actionId": 410,
+      "name": "空中△落下攻撃",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2200",
+      "mot": "3a00",
+      "actionId": 400,
+      "name": "ジャンプ上昇攻撃",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "310c",
+      "actionId": 151,
+      "name": "バクステ射撃・溜めなし",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "311c",
+      "actionId": 152,
+      "name": "バクステ射撃・溜めあり",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "312c",
+      "actionId": 155,
+      "name": "□△△（バクステフィニッシュ）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "313a",
+      "actionId": 160,
+      "name": "□□△（周囲ショット）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "315a",
+      "actionId": 165,
+      "name": "□□△△（周囲フィニッシュ）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "316a",
+      "actionId": 170,
+      "name": "□□□△（単体DPS）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "318a",
+      "actionId": 175,
+      "name": "□□□△△（単体DPSフィニッシュ）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "31ba",
+      "actionId": 155,
+      "name": "□△△（バクステフィニッシュ）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "31ca",
+      "actionId": 200,
+      "name": "△（マルチロックオン）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "31da",
+      "actionId": 200,
+      "name": "△（マルチロックオン）",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3200",
+      "actionId": 300,
+      "name": "空中□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3210",
+      "actionId": 310,
+      "name": "空中□□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3220",
+      "actionId": 320,
+      "name": "空中□□□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3300",
+      "actionId": 410,
+      "name": "空中△",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3400",
+      "actionId": 1100,
+      "name": "ディプラヴィティ",
+      "tag": "AB_PL2300_02",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3420",
+      "actionId": 1200,
+      "name": "クリンチャー",
+      "tag": "AB_PL2300_03",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3432",
+      "actionId": 1510,
+      "name": "キリングレイン(発射)",
+      "tag": "AB_PL2300_06",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3440",
+      "actionId": 1400,
+      "name": "フェアタイレン",
+      "tag": "AB_PL2300_05",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3450",
+      "actionId": 1300,
+      "name": "ヴェリエンス",
+      "tag": "AB_PL2300_04",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3460",
+      "actionId": 1700,
+      "name": "二王の諍い",
+      "tag": "AB_PL2300_08",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3473",
+      "actionId": 1600,
+      "name": "ピアレス",
+      "tag": "AB_PL2300_07",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3632",
+      "actionId": 100,
+      "name": "□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3682",
+      "actionId": 110,
+      "name": "□□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2300",
+      "mot": "3732",
+      "actionId": 120,
+      "name": "□□□",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2600",
+      "mot": "3430",
+      "actionId": 4000,
+      "name": "【アビリティ02】スロウ攻撃",
+      "tag": "AB_PL2600_04",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3100",
+      "actionId": 112,
+      "name": "□ 射撃 ステップ (最終弾)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3101",
+      "actionId": 112,
+      "name": "□ 射撃 ステップ (最終弾)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3102",
+      "actionId": 112,
+      "name": "□ 射撃 ステップ (最終弾)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3103",
+      "actionId": 112,
+      "name": "□ 射撃 ステップ (最終弾)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3110",
+      "actionId": 140,
+      "name": "□ 射撃 フィニッシュ ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3111",
+      "actionId": 140,
+      "name": "□ 射撃 フィニッシュ ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3112",
+      "actionId": 140,
+      "name": "□ 射撃 フィニッシュ ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3113",
+      "actionId": 140,
+      "name": "□ 射撃 フィニッシュ ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3120",
+      "actionId": 110,
+      "name": "□ 射撃 ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3121",
+      "actionId": 110,
+      "name": "□ 射撃 ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3122",
+      "actionId": 110,
+      "name": "□ 射撃 ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3123",
+      "actionId": 110,
+      "name": "□ 射撃 ステップ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3135",
+      "actionId": 130,
+      "name": "□ 射撃 フィニッシュ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3152",
+      "actionId": 100,
+      "name": "□ チャージ",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3153",
+      "actionId": 121,
+      "name": "□ 射撃 チャージ済",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3154",
+      "actionId": 122,
+      "name": "□ 射撃 未チャージ (最終弾)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3200",
+      "actionId": 300,
+      "name": "空中□攻撃 通常",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3201",
+      "actionId": 301,
+      "name": "空中□攻撃 (最終弾)",
+      "tag": "",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3474",
+      "actionId": 1700,
+      "name": "アビ サンダー",
+      "tag": "AB_PL2700_08",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2700",
+      "mot": "3475",
+      "actionId": 1700,
+      "name": "アビ サンダー",
+      "tag": "AB_PL2700_08",
+      "bullet": "0",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3000",
+      "actionId": 100,
+      "name": "X",
+      "tag": "",
+      "bullet": "7",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3001",
+      "actionId": 101,
+      "name": "XX",
+      "tag": "",
+      "bullet": "8",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3002",
+      "actionId": 102,
+      "name": "XXX",
+      "tag": "",
+      "bullet": "9",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3003",
+      "actionId": 103,
+      "name": "踏みつけ開始",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3004",
+      "actionId": 110,
+      "name": "踏みつけループA",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3005",
+      "actionId": 111,
+      "name": "踏みつけループB",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3006",
+      "actionId": 112,
+      "name": "踏みつけループC",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3007",
+      "actionId": 113,
+      "name": "踏みつけループD",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3008",
+      "actionId": 120,
+      "name": "踏みつけ開始 空中ストンプから",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "31a0",
+      "actionId": 951,
+      "name": "デンプシーフィニッシュ2段目",
+      "tag": "",
+      "bullet": "10",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "31a1",
+      "actionId": 952,
+      "name": "デンプシーフィニッシュ3段目",
+      "tag": "",
+      "bullet": "10",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "31b2",
+      "actionId": 110,
+      "name": "踏みつけループA",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "31fc",
+      "actionId": 950,
+      "name": "デンプシーフィニッシュ",
+      "tag": "",
+      "bullet": "10",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3200",
+      "actionId": 300,
+      "name": "【空中】X",
+      "tag": "",
+      "bullet": "7",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3201",
+      "actionId": 301,
+      "name": "【空中】XX",
+      "tag": "",
+      "bullet": "8",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3202",
+      "actionId": 302,
+      "name": "【空中】XXX",
+      "tag": "",
+      "bullet": "9",
+      "candidates": []
+    },
+    {
+      "char": "pl2900",
+      "mot": "3205",
+      "actionId": 310,
+      "name": "【空中】ストンプ",
+      "tag": "",
+      "bullet": "2",
+      "candidates": []
+    }
+  ]
+}

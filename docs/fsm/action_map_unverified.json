@@ -1,0 +1,334 @@
+{
+  "updated": "2026-10-22",
+  "note": "动作级映射中未找到 Flag1 bit4 mot 的条目，待复核",
+  "entries": [
+    {
+      "char": "pl0200",
+      "actionId": 6,
+      "fsm": "sb_barrier",
+      "confidence": "medium",
+      "note": "动作名 ライトウォール（光墙）语义对应 barrier",
+      "verified": false
+    },
+    {
+      "char": "pl0200",
+      "actionId": 8,
+      "fsm": "sb_barrier_ares",
+      "confidence": "medium",
+      "note": "动作名 エメラルドシールド（盾）",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 1000,
+      "fsm": "healwind",
+      "confidence": "high",
+      "note": "动作名 ヒールウィンド詠唱 直接对应",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 5000,
+      "fsm": "areaeffect_gravity",
+      "confidence": "low",
+      "note": "动作名 魔力の渦",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 7000,
+      "fsm": "orb",
+      "confidence": "medium",
+      "note": "动作名 オーブ分岐",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 7100,
+      "fsm": "orb",
+      "confidence": "medium",
+      "note": "オーブ Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 7101,
+      "fsm": "orb",
+      "confidence": "medium",
+      "note": "オーブ Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 7102,
+      "fsm": "orb",
+      "confidence": "medium",
+      "note": "オーブ Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 7103,
+      "fsm": "orb",
+      "confidence": "medium",
+      "note": "オーブ Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 8000,
+      "fsm": "lightning",
+      "confidence": "high",
+      "note": "动作名 ライトニング",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 8100,
+      "fsm": "lightning",
+      "confidence": "medium",
+      "note": "ライトニング詠唱 Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 8101,
+      "fsm": "lightning",
+      "confidence": "medium",
+      "note": "ライトニング詠唱 Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 8102,
+      "fsm": "lightning",
+      "confidence": "medium",
+      "note": "ライトニング詠唱 Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0400",
+      "actionId": 8103,
+      "fsm": "lightning",
+      "confidence": "medium",
+      "note": "ライトニング詠唱 Lv 变体",
+      "verified": false
+    },
+    {
+      "char": "pl0600",
+      "actionId": 2,
+      "fsm": "tycoon_lv1|tycoon_lv2|tycoon_lv3|tycoon_lv4",
+      "confidence": "medium",
+      "note": "动作名 タイクーン，等级变体",
+      "verified": false
+    },
+    {
+      "char": "pl0600",
+      "actionId": 4,
+      "fsm": "rose_finish",
+      "confidence": "low",
+      "note": "动作名 スパイラルローズ，玫瑰系 FSM",
+      "verified": false
+    },
+    {
+      "char": "pl0600",
+      "actionId": 6,
+      "fsm": "lostlove_bomb_lv1|lostlove_bomb_lv2|lostlove_bomb_lv3|lostlove_bomb_lv4",
+      "confidence": "medium",
+      "note": "动作名 ロスト・ラヴ，等级变体",
+      "verified": false
+    },
+    {
+      "char": "pl0600",
+      "actionId": 8,
+      "fsm": "bouquet_lv1|bouquet_lv2|bouquet_lv3|bouquet_lv4",
+      "confidence": "medium",
+      "note": "动作名 ブーケ，等级取 lv1..lv4",
+      "verified": false
+    },
+    {
+      "char": "pl0700",
+      "actionId": 1300,
+      "fsm": "benediction",
+      "confidence": "medium",
+      "note": "罗马字匹配 0.70",
+      "verified": false
+    },
+    {
+      "char": "pl1800",
+      "actionId": 1100,
+      "fsm": "mehen",
+      "confidence": "medium",
+      "note": "动作名 メヘン詠唱 罗马字匹配 mehen",
+      "verified": false
+    },
+    {
+      "char": "pl1800",
+      "actionId": 1300,
+      "fsm": "barrier",
+      "confidence": "low",
+      "note": "动作名 リーンフォース（强化）语义对应 barrier",
+      "verified": false
+    },
+    {
+      "char": "pl1800",
+      "actionId": 1400,
+      "fsm": "disraption",
+      "confidence": "medium",
+      "note": "动作名 ディスラプション詠唱 罗马字匹配 disraption",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 2000,
+      "fsm": "areaeffect_heal",
+      "confidence": "high",
+      "note": "动作名 アビリティ：回復",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 2100,
+      "fsm": "charge",
+      "confidence": "medium",
+      "note": "动作名 アビリティ：突進，FSM charge 存在",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 2400,
+      "fsm": "explosion",
+      "confidence": "medium",
+      "note": "动作名 単発高火力 → explosion",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 3000,
+      "fsm": "areaeffect_heal_powup",
+      "confidence": "medium",
+      "note": "変身後アビリティ：回復",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 3100,
+      "fsm": "charge",
+      "confidence": "medium",
+      "note": "変身後アビリティ：突進",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 3400,
+      "fsm": "explosion",
+      "confidence": "medium",
+      "note": "変身後アビリティ：高火力",
+      "verified": false
+    },
+    {
+      "char": "pl2100",
+      "actionId": 3700,
+      "fsm": "areaeffect_barrier_powup",
+      "confidence": "low",
+      "note": "変身後アビリティ：ロウ・プリズン",
+      "verified": false
+    },
+    {
+      "char": "pl2200",
+      "actionId": 2110,
+      "fsm": "ability02_god|ability02_enhanced",
+      "confidence": "high",
+      "note": "bulletType 2 分支",
+      "verified": false
+    },
+    {
+      "char": "pl2300",
+      "actionId": 1500,
+      "fsm": "ab_arrow_area",
+      "confidence": "medium",
+      "note": "キリングレイン（箭雨）",
+      "verified": false
+    },
+    {
+      "char": "pl2400",
+      "actionId": 1500,
+      "fsm": "ability4_2",
+      "confidence": "medium",
+      "note": "AB_05 按 ability4_x 顺序",
+      "verified": false
+    },
+    {
+      "char": "pl2400",
+      "actionId": 1600,
+      "fsm": "ability4_3",
+      "confidence": "medium",
+      "note": "AB_06 按 ability4_x 顺序",
+      "verified": false
+    },
+    {
+      "char": "pl2400",
+      "actionId": 1700,
+      "fsm": "ability4_4",
+      "confidence": "medium",
+      "note": "AB_07 按 ability4_x 顺序",
+      "verified": false
+    },
+    {
+      "char": "pl2400",
+      "actionId": 1800,
+      "fsm": "kibagiri",
+      "confidence": "medium",
+      "note": "动作名 鎧散牙（牙）语义对应 kibagiri",
+      "verified": false
+    },
+    {
+      "char": "pl2500",
+      "actionId": 1400,
+      "fsm": "areaeffect_guard",
+      "confidence": "medium",
+      "note": "动作名 移動式ランパート（开始）语义对应 guard",
+      "verified": false
+    },
+    {
+      "char": "pl2500",
+      "actionId": 1401,
+      "fsm": "areaeffect_guard",
+      "confidence": "low",
+      "note": "移動式ランパート(终了)",
+      "verified": false
+    },
+    {
+      "char": "pl2500",
+      "actionId": 1600,
+      "fsm": "areaeffect_guard",
+      "confidence": "medium",
+      "note": "动作名 アビリティ バリア 语义对应 guard",
+      "verified": false
+    },
+    {
+      "char": "pl2800",
+      "actionId": 5000,
+      "fsm": "ability05_fireball",
+      "confidence": "medium",
+      "note": "abilityTag AB_PL2800_05 与 FSM 名同号",
+      "verified": false
+    },
+    {
+      "char": "pl2900",
+      "actionId": 5000,
+      "fsm": "ability05",
+      "confidence": "medium",
+      "note": "abilityTag AB_PL2900_05 与 FSM 名同号",
+      "verified": false
+    },
+    {
+      "char": "pl2900",
+      "actionId": 8000,
+      "fsm": "ability08",
+      "confidence": "medium",
+      "note": "abilityTag AB_PL2900_08 与 FSM 名同号",
+      "verified": false
+    }
+  ]
+}

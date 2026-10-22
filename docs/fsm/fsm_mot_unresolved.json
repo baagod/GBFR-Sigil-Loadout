@@ -1,0 +1,2413 @@
+{
+  "count": 301,
+  "rows": [
+    {
+      "char": "pl0000",
+      "fsm": "allowrainlv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "allowrainlv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "allowrainlv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "allowrainlv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_clearall_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_clearall_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_clearall_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_clearall_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_delay_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_delay_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_delay_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_delay_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_dispel_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_dispel_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_dispel_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_dispel_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_gravity",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_misera_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_misera_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_misera_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_misera_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_revive_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_revive_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_revive_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "areaeffect_revive_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "destream_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "destream_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "destream_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "destream_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "dispel_fsm_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "dispel_fsm_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "dispel_fsm_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "dispel_fsm_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_barrier_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_barrier_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_barrier_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_barrier_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "heal_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0000",
+      "fsm": "regin_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0000",
+      "fsm": "regin_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0000",
+      "fsm": "regin_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0000",
+      "fsm": "regin_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0000",
+      "fsm": "regin_tutorial",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0100",
+      "fsm": "allowrainlv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "allowrainlv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "allowrainlv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "allowrainlv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_clearall_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_clearall_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_clearall_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_clearall_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_delay_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_delay_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_delay_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_delay_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_dispel_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_dispel_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_dispel_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_dispel_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_gravity",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_misera",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_misera_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_misera_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_misera_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_misera_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_revive_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_revive_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_revive_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "areaeffect_revive_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "destream_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "destream_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "destream_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "destream_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "dispel_fsm_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "dispel_fsm_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "dispel_fsm_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "dispel_fsm_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_barrier_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_barrier_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_barrier_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_barrier_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "heal_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0100",
+      "fsm": "regin_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0100",
+      "fsm": "regin_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0100",
+      "fsm": "regin_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0100",
+      "fsm": "regin_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0100",
+      "fsm": "regin_tutorial",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [2000, 2001, 2002]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot_ares",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [240, 241, 242]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot_ares_sub",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [240, 241, 242]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot_ares_sub1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [240, 241, 242]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot_ares_sub2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [240, 241, 242]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot_ares_sub3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [240, 241, 242]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "abilityshot_ares_sub4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [240, 241, 242]，不唯一"
+    },
+    {
+      "char": "pl0200",
+      "fsm": "fallaresshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "air_pow_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "charge_lv_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "charge_lv_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "charge_lv_3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "charge_lv_4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "charge_lv_max",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "chargemaxshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "chargeshot_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "chargeshot_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "chargeshot_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "chargeshot_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "collateral",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "just_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "just_shot_double",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "just_shot_first",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "just_shot_first_double",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "justshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "justshot_double",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "link_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "linkshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "melee_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0300",
+      "fsm": "special_arts",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "area_heal",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "areaeffect_burn",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "areaeffect_gravity",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "areaeffect_large_fastcast",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "areatest",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "baseareaattack",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "explosion",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "fastmoveattack",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "homing",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "meteorite",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "meteorite_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "meteorite_powerup",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "meteorite_powerup_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0400",
+      "fsm": "specialartsstartshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "ab_air_bomb",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "ab_back_step_bomb_just_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "ab_back_step_bomb_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "ab_charge_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "ab_charge_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "ab_charge_max",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "aimshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "aimshot_charge",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "aimshot_charge_skillboard",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "area_small_bomb_dispel",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "bombshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "link_atk_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0500",
+      "fsm": "tst_goto_folka",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0600",
+      "fsm": "link_attack",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0600",
+      "fsm": "lostlove_bomb_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0600",
+      "fsm": "lostlove_bomb_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0600",
+      "fsm": "lostlove_bomb_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0600",
+      "fsm": "lostlove_bomb_lv4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0600",
+      "fsm": "tst_goto_folka",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0700",
+      "fsm": "areaeffect_slow",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0700",
+      "fsm": "benediction",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0700",
+      "fsm": "dispel",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0800",
+      "fsm": "vogen",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0800",
+      "fsm": "vogen_loop_a",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl0800",
+      "fsm": "vogen_loop_b",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1000",
+      "fsm": "ab_atk_hit_bomb",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1000",
+      "fsm": "ab_atk_short_cyclon",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1000",
+      "fsm": "burn_sb_sp200",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1000",
+      "fsm": "cyclon",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1200",
+      "fsm": "ability_jump_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1200",
+      "fsm": "ability_jump_shot_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1200",
+      "fsm": "ability_jump_shot_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1200",
+      "fsm": "ability_jump_shot_3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1300",
+      "fsm": "ab_just_combo_shot_lv0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1300",
+      "fsm": "ab_just_combo_shot_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1300",
+      "fsm": "ab_just_combo_shot_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1300",
+      "fsm": "ab_just_combo_shot_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1300",
+      "fsm": "sparts_bonus_damage",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_charge_lasthit_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_charge_lasthit_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_charge_lasthit_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_0_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_1_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_2_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_2_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_3_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_3_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_3_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_4",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_4_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_4_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_4_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_5",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_5_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_5_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_5_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_6",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_6_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_6_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "ab_step_shot_6_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "genzi_just_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "genzi_slash",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "genzi_slash_last",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "genzi_slash_last_full_charge",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "justshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1400",
+      "fsm": "slip_damage_area",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1600",
+      "fsm": "areaeffect_dispel",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1800",
+      "fsm": "collapse_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1800",
+      "fsm": "collapse_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1800",
+      "fsm": "collapse_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1800",
+      "fsm": "spare_body",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "7st_od_interrupt",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "chargeshot_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "chargeshot_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "chargeshot_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "counter_burst_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "counter_burst_lv1_super",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "counter_burst_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "counter_burst_lv2_super",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "counter_burst_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "counter_burst_lv3_super",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl1900",
+      "fsm": "regin_super",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": "候选动作 [1, 10]，不唯一"
+    },
+    {
+      "char": "pl1900",
+      "fsm": "super_finish_fire",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "beam",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "beam_bomb",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "beam_bomb_ms101",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "beam_ms101",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "finish_beam",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "finish_beam_edge",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "horming",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "horming_fullcharge",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "horming_no_target",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "horming_no_target_fullcharge",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2000",
+      "fsm": "singleshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "areaeffect_heal",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "areaeffect_heal_powup",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "areaeffect_weakelement",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "areaeffect_weakelement_transform",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "battlewait",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "emattackjack",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "explosion",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "link_fin_npc",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "paradise_lost_offset",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "slash",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "slash_npc",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "slash_step",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "straight_shot_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "straight_shot_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2100",
+      "fsm": "straight_shot_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2200",
+      "fsm": "kentaku_01",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2200",
+      "fsm": "kentaku_02",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2200",
+      "fsm": "kentaku_03",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2200",
+      "fsm": "sparts_max",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "ab_arrow_area",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "ab_arrow_area_plus",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "link_attack",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "multilock_lv0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "multilock_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "multilock_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "multilock_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "unique_skill_debuff_atkdown",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "unique_skill_debuff_burn",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "unique_skill_debuff_defdown",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2300",
+      "fsm": "unique_skill_debuff_poison",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2400",
+      "fsm": "kibagiri",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "addshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "areaeffect_tornado",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "chandelier_shot_lv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "chandelier_shot_lv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "chandelier_shot_lv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "gun_shot_normal",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "neutral_shot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "neutral_shot_horming",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "neutral_shot_horming_0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "neutral_shot_horming_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "neutral_shot_horming_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "rainshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2500",
+      "fsm": "turnshot",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_1_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_2_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_2_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_3_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_3_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_4_1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2600",
+      "fsm": "accelfinish_4_2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_diffusionchain",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_diffusionself",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_markingexplosion",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_markingexplosioncausing",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_satellite",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_satellitefinishlv0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_satellitefinishlv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_satellitefinishlv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_satellitefinishlv3",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_wideshotlv0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_wideshotlv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_wideshotlv2",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_wideshotrootlv0",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2700",
+      "fsm": "ability_wideshotrootlv1",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    },
+    {
+      "char": "pl2800",
+      "fsm": "areaeffect_debuff_area",
+      "mots": [],
+      "actions": [],
+      "status": "unresolved",
+      "note": ""
+    }
+  ]
+}
