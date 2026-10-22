@@ -3,6 +3,7 @@ import type {SortingState} from "@tanstack/react-table"
 
 import type {TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
 import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
+import {attackColumnLabel} from "@/lib/attackfields"
 import type {Messages} from "@/lib/messages"
 import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
 import {InfoBadge} from "@/components/InfoBadge"
@@ -106,7 +107,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
         调用方从此不必再为它挑组件。
     */
     const isFlags = table.kind === "flags"
-    const columnSpec = useMemo(() => (isFlags ? columnOf(t) : undefined), [isFlags, t])
+    const columnSpec = useMemo(() => (isFlags ? columnOf(t) : attackColumnOf(t)), [isFlags, t])
     return (
         <ActionsTable
             t={t}
@@ -210,6 +211,17 @@ const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
         return {label: t.colEffects, readonly: true, width: 400, render: (row) => <FlagEffects row={row} />}
     // `startTime` / `endTime` 的表头文案不在这里 —— 那是**所有表通用**的一条，基座兜底（`model.columnLabel`）。
     return undefined
+}
+
+/**
+ * Attack 轨的**columnSpec**：只把表头换成译名（`lib/attackfields.ts` 那张映射），别的口径与通用轨一样
+ * （可编辑、列宽、选区都不特殊）。认不出的列名返回 undefined —— 表头退回字段名，不编名字。
+ *
+ * 其余轨（effect / speed）没有这一层：列名就是字段名，原样上屏。
+ */
+const attackColumnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
+    const label = attackColumnLabel(key, t)
+    return label === undefined ? undefined : {label}
 }
 
 /**
