@@ -16,6 +16,9 @@ var toolHidden atomic.Bool
 // mod 只在游戏是前台窗口时响应热键，没有这一步，下一次按 F1 就被忽略。
 var returnFocusTo atomic.Uintptr
 
+// minimiseTarget 是"正常最小化之后焦点该交给谁"（缩之前按 Z 序算好）。wmAfterMinimise 那一拍取走。
+var minimiseTarget atomic.Uintptr
+
 // quitting 由关机流程置位（见 main.go 的 OnShutdown）。Wails 的 cleanup() 会挨个 window.Close() →
 // WM_CLOSE；照常答"已处理"的话框架的干净收尾永远不跑，改成假隐藏（顺带在退出时抢游戏前台 + 注入点击）。
 var quitting atomic.Bool
@@ -55,14 +58,7 @@ func hideNow(hwnd uintptr) {
 			// ( 游戏内实测 )。判据就是"焦点真的交回给了游戏"：target 由 Z 序兜底找来也一样，
 			// 注入本来只可能打进游戏，而游戏接下来必定吞掉第一击。
 			if ret != 0 && isGameWindow(target) {
-				go func() {
-					// 先给游戏一点时间处理焦点变化，然后按住这么久：轮询会漏掉零长度的点击，1ms 又太短。
-					time.Sleep(20 * time.Millisecond)
-					debugf("  replay cursor-hiding click (hold)")
-					procMouseEvent.Call(mouseeventfLeftDown, 0, 0, 0, 0)
-					time.Sleep(20 * time.Millisecond)
-					procMouseEvent.Call(mouseeventfLeftUp, 0, 0, 0, 0)
-				}()
+				replayCursorHidingClick()
 			}
 		} else {
 			debugf("  target %d is not a window", target)
@@ -71,6 +67,20 @@ func hideNow(hwnd uintptr) {
 	ret, _, _ := procEnableWindow.Call(hwnd, 0)
 	debugf("  EnableWindow ret=%d", ret)
 	toolHidden.Store(true)
+}
+
+// replayCursorHidingClick 重放游戏自己那记"首击隐藏光标"的点击：游戏只在鼠标按下时才隐藏光标，
+// 所以焦点交回去之后必须补一记点击，否则指针一直留在游戏里。按下/松开各 20ms：轮询会漏掉零长度
+// 的点击，1ms 又太短（游戏内实测）。
+func replayCursorHidingClick() {
+	go func() {
+		// 先给游戏一点时间处理焦点变化。
+		time.Sleep(20 * time.Millisecond)
+		debugf("  replay cursor-hiding click (hold)")
+		procMouseEvent.Call(mouseeventfLeftDown, 0, 0, 0, 0)
+		time.Sleep(20 * time.Millisecond)
+		procMouseEvent.Call(mouseeventfLeftUp, 0, 0, 0, 0)
+	}()
 }
 
 func revealTool(hwnd uintptr) {
@@ -151,13 +161,40 @@ func HandleMsg(w *application.WebviewWindow, hwnd uintptr, msg uint32, wparam, _
 		fakeHide(hwnd)
 		return 0, true
 	case 0x0112: // WM_SYSCOMMAND：最小化按钮走这条路，不是 WM_CLOSE
-		// 让它和 X 一样假隐藏。真最小化不经过 hideNow，那记"让游戏把光标收起来"的点击就不会重放，
-		// 焦点也不是明确交回去的 —— 所以最小化之后指针留在游戏里（实测）。低 4 位是系统用的，掩掉。
+		// 最小化**不做处理**：正常缩到任务栏（Windows 自己会把前台交给 Z 序的下一个窗口，通常就是
+		// 游戏）。这里只记下"缩下去之后焦点该交给谁"，并把收尾排到默认处理之后（wmAfterMinimise）。
+		// ⚠️ 必须 return false：吞掉的话窗口根本不会缩下去。
 		if wparam&0xfff0 == 0xf020 { // SC_MINIMIZE
 			debugf("WM_SYSCOMMAND SC_MINIMIZE hwnd=%d", hwnd)
-			fakeHide(hwnd)
+			minimiseTarget.Store(nextForegroundWindow(hwnd))
+			procPostMessageW.Call(hwnd, wmAfterMinimise, 0, 0)
+			return 0, false
+		}
+	case wmAfterMinimise:
+		// 正常最小化已经跑完。只剩两件事：焦点交回游戏、补一记"让游戏收起光标"的点击。
+		target := minimiseTarget.Swap(0)
+		debugf("wmAfterMinimise target=%d fg=%d", target, foregroundWindow())
+		if target == 0 || target == hwnd || isOwnWindow(target) {
 			return 0, true
 		}
+		if ok, _, _ := procIsWindow.Call(target); ok == 0 {
+			return 0, true
+		}
+		// 只在目标是游戏时接手：最小化本来就该把前台交给 Z 序的下一个窗口，目标不是游戏就
+		// 保留系统的处理结果，别去抢别的程序的前台。
+		if !isGameWindow(target) {
+			debugf("wmAfterMinimise target=%d 不是游戏，交给系统默认结果", target)
+			return 0, true
+		}
+		if foregroundWindow() != target {
+			ret, _, _ := procSetForegroundWindow.Call(target)
+			debugf("wmAfterMinimise setfg target=%d ret=%d", target, ret)
+			if ret == 0 {
+				return 0, true
+			}
+		}
+		replayCursorHidingClick()
+		return 0, true
 	case wmFakeHide:
 		hideNow(hwnd)
 		return 0, true

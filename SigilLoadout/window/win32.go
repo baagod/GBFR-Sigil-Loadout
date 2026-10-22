@@ -33,6 +33,9 @@ const wmActivate = 0x8010
 // 由游戏内热键 post 的开关命令：工具可见就收、不可见就呼出（状态在 windowstate.go 的 toolHidden）。
 const wmToggle = 0x8012
 
+// wmAfterMinimise 是"已经正常最小化到任务栏"之后的那一拍：默认处理跑完再来收焦点与光标。
+const wmAfterMinimise = 0x8013
+
 const gwHwndNext = 2
 
 // 用来重放游戏自己那记「首击隐藏光标」的 mouse_event flags。
