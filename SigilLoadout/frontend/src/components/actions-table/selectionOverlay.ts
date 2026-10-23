@@ -144,7 +144,7 @@ const RING_WIDTH = 3
 const emptyLayer = (): LayerModel => ({fill: [], ring: [], copy: [], rowHead: []})
 
 /** 一段选区按钉住列边界切成 1~2 段；切开处不是选区边界，那条竖边不画。
- * `hideRight`：整行选区（覆盖 0..最后一列）不画右边缘 —— 用户口径：末列没有格线，画了像表外多一道竖线。 */
+ * `hideRight`：整行选区（覆盖 0..最后一列）不画右边缘 —— 末列没有格线，画了像表外多一道竖线。 */
 function splitByPinned(bounds: Bounds, geo: GeometryInput, hideRight = false): {rect: Rect; edges: Edges; pinned: boolean}[] {
     const {minColumnIndex: minC, maxColumnIndex: maxC} = bounds
     const pinnedEnd = geo.pinnedColumnCount - 1
@@ -321,13 +321,15 @@ export function buildOverlay(input: {
 
     for (const area of copyAreas) {
         const pinnedEnd = geo.pinnedColumnCount - 1
+        /* 与实线选区同口径：整行复制区（覆盖 0..最后一列）不画右边缘。 */
+        const hideRight = area.minColumnIndex === 0 && area.maxColumnIndex === lastColumnIndex
         for (let rowIndex = area.minRowIndex; rowIndex <= area.maxRowIndex; rowIndex++) {
             for (let columnIndex = area.minColumnIndex; columnIndex <= area.maxColumnIndex; columnIndex++) {
                 const edges: Edges = {
                     top: rowIndex === area.minRowIndex,
                     bottom: rowIndex === area.maxRowIndex,
                     left: columnIndex === area.minColumnIndex,
-                    right: columnIndex === area.maxColumnIndex,
+                    right: columnIndex === area.maxColumnIndex && !hideRight,
                 }
                 if (!edges.top && !edges.bottom && !edges.left && !edges.right) continue
                 const rect: Rect = {

@@ -275,9 +275,10 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
 
     /*
         复制区跨钉住列：虚线按钉住边界切成两段，各自进自己的层（与选区轮廓同一条切法）。
-        pinned 段是 0、1 列，scrolled 段是 2、3 列；横边只在首/尾行，竖边只在首/尾列。
+        pinned 段是 0、1 列，scrolled 段是 2、3 列；横边只在首/尾行，竖边只在首列
+        （整行复制区覆盖到最后一列 → 末列不画右边，与实线选区同口径）。
     */
-    it("复制源跨钉住列：切两段各进各自层，横边只在首/尾行、竖边只在首/尾列", () => {
+    it("复制源跨钉住列：切两段各进各自层，横边只在首/尾行、竖边只在首列", () => {
         const model = buildOverlay({
             bounds: [],
             geo: geo(),
@@ -287,15 +288,15 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
 
         /** 盒子的左上角，排序后比较：不依赖遍历顺序。 */
         const corners = (cells: {left: number; top: number}[]) => cells.map((c) => `${c.left},${c.top}`).sort()
-        // 4 列 × 3 行，内部 (1,1)/(1,2) 两格没有边 → 每层各 5 个盒子。
+        // 4 列 × 3 行：pinned 段内部 (1,1) 没有边 → 5 个盒子；scrolled 段内部 (1,2) 与末列中行都没有边 → 4 个。
         expect(corners(model.pinned.copy)).toEqual(["40,41", "40,68", "40,95", "80,41", "80,95"])
-        expect(corners(model.scrolled.copy)).toEqual(["140,41", "140,95", "200,41", "200,68", "200,95"])
+        expect(corners(model.scrolled.copy)).toEqual(["140,41", "140,95", "200,41", "200,95"])
 
         const all = [...model.pinned.copy, ...model.scrolled.copy]
         expect(all.filter((c) => c.edges.top)).toHaveLength(4) // 首行 4 列
         expect(all.filter((c) => c.edges.bottom)).toHaveLength(4) // 尾行 4 列
         expect(all.filter((c) => c.edges.left)).toHaveLength(3) // 首列 3 行
-        expect(all.filter((c) => c.edges.right)).toHaveLength(3) // 尾列 3 行
+        expect(all.filter((c) => c.edges.right)).toHaveLength(0) // 整行复制区不画右边
         for (const cell of all) {
             if (cell.edges.top) expect(cell.top).toBe(41)
             if (cell.edges.bottom) expect(cell.top).toBe(41 + 2 * 27)
