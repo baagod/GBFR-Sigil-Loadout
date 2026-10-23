@@ -380,7 +380,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 pr-2 是滚动条与表格之间的 8px，在预留位**内侧**，所以那点间距不受影响。 */}
             <div className="min-h-0 flex-1 overflow-auto pr-2 scrollbar-gutter-stable">
                 {loaded && infos.length === 0 && (
-                    <p className="text-xs text-muted-foreground">{t.trackNone}</p>
+                    <p className="text-sm text-muted-foreground">{t.trackNone}</p>
                 )}
                 {/* 三条轨（flags/effect/attack…）：常开、直接铺开，右侧没有折叠箭头。
                     整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}

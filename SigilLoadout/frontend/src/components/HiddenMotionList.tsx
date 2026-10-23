@@ -74,7 +74,7 @@ export function HiddenMotionList({t, charCode, onOpen}: {
                     </div>
                 )
             )}
-            {list.length === 0 && <p className="p-2 text-xs text-muted-foreground">{t.trackNone}</p>}
+            {list.length === 0 && <p className="p-2 text-sm text-muted-foreground">{t.trackNone}</p>}
         </div>
     )
 }

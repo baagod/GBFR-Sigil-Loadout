@@ -90,7 +90,7 @@ const zh = {
     /** 组标题。「技能」那一组直接复用 hmRangeSkill。 */
     hmGroupOther: "其他",
     // 动画详情页
-    trackNone: "这个动画没有轨文件",
+    trackNone: "该动画无轨文件",
     saveFailedText: (detail: string) => `保存失败：${detail}`,
     colConfig: "配置",
     colStart: "开始",
@@ -178,7 +178,7 @@ const zh = {
         flags 的 `startTime` 不是同一批键，所以不放进 model.ts 的 PLAIN_COLUMNS（见 lib/attackfields.ts）。
         含义、取值与把握度见 docs/action/Attack轨字段含义.md；没搞清的按英文字面翻，不编更具体的说法。
     */
-    colAtkLayerFlag: "层",
+    colAtkLayerFlag: "层标志",
     colAtkSeqFlag: "序列",
     colAtkNo: "编号",
     colAtkShape: "形状",
@@ -186,10 +186,10 @@ const zh = {
     colAtkPower: "威力",
     colAtkPartsNo: "部位编号",
     colAtkOffset: "偏移",
-    colAtkRot: "旋转",
+    colAtkRot: "旋转（弧度）",
     colAtkSize: "尺寸",
     colAtkAttackRate: "伤害倍率",
-    colAtkBreakRate: "眩晕倍率",
+    colAtkBreakRate: "昏厥倍率",
     colAtkSpArtsRate: "奥义槽倍率",
     colAtkHitStop: "命中停顿",
     colAtkAbilityGage: "技能槽增加",
@@ -341,7 +341,7 @@ export const messages: Record<Lang, Messages> = {
         colFrame: "Frame",
         colEffects: "Effects",
         // Attack track header labels (column names are XML attributes such as `StartTime`). See lib/attackfields.ts.
-        colAtkLayerFlag: "Layer",
+        colAtkLayerFlag: "Layer Flag",
         colAtkSeqFlag: "Sequence",
         colAtkNo: "No.",
         colAtkShape: "Shape",
@@ -349,7 +349,7 @@ export const messages: Record<Lang, Messages> = {
         colAtkPower: "Power",
         colAtkPartsNo: "Parts No.",
         colAtkOffset: "Offset",
-        colAtkRot: "Rotation",
+        colAtkRot: "Rotation (rad)",
         colAtkSize: "Size",
         colAtkAttackRate: "Attack Rate",
         colAtkBreakRate: "Stun Rate",
@@ -497,7 +497,7 @@ export const messages: Record<Lang, Messages> = {
         colFrame: "フレーム",
         colEffects: "効果",
         // Attack トラックの見出し（列名は `StartTime` のような XML 属性名）。lib/attackfields.ts を参照。
-        colAtkLayerFlag: "レイヤー",
+        colAtkLayerFlag: "レイヤーフラグ",
         colAtkSeqFlag: "シーケンス",
         colAtkNo: "番号",
         colAtkShape: "形状",
@@ -505,7 +505,7 @@ export const messages: Record<Lang, Messages> = {
         colAtkPower: "威力",
         colAtkPartsNo: "部位番号",
         colAtkOffset: "オフセット",
-        colAtkRot: "回転",
+        colAtkRot: "回転（ラジアン）",
         colAtkSize: "サイズ",
         colAtkAttackRate: "攻撃倍率",
         colAtkBreakRate: "スタン倍率",
@@ -653,7 +653,7 @@ export const messages: Record<Lang, Messages> = {
         colFrame: "프레임",
         colEffects: "효과",
         // Attack 트랙 머리글（열 이름은 `StartTime` 같은 XML 속성명）. lib/attackfields.ts 참조.
-        colAtkLayerFlag: "레이어",
+        colAtkLayerFlag: "레이어 플래그",
         colAtkSeqFlag: "시퀀스",
         colAtkNo: "번호",
         colAtkShape: "형상",
@@ -661,7 +661,7 @@ export const messages: Record<Lang, Messages> = {
         colAtkPower: "위력",
         colAtkPartsNo: "부위 번호",
         colAtkOffset: "오프셋",
-        colAtkRot: "회전",
+        colAtkRot: "회전(라디안)",
         colAtkSize: "크기",
         colAtkAttackRate: "공격 배율",
         colAtkBreakRate: "스턴 배율",
