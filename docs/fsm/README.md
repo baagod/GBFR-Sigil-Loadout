@@ -2,16 +2,14 @@
 
 只有 **三条证据齐全** 的才写成 `fsm → mot`：
 
-1. exe 里该动作/分支确实加载这个 FSM；
-2. 该动作的 `saveMotIdXX_` 包含这个 mot；
+1. exe 里该动作、分支确实加载这个 FSM；
+2. 该角色的 `saveMotId*_`、`通用 mot` 包含这个 mot；
 3. 该 mot 的 flags 有 `Flag1 & 16`。
-
-其余 FSM 只列名字，表示 **未确认**，不猜。
 
 只列有 `plXXXX_action.msg` 的玩家目录；`pl0001` / `pl0101` / `pl8000` 没有动作表，已排除。
 
 - FSM 总数：744
-- 已确认 FSM→mot：35
+- 已确认 FSM → mot：35
 
 ---
 

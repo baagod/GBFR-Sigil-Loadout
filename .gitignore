@@ -15,7 +15,6 @@ dist/
 # 条目名就是部署路径，由 gen 的 data 子命令产出）。少了它，别人装上去每个角色的轨与动作表都读不到
 # ——而作者本机有解包目录兜底，看不出来。
 !SigilLoadout/assets/data.zip
-/docs/action/
 
 # 构建中间产物：专属表由 gen 的 exclusive 子命令生成，vcxproj 每次编译前重跑它
 GBFR.SigilLoadout.Native/src/exclusive_table.inc
@@ -28,3 +27,6 @@ openwiki/.run.json
 
 # cdp-probe.mjs / selection 截图这类探针产物（源文件 cdp.mjs / cdp-probe.mjs 入库）
 tools/debug/*.png
+
+# JVM 崩溃日志（工具链产物，不入库）
+hs_err_pid*.log

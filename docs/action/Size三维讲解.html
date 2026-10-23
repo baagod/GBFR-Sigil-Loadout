@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Size 三维讲解 · 0.7 / 4 / 2.5</title>
+<style>
+  :root{
+    --ink:#171a21; --sub:#5b6472; --line:#e8edf5; --card:#ffffff;
+    --accent:#3b6fe0; --x:#d64545; --y:#2e8b57; --z:#2f6fd0;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:var(--ink);
+    background:
+      radial-gradient(1100px 700px at 12% -12%, #eef4ff 0%, rgba(238,244,255,0) 62%),
+      radial-gradient(900px 600px at 102% -4%, #f3f0ff 0%, rgba(243,240,255,0) 58%),
+      linear-gradient(180deg,#f8fafd 0%, #edf2f8 100%);
+  }
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 392px;grid-template-rows:100%;height:100%;overflow:hidden}
+  .stage{position:relative;min-width:0;min-height:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  canvas.drag{cursor:grabbing}
+  .ver{position:absolute;right:14px;top:12px;font-size:11px;color:#a6aebc;letter-spacing:.06em}
+  .pad{position:absolute;right:16px;bottom:52px;display:grid;grid-template-columns:repeat(3,34px);gap:6px}
+  .pad button{padding:0;height:34px;font-size:15px;line-height:1;border-radius:9px;background:rgba(255,255,255,.85);backdrop-filter:blur(6px)}  .hint{
+    position:absolute;left:18px;bottom:16px;font-size:12.5px;color:#7b8494;
+    background:rgba(255,255,255,.72);backdrop-filter:blur(6px);
+    border:1px solid rgba(232,237,245,.95);padding:6px 12px;border-radius:999px;
+    box-shadow:0 6px 18px -12px rgba(16,24,40,.35);
+  }
+  aside{
+    min-height:0;
+    border-left:1px solid var(--line);background:rgba(255,255,255,.66);
+    backdrop-filter:blur(12px);overflow:auto;padding:18px 18px 26px;
+  }
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 28px -22px rgba(16,24,40,.45);
+    padding:14px 14px 16px;margin-bottom:14px;
+  }
+  h1{font-size:17px;margin:2px 2px 6px;letter-spacing:.2px}
+  .lede{font-size:12.5px;line-height:1.7;color:var(--sub);margin:0 4px 14px}
+  h2{font-size:11.5px;font-weight:600;color:#8a93a3;letter-spacing:.1em;margin:0 0 8px}
+  .row{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin:12px 0 4px}
+  .row .name{display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .pill{
+    font-variant-numeric:tabular-nums;font-size:12px;color:#495265;
+    background:#f3f6fb;border:1px solid #e7ecf5;border-radius:7px;padding:1px 7px;
+  }
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:99px;background:#e7ecf5}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:15px;height:15px;margin-top:-5.5px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);box-shadow:0 1px 5px rgba(59,111,224,.4);
+  }
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button{
+    font:inherit;font-size:12.5px;color:#3c4557;background:#fff;border:1px solid #e2e8f2;
+    border-radius:9px;padding:7px 11px;cursor:pointer;transition:.15s;
+  }
+  button:hover{background:#f5f8fd;border-color:#cdd8ea}
+  button.on{background:#edf3ff;border-color:#b9ccf4;color:#25508f}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--sub);margin-top:12px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .eq{font-size:12.5px;line-height:1.8;color:var(--sub);margin:2px 4px 0}
+  .eq b{color:var(--ink);font-weight:600}
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr;grid-template-rows:minmax(320px,1fr) auto}
+    aside{border-left:0;border-top:1px solid var(--line);max-height:48vh}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">拖动 = 自由旋转（轨道球，绕圈拖会侧翻） · Shift+拖动 = 绕正面滚 · 滚轮 = 缩放</div>
+    <div class="ver">v19</div>
+    <div class="pad">
+      <button data-ax="y" data-deg="-15" title="左转">↺</button>
+      <button data-ax="x" data-deg="-15" title="上翻">↑</button>
+      <button data-ax="z" data-deg="-15" title="逆时针滚">⟲</button>
+      <button data-ax="y" data-deg="15" title="右转">↻</button>
+      <button data-ax="x" data-deg="15" title="下翻">↓</button>
+      <button data-ax="z" data-deg="15" title="顺时针滚">⟳</button>
+    </div>
+  </div>
+
+  <aside>
+    <h1>Size = 盒子的三围</h1>
+    <p class="lede">
+      判定盒是一个看不见的长方体。<b>Size</b> 的三个数就是它三条边的长度：
+      <span style="color:var(--x)">x</span>、<span style="color:var(--y)">y</span>、<span style="color:var(--z)">z</span>；第 4 个数永远写 0。
+    </p>
+
+    <p class="eq" style="margin:0 4px 14px">地上的 <b style="color:#d64545">●</b> = 人物位置（技能原点），判定盒从这里发出。</p>
+
+    <div class="card">
+      <h2>三条边（米）</h2>
+      <div class="row"><span class="name"><i class="dot" style="background:var(--x)"></i>x 边</span><span class="pill" id="vx">0.70</span></div>
+      <input type="range" id="sx" min="0.1" max="6" step="0.05" value="0.7">
+      <div class="row"><span class="name"><i class="dot" style="background:var(--y)"></i>y 边</span><span class="pill" id="vy">4.00</span></div>
+      <input type="range" id="sy" min="0.1" max="6" step="0.05" value="4">
+      <div class="row"><span class="name"><i class="dot" style="background:var(--z)"></i>z 边</span><span class="pill" id="vz">2.50</span></div>
+      <input type="range" id="sz" min="0.1" max="6" step="0.05" value="2.5">
+    </div>
+
+    <div class="card">
+      <h2>偏移（Offset，米）</h2>
+      <div class="row"><span class="name">盒子 x 偏移</span><span class="pill" id="vox">0.00</span></div>
+      <input type="range" id="ox" min="-2.5" max="2.5" step="0.05" value="0">
+      <div class="row"><span class="name">盒子 y 偏移（高度）</span><span class="pill" id="voy">0.00</span></div>
+      <input type="range" id="oy" min="-1" max="3.5" step="0.05" value="0">
+      <div class="row"><span class="name">盒子 z 偏移（前方）</span><span class="pill" id="voz">0.00</span></div>
+      <input type="range" id="oz" min="-2" max="4.5" step="0.05" value="0">
+      <p class="eq" style="margin:10px 2px 0">Offset = 判定盒中心相对人物（红点）的位置；它只移动盒子，不改变尺寸。默认 0 就是盒子罩住人物；游戏数据是 (0, 0.7, 3.5)。</p>
+    </div>
+
+    <div class="card">
+      <h2>盒子姿态（Rot）</h2>
+      <div class="row"><span class="name">绕 x 转</span><span class="pill" id="vrx">0°</span></div>
+      <input type="range" id="rx" min="-180" max="180" step="1" value="0">
+      <div class="row"><span class="name">绕 y 转</span><span class="pill" id="vry">0°</span></div>
+      <input type="range" id="ry" min="-180" max="180" step="1" value="0">
+      <div class="row"><span class="name">绕 z 转</span><span class="pill" id="vrz">0°</span></div>
+      <input type="range" id="rz" min="-180" max="180" step="1" value="0">
+
+      <div class="btns">
+        <button id="presetFlat" class="on">归零 · 正面</button>
+        <button id="presetData">数据里的姿态（z=-90°）</button>
+        <button id="resetAll">重置（回到默认）</button>
+      </div>
+      <p class="eq" style="margin:10px 2px 0">旋转方向：正角 = 逆时针（从 +z 一侧看），负角 = 顺时针。</p>
+    </div>
+
+    <div class="card">
+      <h2>高亮</h2>
+      <div class="btns">
+        <button id="onlyX">只看 x 边（0.7）</button>
+        <button id="allX" class="on">显示全部</button>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--x)"></i>x = 0.7</span>
+        <span><i class="dot" style="background:var(--y)"></i>y = 4</span>
+        <span><i class="dot" style="background:var(--z)"></i>z = 2.5</span>
+      </div>
+    </div>
+
+
+  </aside>
+</div>
+
+<script>
+window.onerror = (msg, src, line, col, err) => {
+  if (String(msg).includes('ResizeObserver loop')) return;
+  const d = document.createElement('pre');
+  d.style.cssText = 'position:fixed;left:12px;top:12px;z-index:99;max-width:80vw;white-space:pre-wrap;background:#fff;color:#b00020;border:1px solid #f3c2cc;border-radius:8px;padding:10px 12px;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.08)';
+  d.textContent = '页面脚本报错（把这段发我）：\n' + msg + '\n' + ((err && err.stack) || '');
+  document.body.appendChild(d);
+};
+(() => {
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const stage = document.querySelector('.stage');
+
+  const q = new URLSearchParams(location.search);
+  const state = { sx:0.7, sy:4, sz:2.5, rx:0, ry:0, rz:0, ox:0, oy:0, oz:0, zoom:1, onlyX:false, k:0.6 };
+  if (q.has('rz')) state.rz = Math.max(-180, Math.min(180, parseFloat(q.get('rz')) || 0));
+  if (q.has('onlyx')) state.onlyX = true;
+  for (const k of ['ox','oy','oz','rx','ry','sx','sy','sz']) {
+    if (q.has(k)) state[k] = parseFloat(q.get(k));
+  }
+
+  const rad = d => d * Math.PI / 180;
+  const YAW = 0.30, PITCH = 0.20;   // 固定视角：地面永远水平
+  let scale = 70, cx0 = 0, cy0 = 0;
+
+  let lastW = 0, lastH = 0;
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const w = Math.round(r.width), h = Math.round(r.height);
+    if (!w || !h || (w === lastW && h === lastH)) return;
+    lastW = w; lastH = h;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(w * dpr));
+    cv.height = Math.max(1, Math.round(h * dpr));
+    cv._dpr = dpr; cv._w = w; cv._h = h;
+    draw();
+  }
+  new ResizeObserver(resize).observe(stage);
+
+  const matMul = (A, B) => A.map((row, i) => B[0].map((_, j) => row.reduce((s, _, k) => s + A[i][k] * B[k][j], 0)));
+
+  // M = Ry(ry) · Rx(rx) · Rz(rz)
+  function eulerToM(rxDeg, ryDeg, rzDeg) {
+    const a = rad(rxDeg), b = rad(ryDeg), c = rad(rzDeg);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const cb = Math.cos(b), sb = Math.sin(b);
+    const cc = Math.cos(c), sc = Math.sin(c);
+    return [
+      [cb*cc + sb*sa*sc, -cb*sc + sb*sa*cc, sb*ca],
+      [ca*sc,             ca*cc,            -sa],
+      [-sb*cc + cb*sa*sc,  sb*sc + cb*sa*cc, cb*ca],
+    ];
+  }
+  function mToEuler(M) {
+    const a = Math.asin(Math.max(-1, Math.min(1, -M[1][2])));
+    const b = Math.atan2(M[0][2], M[2][2]);
+    const c = Math.atan2(M[1][0], M[1][1]);
+    return { x: a*180/Math.PI, y: b*180/Math.PI, z: c*180/Math.PI };
+  }
+  function axisAngle(ax, ay, az, ang) {
+    const n = Math.hypot(ax, ay, az) || 1;
+    ax /= n; ay /= n; az /= n;
+    const c = Math.cos(ang), s = Math.sin(ang), t = 1 - c;
+    return [
+      [t*ax*ax + c,   t*ax*ay - s*az, t*ax*az + s*ay],
+      [t*ax*ay + s*az, t*ay*ay + c,   t*ay*az - s*ax],
+      [t*ax*az - s*ay, t*ay*az + s*ax, t*az*az + c],
+    ];
+  }
+  // 视图坐标 → 世界坐标（相机矩阵的转置）
+  function camInv(v) {
+    const cyw = Math.cos(YAW), syw = Math.sin(YAW);
+    const cp = Math.cos(PITCH), sp = Math.sin(PITCH);
+    const [vx, vy, vz] = v;
+    const y1 = vy * cp + vz * sp;
+    const z1 = -vy * sp + vz * cp;
+    return [vx * cyw - z1 * syw, y1, vx * syw + z1 * cyw];
+  }
+
+  function rotateLocal(p) {
+    const M = state.M;
+    return [
+      M[0][0]*p[0] + M[0][1]*p[1] + M[0][2]*p[2],
+      M[1][0]*p[0] + M[1][1]*p[1] + M[1][2]*p[2],
+      M[2][0]*p[0] + M[2][1]*p[1] + M[2][2]*p[2],
+    ];
+  }
+  state.M = eulerToM(state.rx, state.ry, state.rz);
+
+  function cam(p) {
+    const [x, y, z] = p;
+    const cyw = Math.cos(YAW), syw = Math.sin(YAW);
+    const x1 = x * cyw + z * syw;
+    const z1 = -x * syw + z * cyw;
+    const cp = Math.cos(PITCH), sp = Math.sin(PITCH);
+    return [x1, y * cp - z1 * sp, y * sp + z1 * cp];
+  }
+  function project(p) {
+    const c = cam(p);
+    return [cx0 + c[0] * scale, cy0 - c[1] * scale, c[2]];
+  }
+
+  function centerY() {
+    return state.oy + state.sy / 2;   // 固定中心：不随旋转上下漂
+  }
+
+  function corners() {
+    const hx = state.sx/2, hy = state.sy/2, hz = state.sz/2;
+    const cy = centerY();
+    const out = [];
+    for (let i=0;i<2;i++) for (let j=0;j<2;j++) for (let k=0;k<2;k++) {
+      const r = rotateLocal([i?hx:-hx, j?hy:-hy, k?hz:-hz]);
+      out.push([state.ox + r[0], cy + r[1], state.oz + r[2]]);
+    }
+    return out;
+  }
+  function boxCenter() {
+    return [state.ox, centerY(), state.oz];
+  }
+  const idx = (i,j,k) => i*4 + j*2 + k;
+
+  const EDGES = [];
+  for (let j=0;j<2;j++) for (let k=0;k<2;k++) EDGES.push([idx(0,j,k), idx(1,j,k), 'x']);
+  for (let i=0;i<2;i++) for (let k=0;k<2;k++) EDGES.push([idx(i,0,k), idx(i,1,k), 'y']);
+  for (let i=0;i<2;i++) for (let j=0;j<2;j++) EDGES.push([idx(i,j,0), idx(i,j,1), 'z']);
+
+  const COLOR = { x:'#d64545', y:'#2e8b57', z:'#2f6fd0' };
+
+  function poly(pts, fill, stroke, lw) {
+    if (!pts.length) return;
+    ctx.beginPath();
+    pts.forEach((p,i)=> i ? ctx.lineTo(p[0],p[1]) : ctx.moveTo(p[0],p[1]));
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1; ctx.stroke(); }
+  }
+
+  function chip(x, y, text, color, align='left') {
+    ctx.font = '12.5px "Microsoft YaHei", sans-serif';
+    const w = ctx.measureText(text).width;
+    const padX = 8, h = 22;
+    let bx = x;
+    if (align === 'right') bx = x - w - padX*2;
+    if (align === 'center') bx = x - (w + padX*2)/2;
+    const by = y - h/2, r = 7;
+    ctx.beginPath();
+    ctx.moveTo(bx+r, by);
+    ctx.arcTo(bx+w+padX*2, by, bx+w+padX*2, by+h, r);
+    ctx.arcTo(bx+w+padX*2, by+h, bx, by+h, r);
+    ctx.arcTo(bx, by+h, bx, by, r);
+    ctx.arcTo(bx, by, bx+w+padX*2, by, r);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fill();
+    ctx.strokeStyle = color + '55'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, bx+padX, by+h/2+0.5);
+  }
+
+  function drawGround() {
+    for (let i=-8;i<=8;i++){
+      const a = Math.max(0, 1 - Math.abs(i)/9);
+      ctx.strokeStyle = `rgba(120,138,166,${a*0.28})`;
+      ctx.lineWidth = 1;
+      let A = project([i,0,-8]), B = project([i,0,8]);
+      ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+      A = project([-8,0,i]); B = project([8,0,i]);
+      ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+    }
+    // 地面中心一圈淡光
+    const o = project([0,0,0]);
+    const g = ctx.createRadialGradient(o[0], o[1], 4, o[0], o[1], 260);
+    g.addColorStop(0, 'rgba(255,255,255,.75)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(o[0], o[1], 260, 0, Math.PI*2); ctx.fill();
+  }
+
+  function drawOrigin() {
+    const o = project([0, 0.004, 0]);
+    const g = ctx.createRadialGradient(o[0], o[1], 1, o[0], o[1], 22);
+    g.addColorStop(0, 'rgba(224,74,74,.45)');
+    g.addColorStop(1, 'rgba(224,74,74,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o[0], o[1], 22, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(o[0], o[1], 6, 0, Math.PI*2);
+    ctx.fillStyle = '#e04a4a'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  function drawShadow(cs) {
+    const pts = [];
+    for (let i=0;i<2;i++) for (let j=0;j<2;j++){
+      const p = cs[idx(i,0,j)];
+      pts.push(project([p[0], 0.002, p[2]]));
+    }
+    const xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
+    const cxp = (Math.min(...xs)+Math.max(...xs))/2;
+    const cyp = (Math.min(...ys)+Math.max(...ys))/2;
+    const rx = Math.max(20,(Math.max(...xs)-Math.min(...xs))/2 + 10);
+    const ry = Math.max(12,(Math.max(...ys)-Math.min(...ys))/2 + 8);
+    const g = ctx.createRadialGradient(cxp, cyp, 1, cxp, cyp, Math.max(rx,ry));
+    g.addColorStop(0, 'rgba(20,30,55,.22)');
+    g.addColorStop(1, 'rgba(20,30,55,0)');
+    ctx.save();
+    ctx.translate(cxp, cyp); ctx.scale(1, ry/rx); ctx.translate(-cxp,-cyp);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cxp, cyp, rx, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBox() {
+    const cs = corners();
+    drawShadow(cs);
+
+    const faces = [
+      [idx(0,0,0), idx(1,0,0), idx(1,1,0), idx(0,1,0)],
+      [idx(0,0,1), idx(1,0,1), idx(1,1,1), idx(0,1,1)],
+      [idx(0,0,0), idx(1,0,0), idx(1,0,1), idx(0,0,1)],
+      [idx(0,1,0), idx(1,1,0), idx(1,1,1), idx(0,1,1)],
+      [idx(0,0,0), idx(0,1,0), idx(0,1,1), idx(0,0,1)],
+      [idx(1,0,0), idx(1,1,0), idx(1,1,1), idx(1,0,1)],
+    ];
+    faces
+      .map(f => ({ ids:f, d: f.reduce((s,i)=>s+cam(cs[i])[2],0)/4 }))
+      .sort((a,b)=>b.d-a.d)
+      .forEach(f => {
+        const pts = f.ids.map(i=>project(cs[i]));
+        const grad = ctx.createLinearGradient(pts[0][0], pts[0][1], pts[2][0], pts[2][1]);
+        grad.addColorStop(0, 'rgba(150,185,242,.34)');
+        grad.addColorStop(1, 'rgba(92,136,214,.18)');
+        poly(pts, grad, 'rgba(72,112,192,.16)', 1);
+      });
+
+    for (const [a,b,axis] of EDGES) {
+      const A = project(cs[a]), B = project(cs[b]);
+      const active = !state.onlyX || axis === 'x';
+      ctx.strokeStyle = active ? COLOR[axis] : 'rgba(150,160,175,.25)';
+      ctx.lineWidth = active ? (state.onlyX ? 4.6 : 2.6) : 1.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(A[0],A[1]); ctx.lineTo(B[0],B[1]); ctx.stroke();
+    }
+
+    const mid = (a,b) => {
+      const A = cs[a], B = cs[b];
+      return [(A[0]+B[0])/2, (A[1]+B[1])/2, (A[2]+B[2])/2];
+    };
+    const put = (p, text, color, dx, dy, align='left') => {
+      const s = project(p);
+      chip(s[0]+dx, s[1]+dy, text, color, align);
+    };
+    if (!state.onlyX) {
+      put(mid(idx(0,1,0), idx(1,1,0)), `x = ${state.sx.toFixed(2)} m`, COLOR.x, 0, -24, 'center');
+      put(mid(idx(0,0,0), idx(0,1,0)), `y = ${state.sy.toFixed(2)} m`, COLOR.y, -16, 0, 'right');
+      put(mid(idx(1,0,0), idx(1,0,1)), `z = ${state.sz.toFixed(2)} m`, COLOR.z, 16, 26);
+    } else {
+      put(mid(idx(0,1,0), idx(1,1,0)), `x = ${state.sx.toFixed(2)} m`, COLOR.x, 0, -26, 'center');
+    }
+
+  }
+
+
+  function drawGizmo() {
+    const ox = 78, oy = 92;
+    for (const [name, color, v] of [['x', COLOR.x, [1,0,0]], ['y', COLOR.y, [0,1,0]], ['z', COLOR.z, [0,0,1]]]) {
+      const c = cam(v);
+      const dx = c[0] * 38, dy = -c[1] * 38;
+      ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + dx, oy + dy); ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(name, ox + dx * 1.22, oy + dy * 1.22);
+    }
+    ctx.fillStyle = '#9aa3b2';
+    ctx.font = '11.5px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('世界坐标', ox, oy + 52);
+  }
+
+  function draw() {
+    const dpr = cv._dpr || 1, W = cv._w, H = cv._h;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    ctx.lineJoin = 'round';
+
+    const m = Math.max(state.sx, state.sy, state.sz, 1);
+    scale = Math.min(W / (m * 3.0), H / (m * 2.4)) * state.zoom;
+    const cc = cam(boxCenter());
+    cx0 = W * 0.5 - cc[0] * scale;
+    cy0 = H * 0.5 + cc[1] * scale;
+
+    drawGround();
+    drawBox();
+    drawOrigin();
+    drawGizmo();
+  }
+
+  const $ = id => document.getElementById(id);
+
+  let dragging = false, lastX = 0, lastY = 0, arc0 = null;
+
+  // 虚拟轨道球：把光标映射到单位球面，两点之间的旋转轴 = 叉积
+  function arcPoint(e) {
+    const r = cv.getBoundingClientRect();
+    const w = r.width, h = r.height;
+    const R = Math.min(w, h) * 0.32;
+    let x = (e.clientX - r.left - w / 2) / R;
+    let y = (h / 2 - (e.clientY - r.top)) / R;
+    const d = Math.hypot(x, y);
+    if (d > 1) { x /= d; y /= d; }
+    return [x, y, Math.sqrt(Math.max(0, 1 - x * x - y * y))];
+  }
+
+  cv.addEventListener('pointerdown', e => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    arc0 = arcPoint(e);
+    cv.classList.add('drag');
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (!dx && !dy) return;
+    const r = state.k * Math.PI / 180;   // °/px → rad/px
+    if (e.shiftKey) {
+      const az = camInv([0, 0, 1]);
+      state.M = matMul(axisAngle(az[0], az[1], az[2], -dx * r), state.M);   // 绕屏幕正面（z）
+      arc0 = arcPoint(e);
+    } else if (arc0) {
+      const v1 = arcPoint(e);
+      const cr = [
+        arc0[1] * v1[2] - arc0[2] * v1[1],
+        arc0[2] * v1[0] - arc0[0] * v1[2],
+        arc0[0] * v1[1] - arc0[1] * v1[0],
+      ];
+      const dot = arc0[0] * v1[0] + arc0[1] * v1[1] + arc0[2] * v1[2];
+      const lenC = Math.hypot(cr[0], cr[1], cr[2]);
+      const ang = Math.atan2(lenC, dot) * (state.k / 0.25);
+      if (lenC > 1e-9 && Math.abs(ang) > 1e-6) {
+        const a = camInv([cr[0] / lenC, cr[1] / lenC, cr[2] / lenC]);
+        state.M = matMul(axisAngle(a[0], a[1], a[2], ang), state.M);
+      }
+      arc0 = v1;
+    }
+    const eu = mToEuler(state.M);
+    state.rx = eu.x; state.ry = eu.y; state.rz = eu.z;
+    syncRotUI();
+    draw();
+  });
+  cv.addEventListener('pointerup', () => { dragging = false; cv.classList.remove('drag'); });
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    state.zoom = Math.max(0.5, Math.min(2.2, state.zoom * (e.deltaY > 0 ? 0.93 : 1.07)));
+    draw();
+  }, { passive:false });
+
+  function bind(id, key, outId, fmt) {
+    $(id).addEventListener('input', () => {
+      state[key] = parseFloat($(id).value);
+      if (key === 'rx' || key === 'ry' || key === 'rz') {
+        state.M = eulerToM(state.rx, state.ry, state.rz);
+      }
+      $(outId).textContent = fmt(state[key]);
+      draw();
+    });
+  }
+  bind('sx','sx','vx', v=>v.toFixed(2));
+  bind('sy','sy','vy', v=>v.toFixed(2));
+  bind('sz','sz','vz', v=>v.toFixed(2));
+  bind('ox','ox','vox', v=>v.toFixed(2));
+  bind('oy','oy','voy', v=>v.toFixed(2));
+  bind('oz','oz','voz', v=>v.toFixed(2));
+  bind('rx','rx','vrx', v=>Math.round(v)+'°');
+  bind('ry','ry','vry', v=>Math.round(v)+'°');
+  bind('rz','rz','vrz', v=>Math.round(v)+'°');
+
+  function syncRotUI(){
+    for (const k of ['rx','ry','rz']) {
+      $('v'+k).textContent = Math.round(state[k]) + '°';
+      $(k).value = String(Math.round(state[k]));
+    }
+  }
+  function setRot(v){
+    state.rx = v.rx || 0; state.ry = v.ry || 0; state.rz = v.rz || 0;
+    state.M = eulerToM(state.rx, state.ry, state.rz);
+    syncRotUI(); draw();
+  }
+  $('presetFlat').addEventListener('click', () => setRot({}));
+  $('presetData').addEventListener('click', () => setRot({rz:-90}));
+  $('resetAll').addEventListener('click', () => {
+    state.rx = state.ry = state.rz = 0;
+    state.ox = state.oy = state.oz = 0;
+    state.zoom = 1;
+    state.M = eulerToM(0, 0, 0);
+    syncRotUI();
+    for (const k of ['ox','oy','oz']) {
+      $('v'+k).textContent = '0.00';
+      $(k).value = '0';
+    }
+    draw();
+  });
+  $('onlyX').addEventListener('click', () => { state.onlyX = true; draw(); });
+  $('allX').addEventListener('click', () => { state.onlyX = false; draw(); });
+
+  if (q.has('sim')) {
+    const [sx, sy] = q.get('sim').split(',').map(Number);
+    state.M = matMul(axisAngle(0, 1, 0, (sx||0) * 0.5), state.M);
+    const axs = camInv([1, 0, 0]);
+    state.M = matMul(axisAngle(axs[0], axs[1], axs[2], (sy||0) * 0.5), state.M);
+    const eu0 = mToEuler(state.M);
+    state.rx = eu0.x; state.ry = eu0.y; state.rz = eu0.z;
+  }
+  syncRotUI();
+  for (const k of ['ox','oy','oz']) {
+    $(k).value = String(state[k]);
+    $('v'+k).textContent = state[k].toFixed(2);
+  }
+  for (const b of document.querySelectorAll('.pad button')) {
+    b.addEventListener('click', () => {
+      const deg = parseFloat(b.dataset.deg) * Math.PI / 180;
+      const v = b.dataset.ax === 'x' ? [1,0,0] : b.dataset.ax === 'y' ? [0,1,0] : [0,0,1];
+      const a = camInv(v);
+      state.M = matMul(axisAngle(a[0], a[1], a[2], deg), state.M);
+      const eu2 = mToEuler(state.M);
+      state.rx = eu2.x; state.ry = eu2.y; state.rz = eu2.z;
+      syncRotUI(); draw();
+    });
+  }  if (state.onlyX) $('onlyX').classList.add('on');
+  resize();
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
