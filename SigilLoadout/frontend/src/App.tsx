@@ -456,7 +456,7 @@ export default function App() {
                     这一页自己就是滚动盒（上半区横滚、下半区纵滚），所以外层不再给 overflow-auto。
                 */}
                 <TabsContent value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
-                    <ActionsPanel t={t} charaNames={charaNames} charaTable={charaTable} />
+                    <ActionsPanel t={t} lang={lang} charaNames={charaNames} charaTable={charaTable} />
                 </TabsContent>
             </Tabs>
         </div>

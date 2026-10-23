@@ -135,6 +135,10 @@ func loadAssetsFrom(dir string) error {
 	if err := loadLimitBonusTables(dir); err != nil {
 		return err
 	}
+	// 动作页「附加效果」弹窗要的 buff 释义与名字（见 bufftable.go）。
+	if err := loadBuffTable(dir); err != nil {
+		return err
+	}
 	return loadSkillboardTables(dir)
 }
 

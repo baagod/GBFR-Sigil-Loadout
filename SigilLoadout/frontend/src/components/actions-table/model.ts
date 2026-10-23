@@ -265,7 +265,7 @@ export const showMotDrill = (key: string, shown?: string): boolean => /^saveMotI
  * `shown` = 这一格**当前显示值**：调用方据此决定"这格值不值得给详情入口"（如 mot 格是 `-` 就不给）。
  * 表头调它时不传 `shown`（列级配色仍按列判断）。
  */
-export type DrillSpec = {label: string; open: (shown: string) => void}
+export type DrillSpec = {label: string; open: (shown: string, rowId?: string) => void}
 export const DrillContext = createContext<(key: string, shown?: string) => DrillSpec | undefined>(() => undefined)
 
 

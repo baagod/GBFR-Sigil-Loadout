@@ -98,6 +98,11 @@ export type TableCommands = {
     paste: () => void
     /** 行级命令：添加 / 复制 / 剪切 / 插入 / 删除（与键盘同一条实现）。 */
     rows: RowCommands
+    /**
+     * 直接写一格（详情弹窗那类"编辑器在格子外面"的入口用）：`null` = 回到原值，
+     * 与 `Cell` 的提交口径一致。走的是表里唯一的写出口 `write`。
+     */
+    writeCell: (rowId: string, key: string, value: string | null) => void
 }
 
 /*
@@ -626,6 +631,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         },
         paste: pasteClipboard,
         rows: rowCommands,
+        writeCell: (rowId, key, value) => write(rowId, key, value ?? ""),
     }
     useEffect(() => {
         onCommandsReady?.(tableCommands)

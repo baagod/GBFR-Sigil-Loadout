@@ -245,7 +245,7 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                 e.preventDefault()
                 e.stopPropagation()
             }}
-            onClick={() => drill.open(shown)}
+            onClick={() => drill.open(shown, rowId)}
             aria-label={drill.label}
             data-drill=""
             className="-mr-2 flex shrink-0 cursor-pointer items-center self-stretch px-2 text-muted-foreground/50 hover:text-foreground"

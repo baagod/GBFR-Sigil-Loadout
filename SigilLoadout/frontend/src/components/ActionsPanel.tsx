@@ -19,11 +19,12 @@ import {
 } from "@/components/ui/combobox"
 import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group"
 import {ChevronDown, Search} from "lucide-react"
-import {ActionsTable} from "@/components/ActionsTable"
+import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
 import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import type {ActionRow} from "@/components/actions-table/model"
 import {DrillContext, columnsOf, showMotDrill, toActionRow} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
+import {SupportEffectEditor} from "@/components/SupportEffectEditor"
 import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
 import {GlobalParamList} from "@/components/GlobalParamList"
@@ -33,6 +34,8 @@ import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf} from "@/lib/actionflags"
 import {PLAYER_CODE, type CharaTable} from "@/lib/chara"
+import type {Lang} from "@/lib/lang"
+import {loadBuffs, type BuffInfo} from "@/lib/buffs"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -166,8 +169,10 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
     )
 }
 
-function ActionsPanelBase({t, charaNames, charaTable}: {
+function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     t: Messages
+    /** 当前界面语言：buff 名只有中/英两份，按它取（取不到退回英文，见 `lib/buffs`）。 */
+    lang: Lang
     charaNames: Record<string, string>
     /** 角色表（chara.json）：名字的颜色从这里取，和专属 / 角色强化 / 专精技能三页同一个来源。 */
     charaTable: CharaTable
@@ -251,10 +256,31 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
         表头调它时不传 `shown`（列级配色仍按列判断）。
     */
     const drillOf = useMemo(
-        () => (key: string, shown?: string) =>
-            showMotDrill(key, shown) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined,
-        [t.generalTracks, charCode],
+        () => (key: string, shown?: string): {label: string; open: (shown: string, rowId?: string) => void} | undefined => {
+            if (key === "supportEffectList_") {
+                // 格右端 `···`：开「附加效果」弹窗（点格子还是正常编辑，弹窗是另一条捷径）。
+                return {
+                    label: t.supportEffectTitle,
+                    open: (raw: string, rowId?: string) => setEffectTarget(rowId ? {rowId, raw} : null),
+                }
+            }
+            return showMotDrill(key, shown) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined
+        },
+        [t.generalTracks, t.supportEffectTitle, charCode],
     )
+
+    /**
+     * **buff 表**（哈希 → 6 个槽的注释 + 中/英名字）：动作页只有「附加效果」弹窗要它。
+     * 读一次就缓存（`lib/buffs` 里那次 promise），换资产要重启工具 —— 与别的随包数据同一个约定。
+     */
+    const [buffs, setBuffs] = useState<BuffInfo[]>([])
+    useEffect(() => {
+        void loadBuffs().then(setBuffs).catch((e) => console.error(e))
+    }, [])
+    /** 这一格正在编辑的原始值 + 行 id（null = 没开弹窗）。 */
+    const [effectTarget, setEffectTarget] = useState<{rowId: string; raw: string} | null>(null)
+    /** 表的动作包（详情弹窗提交走 `writeCell`，与格子编辑同一条写出口）。 */
+    const commandsRef = useRef<TableCommands | null>(null)
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -576,6 +602,10 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                             rows={rows}
                             keys={keys}
                             t={t}
+                            // 详情弹窗提交要一个"直接写一格"的入口（与格子编辑同一条写出口）。
+                            onCommandsReady={(commands) => {
+                                commandsRef.current = commands
+                            }}
                             // 数据到位后把保存动作交出来（与 GlobalParamPanel 同一个约定），
                             // 外面那个「保存」按钮再一起调 —— 这个组件自己没有工具条。
                             onSaveReady={(save) => {
@@ -635,6 +665,18 @@ function ActionsPanelBase({t, charaNames, charaTable}: {
                     charCode={motTarget.charCode}
                     t={t}
                     onClose={() => setMotTarget(null)}
+                />
+            )}
+
+            {/* 「附加效果」：动作表 supportEffectList_ 那一格的结构化编辑器（整张 buff 列表 + 勾选 + 6 个值）。 */}
+            {effectTarget && (
+                <SupportEffectEditor
+                    value={effectTarget.raw}
+                    buffs={buffs}
+                    lang={lang}
+                    t={t}
+                    onChange={(raw) => commandsRef.current?.writeCell(effectTarget.rowId, "supportEffectList_", raw)}
+                    onClose={() => setEffectTarget(null)}
                 />
             )}
         </div>

@@ -275,7 +275,8 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         expect(target?.getAttribute("title")).toBeNull()
 
         fireEvent.click(target!)
-        expect(open).toHaveBeenCalledWith("3400")
+        // 第二个参数是行 id（「附加效果」弹窗要按行写回；mot 那一支忽略它）。
+        expect(open).toHaveBeenCalledWith("3400", "1000")
     })
 
     /* ‼️ 值是 `-` 的 mot 格：没有对应动作 → 不渲染 `···`（点不出来），也不挂任何提示。 */

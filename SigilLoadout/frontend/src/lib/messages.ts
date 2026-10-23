@@ -116,6 +116,9 @@ const zh = {
     colBulletFreeWork: (no: string) => `子弹参数 ${no}`,
     // 哈希 + 6 个值的数组：Flag1:2 被调用时据此给角色/队友挂 Buff（字段表 74 行 / 文档 §4.1）。
     colSupportEffectList: "附加效果",
+    // 「附加效果」编辑弹窗：这一格挂了哪几条 buff、每条各自的 6 个值。
+    supportEffectTitle: "附加效果",
+    supportEffectSearch: "搜索 BUFF ID | 名称",
     // 「子弹类型」（`bulletType_`，与 bulletFreeWorkNN_ 同族）。
     colBulletType: "子弹类型",
     // 冷却消耗时机的小枚举（实测 0/1/2/3，其中 2 = 一次性，如 Seofon 7SB / Tweyen 2CS）。
@@ -300,6 +303,9 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `Bullet Param ${no}`,
         // 哈希 + 6 个值的数组：挂 Buff 用（见文档 §4.1）。
         colSupportEffectList: "Additional Effect",
+        // The "support effects" editor: which buffs this action attaches, and the six values of each.
+        supportEffectTitle: "Support Effects",
+        supportEffectSearch: "Search BUFF ID | name",
         colBulletType: "Bullet Type",
         // 冷却消耗时机的小枚举（2 = 一次性）。
         colSaveActionType: "Action Type",
@@ -456,6 +462,9 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `弾パラメータ ${no}`,
         // ハッシュ + 6 値の配列：Flag1:2 でバフを付ける。
         colSupportEffectList: "追加効果",
+        // 「追加効果」編集ダイアログ：このアクションが付けるバフと、それぞれの 6 つの値。
+        supportEffectTitle: "付加効果",
+        supportEffectSearch: "BUFF ID | 名前で検索",
         colBulletType: "弾種",
         // クールダウンを消費するタイミングの小さな列挙（2 = 一回限り）。
         colSaveActionType: "アクション種類",
@@ -612,6 +621,9 @@ export const messages: Record<Lang, Messages> = {
         colBulletFreeWork: (no: string) => `탄환 파라미터 ${no}`,
         // 해시 + 값 6개짜리 배열：Flag1:2 로 버프를 건다.
         colSupportEffectList: "추가 효과",
+        // 「추가 효과」편집 대화상자：이 액션이 거는 버프와 각 버프의 값 6개.
+        supportEffectTitle: "부가 효과",
+        supportEffectSearch: "BUFF ID | 이름 검색",
         colBulletType: "탄 종류",
         // 쿨다운을 소비하는 시점을 정하는 작은 열거형(2 = 1회용).
         colSaveActionType: "액션 종류",
