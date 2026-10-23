@@ -740,6 +740,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                 <SupportEffectEditor
                     value={effectTarget.raw}
                     original={effectTarget.original}
+                    charCode={charCode}
                     buffs={buffs}
                     lang={lang}
                     t={t}

@@ -10,13 +10,20 @@ package service
 // Labels 与资产里的行一一对应（buff.json 的 params[i][1]），空串 = 这一槽没有解释；
 // Names 只有中/英两门（人工表就这两门），界面按当前语言取，取不到退回哈希。
 type BuffInfo struct {
-	Hash   string            `json:"hash"`
-	Labels []string          `json:"labels"`
-	Names  map[string]string `json:"names"`
+	Hash   string   `json:"hash"`
+	Labels []string `json:"labels"`
+	// Values 是这一 buff 的**默认参数**（buff.json 里第一组值的 6 个槽）：动作原本没挂它时，
+	// 弹窗用这组值当占位符，而不是一律 0。
+	Values []string `json:"values"`
+	// ByChar 是「角色 → 该角色用过的参数」：同一个 buff 不同角色给的值不同（防御(自身) 在
+	// PL1400 是 40/30、在 PL0900 是 50/60）。弹窗优先拿当前角色那一组，拿不到再退回 Values。
+	ByChar map[string][]string `json:"byChar"`
+	Names  map[string]string   `json:"names"`
 }
 
-// buffAssetRow 是 buff.json 里的一行值组合：只关心 params（值本身不需要，界面从动作表拿）。
+// buffAssetRow 是 buff.json 里的一行值组合：params[i] = [值, 注释]，值同时充当默认参数。
 type buffAssetRow struct {
+	Char   string      `json:"char"`
 	Params [][2]string `json:"params"`
 }
 
@@ -38,24 +45,32 @@ func loadBuffTable(dir string) error {
 	}
 
 	buffTable = make([]BuffInfo, 0, len(rows))
-	seen := make(map[string]bool, len(rows))
+	index := make(map[string]int, len(rows))
 	for _, row := range rows {
 		for hash, buff := range row {
-			if seen[hash] {
-				continue
-			}
-			seen[hash] = true
 			labels := make([]string, len(buff.Params))
+			values := make([]string, len(buff.Params))
 			for i, pair := range buff.Params {
+				values[i] = pair[0]
 				labels[i] = pair[1]
 			}
-			info := BuffInfo{Hash: hash, Labels: labels, Names: map[string]string{}}
-			for lang, byHash := range names {
-				if name := byHash[hash]; name != "" {
-					info.Names[lang] = name
+			pos, ok := index[hash]
+			if !ok {
+				info := BuffInfo{Hash: hash, Labels: labels, Values: values, ByChar: map[string][]string{}, Names: map[string]string{}}
+				for lang, byHash := range names {
+					if name := byHash[hash]; name != "" {
+						info.Names[lang] = name
+					}
+				}
+				buffTable = append(buffTable, info)
+				pos = len(buffTable) - 1
+				index[hash] = pos
+			}
+			if buff.Char != "" {
+				if _, exists := buffTable[pos].ByChar[buff.Char]; !exists {
+					buffTable[pos].ByChar[buff.Char] = values
 				}
 			}
-			buffTable = append(buffTable, info)
 		}
 	}
 	return nil

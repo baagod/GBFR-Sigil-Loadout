@@ -21,15 +21,15 @@ const t = messages.zh;
 afterEach(cleanup);
 
 const buffs: BuffInfo[] = [
-    { hash: "4039598841", labels: ["duration", "range", "", "", "", ""], names: { zh: "霸体", en: "Stout Heart" } },
-    { hash: "1039632913", labels: ["", "", "", "", "1", "1"], names: { zh: "双发子弹", en: "Various" } },
+    { hash: "4039598841", labels: ["duration", "range", "", "", "", ""], values: ["0", "0", "0", "0", "0", "0"], byChar: {}, names: { zh: "霸体", en: "Stout Heart" } },
+    { hash: "1039632913", labels: ["", "", "", "", "1", "1"], values: ["2", "45", "0", "0", "1", "1"], byChar: { PL1400: ["7", "8", "0", "0", "1", "1"] }, names: { zh: "双发子弹", en: "Various" } },
 ];
 
 /** `original` 不传 = 与 value 相同（最常见的"没改过"）。 */
-const renderEditor = (value: string, original: string = value) => {
+const renderEditor = (value: string, original: string = value, charCode = "PL0000") => {
     const onSave = vi.fn();
     const onClose = vi.fn();
-    render(<SupportEffectEditor value={value} original={original} buffs={buffs} lang="zh" t={t} onSave={onSave} onClose={onClose} />);
+    render(<SupportEffectEditor value={value} original={original} charCode={charCode} buffs={buffs} lang="zh" t={t} onSave={onSave} onClose={onClose} />);
     return { onSave, onClose };
 };
 
@@ -100,13 +100,25 @@ describe("附加效果弹窗", () => {
         expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["18", "0", "0", "0", "1", "1"] }]);
     });
 
-    it("新勾一条（原值里没有）：占位符是 0，写回全 0", () => {
+    it("输成默认值等于没改：输入框回到空、关窗不写回", () => {
+        const raw = JSON.stringify(["1", "1039632913", "7", "8", "0", "0", "1", "1"]);
+        const { onSave } = renderEditor(raw, raw, "PL1400");
+
+        const input = valueInput("双发子弹 1039632913 1");
+        expect(input.value).toBe("");
+        fireEvent.change(input, { target: { value: "7" } });
+        expect(input.value).toBe("");
+        close();
+        expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("新勾一条（原值里没有）：占位符用 buff 默认参数，写回也是默认值", () => {
         const { onSave } = renderEditor('["0"]');
 
-        expect(valueInput("双发子弹 1039632913 1").placeholder).toBe("0");
+        expect(valueInput("双发子弹 1039632913 1").placeholder).toBe("2");
         fireEvent.click(checkbox("双发子弹"));
         close();
-        expect(saved(onSave)).toEqual([{ hash: "1039632913", values: ["0", "0", "0", "0", "0", "0"] }]);
+        expect(saved(onSave)).toEqual([{ hash: "1039632913", values: ["2", "45", "0", "0", "1", "1"] }]);
     });
 
     it("排序：勾选的置顶，两组内部都是 原 buff → 新加", () => {
@@ -114,6 +126,13 @@ describe("附加效果弹窗", () => {
         renderEditor('["0"]', JSON.stringify(["1", "1039632913", "2", "45", "0", "0", "1", "1"]));
 
         expect(rowNames()).toEqual(["双发子弹", "霸体"]);
+    });
+
+    it("默认参数优先取当前角色的那一组（同一 buff 不同角色值不同）", () => {
+        renderEditor('["0"]', '["0"]', "PL1400");
+
+        expect(valueInput("双发子弹 1039632913 1").placeholder).toBe("7");
+        expect(valueInput("双发子弹 1039632913 2").placeholder).toBe("8");
     });
 
     it("已勾选的 buff 置顶，取消勾选后回到原位", () => {

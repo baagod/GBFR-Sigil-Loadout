@@ -39,22 +39,30 @@ const emptyValues = (): string[] => Array.from({ length: SLOTS }, () => "");
  * 原始字符串 → 每行状态（按哈希索引；未知哈希也在 `list` 里，见 `rowsOf`）。
  * 解析失败（`null`）按"没有任何效果"打开，不抛错也不显示脏数据。
  *
- * ‼️ 输入框**不预填当前值**：与 `original` 相同的槽留空，把原值交给占位符显示 ——
- * 玩家没动过的格子看起来就是"空的"（灰字是原值），动过才留下实字。
+ * ‼️ 输入框**不预填当前值**：与「这一槽的默认值」（原值，没有则当前角色/全表默认）相同的槽留空，
+ * 把默认值交给占位符显示 —— 玩家没动过的格子看起来就是"空的"（灰字是默认值），动过才留下实字。
  *
  * 同一个哈希出现两次时只认第一次：这个弹窗的模型是"一行一个 buff"，一格里重复挂同一个 buff
  * 没有对应的行可以表达 —— 写回时那次重复会消失（数据里没出现过，见 lib/buffs.ts 的严进）。
  */
-function initialRows(list: readonly BuffInfo[], raw: string, original: ReadonlyMap<string, string[]>): Map<string, Row> {
+function initialRows(
+    list: readonly BuffInfo[],
+    raw: string,
+    original: ReadonlyMap<string, string[]>,
+    defaults: (hash: string) => string[] | undefined,
+): Map<string, Row> {
     const effects = parseSupportEffects(raw) ?? [];
     const byHash = new Map(effects.map((effect) => [effect.hash, effect.values]));
     const rows = new Map<string, Row>();
     for (const info of list) {
         const values = byHash.get(info.hash);
         const originalValues = original.get(info.hash);
+        const defaultValues = defaults(info.hash);
         rows.set(info.hash, {
             checked: values !== undefined,
-            values: values ? values.map((value, slot) => (value === originalValues?.[slot] ? "" : value)) : emptyValues(),
+            values: values
+                ? values.map((value, slot) => (value === (originalValues?.[slot] ?? defaultValues?.[slot]) ? "" : value))
+                : emptyValues(),
         });
     }
     return rows;
@@ -78,19 +86,25 @@ function rowsOf(buffs: readonly BuffInfo[], raw: string): BuffInfo[] {
 
 /**
  * 行状态 → 这一格的 JSON。数量由勾中的行数算。
- * 空输入框回落到原值（这个哈希在这一格的原值没有该槽时退回 0）；单独一个 "-" 也不是数字，按 0 写。
+ * 空输入框回落顺序：该动作的原值 → 当前角色用过的参数 → 全表第一组默认 → 0；单独一个 "-" 按 0 写。
  */
-function serialize(list: readonly BuffInfo[], rows: ReadonlyMap<string, Row>, original: ReadonlyMap<string, string[]>): string {
+function serialize(
+    list: readonly BuffInfo[],
+    rows: ReadonlyMap<string, Row>,
+    original: ReadonlyMap<string, string[]>,
+    defaults: (hash: string) => string[] | undefined,
+): string {
     const effects: { hash: string; values: string[] }[] = [];
     for (const info of list) {
         const row = rows.get(info.hash);
         if (!row?.checked) continue;
         const originalValues = original.get(info.hash);
+        const defaultValues = defaults(info.hash);
         effects.push({
             hash: info.hash,
             values: row.values.map((raw, slot) => {
                 const trimmed = raw.trim();
-                if (trimmed === "") return originalValues?.[slot] ?? "0";
+                if (trimmed === "") return originalValues?.[slot] ?? defaultValues?.[slot] ?? "0";
                 return trimmed === "-" ? "0" : trimmed;
             }),
         });
@@ -136,6 +150,7 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
 export function SupportEffectEditor({
     value,
     original,
+    charCode,
     buffs,
     lang,
     t,
@@ -146,6 +161,8 @@ export function SupportEffectEditor({
     value: string;
     /** 这一格的**原值**：输入框占位符与"没填就用原值"都取自它。 */
     original: string;
+    /** 当前角色码（`pl1400` 这种）：buff 的默认参数按角色取。 */
+    charCode: string;
     /** 全部 buff（已按哈希升序；界面不再排）。 */
     buffs: BuffInfo[];
     lang: Lang;
@@ -162,7 +179,19 @@ export function SupportEffectEditor({
         () => new Map((parseSupportEffects(original) ?? []).map((effect) => [effect.hash, effect.values])),
         [original],
     );
-    const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value, originalValues));
+    /**
+     * 哈希 → buff 的**默认参数**：同一个 buff 不同角色给的值不一样（防御(自身) 在 PL1400 是 40/30、
+     * 在 PL0900 是 50/60），所以先取当前角色那一组，没有再用全表第一组。
+     */
+    const defaultsOf = useMemo(
+        () => (hash: string) => {
+            const info = buffs.find((buff) => buff.hash === hash);
+            // 角色码两套写法：资产里是 PL1400，界面/路径里是 pl1400 —— 按大写对。
+            return info?.byChar[charCode.toUpperCase()] ?? info?.values;
+        },
+        [buffs, charCode],
+    );
+    const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value, originalValues, defaultsOf));
     const [query, setQuery] = useState("");
 
     /**
@@ -170,7 +199,7 @@ export function SupportEffectEditor({
      * 在动作表里留一条草稿）。比较按解析后的值比，原字符串的空格/格式不算改动。
      */
     const close = () => {
-        const raw = serialize(list, rows, originalValues);
+        const raw = serialize(list, rows, originalValues, defaultsOf);
         if (JSON.stringify(parseSupportEffects(raw)) !== JSON.stringify(parseSupportEffects(value))) {
             onSave(raw);
         }
@@ -185,14 +214,21 @@ export function SupportEffectEditor({
         setRows(next);
     };
 
-    /** 改值只改值，**不代勾选**（勾选是一个明确的动作；改了值但没勾 = 这条不挂）。键入只留整数写法。 */
+    /**
+     * 改值只改值，**不代勾选**（勾选是一个明确的动作；改了值但没勾 = 这条不挂）。键入只留整数写法。
+     *
+     * ‼️ 输成与默认值一样（原值 / 当前角色默认）就存回空串：等于没改 —— 关窗不会写回单元格，
+     * 再次打开还是灰字占位符。
+     */
     const setValue = (hash: string, slot: number, text: string) => {
         const row = rows.get(hash);
         if (!row) return;
         const digits = text.replace(/[^\d-]/g, "");
-        const next = new Map(rows);
-        next.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? digits : old)) });
-        setRows(next);
+        const baseline = originalValues.get(hash)?.[slot] ?? defaultsOf(hash)?.[slot];
+        const next = digits === baseline ? "" : digits;
+        const nextRows = new Map(rows);
+        nextRows.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? next : old)) });
+        setRows(nextRows);
     };
 
     /**
@@ -211,12 +247,12 @@ export function SupportEffectEditor({
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : close())}>
             {/* 宽度：左名字列 + 6 个值格，官方的 448 装不下 6 列。 */}
-            <DialogContent className="flex h-[min(800px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col gap-4 sm:max-w-none">
+            <DialogContent className="flex h-[min(1080px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col gap-4 sm:max-w-none">
                 <DialogHeader className="gap-3 border-b pb-4">
                     {/* 第一行只放标题与 ×：× 由 DialogContent 绝对定位在右上角，这里留出 pr-8 避开它。 */}
                     <DialogTitle className="text-base font-medium">{t.supportEffectTitle}</DialogTitle>
                     {/* 第二行：搜索占满整行、带放大镜。搜索是这层最常用的动作，单独一行比挤在标题旁边好认。 */}
-                    <div className="relative">
+                    <div className="relative pr-8">
                         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={query}
@@ -241,8 +277,10 @@ export function SupportEffectEditor({
                                     onCheckedChange={(next) => setChecked(info.hash, next === true)}
                                     aria-label={displayName}
                                 />
-                                {/* 名字列到第一个输入框 32px（列表容器本身没有 gap，这里自己给）。 */}
-                                <div className="ml-3 w-36 min-w-0 shrink-0">
+                                {/* 名字列：随弹窗宽度按 28% 拉伸，夹在 144~280px 之间。
+                                    280 是「DMG Increase Based on SBA Gauge (Vane)」在 14px 下的实测宽度（273）。
+                                    名字列到第一个输入框 32px（列表容器本身没有 gap，这里自己给）。 */}
+                                <div className="ml-3 w-[28%] max-w-[280px] min-w-36 shrink-0">
                                     {/* 英文名比中文长：放不下就折行（最多两行），不截断。 */}
                                     {/* 这个动作**原本就有**的 buff 灰显；其余（新加的、本格之外的）默认白字。 */}
                                     <div
@@ -260,7 +298,7 @@ export function SupportEffectEditor({
                                             key={slot}
                                             label={info.labels[slot] ?? ""}
                                             value={row.values[slot]}
-                                            placeholder={originalValues.get(info.hash)?.[slot] ?? "0"}
+                                            placeholder={originalValues.get(info.hash)?.[slot] ?? defaultsOf(info.hash)?.[slot] ?? "0"}
                                             ariaLabel={`${displayName} ${info.hash} ${slot + 1}`}
                                             onChange={(text) => setValue(info.hash, slot, text)}
                                         />

@@ -305,7 +305,7 @@ export const messages: Record<Lang, Messages> = {
         colSupportEffectList: "Additional Effect",
         // The "support effects" editor: which buffs this action attaches, and the six values of each.
         supportEffectTitle: "Support Effects",
-        supportEffectSearch: "Search BUFF ID | name",
+        supportEffectSearch: "Search BUFF ID | Name",
         colBulletType: "Bullet Type",
         // 冷却消耗时机的小枚举（2 = 一次性）。
         colSaveActionType: "Action Type",
