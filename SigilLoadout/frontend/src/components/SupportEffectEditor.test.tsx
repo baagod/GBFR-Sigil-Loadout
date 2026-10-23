@@ -1,15 +1,13 @@
 // @vitest-environment happy-dom
 /*
-    「附加效果」弹窗：勾选、值原样显示、键入过滤、**关窗才写回**、已勾选置顶、搜索过滤。
+    「附加效果」弹窗：勾选、原值灰显占位、关窗才写回、已勾选置顶、搜索过滤。
 
-    只钉这个弹窗自己的契约（解析失败当空、未勾不写、空串补 0），不重复测 lib/buffs 的解析 ——
-    那部分在 lib/buffs.test.ts。
+    只钉这个弹窗自己的契约（输入框不预填、空输入回落原值、未勾不写），不重复测 lib/buffs 的解析。
 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 // vi.mock 会被提升到文件最前：工厂里不能引用外面的变量（React 19 的 act 环境警告）。
-// 组件本身不调 LoadBuffs，但 lib/buffs 会 import 它，所以必须挡掉 Wails 运行时。
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     LoadBuffs: vi.fn(),
 }));
@@ -20,69 +18,61 @@ import { messages } from "@/lib/messages";
 
 const t = messages.zh;
 
-// 弹层渲染在 portal 里，不卸载就会漏到下一个用例（仓库里其它弹层测试同样 afterEach(cleanup)）。
 afterEach(cleanup);
 
 const buffs: BuffInfo[] = [
-    {
-        hash: "4039598841",
-        labels: ["duration", "range", "", "", "", ""],
-        names: { zh: "霸体", en: "Stout Heart" },
-    },
-    {
-        hash: "1039632913",
-        labels: ["", "", "", "", "1", "1"],
-        names: { zh: "双发子弹", en: "Various" },
-    },
+    { hash: "4039598841", labels: ["duration", "range", "", "", "", ""], names: { zh: "霸体", en: "Stout Heart" } },
+    { hash: "1039632913", labels: ["", "", "", "", "1", "1"], names: { zh: "双发子弹", en: "Various" } },
 ];
 
-const renderEditor = (raw: string) => {
+/** `original` 不传 = 与 value 相同（最常见的"没改过"）。 */
+const renderEditor = (value: string, original: string = value) => {
     const onSave = vi.fn();
     const onClose = vi.fn();
-    render(<SupportEffectEditor value={raw} buffs={buffs} lang="zh" t={t} onSave={onSave} onClose={onClose} />);
+    render(<SupportEffectEditor value={value} original={original} buffs={buffs} lang="zh" t={t} onSave={onSave} onClose={onClose} />);
     return { onSave, onClose };
 };
 
 const checkbox = (name: string) => screen.getByLabelText(name) as HTMLButtonElement;
 const valueInput = (name: string) => screen.getByLabelText(name) as HTMLInputElement;
-/** 列表里每一行：按 DOM 顺序取名字（已勾选的应当排在前面）。 */
 const rowNames = () =>
     Array.from(screen.getByTestId("support-effect-rows").children).map((row) => row.querySelector(".text-sm")?.textContent ?? "");
-/** 走 × 关窗（关窗即保存）。 */
 const close = () => fireEvent.click(screen.getByRole("button", { name: "Close" }));
 const saved = (onSave: ReturnType<typeof vi.fn>) => parseSupportEffects(onSave.mock.calls.at(-1)?.[0] as string);
 
+const RAW = JSON.stringify(["1", "4039598841", "15", "0", "0", "0", "1", "1"]);
+
 describe("附加效果弹窗", () => {
-    it("标题、搜索框、每一槽的注释、原始值（含小数）都照原样显示", () => {
-        renderEditor(JSON.stringify(["2", "4039598841", "0.5", "0", "0", "0", "1", "1", "1039632913", "2", "45", "0", "0", "1", "1"]));
+    it("输入框不预填：原值以灰字占位符显示", () => {
+        renderEditor(RAW);
 
         expect(screen.getByText(t.supportEffectTitle)).toBeTruthy();
         expect(screen.getByPlaceholderText(t.supportEffectSearch)).toBeTruthy();
-        // 标签随行：霸体那行第一槽是 duration；没有注释的槽**什么都不显示**（连占位符都没有）。
         expect(screen.getByText("duration")).toBeTruthy();
-        expect(screen.queryAllByText("-").length).toBe(0);
-        // 小数**打开时原样显示**（不在初始化时归一）。
-        expect(valueInput("霸体 4039598841 1").value).toBe("0.5");
-        expect(valueInput("双发子弹 1039632913 1").value).toBe("2");
+
+        const input = valueInput("霸体 4039598841 1");
+        expect(input.value).toBe("");
+        expect(input.placeholder).toBe("15");
+        expect(valueInput("霸体 4039598841 2").placeholder).toBe("0");
         expect(checkbox("霸体").getAttribute("aria-checked")).toBe("true");
-        // 弹窗里没有保存/取消按钮：改动在关窗时才写回。
-        expect(screen.queryByText(t.cancel)).toBeNull();
+        // 原本就有的 buff 灰显；不在原值里的默认白字。
+        expect(screen.getAllByText("霸体").some((el) => el.className.includes("text-muted-foreground"))).toBe(true);
+        expect(screen.getAllByText("双发子弹").every((el) => !el.className.includes("text-muted-foreground"))).toBe(true);
     });
 
-    it("打开时不写回；解析失败（[]）按没有效果打开", () => {
-        const { onSave } = renderEditor("[]");
+    it("打开不改动：关窗只回调 onClose，不写回", () => {
+        const { onSave, onClose } = renderEditor(RAW);
 
-        expect(checkbox("霸体").getAttribute("aria-checked")).toBe("false");
+        close();
+        expect(onClose).toHaveBeenCalledTimes(1);
         expect(onSave).not.toHaveBeenCalled();
     });
 
-    it("改动不会立刻写回；关窗时写一次（键入按整数过滤）", () => {
-        const { onSave } = renderEditor(JSON.stringify(["1", "4039598841", "15", "0", "0", "0", "1", "1"]));
+    it("改动不会立刻写回；关窗时写一次，空槽回落到原值", () => {
+        const { onSave } = renderEditor(RAW);
 
-        const input = valueInput("霸体 4039598841 1");
-        // 用户键入 "1.8"：小数点被过滤掉（小数只保留在初始化那一份）。
-        fireEvent.change(input, { target: { value: "1.8" } });
-        expect(input.value).toBe("18");
+        fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "1.8" } });
+        expect(valueInput("霸体 4039598841 1").value).toBe("18");
         expect(onSave).not.toHaveBeenCalled();
 
         close();
@@ -90,8 +80,17 @@ describe("附加效果弹窗", () => {
         expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["18", "0", "0", "0", "1", "1"] }]);
     });
 
+    it("清空输入框 = 用原值：原样数据不会产生改动", () => {
+        const { onSave } = renderEditor(RAW);
+
+        fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "20" } });
+        fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "" } });
+        close();
+        expect(onSave).not.toHaveBeenCalled();
+    });
+
     it("改输入框不会自动勾选；没勾的行不写回", () => {
-        const { onSave } = renderEditor(JSON.stringify(["1", "4039598841", "15", "0", "0", "0", "1", "1"]));
+        const { onSave } = renderEditor(RAW);
 
         fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "18" } });
         fireEvent.change(valueInput("双发子弹 1039632913 1"), { target: { value: "7" } });
@@ -101,14 +100,20 @@ describe("附加效果弹窗", () => {
         expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["18", "0", "0", "0", "1", "1"] }]);
     });
 
-    it("点一下勾选就挂上（默认值全 0），空串补 0", () => {
-        const { onSave } = renderEditor("");
+    it("新勾一条（原值里没有）：占位符是 0，写回全 0", () => {
+        const { onSave } = renderEditor('["0"]');
 
+        expect(valueInput("双发子弹 1039632913 1").placeholder).toBe("0");
         fireEvent.click(checkbox("双发子弹"));
-        fireEvent.change(valueInput("双发子弹 1039632913 5"), { target: { value: "" } });
-
         close();
         expect(saved(onSave)).toEqual([{ hash: "1039632913", values: ["0", "0", "0", "0", "0", "0"] }]);
+    });
+
+    it("排序：勾选的置顶，两组内部都是 原 buff → 新加", () => {
+        // 原值里只有「双发子弹」；当前值一个都没勾 —— 未选组仍应先列原 buff。
+        renderEditor('["0"]', JSON.stringify(["1", "1039632913", "2", "45", "0", "0", "1", "1"]));
+
+        expect(rowNames()).toEqual(["双发子弹", "霸体"]);
     });
 
     it("已勾选的 buff 置顶，取消勾选后回到原位", () => {
@@ -116,10 +121,10 @@ describe("附加效果弹窗", () => {
 
         expect(rowNames()).toEqual(["双发子弹", "霸体"]);
 
-        fireEvent.click(checkbox("双发子弹")); // 取消勾选
-        expect(rowNames()).toEqual(["霸体", "双发子弹"]);
+        fireEvent.click(checkbox("双发子弹")); // 取消勾选（它仍是原 buff，未选组里排最前）
+        expect(rowNames()).toEqual(["双发子弹", "霸体"]);
 
-        fireEvent.click(checkbox("霸体")); // 勾上另一个
+        fireEvent.click(checkbox("霸体"));
         expect(rowNames()).toEqual(["霸体", "双发子弹"]);
 
         close();
@@ -127,7 +132,7 @@ describe("附加效果弹窗", () => {
     });
 
     it("标题栏输入框按哈希或名字过滤", () => {
-        renderEditor("");
+        renderEditor('["0"]');
 
         const search = screen.getByPlaceholderText(t.supportEffectSearch);
         fireEvent.change(search, { target: { value: "1039" } });
@@ -137,19 +142,12 @@ describe("附加效果弹窗", () => {
         expect(rowNames()).toEqual(["霸体"]);
     });
 
-    it("没改动时关窗只回调 onClose，不写回", () => {
-        const { onSave, onClose } = renderEditor(JSON.stringify(["0"]));
-
-        close();
-        expect(onClose).toHaveBeenCalledTimes(1);
-        expect(onSave).not.toHaveBeenCalled();
-    });
-
     it("这一格里的未知哈希也留一行（否则写回时会丢）", () => {
-        const { onSave } = renderEditor(JSON.stringify(["1", "999", "7", "0", "0", "0", "1", "1"]));
+        const raw = JSON.stringify(["1", "999", "7", "0", "0", "0", "1", "1"]);
+        const { onSave } = renderEditor(raw);
 
-        // 未知哈希是勾上的 → 和最前面那组一起置顶。
         expect(rowNames()).toEqual(["999", "霸体", "双发子弹"]);
+        expect(valueInput("999 999 1").placeholder).toBe("7");
         fireEvent.change(valueInput("999 999 2"), { target: { value: "8" } });
 
         close();

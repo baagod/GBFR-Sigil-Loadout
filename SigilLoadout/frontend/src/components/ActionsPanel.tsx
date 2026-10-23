@@ -311,12 +311,17 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                 // 格右端 `···`：开「附加效果」弹窗（点格子还是正常编辑，弹窗是另一条捷径）。
                 return {
                     label: t.supportEffectTitle,
-                    open: (raw: string, rowId?: string) => setEffectTarget(rowId ? {rowId, raw} : null),
+                    open: (raw: string, rowId?: string) =>
+                        setEffectTarget(
+                            rowId
+                                ? {rowId, raw, original: rows.find((row) => row.id === rowId)?.originals["supportEffectList_"] ?? ""}
+                                : null,
+                        ),
                 }
             }
             return showMotDrill(key, shown) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined
         },
-        [t.generalTracks, t.supportEffectTitle, charCode],
+        [t.generalTracks, t.supportEffectTitle, charCode, rows],
     )
 
     /**
@@ -327,8 +332,8 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     useEffect(() => {
         void loadBuffs().then(setBuffs).catch((e) => console.error(e))
     }, [])
-    /** 这一格正在编辑的原始值 + 行 id（null = 没开弹窗）。 */
-    const [effectTarget, setEffectTarget] = useState<{rowId: string; raw: string} | null>(null)
+    /** 这一格正在编辑的当前值 + 原值 + 行 id（null = 没开弹窗）。 */
+    const [effectTarget, setEffectTarget] = useState<{rowId: string; raw: string; original: string} | null>(null)
     /** 表的动作包（详情弹窗提交走 `writeCell`，与格子编辑同一条写出口）。 */
     const commandsRef = useRef<TableCommands | null>(null)
     /** 哈希 → buff（「附加效果」列里显示名字用，与弹窗同一份数据）。 */
@@ -734,11 +739,13 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
             {effectTarget && (
                 <SupportEffectEditor
                     value={effectTarget.raw}
+                    original={effectTarget.original}
                     buffs={buffs}
                     lang={lang}
                     t={t}
                     onSave={(raw) => commandsRef.current?.writeCell(effectTarget.rowId, "supportEffectList_", raw)}
-                    onClose={() => setEffectTarget(null)}                />
+                    onClose={() => setEffectTarget(null)}
+                />
             )}
         </div>
     )

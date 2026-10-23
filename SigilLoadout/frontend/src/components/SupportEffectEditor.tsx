@@ -28,27 +28,34 @@ const SLOTS = 6;
 type Row = {
     /** 这条 buff 挂不挂。 */
     checked: boolean;
-    /** 恒 6 个，原样字符串。 */
+    /** 恒 6 个：**空串 = 用原值**（输入框只显示原值当占位符，没动过就留空）。 */
     values: string[];
 };
 
-/** 没勾的行的初始值：全 0（保存时"未填补 0"同一条口径）。 */
-const emptyValues = (): string[] => Array.from({ length: SLOTS }, () => "0");
+/** 没勾/没动过的行：6 个空串 = 全用原值（原值也没有就是 0）。 */
+const emptyValues = (): string[] => Array.from({ length: SLOTS }, () => "");
 
 /**
  * 原始字符串 → 每行状态（按哈希索引；未知哈希也在 `list` 里，见 `rowsOf`）。
  * 解析失败（`null`）按"没有任何效果"打开，不抛错也不显示脏数据。
  *
+ * ‼️ 输入框**不预填当前值**：与 `original` 相同的槽留空，把原值交给占位符显示 ——
+ * 玩家没动过的格子看起来就是"空的"（灰字是原值），动过才留下实字。
+ *
  * 同一个哈希出现两次时只认第一次：这个弹窗的模型是"一行一个 buff"，一格里重复挂同一个 buff
  * 没有对应的行可以表达 —— 写回时那次重复会消失（数据里没出现过，见 lib/buffs.ts 的严进）。
  */
-function initialRows(list: readonly BuffInfo[], raw: string): Map<string, Row> {
+function initialRows(list: readonly BuffInfo[], raw: string, original: ReadonlyMap<string, string[]>): Map<string, Row> {
     const effects = parseSupportEffects(raw) ?? [];
     const byHash = new Map(effects.map((effect) => [effect.hash, effect.values]));
     const rows = new Map<string, Row>();
     for (const info of list) {
         const values = byHash.get(info.hash);
-        rows.set(info.hash, { checked: values !== undefined, values: values ? [...values] : emptyValues() });
+        const originalValues = original.get(info.hash);
+        rows.set(info.hash, {
+            checked: values !== undefined,
+            values: values ? values.map((value, slot) => (value === originalValues?.[slot] ? "" : value)) : emptyValues(),
+        });
     }
     return rows;
 }
@@ -69,17 +76,22 @@ function rowsOf(buffs: readonly BuffInfo[], raw: string): BuffInfo[] {
     return [...buffs, ...unknown.map((hash) => ({ hash, labels: [], names: {} }))];
 }
 
-/** 行状态 → 这一格的 JSON。数量由勾中的行数算；单独一个 "-" 不是数字，按 0 写。 */
-function serialize(list: readonly BuffInfo[], rows: ReadonlyMap<string, Row>): string {
+/**
+ * 行状态 → 这一格的 JSON。数量由勾中的行数算。
+ * 空输入框回落到原值（这个哈希在这一格的原值没有该槽时退回 0）；单独一个 "-" 也不是数字，按 0 写。
+ */
+function serialize(list: readonly BuffInfo[], rows: ReadonlyMap<string, Row>, original: ReadonlyMap<string, string[]>): string {
     const effects: { hash: string; values: string[] }[] = [];
     for (const info of list) {
         const row = rows.get(info.hash);
         if (!row?.checked) continue;
+        const originalValues = original.get(info.hash);
         effects.push({
             hash: info.hash,
-            values: row.values.map((raw) => {
+            values: row.values.map((raw, slot) => {
                 const trimmed = raw.trim();
-                return trimmed === "" || trimmed === "-" ? "0" : trimmed;
+                if (trimmed === "") return originalValues?.[slot] ?? "0";
+                return trimmed === "-" ? "0" : trimmed;
             }),
         });
     }
@@ -94,9 +106,11 @@ function serialize(list: readonly BuffInfo[], rows: ReadonlyMap<string, Row>): s
  * 想按像素收紧就得一路 `!` 覆盖，反而把高度算糊涂（踩过：同排格子高矮不一）。这里就是两行：
  * 标签 16px + 输入 20px + 上下留白，固定 44px，所有格子完全等高。
  */
-function ValueCell({label, value, ariaLabel, onChange}: {
+function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
     label: string;
     value: string;
+    /** 空输入时显示的灰字：这一槽的原值（新加的 buff / 原值没有该槽就是 "0"）。 */
+    placeholder: string;
     ariaLabel: string;
     onChange: (text: string) => void;
 }) {
@@ -109,6 +123,7 @@ function ValueCell({label, value, ariaLabel, onChange}: {
             <span className="h-3 truncate text-[12px] leading-3 text-muted-foreground">{label}</span>
             <input
                 value={value}
+                placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
                 inputMode="numeric"
                 aria-label={ariaLabel}
@@ -120,14 +135,17 @@ function ValueCell({label, value, ariaLabel, onChange}: {
 
 export function SupportEffectEditor({
     value,
+    original,
     buffs,
     lang,
     t,
     onSave,
     onClose,
 }: {
-    /** 这一格的原始字符串（`[数量, 哈希, 值×6, …]`）。 */
+    /** 这一格**当前**的字符串（`[数量, 哈希, 值×6, …]`）。 */
     value: string;
+    /** 这一格的**原值**：输入框占位符与"没填就用原值"都取自它。 */
+    original: string;
     /** 全部 buff（已按哈希升序；界面不再排）。 */
     buffs: BuffInfo[];
     lang: Lang;
@@ -139,7 +157,12 @@ export function SupportEffectEditor({
 }) {
     /** 资产里的 buff + 这一格里的未知哈希（见 rowsOf：不补这一行，写回时未知效果会丢）。 */
     const list = useMemo(() => rowsOf(buffs, value), [buffs, value]);
-    const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value));
+    /** 哈希 → 原值那 6 个槽（输入框占位符 + 空输入的回落值）。 */
+    const originalValues = useMemo(
+        () => new Map((parseSupportEffects(original) ?? []).map((effect) => [effect.hash, effect.values])),
+        [original],
+    );
+    const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value, originalValues));
     const [query, setQuery] = useState("");
 
     /**
@@ -147,7 +170,7 @@ export function SupportEffectEditor({
      * 在动作表里留一条草稿）。比较按解析后的值比，原字符串的空格/格式不算改动。
      */
     const close = () => {
-        const raw = serialize(list, rows);
+        const raw = serialize(list, rows, originalValues);
         if (JSON.stringify(parseSupportEffects(raw)) !== JSON.stringify(parseSupportEffects(value))) {
             onSave(raw);
         }
@@ -174,21 +197,16 @@ export function SupportEffectEditor({
 
     /**
      * 标题栏那个输入框：按哈希子串或名字子串过滤（不区分大小写）。
-     * **已勾选的置顶**（两组内部各自保持原顺序）：勾上的那几条就是这次在编辑的东西，不该翻半天找。
+     * 排序：**已勾选置顶**；两组内部都是 **原值里有的 → 新加的**；同级按资产顺序（列表原序，稳定排序）。
      */
     const visible = useMemo(() => {
         const needle = query.trim().toLowerCase();
         const matched = needle
             ? list.filter((info) => info.hash.includes(needle) || buffName(info, lang).toLowerCase().includes(needle))
             : list;
-        const checked: BuffInfo[] = [];
-        const rest: BuffInfo[] = [];
-        for (const info of matched) {
-            if (rows.get(info.hash)?.checked) checked.push(info);
-            else rest.push(info);
-        }
-        return [...checked, ...rest];
-    }, [list, query, lang, rows]);
+        const rank = (info: BuffInfo) => (rows.get(info.hash)?.checked ? 2 : 0) + (originalValues.has(info.hash) ? 1 : 0);
+        return [...matched].sort((a, b) => rank(b) - rank(a));
+    }, [list, query, lang, rows, originalValues]);
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : close())}>
@@ -210,7 +228,7 @@ export function SupportEffectEditor({
                     </div>
                 </DialogHeader>
 
-                <div className="min-h-0 flex-1 overflow-y-auto pr-2" data-testid="support-effect-rows">
+                <div className="min-h-0 flex-1 overflow-y-auto pr-4" data-testid="support-effect-rows">
                     {visible.map((info) => {
                         const row = rows.get(info.hash);
                         if (!row) return null;
@@ -226,7 +244,14 @@ export function SupportEffectEditor({
                                 {/* 名字列到第一个输入框 32px（列表容器本身没有 gap，这里自己给）。 */}
                                 <div className="ml-3 w-36 min-w-0 shrink-0">
                                     {/* 英文名比中文长：放不下就折行（最多两行），不截断。 */}
-                                    <div className="line-clamp-2 text-sm leading-tight break-words">{displayName}</div>
+                                    {/* 这个动作**原本就有**的 buff 灰显；其余（新加的、本格之外的）默认白字。 */}
+                                    <div
+                                        className={`line-clamp-2 text-sm leading-tight break-words ${
+                                            originalValues.has(info.hash) ? "text-muted-foreground" : ""
+                                        }`}
+                                    >
+                                        {displayName}
+                                    </div>
                                     <div className="truncate font-mono text-[12px] text-muted-foreground">{info.hash}</div>
                                 </div>
                                 <div className="ml-8 grid flex-1 grid-cols-6 gap-2">
@@ -235,6 +260,7 @@ export function SupportEffectEditor({
                                             key={slot}
                                             label={info.labels[slot] ?? ""}
                                             value={row.values[slot]}
+                                            placeholder={originalValues.get(info.hash)?.[slot] ?? "0"}
                                             ariaLabel={`${displayName} ${info.hash} ${slot + 1}`}
                                             onChange={(text) => setValue(info.hash, slot, text)}
                                         />
