@@ -5,7 +5,7 @@
 
     文案（页签、按钮、表头）走 messages.ts；字段名与错误文本来自后端，不翻译。
 */
-import {memo, useCallback, useEffect, useMemo, useRef, useState} from "react"
+import {memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from "react"
 
 import {LoadActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy} from "../../bindings/sigilloadout/service/actionsservice"
 import {Button} from "@/components/ui/button"
@@ -22,8 +22,10 @@ import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
 import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import type {ActionRow} from "@/components/actions-table/model"
-import {DrillContext, columnsOf, showMotDrill, toActionRow} from "@/components/actions-table/model"
+import {DrillContext, columnsOf, showMotDrill, shownValue, toActionRow, type ColumnSpec} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
+import {Badge} from "@/components/ui/badge"
+import {InfoBadge} from "@/components/InfoBadge"
 import {SupportEffectEditor} from "@/components/SupportEffectEditor"
 import {PanelFailureDialog} from "@/components/PanelFailureDialog"
 import {usePanelFailure} from "@/hooks/usePanelFailure"
@@ -35,7 +37,7 @@ import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf} from "@/lib/actionflags"
 import {PLAYER_CODE, type CharaTable} from "@/lib/chara"
 import type {Lang} from "@/lib/lang"
-import {loadBuffs, type BuffInfo} from "@/lib/buffs"
+import {buffName, loadBuffs, parseSupportEffects, type BuffInfo} from "@/lib/buffs"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -169,6 +171,54 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
     )
 }
 
+/**
+ * 「附加效果」那一列的显示：这一格挂的 buff 全用 `Badge` 列出来，**有名字显示名字，没名字显示哈希**。
+ *
+ * 三种状态靠底色区分：
+ *   · 原样（原值里就有、6 个值没动）→ `InfoBadge`（默认蓝）；
+ *   · 原 buff 改了参数 → sky 蓝；
+ *   · 这一格新加的 buff → green 绿。
+ *
+ * badge 本身**没有点击事件**：空单元格不显示任何东西，双击整格进弹窗（唯一入口）。
+ * 宽度由 `ColumnSpec.width`（400）钉住，超出在这个宽度里换行 —— 与轨表「效果」列同一套做法。
+ */
+function SupportEffectCell({row, nameOf}: {row: ActionRow; nameOf: (hash: string) => string}) {
+    const drill = useContext(DrillContext)
+    const raw = shownValue(row, "supportEffectList_")
+    const spec = drill("supportEffectList_", raw)
+    const effects = parseSupportEffects(raw) ?? []
+    const originals = new Map((parseSupportEffects(row.originals["supportEffectList_"] ?? "") ?? []).map((effect) => [
+        effect.hash,
+        effect.values.join(","),
+    ]))
+    return (
+        <div
+            className="flex min-h-6 w-full flex-wrap content-center items-center gap-x-1 gap-y-0.5 px-1 py-0.75 text-xs"
+            onDoubleClick={() => spec?.open(raw, row.id)}
+        >
+            {effects.map((effect, index) => {
+                const original = originals.get(effect.hash)
+                const status = original === undefined ? "added" : original === effect.values.join(",") ? "original" : "changed"
+                return (
+                    <SupportEffectBadge key={`${effect.hash}-${index}`} status={status}>
+                        {nameOf(effect.hash) || effect.hash}
+                    </SupportEffectBadge>
+                )
+            })}
+        </div>
+    )
+}
+
+function SupportEffectBadge({status, children}: {status: "original" | "changed" | "added"; children: ReactNode}) {
+    if (status === "original") {
+        return <InfoBadge>{children}</InfoBadge>
+    }
+    if (status === "changed") {
+        return <Badge className="bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300">{children}</Badge>
+    }
+    return <Badge className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">{children}</Badge>
+}
+
 function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     t: Messages
     /** 当前界面语言：buff 名只有中/英两份，按它取（取不到退回英文，见 `lib/buffs`）。 */
@@ -281,6 +331,17 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     const [effectTarget, setEffectTarget] = useState<{rowId: string; raw: string} | null>(null)
     /** 表的动作包（详情弹窗提交走 `writeCell`，与格子编辑同一条写出口）。 */
     const commandsRef = useRef<TableCommands | null>(null)
+    /** 哈希 → buff（「附加效果」列里显示名字用，与弹窗同一份数据）。 */
+    const buffMap = useMemo(() => new Map(buffs.map((info) => [info.hash, info])), [buffs])
+    const buffNameOf = useCallback((hash: string) => buffName(buffMap.get(hash), lang), [buffMap, lang])
+    /** 列规格：只有「附加效果」这一列换成 badge 显示；值本身没变，复制/粘贴仍走原 JSON。 */
+    const columnOf = useMemo(
+        () => (key: string): ColumnSpec | undefined =>
+            key === "supportEffectList_"
+                ? {render: (row: ActionRow) => <SupportEffectCell row={row} nameOf={buffNameOf} />, width: 400}
+                : undefined,
+        [buffNameOf],
+    )
 
     /**
      * 「全局参数」：右栏正在看哪张表（先在左栏点一张；清单读出来之后自动选中第一张）。
@@ -602,6 +663,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                             rows={rows}
                             keys={keys}
                             t={t}
+                            columnOf={columnOf}
                             // 详情弹窗提交要一个"直接写一格"的入口（与格子编辑同一条写出口）。
                             onCommandsReady={(commands) => {
                                 commandsRef.current = commands
@@ -675,9 +737,8 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                     buffs={buffs}
                     lang={lang}
                     t={t}
-                    onChange={(raw) => commandsRef.current?.writeCell(effectTarget.rowId, "supportEffectList_", raw)}
-                    onClose={() => setEffectTarget(null)}
-                />
+                    onSave={(raw) => commandsRef.current?.writeCell(effectTarget.rowId, "supportEffectList_", raw)}
+                    onClose={() => setEffectTarget(null)}                />
             )}
         </div>
     )

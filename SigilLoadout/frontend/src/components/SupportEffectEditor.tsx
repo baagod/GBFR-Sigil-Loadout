@@ -10,8 +10,8 @@
       · 打开时**原样显示**（源数据里有 `0.5` 这种小数，不能预先归一）；
       · 用户一敲键盘就按整数过滤（`/[^\d-]/g`，见 setValue）—— 这是用户口径，不是数据约束。
 
-    ⚠️ 勾选与值分开存：勾选之前输入框也能编辑，**编辑即自动勾选**（免得"改了值却忘了勾"）。
-    ‼️ 没有保存/取消按钮：每次改动都直接写回那一格（`onChange`），右上角的 × 只是关掉弹窗。
+    ⚠️ 勾选与值分开存：**编辑输入框不会自动勾上这一行** —— 勾选是明确的动作，没勾的效果不写回。
+    ‼️ 没有保存/取消按钮：改动先留在弹窗里，**关窗（× / Esc / 点遮罩）时才写回那一格**；没改就不写。
 */
 import { useMemo, useState } from "react";
 import { buffName, formatSupportEffects, parseSupportEffects, type BuffInfo } from "@/lib/buffs";
@@ -123,7 +123,7 @@ export function SupportEffectEditor({
     buffs,
     lang,
     t,
-    onChange,
+    onSave,
     onClose,
 }: {
     /** 这一格的原始字符串（`[数量, 哈希, 值×6, …]`）。 */
@@ -132,9 +132,9 @@ export function SupportEffectEditor({
     buffs: BuffInfo[];
     lang: Lang;
     t: Messages;
-    /** 每次改动都交出去（直接写回那一格；弹窗不关）。 */
-    onChange: (raw: string) => void;
-    /** 关掉弹窗（× / Esc / 点遮罩）。 */
+    /** 关窗时才交出去（只写一次；没改就不调）。 */
+    onSave: (raw: string) => void;
+    /** 关掉弹窗（× / Esc / 点遮罩）—— 关窗即保存。 */
     onClose: () => void;
 }) {
     /** 资产里的 buff + 这一格里的未知哈希（见 rowsOf：不补这一行，写回时未知效果会丢）。 */
@@ -142,10 +142,16 @@ export function SupportEffectEditor({
     const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value));
     const [query, setQuery] = useState("");
 
-    /** 改一行 → 立刻写回（没有保存按钮，见文件头）。 */
-    const emit = (next: Map<string, Row>) => {
-        setRows(next);
-        onChange(serialize(list, next));
+    /**
+     * 关窗时才落盘：把当前行状态序列化，和打开时那份比——**没改就不写**（避免"点开看一眼"也
+     * 在动作表里留一条草稿）。比较按解析后的值比，原字符串的空格/格式不算改动。
+     */
+    const close = () => {
+        const raw = serialize(list, rows);
+        if (JSON.stringify(parseSupportEffects(raw)) !== JSON.stringify(parseSupportEffects(value))) {
+            onSave(raw);
+        }
+        onClose();
     };
 
     const setChecked = (hash: string, checked: boolean) => {
@@ -153,17 +159,17 @@ export function SupportEffectEditor({
         if (!row) return;
         const next = new Map(rows);
         next.set(hash, { ...row, checked });
-        emit(next);
+        setRows(next);
     };
 
-    /** 改值 = 自动勾上这一行（见文件头）。小数点在键入时被过滤掉，只留整数写法。 */
+    /** 改值只改值，**不代勾选**（勾选是一个明确的动作；改了值但没勾 = 这条不挂）。键入只留整数写法。 */
     const setValue = (hash: string, slot: number, text: string) => {
         const row = rows.get(hash);
         if (!row) return;
         const digits = text.replace(/[^\d-]/g, "");
         const next = new Map(rows);
-        next.set(hash, { checked: true, values: row.values.map((old, s) => (s === slot ? digits : old)) });
-        emit(next);
+        next.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? digits : old)) });
+        setRows(next);
     };
 
     /**
@@ -185,7 +191,7 @@ export function SupportEffectEditor({
     }, [list, query, lang, rows]);
 
     return (
-        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+        <Dialog open onOpenChange={(next) => (next ? undefined : close())}>
             {/* 宽度：左名字列 + 6 个值格，官方的 448 装不下 6 列。 */}
             <DialogContent className="flex h-[min(800px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col gap-4 sm:max-w-none">
                 <DialogHeader className="gap-3 border-b pb-4">
