@@ -5,9 +5,12 @@
 */
 import {
     cellSelectionFeature,
+    columnFilteringFeature,
     columnPinningFeature,
     columnSizingFeature,
+    createFilteredRowModel,
     createSortedRowModel,
+    globalFilteringFeature,
     rowSortingFeature,
     sortFn_alphanumeric,
     tableFeatures,
@@ -394,12 +397,43 @@ export function acceptPaste(columnId: string, value: string, branchIds: Readonly
  *     （Excel 的模型）。库那个 `getToggleSelectedHandler()` 也用不了：它给**复选框**写的，方向取自
  *     `event.target.checked`（源码第一行就是它），行号格上没有 `checked`。
  */
+/**
+ * 记录清单过滤器：`id_` / 任一 `saveMotId*` / 动作名（原文或显示名）里**含**这一段就算命中。
+ * token 之间是"或"：与后端 `recordsMatching` 同一口径，另加名称；空白或逗号分隔。
+ *
+ * 只在当前角色这张表上跑（一张表 35~60 条），所以搜索不需要重新读后端。
+ */
+export const matchesIdsFilter = (values: Record<string, string>, filterText: string): boolean => {
+    const tokens = filterText
+        .toLowerCase()
+        .replaceAll(",", " ")
+        .split(/\s+/)
+        .filter(Boolean)
+    if (tokens.length === 0) return true
+    const haystack = [
+        values["id_"] ?? "",
+        values["actionName_"] ?? "",
+        values["abilityTag_"] ?? "",
+        ...Object.entries(values)
+            .filter(([key]) => key.startsWith("saveMotId"))
+            .map(([, value]) => value),
+    ].map((value) => value.toLowerCase())
+    return tokens.some((token) => haystack.some((value) => value.includes(token)))
+}
+
+const filterFn_idsOrName = (row: {original: ActionRow}, _columnId: string, filterValue: unknown) =>
+    matchesIdsFilter(row.original.originals, String(filterValue ?? ""))
+
 export const features = tableFeatures({
     cellSelectionFeature,
+    columnFilteringFeature,
+    globalFilteringFeature,
     columnPinningFeature,
     columnSizingFeature,
     rowSortingFeature,
+    filteredRowModel: createFilteredRowModel(),
     sortedRowModel: createSortedRowModel(),
+    filterFns: {idsOrName: filterFn_idsOrName},
     sortFns: {alphanumeric: sortFn_alphanumeric},
 })
 

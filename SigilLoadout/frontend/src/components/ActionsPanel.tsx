@@ -7,7 +7,7 @@
 */
 import {memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from "react"
 
-import {LoadActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy} from "../../bindings/sigilloadout/service/actionsservice"
+import {LoadCharacterActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy} from "../../bindings/sigilloadout/service/actionsservice"
 import {Button} from "@/components/ui/button"
 import {
     Combobox,
@@ -22,7 +22,7 @@ import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
 import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import type {ActionRow} from "@/components/actions-table/model"
-import {DrillContext, RevealContext, columnsOf, showMotDrill, shownValue, snapshotKey, toActionRow, useEnterEditHandler, type ColumnSpec} from "@/components/actions-table/model"
+import {DrillContext, RevealContext, columnsOf, matchesIdsFilter, showMotDrill, shownValue, snapshotKey, toActionRow, useEnterEditHandler, type ColumnSpec} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {Badge} from "@/components/ui/badge"
 import {InfoBadge} from "@/components/InfoBadge"
@@ -40,8 +40,17 @@ import type {Lang} from "@/lib/lang"
 import {buffName, loadBuffs, parseSupportEffects, type BuffInfo} from "@/lib/buffs"
 import type {Messages} from "@/lib/messages"
 
-/** 记录清单的"实际内容"：按空白切成词再拼回去（后端用 `strings.Fields`，比较也得用同一口径）。 */
-const normalizeIds = (value: string) => value.trim().split(/\s+/).filter(Boolean).join(" ")
+/**
+ * 记录清单的"实际内容"：与后端 `SetActionIDs` 同一口径 —— 逗号当分隔符、按空白切词、丢掉空项。
+ * 比较必须用这个，不能用原串：后端存回来的是规范化形式，原串一比就永远不等。
+ */
+const normalizeIds = (value: string) =>
+    value
+        .replaceAll(",", " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .join(" ")
 
 /**
  * 角色下拉。这一页的三份数据（动作表 / flags / FSM）**全都按角色走**，所以它是整页的选择，不是某一块的。
@@ -352,6 +361,11 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     /** 哈希 → buff（「附加效果」列里显示名字用，与弹窗同一份数据）。 */
     const buffMap = useMemo(() => new Map(buffs.map((info) => [info.hash, info])), [buffs])
     const buffNameOf = useCallback((hash: string) => buffName(buffMap.get(hash), lang), [buffMap, lang])
+    /** 当前过滤后能看见几行（与表里的过滤同一判据）：全被过滤掉时给一句提示，别只留一个空表头。 */
+    const visibleRowCount = useMemo(
+        () => rows.filter((row) => matchesIdsFilter(row.originals, idsText)).length,
+        [rows, idsText],
+    )
     /** 列规格：只有「附加效果」这一列换成 badge 显示；值本身没变，复制/粘贴仍走原 JSON。 */
     const columnOf = useMemo(
         () => (key: string): ColumnSpec | undefined =>
@@ -408,20 +422,19 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
      * ‼️ 这里是**唯一**读 `LoadActions` 的地方（表不再自己读），所以下面那份数据的角色一定是当前角色：
      * `switchCharacter` 先 `await SetCharacter` 再调本函数。
      */
-    const loadAll = async (opts?: {keepIdsText?: boolean}) => {
+    const loadAll = async () => {
         // ‼️ 第一件事：把表**立刻**藏起来、骨架顶上（换角色时旧数据还挂在表上，不能让它继续显示）。
         setTableLoading(true)
         const [path, codes, ids] = await Promise.all([Path(), ListCharacters(), ActionIDs()])
         setCharCode(charCodeOf(path ?? ""))
         setCharacters(codes ?? [])
-        // 清单回填给工具栏那个输入框；idsApplied 记着"上一次真的生效的值"，失焦时才判断要不要提交。
-        // ‼️ `keepIdsText`：这是"提交清单之后的重读"，输入框里是用户敲的那串（含尾部空格/半截输入），
-        // 不能拿后端规范化后的值盖回去 —— 那一下就是用户看到的"自动恢复/抖动"。
-        if (!opts?.keepIdsText) setIdsText(ids ?? "")
+        // 清单回填给工具栏那个输入框（过滤器）；idsApplied 记着"已经存进设置的那一串"，用来避免重复提交。
+        setIdsText(ids ?? "")
         setIdsApplied(ids ?? "")
 
-        // 这一步失败就抛给调用方（上面几份不受影响）。
-        const loaded = (await LoadActions()) ?? []
+        // 这一步失败就抛给调用方（上面几份不受影响）。**读全表**：清单过滤在界面层做（见 ActionsTable 的
+        // filterText），换清单不该再重读；换角色才重读这一张（一张表 35~60 条）。
+        const loaded = (await LoadCharacterActions()) ?? []
         setRows(loaded.map(toActionRow))
         setLoaded(true)
         setDataVersion((v) => v + 1) // 换一份数据 → 让表整个重新挂载（理由见 `dataVersion`）
@@ -456,34 +469,21 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     }
 
     /**
-     * 提交记录清单（工具栏那个输入框）：存进设置，再重读这张表。
-     *
-     * 值没变就什么都不做——免得"点了一下框"也触发一次重读，把动作表里没保存的草稿冲掉。
-     *
-     * ⚠️ **输入框的值一律不动**：重读会把后端的值（`strings.Fields` 规范化过的）带回来，写回框里
-     * 就等于替用户改字——尾部多个空格会被"退一格"。所以提交后把用户敲的那串原样放回去。
+     * 把记录清单**存进设置**（工具栏那个输入框）。只写配置，不重读、不换数据：过滤由表格自己按
+     * `filterText` 做（当前角色的表已在内存里）。写进去是为了下次打开/换角色时还能恢复这串。
      */
     const applyIds = async () => {
-        // **空提交是有意义的一次提交**：空清单 = "这条表里全部记录"（后端 LoadActions 认这个值，
-        // SetActionIDs 也收）。所以这里不再对空值提前返回 —— 那会让"清空"永远生效不了：设置里还是旧
-        // 清单，换角色时 loadAll 重读 ActionIDs() 就把旧值填回框里，表也一直是被筛过的。
-        // 按**规范化后的空格分隔串**比：后端就是这样归一（`strings.Fields`）。直接比原串的话，
-        // "4,6"、"4  6 "、尾部空格这些每次重读都对不上 → 每 500ms 再提交一次 + 整表重读（抖动来源）。
         if (normalizeIds(idsText) === normalizeIds(idsApplied)) return
         if (applyingIdsRef.current) return
         applyingIdsRef.current = true
-        // 原样提交用户敲的那串（后端自己规范化）；成功后 loadAll 不回填输入框，框里就不会跳。
-        const typed = idsText
-        setBusy(true)
         try {
-            await SetActionIDs(typed)
-            await loadAll({keepIdsText: true})
+            await SetActionIDs(idsText)
+            setIdsApplied(normalizeIds(idsText))
         } catch (e) {
             // 写不进去也**不动输入框**（输入什么就是什么），只在控制台留一条。
             console.error(e)
         } finally {
             applyingIdsRef.current = false
-            setBusy(false)
         }
     }
 
@@ -659,6 +659,9 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                         // 就地显示、不居中也不撑高：一行 14px 的灰字。
                         <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
                     )}
+                    {loaded && rows.length > 0 && visibleRowCount === 0 && (
+                        <div className="pb-1 text-sm text-muted-foreground">{t.noMatchItems}</div>
+                    )}
                     {loaded && rows.length > 0 && (
                         // ⚠️ 新表（TanStack）**已转正**：它就是动作表本身，旧的 TrackTable 那套连同切换开关一起删了。
                         // 保存走 ttSaveRef（见 handleSaveAndDeploy）—— 这个组件自己没有工具条。
@@ -688,6 +691,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                             keys={keys}
                             t={t}
                             columnOf={columnOf}
+                            filterText={idsText}
                             // 详情弹窗提交要一个"直接写一格"的入口（与格子编辑同一条写出口）。
                             onCommandsReady={(commands) => {
                                 commandsRef.current = commands

@@ -195,6 +195,25 @@ LoadActions 读动作表，给出要显示的那几条记录。
 */
 func (s *ActionsService) LoadActions() ([]Action, error) {
 	cfg := s.config()
+	ids := cfg.IDs
+	if len(ids) == 0 {
+		ids = nil // 空清单 = 全部记录
+	}
+	return s.loadActions(cfg, ids)
+}
+
+/*
+LoadCharacterActions 返回当前角色动作表的**全部**记录（不按记录清单过滤）。
+
+清单现在是**界面层的过滤器**（表格自己按 id_ / mot / 名称过滤），加载只跟角色走：
+一张表 35~60 条记录，一次读完在前端筛，比每敲一次搜索就重读整张表便宜得多。
+*/
+func (s *ActionsService) LoadCharacterActions() ([]Action, error) {
+	return s.loadActions(s.config(), nil)
+}
+
+// loadActions 是两条读取路径的实现：tokens 为 nil = 全部记录，否则按 token 匹配（id_ 或 mot 包含）。
+func (s *ActionsService) loadActions(cfg actionConfig, tokens []string) ([]Action, error) {
 	original, err := loadActionOriginal(cfg)
 	if err != nil {
 		return nil, err
@@ -205,7 +224,7 @@ func (s *ActionsService) LoadActions() ([]Action, error) {
 	}
 	changed := mergeActionEdits(edits, charCode(cfg))
 
-	ids := cfg.IDs
+	ids := tokens
 	if len(ids) == 0 {
 		ids = tableIDs(original)
 	}

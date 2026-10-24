@@ -55,7 +55,7 @@ const zh = {
     noBonuses: "没有可强化的条目",
 
     // 角色动作页
-    idsHint: "搜索 ID | mot | 名称，以空格分隔。",
+    idsHint: "搜索 ID | 动画号 | 名称，以空格分隔。",
     charEmpty: "解包目录里没有别的角色动作表",
     /** 清单上的记录这张表里一条都没有：不是错误，是 ids 与表不匹配（见后端 LoadActions）。 */
     actionsEmpty: "无搜索动作",
@@ -257,7 +257,7 @@ export const messages: Record<Lang, Messages> = {
 
         noBonuses: "No boostable entries",
 
-        idsHint: "Search ID | mot | name, space-separated.",
+        idsHint: "Search ID | motion | name, space-separated.",
         charEmpty: "No other character action tables extracted",
         actionsEmpty: "No matching actions",
         actionBranchSearch: "Search",
@@ -416,7 +416,7 @@ export const messages: Record<Lang, Messages> = {
 
         noBonuses: "強化できる項目がありません",
 
-        idsHint: "ID | mot | 名前を検索、空白区切り。",
+        idsHint: "ID | モーション | 名前を検索、空白区切り。",
         charEmpty: "解包先に他のキャラクターのアクション表がありません",
         actionsEmpty: "該当するアクションがありません",
         actionBranchSearch: "検索",
@@ -575,7 +575,7 @@ export const messages: Record<Lang, Messages> = {
 
         noBonuses: "강화할 항목이 없습니다",
 
-        idsHint: "ID | mot | 이름 검색, 공백 구분.",
+        idsHint: "ID | 모션 | 이름 검색, 공백 구분.",
         charEmpty: "다른 캐릭터의 액션 표가 없습니다",
         actionsEmpty: "일치하는 액션이 없습니다",
         actionBranchSearch: "검색",

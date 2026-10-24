@@ -13,7 +13,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {ActionsTable} from "@/components/ActionsTable"
 import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
-import {DrillContext, showMotDrill} from "@/components/actions-table/model"
+import {DrillContext, columnsOf, showMotDrill, toActionRow} from "@/components/actions-table/model"
 
 import {KEYS, cellAt, tableProps, useTableHarness, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
 
@@ -30,6 +30,19 @@ const headLines = (th: Element): string | string[] => {
 }
 
 describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 / 排序 / 钉住 / 层高）", () => {
+    it("filterText 在客户端过滤：按 id_ / 名称命中，不换数据", async () => {
+        const rows = [
+            makeRow("1000", {}, {id_: "1000", abilityTag_: "花風・薄紅舞"}),
+            makeRow("2000", {}, {id_: "2000", abilityTag_: "剣"}),
+        ]
+        const actionRows = rows.map(toActionRow)
+        const {container} = render(
+            <ActionsTable t={t} rows={actionRows} keys={columnsOf(actionRows)} filterText="花風" />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
+        expect(container.querySelector("tbody tr td[data-col-id=id_]")?.textContent).toContain("1000")
+    })
+
     it("数据列全部渲染成表头，前面多一格行号（`#` 不入列模型）", async () => {
         const {container} = render(<ActionsTable t={t} {...tableProps([makeRow("1000")])} />)
         await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))

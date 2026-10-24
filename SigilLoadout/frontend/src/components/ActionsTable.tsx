@@ -138,7 +138,7 @@ export type TableCommands = {
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
+export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, filterText, loading = false, busy = false, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -165,6 +165,11 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 不给 = 列 id 就是数据键与表头、显示原值、可编辑。
      */
     columnOf?: (key: string) => ColumnSpec | undefined
+    /**
+     * 记录清单（搜索框那串）：**只过滤当前这份 rows**，不触发后端重读。
+     * 语义见 `model` 的 `filterFn_idsOrName`（id_ / mot / 名称，空白或逗号分隔）。
+     */
+    filterText?: string
     /** **行序能拖**：给了才有行号列右边那条握把列、才接 dnd-kit（动作表的行是记录、没有行序，不传）。 */
     reorder?: (from: number, to: number) => void
     /**
@@ -420,10 +425,14 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪一片格：都是**受控状态** —— 值由我们给，
         // 库通过 onChange 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态）。
         // ⚠️ 列宽**没有** onChange：没注册 `columnResizingFeature`，列宽只由测量那一趟写（见 `useColumnMeasure`）。
-        state: {columnPinning: pinning, columnSizing, sorting, cellSelection},
+        state: {columnPinning: pinning, columnSizing, sorting, cellSelection, globalFilter: filterText ?? ""},
         onColumnPinningChange: setPinning,
         onSortingChange: setSorting,
         onCellSelectionChange: setCellSelection,
+        // 全局过滤只跑一遍（每个 token 在整行上找），所以只让 id_ 这一列"参与"，filterFn 自己看整行。
+        globalFilterFn: "idsOrName",
+        getColumnCanGlobalFilter: (column) => column.id === "id_",
+        onGlobalFilterChange: () => undefined,
     })
 
     /*
