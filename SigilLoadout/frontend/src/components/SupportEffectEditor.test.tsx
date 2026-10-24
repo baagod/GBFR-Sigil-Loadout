@@ -150,6 +150,16 @@ describe("附加效果弹窗", () => {
         expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["0", "0", "0", "0", "0", "0"] }]);
     });
 
+    it("搜索框右侧 × 清空搜索", () => {
+        renderEditor('["0"]');
+
+        fireEvent.change(screen.getByPlaceholderText(t.supportEffectSearch), { target: { value: "1039" } });
+        expect(rowNames()).toEqual(["双发子弹"]);
+
+        fireEvent.click(screen.getByRole("button", { name: t.clearSearch }));
+        expect(rowNames()).toEqual(["霸体", "双发子弹"]);
+    });
+
     it("标题栏输入框按哈希或名字过滤", () => {
         renderEditor('["0"]');
 

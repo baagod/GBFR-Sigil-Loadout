@@ -22,7 +22,7 @@ import {ChevronDown, Search} from "lucide-react"
 import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
 import {TableSkeleton} from "@/components/actions-table/TableSkeleton"
 import type {ActionRow} from "@/components/actions-table/model"
-import {DrillContext, columnsOf, showMotDrill, shownValue, toActionRow, type ColumnSpec} from "@/components/actions-table/model"
+import {DrillContext, RevealContext, columnsOf, showMotDrill, shownValue, snapshotKey, toActionRow, useEnterEditHandler, type ColumnSpec} from "@/components/actions-table/model"
 import {AnimationDetail} from "@/components/AnimationDetail"
 import {Badge} from "@/components/ui/badge"
 import {InfoBadge} from "@/components/InfoBadge"
@@ -39,6 +39,9 @@ import {PLAYER_CODE, type CharaTable} from "@/lib/chara"
 import type {Lang} from "@/lib/lang"
 import {buffName, loadBuffs, parseSupportEffects, type BuffInfo} from "@/lib/buffs"
 import type {Messages} from "@/lib/messages"
+
+/** 记录清单的"实际内容"：按空白切成词再拼回去（后端用 `strings.Fields`，比较也得用同一口径）。 */
+const normalizeIds = (value: string) => value.trim().split(/\s+/).filter(Boolean).join(" ")
 
 /**
  * 角色下拉。这一页的三份数据（动作表 / flags / FSM）**全都按角色走**，所以它是整页的选择，不是某一块的。
@@ -179,13 +182,21 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
  *   · 原 buff 改了参数 → sky 蓝；
  *   · 这一格新加的 buff → green 绿。
  *
- * badge 本身**没有点击事件**：空单元格不显示任何东西，双击整格进弹窗（唯一入口）。
- * 宽度由 `ColumnSpec.width`（400）钉住，超出在这个宽度里换行 —— 与轨表「效果」列同一套做法。
+ * badge 本身**没有点击事件**：空单元格不显示任何东西。进编辑统一走表的那套入口 ——
+ * 双击 / F2 / Enter 都落到 `enterEdit`（与普通格切输入框、选值格展开列表同一个注册表）。
+ * 宽度由 `ColumnSpec.width`（256）钉住，超出在这个宽度里换行 —— 与轨表「效果」列同一套做法。
  */
 function SupportEffectCell({row, nameOf}: {row: ActionRow; nameOf: (hash: string) => string}) {
     const drill = useContext(DrillContext)
+    const {reveal} = useContext(RevealContext)
     const raw = shownValue(row, "supportEffectList_")
     const spec = drill("supportEffectList_", raw)
+    const enterEdit = useCallback(() => {
+        reveal()
+        spec?.open(raw, row.id)
+    }, [reveal, spec, raw, row.id])
+    /** 与普通格 `Cell.enterEdit` / 选值格 `openForEdit` 同一处登记：Enter / F2 会喊它。 */
+    useEnterEditHandler(snapshotKey(row.id, "supportEffectList_"), enterEdit)
     const effects = parseSupportEffects(raw) ?? []
     const originals = new Map((parseSupportEffects(row.originals["supportEffectList_"] ?? "") ?? []).map((effect) => [
         effect.hash,
@@ -194,7 +205,7 @@ function SupportEffectCell({row, nameOf}: {row: ActionRow; nameOf: (hash: string
     return (
         <div
             className="flex min-h-6 w-full flex-wrap content-center items-center gap-x-1 gap-y-0.5 px-1 py-0.75 text-xs"
-            onDoubleClick={() => spec?.open(raw, row.id)}
+            onDoubleClick={enterEdit}
         >
             {effects.map((effect, index) => {
                 const original = originals.get(effect.hash)
@@ -282,6 +293,8 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     // 记录清单的输入框：idsText 是框里的半成品，idsApplied 是上一次真的生效的那份（失焦时比一比）。
     const [idsText, setIdsText] = useState("")
     const [idsApplied, setIdsApplied] = useState("")
+    /** 一次提交还没回来：防抖 + Enter 同时触发时别叠两发。 */
+    const applyingIdsRef = useRef(false)
 
     // 下方那块地方归谁：顶栏那个 ToggleGroup 在「动作表 / 通用轨 / 全员参数 / FSM」四块之间单选切换
     //（**默认动作表**，即 "actions"）。
@@ -343,7 +356,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     const columnOf = useMemo(
         () => (key: string): ColumnSpec | undefined =>
             key === "supportEffectList_"
-                ? {render: (row: ActionRow) => <SupportEffectCell row={row} nameOf={buffNameOf} />, width: 400}
+                ? {render: (row: ActionRow) => <SupportEffectCell row={row} nameOf={buffNameOf} />, width: 512}
                 : undefined,
         [buffNameOf],
     )
@@ -395,14 +408,16 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
      * ‼️ 这里是**唯一**读 `LoadActions` 的地方（表不再自己读），所以下面那份数据的角色一定是当前角色：
      * `switchCharacter` 先 `await SetCharacter` 再调本函数。
      */
-    const loadAll = async () => {
+    const loadAll = async (opts?: {keepIdsText?: boolean}) => {
         // ‼️ 第一件事：把表**立刻**藏起来、骨架顶上（换角色时旧数据还挂在表上，不能让它继续显示）。
         setTableLoading(true)
         const [path, codes, ids] = await Promise.all([Path(), ListCharacters(), ActionIDs()])
         setCharCode(charCodeOf(path ?? ""))
         setCharacters(codes ?? [])
         // 清单回填给工具栏那个输入框；idsApplied 记着"上一次真的生效的值"，失焦时才判断要不要提交。
-        setIdsText(ids ?? "")
+        // ‼️ `keepIdsText`：这是"提交清单之后的重读"，输入框里是用户敲的那串（含尾部空格/半截输入），
+        // 不能拿后端规范化后的值盖回去 —— 那一下就是用户看到的"自动恢复/抖动"。
+        if (!opts?.keepIdsText) setIdsText(ids ?? "")
         setIdsApplied(ids ?? "")
 
         // 这一步失败就抛给调用方（上面几份不受影响）。
@@ -452,18 +467,22 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
         // **空提交是有意义的一次提交**：空清单 = "这条表里全部记录"（后端 LoadActions 认这个值，
         // SetActionIDs 也收）。所以这里不再对空值提前返回 —— 那会让"清空"永远生效不了：设置里还是旧
         // 清单，换角色时 loadAll 重读 ActionIDs() 就把旧值填回框里，表也一直是被筛过的。
-        if (idsText.trim() === idsApplied.trim()) return
-        // 原样记住（含尾部空格、逗号写法）：提交完 loadAll 会重读，但框里显示的还是你敲的这一串。
+        // 按**规范化后的空格分隔串**比：后端就是这样归一（`strings.Fields`）。直接比原串的话，
+        // "4,6"、"4  6 "、尾部空格这些每次重读都对不上 → 每 500ms 再提交一次 + 整表重读（抖动来源）。
+        if (normalizeIds(idsText) === normalizeIds(idsApplied)) return
+        if (applyingIdsRef.current) return
+        applyingIdsRef.current = true
+        // 原样提交用户敲的那串（后端自己规范化）；成功后 loadAll 不回填输入框，框里就不会跳。
         const typed = idsText
         setBusy(true)
         try {
             await SetActionIDs(typed)
-            await loadAll()
-            setIdsText(typed)
+            await loadAll({keepIdsText: true})
         } catch (e) {
             // 写不进去也**不动输入框**（输入什么就是什么），只在控制台留一条。
             console.error(e)
         } finally {
+            applyingIdsRef.current = false
             setBusy(false)
         }
     }
@@ -475,7 +494,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
      * 也不是有效清单，只会白读几次）。值没变时 applyIds 自己会直接返回，首次回填也不会触发。
      */
     useEffect(() => {
-        if (idsText.trim() === idsApplied.trim()) return
+        if (normalizeIds(idsText) === normalizeIds(idsApplied)) return
         const timer = setTimeout(() => void applyIds(), 500)
         return () => clearTimeout(timer)
         // applyIds 每次渲染都是新的，放进依赖会每帧重置定时器；这里只认"输入的内容 + 上一次生效的值"。

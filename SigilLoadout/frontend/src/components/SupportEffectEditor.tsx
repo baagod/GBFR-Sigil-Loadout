@@ -17,10 +17,11 @@ import { useMemo, useState } from "react";
 import { buffName, formatSupportEffects, parseSupportEffects, type BuffInfo } from "@/lib/buffs";
 import type { Lang } from "@/lib/lang";
 import type { Messages } from "@/lib/messages";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 /** 每组固定 6 个值（`1 + 7n` 那个 7 里的 6）。 */
 const SLOTS = 6;
@@ -133,7 +134,7 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
             上下与中间的留白都走 8px（`py-2` + `gap-2`），高度由内容算：8 + 16(标签) + 8 + 20(输入) + 8 = 60px。
             不再写死 h-11：写死之后中间那道缝会被 justify-center 分走，上下缝和中间缝就不一样了。
         */
-        <div className="flex w-full flex-col justify-center gap-2 rounded-md border border-input bg-input/20 px-2 py-2">
+        <label className="flex w-full cursor-text flex-col justify-center gap-2 rounded-md border border-input bg-input/20 px-2 py-2">
             <span className="h-3 truncate text-[12px] leading-3 text-muted-foreground">{label}</span>
             <input
                 value={value}
@@ -143,7 +144,7 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
                 aria-label={ariaLabel}
                 className="h-[14px] w-full bg-transparent p-0 text-sm leading-[14px] outline-none"
             />
-        </div>
+        </label>
     );
 }
 
@@ -251,7 +252,7 @@ export function SupportEffectEditor({
                 <DialogHeader className="gap-3 border-b pb-4">
                     {/* 第一行只放标题与 ×：× 由 DialogContent 绝对定位在右上角，这里留出 pr-8 避开它。 */}
                     <DialogTitle className="text-base font-medium">{t.supportEffectTitle}</DialogTitle>
-                    {/* 第二行：搜索占满整行、带放大镜。搜索是这层最常用的动作，单独一行比挤在标题旁边好认。 */}
+                    {/* 第二行：搜索占满整行、带放大镜；右侧是默认样式的清除按钮（Ghost + X 图标）。 */}
                     <div className="relative pr-8">
                         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -259,8 +260,19 @@ export function SupportEffectEditor({
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t.supportEffectSearch}
                             aria-label={t.supportEffectSearch}
-                            className="w-full pl-8"
+                            className="w-full pr-8 pl-8"
                         />
+                        {query !== "" && (
+                            <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setQuery("")}
+                                aria-label={t.clearSearch}
+                                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
+                            >
+                                <X />
+                            </Button>
+                        )}
                     </div>
                 </DialogHeader>
 
