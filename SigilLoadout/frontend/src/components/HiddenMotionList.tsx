@@ -14,10 +14,12 @@ import type {Messages} from "@/lib/messages"
  * 组标题只是个说明、**不可折叠**（这一页下方那块地方本来就窄，清单也不长，一次全铺开更省事）；
  * 号用**网格**排（Link 风格按钮），格子里只有号本身，不显示任何判断标记。
  */
-export function HiddenMotionList({t, charCode, onOpen}: {
+export function HiddenMotionList({t, charCode, filterText, onOpen}: {
     t: Messages
     /** 当前角色码。只是当"该重读了"的信号用 —— ListHiddenMotions() 不带参数，后端按**它自己的当前角色**给数据。 */
     charCode: string
+    /** 工具栏那个搜索框（动画号）：在**已读到的清单**里筛，不再问后端。 */
+    filterText: string
     onOpen: (motion: string) => void
 }) {
     const [list, setList] = useState<HiddenMotion[]>([])
@@ -41,10 +43,18 @@ export function HiddenMotionList({t, charCode, onOpen}: {
         }
     }, [charCode])
 
+    const tokens = filterText
+        .toLowerCase()
+        .replaceAll(",", " ")
+        .split(/\s+/)
+        .filter(Boolean)
+    /** 这张页只有号，没有名字：token 按"号里含这段"匹配（与动作表那边的搜索同一套分词语义）。 */
+    const visible = tokens.length === 0 ? list : list.filter((item) => tokens.some((token) => item.motion.toLowerCase().includes(token)))
+
     const groups = (["skill", "other"] as const).map((key) => ({
         key,
         label: key === "skill" ? t.hmRangeSkill : t.hmGroupOther,
-        items: list.filter((item) => item.group === key),
+        items: visible.filter((item) => item.group === key),
     }))
 
     return (
@@ -75,6 +85,7 @@ export function HiddenMotionList({t, charCode, onOpen}: {
                 )
             )}
             {list.length === 0 && <p className="p-2 text-sm text-muted-foreground">{t.trackNone}</p>}
+            {list.length > 0 && visible.length === 0 && <p className="p-2 text-sm text-muted-foreground">{t.noMatchItems}</p>}
         </div>
     )
 }

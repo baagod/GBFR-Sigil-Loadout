@@ -628,7 +628,12 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                         section === "general" ? "flex-1" : "h-0 overflow-hidden -mt-4"
                     }`}
                 >
-                    <HiddenMotionList t={t} charCode={charCode} onOpen={(motion) => setMotTarget({motion, charCode})} />
+                    <HiddenMotionList
+                        t={t}
+                        charCode={charCode}
+                        filterText={idsText}
+                        onOpen={(motion) => setMotTarget({motion, charCode})}
+                    />
                 </div>
                 <div
                     className={`flex min-h-0 flex-col ${
