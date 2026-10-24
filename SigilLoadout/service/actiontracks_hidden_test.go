@@ -44,15 +44,17 @@ func TestPickHiddenMotionsKeepsEverythingButReferenced(t *testing.T) {
 func TestHiddenGroupKeysOnAttack(t *testing.T) {
 	for _, tc := range []struct {
 		have map[string]bool
+		fsm  bool
 		want string
 	}{
-		{map[string]bool{flagsKind: true, "attack": true, "effect": true}, groupSkill}, // 有 attack ⇒ 技能
-		{map[string]bool{"attack": true}, groupSkill},                                  // 只有 attack 也算
-		{map[string]bool{flagsKind: true, "effect": true}, groupOther},                 // 没有 attack ⇒ 其他
-		{map[string]bool{flagsKind: true, "speed": true}, groupOther},                  // speed 不参与分组
+		{map[string]bool{flagsKind: true, "attack": true, "effect": true}, false, groupSkill}, // 有 attack ⇒ 技能
+		{map[string]bool{"attack": true}, false, groupSkill},                                  // 只有 attack 也算
+		{map[string]bool{flagsKind: true, "effect": true}, false, groupOther},                 // 没有 attack ⇒ 其他
+		{map[string]bool{flagsKind: true, "speed": true}, false, groupOther},                  // speed 不参与分组
+		{map[string]bool{flagsKind: true, "effect": true}, true, groupSkill},                  // flags 置了「调用 FSM 技能」⇒ 技能
 	} {
-		if got := hiddenGroup(tc.have); got != tc.want {
-			t.Errorf("hiddenGroup(%v) = %q，want %q", tc.have, got, tc.want)
+		if got := hiddenGroup(tc.have, tc.fsm); got != tc.want {
+			t.Errorf("hiddenGroup(%v, fsm=%v) = %q，want %q", tc.have, tc.fsm, got, tc.want)
 		}
 	}
 }
@@ -63,6 +65,24 @@ duplicateOf 取"相同的轨最多"的那个号，并回答它**被动作表引�
 实测：3116 的 flags 与 effect 都和 3106 逐字节相同，而 3106 是被引用的；把 3116 放大后游戏里毫无反应，
 所以界面上这一栏要靠它把"没人播的重复轨"标出来。并列时取号小的，结果才稳定。
 */
+// flags 轨的「调用 FSM 技能」= Flag1 bit4；任意一段置位就算（实测有号只有子轨置位）。
+func TestFlagsHasFsmSkill(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{"没有 Flag1", `<SeqRoot><FlagsTrack><Seq Flag0="32"/></FlagsTrack></SeqRoot>`, false},
+		{"bit4", `<SeqRoot><FlagsTrack><Seq Flag1="16"/></FlagsTrack></SeqRoot>`, true},
+		{"混合掩码里的 bit4", `<SeqRoot><FlagsTrack><Seq Flag1="128"/><Seq Flag1="4194304"/><Seq Flag1="20"/></FlagsTrack></SeqRoot>`, true},
+		{"只有别的位", `<SeqRoot><FlagsTrack><Seq Flag1="128"/><Seq Flag1="134217728"/></FlagsTrack></SeqRoot>`, false},
+	} {
+		if got := flagsHasFsmSkill([]byte(tc.raw)); got != tc.want {
+			t.Errorf("%s: flagsHasFsmSkill = %v，want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestDuplicateOfPicksMostSharedAndReportsReference(t *testing.T) {
 	hashes := map[string]map[string]string{
 		"3106": {flagsKind: "A", "effect": "B"},

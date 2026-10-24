@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -328,9 +330,20 @@ func (s *ActionsService) ListHiddenMotions() ([]HiddenMotion, error) {
 	// kinds 是清单本身（号 → 有哪些轨）；hashes 只为判"内容逐字节相同"服务，顺路一起读。
 	kinds := map[string]map[string]bool{}
 	hashes := map[string]map[string]string{}
+	// fsmSkill：这个号有没有哪条 flags 轨置了「调用 FSM 技能」。
+	// ‼️ 必须看**所有子轨**：实测有 3 个号只有子轨置位、主轨（sub 0）没置（pl1900/4112 等）。
+	fsmSkill := map[string]bool{}
 	for _, path := range matches {
 		motion, sub, kind, ok := splitTrackName(filepath.Base(path), char)
-		if !ok || sub != "0" {
+		if !ok {
+			continue
+		}
+		if kind == flagsKind {
+			if raw, err := os.ReadFile(path); err == nil && flagsHasFsmSkill(raw) {
+				fsmSkill[motion] = true
+			}
+		}
+		if sub != "0" {
 			continue
 		}
 		if kinds[motion] == nil {
@@ -352,7 +365,7 @@ func (s *ActionsService) ListHiddenMotions() ([]HiddenMotion, error) {
 	motions := pickHiddenMotions(kinds, referenced)
 	out := make([]HiddenMotion, 0, len(motions))
 	for _, motion := range motions {
-		item := HiddenMotion{Motion: motion, Group: hiddenGroup(kinds[motion])}
+		item := HiddenMotion{Motion: motion, Group: hiddenGroup(kinds[motion], fsmSkill[motion])}
 		for _, code := range sortedKeys(refs[motion]) {
 			// 自己不算"别的角色"：这一栏问的是"还有谁在用这个号"。
 			if code == char {
@@ -384,9 +397,26 @@ func pickHiddenMotions(kinds map[string]map[string]bool, referenced map[string]b
 	return motions
 }
 
-// hiddenGroup 按"有没有 attack 轨"把号归入一组（互斥且全覆盖，取值见 group* 常量）。
-func hiddenGroup(have map[string]bool) string {
-	if have["attack"] {
+// flag1Value 抓 flags 轨里每段的 Flag1 掩码（十进制）。
+var flag1Value = regexp.MustCompile(`Flag1="(\d+)"`)
+
+// flagsHasFsmSkill 问这份 flags 轨有没有任意一段置了 Flag1 bit4 —— 界面上的「调用 FSM 技能」。
+func flagsHasFsmSkill(raw []byte) bool {
+	for _, match := range flag1Value.FindAllSubmatch(raw, -1) {
+		if value, err := strconv.ParseUint(string(match[1]), 10, 64); err == nil && value&(1<<4) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+/*
+hiddenGroup 分组：有 attack 轨，或任意 flags 轨置了「调用 FSM 技能」，都算「技能」。互斥且全覆盖。
+
+FSM 这一条是为了把"不播攻击、但走技能 FSM"的号从「其他」里挑出来（只在轨迹表页分组，动作表页无关）。
+*/
+func hiddenGroup(have map[string]bool, fsmSkill bool) string {
+	if have["attack"] || fsmSkill {
 		return groupSkill
 	}
 	return groupOther
