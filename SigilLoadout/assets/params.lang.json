@@ -381,7 +381,7 @@
             "zh": "奥义连锁伤害上限"
         },
         "conceitCurve_": {
-            "zh": "坚忍曲线"
+            "zh": "刚健曲线"
         },
         "contributionPointArray_": {
             "zh": "贡献度点数"
@@ -444,25 +444,25 @@
             "zh": "倒地无敌时间"
         },
         "drainValueLimitByAction_HeartsOnFire_": {
-            "zh": "汲取上限（HeartsOnFire）"
+            "zh": "汲取上限（烈焰之心）"
         },
         "drainValueLimitByAction_HeroicBeat_": {
-            "zh": "汲取上限（HeroicBeat）"
+            "zh": "汲取上限（英勇打击）"
         },
         "drainValueLimitByAction_NeverEnoughDragon_": {
-            "zh": "汲取上限（NeverEnough 龙形态）"
+            "zh": "汲取上限（永无止境 龙形态）"
         },
         "drainValueLimitByAction_NeverEnoughSuper_": {
-            "zh": "汲取上限（NeverEnough 奥义）"
+            "zh": "汲取上限（永无止境 强化版）"
         },
         "drainValueLimitByAction_NeverEnough_": {
-            "zh": "汲取上限（NeverEnough）"
+            "zh": "汲取上限（永无止境）"
         },
         "drainValueLimitByAction_Pl0900Attack_": {
-            "zh": "汲取上限（PL0900 攻击）"
+            "zh": "汲取上限（巴恩攻击）"
         },
         "drainValueLimitByAction_ViolentShadows_": {
-            "zh": "汲取上限（ViolentShadows）"
+            "zh": "汲取上限（暴虐暗影）"
         },
         "drainValueLimitByBuff_": {
             "zh": "汲取上限（增益）"
@@ -471,7 +471,7 @@
             "zh": "汲取上限（无尽模式增益）"
         },
         "drainValueLimitByPl2800Buff_": {
-            "zh": "汲取上限（PL2800 增益）"
+            "zh": "汲取上限（芙劳增益）"
         },
         "earth_": {
             "zh": "土属性"
@@ -963,13 +963,13 @@
             "zh": "减速转为迟缓的比例"
         },
         "smiteAttackRateMax_": {
-            "zh": "痛击攻击倍率上限"
+            "zh": "重击攻击倍率上限"
         },
         "smiteAttackRateMin_": {
-            "zh": "痛击攻击倍率下限"
+            "zh": "重击攻击倍率下限"
         },
         "smiteCurve_": {
-            "zh": "痛击曲线"
+            "zh": "重击曲线"
         },
         "spArtsAutoHomingParam_": {
             "zh": "奥义自动追踪参数"

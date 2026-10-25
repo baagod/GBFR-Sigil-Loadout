@@ -134,7 +134,7 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
             上下与中间的留白都走 8px（`py-2` + `gap-2`），高度由内容算：8 + 16(标签) + 8 + 20(输入) + 8 = 60px。
             不再写死 h-11：写死之后中间那道缝会被 justify-center 分走，上下缝和中间缝就不一样了。
         */
-        <label className="flex w-full cursor-text flex-col justify-center gap-2 rounded-md border border-input bg-input/20 px-2 py-2">
+        <label className="flex w-full cursor-text flex-col justify-center gap-[7px] rounded-md border border-input bg-input/20 px-2 pt-[7px] pb-[7px]">
             <span className="h-3 truncate text-[12px] leading-3 text-muted-foreground">{label}</span>
             <input
                 value={value}
@@ -142,7 +142,7 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
                 onChange={(event) => onChange(event.target.value)}
                 inputMode="numeric"
                 aria-label={ariaLabel}
-                className="h-[14px] w-full bg-transparent p-0 text-sm leading-[14px] outline-none"
+                className="h-[13px] w-full bg-transparent p-0 text-[13px] leading-[13px] outline-none"
             />
         </label>
     );

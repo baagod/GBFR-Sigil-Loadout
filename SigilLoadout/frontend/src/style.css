@@ -298,24 +298,6 @@ table tr.row-removed > td.cell-handle {
 /* 行号列右缘那条 2px 边框已挪到选区覆盖层（`selectionOverlay` 的 `rowHead`）——
    不再改 `<td>` 的 border 宽度：那会动表格布局，也不随覆盖层一起横滚跟随。 */
 
-/* 「全局参数」表：一行里任意一格拿焦点时，整行下沿画 1px 线（rgb(43,127,255)，与动作表的焦点框同色）。
-   用伪元素不用 border-b-2（border 参与布局，焦点会让整行跳 1px）；挂 `<tr>` 上让两格一起变色；
-   `bottom: -1px` 压住格子自己的 1px 下框线，避免"亮线 + 暗线"两条。 */
-@utility row-focus {
-    &:focus-within > td {
-        position: relative;
-
-        &::after {
-            content:    "";
-            position:   absolute;
-            right:      0;
-            bottom:     -1px;
-            left:       0;
-            height:     1px;
-            background: rgb(43, 127, 255);
-        }
-    }
-}
 
 
 /* 「专精技能」页的两级吸顶（角色行 + 专精类型名）。两个 sticky 元素必须是滚动容器的直接子/孙元素，

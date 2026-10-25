@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react"
+import {useRef, useState} from "react"
 import {Input} from "@/components/ui/input"
 import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
 
@@ -25,7 +25,7 @@ import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({tdClassName, value, onCommit, placeholder, override, editTrigger, alignBottom}: {
+export function EditableCell({tdClassName, value, onCommit, placeholder, override, alignBottom}: {
     /** 这个格的 td 类，由调用点给（各表的边框/底色/吸顶不一样）。 */
     tdClassName: string
     value: string
@@ -37,8 +37,7 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
      * 草稿提交回原值等于"没改"（提交空串，见下面 onBlur）。
      */
     override?: boolean
-    /** 外部要求"进编辑态"的递增 token（整行点击用）：值变大就打开输入框，不改变其它状态。 */
-    editTrigger?: number
+
     /** 输入框贴着格子**底部**（与显示态的文字底对齐）：单行 input 默认是竖向居中的，不贴底会跳一下。 */
     alignBottom?: boolean
 }) {
@@ -52,25 +51,16 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
     const [editing, setEditing] = useState(false)
     /** 显示态那层文本（焦点环由 td 的 `:focus-within` 画，见 style.css 的 cell-focus）。 */
     const textRef = useRef<HTMLDivElement>(null)
-    /**
-     * 程序化把焦点还给文本层时，别在 onFocus 里**又弹回编辑态**。
-     *
-     * 文本层的 onFocus 是"点一下 / Tab 进来就编辑"，而 Esc 退出编辑恰恰要把焦点放回它
-     * —— 没有这个开关就会自己把自己弹回去 ✗。
-     */
-    const skipFocusRef = useRef(false)
+
     /**
      * Esc 那条路自己收尾时用：紧接着 input 会失焦，**那一次 blur 不许提交**（Esc = 放弃草稿）。
      * （Enter 走的还是 blur 那条唯一提交路径，只是不经这里。）
      */
     const skipCommitRef = useRef(false)
-    /** 已经响应过的外部 token：只有"变了"才进编辑，重渲染不重复打开。 */
-    const seenTriggerRef = useRef(editTrigger ?? 0)
-    useEffect(() => {
-        if (editTrigger === undefined || editTrigger <= seenTriggerRef.current) return
-        seenTriggerRef.current = editTrigger
-        setEditing(true)
-    }, [editTrigger])
+
+
+
+
     // 没在编辑的格子跟着**显示值**走：别处保存完、重读回来的新值要上屏，预填的那份也要跟着回正。
     if (!editing && draft !== shown) setDraft(shown)
 
@@ -89,7 +79,18 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
     }
 
     return (
-        <td className={tdClassName} onClick={() => setEditing(true)}>
+                <td
+            className={`${tdClassName} cursor-text`}
+            onMouseDown={(e) => {
+                // 编辑中：值格里非输入框的位置（比如上缘）什么都不做，别让输入框失焦再重进。
+                if (editing && !(e.target as HTMLElement).closest("input")) e.preventDefault()
+            }}
+            onClick={() => {
+                const selection = window.getSelection()
+                if (selection && !selection.isCollapsed && selection.toString().trim() !== "") return
+                setEditing(true)
+            }}
+        >
             {/*
              * 显示态那段文本**两个状态下都留在流里**——它才是列宽的唯一来源。
              *
@@ -107,14 +108,7 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                 tabIndex={editing ? -1 : 0}
                 // 不可见时别把同一份文本再塞进无障碍树（编辑态该读的是那个输入框）。
                 aria-hidden={editing || undefined}
-                onFocus={() => {
-                    // Esc 刚把焦点还回来：这一次不算"用户要编辑"。
-                    if (skipFocusRef.current) {
-                        skipFocusRef.current = false
-                        return
-                    }
-                    setEditing(true)
-                }}
+
                 onKeyDown={(e) => onCopy(e, false)}
                 className={`${CELL_TEXT} ${value === "" ? "text-muted-foreground" : ""} ${editing ? "opacity-0" : ""}`}
             >
@@ -134,6 +128,7 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                         // Esc 那条路已经自己收过尾（焦点交给文本层、草稿丢掉）→ 这一次 blur 不提交。
                         if (skipCommitRef.current) {
                             skipCommitRef.current = false
+                            setEditing(false)
                             return
                         }
                         // 原值模型下，草稿等于**原值**就是"没改"：提交空串退回原值（后端把空串当
@@ -141,16 +136,17 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                         // 轨表的 value 就是真值，没有这一层，值没变就什么都不做。
                         if (override && placeholder !== undefined && draft === placeholder) {
                             if (value !== "") onCommit("")
-                            return
+                        } else if (draft !== value) {
+                            onCommit(draft)
                         }
-                        if (draft !== value) onCommit(draft)
+
+
                     }}
                     onKeyDown={(e) => {
                         // 回车提交：焦点先交给本格文本层（它会触发上面那个 onBlur），
                         // 于是**提交仍然只有 blur 那一条路** ✓，而焦点一刻都没离开这一格 →
                         // 焦点环不闪（与 Esc 同一条收尾，只是这里要提交）。
                         if (e.key === "Enter") {
-                            skipFocusRef.current = true
                             textRef.current?.focus({preventScroll: true})
                             return
                         }
@@ -169,7 +165,6 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                         if (e.key === "Escape") {
                             e.preventDefault()
                             e.stopPropagation()
-                            skipFocusRef.current = true // 这一次 focus 不算"用户要编辑"
                             skipCommitRef.current = true // 紧接着的 blur 不提交（草稿要丢掉）
                             textRef.current?.focus({preventScroll: true})
                             setDraft(value) // 放弃草稿：下一次进编辑态是干净的原值
