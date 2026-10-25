@@ -13,14 +13,13 @@
     ⚠️ 勾选与值分开存：**编辑输入框不会自动勾上这一行** —— 勾选是明确的动作，没勾的效果不写回。
     ‼️ 没有保存/取消按钮：改动先留在弹窗里，**关窗（× / Esc / 点遮罩）时才写回那一格**；没改就不写。
 */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { buffName, formatSupportEffects, parseSupportEffects, type BuffInfo } from "@/lib/buffs";
 import type { Lang } from "@/lib/lang";
 import type { Messages } from "@/lib/messages";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Search, X } from "lucide-react";
 
 /** 每组固定 6 个值（`1 + 7n` 那个 7 里的 6）。 */
@@ -173,6 +172,7 @@ export function SupportEffectEditor({
     /** 关掉弹窗（× / Esc / 点遮罩）—— 关窗即保存。 */
     onClose: () => void;
 }) {
+    const searchBox = useRef<HTMLInputElement>(null);
     /** 资产里的 buff + 这一格里的未知哈希（见 rowsOf：不补这一行，写回时未知效果会丢）。 */
     const list = useMemo(() => rowsOf(buffs, value), [buffs, value]);
     /** 哈希 → 原值那 6 个槽（输入框占位符 + 空输入的回落值）。 */
@@ -252,28 +252,33 @@ export function SupportEffectEditor({
                 <DialogHeader className="gap-3 border-b pb-4">
                     {/* 第一行只放标题与 ×：× 由 DialogContent 绝对定位在右上角，这里留出 pr-8 避开它。 */}
                     <DialogTitle className="text-base font-medium">{t.supportEffectTitle}</DialogTitle>
-                    {/* 第二行：搜索占满整行、带放大镜；右侧是默认样式的清除按钮（Ghost + X 图标）。 */}
-                    <div className="relative pr-8">
-                        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
+                    {/* 第二行：搜索占满整行、带放大镜；清除叉走 InputGroup 的内联槽位（与因子编辑页同一组件），
+                        绝对定位会按容器算，有字时叉跑到输入框外。 */}
+                    <InputGroup>
+                        <InputGroupAddon align="inline-start">
+                            <Search className="text-muted-foreground" />
+                        </InputGroupAddon>
+                        <InputGroupInput
+                            ref={searchBox}
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t.supportEffectSearch}
                             aria-label={t.supportEffectSearch}
-                            className="w-full pr-8 pl-8"
                         />
                         {query !== "" && (
-                            <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                onClick={() => setQuery("")}
-                                aria-label={t.clearSearch}
-                                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
-                            >
-                                <X />
-                            </Button>
+                            <InputGroupAddon align="inline-end">
+                                <InputGroupButton
+                                    aria-label={t.clearSearch}
+                                    onClick={() => {
+                                        setQuery("");
+                                        searchBox.current?.focus();
+                                    }}
+                                >
+                                    <X />
+                                </InputGroupButton>
+                            </InputGroupAddon>
                         )}
-                    </div>
+                    </InputGroup>
                 </DialogHeader>
 
                 <div className="min-h-0 flex-1 overflow-y-auto pr-4" data-testid="support-effect-rows">
