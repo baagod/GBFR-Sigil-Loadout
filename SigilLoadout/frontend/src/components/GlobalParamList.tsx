@@ -1,16 +1,18 @@
-import {useEffect, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {ListGlobalParams} from "../../bindings/sigilloadout/service/actionsservice"
+import type {ParamLabels} from "../../bindings/sigilloadout/service/models"
+import {loadParamLabels, paramTableLabel} from "@/lib/paramlabels"
 
 /**
  * 「全局参数」那张表的清单（左右分栏里的**左栏**）：解包目录 `system\player\` 下那十几张
  * **不分角色**的参数表（guardparam / damagecalcparam …）。
  *
- * 点一行就换右边那张表。这里只列文件名，不做中文名也不分组 —— 表名就是游戏自己的文件名，
- * 改一张表要认得出的正是它。表名因此**不翻译**，这个组件也就不需要文案表。
+ * 点一行就换右边那张表。每行两行字：上面是译名（`assets/params.lang.json`）、下面是游戏自己的文件名 ——
+ * 译名方便找表，文件名是这张表的身份（改表、对日志时要认的还是它）。
  *
  * 条目长相**照 combobox 的条目**（见 ui/combobox.tsx 的 ComboboxItem，用户要求这个风格）：
- * `rounded-sm` + `py-1.5 pl-2 pr-2`（上下各 6px 内边距 → 32px 行高）+ 选中用 `bg-accent`、
- * 悬停用淡一档的 `bg-accent/50`。**行与行之间不留外边距**（用户要求"0 间距"），所以外层不加 gap。
+ * `rounded-sm` + `py-1.5 pl-2 pr-2` + 选中用 `bg-accent`、悬停用淡一档的 `bg-accent/50`。
+ * **行与行之间不留外边距**（用户要求"0 间距"），所以外层不加 gap。
  *
  * ⚠️ 只在挂载时读一次（依赖是空数组）：这一层在**解包根**下（`<根>\system\player`），而角色只换它下面
  * data\<角色>\ 那一段 —— 换角色不会换出另一份清单。
@@ -25,11 +27,19 @@ export function GlobalParamList({onOpen, selected, onLoaded, className}: {
     className?: string
 }) {
     const [tables, setTables] = useState<string[]>([])
+    const [labels, setLabels] = useState<ParamLabels | null>(null)
     const [failure, setFailure] = useState("")
+    const listRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         let alive = true
         void (async () => {
+            try {
+                const loaded = await loadParamLabels()
+                if (alive) setLabels(loaded)
+            } catch {
+                /* 译名表读不到就只显示文件名 */
+            }
             try {
                 const names = await ListGlobalParams()
                 if (alive) {
@@ -48,20 +58,50 @@ export function GlobalParamList({onOpen, selected, onLoaded, className}: {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    /** 上下方向键在清单里移动选中项；焦点跟着走到新条目上（否则连按第二下时焦点还在旧条）。 */
+    const moveSelection = (delta: number) => {
+        if (tables.length === 0) return
+        const current = tables.indexOf(selected ?? "")
+        const next = Math.min(tables.length - 1, Math.max(0, (current < 0 ? 0 : current) + delta))
+        if (next === current || next < 0 || !tables[next]) return
+        onOpen(tables[next])
+        requestAnimationFrame(() => {
+            listRef.current?.querySelector<HTMLElement>(`[data-index="${next}"]`)?.focus()
+        })
+    }
+
     return (
         // ⚠️ **不许出现横向滚动条**（用户要求）：这一栏是给"左右分栏"用的，名字必须一行看全，
         // 于是纵向自己滚、横向直接裁掉（宽度由外面给 `w-max`，按最长的名字自适应）。
         // 这里也不用 scrollbar-gutter-stable：它会在右侧留 ~15px 沟槽，选中底色就永远够不到列右边缘。
-        <div className={"min-h-0 overflow-y-auto overflow-x-hidden " + (className ?? "")}>
+        <div
+            ref={listRef}
+            // 滚动条隐掉（用户要求）：这一栏自己滚、但不画条 —— 够不够滚由条目露没露出来判断。
+            // 键盘：↑/↓ 换选中项（焦点跟着走），Enter/Space 由条目自己处理。
+            onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                    e.preventDefault()
+                    moveSelection(1)
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault()
+                    moveSelection(-1)
+                }
+            }}
+            className={
+                "min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden " +
+                (className ?? "")
+            }
+        >
             {failure && <p className="p-2 text-xs text-destructive">{failure}</p>}
             {/* 行与行之间 6px（用户要求）：条目本身 32px（文字 20 + 上下各 6px 内边距）。 */}
             <div className="flex flex-col gap-1.5">
-                {tables.map((table) => (
+                {tables.map((table, index) => (
                     // ⚠️ 用 div + role="button" 而**不是** <button>：Chromium 里 <button> 内的文字
                     // **用鼠标拖选选不中**（程序化 Range 能选中，所以一不小心就会误判成"已经能选了"）。
                     // 这里要的就是"能拖选、复制表名"，所以换掉标签；键盘可达性用 tabIndex + Enter/Space 补上。
                     <div
                         key={table}
+                        data-index={index}
                         role="button"
                         tabIndex={0}
                         onClick={() => onOpen(table)}
@@ -76,10 +116,14 @@ export function GlobalParamList({onOpen, selected, onLoaded, className}: {
                             (selected === table ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
                         }
                     >
-                        {/* 后缀只是文件格式与命名习惯，对用户没意义（用户要求去掉）：
-                            `.msg` 是格式，`param` / `parameter` 是这批表共有的尾巴（`guardparam` → `guard`、
-                            `playerlinkattackvoiceparameter` → `playerlinkattackvoice`）。传出去的仍是完整文件名。 */}
-                        {table.replace(/\.msg$/, "").replace(/param(eter)?$/, "")}
+                        {/* 上：译名（查不到就退成文件名）；下：文件名，后缀只在显示时去掉 —— 传出去的仍是完整文件名。 */}
+                        <span className="flex min-w-0 flex-col leading-tight">
+                            {/* 列表里去掉结尾的「参数」：左边栏本来就全是参数表，两个字纯占宽。 */}
+                            <span className="truncate">{paramTableLabel(labels, table).replace(/参数$/, "")}</span>
+                            <span className="truncate font-mono text-[11px] text-muted-foreground">
+                                {table.replace(/\.msg$/, "").replace(/param(eter)?$/, "")}
+                            </span>
+                        </span>
                     </div>
                 ))}
             </div>

@@ -254,12 +254,26 @@ func (s *ActionsService) deployGlobalParam(cfg actionConfig, table string, edits
 // 这 16 张表里的叶子**实测全是 msgpack 字符串**（一个数字/布尔都没有），所以写回就是换一个字符串；
 // 换成别的种类的节点会被静默编成一堆 0，所以对不上就报错、不猜。
 // 字符串长度由 writeStr 自己处理（原来是 fixstr 装不下就升级成 str8），不需要在这里管。
+// setGlobalParamValue 按原节点自己的种类写值：字符串照抄，布尔只收 true/false。
+// ‼️ 种类不换：把字符串写进整数/布尔节点会编出一份游戏读不懂的表（见 globalparams_test 那条）。
 func setGlobalParamValue(node *msgValue, value string) error {
-	if node.format != msgString {
-		return fmt.Errorf("这一格不是字符串，这里不给它换种类")
+	switch node.format {
+	case msgString:
+		node.str = value
+		return nil
+	case msgBool:
+		switch strings.TrimSpace(value) {
+		case "true":
+			node.bl = true
+		case "false":
+			node.bl = false
+		default:
+			return fmt.Errorf("这一格是布尔值，%q 不是 true/false", value)
+		}
+		return nil
+	default:
+		return fmt.Errorf("这一格不是字符串或布尔值，这里不给它换种类")
 	}
-	node.str = value
-	return nil
 }
 
 /*

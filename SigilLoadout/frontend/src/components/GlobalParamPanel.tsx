@@ -1,10 +1,12 @@
-import {useEffect, useState} from "react"
+import {Fragment, useEffect, useState} from "react"
 import {LoadGlobalParam, SaveGlobalParam} from "../../bindings/sigilloadout/service/actionsservice"
-import type {ActionField} from "../../bindings/sigilloadout/service/models"
+import type {ActionField, ParamLabels} from "../../bindings/sigilloadout/service/models"
 import {LoadConfig} from "../../bindings/sigilloadout/service/loadoutservice"
+import {Checkbox} from "@/components/ui/checkbox"
 import {EditableCell} from "@/components/EditableCell"
 import {messages, type Messages} from "@/lib/messages"
 import {LANGS, initialLang, type Lang} from "@/lib/lang"
+import {loadParamLabels, paramFieldLabel, paramFieldLabelParts} from "@/lib/paramlabels"
 
 /*
     「全局参数」那张表的**面板**：由主窗口里的一个 dialog 显示（见 ActionsPanel 的 globals 那一段）。
@@ -20,6 +22,12 @@ import {LANGS, initialLang, type Lang} from "@/lib/lang"
     表格是**点击编辑**（EditableCell：平时是文本、点一下才变输入框），不是给每格铺一个输入框：
     playerabilityuiparameter 那张有 1103 行，平铺输入框会像动作表那样把主线程卡住一秒。
 */
+/** 布尔叶子：原值是 true/false 的那一类。界面用勾选框，不用文本输入。 */
+const isBoolField = (original: string) => original === "true" || original === "false"
+
+/** 这一格显示的值：改过用改动，没改过用原值（与 EditableCell 的 override 同一口径）。 */
+const booleanShown = (field: ActionField) => (field.value ? field.value : field.original)
+
 export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
     table: string
     // 有没有没保存的改动（外面那个「保存」按钮据此决定要不要一起保存这张表）。
@@ -29,13 +37,22 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
 }) {
     const [t, setT] = useState<Messages | null>(null)
     const [fields, setFields] = useState<ActionField[]>([])
+    const [labels, setLabels] = useState<ParamLabels | null>(null)
     const [dirty, setDirty] = useState(false)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
+    /** 行点击"进编辑"的递增信号（按行号）：值列自己不带外部触发口，用这个 token 让它切输入框。 */
+    const [editSignals, setEditSignals] = useState<Record<number, number>>({})
 
     useEffect(() => {
         let alive = true
         void (async () => {
+            try {
+                const loaded = await loadParamLabels()
+                if (alive) setLabels(loaded)
+            } catch {
+                /* 译名表读不到不影响这张表：原路径照旧可读 */
+            }
             // 语言只存 loadout.json 一处（见 lang.ts）：窗口不继承主窗口的内存状态，所以自己读一遍；
             // 读不到就退回"系统语言"这套猜测。
             let lang: Lang = initialLang()
@@ -68,6 +85,16 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
         setFields((prev) => prev.map((field, i) => (i === index ? {...field, value} : field)))
         setDirty(true)
     }
+
+    /** 布尔格翻转：勾选框自己点、或整行点击都走这一条（改回原值 = 写成空串 = 没改）。 */
+    const toggleBool = (index: number) => {
+        const field = fields[index]
+        const next = booleanShown(field) === "true" ? "false" : "true"
+        edit(index, next === field.original ? "" : next)
+    }
+
+    /** 整行点击：值格切进编辑态（EditableCell 收到递增 token 就自己打开输入框）。 */
+    const requestEdit = (index: number) => setEditSignals((prev) => ({...prev, [index]: (prev[index] ?? 0) + 1}))
 
     /**
      * 保存这张表：整张交给后端（原始 + 改动 → 一份完整 msgpack 写进 mod），失败就地显示。
@@ -120,40 +147,101 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
             <div className="min-h-0 flex-1 overflow-auto pr-2 scrollbar-gutter-stable">
                 {/* 表**不套外框**，只剩下每一行下面那条线（与 mot 窗口里的 FSM 表同一套，用户要求）；
                     格线颜色仍走全站那一个来路（table-border → --input），不自己定一套。
-                    `[&_tr:last-child>*]:border-b-0`：**最后一行不要下边框**（用户要求）—— 表到那里就结束了，
-                    留着那条线等于给表画了一条多余的收尾线。 */}
-                <table className="w-full table-border border-separate border-spacing-0 text-xs [&_tr:last-child>*]:border-b-0">
+                    最后一行也画下边框（用户要求）：表到哪里结束由滚动条告诉，不靠"少一条线"。 */}
+                <table className="w-full table-border border-separate border-spacing-0 text-xs">
                     <tbody>
                         {fields.map((field, i) => (
-                            // row-focus（style.css）：行里任意一格拿到焦点时，**整行**下沿画一条 2px 的
-                            // ring 色线 —— 包括左边那格字段名。用伪元素而不是 border-b-2：border 会改布局，
+                            // row-focus（style.css）：行里任意一格拿到焦点时，**整行**下沿画一条 1px 的
+                            // rgb(43,127,255) 线 —— 包括左边那格字段名。用伪元素而不是 border-b-2：border 会改布局，
                             // 焦点一来下面的行全跳 1px。
-                            <tr key={field.key} className="row-focus">
+                            <tr
+                                key={field.key}
+                                className="row-focus"
+                                onMouseDown={(e) => {
+                                    // 这一行正在编辑：别让 mousedown 把焦点从输入框抢走。
+                                    // 点的是行里其它地方（td 不可聚焦）时，浏览器默认会把焦点移走 → blur 提交/退出编辑，
+                                    // 紧接着 click 又把它拉回来，看着就是"退出再进入"。
+                                    if (!e.currentTarget.querySelector('input:not([type="checkbox"])')) return
+                                    if ((e.target as HTMLElement).closest("input")) return
+                                    e.preventDefault()
+                                }}
+                                onClick={(e) => {
+                                    // 勾选框自己处理一次就够了；不然冒泡上来会再翻一次（净零）。
+                                    if ((e.target as HTMLElement).closest("[data-slot=checkbox]")) return
+                                    // 这一行已经在编辑：别再发"进编辑"信号 —— 否则点一下会先因失焦退出编辑、
+                                    // 又被新 token 拉回输入态（看着像闪一下重新进编辑）。
+                                    // 只看**文本编辑框**：勾选框组件自己也渲染一个 input[type=checkbox]，别把它当成"正在编辑"。
+                                    if (e.currentTarget.querySelector('input:not([type="checkbox"])')) return
+                                    // 鼠标拖选文本不是"点击进入"：选中了字段名就只做选择，不抢焦点。
+                                    const selection = window.getSelection()
+                                    if (
+                                        selection &&
+                                        !selection.isCollapsed &&
+                                        selection.toString().trim() !== "" &&
+                                        e.currentTarget.contains(selection.anchorNode)
+                                    ) {
+                                        return
+                                    }
+                                    if (isBoolField(field.original)) toggleBool(i)
+                                    else requestEdit(i)
+                                }}
+                            >
                                 {/* 字段名只显示**第一个 "." 之后**的部分（用户要求）：点前面那一截就是左边选中的
                                     那张表名（`PlayerLinkAttackVoiceParameter.selectVersatileVoice_MainStory`
                                     → `selectVersatileVoice_MainStory`），每行都一样、纯占地方。
                                     表名本身在左栏是**高亮**的，所以看字段不需要这一截。
                                     值仍然整串给后端（key 是身份，改的只是显示）。 */}
-                                <td className="border-b px-2 py-1 whitespace-nowrap">
-                                    {field.key.replace(/^[^.]*\./, "")}
+                                <td className="border-b px-2 py-1 align-top">
+                                    {/* 译名在上（14px / 500）：**默认灰**，这一行改过才亮成白字；整行不换行。 */}
+                                    <span
+                                        className={
+                                            "block text-sm leading-5 font-medium whitespace-nowrap " +
+                                            (field.value ? "text-foreground" : "text-muted-foreground")
+                                        }
+                                    >
+                                        {/* 分隔符单独画：同一字号下 `›` 视觉太小，放大一档（仍跟随这一行的颜色）。 */}
+                                        {paramFieldLabelParts(labels, table, field.key).map((word, index) => (
+                                            <Fragment key={index}>
+                                                {index > 0 && (
+                                                    <span className="mx-1 text-[16px] leading-none">›</span>
+                                                )}
+                                                {word}
+                                            </Fragment>
+                                        ))}
+                                    </span>
+                                    {/* 原字段在下（12px / 常规字重）：一直是灰的，只作对照。 */}
+                                    <span className="block font-mono text-[12px] leading-4 whitespace-nowrap text-muted-foreground">
+                                        {field.key.replace(/^[^.]*\./, "")}
+                                    </span>
                                 </td>
-                                {/* 值与动作表同一套：value 为空 = 没改过，显示原值当占位符（灰）。
-                                    `w-full` 让这一列吃掉剩下的宽度（左边那列不换行，宽度正好等于最长那个
-                                    字段名）；`align-middle` 让单行的值在这行里居中（表格默认按基线排）。
+                                {/* 值：字符串走 EditableCell（value 为空 = 没改过，显示原值当占位符），
+                                    布尔值换成勾选框 —— 表格里点一下就是"改这一格"，没有输入法/非法文本的问题。
 
-                                    ⚠️ 这一格有两处刻意的不同（用户要求，只这张表这样）：
+                                    ⚠️ 字符串那一格有两处刻意的不同（用户要求，只这张表这样）：
                                       · 底色**透明**（别处可编辑格是写死的 #1a1a1a，见 TrackGrid / ActionsPanel）；
                                       · **不带 `cell-focus`** = 不画那圈焦点线。`relative` 得自己补上 ——
                                         编辑时那个 `<Input>` 是 `absolute inset-0`，没有定位祖先就会跑出格子
                                         （cell-focus 平时顺手提供 position:relative，这里得显式写）。
-                                    焦点那圈线由上面那个 row-focus 负责（整行一条 2px 的下划线）。 */}
-                                <EditableCell
-                                    tdClassName="relative w-full border-b p-0 align-middle"
-                                    value={field.value ?? ""}
-                                    placeholder={field.original}
-                                    override
-                                    onCommit={(value) => edit(i, value)}
-                                />
+                                    焦点那圈线由上面那个 row-focus 负责（整行一条 1px 的下划线）。 */}
+                                {isBoolField(field.original) ? (
+                                    <td className="w-full border-b px-2 pt-1 pb-1 align-bottom">
+                                        <Checkbox
+                                            checked={booleanShown(field) === "true"}
+                                            aria-label={paramFieldLabel(labels, table, field.key)}
+                                            onCheckedChange={() => toggleBool(i)}
+                                        />
+                                    </td>
+                                ) : (
+                                    <EditableCell
+                                        editTrigger={editSignals[i]}
+                                        alignBottom
+                                        tdClassName="relative w-full border-b p-0 align-bottom [&>div]:items-end [&>div]:pb-1"
+                                        value={field.value ?? ""}
+                                        placeholder={field.original}
+                                        override
+                                        onCommit={(value) => edit(i, value)}
+                                    />
+                                )}
                             </tr>
                         ))}
                     </tbody>

@@ -1,4 +1,4 @@
-import {useRef, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {Input} from "@/components/ui/input"
 import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
 
@@ -25,7 +25,7 @@ import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
-export function EditableCell({tdClassName, value, onCommit, placeholder, override}: {
+export function EditableCell({tdClassName, value, onCommit, placeholder, override, editTrigger, alignBottom}: {
     /** 这个格的 td 类，由调用点给（各表的边框/底色/吸顶不一样）。 */
     tdClassName: string
     value: string
@@ -37,6 +37,10 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
      * 草稿提交回原值等于"没改"（提交空串，见下面 onBlur）。
      */
     override?: boolean
+    /** 外部要求"进编辑态"的递增 token（整行点击用）：值变大就打开输入框，不改变其它状态。 */
+    editTrigger?: number
+    /** 输入框贴着格子**底部**（与显示态的文字底对齐）：单行 input 默认是竖向居中的，不贴底会跳一下。 */
+    alignBottom?: boolean
 }) {
     /**
      * 这一格显示的那份文本：原值模型下**没填过值就是原值**（`placeholder`），轨表就是 `value` 本身。
@@ -60,6 +64,13 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
      * （Enter 走的还是 blur 那条唯一提交路径，只是不经这里。）
      */
     const skipCommitRef = useRef(false)
+    /** 已经响应过的外部 token：只有"变了"才进编辑，重渲染不重复打开。 */
+    const seenTriggerRef = useRef(editTrigger ?? 0)
+    useEffect(() => {
+        if (editTrigger === undefined || editTrigger <= seenTriggerRef.current) return
+        seenTriggerRef.current = editTrigger
+        setEditing(true)
+    }, [editTrigger])
     // 没在编辑的格子跟着**显示值**走：别处保存完、重读回来的新值要上屏，预填的那份也要跟着回正。
     if (!editing && draft !== shown) setDraft(shown)
 
@@ -188,7 +199,7 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                     // 列宽是由显示态文本撑出来的，内容区正好等于文本宽度（实测 clientWidth == scrollWidth），
                     // 于是"该列最长的那串文本"一旦进入编辑态，光标就落在最后一个字符的边界上、看着像卡在
                     // 数字里。左侧内边距保持 4px 不动 —— 文字起点与显示态仍然对得齐，只是行尾多出余量。
-                    className={`absolute inset-0 h-auto! ${CELL_INPUT} pr-0`}
+                    className={alignBottom ? `absolute inset-x-0 bottom-1 h-5! leading-5 ${CELL_INPUT} pr-0` : `absolute inset-0 h-auto! ${CELL_INPUT} pr-0`}
                 />
             )}
         </td>

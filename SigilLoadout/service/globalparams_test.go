@@ -511,3 +511,27 @@ func TestRealGlobalParamFilesRoundTripByteIdentical(t *testing.T) {
 		t.Fatal("解包目录里一份 .msg 都没有")
 	}
 }
+
+// 布尔叶子：改 true/false 要真的写进节点（以前只收字符串，界面上点了也会报错）。
+func TestSaveGlobalParamWritesBoolLeaves(t *testing.T) {
+	const table = "guardparam.msg"
+	service, _ := globalParamFixture(t, table, gpMap(
+		gpEntry("GuardParam", gpMap(gpEntry("isAutoDash_", &msgValue{format: msgBool, bl: true}))),
+	))
+
+	if err := service.SaveGlobalParam(table, []ActionField{{Key: "GuardParam.isAutoDash_", Value: strPtr("false")}}); err != nil {
+		t.Fatalf("写布尔值: %v", err)
+	}
+	rows, err := service.LoadGlobalParam(table)
+	if err != nil {
+		t.Fatalf("LoadGlobalParam: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Original != "true" || rows[0].Value == nil || *rows[0].Value != "false" {
+		t.Fatalf("布尔节点读回来是 %+v，want 原值 true / 改动 false", rows)
+	}
+
+	// 非 true/false 的写法不猜：拒绝，且不留改动。
+	if err := service.SaveGlobalParam(table, []ActionField{{Key: "GuardParam.isAutoDash_", Value: strPtr("1")}}); err == nil {
+		t.Fatal("布尔节点收下了 \"1\"")
+	}
+}
