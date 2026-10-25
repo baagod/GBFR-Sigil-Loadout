@@ -127,7 +127,13 @@ func (s *ActionsService) SaveGlobalParam(table string, fields []ActionField) err
 		return err
 	}
 	for _, field := range fields {
-		edits = setGlobalParamEdit(edits, table, field.Key, field.Value)
+		value := field.Value
+		// 空串在界面上等于"没改"（占位符显示原值）：当成没编辑，而不是把空格写进表里
+		// —— 数值类叶子被清成 "" 会让游戏启动解析失败（conceitCurve_.Params 实测）。
+		if value != nil && *value == "" {
+			value = nil
+		}
+		edits = setGlobalParamEdit(edits, table, field.Key, value)
 	}
 	// 部署这一步把三件事一次办完：非法路径当场报错（坏改动不会先被存下来）、"有没有真改动"顺手算出来、
 	// 该写的字节也合成了。它同时决定账本该记什么：全是空操作的那些改动不记账，mod 里那份也删掉

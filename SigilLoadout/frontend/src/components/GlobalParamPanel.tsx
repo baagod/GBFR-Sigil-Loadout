@@ -80,7 +80,8 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
      * 灰着。改回原值只是把这一格写成原值本身，同样是一次正常保存。
      */
     const edit = (index: number, value: string) => {
-        setFields((prev) => prev.map((field, i) => (i === index ? {...field, value} : field)))
+        // 清空输入框 = 回到原值（保存时按"没改过"处理）；空串不能当成值写进表里。
+        setFields((prev) => prev.map((field, i) => (i === index ? {...field, value: value === "" ? undefined : value} : field)))
         setDirty(true)
     }
 

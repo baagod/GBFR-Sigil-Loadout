@@ -362,7 +362,29 @@ func TestSaveGlobalParamKeepsOnlyRealEdits(t *testing.T) {
 	}
 }
 
-// 表名会被拼进路径与部署路径，带分隔符/上跳/不是 .msg 的一律挡在外面。
+// 清空输入框（Value 指向空串）要按"没改"处理：空串写进数值叶子会让游戏启动失败
+// （damagecalcparam 的 conceitCurve_.Params 实测崩过一次）。
+func TestSaveGlobalParamTreatsEmptyValueAsRevert(t *testing.T) {
+	const table = "guardparam.msg"
+	service, _ := globalParamFixture(t, table, sampleGuardParam())
+
+	rows, err := service.LoadGlobalParam(table)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SaveGlobalParam(table, setValue(rows, "GuardParam.GuardGageMax", "")); err != nil {
+		t.Fatalf("清空一格: %v", err)
+	}
+	if edits, err := loadGlobalParamEdits(); err != nil {
+		t.Fatal(err)
+	} else if len(edits) != 0 {
+		t.Fatalf("清空之后改动表 = %+v，要的是空的", edits)
+	}
+	if _, err := os.Stat(deployGlobalParamPath(table)); !os.IsNotExist(err) {
+		t.Fatalf("清空不应该留下部署文件，stat err = %v", err)
+	}
+}
+
 func TestGlobalParamRefusesBadTableNames(t *testing.T) {
 	service, _ := globalParamFixture(t, "guardparam.msg", sampleGuardParam())
 	for _, table := range []string{"", "..", "../../x.msg", `system\player`, "guardparam", "guardparam.txt", "../guardparam.msg"} {
