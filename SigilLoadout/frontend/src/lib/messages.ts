@@ -222,7 +222,7 @@ export const messages: Record<Lang, Messages> = {
     // en 的大小写：标签类（页签、按钮、占位符、aria、空态）Title Case；整句（失败消息、崩溃提示）
     // 句首大写。句子里有 to/of 这类词，Title Case 会读成坏英文。
     en: {
-        tabGeneral: "General Loadout",
+        tabGeneral: "Equipment",
         tabExclusive: "Exclusive Sigils",
         tabSigilEditor: "Sigil Edit",
         tabLimitBonus: "Character Boost",
