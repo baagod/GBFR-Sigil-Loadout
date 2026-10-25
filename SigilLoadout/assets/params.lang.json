@@ -13,7 +13,7 @@
             "zh": "技能界面参数"
         },
         "playerailmentparameter.msg": {
-            "zh": "异常状态参数"
+            "zh": "弱化效果参数"
         },
         "playerautohomingparameter.msg": {
             "zh": "自动追踪参数"
@@ -31,10 +31,10 @@
             "zh": "玩家列表"
         },
         "playerlockonparameter.msg": {
-            "zh": "锁敌参数"
+            "zh": "锁定参数"
         },
         "playerlockonwingparameter.msg": {
-            "zh": "锁敌镜头参数"
+            "zh": "锁定镜头参数"
         },
         "playermoveparameter.msg": {
             "zh": "玩家移动参数"
@@ -50,348 +50,1032 @@
         }
     },
     "segments": {
-        "AddRateChaos": {"zh": "混乱难度增加率"},
-        "AfterInvisibleSec": {"zh": "奥义结束后无敌时间"},
-        "AttackHitAddPoint": {"zh": "攻击命中增加点数"},
-        "AutoHealAmount": {"zh": "自动回复量"},
-        "AutoHealAmount_inBattle": {"zh": "战斗中自动回复量"},
-        "CamAddLen": {"zh": "镜头拉远距离"},
-        "CamAddLenLimit": {"zh": "镜头拉远距离上限"},
-        "CamAddLenTimer": {"zh": "镜头拉远持续时间"},
-        "CamAddRate": {"zh": "镜头拉远倍率"},
-        "ChainBurstATKRate_2Chain": {"zh": "二连锁爆发攻击倍率"},
-        "ChainBurstATKRate_3Chain": {"zh": "三连锁爆发攻击倍率"},
-        "ChainBurstATKRate_FullChain": {"zh": "满连锁爆发攻击倍率"},
-        "ChargeParryAcceptFrame": {"zh": "蓄力格挡判定帧"},
-        "ChargeParryInvinsbleTime": {"zh": "蓄力格挡无敌时间"},
-        "CurveFile": {"zh": "曲线文件"},
-        "DamageHitAddPoint": {"zh": "受击增加点数"},
-        "DamageHitBonusPoint_HpHigh": {"zh": "高血量受击奖励点数"},
-        "DamageHitBonusPoint_HpLow": {"zh": "低血量受击奖励点数"},
-        "DamageStopHealSec": {"zh": "受击后停止回复时间"},
-        "FocusPointOffsetHeight2D": {"zh": "2D 准星高度偏移"},
-        "FocusPointScoreTable2D": {"zh": "2D 准星评分表"},
-        "FocusPointScoreTable3D": {"zh": "3D 准星评分表"},
-        "GageMax_NewMode": {"zh": "计量上限（新模式）"},
-        "GuardAutoHealValue": {"zh": "格挡值自动回复量"},
-        "GuardBreakDamageCutRate": {"zh": "格挡破防伤害减免率"},
-        "GuardBreakSec": {"zh": "格挡破防时间"},
-        "GuardDamageCutRate": {"zh": "格挡伤害减免率"},
-        "GuardGageMax": {"zh": "格挡值上限"},
-        "GuardPointBreakGageRate": {"zh": "格挡点破防计量倍率"},
-        "GuardPointStopHealSec": {"zh": "格挡点停止回复时间"},
-        "GuardStopHealSec": {"zh": "格挡停止回复时间"},
-        "HelpGuardBreakGageRate": {"zh": "援护格挡破防计量倍率"},
-        "HelpGuardStopHealSec": {"zh": "援护格挡停止回复时间"},
-        "HelpHealAmount": {"zh": "援护回复量"},
-        "HelpHealAmount_inBattle": {"zh": "战斗中援护回复量"},
-        "ID": {"zh": "ID"},
-        "InputHealAmount_": {"zh": "手动回复量"},
-        "IsManualLockOnByFocusPoint_LinearScoring2D": {"zh": "2D 准星手动锁定"},
-        "IsManualLockOnByFocusPoint_LinearScoring3D": {"zh": "3D 准星手动锁定"},
-        "JustGuardAcceptFrame": {"zh": "精准防御判定帧"},
-        "JustGuardAttackBreakRate": {"zh": "精准防御破防倍率"},
-        "JustGuardAttackOffset": {"zh": "精准防御攻击偏移"},
-        "JustGuardAttackSize": {"zh": "精准防御攻击范围"},
-        "JustGuardPraiseVoiceIntervalSec": {"zh": "精准防御称赞语音间隔"},
-        "KnockBackGuardTurnRate": {"zh": "击退格挡转向倍率"},
-        "KnockBackJudgePowerMax": {"zh": "击退判定强度上限"},
-        "KnockBackJudgePowerMin": {"zh": "击退判定强度下限"},
-        "KnockBackRateMax": {"zh": "击退倍率上限"},
-        "KnockBackRateMin": {"zh": "击退倍率下限"},
-        "NpcActivateEnemyHpRate_2chain_": {"zh": "NPC 触发二连锁时敌人血量倍率"},
-        "NpcActivateEnemyHpRate_3chain_": {"zh": "NPC 触发三连锁时敌人血量倍率"},
-        "NpcActivateEnemyHpRate_Single_": {"zh": "NPC 触发单体奥义时敌人血量倍率"},
-        "NpcGageAddRate": {"zh": "NPC 计量增加倍率"},
-        "NpcGageAddRateChaos": {"zh": "NPC 计量增加倍率（混乱）"},
-        "NpcInputHealAmount_": {"zh": "NPC 手动回复量"},
-        "Params": {"zh": "参数"},
-        "SpArtsAfterGagePenaltyRate_": {"zh": "奥义后计量惩罚倍率"},
-        "SpArtsAfterGagePenaltySec_": {"zh": "奥义后计量惩罚时间"},
-        "SpArtsChainAddRate": {"zh": "奥义连锁增加倍率"},
-        "TutorialAttackHitAddPoint": {"zh": "教程攻击命中增加点数"},
-        "abilityTag_": {"zh": "技能键"},
-        "abilityUIInfoList_": {"zh": "技能界面信息"},
-        "addDamageLimitBonusStatusRate_": {"zh": "伤害上限加成状态倍率"},
-        "addPoint2ChainBurst": {"zh": "二连锁爆发增加点数"},
-        "addPoint2ChainBurst_Chaos": {"zh": "二连锁爆发增加点数（混乱）"},
-        "addPoint3ChainBurst": {"zh": "三连锁爆发增加点数"},
-        "addPoint3ChainBurst_Chaos": {"zh": "三连锁爆发增加点数（混乱）"},
-        "addPointAbilityUse_Max": {"zh": "能力使用增加点数上限"},
-        "addPointAbilityUse_Max_Chaos": {"zh": "能力使用增加点数上限（混乱）"},
-        "addPointAbilityUse_Min": {"zh": "能力使用增加点数下限"},
-        "addPointAbilityUse_Min_Chaos": {"zh": "能力使用增加点数下限（混乱）"},
-        "addPointFullChainBurst": {"zh": "满连锁爆发增加点数"},
-        "addPointFullChainBurst_Chaos": {"zh": "满连锁爆发增加点数（混乱）"},
-        "addPointLinkAttack": {"zh": "连锁攻击增加点数"},
-        "addPointLinkAttack_Chaos": {"zh": "连锁攻击增加点数（混乱）"},
-        "addPointReceptionistSummon": {"zh": "接待员召唤增加点数"},
-        "addPointReceptionistSummon_Chaos": {"zh": "接待员召唤增加点数（混乱）"},
-        "addPointReviveFriend": {"zh": "复活队友增加点数"},
-        "addPointReviveFriend_Chaos": {"zh": "复活队友增加点数（混乱）"},
-        "addPointSpArts": {"zh": "奥义增加点数"},
-        "addPointSpArts_Chaos": {"zh": "奥义增加点数（混乱）"},
-        "addPointUseAllPotion": {"zh": "使用全体回复药增加点数"},
-        "addPointUseAllPotion_Chaos": {"zh": "使用全体回复药增加点数（混乱）"},
-        "aiIgnoreGroundHitTime_": {"zh": "AI 无视落地硬直时间"},
-        "aiSelectUseAbilityType_": {"zh": "AI 选择使用能力类型"},
-        "assist2stRangeLimit_": {"zh": "辅助二段范围上限"},
-        "assistActiveGuardRate_": {"zh": "辅助主动格挡倍率"},
-        "assistActiveGuardRate_GuardOnly_": {"zh": "辅助主动格挡倍率（仅格挡）"},
-        "atkTypeDamageLimit_Ability_": {"zh": "能力伤害上限"},
-        "atkTypeDamageLimit_Normal_": {"zh": "普通攻击伤害上限"},
-        "atkTypeDamageLimit_SpArts_": {"zh": "奥义伤害上限"},
-        "autoDashStartTime_": {"zh": "自动冲刺启动时间"},
-        "autoDashThreshold_": {"zh": "自动冲刺阈值"},
-        "autoHealStunPerSec_": {"zh": "每秒自动回复眩晕值"},
-        "autoReviveCoolTime_": {"zh": "自动复活冷却时间"},
-        "autoReviveHpRate_": {"zh": "自动复活血量比例"},
-        "autoReviveMaxCount_": {"zh": "自动复活次数上限"},
-        "avoidCountMax_": {"zh": "闪避次数上限"},
-        "avoidCountResetTime_": {"zh": "闪避次数重置时间"},
-        "baseAbilityCoolTime_Max": {"zh": "基础能力冷却上限"},
-        "baseAbilityCoolTime_Min": {"zh": "基础能力冷却下限"},
-        "burn_DamageInterval_": {"zh": "灼烧伤害间隔"},
-        "burn_EmDamageRate_": {"zh": "灼烧对敌伤害倍率"},
-        "burn_SupHpRate_": {"zh": "灼烧对支援效果的血量倍率"},
-        "cameraControlParamX_": {"zh": "镜头控制参数 X"},
-        "cameraCtrlCorrectDistMax_": {"zh": "镜头校正距离上限"},
-        "cameraCtrlCorrectDistMin_": {"zh": "镜头校正距离下限"},
-        "cameraCtrlParamY_DistMax_": {"zh": "镜头 Y 轴距离上限"},
-        "cameraCtrlParamY_DistMin_": {"zh": "镜头 Y 轴距离下限"},
-        "chainBurstDamageLimit_": {"zh": "连锁爆发伤害上限"},
-        "conceitCurve_": {"zh": "坚忍曲线"},
-        "contributionPointArray_": {"zh": "贡献度点数"},
-        "criticalDamageUpperRate_": {"zh": "暴击伤害上限倍率"},
-        "damageStunTimerStopSec_": {"zh": "受击眩晕计时停止时间"},
-        "dark_": {"zh": "暗属性"},
-        "dataVersion_": {"zh": "数据版本"},
-        "debuffTimeExtendParam_": {"zh": "减益延长时间参数"},
-        "decreasePointNoBattle_": {"zh": "非战斗减少点数"},
-        "decreasePoint_": {"zh": "减少点数"},
-        "dieCountGageDecreaseBias_2": {"zh": "死亡计数计量减少偏置 2"},
-        "dieCountGageDecreaseBias_3": {"zh": "死亡计数计量减少偏置 3"},
-        "dieCountGageDecreaseBias_4": {"zh": "死亡计数计量减少偏置 4"},
-        "dieCountMax_": {"zh": "死亡次数上限"},
-        "dieCountMax_Ultimate_": {"zh": "死亡次数上限（究极难度）"},
-        "dieVoiceIntervalSec_": {"zh": "死亡语音间隔"},
-        "dimension_DamageInterval_": {"zh": "次元伤害间隔"},
-        "dimension_DamageLimit7st_": {"zh": "次元伤害上限（第 7 段）"},
-        "dimension_SupHpRate_": {"zh": "次元对支援效果的血量倍率"},
-        "distMax_": {"zh": "距离上限"},
-        "distMin_": {"zh": "距离下限"},
-        "downInvisibleTime_": {"zh": "倒地无敌时间"},
-        "drainValueLimitByAction_HeartsOnFire_": {"zh": "吸收上限（HeartsOnFire）"},
-        "drainValueLimitByAction_HeroicBeat_": {"zh": "吸收上限（HeroicBeat）"},
-        "drainValueLimitByAction_NeverEnoughDragon_": {"zh": "吸收上限（NeverEnough 龙形态）"},
-        "drainValueLimitByAction_NeverEnoughSuper_": {"zh": "吸收上限（NeverEnough 奥义）"},
-        "drainValueLimitByAction_NeverEnough_": {"zh": "吸收上限（NeverEnough）"},
-        "drainValueLimitByAction_Pl0900Attack_": {"zh": "吸收上限（PL0900 攻击）"},
-        "drainValueLimitByAction_ViolentShadows_": {"zh": "吸收上限（ViolentShadows）"},
-        "drainValueLimitByBuff_": {"zh": "吸收上限（增益）"},
-        "drainValueLimitByEndlessModeBuff_": {"zh": "吸收上限（无尽模式增益）"},
-        "drainValueLimitByPl2800Buff_": {"zh": "吸收上限（PL2800 增益）"},
-        "earth_": {"zh": "土属性"},
-        "em8300WaterBallBindDisableTime_": {"zh": "水球束缚解除时间"},
-        "em8300WaterBallBindDotDamageRate_": {"zh": "水球束缚持续伤害倍率"},
-        "em8300WaterBallBindDotDamageTime_": {"zh": "水球束缚持续伤害时间"},
-        "em8300WaterBallBindHealValue_": {"zh": "水球束缚回复量"},
-        "em8300WaterBallBindInvincibleTime_": {"zh": "水球束缚无敌时间"},
-        "enemyStatusAttackerRateUpperLimit_": {"zh": "敌方攻击状态倍率上限"},
-        "enemyStatusDeffenderRateLowerLimit_": {"zh": "敌方防御状态倍率下限"},
-        "enmityCurve_": {"zh": "仇火曲线"},
-        "farDistanceAutoHomingParam_": {"zh": "远距离自动追踪参数"},
-        "fearDeffenceDownPercent_": {"zh": "恐惧防御下降百分比"},
-        "fire_": {"zh": "火属性"},
-        "frostbiteCoolTimeSec_": {"zh": "冰结冷却时间"},
-        "gameOverCrisisSecMax_": {"zh": "濒死倒计时上限"},
-        "gameOverCrisisSecMax_Ultimate_": {"zh": "濒死倒计时上限（究极难度）"},
-        "gameOverCrisisSecMin_": {"zh": "濒死倒计时下限"},
-        "gameOverCrisisSecMin_Ultimate_": {"zh": "濒死倒计时下限（究极难度）"},
-        "garrisonCurve_": {"zh": "坚守曲线"},
-        "guardFailedPenaltyTime": {"zh": "格挡失败惩罚时间"},
-        "gutsCoolTime_": {"zh": "毅力冷却时间"},
-        "gutsInvinsibleSec_": {"zh": "毅力无敌时间"},
-        "gutsMaxCount_": {"zh": "毅力次数上限"},
-        "healLimit_Ability_": {"zh": "回复上限（能力）"},
-        "healLimit_ReviveAbility_": {"zh": "回复上限（复活能力）"},
-        "healLimit_RevivePotion_": {"zh": "回复上限（复活药）"},
-        "healLimit_System_": {"zh": "回复上限（系统）"},
-        "height": {"zh": "高度"},
-        "hipSliderSpeedListNum_": {"zh": "滑行速度表条目数"},
-        "hipSliderSpeedList_": {"zh": "滑行速度表"},
-        "hormingMoveRateMax_": {"zh": "追踪移动倍率上限"},
-        "hormingMoveRateMin_": {"zh": "追踪移动倍率下限"},
-        "illusionInInvisibleTime_": {"zh": "幻影无敌时间"},
-        "isAutoDash_": {"zh": "启用自动冲刺"},
-        "isBreakObjectCheck": {"zh": "检测可破坏物"},
-        "isEnableStickInput": {"zh": "允许摇杆输入"},
-        "isForceEnableStickInput": {"zh": "强制允许摇杆输入"},
-        "isLockOnMaxRangeSetting": {"zh": "按最大锁定距离设置"},
-        "isUltimateDifficultyChange_": {"zh": "究极难度生效"},
-        "jumpAssistFrame_": {"zh": "跳跃辅助帧"},
-        "justAvoidFrame_": {"zh": "精准闪避判定帧"},
-        "justAvoidSucces_InvinsibleTime_": {"zh": "精准闪避成功无敌时间"},
-        "largeDamageVoiceIntervalSec_": {"zh": "重创语音间隔"},
-        "largeDamageVoiceTriggerHpRate_": {"zh": "重创语音触发血量比例"},
-        "level0_": {"zh": "等级 0"},
-        "level1_": {"zh": "等级 1"},
-        "level2_": {"zh": "等级 2"},
-        "level3_": {"zh": "等级 3"},
-        "level4_": {"zh": "等级 4"},
-        "level5_": {"zh": "等级 5"},
-        "light_": {"zh": "光属性"},
-        "linkTimeAbilityCoolTimeRecoverRate_": {"zh": "连锁时间能力冷却回复倍率"},
-        "linkTimeAccelEndSec_": {"zh": "连锁时间加速结束时间"},
-        "linkTimeAccelSpeedRate_": {"zh": "连锁时间加速倍率"},
-        "linkTimeAddPointDecreaseSpeedAccelEndSec_": {"zh": "连锁时间点数减少减速加速结束时间"},
-        "linkTimeAddPointDecreaseSpeedAccelSpeedRate_": {"zh": "连锁时间点数减少减速加速倍率"},
-        "linkTimeAddPointDecreaseSpeedUpSec_": {"zh": "连锁时间点数减少减速开始时间"},
-        "linkTimeAttackBuffRate_": {"zh": "连锁时间攻击增益倍率"},
-        "linkTimeAttackHitExtendAtkRate_Max_": {"zh": "连锁时间攻击命中延长攻击倍率上限"},
-        "linkTimeAttackHitExtendAtkRate_Min_": {"zh": "连锁时间攻击命中延长攻击倍率下限"},
-        "linkTimeAttackHitExtendCoolTimeSec_": {"zh": "连锁时间攻击命中延长冷却时间"},
-        "linkTimeAttackHitExtendSec_": {"zh": "连锁时间攻击命中延长时间"},
-        "linkTimeAttackHitExtendSec_Max_": {"zh": "连锁时间攻击命中延长时间上限"},
-        "linkTimeAttackHitExtendSec_Min_": {"zh": "连锁时间攻击命中延长时间下限"},
-        "linkTimeCriticalRate_": {"zh": "连锁时间暴击率"},
-        "linkTimeDecreaseSpeedUpSec_": {"zh": "连锁时间点数减少加速开始时间"},
-        "linkTimeEnemySlowRate_": {"zh": "连锁时间敌人减速倍率"},
-        "linkTimeExtendAtkRateCurve_": {"zh": "连锁时间延长攻击倍率曲线"},
-        "linkTimeKeepSec_": {"zh": "连锁时间持续时间"},
-        "linkTimeRecoverHpRate_": {"zh": "连锁时间回复血量比例"},
-        "linkTimeRecoverIntervalSec_": {"zh": "连锁时间回复间隔"},
-        "lockOnCameraControlReactionSec_": {"zh": "锁定镜头控制反应时间"},
-        "lockOnSwitchWaitSec_": {"zh": "锁定切换等待时间"},
-        "lockonCameraOffsetAngleFar_": {"zh": "锁定镜头远距离角度偏移"},
-        "lockonCameraOffsetAngleNear_": {"zh": "锁定镜头近距离角度偏移"},
-        "lockonCameraOffsetAngleOffsetX_": {"zh": "锁定镜头 X 轴角度偏移"},
-        "lockonCameraOffsetAngleOffsetX_Far_": {"zh": "锁定镜头 X 轴角度偏移（远）"},
-        "lockonCameraOffsetAngleOffsetX_Far_CameraFar_": {"zh": "锁定镜头 X 轴角度偏移（远·镜头远）"},
-        "lockonCameraOffsetAngleOffsetX_Near_": {"zh": "锁定镜头 X 轴角度偏移（近）"},
-        "lockonCameraOffsetAngleXCheckCameraDistFar_": {"zh": "锁定镜头 X 轴检查镜头距离（远）"},
-        "lockonCameraOffsetAngleXCheckCameraDistNear_": {"zh": "锁定镜头 X 轴检查镜头距离（近）"},
-        "lockonCameraOffsetAngleXCheckDistFar_": {"zh": "锁定镜头 X 轴检查距离（远）"},
-        "lockonCameraOffsetAngleXCheckDistNear_": {"zh": "锁定镜头 X 轴检查距离（近）"},
-        "lockonCameraOffsetCheckDistFar_": {"zh": "锁定镜头检查距离（远）"},
-        "lockonCameraOffsetCheckDistNear_": {"zh": "锁定镜头检查距离（近）"},
-        "maxHpDebuffCoolTimeSec_": {"zh": "最大生命减益冷却时间"},
-        "maxHpDebuffRate_": {"zh": "最大生命减益比例"},
-        "maxLen": {"zh": "搜索距离上限"},
-        "maxRot": {"zh": "搜索角度上限"},
-        "nearDistanceAutoHomingParam_": {"zh": "近距离自动追踪参数"},
-        "npcPotionHealMax_": {"zh": "NPC 回复药回复上限"},
-        "npcPotionHealRate_": {"zh": "NPC 回复药回复比例"},
-        "npcUsePotionCoolTimeRandom_": {"zh": "NPC 使用回复药随机冷却"},
-        "npcUsePotionCoolTime_": {"zh": "NPC 使用回复药冷却"},
-        "npcUsePotionCountMax_": {"zh": "NPC 使用回复药次数上限"},
-        "npcUsePotionTriggerHpRate_": {"zh": "NPC 使用回复药触发血量比例"},
-        "npcUsePotionWaitTimeMax_": {"zh": "NPC 使用回复药等待上限"},
-        "npcUsePotionWaitTimeMin_": {"zh": "NPC 使用回复药等待下限"},
-        "parameter01_": {"zh": "参数 1"},
-        "parameter02_": {"zh": "参数 2"},
-        "parameter03_": {"zh": "参数 3"},
-        "parameterType_": {"zh": "参数类型"},
-        "passiveInvinsibleTime_": {"zh": "被动无敌时间"},
-        "playerStatusAttackerRateUpperLimit_": {"zh": "我方攻击状态倍率上限"},
-        "playerStatusDeffenderRateLowerLimit_": {"zh": "我方防御状态倍率下限"},
-        "pointMax_": {"zh": "点数上限"},
-        "poisonByGimmick_DamageInterval_": {"zh": "机关中毒伤害间隔"},
-        "poisonByGimmick_EmDamageRate_": {"zh": "机关中毒对敌伤害倍率"},
-        "poisonByGimmick_SupHpRate_": {"zh": "机关中毒对支援效果的血量倍率"},
-        "poison_DamageInterval_": {"zh": "中毒伤害间隔"},
-        "poison_EmDamageRate_": {"zh": "中毒对敌伤害倍率"},
-        "poison_SupHpRate_": {"zh": "中毒对支援效果的血量倍率"},
-        "questId_": {"zh": "任务 ID"},
-        "rankAtkRate_": {"zh": "等级攻击倍率"},
-        "rateMax_": {"zh": "倍率上限"},
-        "rateMin_": {"zh": "倍率下限"},
-        "rate_": {"zh": "倍率"},
-        "restraintCoolTimeSec_": {"zh": "束缚冷却时间"},
-        "rotMax_": {"zh": "旋转上限"},
-        "rotMin_": {"zh": "旋转下限"},
-        "searchTargetInfoList_": {"zh": "索敌信息列表"},
-        "selectPairsUniqueVoice_MainStory_": {"zh": "组合专属语音概率（主线）"},
-        "selectVersatileVoice_MainStory_": {"zh": "通用语音概率（主线）"},
-        "selectVersatileVoice_Quest_": {"zh": "通用语音概率（任务）"},
-        "selfInputInterval_": {"zh": "手动输入间隔"},
-        "shotAutoHomingParam_": {"zh": "射击自动追踪参数"},
-        "skill233Curve_": {"zh": "技能 233 曲线"},
-        "skill234Curve_": {"zh": "技能 234 曲线"},
-        "skillAvoidMovementRate_": {"zh": "技能闪避移动倍率"},
-        "skillBoardDamageRateDown": {"zh": "技能盘伤害降低倍率"},
-        "skillBoardDamageRateUp": {"zh": "技能盘伤害提升倍率"},
-        "skillBoardGuildmarmGaugeRateDown": {"zh": "技能盘公会接待员计量降低倍率"},
-        "skillBoardGuildmarmGaugeRateUp": {"zh": "技能盘公会接待员计量提升倍率"},
-        "skillBoardMonkGaugeRateDown": {"zh": "技能盘武僧计量降低倍率"},
-        "skillBoardMonkGaugeRateUp": {"zh": "技能盘武僧计量提升倍率"},
-        "skillBoardRefereeDebuffRate": {"zh": "技能盘裁判减益倍率"},
-        "skillBoardRefereeDebuffTime": {"zh": "技能盘裁判减益时间"},
-        "skillBoardRefereeStunRateDown": {"zh": "技能盘裁判眩晕降低倍率"},
-        "skillBoardRouletteAmplifyRate": {"zh": "技能盘轮盘强化倍率"},
-        "skillBoardRouletteAttackUpRate": {"zh": "技能盘轮盘攻击提升倍率"},
-        "skillBoardRouletteDoubleAttackRate": {"zh": "技能盘轮盘二连击倍率"},
-        "skillBoardRouletteStatusTime": {"zh": "技能盘轮盘状态时间"},
-        "skillBoardSlimeMoneyRateDown": {"zh": "技能盘史莱姆金钱降低倍率"},
-        "skillBoardSlimeMoneyRateUp": {"zh": "技能盘史莱姆金钱提升倍率"},
-        "skillBoardStatusEffectRateDown": {"zh": "技能盘状态效果降低倍率"},
-        "skillBoardStatusEffectRateUp": {"zh": "技能盘状态效果提升倍率"},
-        "skillBoardStatusTimeRateDown": {"zh": "技能盘状态时间降低倍率"},
-        "skillBoardStatusTimeRateUp": {"zh": "技能盘状态时间提升倍率"},
-        "skillBoardVillagerPotionUp": {"zh": "技能盘村民回复药提升"},
-        "sliderAccel_": {"zh": "滑行加速度"},
-        "sliderAccelerationDot_": {"zh": "滑行加速方向判定"},
-        "sliderBaseSpeedRate_Hip_": {"zh": "滑行基础速度倍率（冲刺）"},
-        "sliderBaseSpeedRate_Stand_": {"zh": "滑行基础速度倍率（站立）"},
-        "sliderDeceleration_": {"zh": "滑行减速度"},
-        "sliderEndSpeed_": {"zh": "滑行结束速度"},
-        "sliderRotationRate_": {"zh": "滑行转向速率"},
-        "sliderSpeedMax_": {"zh": "滑行最高速度"},
-        "sliderSpeedMax_WindDash_": {"zh": "滑行最高速度（风冲刺）"},
-        "sliderSpeedSubRate_": {"zh": "滑行速度衰减倍率"},
-        "sliderStartEnableDot_": {"zh": "滑行启动方向判定"},
-        "slider_Stand_JumpCheckHeight_": {"zh": "滑行跳跃检测高度"},
-        "slider_Stand_JumpCheckWidth_": {"zh": "滑行跳跃检测宽度"},
-        "slowRateToFrostbite_": {"zh": "减速转为冰结的比例"},
-        "slowRateToSlow_": {"zh": "减速转为迟缓的比例"},
-        "smiteAttackRateMax_": {"zh": "痛击攻击倍率上限"},
-        "smiteAttackRateMin_": {"zh": "痛击攻击倍率下限"},
-        "smiteCurve_": {"zh": "痛击曲线"},
-        "spArtsAutoHomingParam_": {"zh": "奥义自动追踪参数"},
-        "speedRate_": {"zh": "速度倍率"},
-        "staminaCurve_": {"zh": "精力曲线"},
-        "statusInfoList_": {"zh": "状态信息"},
-        "statusTypeList_": {"zh": "状态类型列表"},
-        "statusType_": {"zh": "状态类型"},
-        "stoneEnableMoveFrame_": {"zh": "石化允许移动帧"},
-        "stoneMoveMotRate_": {"zh": "石化移动动作倍率"},
-        "stopAutoDecreaseSecAddPoint_": {"zh": "停止自动减少的额外秒数"},
-        "stopAutoDecreaseSecAddPoint_NoBattle_": {"zh": "非战斗停止自动减少的额外秒数"},
-        "stunClearLimitRate_": {"zh": "眩晕解除上限比例"},
-        "stunMaxIncreaseMaxCount_": {"zh": "眩晕上限提升次数上限"},
-        "stunMaxIncreaseRate_": {"zh": "眩晕上限提升比例"},
-        "stunMax_": {"zh": "眩晕值上限"},
-        "stunSecIncrementRate_": {"zh": "眩晕时间递增比例"},
-        "stunSec_": {"zh": "眩晕时间"},
-        "summonEndInvinsibleSec": {"zh": "召唤结束无敌时间"},
-        "summonLeftBiasBaseDist_": {"zh": "召唤左侧偏置基础距离"},
-        "summonLeftBiasMoveMax_": {"zh": "召唤左侧偏置移动上限"},
-        "summonLeftBiasMoveMin_": {"zh": "召唤左侧偏置移动下限"},
-        "summonLeftBiasRange_": {"zh": "召唤左侧偏置范围"},
-        "superArmorDamageRate_": {"zh": "霸体伤害倍率"},
-        "superEnmityCurve_": {"zh": "超级仇火曲线"},
-        "superStaminaCurve_": {"zh": "超级精力曲线"},
-        "targetMarkerCameraKeepTime_": {"zh": "目标标记镜头保持时间"},
-        "throwMotInterpolationFrame_": {"zh": "投掷动作插值帧"},
-        "throwWaitFrame_": {"zh": "投掷等待帧"},
-        "type_": {"zh": "类型"},
-        "voiceWaitParam_": {"zh": "语音等待参数"},
-        "water_": {"zh": "水属性"},
-        "weakElementAddDamageRate_": {"zh": "弱点属性附加伤害倍率"},
-        "windLadderJumpCamAddLen_": {"zh": "风梯跳跃镜头拉远距离"},
-        "windLadderJumpPower_": {"zh": "风梯跳跃力度"},
-        "wind_": {"zh": "风属性"},
-        "yCorrectionHeightLimit_": {"zh": "Y 轴校正高度上限"}
+        "AddRateChaos": {
+            "zh": "混乱难度增加率"
+        },
+        "AfterInvisibleSec": {
+            "zh": "奥义结束后无敌时间"
+        },
+        "AttackHitAddPoint": {
+            "zh": "攻击命中增加点数"
+        },
+        "AutoHealAmount": {
+            "zh": "自动回复量"
+        },
+        "AutoHealAmount_inBattle": {
+            "zh": "战斗中自动回复量"
+        },
+        "CamAddLen": {
+            "zh": "镜头拉远距离"
+        },
+        "CamAddLenLimit": {
+            "zh": "镜头拉远距离上限"
+        },
+        "CamAddLenTimer": {
+            "zh": "镜头拉远持续时间"
+        },
+        "CamAddRate": {
+            "zh": "镜头拉远倍率"
+        },
+        "ChainBurstATKRate_2Chain": {
+            "zh": "二段奥义连锁攻击倍率"
+        },
+        "ChainBurstATKRate_3Chain": {
+            "zh": "三段奥义连锁攻击倍率"
+        },
+        "ChainBurstATKRate_FullChain": {
+            "zh": "FULL CHAIN 攻击倍率"
+        },
+        "ChargeParryAcceptFrame": {
+            "zh": "蓄力反击判定帧"
+        },
+        "ChargeParryInvinsbleTime": {
+            "zh": "蓄力反击无敌时间"
+        },
+        "CurveFile": {
+            "zh": "曲线文件"
+        },
+        "DamageHitAddPoint": {
+            "zh": "受击增加点数"
+        },
+        "DamageHitBonusPoint_HpHigh": {
+            "zh": "高血量受击奖励点数"
+        },
+        "DamageHitBonusPoint_HpLow": {
+            "zh": "低血量受击奖励点数"
+        },
+        "DamageStopHealSec": {
+            "zh": "受击后停止回复时间"
+        },
+        "FocusPointOffsetHeight2D": {
+            "zh": "2D 准星高度偏移"
+        },
+        "FocusPointScoreTable2D": {
+            "zh": "2D 准星评分表"
+        },
+        "FocusPointScoreTable3D": {
+            "zh": "3D 准星评分表"
+        },
+        "GageMax_NewMode": {
+            "zh": "计量上限（新模式）"
+        },
+        "GuardAutoHealValue": {
+            "zh": "格挡值自动回复量"
+        },
+        "GuardBreakDamageCutRate": {
+            "zh": "破防伤害减免率"
+        },
+        "GuardBreakSec": {
+            "zh": "破防持续时间"
+        },
+        "GuardDamageCutRate": {
+            "zh": "格挡伤害减免率"
+        },
+        "GuardGageMax": {
+            "zh": "格挡值上限"
+        },
+        "GuardPointBreakGageRate": {
+            "zh": "格挡点破防计量倍率"
+        },
+        "GuardPointStopHealSec": {
+            "zh": "格挡点停止回复时间"
+        },
+        "GuardStopHealSec": {
+            "zh": "格挡停止回复时间"
+        },
+        "HelpGuardBreakGageRate": {
+            "zh": "援护格挡破防计量倍率"
+        },
+        "HelpGuardStopHealSec": {
+            "zh": "援护格挡停止回复时间"
+        },
+        "HelpHealAmount": {
+            "zh": "援护回复量"
+        },
+        "HelpHealAmount_inBattle": {
+            "zh": "战斗中援护回复量"
+        },
+        "ID": {
+            "zh": "ID"
+        },
+        "InputHealAmount_": {
+            "zh": "手动回复量"
+        },
+        "IsManualLockOnByFocusPoint_LinearScoring2D": {
+            "zh": "2D 准星手动锁定"
+        },
+        "IsManualLockOnByFocusPoint_LinearScoring3D": {
+            "zh": "3D 准星手动锁定"
+        },
+        "JustGuardAcceptFrame": {
+            "zh": "精准格挡判定帧"
+        },
+        "JustGuardAttackBreakRate": {
+            "zh": "精准格挡破防倍率"
+        },
+        "JustGuardAttackOffset": {
+            "zh": "精准格挡攻击偏移"
+        },
+        "JustGuardAttackSize": {
+            "zh": "精准格挡攻击范围"
+        },
+        "JustGuardPraiseVoiceIntervalSec": {
+            "zh": "精准格挡称赞语音间隔"
+        },
+        "KnockBackGuardTurnRate": {
+            "zh": "击退格挡转向倍率"
+        },
+        "KnockBackJudgePowerMax": {
+            "zh": "击退判定强度上限"
+        },
+        "KnockBackJudgePowerMin": {
+            "zh": "击退判定强度下限"
+        },
+        "KnockBackRateMax": {
+            "zh": "击退倍率上限"
+        },
+        "KnockBackRateMin": {
+            "zh": "击退倍率下限"
+        },
+        "NpcActivateEnemyHpRate_2chain_": {
+            "zh": "NPC 触发二段奥义连锁时敌人血量倍率"
+        },
+        "NpcActivateEnemyHpRate_3chain_": {
+            "zh": "NPC 触发三段奥义连锁时敌人血量倍率"
+        },
+        "NpcActivateEnemyHpRate_Single_": {
+            "zh": "NPC 触发单发奥义时敌人血量倍率"
+        },
+        "NpcGageAddRate": {
+            "zh": "NPC 计量增加倍率"
+        },
+        "NpcGageAddRateChaos": {
+            "zh": "NPC 计量增加倍率（混乱）"
+        },
+        "NpcInputHealAmount_": {
+            "zh": "NPC 手动回复量"
+        },
+        "Params": {
+            "zh": "参数"
+        },
+        "SpArtsAfterGagePenaltyRate_": {
+            "zh": "奥义后计量惩罚倍率"
+        },
+        "SpArtsAfterGagePenaltySec_": {
+            "zh": "奥义后计量惩罚时间"
+        },
+        "SpArtsChainAddRate": {
+            "zh": "奥义连锁增加倍率"
+        },
+        "TutorialAttackHitAddPoint": {
+            "zh": "教程攻击命中增加点数"
+        },
+        "abilityTag_": {
+            "zh": "技能键"
+        },
+        "abilityUIInfoList_": {
+            "zh": "技能界面信息"
+        },
+        "addDamageLimitBonusStatusRate_": {
+            "zh": "伤害上限加成状态倍率"
+        },
+        "addPoint2ChainBurst": {
+            "zh": "二段奥义连锁增加点数"
+        },
+        "addPoint2ChainBurst_Chaos": {
+            "zh": "二段奥义连锁增加点数（混乱）"
+        },
+        "addPoint3ChainBurst": {
+            "zh": "三段奥义连锁增加点数"
+        },
+        "addPoint3ChainBurst_Chaos": {
+            "zh": "三段奥义连锁增加点数（混乱）"
+        },
+        "addPointAbilityUse_Max": {
+            "zh": "能力使用增加点数上限"
+        },
+        "addPointAbilityUse_Max_Chaos": {
+            "zh": "能力使用增加点数上限（混乱）"
+        },
+        "addPointAbilityUse_Min": {
+            "zh": "能力使用增加点数下限"
+        },
+        "addPointAbilityUse_Min_Chaos": {
+            "zh": "能力使用增加点数下限（混乱）"
+        },
+        "addPointFullChainBurst": {
+            "zh": "FULL CHAIN 增加点数"
+        },
+        "addPointFullChainBurst_Chaos": {
+            "zh": "FULL CHAIN 增加点数（混乱）"
+        },
+        "addPointLinkAttack": {
+            "zh": "连锁攻击增加点数"
+        },
+        "addPointLinkAttack_Chaos": {
+            "zh": "连锁攻击增加点数（混乱）"
+        },
+        "addPointReceptionistSummon": {
+            "zh": "接待员召唤增加点数"
+        },
+        "addPointReceptionistSummon_Chaos": {
+            "zh": "接待员召唤增加点数（混乱）"
+        },
+        "addPointReviveFriend": {
+            "zh": "复活队友增加点数"
+        },
+        "addPointReviveFriend_Chaos": {
+            "zh": "复活队友增加点数（混乱）"
+        },
+        "addPointSpArts": {
+            "zh": "奥义增加点数"
+        },
+        "addPointSpArts_Chaos": {
+            "zh": "奥义增加点数（混乱）"
+        },
+        "addPointUseAllPotion": {
+            "zh": "使用全体回复药增加点数"
+        },
+        "addPointUseAllPotion_Chaos": {
+            "zh": "使用全体回复药增加点数（混乱）"
+        },
+        "aiIgnoreGroundHitTime_": {
+            "zh": "AI 无视落地硬直时间"
+        },
+        "aiSelectUseAbilityType_": {
+            "zh": "AI 选择使用能力类型"
+        },
+        "assist2stRangeLimit_": {
+            "zh": "辅助二段范围上限"
+        },
+        "assistActiveGuardRate_": {
+            "zh": "辅助主动格挡倍率"
+        },
+        "assistActiveGuardRate_GuardOnly_": {
+            "zh": "辅助主动格挡倍率（仅格挡）"
+        },
+        "atkTypeDamageLimit_Ability_": {
+            "zh": "能力伤害上限"
+        },
+        "atkTypeDamageLimit_Normal_": {
+            "zh": "普通攻击伤害上限"
+        },
+        "atkTypeDamageLimit_SpArts_": {
+            "zh": "奥义伤害上限"
+        },
+        "autoDashStartTime_": {
+            "zh": "自动冲刺启动时间"
+        },
+        "autoDashThreshold_": {
+            "zh": "自动冲刺阈值"
+        },
+        "autoHealStunPerSec_": {
+            "zh": "每秒自动回复昏厥值"
+        },
+        "autoReviveCoolTime_": {
+            "zh": "自动复活冷却时间"
+        },
+        "autoReviveHpRate_": {
+            "zh": "自动复活血量比例"
+        },
+        "autoReviveMaxCount_": {
+            "zh": "自动复活次数上限"
+        },
+        "avoidCountMax_": {
+            "zh": "躲避次数上限"
+        },
+        "avoidCountResetTime_": {
+            "zh": "躲避次数重置时间"
+        },
+        "baseAbilityCoolTime_Max": {
+            "zh": "基础能力冷却上限"
+        },
+        "baseAbilityCoolTime_Min": {
+            "zh": "基础能力冷却下限"
+        },
+        "burn_DamageInterval_": {
+            "zh": "灼热伤害间隔"
+        },
+        "burn_EmDamageRate_": {
+            "zh": "灼热对敌伤害倍率"
+        },
+        "burn_SupHpRate_": {
+            "zh": "灼热对支援效果的血量倍率"
+        },
+        "cameraControlParamX_": {
+            "zh": "镜头控制参数 X"
+        },
+        "cameraCtrlCorrectDistMax_": {
+            "zh": "镜头校正距离上限"
+        },
+        "cameraCtrlCorrectDistMin_": {
+            "zh": "镜头校正距离下限"
+        },
+        "cameraCtrlParamY_DistMax_": {
+            "zh": "镜头 Y 轴距离上限"
+        },
+        "cameraCtrlParamY_DistMin_": {
+            "zh": "镜头 Y 轴距离下限"
+        },
+        "chainBurstDamageLimit_": {
+            "zh": "奥义连锁伤害上限"
+        },
+        "conceitCurve_": {
+            "zh": "坚忍曲线"
+        },
+        "contributionPointArray_": {
+            "zh": "贡献度点数"
+        },
+        "criticalDamageUpperRate_": {
+            "zh": "暴击伤害上限倍率"
+        },
+        "damageStunTimerStopSec_": {
+            "zh": "受击昏厥计时停止时间"
+        },
+        "dark_": {
+            "zh": "暗属性"
+        },
+        "dataVersion_": {
+            "zh": "数据版本"
+        },
+        "debuffTimeExtendParam_": {
+            "zh": "减益延长时间参数"
+        },
+        "decreasePointNoBattle_": {
+            "zh": "非战斗减少点数"
+        },
+        "decreasePoint_": {
+            "zh": "减少点数"
+        },
+        "dieCountGageDecreaseBias_2": {
+            "zh": "死亡计数计量减少偏置 2"
+        },
+        "dieCountGageDecreaseBias_3": {
+            "zh": "死亡计数计量减少偏置 3"
+        },
+        "dieCountGageDecreaseBias_4": {
+            "zh": "死亡计数计量减少偏置 4"
+        },
+        "dieCountMax_": {
+            "zh": "死亡次数上限"
+        },
+        "dieCountMax_Ultimate_": {
+            "zh": "死亡次数上限（究极难度）"
+        },
+        "dieVoiceIntervalSec_": {
+            "zh": "死亡语音间隔"
+        },
+        "dimension_DamageInterval_": {
+            "zh": "次元伤害间隔"
+        },
+        "dimension_DamageLimit7st_": {
+            "zh": "次元伤害上限（第 7 段）"
+        },
+        "dimension_SupHpRate_": {
+            "zh": "次元对支援效果的血量倍率"
+        },
+        "distMax_": {
+            "zh": "距离上限"
+        },
+        "distMin_": {
+            "zh": "距离下限"
+        },
+        "downInvisibleTime_": {
+            "zh": "倒地无敌时间"
+        },
+        "drainValueLimitByAction_HeartsOnFire_": {
+            "zh": "汲取上限（HeartsOnFire）"
+        },
+        "drainValueLimitByAction_HeroicBeat_": {
+            "zh": "汲取上限（HeroicBeat）"
+        },
+        "drainValueLimitByAction_NeverEnoughDragon_": {
+            "zh": "汲取上限（NeverEnough 龙形态）"
+        },
+        "drainValueLimitByAction_NeverEnoughSuper_": {
+            "zh": "汲取上限（NeverEnough 奥义）"
+        },
+        "drainValueLimitByAction_NeverEnough_": {
+            "zh": "汲取上限（NeverEnough）"
+        },
+        "drainValueLimitByAction_Pl0900Attack_": {
+            "zh": "汲取上限（PL0900 攻击）"
+        },
+        "drainValueLimitByAction_ViolentShadows_": {
+            "zh": "汲取上限（ViolentShadows）"
+        },
+        "drainValueLimitByBuff_": {
+            "zh": "汲取上限（增益）"
+        },
+        "drainValueLimitByEndlessModeBuff_": {
+            "zh": "汲取上限（无尽模式增益）"
+        },
+        "drainValueLimitByPl2800Buff_": {
+            "zh": "汲取上限（PL2800 增益）"
+        },
+        "earth_": {
+            "zh": "土属性"
+        },
+        "em8300WaterBallBindDisableTime_": {
+            "zh": "水球束缚解除时间"
+        },
+        "em8300WaterBallBindDotDamageRate_": {
+            "zh": "水球束缚持续伤害倍率"
+        },
+        "em8300WaterBallBindDotDamageTime_": {
+            "zh": "水球束缚持续伤害时间"
+        },
+        "em8300WaterBallBindHealValue_": {
+            "zh": "水球束缚回复量"
+        },
+        "em8300WaterBallBindInvincibleTime_": {
+            "zh": "水球束缚无敌时间"
+        },
+        "enemyStatusAttackerRateUpperLimit_": {
+            "zh": "敌方攻击状态倍率上限"
+        },
+        "enemyStatusDeffenderRateLowerLimit_": {
+            "zh": "敌方防御状态倍率下限"
+        },
+        "enmityCurve_": {
+            "zh": "背水曲线"
+        },
+        "farDistanceAutoHomingParam_": {
+            "zh": "远距离自动追踪参数"
+        },
+        "fearDeffenceDownPercent_": {
+            "zh": "恐惧防御下降百分比"
+        },
+        "fire_": {
+            "zh": "火属性"
+        },
+        "frostbiteCoolTimeSec_": {
+            "zh": "冻伤冷却时间"
+        },
+        "gameOverCrisisSecMax_": {
+            "zh": "濒死倒计时上限"
+        },
+        "gameOverCrisisSecMax_Ultimate_": {
+            "zh": "濒死倒计时上限（究极难度）"
+        },
+        "gameOverCrisisSecMin_": {
+            "zh": "濒死倒计时下限"
+        },
+        "gameOverCrisisSecMin_Ultimate_": {
+            "zh": "濒死倒计时下限（究极难度）"
+        },
+        "garrisonCurve_": {
+            "zh": "坚守曲线"
+        },
+        "guardFailedPenaltyTime": {
+            "zh": "格挡失败惩罚时间"
+        },
+        "gutsCoolTime_": {
+            "zh": "豪胆冷却时间"
+        },
+        "gutsInvinsibleSec_": {
+            "zh": "豪胆无敌时间"
+        },
+        "gutsMaxCount_": {
+            "zh": "豪胆次数上限"
+        },
+        "healLimit_Ability_": {
+            "zh": "回复上限（能力）"
+        },
+        "healLimit_ReviveAbility_": {
+            "zh": "回复上限（复活能力）"
+        },
+        "healLimit_RevivePotion_": {
+            "zh": "回复上限（复活药）"
+        },
+        "healLimit_System_": {
+            "zh": "回复上限（系统）"
+        },
+        "height": {
+            "zh": "高度"
+        },
+        "hipSliderSpeedListNum_": {
+            "zh": "滑行速度表条目数"
+        },
+        "hipSliderSpeedList_": {
+            "zh": "滑行速度表"
+        },
+        "hormingMoveRateMax_": {
+            "zh": "追踪移动倍率上限"
+        },
+        "hormingMoveRateMin_": {
+            "zh": "追踪移动倍率下限"
+        },
+        "illusionInInvisibleTime_": {
+            "zh": "幻影无敌时间"
+        },
+        "isAutoDash_": {
+            "zh": "启用自动冲刺"
+        },
+        "isBreakObjectCheck": {
+            "zh": "检测可破坏物"
+        },
+        "isEnableStickInput": {
+            "zh": "允许摇杆输入"
+        },
+        "isForceEnableStickInput": {
+            "zh": "强制允许摇杆输入"
+        },
+        "isLockOnMaxRangeSetting": {
+            "zh": "按最大锁定距离设置"
+        },
+        "isUltimateDifficultyChange_": {
+            "zh": "究极难度生效"
+        },
+        "jumpAssistFrame_": {
+            "zh": "跳跃辅助帧"
+        },
+        "justAvoidFrame_": {
+            "zh": "精准躲避判定帧"
+        },
+        "justAvoidSucces_InvinsibleTime_": {
+            "zh": "精准躲避成功无敌时间"
+        },
+        "largeDamageVoiceIntervalSec_": {
+            "zh": "重创语音间隔"
+        },
+        "largeDamageVoiceTriggerHpRate_": {
+            "zh": "重创语音触发血量比例"
+        },
+        "level0_": {
+            "zh": "等级 0"
+        },
+        "level1_": {
+            "zh": "等级 1"
+        },
+        "level2_": {
+            "zh": "等级 2"
+        },
+        "level3_": {
+            "zh": "等级 3"
+        },
+        "level4_": {
+            "zh": "等级 4"
+        },
+        "level5_": {
+            "zh": "等级 5"
+        },
+        "light_": {
+            "zh": "光属性"
+        },
+        "linkTimeAbilityCoolTimeRecoverRate_": {
+            "zh": "连锁时域能力冷却回复倍率"
+        },
+        "linkTimeAccelEndSec_": {
+            "zh": "连锁时域加速结束时间"
+        },
+        "linkTimeAccelSpeedRate_": {
+            "zh": "连锁时域加速倍率"
+        },
+        "linkTimeAddPointDecreaseSpeedAccelEndSec_": {
+            "zh": "连锁时域点数减少减速加速结束时间"
+        },
+        "linkTimeAddPointDecreaseSpeedAccelSpeedRate_": {
+            "zh": "连锁时域点数减少减速加速倍率"
+        },
+        "linkTimeAddPointDecreaseSpeedUpSec_": {
+            "zh": "连锁时域点数减少减速开始时间"
+        },
+        "linkTimeAttackBuffRate_": {
+            "zh": "连锁时域攻击增益倍率"
+        },
+        "linkTimeAttackHitExtendAtkRate_Max_": {
+            "zh": "连锁时域攻击命中延长攻击倍率上限"
+        },
+        "linkTimeAttackHitExtendAtkRate_Min_": {
+            "zh": "连锁时域攻击命中延长攻击倍率下限"
+        },
+        "linkTimeAttackHitExtendCoolTimeSec_": {
+            "zh": "连锁时域攻击命中延长冷却时间"
+        },
+        "linkTimeAttackHitExtendSec_": {
+            "zh": "连锁时域攻击命中延长时间"
+        },
+        "linkTimeAttackHitExtendSec_Max_": {
+            "zh": "连锁时域攻击命中延长时间上限"
+        },
+        "linkTimeAttackHitExtendSec_Min_": {
+            "zh": "连锁时域攻击命中延长时间下限"
+        },
+        "linkTimeCriticalRate_": {
+            "zh": "连锁时域暴击率"
+        },
+        "linkTimeDecreaseSpeedUpSec_": {
+            "zh": "连锁时域点数减少加速开始时间"
+        },
+        "linkTimeEnemySlowRate_": {
+            "zh": "连锁时域敌人减速倍率"
+        },
+        "linkTimeExtendAtkRateCurve_": {
+            "zh": "连锁时域延长攻击倍率曲线"
+        },
+        "linkTimeKeepSec_": {
+            "zh": "连锁时域持续时间"
+        },
+        "linkTimeRecoverHpRate_": {
+            "zh": "连锁时域回复血量比例"
+        },
+        "linkTimeRecoverIntervalSec_": {
+            "zh": "连锁时域回复间隔"
+        },
+        "lockOnCameraControlReactionSec_": {
+            "zh": "锁定镜头控制反应时间"
+        },
+        "lockOnSwitchWaitSec_": {
+            "zh": "锁定切换等待时间"
+        },
+        "lockonCameraOffsetAngleFar_": {
+            "zh": "锁定镜头远距离角度偏移"
+        },
+        "lockonCameraOffsetAngleNear_": {
+            "zh": "锁定镜头近距离角度偏移"
+        },
+        "lockonCameraOffsetAngleOffsetX_": {
+            "zh": "锁定镜头 X 轴角度偏移"
+        },
+        "lockonCameraOffsetAngleOffsetX_Far_": {
+            "zh": "锁定镜头 X 轴角度偏移（远）"
+        },
+        "lockonCameraOffsetAngleOffsetX_Far_CameraFar_": {
+            "zh": "锁定镜头 X 轴角度偏移（远·镜头远）"
+        },
+        "lockonCameraOffsetAngleOffsetX_Near_": {
+            "zh": "锁定镜头 X 轴角度偏移（近）"
+        },
+        "lockonCameraOffsetAngleXCheckCameraDistFar_": {
+            "zh": "锁定镜头 X 轴检查镜头距离（远）"
+        },
+        "lockonCameraOffsetAngleXCheckCameraDistNear_": {
+            "zh": "锁定镜头 X 轴检查镜头距离（近）"
+        },
+        "lockonCameraOffsetAngleXCheckDistFar_": {
+            "zh": "锁定镜头 X 轴检查距离（远）"
+        },
+        "lockonCameraOffsetAngleXCheckDistNear_": {
+            "zh": "锁定镜头 X 轴检查距离（近）"
+        },
+        "lockonCameraOffsetCheckDistFar_": {
+            "zh": "锁定镜头检查距离（远）"
+        },
+        "lockonCameraOffsetCheckDistNear_": {
+            "zh": "锁定镜头检查距离（近）"
+        },
+        "maxHpDebuffCoolTimeSec_": {
+            "zh": "最大生命减益冷却时间"
+        },
+        "maxHpDebuffRate_": {
+            "zh": "最大生命减益比例"
+        },
+        "maxLen": {
+            "zh": "搜索距离上限"
+        },
+        "maxRot": {
+            "zh": "搜索角度上限"
+        },
+        "nearDistanceAutoHomingParam_": {
+            "zh": "近距离自动追踪参数"
+        },
+        "npcPotionHealMax_": {
+            "zh": "NPC 回复药回复上限"
+        },
+        "npcPotionHealRate_": {
+            "zh": "NPC 回复药回复比例"
+        },
+        "npcUsePotionCoolTimeRandom_": {
+            "zh": "NPC 使用回复药随机冷却"
+        },
+        "npcUsePotionCoolTime_": {
+            "zh": "NPC 使用回复药冷却"
+        },
+        "npcUsePotionCountMax_": {
+            "zh": "NPC 使用回复药次数上限"
+        },
+        "npcUsePotionTriggerHpRate_": {
+            "zh": "NPC 使用回复药触发血量比例"
+        },
+        "npcUsePotionWaitTimeMax_": {
+            "zh": "NPC 使用回复药等待上限"
+        },
+        "npcUsePotionWaitTimeMin_": {
+            "zh": "NPC 使用回复药等待下限"
+        },
+        "parameter01_": {
+            "zh": "参数 1"
+        },
+        "parameter02_": {
+            "zh": "参数 2"
+        },
+        "parameter03_": {
+            "zh": "参数 3"
+        },
+        "parameterType_": {
+            "zh": "参数类型"
+        },
+        "passiveInvinsibleTime_": {
+            "zh": "被动无敌时间"
+        },
+        "playerStatusAttackerRateUpperLimit_": {
+            "zh": "我方攻击状态倍率上限"
+        },
+        "playerStatusDeffenderRateLowerLimit_": {
+            "zh": "我方防御状态倍率下限"
+        },
+        "pointMax_": {
+            "zh": "点数上限"
+        },
+        "poisonByGimmick_DamageInterval_": {
+            "zh": "机关中毒伤害间隔"
+        },
+        "poisonByGimmick_EmDamageRate_": {
+            "zh": "机关中毒对敌伤害倍率"
+        },
+        "poisonByGimmick_SupHpRate_": {
+            "zh": "机关中毒对支援效果的血量倍率"
+        },
+        "poison_DamageInterval_": {
+            "zh": "中毒伤害间隔"
+        },
+        "poison_EmDamageRate_": {
+            "zh": "中毒对敌伤害倍率"
+        },
+        "poison_SupHpRate_": {
+            "zh": "中毒对支援效果的血量倍率"
+        },
+        "questId_": {
+            "zh": "任务 ID"
+        },
+        "rankAtkRate_": {
+            "zh": "等级攻击倍率"
+        },
+        "rateMax_": {
+            "zh": "倍率上限"
+        },
+        "rateMin_": {
+            "zh": "倍率下限"
+        },
+        "rate_": {
+            "zh": "倍率"
+        },
+        "restraintCoolTimeSec_": {
+            "zh": "束缚冷却时间"
+        },
+        "rotMax_": {
+            "zh": "旋转上限"
+        },
+        "rotMin_": {
+            "zh": "旋转下限"
+        },
+        "searchTargetInfoList_": {
+            "zh": "索敌信息列表"
+        },
+        "selectPairsUniqueVoice_MainStory_": {
+            "zh": "组合专属语音概率（主线）"
+        },
+        "selectVersatileVoice_MainStory_": {
+            "zh": "通用语音概率（主线）"
+        },
+        "selectVersatileVoice_Quest_": {
+            "zh": "通用语音概率（任务）"
+        },
+        "selfInputInterval_": {
+            "zh": "手动输入间隔"
+        },
+        "shotAutoHomingParam_": {
+            "zh": "射击自动追踪参数"
+        },
+        "skill233Curve_": {
+            "zh": "技能 233 曲线"
+        },
+        "skill234Curve_": {
+            "zh": "技能 234 曲线"
+        },
+        "skillAvoidMovementRate_": {
+            "zh": "技能躲避移动倍率"
+        },
+        "skillBoardDamageRateDown": {
+            "zh": "专精伤害降低倍率"
+        },
+        "skillBoardDamageRateUp": {
+            "zh": "专精伤害提升倍率"
+        },
+        "skillBoardGuildmarmGaugeRateDown": {
+            "zh": "专精公会接待员计量降低倍率"
+        },
+        "skillBoardGuildmarmGaugeRateUp": {
+            "zh": "专精公会接待员计量提升倍率"
+        },
+        "skillBoardMonkGaugeRateDown": {
+            "zh": "专精武僧计量降低倍率"
+        },
+        "skillBoardMonkGaugeRateUp": {
+            "zh": "专精武僧计量提升倍率"
+        },
+        "skillBoardRefereeDebuffRate": {
+            "zh": "专精裁判减益倍率"
+        },
+        "skillBoardRefereeDebuffTime": {
+            "zh": "专精裁判减益时间"
+        },
+        "skillBoardRefereeStunRateDown": {
+            "zh": "专精裁判昏厥降低倍率"
+        },
+        "skillBoardRouletteAmplifyRate": {
+            "zh": "专精轮盘强化倍率"
+        },
+        "skillBoardRouletteAttackUpRate": {
+            "zh": "专精轮盘攻击提升倍率"
+        },
+        "skillBoardRouletteDoubleAttackRate": {
+            "zh": "专精轮盘二连击倍率"
+        },
+        "skillBoardRouletteStatusTime": {
+            "zh": "专精轮盘状态时间"
+        },
+        "skillBoardSlimeMoneyRateDown": {
+            "zh": "专精史莱姆金钱降低倍率"
+        },
+        "skillBoardSlimeMoneyRateUp": {
+            "zh": "专精史莱姆金钱提升倍率"
+        },
+        "skillBoardStatusEffectRateDown": {
+            "zh": "专精状态效果降低倍率"
+        },
+        "skillBoardStatusEffectRateUp": {
+            "zh": "专精状态效果提升倍率"
+        },
+        "skillBoardStatusTimeRateDown": {
+            "zh": "专精状态时间降低倍率"
+        },
+        "skillBoardStatusTimeRateUp": {
+            "zh": "专精状态时间提升倍率"
+        },
+        "skillBoardVillagerPotionUp": {
+            "zh": "专精村民回复药提升"
+        },
+        "sliderAccel_": {
+            "zh": "滑行加速度"
+        },
+        "sliderAccelerationDot_": {
+            "zh": "滑行加速方向判定"
+        },
+        "sliderBaseSpeedRate_Hip_": {
+            "zh": "滑行基础速度倍率（冲刺）"
+        },
+        "sliderBaseSpeedRate_Stand_": {
+            "zh": "滑行基础速度倍率（站立）"
+        },
+        "sliderDeceleration_": {
+            "zh": "滑行减速度"
+        },
+        "sliderEndSpeed_": {
+            "zh": "滑行结束速度"
+        },
+        "sliderRotationRate_": {
+            "zh": "滑行转向速率"
+        },
+        "sliderSpeedMax_": {
+            "zh": "滑行最高速度"
+        },
+        "sliderSpeedMax_WindDash_": {
+            "zh": "滑行最高速度（风冲刺）"
+        },
+        "sliderSpeedSubRate_": {
+            "zh": "滑行速度衰减倍率"
+        },
+        "sliderStartEnableDot_": {
+            "zh": "滑行启动方向判定"
+        },
+        "slider_Stand_JumpCheckHeight_": {
+            "zh": "滑行跳跃检测高度"
+        },
+        "slider_Stand_JumpCheckWidth_": {
+            "zh": "滑行跳跃检测宽度"
+        },
+        "slowRateToFrostbite_": {
+            "zh": "减速转为冻伤的比例"
+        },
+        "slowRateToSlow_": {
+            "zh": "减速转为迟缓的比例"
+        },
+        "smiteAttackRateMax_": {
+            "zh": "痛击攻击倍率上限"
+        },
+        "smiteAttackRateMin_": {
+            "zh": "痛击攻击倍率下限"
+        },
+        "smiteCurve_": {
+            "zh": "痛击曲线"
+        },
+        "spArtsAutoHomingParam_": {
+            "zh": "奥义自动追踪参数"
+        },
+        "speedRate_": {
+            "zh": "速度倍率"
+        },
+        "staminaCurve_": {
+            "zh": "热血曲线"
+        },
+        "statusInfoList_": {
+            "zh": "状态信息"
+        },
+        "statusTypeList_": {
+            "zh": "状态类型列表"
+        },
+        "statusType_": {
+            "zh": "状态类型"
+        },
+        "stoneEnableMoveFrame_": {
+            "zh": "恐惧允许移动帧"
+        },
+        "stoneMoveMotRate_": {
+            "zh": "恐惧移动动作倍率"
+        },
+        "stopAutoDecreaseSecAddPoint_": {
+            "zh": "停止自动减少的额外秒数"
+        },
+        "stopAutoDecreaseSecAddPoint_NoBattle_": {
+            "zh": "非战斗停止自动减少的额外秒数"
+        },
+        "stunClearLimitRate_": {
+            "zh": "昏厥解除上限比例"
+        },
+        "stunMaxIncreaseMaxCount_": {
+            "zh": "昏厥上限提升次数上限"
+        },
+        "stunMaxIncreaseRate_": {
+            "zh": "昏厥上限提升比例"
+        },
+        "stunMax_": {
+            "zh": "昏厥值上限"
+        },
+        "stunSecIncrementRate_": {
+            "zh": "昏厥时间递增比例"
+        },
+        "stunSec_": {
+            "zh": "昏厥时间"
+        },
+        "summonEndInvinsibleSec": {
+            "zh": "召唤结束无敌时间"
+        },
+        "summonLeftBiasBaseDist_": {
+            "zh": "召唤左侧偏置基础距离"
+        },
+        "summonLeftBiasMoveMax_": {
+            "zh": "召唤左侧偏置移动上限"
+        },
+        "summonLeftBiasMoveMin_": {
+            "zh": "召唤左侧偏置移动下限"
+        },
+        "summonLeftBiasRange_": {
+            "zh": "召唤左侧偏置范围"
+        },
+        "superArmorDamageRate_": {
+            "zh": "霸体伤害倍率"
+        },
+        "superEnmityCurve_": {
+            "zh": "超级背水曲线"
+        },
+        "superStaminaCurve_": {
+            "zh": "超级热血曲线"
+        },
+        "targetMarkerCameraKeepTime_": {
+            "zh": "目标标记镜头保持时间"
+        },
+        "throwMotInterpolationFrame_": {
+            "zh": "投掷动作插值帧"
+        },
+        "throwWaitFrame_": {
+            "zh": "投掷等待帧"
+        },
+        "type_": {
+            "zh": "类型"
+        },
+        "voiceWaitParam_": {
+            "zh": "语音等待参数"
+        },
+        "water_": {
+            "zh": "水属性"
+        },
+        "weakElementAddDamageRate_": {
+            "zh": "弱点属性附加伤害倍率"
+        },
+        "windLadderJumpCamAddLen_": {
+            "zh": "风梯跳跃镜头拉远距离"
+        },
+        "windLadderJumpPower_": {
+            "zh": "风梯跳跃力度"
+        },
+        "wind_": {
+            "zh": "风属性"
+        },
+        "yCorrectionHeightLimit_": {
+            "zh": "Y 轴校正高度上限"
+        }
     },
     "overrides": {}
 }
