@@ -19,6 +19,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
 import {FLAG_KEYS, TrackGrid} from "@/components/TrackGrid"
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
+import {slotEdit} from "@/lib/numericText"
 import type {TableCommands} from "@/components/ActionsTable"
 import {TrackToolbar} from "@/components/TrackToolbar"
 import type {Messages} from "@/lib/messages"
@@ -31,6 +32,14 @@ import type {Messages} from "@/lib/messages"
  * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
+
+/** Motion.scale 的提交规则：与数值输入框共用 slotEdit；空 = 默认 1，半成品/非法输入不改旧值。 */
+function commitScale(text: string): string | null {
+    const edit = slotEdit(text)
+    if (edit.kind !== "commit") return null
+    if (edit.value === null) return "1"
+    return edit.value === 1 ? "1" : String(edit.value)
+}
 
 /*
 动画详情页：点动作表里的动画号弹出来的那一层。
@@ -494,7 +503,10 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                     value={motScale === "1" ? "" : motScale}
                                     placeholder="1"
                                     override
-                                    onCommit={(value) => setMotScale(value === "" ? "1" : value)}
+                                    onCommit={(value) => {
+                                        const next = commitScale(value)
+                                        if (next !== null) setMotScale(next)
+                                    }}
                                 />
                             </tr>
                         </tbody>

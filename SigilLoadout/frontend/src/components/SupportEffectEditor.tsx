@@ -8,7 +8,8 @@
 
     值的形态：
       · 打开时**原样显示**（源数据里有 `0.5` 这种小数，不能预先归一）；
-      · 用户一敲键盘就按整数过滤（`/[^\d-]/g`，见 setValue）—— 这是用户口径，不是数据约束。
+      · 用户一敲键盘就按数值文本解析（`slotEdit`，整数/小数都收，见 setValue）；
+      · 是否真的改了按**数值**与默认值比较（0 与 0.0 是同一个值），相等就在关窗时当作没改。
 
     ⚠️ 勾选与值分开存：**编辑输入框不会自动勾上这一行** —— 勾选是明确的动作，没勾的效果不写回。
     ‼️ 没有保存按钮：改动先留在弹窗里，**关窗（取消 / Esc / 点遮罩）时才写回那一格**；没改就不写。
@@ -17,6 +18,7 @@ import { useMemo, useRef, useState } from "react";
 import { buffName, formatSupportEffects, parseSupportEffects, type BuffInfo } from "@/lib/buffs";
 import type { Lang } from "@/lib/lang";
 import type { Messages } from "@/lib/messages";
+import { slotEdit } from "@/lib/numericText";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -50,6 +52,16 @@ const zeroValues = (): string[] => Array.from({ length: SLOTS }, () => "0");
  */
 type Baseline = (hash: string, slot: number) => string
 
+/**
+ * 两个槽的文本在**数值上**是否相同：0、0.0、00 是同一个值，用于判断"有没有改"。
+ * 不是数字的文本一律按不同处理（让 serialize 原样写回去，交给上层报错）。
+ */
+function sameNumber(a: string, b: string): boolean {
+    const left = Number(a.trim());
+    const right = Number(b.trim());
+    return a.trim() !== "" && b.trim() !== "" && Number.isFinite(left) && Number.isFinite(right) && left === right;
+}
+
 function initialRows(
     list: readonly BuffInfo[],
     raw: string,
@@ -62,7 +74,9 @@ function initialRows(
         const values = byHash.get(info.hash);
         rows.set(info.hash, {
             checked: values !== undefined,
-            values: values ? values.map((value, slot) => (value === baseline(info.hash, slot) ? "" : value)) : emptyValues(),
+            values: values
+                ? values.map((value, slot) => (sameNumber(value, baseline(info.hash, slot)) ? "" : value))
+                : emptyValues(),
         });
     }
     return rows;
@@ -87,6 +101,7 @@ function rowsOf(buffs: readonly BuffInfo[], raw: string): BuffInfo[] {
 /**
  * 行状态 → 这一格的 JSON。数量由勾中的行数算。
  * 空输入框回落顺序：该动作的原值 → 默认占位值（见 `baselineOf`，未知哈希是 0）；单独一个 "-" 按 0 写。
+ * 非空值先转成数值，和默认值相等就写默认值（0 与 0.0 不算改），否则写规范化后的数。
  */
 function serialize(
     list: readonly BuffInfo[],
@@ -101,8 +116,12 @@ function serialize(
             hash: info.hash,
             values: row.values.map((raw, slot) => {
                 const trimmed = raw.trim();
-                if (trimmed === "") return baseline(info.hash, slot);
-                return trimmed === "-" ? "0" : trimmed;
+                const base = baseline(info.hash, slot);
+                if (trimmed === "") return base;
+                if (trimmed === "-") return base;
+                const numeric = Number(trimmed);
+                if (!Number.isFinite(numeric)) return base;
+                return sameNumber(String(numeric), base) ? base : String(numeric);
             }),
         });
     }
@@ -117,13 +136,16 @@ function serialize(
  * 想按像素收紧就得一路 `!` 覆盖，反而把高度算糊涂（踩过：同排格子高矮不一）。这里就是两行：
  * 标签 16px + 输入 20px + 上下留白，固定 44px，所有格子完全等高。
  */
-function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
+function ValueCell({label, value, draft, placeholder, ariaLabel, onChange, onBlur}: {
     label: string;
     value: string;
+    /** 正在输入、还没成为数字的文本（如 "-"、"0."）：只在焦点里显示，失焦就丢掉。 */
+    draft?: string;
     /** 空输入时显示的灰字：这一槽的原值（新加的 buff / 原值没有该槽就是 "0"）。 */
     placeholder: string;
     ariaLabel: string;
     onChange: (text: string) => void;
+    onBlur: () => void;
 }) {
     return (
         /*
@@ -133,10 +155,11 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
         <label className="flex w-full cursor-text flex-col justify-center gap-[7px] px-2 pt-[7px] pb-[7px]">
             <span className="h-3 truncate text-[12px] leading-3 text-muted-foreground">{label}</span>
             <input
-                value={value}
+                value={draft ?? value}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
-                inputMode="numeric"
+                onBlur={onBlur}
+                inputMode="decimal"
                 aria-label={ariaLabel}
                 className="h-[13px] w-full bg-transparent p-0 text-[13px] leading-[13px] outline-none"
             />
@@ -192,6 +215,11 @@ export function SupportEffectEditor({
     /** 一槽的基准值：原值 → 默认占位值。打开/写回/输入比较/占位符四处共用这一条。 */
     const baselineOf = (hash: string, slot: number): string => originalValues.get(hash)?.[slot] ?? defaultsOf(hash)[slot];
     const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value, baselineOf));
+    /**
+     * 正在输入、还没成为数字的文本（"-"、"0."）：键是 `哈希#槽`。它只负责"焦点里显示什么"，
+     * 失焦就删掉；模型（rows.values）里永远只存已经成立的值。
+     */
+    const [drafts, setDrafts] = useState<Map<string, string>>(new Map());
     const [query, setQuery] = useState("");
     /**
      * 打开时那份行状态序列化一次：关窗时按**同一个函数**再算一遍，两份一样就是"没改"
@@ -216,18 +244,37 @@ export function SupportEffectEditor({
     };
 
     /**
-     * 改值只改值，**不代勾选**（勾选是一个明确的动作；改了值但没勾 = 这条不挂）。键入只留整数写法。
+     * 改值只改值，**不代勾选**（勾选是一个明确的动作；改了值但没勾 = 这条不挂）。
      *
      * 输入原样收下，包括与默认值相同的数：输入时拦截会让“默认值 5 → 想打 55”永远打不出来。
-     * 是否真的改了由 `serialize`/`openedRaw` 在关窗时比较，相等就不写回。
+     * 半成品（"-"、"0."）只进 `drafts`，不进模型；失焦时草稿清掉，回到模型里的上一个值。
      */
     const setValue = (hash: string, slot: number, text: string) => {
         const row = rows.get(hash);
         if (!row) return;
-        const next = text.replace(/[^\d-]/g, "");
+        const edit = slotEdit(text);
+        if (edit.kind === "drop") return;
+        const key = `${hash}#${slot}`;
+        if (edit.kind === "half") {
+            setDrafts((prev) => new Map(prev).set(key, edit.text));
+            return;
+        }
+        const model = edit.value === null ? "" : String(edit.value);
+        const shown = edit.value === null ? "" : (edit.keeps ?? String(edit.value));
         const nextRows = new Map(rows);
-        nextRows.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? next : old)) });
+        nextRows.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? model : old)) });
         setRows(nextRows);
+        setDrafts((prev) => new Map(prev).set(key, shown));
+    };
+
+    const clearDraft = (hash: string, slot: number) => {
+        const key = `${hash}#${slot}`;
+        setDrafts((prev) => {
+            if (!prev.has(key)) return prev;
+            const next = new Map(prev);
+            next.delete(key);
+            return next;
+        });
     };
 
     /**
@@ -286,7 +333,7 @@ export function SupportEffectEditor({
                         const name = buffName(info, lang);
                         const displayName = name || info.hash;
                         return (
-                            <div key={info.hash} className="flex items-center border-b pl-2 last:border-b-0">
+                            <div key={info.hash} className="flex items-center border-b pl-2">
                                 <Checkbox
                                     checked={row.checked}
                                     onCheckedChange={(next) => setChecked(info.hash, next === true)}
@@ -315,9 +362,11 @@ export function SupportEffectEditor({
                                             key={slot}
                                             label={info.labels[slot] ?? ""}
                                             value={row.values[slot]}
+                                            draft={drafts.get(`${info.hash}#${slot}`)}
                                             placeholder={baselineOf(info.hash, slot)}
                                             ariaLabel={`${displayName} ${info.hash} ${slot + 1}`}
                                             onChange={(text) => setValue(info.hash, slot, text)}
+                                            onBlur={() => clearDraft(info.hash, slot)}
                                         />
                                     ))}
                                 </div>

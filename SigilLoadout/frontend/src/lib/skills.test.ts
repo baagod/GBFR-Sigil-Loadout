@@ -120,7 +120,7 @@ describe("the two patterns", () => {
         });
         expect(slotEdit("0.004")).toMatchObject({ value: 0.004 });
         expect(slotEdit("0")).toMatchObject({ value: 0, keeps: "0" });
-        expect(slotEdit("0.")).toMatchObject({ kind: "half", text: "0." });
+        expect(slotEdit("0.")).toMatchObject({ value: 0, keeps: "0." });
     });
 
     it("refuses more digits than the game can carry, so no box can hold Infinity", () => {

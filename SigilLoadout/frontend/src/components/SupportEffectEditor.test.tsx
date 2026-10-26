@@ -82,6 +82,60 @@ describe("附加效果弹窗", () => {
         expect(onSave).not.toHaveBeenCalled();
     });
 
+    /* 支持整数/小数：0. 是通往 0.5 的半成品，0.0 与默认值 0 在数值上相同。 */
+    it("允许输入小数，且 0. 可以继续打成 0.5", () => {
+        renderEditor(RAW);
+        const input = valueInput("霸体 4039598841 2");
+
+        fireEvent.change(input, { target: { value: "0." } });
+        expect(input.value).toBe("0.");
+        fireEvent.change(input, { target: { value: "0.5" } });
+        expect(input.value).toBe("0.5");
+    });
+
+    it("输入与默认值数值相同的 0.0 时关窗不写回", () => {
+        const { onSave } = renderEditor(RAW);
+        const input = valueInput("霸体 4039598841 2");
+        expect(input.placeholder).toBe("0");
+
+        fireEvent.change(input, { target: { value: "0.0" } });
+        close();
+        expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("输入小数后关窗按小数写回", () => {
+        const { onSave } = renderEditor(RAW);
+        fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "1.5" } });
+        close();
+        expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["1.5", "0", "0", "0", "1", "1"] }]);
+    });
+
+    /* 前导零不保留：00 → 0、007 → 7，框里只可能出现一个 0。 */
+    it("前导零归一到单个 0", () => {
+        renderEditor(RAW);
+        const input = valueInput("霸体 4039598841 2");
+
+        fireEvent.change(input, { target: { value: "00" } });
+        expect(input.value).toBe("0");
+        fireEvent.change(input, { target: { value: "007" } });
+        expect(input.value).toBe("7");
+    });
+
+    /* "-" 只是通往负数的半成品：焦点里能看，失焦就回到模型里的原值（没有就回到占位符）。 */
+    it("单独的 - 不留在输入框：失焦回到原值", () => {
+        const { onSave } = renderEditor(RAW);
+        const input = valueInput("霸体 4039598841 2");
+        expect(input.placeholder).toBe("0");
+
+        fireEvent.change(input, { target: { value: "-" } });
+        expect(input.value).toBe("-");
+        fireEvent.blur(input);
+        expect(input.value).toBe("");
+
+        close();
+        expect(onSave).not.toHaveBeenCalled();
+    });
+
     it("打开不改动：关窗只回调 onClose，不写回", () => {
         const { onSave, onClose } = renderEditor(RAW);
 
@@ -103,12 +157,12 @@ describe("附加效果弹窗", () => {
         const { onSave } = renderEditor(RAW);
 
         fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "1.8" } });
-        expect(valueInput("霸体 4039598841 1").value).toBe("18");
+        expect(valueInput("霸体 4039598841 1").value).toBe("1.8");
         expect(onSave).not.toHaveBeenCalled();
 
         close();
         expect(onSave).toHaveBeenCalledTimes(1);
-        expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["18", "0", "0", "0", "1", "1"] }]);
+        expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["1.8", "0", "0", "0", "1", "1"] }]);
     });
 
     it("清空输入框 = 用原值：原样数据不会产生改动", () => {
