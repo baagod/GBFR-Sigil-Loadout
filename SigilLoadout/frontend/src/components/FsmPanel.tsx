@@ -2,6 +2,7 @@ import {useEffect, useState} from "react"
 import {ListFsm, LoadFsm} from "../../bindings/sigilloadout/service/actionsservice"
 import type {ActionField} from "../../bindings/sigilloadout/service/models"
 import {InfoBadge} from "@/components/InfoBadge"
+import {SideListItem, sideListRows} from "@/components/ui/side-list"
 import type {Messages} from "@/lib/messages"
 
 /*
@@ -61,30 +62,15 @@ export function FsmPanel({charCode, t}: {charCode: string; t: Messages}) {
             {/* 左栏：条目长相照 combobox（同 GlobalParamList）。名字不翻译 —— 它就是游戏里的文件名。 */}
             <div className="min-h-0 w-max shrink-0 overflow-y-auto overflow-x-hidden border-r pr-3">
                 {failure && <p className="p-2 text-xs text-destructive">{failure}</p>}
-                <div className="flex flex-col gap-1.5">
+                <div className={sideListRows}>
                     {names.map((name) => {
                         const shared = name.includes("/")
                         const label = shared ? name.slice(name.indexOf("/") + 1) : name
                         return (
-                            <div
-                                key={name}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => setSelected(name)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault()
-                                        setSelected(name)
-                                    }
-                                }}
-                                className={
-                                    "flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-hidden select-text " +
-                                    (selected === name ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
-                                }
-                            >
+                            <SideListItem key={name} selected={selected === name} onSelect={() => setSelected(name)}>
                                 <span>{label}</span>
                                 {shared && <InfoBadge>{t.sharedLayer}</InfoBadge>}
-                            </div>
+                            </SideListItem>
                         )
                     })}
                 </div>

@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"sigilloadout/appfiles"
+	"sigilloadout/service/archive"
 )
 
 const gameConfigName = "game.json"
@@ -22,9 +23,19 @@ type gameConfig struct {
 	GameDir string `json:"gameDir"`
 }
 
+/*
+gameDataSource 是"当前游戏目录 + 由它打开的归档"的**唯一**缓存：同一个目录只打开一次归档，
+换目录时两者一起丢。以前目录和归档各有一套缓存/锁，失效规则一个显式清、一个靠字符串比较，
+容易短暂不一致。
+*/
+type gameDataSource struct {
+	mu      sync.Mutex
+	dir     string
+	archive *archive.Archive
+}
+
 var (
-	gameMu    sync.Mutex
-	gameCache string
+	gameData  gameDataSource
 	gameVDFRe = regexp.MustCompile(`"path"\s+"([^"]+)"`)
 )
 
@@ -84,7 +95,7 @@ func SetGameDir(path string) error {
 	if err := writeGameConfig(gameConfig{GameDir: path}); err != nil {
 		return err
 	}
-	clearGameCache()
+	resetGameData()
 	return nil
 }
 
@@ -146,23 +157,49 @@ func steamLibraries() []string {
 	return libs
 }
 
-// gameDir 是当前生效的游戏目录（带内存缓存，配置改过后调用下面清缓存）。
+// gameDir 是当前生效的游戏目录（带内存缓存，配置改过后 `resetGameData`）。
 func gameDir() (string, error) {
-	gameMu.Lock()
-	defer gameMu.Unlock()
-	if gameCache != "" {
-		return gameCache, nil
+	gameData.mu.Lock()
+	defer gameData.mu.Unlock()
+	return gameData.dirLocked()
+}
+
+// dirLocked 取当前目录；调用方必须持有 gameData.mu。
+func (s *gameDataSource) dirLocked() (string, error) {
+	if s.dir != "" {
+		return s.dir, nil
 	}
 	dir := DetectGameDir()
 	if dir == "" {
 		return "", fmt.Errorf("找不到游戏目录，请在设置里指定")
 	}
-	gameCache = dir
+	s.dir = dir
 	return dir, nil
 }
 
-func clearGameCache() {
-	gameMu.Lock()
-	gameCache = ""
-	gameMu.Unlock()
+// openGameArchive 打开当前目录的 data.i；同一个目录只解析一次 index。
+func openGameArchive() (*archive.Archive, error) {
+	gameData.mu.Lock()
+	defer gameData.mu.Unlock()
+	dir, err := gameData.dirLocked()
+	if err != nil {
+		return nil, err
+	}
+	if gameData.archive != nil {
+		return gameData.archive, nil
+	}
+	a, err := archive.Open(filepath.Join(dir, "data.i"))
+	if err != nil {
+		return nil, err
+	}
+	gameData.archive = a
+	return a, nil
+}
+
+// resetGameData 丢掉目录与归档缓存；SetGameDir 改配置后调用。
+func resetGameData() {
+	gameData.mu.Lock()
+	gameData.dir = ""
+	gameData.archive = nil
+	gameData.mu.Unlock()
 }

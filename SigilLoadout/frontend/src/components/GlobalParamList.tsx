@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from "react"
 import {ListGlobalParams} from "../../bindings/sigilloadout/service/actionsservice"
 import type {ParamLabels} from "../../bindings/sigilloadout/service/models"
+import {SideListItem, sideListRows} from "@/components/ui/side-list"
 import {loadParamLabels, paramTableLabel} from "@/lib/paramlabels"
 
 /**
@@ -94,28 +95,9 @@ export function GlobalParamList({onOpen, selected, onLoaded, className}: {
         >
             {failure && <p className="p-2 text-xs text-destructive">{failure}</p>}
             {/* 行与行之间 6px（用户要求）：条目本身 32px（文字 20 + 上下各 6px 内边距）。 */}
-            <div className="flex flex-col gap-1.5">
+            <div className={sideListRows}>
                 {tables.map((table, index) => (
-                    // ⚠️ 用 div + role="button" 而**不是** <button>：Chromium 里 <button> 内的文字
-                    // **用鼠标拖选选不中**（程序化 Range 能选中，所以一不小心就会误判成"已经能选了"）。
-                    // 这里要的就是"能拖选、复制表名"，所以换掉标签；键盘可达性用 tabIndex + Enter/Space 补上。
-                    <div
-                        key={table}
-                        data-index={index}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onOpen(table)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault()
-                                onOpen(table)
-                            }
-                        }}
-                        className={
-                            "flex w-full cursor-default items-center rounded-sm py-1.5 pr-2 pl-2 text-left text-sm outline-hidden select-text " +
-                            (selected === table ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")
-                        }
-                    >
+                    <SideListItem key={table} dataIndex={index} selected={selected === table} onSelect={() => onOpen(table)}>
                         {/* 上：译名（查不到就退成文件名）；下：文件名，后缀只在显示时去掉 —— 传出去的仍是完整文件名。 */}
                         <span className="flex min-w-0 flex-col leading-tight">
                             {/* 列表里去掉结尾的「参数」：左边栏本来就全是参数表，两个字纯占宽。 */}
@@ -124,7 +106,7 @@ export function GlobalParamList({onOpen, selected, onLoaded, className}: {
                                 {table.replace(/\.msg$/, "").replace(/param(eter)?$/, "")}
                             </span>
                         </span>
-                    </div>
+                    </SideListItem>
                 ))}
             </div>
         </div>

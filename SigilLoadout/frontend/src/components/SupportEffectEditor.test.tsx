@@ -36,7 +36,7 @@ const renderEditor = (value: string, original: string = value, charCode = "PL000
 const checkbox = (name: string) => screen.getByLabelText(name) as HTMLButtonElement;
 const valueInput = (name: string) => screen.getByLabelText(name) as HTMLInputElement;
 const rowNames = () =>
-    Array.from(screen.getByTestId("support-effect-rows").children).map((row) => row.querySelector(".text-sm")?.textContent ?? "");
+    Array.from(screen.getByTestId("support-effect-rows").children).map((row) => row.querySelector("[data-buff-name]")?.textContent ?? "");
 // 弹窗没有右上角 ×（提交与取消都在标题栏），关窗 = 点「取消」。
 const close = () => fireEvent.click(screen.getByRole("button", { name: t.cancel }));
 const saved = (onSave: ReturnType<typeof vi.fn>) => parseSupportEffects(onSave.mock.calls.at(-1)?.[0] as string);
@@ -56,9 +56,9 @@ describe("附加效果弹窗", () => {
         expect(input.placeholder).toBe("15");
         expect(valueInput("霸体 4039598841 2").placeholder).toBe("0");
         expect(checkbox("霸体").getAttribute("aria-checked")).toBe("true");
-        // 原本就有的 buff 灰显；不在原值里的默认白字。
-        expect(screen.getAllByText("霸体").some((el) => el.className.includes("text-muted-foreground"))).toBe(true);
-        expect(screen.getAllByText("双发子弹").every((el) => !el.className.includes("text-muted-foreground"))).toBe(true);
+        // 原本就有的 buff 灰显；不在原值里的默认白字。断言状态属性，不绑 Tailwind 类名。
+        expect(screen.getAllByText("霸体").some((el) => el.getAttribute("data-original") === "true")).toBe(true);
+        expect(screen.getAllByText("双发子弹").every((el) => el.getAttribute("data-original") !== "true")).toBe(true);
     });
 
     it("打开不改动：关窗只回调 onClose，不写回", () => {

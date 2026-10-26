@@ -44,17 +44,16 @@ func TestPickHiddenMotionsKeepsEverythingButReferenced(t *testing.T) {
 func TestHiddenGroupKeysOnAttack(t *testing.T) {
 	for _, tc := range []struct {
 		have map[string]bool
-		fsm  bool
 		want string
 	}{
-		{map[string]bool{flagsKind: true, "attack": true, "effect": true}, false, groupSkill}, // 有 attack ⇒ 技能
-		{map[string]bool{"attack": true}, false, groupSkill},                                  // 只有 attack 也算
-		{map[string]bool{flagsKind: true, "effect": true}, false, groupOther},                 // 没有 attack ⇒ 其他
-		{map[string]bool{flagsKind: true, "speed": true}, false, groupOther},                  // speed 不参与分组
-		{map[string]bool{flagsKind: true, "effect": true}, true, groupSkill},                  // flags 置了「调用 FSM 技能」⇒ 技能
+		{map[string]bool{flagsKind: true, "attack": true, "effect": true}, groupSkill},   // 有 attack ⇒ 技能
+		{map[string]bool{"attack": true}, groupSkill},                                    // 只有 attack 也算
+		{map[string]bool{flagsKind: true, "effect": true}, groupOther},                   // 没有 attack ⇒ 其他
+		{map[string]bool{flagsKind: true, "speed": true}, groupOther},                    // speed 不参与分组
+		{map[string]bool{flagsKind: true, "effect": true, "fsmSkill": true}, groupSkill}, // fsmSkill 标记 ⇒ 技能
 	} {
-		if got := hiddenGroup(tc.have, tc.fsm); got != tc.want {
-			t.Errorf("hiddenGroup(%v, fsm=%v) = %q，want %q", tc.have, tc.fsm, got, tc.want)
+		if got := hiddenGroup(tc.have); got != tc.want {
+			t.Errorf("hiddenGroup(%v) = %q，want %q", tc.have, got, tc.want)
 		}
 	}
 }

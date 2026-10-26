@@ -6,17 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
-
-	"sigilloadout/service/archive"
-)
-
-var (
-	motMu        sync.Mutex
-	motArchive   *archive.Archive
-	motArchiveAt string
 )
 
 // GameService 只负责游戏目录与归档读取，不碰 mod 的保存。
@@ -79,25 +70,6 @@ func (s *GameService) MotScale(char, motion string) (float64, error) {
 // ScaleMotRootMotion 把根运动位移乘以 scale，并写进 mod 的 data 目录。
 func (s *GameService) ScaleMotRootMotion(char, motion string, scale float64) (MotInfo, error) {
 	return ScaleMotRootMotion(char, motion, scale)
-}
-
-func openGameArchive() (*archive.Archive, error) {
-	dir, err := gameDir()
-	if err != nil {
-		return nil, err
-	}
-	motMu.Lock()
-	defer motMu.Unlock()
-	if motArchive != nil && motArchiveAt == dir {
-		return motArchive, nil
-	}
-	a, err := archive.Open(filepath.Join(dir, "data.i"))
-	if err != nil {
-		return nil, err
-	}
-	motArchive = a
-	motArchiveAt = dir
-	return a, nil
 }
 
 var (

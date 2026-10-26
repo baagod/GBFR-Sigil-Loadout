@@ -362,10 +362,17 @@ func (s *ActionsService) ListHiddenMotions() ([]HiddenMotion, error) {
 		return nil, err
 	}
 
+	// 把 FSM 技能标记并进同一张 kinds 表：分组只查一张表，不再给 hiddenGroup 传第二个布尔参数。
+	for motion := range fsmSkill {
+		if kinds[motion] != nil {
+			kinds[motion]["fsmSkill"] = true
+		}
+	}
+
 	motions := pickHiddenMotions(kinds, referenced)
 	out := make([]HiddenMotion, 0, len(motions))
 	for _, motion := range motions {
-		item := HiddenMotion{Motion: motion, Group: hiddenGroup(kinds[motion], fsmSkill[motion])}
+		item := HiddenMotion{Motion: motion, Group: hiddenGroup(kinds[motion])}
 		for _, code := range sortedKeys(refs[motion]) {
 			// 自己不算"别的角色"：这一栏问的是"还有谁在用这个号"。
 			if code == char {
@@ -411,12 +418,11 @@ func flagsHasFsmSkill(raw []byte) bool {
 }
 
 /*
-hiddenGroup 分组：有 attack 轨，或任意 flags 轨置了「调用 FSM 技能」，都算「技能」。互斥且全覆盖。
-
-FSM 这一条是为了把"不播攻击、但走技能 FSM"的号从「其他」里挑出来（只在轨迹表页分组，动作表页无关）。
+hiddenGroup 分组：有 attack 轨，或任意 flags 轨置了「调用 FSM 技能」（`fsmSkill` 标记），都算「技能」。
+互斥且全覆盖。FSM 这一条是为了把"不播攻击、但走技能 FSM"的号从「其他」里挑出来。
 */
-func hiddenGroup(have map[string]bool, fsmSkill bool) string {
-	if have["attack"] || fsmSkill {
+func hiddenGroup(have map[string]bool) string {
+	if have["attack"] || have["fsmSkill"] {
 		return groupSkill
 	}
 	return groupOther

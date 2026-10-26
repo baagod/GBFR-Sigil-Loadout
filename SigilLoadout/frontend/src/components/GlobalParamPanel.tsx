@@ -76,12 +76,11 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
     /**
      * 改一格：只记在本地，按「保存」才交给后端。
      *
-     * 值**不在这里跟原值比**：空串就是"没填 = 回到原值"（后端那套 Value 为 nil 的模型），显示态因此
-     * 灰着。改回原值只是把这一格写成原值本身，同样是一次正常保存。
+     * 空串就是"没填 = 回到原值"，由后端统一当成没改（见 `SaveGlobalParam`）；这里原样收下，
+     * 不再自己翻译成 undefined。改回原值只是把这一格写成原值本身，同样是一次正常保存。
      */
     const edit = (index: number, value: string) => {
-        // 清空输入框 = 回到原值（保存时按"没改过"处理）；空串不能当成值写进表里。
-        setFields((prev) => prev.map((field, i) => (i === index ? {...field, value: value === "" ? undefined : value} : field)))
+        setFields((prev) => prev.map((field, i) => (i === index ? {...field, value} : field)))
         setDirty(true)
     }
 

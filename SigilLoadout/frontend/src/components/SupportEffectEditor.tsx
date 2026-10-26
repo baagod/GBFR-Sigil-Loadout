@@ -300,6 +300,8 @@ export function SupportEffectEditor({
                                     {/* 英文名比中文长：放不下就折行（最多两行），不截断。 */}
                                     {/* 这个动作**原本就有**的 buff 灰显；其余（新加的、本格之外的）默认白字。 */}
                                     <div
+                                        data-buff-name={displayName}
+                                        data-original={originalValues.has(info.hash) ? "true" : "false"}
                                         className={`line-clamp-2 text-sm leading-tight break-words ${
                                             originalValues.has(info.hash) ? "text-muted-foreground" : ""
                                         }`}
