@@ -196,6 +196,12 @@ try {
         throw '前端依赖没装：先在 SigilLoadout\frontend 跑 pnpm install，见 README 的「从源码构建」。'
     }
     # bindings 是 git 忽略的生成产物；前端构建前重新生成。
+    # 生成的 bindings 必须和运行期 wails 模块同版本：CLI 旧一版会生成旧形状的绑定。
+    $moduleVersion = ((& go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3 2>&1) -join "`n").Trim()
+    $cliVersion = ((& wails3 version 2>&1) -join "`n").Trim()
+    if ($cliVersion -ne $moduleVersion) {
+        throw "wails3 版本 $cliVersion 与 go.mod 的 $moduleVersion 不一致；先升级 CLI。"
+    }
     & wails3 generate bindings ./...
     if ($LASTEXITCODE -ne 0) {
         throw "Wails bindings generation failed with exit code $LASTEXITCODE."

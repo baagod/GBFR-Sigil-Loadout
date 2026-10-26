@@ -60,6 +60,12 @@ try {
     # 前端还按旧参数个数调用（运行期报 `expects N arguments, got M`）。build-release 那一步一直有，
     # 快速部署以前没有；没装 wails3 时跳过并明说，别把快速迭代卡死。
     if (Get-Command wails3 -ErrorAction SilentlyContinue) {
+        # 生成的 bindings 必须和运行期 wails 模块同版本：CLI 旧一版会生成旧形状的绑定。
+        $moduleVersion = ((& go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3 2>&1) -join "`n").Trim()
+        $cliVersion = ((& wails3 version 2>&1) -join "`n").Trim()
+        if ($cliVersion -ne $moduleVersion) {
+            throw "wails3 版本 $cliVersion 与 go.mod 的 $moduleVersion 不一致；先升级 CLI。"
+        }
         & wails3 generate bindings ./...
         if ($LASTEXITCODE -ne 0) { throw 'Wails bindings 生成失败。' }
     } else {
