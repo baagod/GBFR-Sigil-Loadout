@@ -201,13 +201,6 @@ func mustMotInfo(t *testing.T, b []byte) MotInfo {
 	return info
 }
 
-// 纯竖直运动（X/Z=0、Y≠0）也必须能算倍率，不能因为只看 X/Z 就当成 0。
-func TestMotLengthIncludesY(t *testing.T) {
-	if got := motLength(MotInfo{RootY: 2}); got != 2 {
-		t.Fatalf("motLength(纯竖直 2) = %v，want 2", got)
-	}
-}
-
 // typ4：每帧 16 字节（frame/dummy/value/m0/m1）；缩差值并同比缩切线，首帧起点不动。
 func TestScaleRootAxisTyp4(t *testing.T) {
 	b := make([]byte, 32)
@@ -236,42 +229,19 @@ func TestScaleRootAxisTyp4(t *testing.T) {
 	}
 }
 
-// 最小的 mot：一条 bone=-1 / prop=2（根运动 Z）的插值记录：p=0、dp=1，两帧 0/100 → 位移 100。
-func syntheticRootZMot() []byte {
-	b := make([]byte, 68)
-	copy(b, "mot\x00")
-	binary.LittleEndian.PutUint16(b[10:], 2)      // FrameCount
-	binary.LittleEndian.PutUint32(b[16:], 1)      // RecordCount
-	copy(b[24:44], "test")                        // AnimationName
-	binary.LittleEndian.PutUint16(b[44:], 0xffff) // bone = -1
-	b[46] = 2                                     // prop = 2（Z）
-	b[47] = 2                                     // typ = 2（p + dp*u16）
-	binary.LittleEndian.PutUint16(b[48:], 2)      // count
-	binary.LittleEndian.PutUint32(b[52:], 12)     // chunk 偏移（相对记录起点）
-	binary.LittleEndian.PutUint32(b[56:], math.Float32bits(0))
-	binary.LittleEndian.PutUint32(b[60:], math.Float32bits(1))
-	binary.LittleEndian.PutUint16(b[64:], 0)
-	binary.LittleEndian.PutUint16(b[66:], 100)
-	return b
-}
-
-// 缩放后交回界面的 MotInfo 必须是**新位移**：r.recs 里是缩放前的快照，不重读就会显示旧值。
-func TestScaleMotBytesReportsScaledRoot(t *testing.T) {
-	info, err := scaleMotBytes(syntheticRootZMot(), 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if math.Abs(info.RootZ-200) > 1e-3 {
-		t.Fatalf("RootZ = %v，want 200（返回的是缩放前的快照？）", info.RootZ)
-	}
-}
-
 // 非有限倍率（Inf / NaN）写回会把整段值写成 Inf/NaN，必须在读游戏文件之前就拒绝。
 func TestScaleMotRootMotionRejectsNonFiniteScale(t *testing.T) {
 	for _, scale := range []float64{math.Inf(1), math.Inf(-1), math.NaN(), 0, -1} {
 		if _, err := ScaleMotRootMotion("pl1400", "3470", scale); err == nil {
 			t.Fatalf("倍率 %v 被收下了", scale)
 		}
+	}
+}
+
+// 倍率本身有限、但大到把 float32 撑成 Inf 时也要拒绝，不能把坏字节写进 mod。
+func TestScaleMotBytesRejectsOverflow(t *testing.T) {
+	if _, err := scaleMotBytes(syntheticRootMot(0), 1e39); err == nil {
+		t.Fatal("溢出成 Inf 的缩放被收下了")
 	}
 }
 

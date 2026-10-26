@@ -433,7 +433,25 @@ func scaleMotBytes(b []byte, scale float64) (MotInfo, error) {
 	if err != nil {
 		return MotInfo{}, err
 	}
-	return motInfoOf(scaled)
+	info, err := motInfoOf(scaled)
+	if err != nil {
+		return MotInfo{}, err
+	}
+	// 半精度/float 都有上限：倍率极端时 dp*scale 会写回 Inf/NaN，这种字节不能落盘。
+	if !finiteMot(info) {
+		return MotInfo{}, fmt.Errorf("缩放后根运动不是有限数（倍率过大）")
+	}
+	return info, nil
+}
+
+// finiteMot 判断三个根轴位移都是有限数。
+func finiteMot(info MotInfo) bool {
+	for _, v := range []float64{info.RootX, info.RootY, info.RootZ} {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return false
+		}
+	}
+	return true
 }
 
 /*

@@ -254,6 +254,21 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
      * 混成一栏就分不出"没改过"与"改成了空"，见 `service/actionedits.go`）。
      */
     const [rows, setRows] = useState<ActionRow[]>([])
+    /**
+     * 改一格：**改动归本页**（表的 `onEdit` 数据所有权开关）。表只显示过滤后的行，编辑却必须写进
+     * 整份 `rows` —— 否则过滤一开，隐藏行的改动既存不住、保存也交不出去。
+     */
+    const editRow = useCallback((rowId: string, key: string, value: string | null) => {
+        setRows((prev) =>
+            prev.map((row) => {
+                if (row.id !== rowId) return row
+                const values = {...row.values}
+                if (value === null) delete values[key]
+                else values[key] = value
+                return {...row, values}
+            }),
+        )
+    }, [])
     /** 字段顺序（= 表头顺序），见 `columnsOf`。 */
     const keys = useMemo(() => columnsOf(rows), [rows])
     /**
@@ -689,6 +704,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                             onReady={handleTableReady}
                             rows={visibleRows}
                             saveRows={rows}
+                            onEdit={editRow}
                             keys={keys}
                             t={t}
                             columnOf={columnOf}
