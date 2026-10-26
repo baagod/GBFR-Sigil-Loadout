@@ -81,15 +81,6 @@ func (s *GameService) ScaleMotRootMotion(char, motion string, scale float64) (Mo
 	return ScaleMotRootMotion(char, motion, scale)
 }
 
-// ReadGameFile 按归档路径读任意原始文件。
-func (s *GameService) ReadGameFile(path string) ([]byte, error) {
-	a, err := openGameArchive()
-	if err != nil {
-		return nil, err
-	}
-	return a.ReadFile(path)
-}
-
 func openGameArchive() (*archive.Archive, error) {
 	dir, err := gameDir()
 	if err != nil {

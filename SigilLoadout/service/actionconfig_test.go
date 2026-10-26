@@ -111,9 +111,9 @@ func TestEmptyIDListIsEveryRecordAndSurvivesACharacterSwitch(t *testing.T) {
 	if err := service.SetActionIDs(""); err != nil {
 		t.Fatalf("SetActionIDs(\"\"): %v", err)
 	}
-	all, err := service.LoadActions()
+	all, err := service.LoadCharacterActions()
 	if err != nil {
-		t.Fatalf("LoadActions: %v", err)
+		t.Fatalf("LoadCharacterActions: %v", err)
 	}
 	if len(all) < 2 {
 		t.Fatalf("空清单只列出 %d 条记录", len(all))

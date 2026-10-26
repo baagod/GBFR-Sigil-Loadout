@@ -37,7 +37,8 @@ const checkbox = (name: string) => screen.getByLabelText(name) as HTMLButtonElem
 const valueInput = (name: string) => screen.getByLabelText(name) as HTMLInputElement;
 const rowNames = () =>
     Array.from(screen.getByTestId("support-effect-rows").children).map((row) => row.querySelector(".text-sm")?.textContent ?? "");
-const close = () => fireEvent.click(screen.getByRole("button", { name: "Close" }));
+// 弹窗没有右上角 ×（提交与取消都在标题栏），关窗 = 点「取消」。
+const close = () => fireEvent.click(screen.getByRole("button", { name: t.cancel }));
 const saved = (onSave: ReturnType<typeof vi.fn>) => parseSupportEffects(onSave.mock.calls.at(-1)?.[0] as string);
 
 const RAW = JSON.stringify(["1", "4039598841", "15", "0", "0", "0", "1", "1"]);
@@ -65,6 +66,15 @@ describe("附加效果弹窗", () => {
 
         close();
         expect(onClose).toHaveBeenCalledTimes(1);
+        expect(onSave).not.toHaveBeenCalled();
+    });
+
+    /* 原值的排列顺序与资产顺序不同，也只是"没改"：写回按资产顺序排，不能因此留一条草稿。 */
+    it("打开不改动：原值顺序与资产不同也不写回", () => {
+        const reversed = JSON.stringify(["2", "1039632913", "2", "45", "0", "0", "1", "1", "4039598841", "15", "0", "0", "0", "1", "1"]);
+        const { onSave } = renderEditor(reversed);
+
+        close();
         expect(onSave).not.toHaveBeenCalled();
     });
 

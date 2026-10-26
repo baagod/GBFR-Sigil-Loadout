@@ -5,18 +5,16 @@
 */
 import {
     cellSelectionFeature,
-    columnFilteringFeature,
     columnPinningFeature,
     columnSizingFeature,
-    createFilteredRowModel,
     createSortedRowModel,
-    globalFilteringFeature,
     rowSortingFeature,
     sortFn_alphanumeric,
     tableFeatures,
 } from "@tanstack/react-table"
 import {createContext, useContext, useEffect, type ReactNode} from "react"
 import {CELL_CHOICES} from "@/lib/controltypes"
+import {parseFilterTokens} from "@/lib/filter"
 import type {Messages} from "@/lib/messages"
 
 /* **列 id → 消息键**：表头文案只写在这一张表里 —— `ActionsTableLabels` 与 `columnLabel` 的类型都从它推出来。
@@ -399,16 +397,12 @@ export function acceptPaste(columnId: string, value: string, branchIds: Readonly
  */
 /**
  * 记录清单过滤器：`id_` / 任一 `saveMotId*` / 动作名（原文或显示名）里**含**这一段就算命中。
- * token 之间是"或"：与后端 `recordsMatching` 同一口径，另加名称；空白或逗号分隔。
+ * token 之间是"或"：分词口径见 `lib/filter`（逗号也算分隔符）；空白或逗号分隔。
  *
  * 只在当前角色这张表上跑（一张表 35~60 条），所以搜索不需要重新读后端。
  */
 export const matchesIdsFilter = (values: Record<string, string>, filterText: string): boolean => {
-    const tokens = filterText
-        .toLowerCase()
-        .replaceAll(",", " ")
-        .split(/\s+/)
-        .filter(Boolean)
+    const tokens = parseFilterTokens(filterText)
     if (tokens.length === 0) return true
     const haystack = [
         values["id_"] ?? "",
@@ -421,19 +415,12 @@ export const matchesIdsFilter = (values: Record<string, string>, filterText: str
     return tokens.some((token) => haystack.some((value) => value.includes(token)))
 }
 
-const filterFn_idsOrName = (row: {original: ActionRow}, _columnId: string, filterValue: unknown) =>
-    matchesIdsFilter(row.original.originals, String(filterValue ?? ""))
-
 export const features = tableFeatures({
     cellSelectionFeature,
-    columnFilteringFeature,
-    globalFilteringFeature,
     columnPinningFeature,
     columnSizingFeature,
     rowSortingFeature,
-    filteredRowModel: createFilteredRowModel(),
     sortedRowModel: createSortedRowModel(),
-    filterFns: {idsOrName: filterFn_idsOrName},
     sortFns: {alphanumeric: sortFn_alphanumeric},
 })
 

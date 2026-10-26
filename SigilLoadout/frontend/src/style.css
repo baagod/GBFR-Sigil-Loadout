@@ -298,8 +298,6 @@ table tr.row-removed > td.cell-handle {
 /* 行号列右缘那条 2px 边框已挪到选区覆盖层（`selectionOverlay` 的 `rowHead`）——
    不再改 `<td>` 的 border 宽度：那会动表格布局，也不随覆盖层一起横滚跟随。 */
 
-
-
 /* 「专精技能」页的两级吸顶（角色行 + 专精类型名）。两个 sticky 元素必须是滚动容器的直接子/孙元素，
    否则滚动祖先会变成角色面板、滚到下一个角色就跟着走。
    `top: 0` 不能写 -1（吸顶瞬间会跳 1px）；类型名 `top: 39px` 与 JSX 的 `-mt-[5px]` 成对

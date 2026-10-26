@@ -35,6 +35,8 @@ type Row = {
 
 /** 没勾/没动过的行：6 个空串 = 全用原值（原值也没有就是 0）。 */
 const emptyValues = (): string[] => Array.from({ length: SLOTS }, () => "");
+/** 资产里没有的未知哈希没有默认参数，占位值统一取 0。 */
+const zeroValues = (): string[] => Array.from({ length: SLOTS }, () => "0");
 
 /**
  * 原始字符串 → 每行状态（按哈希索引；未知哈希也在 `list` 里，见 `rowsOf`）。
@@ -46,24 +48,21 @@ const emptyValues = (): string[] => Array.from({ length: SLOTS }, () => "");
  * 同一个哈希出现两次时只认第一次：这个弹窗的模型是"一行一个 buff"，一格里重复挂同一个 buff
  * 没有对应的行可以表达 —— 写回时那次重复会消失（数据里没出现过，见 lib/buffs.ts 的严进）。
  */
+type Baseline = (hash: string, slot: number) => string
+
 function initialRows(
     list: readonly BuffInfo[],
     raw: string,
-    original: ReadonlyMap<string, string[]>,
-    defaults: (hash: string) => string[] | undefined,
+    baseline: Baseline,
 ): Map<string, Row> {
     const effects = parseSupportEffects(raw) ?? [];
     const byHash = new Map(effects.map((effect) => [effect.hash, effect.values]));
     const rows = new Map<string, Row>();
     for (const info of list) {
         const values = byHash.get(info.hash);
-        const originalValues = original.get(info.hash);
-        const defaultValues = defaults(info.hash);
         rows.set(info.hash, {
             checked: values !== undefined,
-            values: values
-                ? values.map((value, slot) => (value === (originalValues?.[slot] ?? defaultValues?.[slot]) ? "" : value))
-                : emptyValues(),
+            values: values ? values.map((value, slot) => (value === baseline(info.hash, slot) ? "" : value)) : emptyValues(),
         });
     }
     return rows;
@@ -87,25 +86,22 @@ function rowsOf(buffs: readonly BuffInfo[], raw: string): BuffInfo[] {
 
 /**
  * 行状态 → 这一格的 JSON。数量由勾中的行数算。
- * 空输入框回落顺序：该动作的原值 → 当前角色用过的参数 → 全表第一组默认 → 0；单独一个 "-" 按 0 写。
+ * 空输入框回落顺序：该动作的原值 → 默认占位值（见 `baselineOf`，未知哈希是 0）；单独一个 "-" 按 0 写。
  */
 function serialize(
     list: readonly BuffInfo[],
     rows: ReadonlyMap<string, Row>,
-    original: ReadonlyMap<string, string[]>,
-    defaults: (hash: string) => string[] | undefined,
+    baseline: Baseline,
 ): string {
     const effects: { hash: string; values: string[] }[] = [];
     for (const info of list) {
         const row = rows.get(info.hash);
         if (!row?.checked) continue;
-        const originalValues = original.get(info.hash);
-        const defaultValues = defaults(info.hash);
         effects.push({
             hash: info.hash,
             values: row.values.map((raw, slot) => {
                 const trimmed = raw.trim();
-                if (trimmed === "") return originalValues?.[slot] ?? defaultValues?.[slot] ?? "0";
+                if (trimmed === "") return baseline(info.hash, slot);
                 return trimmed === "-" ? "0" : trimmed;
             }),
         });
@@ -170,7 +166,7 @@ export function SupportEffectEditor({
     t: Messages;
     /** 关窗时才交出去（只写一次；没改就不调）。 */
     onSave: (raw: string) => void;
-    /** 关掉弹窗（× / Esc / 点遮罩）—— 关窗即保存。 */
+    /** 关掉弹窗（取消 / Esc / 点遮罩）—— 关窗即保存。 */
     onClose: () => void;
 }) {
     const searchBox = useRef<HTMLInputElement>(null);
@@ -186,25 +182,28 @@ export function SupportEffectEditor({
      * 在 PL0900 是 50/60），所以先取当前角色那一组，没有再用全表第一组。
      */
     const defaultsOf = useMemo(
-        () => (hash: string) => {
+        () => (hash: string): string[] => {
             const info = buffs.find((buff) => buff.hash === hash);
-            // 角色码两套写法：资产里是 PL1400，界面/路径里是 pl1400 —— 按大写对。
-            return info?.byChar[charCode.toUpperCase()] ?? info?.values;
+            // 资产里的 buff 都有默认值；资产没收录的未知哈希没有，占位值取 0。
+            return info?.byChar[charCode.toUpperCase()] ?? info?.values ?? zeroValues();
         },
         [buffs, charCode],
     );
-    const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value, originalValues, defaultsOf));
+    /** 一槽的基准值：原值 → 默认占位值。打开/写回/输入比较/占位符四处共用这一条。 */
+    const baselineOf = (hash: string, slot: number): string => originalValues.get(hash)?.[slot] ?? defaultsOf(hash)[slot];
+    const [rows, setRows] = useState<Map<string, Row>>(() => initialRows(list, value, baselineOf));
     const [query, setQuery] = useState("");
-
     /**
-     * 关窗时才落盘：把当前行状态序列化，和打开时那份比——**没改就不写**（避免"点开看一眼"也
-     * 在动作表里留一条草稿）。比较按解析后的值比，原字符串的空格/格式不算改动。
+     * 打开时那份行状态序列化一次：关窗时按**同一个函数**再算一遍，两份一样就是"没改"
+     * —— 不用去比原字符串，原值的排列顺序与空格都不算改动（写回总是按资产顺序排）。
      */
+    const openedRaw = useRef<string | null>(null);
+    if (openedRaw.current === null) openedRaw.current = serialize(list, rows, baselineOf);
+
+    /** 关窗时才落盘：**没改就不写**（避免"点开看一眼"也在动作表里留一条草稿）。 */
     const close = () => {
-        const raw = serialize(list, rows, originalValues, defaultsOf);
-        if (JSON.stringify(parseSupportEffects(raw)) !== JSON.stringify(parseSupportEffects(value))) {
-            onSave(raw);
-        }
+        const raw = serialize(list, rows, baselineOf);
+        if (raw !== openedRaw.current) onSave(raw);
         onClose();
     };
 
@@ -226,8 +225,7 @@ export function SupportEffectEditor({
         const row = rows.get(hash);
         if (!row) return;
         const digits = text.replace(/[^\d-]/g, "");
-        const baseline = originalValues.get(hash)?.[slot] ?? defaultsOf(hash)?.[slot];
-        const next = digits === baseline ? "" : digits;
+        const next = digits === baselineOf(hash, slot) ? "" : digits;
         const nextRows = new Map(rows);
         nextRows.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? next : old)) });
         setRows(nextRows);
@@ -316,7 +314,7 @@ export function SupportEffectEditor({
                                             key={slot}
                                             label={info.labels[slot] ?? ""}
                                             value={row.values[slot]}
-                                            placeholder={originalValues.get(info.hash)?.[slot] ?? defaultsOf(info.hash)?.[slot] ?? "0"}
+                                            placeholder={baselineOf(info.hash, slot)}
                                             ariaLabel={`${displayName} ${info.hash} ${slot + 1}`}
                                             onChange={(text) => setValue(info.hash, slot, text)}
                                         />

@@ -46,6 +46,25 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
     })
 
     /*
+        选值格的列表弹层归它自己：在列表里按 Ctrl+C 不能被当成"复制背后的表格"。
+        （粘贴 / 撤销 / Esc 都查这个标记，复制同样要查。）
+    */
+    it("选值格列表里的 Ctrl+C：不复制背后的单元格区域", async () => {
+        const container = await renderTable()
+        selectCell(cellAt(container, 0, 2))
+        fireEvent.copy(container.firstElementChild!, {clipboardData: clipboardStub()})
+        expect(hasCopyBounds(container)).toBe(true)
+
+        const list = document.createElement("div")
+        list.setAttribute("data-slot", "combobox-content")
+        container.firstElementChild!.appendChild(list)
+        const clipboard = clipboardStub()
+        fireEvent.copy(list, {clipboardData: clipboard})
+        expect(clipboard.data["text/plain"]).toBeUndefined()
+        expect(hasCopyBounds(container)).toBe(true)
+    })
+
+    /*
         ‼️ 没有单元格选区时，表格**不许**拦 copy 事件：否则在表格外选一段文字按 Ctrl+C 会被静默吞掉
         （表还"接"了这次事件、却因为没选区什么都不复制）。归属兜底：一张表都没选区 → 谁都不接。
     */

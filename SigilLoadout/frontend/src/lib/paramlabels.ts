@@ -23,14 +23,6 @@ export function paramTableLabel(labels: ParamLabels | null, table: string): stri
     return labels?.tables?.[table] ?? table.replace(/\.msg$/, "")
 }
 
-/**
- * 一行字段的译名：把原始路径按 `.` 拆开，丢掉根对象名（那一段就是表本身），逐段查译名后用 ` > ` 连起来。
- *
- * - 数组下标**贴在它所属的那一段名字后面**（`searchTargetInfoList_[8]` → `索敌信息列表8`），
- *   不单独占一段 —— 单独一段只会多出一串 `› 8 ›`；
- * - `Element` 是数组元素的包装层，直接跳过；
- * - 查不到译名的段保留原文，整行仍然可读（不会出现空段）。
- */
 /** 与 `paramFieldLabel` 同一套分段，返回数组：界面要把分隔符画得比正文大一点，得自己拼。 */
 export function paramFieldLabelParts(labels: ParamLabels | null, table: string, key: string): string[] {
     const parts = key.split(".").slice(1)
@@ -54,6 +46,14 @@ export function paramFieldLabelParts(labels: ParamLabels | null, table: string, 
     return words
 }
 
+/**
+ * 一行字段的译名：把原始路径按 `.` 拆开，丢掉根对象名（那一段就是表本身），逐段查译名后用 ` › ` 连起来。
+ *
+ * - 数组下标**贴在它所属的那一段名字后面**（`searchTargetInfoList_[8]` → `索敌信息列表8`），
+ *   不单独占一段 —— 单独一段只会多出一串 `› 8 ›`；
+ * - `Element` 是数组元素的包装层，直接跳过；
+ * - 查不到译名的段保留原文，整行仍然可读（不会出现空段）。
+ */
 export function paramFieldLabel(labels: ParamLabels | null, table: string, key: string): string {
     return paramFieldLabelParts(labels, table, key).join(" › ")
 }

@@ -37,7 +37,8 @@ func TestBuffTableLoaded(t *testing.T) {
 			t.Fatalf("列表不是升序：%s 在 %s 前", prev, cur)
 		}
 	}
-	// 抽一条已知的：霸体（4039598841）的中文名与注释都来自人工表。
+	// 抽一条已知的：中/英名字都读到了（文案是人工表的内容，这里不钉死具体写法）。
+	// 槽注释来自 buff.json 的 params[i][1]，不是值本身。
 	var body *BuffInfo
 	for i := range buffTable {
 		if buffTable[i].Hash == "4039598841" {
@@ -48,7 +49,7 @@ func TestBuffTableLoaded(t *testing.T) {
 	if body == nil {
 		t.Fatal("buff 列表里没有 4039598841")
 	}
-	if body.Names["zh"] != "霸体 (自身)" || body.Labels[0] != "duration" {
-		t.Fatalf("4039598841 的名字/注释不对：%q %v", body.Names["zh"], body.Labels)
+	if body.Names["zh"] == "" || body.Names["en"] == "" || body.Labels[0] != "duration" {
+		t.Fatalf("4039598841 的名字/注释不对：%q %v", body.Names, body.Labels)
 	}
 }

@@ -148,153 +148,6 @@ func saveErr(service *ActionsService, id string, fields []ActionField) error {
 }
 
 /*
-清单上的记录一条都对不上**不是错误**：那份清单是跨角色共用的（pl1000 的表里没有 954 很正常）。
-LoadActions 返回空列表，界面在表格位置提示"没有这些记录"，而不是弹一句"读取失败：…一条都没有"。
-*/
-func TestLoadActionsReturnsEmptyInsteadOfErroringWhenNoIDMatches(t *testing.T) {
-	service, cfg, _ := actionsFixture(t)
-	sampleActionTable(t, cfg)
-
-	if err := service.SetActionIDs("950 951"); err != nil {
-		t.Fatalf("SetActionIDs: %v", err)
-	}
-	actions, err := service.LoadActions()
-	if err != nil {
-		t.Fatalf("一条都对不上不该报错: %v", err)
-	}
-	if len(actions) != 0 {
-		t.Fatalf("拿到 %d 条记录，want 0", len(actions))
-	}
-}
-
-/*
-搜索框里除了 id_ 还能写 motion 号：一个 token 两种判据（`id_` 等于它，或它引用的 `saveMotId*_` 等于它，
-见 recordsMatching）。这里用一个**真表里真被引用过**的 mot 号去搜，不写死号 —— 样本表是哪个角色都能跑。
-*/
-func TestLoadActionsMatchesMotionNumbersToo(t *testing.T) {
-	service, cfg, _ := actionsFixture(t)
-	sampleActionTable(t, cfg)
-
-	// 先把全表读出来，取第一个被引用的 mot 号，以及引用它的那些 id（按表顺序、去重）。
-	all, err := service.LoadActions()
-	if err != nil {
-		t.Fatal(err)
-	}
-	motion := ""
-	var referencing []string
-	referenced := map[string]bool{}
-	for _, action := range all {
-		for _, field := range action.Fields {
-			if !strings.HasPrefix(field.Key, "saveMotId") || !isMotion(field.Original) {
-				continue
-			}
-			if motion == "" {
-				motion = field.Original
-			}
-			if field.Original == motion && !referenced[action.ID] {
-				referenced[action.ID] = true
-				referencing = append(referencing, action.ID)
-			}
-		}
-	}
-	if motion == "" {
-		t.Skip("这张样本表里没有一个像 mot 号的 saveMotId*_")
-	}
-
-	// 只用 mot 号搜：引用它的记录一条不少，且按表顺序。
-	if err := service.SetActionIDs(motion); err != nil {
-		t.Fatal(err)
-	}
-	got, err := service.LoadActions()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != len(referencing) {
-		t.Fatalf("用 mot %s 搜到 %d 条，want %d 条（%v）", motion, len(got), len(referencing), referencing)
-	}
-	for i, action := range got {
-		if action.ID != referencing[i] {
-			t.Fatalf("第 %d 条是 id_=%s，want %s", i, action.ID, referencing[i])
-		}
-	}
-
-	// id 与 mot 混着写：两种判据都认，同一条记录不会重复出现。
-	id := all[0].ID
-	if err := service.SetActionIDs(id + " " + motion); err != nil {
-		t.Fatal(err)
-	}
-	got, err = service.LoadActions()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seen := map[string]bool{}
-	for _, action := range got {
-		if seen[action.ID] {
-			t.Fatalf("id_=%s 出现了两次", action.ID)
-		}
-		seen[action.ID] = true
-	}
-	if !seen[id] {
-		t.Fatalf("混着写之后按 id_ 的那条没出来：%v", got)
-	}
-	for _, want := range referencing {
-		if !seen[want] {
-			t.Fatalf("混着写之后引用 mot %s 的 id_=%s 没出来", motion, want)
-		}
-	}
-
-	// 模糊（含匹配）：拿这个 mot 号的**中间两位**搜，引用它的记录都该在。
-	mid := motion[1:3]
-	if err := service.SetActionIDs(mid); err != nil {
-		t.Fatal(err)
-	}
-	got, err = service.LoadActions()
-	if err != nil {
-		t.Fatal(err)
-	}
-	fuzzy := map[string]bool{}
-	for _, action := range got {
-		fuzzy[action.ID] = true
-	}
-	for _, want := range referencing {
-		if !fuzzy[want] {
-			t.Fatalf("用 %s 搜不到引用 mot %s 的 id_=%s", mid, motion, want)
-		}
-	}
-}
-
-// 判据是**包含**（大小写不敏感）。`*` 没有任何特殊含义 —— 就是个普通字符，数据里没有它，所以带 `*`
-// 的输入搜不到东西（既不当通配符，也不会被剔掉）。
-func TestContainsToken(t *testing.T) {
-	cases := []struct {
-		value, token string
-		want         bool
-	}{
-		{"34a0", "34a0", true},
-		{"34a0", "34", true},
-		{"34a0", "4a", true},
-		{"34a0", "3430", false},
-		{"34a0", "3a", false}, // 34a0 里没有连续的 "3a"
-		{"3a00", "3a", true},
-		{"3a00", "3a*", false},  // `*` 是普通字符，值里没有它
-		{"3a00", "*3a*", false}, // 同上
-		{"3a00", "00", true},
-		{"3430", "34", true},
-		{"3430", "31", false},
-		{"3430", "34*0", false},
-		{"34A2", "34a2", true}, // 手打大写也认
-		{"1004", "4", true},
-		{"6", "4", false},
-		{"3430", "*", false},
-	}
-	for _, c := range cases {
-		if got := containsToken(c.value, strings.ToLower(c.token)); got != c.want {
-			t.Errorf("含匹配(%q, %q) = %v，want %v", c.value, c.token, got, c.want)
-		}
-	}
-}
-
-/*
 保存**不写源文件**：改动进用户目录的 action_edits.json，原始动作表从此只读。
 
 这是这一页换成"原值 + 改动"模型要保证的第一件事。以前是保存即覆盖源，手滑把一格留空就把原值写没了
@@ -308,7 +161,7 @@ func TestSaveActionsNeverWritesTheSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +216,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 	service, cfg, modDir := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +228,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 	}
 	saveRow(t, service, "6", fields)
 
-	actions, err = service.LoadActions()
+	actions, err = service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +251,7 @@ func TestClearingAFieldFallsBackToTheOriginal(t *testing.T) {
 	if _, err := os.Stat(deployedPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("清空之后这张表与原表一致，mod 里不该再留着产物（err=%v）", err)
 	}
-	actions, err = service.LoadActions()
+	actions, err = service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,23 +292,15 @@ func fieldValue(action Action, key string) string {
 }
 
 /*
-记录清单也是设置项（第五个）：默认是炎帝的 4/6 与 Fediel 的 954，界面上那个输入框改的就是它。
-
-分隔符认空白，逗号也一并收下（从别处粘 "4,6,954" 是常事）；空清单当场拒绝。
-
-⚠️ 判据是**含匹配**（见 matchesToken）：清单里写 4 / 6 会连带把 40、34a0 这些也捞出来。所以这条钉的是
-"4 与 6 自己在结果里、4 排在 6 前面（文件顺序）、字段是整份"，而不是"结果只有这两条"。
+动作表按文件里的顺序整份交出；id_ 4 / 6 的相对顺序就是文件顺序（清单过滤在前端做，不在后端）。
 */
-func TestLoadActionsGivesTheTwoRecordsInFileOrder(t *testing.T) {
+func TestLoadCharacterActionsKeepsFileOrder(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
-	if err := service.SetActionIDs("4 6"); err != nil {
-		t.Fatalf("SetActionIDs: %v", err)
-	}
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
-		t.Fatalf("LoadActions: %v", err)
+		t.Fatalf("LoadCharacterActions: %v", err)
 	}
 	at := map[string]int{}
 	for i, action := range actions {
@@ -510,7 +355,7 @@ func TestSaveActionsKeepsUntouchedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -543,7 +388,7 @@ func TestSaveActionsWritesTheEditBack(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -555,7 +400,7 @@ func TestSaveActionsWritesTheEditBack(t *testing.T) {
 	}
 	saveRow(t, service, "6", fields)
 
-	reread, err := service.LoadActions()
+	reread, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -659,7 +504,7 @@ func TestSaveActionsDropsAValueEqualToTheOriginal(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -680,7 +525,7 @@ func TestSaveActionsDropsAValueEqualToTheOriginal(t *testing.T) {
 	if len(edits) != 0 {
 		t.Fatalf("与原值相同的提交不该进账本，实际 %+v", edits)
 	}
-	for _, action := range mustLoadActions(t, service) {
+	for _, action := range mustLoadCharacterActions(t, service) {
 		if action.ID != "6" {
 			continue
 		}
@@ -702,7 +547,7 @@ func TestSaveActionsKeepsTheLedgerToTheEditedCells(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg)
 
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -792,7 +637,7 @@ func TestSaveActionsWritesNothingWhenOneRowIsRejected(t *testing.T) {
 	sampleActionTable(t, cfg)
 
 	// 先真改一格：产物该出现。它就是下面"没被动过"的对照。
-	fields := actionByID(t, mustLoadActions(t, service), "6").Fields
+	fields := actionByID(t, mustLoadCharacterActions(t, service), "6").Fields
 	for i := range fields {
 		if fields[i].Key == "abilityChargeTime_" {
 			fields[i].Value = strPtr("95")
@@ -813,7 +658,7 @@ func TestSaveActionsWritesNothingWhenOneRowIsRejected(t *testing.T) {
 		t.Fatal("记录里没有的键被收下了")
 	}
 
-	if got := fieldValue(actionByID(t, mustLoadActions(t, service), "6"), "abilityChargeTime_"); got != "95" {
+	if got := fieldValue(actionByID(t, mustLoadCharacterActions(t, service), "6"), "abilityChargeTime_"); got != "95" {
 		t.Fatalf("被拒的那一批里第一行却落了盘：读回来是 %q，want 95", got)
 	}
 	after, err := os.ReadFile(deployed)
@@ -825,10 +670,10 @@ func TestSaveActionsWritesNothingWhenOneRowIsRejected(t *testing.T) {
 	}
 }
 
-// mustLoadActions 读一次表，读不出来当场失败（测试里到处都要这一对三行）。
-func mustLoadActions(t *testing.T, service *ActionsService) []Action {
+// mustLoadCharacterActions 读一次表，读不出来当场失败（测试里到处都要这一对三行）。
+func mustLoadCharacterActions(t *testing.T, service *ActionsService) []Action {
 	t.Helper()
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -838,7 +683,7 @@ func mustLoadActions(t *testing.T, service *ActionsService) []Action {
 // fieldOriginal 取某个字段的原值（写回原值那几条测试要用它当"默认值"）。
 func fieldOriginal(t *testing.T, service *ActionsService, id, key string) string {
 	t.Helper()
-	for _, field := range actionByID(t, mustLoadActions(t, service), id).Fields {
+	for _, field := range actionByID(t, mustLoadCharacterActions(t, service), id).Fields {
 		if field.Key == key {
 			return field.Original
 		}

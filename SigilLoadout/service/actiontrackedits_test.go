@@ -360,9 +360,9 @@ func TestActionTableReadsFromTheContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	actions, err := service.LoadActions()
+	actions, err := service.LoadCharacterActions()
 	if err != nil {
-		t.Fatalf("LoadActions: %v（说明它没去容器里读）", err)
+		t.Fatalf("LoadCharacterActions: %v（说明它没去容器里读）", err)
 	}
 	if len(actions) == 0 {
 		t.Fatal("容器里有真表，却一条记录都没读到")

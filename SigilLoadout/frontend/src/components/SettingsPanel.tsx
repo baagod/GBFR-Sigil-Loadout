@@ -1,37 +1,36 @@
 import {useEffect, useState} from "react"
 
-import {DetectGameDirAuto, GameDirInfo, PickGameExe} from "../../bindings/sigilloadout/service/gameservice"
+import {DetectGameDirAuto, GameDirInfo, PickGameExe, SetGameDir} from "../../bindings/sigilloadout/service/gameservice"
 import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import type {Messages} from "@/lib/messages"
 
 export function SettingsPanel({t}: { t: Messages }) {
     const [dir, setDir] = useState("")
-    const [auto, setAuto] = useState(false)
     const [note, setNote] = useState("")
 
+    // 显示的是**当前生效**的目录（手动配置优先，否则自动检测），不是"刚检测到但没保存"的那个。
     useEffect(() => {
+        let alive = true
         void (async () => {
-            const detected = await DetectGameDirAuto().catch(() => "")
-            if (detected) {
-                setDir(detected)
-                setAuto(true)
-                return
-            }
-            const saved = await GameDirInfo().catch(() => "")
-            setDir(saved)
+            const effective = await GameDirInfo().catch(() => "")
+            if (alive) setDir(effective)
         })()
+        return () => {
+            alive = false
+        }
     }, [])
 
     const detect = async () => {
         try {
-            const d = await DetectGameDirAuto()
-            if (!d) {
+            const detected = await DetectGameDirAuto()
+            if (!detected) {
                 setNote(t.gameDirNotFound)
                 return
             }
-            setDir(d)
-            setAuto(true)
+            // 检测出来就存进配置：只显示不保存的话，这一页写着一个目录、实际用的还是另一个。
+            await SetGameDir(detected)
+            setDir(await GameDirInfo())
             setNote(t.gameDirDetected)
         } catch (e) {
             setNote(String(e))
@@ -40,10 +39,9 @@ export function SettingsPanel({t}: { t: Messages }) {
 
     const pick = async () => {
         try {
-            const d = await PickGameExe()
-            if (d) {
-                setDir(d)
-                setAuto(false)
+            const picked = await PickGameExe()
+            if (picked) {
+                setDir(await GameDirInfo().catch(() => picked))
                 setNote("")
             }
         } catch (e) {
@@ -56,14 +54,15 @@ export function SettingsPanel({t}: { t: Messages }) {
             <div className="flex max-w-3xl flex-col gap-2">
                 <label className="text-sm font-medium" htmlFor="game-dir">{t.gameDir}</label>
                 <div className="flex gap-2">
+                    {/* 路径本身可拖选/复制；选择是显式按钮（键盘也能到，不靠点输入框）。 */}
                     <Input
                         id="game-dir"
                         value={dir}
                         readOnly
-                        onClick={pick}
                         placeholder={t.gameDirPick}
-                        className={auto ? "cursor-pointer opacity-60" : "cursor-pointer"}
+                        className="cursor-text"
                     />
+                    <Button variant="outline" onClick={pick}>{t.gameDirChoose}</Button>
                     <Button variant="outline" onClick={detect}>{t.gameDirAuto}</Button>
                 </div>
                 {note && <p className="text-sm text-muted-foreground">{note}</p>}

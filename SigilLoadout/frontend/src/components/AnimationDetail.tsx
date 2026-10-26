@@ -10,7 +10,7 @@ import {
     SaveFlags,
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
-import type {TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
+import type {MotInfo, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
 import {MotInfo as LoadMotInfo, MotScale as LoadMotScale, ScaleMotRootMotion} from "../../bindings/sigilloadout/service/gameservice"
 import {Button} from "@/components/ui/button"
 import {EditableCell} from "@/components/EditableCell"
@@ -31,20 +31,6 @@ import type {Messages} from "@/lib/messages"
  * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
-
-type MotInfoData = {
-    animationName: string
-    hash: number
-    flag: number
-    frameCount: number
-    recordCount: number
-    rootXKeys: number
-    rootX: number
-    rootY: number
-    rootZ: number
-    rootZKeys: number
-    distance: number
-}
 
 /*
 动画详情页：点动作表里的动画号弹出来的那一层。
@@ -72,8 +58,10 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [infos, setInfos] = useState<TrackInfo[]>([])
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。
     const [loaded, setLoaded] = useState(false)
-    const [motInfo, setMotInfo] = useState<MotInfoData | null>(null)
+    const [motInfo, setMotInfo] = useState<MotInfo | null>(null)
     const [motScale, setMotScale] = useState("1")
+    /** 与磁盘上那份一致的倍率：保存时只写"用户真改了"的，否则每保存一次轨都白写一遍 mot。 */
+    const motScaleSaved = useRef("1")
     const [motNote, setMotNote] = useState("")
     /*
         ‼️ **flags 就是 `tables` 里的普通轨**（按 `trackKey` 存，一个动画可有多条 flags 子轨）—— 不单独占 state。
@@ -176,14 +164,17 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setMotNote("")
         LoadMotInfo(charCode, motion)
             .then((info) => {
-                if (alive) setMotInfo(info as MotInfoData)
+                if (alive) setMotInfo(info)
             })
             .catch((e) => {
                 if (alive) setMotNote(String(e))
             })
         LoadMotScale(charCode, motion)
             .then((scale) => {
-                if (alive) setMotScale(String(Math.round(scale * 1000) / 1000))
+                if (!alive) return
+                const text = String(Math.round(scale * 1000) / 1000)
+                setMotScale(text)
+                motScaleSaved.current = text
             })
             .catch(() => undefined)
         return () => {
@@ -282,55 +273,69 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         })
     }
 
-    /** 一次把改过的轨全写完并部署：flags 走它自己的接口，其余三条走通用轨的批量接口。 */
+    /** 写根运动倍率（只在用户真改过时）。它失败不该连累轨保存，所以是独立动作。 */
+    const saveMotScale = async () => {
+        const scale = Number(motScale)
+        if (motScale.trim() !== "" && !Number.isFinite(scale)) {
+            throw new Error(`缩放系数必须是数字：${motScale}`)
+        }
+        // 没改也调一次会白读游戏归档、写一遍 mot。
+        if (motScale === motScaleSaved.current) return
+        const info = await ScaleMotRootMotion(charCode, motion, scale)
+        setMotInfo(info)
+        setMotNote("")
+        motScaleSaved.current = motScale
+    }
+
+    /** 写改过的轨并部署：它们写**同一本账**（track_edits.json），必须顺序发，不能 Promise.all。 */
+    const saveTracks = async () => {
+        // 整张表原样交给后端（含行身份 `orig` / `removed`）：由它决定"哪些行进 XML"（假删除的不进）、
+        // 并把行身份跟改动一起存进 track_edits.json —— 下次打开照样认得每一行是原版第几行。
+        //
+        // ‼️ **交全部**（不是只交"这次碰过的"那几块）：后端按"交上来的就是这条轨现在的内容"整份替换，
+        // 而"哪些该搬进 mod"由**账本**回答（见 commitTracks）。界面自己再记一本"动过哪几块"是重复
+        // 状态 —— 撤销、重排、换号都得跟着维护它，迟早对不上。
+        //
+        // flags 每条子轨一份（同一本账，所以同样一条一条发）。
+        for (const info of infos) {
+            if (info.kind !== "flags") continue
+            const rows = tables[trackKey(info)]?.rows
+            if (rows) await SaveFlags(motion, info.sub, rows)
+        }
+        const tracks = infos
+            .filter((info) => info.kind !== "flags")
+            .map((info) => tables[trackKey(info)])
+            .filter((table): table is TrackTable => table !== undefined)
+        if (tracks.length > 0) {
+            await SaveTracks(motion, tracks)
+        }
+        // 改动表里记着、mod 目录里却没有的轨：补一次。mod 目录会被整个换掉（deploy.ps1 / 重装），
+        // 而账本不会 —— 上面两句只在"这次改过"时才写，于是那种缺文件的轨点保存什么都不发生 ✗。
+        // **只补缺的那些**，不把这一层里其它轨重写一遍（那件事归页面那个「保存」）。
+        await DeployMissingTracks(motion)
+        // 写完重读一遍：写回的字节与内存里的是同一份，但"读回来"才是真的落地了。
+        const list = (await ListTracks(motion)) ?? []
+        setInfos(list)
+        // **原表不换、行不丢**：原表是游戏原版数据（只读），保存不改变它 —— 于是"相对原版改了什么"
+        // 保存后依然看得见，被假删除的行也照样留在界面上（它们本来就不进文件）。只是想看"干净状态"，
+        // 重开一次弹层即可（那时读到的当前表就是刚保存的那份）。
+    }
+
+    /** 一次保存 = 两个独立动作：各自 try/catch，一个失败不挡另一个，错误合并显示。 */
     const save = async () => {
         if (busy) return
         setBusy(true)
         setFailure("")
-        try {
-            const scale = Number(motScale)
-            if (motScale.trim() !== "" && !Number.isNaN(scale)) {
-                const info = await ScaleMotRootMotion(charCode, motion, scale)
-                setMotInfo(info as MotInfoData)
-                setMotNote("")
+        const failures: string[] = []
+        for (const action of [saveMotScale, saveTracks]) {
+            try {
+                await action()
+            } catch (e) {
+                failures.push(String(e))
             }
-            // 整张表原样交给后端（含行身份 `orig` / `removed`）：由它决定"哪些行进 XML"（假删除的不进）、
-            // 并把行身份跟改动一起存进 track_edits.json —— 下次打开照样认得每一行是原版第几行。
-            //
-            // ‼️ **交全部**（不是只交"这次碰过的"那几块）：后端按"交上来的就是这条轨现在的内容"整份替换，
-            // 而"哪些该搬进 mod"由**账本**回答（见 commitTracks）。界面自己再记一本"动过哪几块"是重复
-            // 状态 —— 撤销、重排、换号都得跟着维护它，迟早对不上。
-            //
-            // ⚠️ 这几句**必须顺序发**，别看着"互不相干"就并成 Promise.all：它们写的是**同一本账**
-            //（track_edits.json 的读-改-写），并行就是其中一次的改动被另一次覆盖掉。
-            // flags 每条子轨一份（同一本账，所以同样一条一条发）。
-            for (const info of infos) {
-                if (info.kind !== "flags") continue
-                const rows = tables[trackKey(info)]?.rows
-                if (rows) await SaveFlags(motion, info.sub, rows)
-            }
-            const tracks = infos
-                .filter((info) => info.kind !== "flags")
-                .map((info) => tables[trackKey(info)])
-                .filter((table): table is TrackTable => table !== undefined)
-            if (tracks.length > 0) {
-                await SaveTracks(motion, tracks)
-            }
-            // 改动表里记着、mod 目录里却没有的轨：补一次。mod 目录会被整个换掉（deploy.ps1 / 重装），
-            // 而账本不会 —— 上面两句只在"这次改过"时才写，于是那种缺文件的轨点保存什么都不发生 ✗。
-            // **只补缺的那些**，不把这一层里其它轨重写一遍（那件事归页面那个「保存」）。
-            await DeployMissingTracks(motion)
-            // 写完重读一遍：写回的字节与内存里的是同一份，但"读回来"才是真的落地了。
-            const list = (await ListTracks(motion)) ?? []
-            setInfos(list)
-            // **原表不换、行不丢**：原表是游戏原版数据（只读），保存不改变它 —— 于是"相对原版改了什么"
-            // 保存后依然看得见，被假删除的行也照样留在界面上（它们本来就不进文件）。只是想看"干净状态"，
-            // 重开一次弹层即可（那时读到的当前表就是刚保存的那份）。
-        } catch (e) {
-            setFailure(t.saveFailedText(String(e)))
-        } finally {
-            setBusy(false)
         }
+        if (failures.length > 0) setFailure(t.saveFailedText(failures.join("；")))
+        setBusy(false)
     }
 
     // 数据没到位之前**整个弹层都不挂载**（而不是挂一个很矮的"读取中…"）：
@@ -454,7 +459,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                 {label: `${t.rootMotion} X`, key: "rootX", value: motInfo.rootX.toFixed(3)},
                                 {label: `${t.rootMotion} Y`, key: "rootY", value: motInfo.rootY.toFixed(3)},
                                 {label: `${t.rootMotion} Z`, key: "rootZ", value: motInfo.rootZ.toFixed(3)},
-                                {label: t.distance, key: "distance", value: motInfo.distance.toFixed(3)},
                             ].map((row) => (
                                 <tr key={row.key}>
                                     <td className="border-b px-2 py-1 align-top">

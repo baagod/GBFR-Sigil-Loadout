@@ -377,6 +377,11 @@ export function useClipboardHistory({
         (e: ClipboardEvent) => {
             if (!isMyEvent(e)) return
             /*
+                选值格的列表弹层归它自己（搜索框里选文字也归浏览器）：不让路的话，列表里按 Ctrl+C
+                会去复制背后的单元格区域。粘贴 / 撤销 / Esc 三条都查这个标记，这里同样不能少。
+            */
+            if ((e.target as HTMLElement | null)?.closest?.("[data-slot=combobox-content]")) return
+            /*
                 有文本选区：用户选了什么就复制什么，浏览器负责；顺带撤掉复制区虚线（剪贴板已不是那片格子）。
             */
             const textSelection = window.getSelection()
@@ -491,31 +496,6 @@ export function useClipboardHistory({
     )
 
     /**
-     * 工具条「粘贴」：**优先读系统剪贴板**（与 Ctrl+V 同一条路，外部复制进来的内容也能粘）；
-     * 读不到（权限 / 非安全上下文 / WebView 不支持）才退回"本应用上一次复制的那片文本"。
-     *
-     * ‼️ 不能反过来"内部优先"：内部 ref 只在**本应用复制**时更新，永不失效 —— 用户从别的程序复制后
-     * 再点按钮，会粘回旧内容，而 Ctrl+V 粘的是新内容（两个入口语义分叉）。系统剪贴板读不到时才用
-     * 内部那份兜底，两个入口对"板上有什么"的判断就一致了。
-     */
-    const pasteClipboard = useCallback(() => {
-        const pasteInternal = () => {
-            if (cellClipboardRef.current) pasteText(cellClipboardRef.current)
-        }
-        let read: Promise<string> | undefined
-        try {
-            read = navigator.clipboard?.readText?.()
-        } catch {
-            read = undefined
-        }
-        if (!read) {
-            pasteInternal()
-            return
-        }
-        void read.then((text) => (text ? pasteText(text) : pasteInternal())).catch(pasteInternal)
-    }, [pasteText])
-
-    /**
      * 复制源那圈虚线的两条**外部**退出路径（规则②③④，见 `CopySource` 那段）。
      *
      * 为什么挂 `paste` 也得挂一份：在源区**外面**粘一下（copy → paste 到别处）在 Excel 里**不撤**虚线，
@@ -593,5 +573,5 @@ export function useClipboardHistory({
         [copyArea],
     )
 
-    return {copyHint, setCopyHint, copySource, clearCopySource, copySelection, pasteClipboard, edit, clearSelectedCells}
+    return {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit, clearSelectedCells}
 }

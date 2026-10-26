@@ -2,6 +2,7 @@ import {useEffect, useState} from "react"
 import {ListHiddenMotions} from "../../bindings/sigilloadout/service/actionsservice"
 import type {HiddenMotion} from "../../bindings/sigilloadout/service/models"
 import {Button} from "@/components/ui/button"
+import {parseFilterTokens} from "@/lib/filter"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -43,11 +44,7 @@ export function HiddenMotionList({t, charCode, filterText, onOpen}: {
         }
     }, [charCode])
 
-    const tokens = filterText
-        .toLowerCase()
-        .replaceAll(",", " ")
-        .split(/\s+/)
-        .filter(Boolean)
+    const tokens = parseFilterTokens(filterText)
     /** 这张页只有号，没有名字：token 按"号里含这段"匹配（与动作表那边的搜索同一套分词语义）。 */
     const visible = tokens.length === 0 ? list : list.filter((item) => tokens.some((token) => item.motion.toLowerCase().includes(token)))
 

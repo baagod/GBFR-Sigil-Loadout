@@ -24,6 +24,7 @@ export function FsmPanel({charCode, t}: {charCode: string; t: Messages}) {
                 const list = orderSharedFirst((await ListFsm()) ?? [])
                 if (!alive) return
                 setNames(list)
+                setFailure("")
                 setSelected((cur) => (list.includes(cur) ? cur : (list[0] ?? "")))
             } catch (e) {
                 if (alive) setFailure(String(e))

@@ -3,9 +3,9 @@ import {Input} from "@/components/ui/input"
 import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
 
 /*
-    共用的可编辑格：**平时是文本，点一下才变输入框**。现在只有全局参数表用它（`GlobalParamPanel`），
-    但它是"一格"这件事的完整实现（焦点环 / Esc / 复制 / 右键 / 原值占位），留在自己一个文件里 ——
-    塞进那一页只会让页面文件变成一个"格子 + 表格"的混合体。
+    共用的可编辑格：**平时是文本，点一下才变输入框**。两个调用点：全局参数表（`GlobalParamPanel`）
+    与动画详情的根运动倍率。它是"一格"这件事的完整实现（焦点环 / Esc / 复制 / 右键 / 原值占位），
+    留在自己一个文件里 —— 塞进页面只会让那些文件变成"格子 + 表格"的混合体。
 */
 
 /**
@@ -21,7 +21,7 @@ import {CELL_INPUT, CELL_TEXT} from "@/lib/classnames"
  * 动作表是只读格（px-2 py-1）撑的，轨表是行号那个拖拽握把撑的。
  *
  * 为什么显示态也要有 tabIndex：焦点圈（style.css 的 cell-focus）靠 td 的 :focus-within 画，
- * 键盘 Tab 也要能进到格子里 —— 有焦点才会换成输入框。
+ * 键盘 Tab 也要能进到格子里 —— 进去之后按 Enter / F2 才换成输入框（鼠标点整格同样进）。
  *
  * 编辑态住在它自己身上：表格在别处提交之后会重渲染，输入框里的半成品文本不能被冲掉。
  */
@@ -58,9 +58,6 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
      */
     const skipCommitRef = useRef(false)
 
-
-
-
     // 没在编辑的格子跟着**显示值**走：别处保存完、重读回来的新值要上屏，预填的那份也要跟着回正。
     if (!editing && draft !== shown) setDraft(shown)
 
@@ -79,7 +76,7 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
     }
 
     return (
-                <td
+        <td
             className={`${tdClassName} cursor-text`}
             onMouseDown={(e) => {
                 // 编辑中：值格里非输入框的位置（比如上缘）什么都不做，别让输入框失焦再重进。
@@ -108,8 +105,15 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                 tabIndex={editing ? -1 : 0}
                 // 不可见时别把同一份文本再塞进无障碍树（编辑态该读的是那个输入框）。
                 aria-hidden={editing || undefined}
-
-                onKeyDown={(e) => onCopy(e, false)}
+                onKeyDown={(e) => {
+                    // Enter / F2 进编辑态：鼠标那条路走 onClick，键盘（Tab 进来）走这里。
+                    if (e.key === "Enter" || e.key === "F2") {
+                        e.preventDefault()
+                        setEditing(true)
+                        return
+                    }
+                    onCopy(e, false)
+                }}
                 className={`${CELL_TEXT} ${value === "" ? "text-muted-foreground" : ""} ${editing ? "opacity-0" : ""}`}
             >
                 {shown}
@@ -128,7 +132,6 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                         // Esc 那条路已经自己收过尾（焦点交给文本层、草稿丢掉）→ 这一次 blur 不提交。
                         if (skipCommitRef.current) {
                             skipCommitRef.current = false
-                            setEditing(false)
                             return
                         }
                         // 原值模型下，草稿等于**原值**就是"没改"：提交空串退回原值（后端把空串当
@@ -139,8 +142,6 @@ export function EditableCell({tdClassName, value, onCommit, placeholder, overrid
                         } else if (draft !== value) {
                             onCommit(draft)
                         }
-
-
                     }}
                     onKeyDown={(e) => {
                         // 回车提交：焦点先交给本格文本层（它会触发上面那个 onBlur），

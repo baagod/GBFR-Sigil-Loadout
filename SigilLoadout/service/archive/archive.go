@@ -31,11 +31,10 @@ type fileChunk struct {
 }
 
 type Archive struct {
-	dir         string
-	numArchives uint16
-	hashes      []uint64
-	files       []fileChunk
-	chunks      []chunk
+	dir    string
+	hashes []uint64
+	files  []fileChunk
+	chunks []chunk
 }
 
 // Open 打开 <gameDir>/data.i。
@@ -68,28 +67,25 @@ func tableField(buf []byte, table, field int) int {
 		return 0
 	}
 	vlen := int(binary.LittleEndian.Uint16(buf[vtable:]))
+	if vtable+vlen > len(buf) {
+		return 0
+	}
 	off := 4 + field*2
 	if off+2 > vlen {
 		return 0
 	}
 	foff := int(binary.LittleEndian.Uint16(buf[vtable+off:]))
-	if foff == 0 {
+	if foff == 0 || table+foff >= len(buf) {
 		return 0
 	}
 	return table + foff
 }
 
-func tableObject(buf []byte, table, field int) int {
+// tableVector 返回向量元素的起始偏移与数量。elemSize 是单个元素的字节数 ——
+// 向量长度是**元素个数**，越界检查必须按元素宽度算（长度本身不带上限）。
+func tableVector(buf []byte, table, field, align, elemSize int) (data, n int, ok bool) {
 	p := tableField(buf, table, field)
-	if p == 0 {
-		return 0
-	}
-	return p + int(binary.LittleEndian.Uint32(buf[p:]))
-}
-
-func tableVector(buf []byte, table, field, align int) (data, n int, ok bool) {
-	p := tableField(buf, table, field)
-	if p == 0 {
+	if p == 0 || p+4 > len(buf) {
 		return 0, 0, false
 	}
 	v := p + int(binary.LittleEndian.Uint32(buf[p:]))
@@ -98,7 +94,7 @@ func tableVector(buf []byte, table, field, align int) (data, n int, ok bool) {
 	}
 	n = int(binary.LittleEndian.Uint32(buf[v:]))
 	data = alignUp(v+4, align)
-	if data < 0 || data+n > len(buf) && n > 0 {
+	if n < 0 || data < 0 || data > len(buf) || n > (len(buf)-data)/elemSize {
 		return 0, 0, false
 	}
 	return data, n, true
@@ -109,11 +105,8 @@ func (a *Archive) parseIndex(buf []byte) error {
 		return fmt.Errorf("索引太小")
 	}
 	root := int(binary.LittleEndian.Uint32(buf))
-	if p := tableField(buf, root, 1); p != 0 {
-		a.numArchives = binary.LittleEndian.Uint16(buf[p:])
-	}
 
-	data, n, ok := tableVector(buf, root, 3, 8)
+	data, n, ok := tableVector(buf, root, 3, 8, 8)
 	if ok {
 		a.hashes = make([]uint64, n)
 		for i := 0; i < n; i++ {
@@ -121,7 +114,7 @@ func (a *Archive) parseIndex(buf []byte) error {
 		}
 	}
 
-	data, n, ok = tableVector(buf, root, 4, 4)
+	data, n, ok = tableVector(buf, root, 4, 4, 12)
 	if ok {
 		a.files = make([]fileChunk, n)
 		for i := 0; i < n; i++ {
@@ -134,7 +127,7 @@ func (a *Archive) parseIndex(buf []byte) error {
 		}
 	}
 
-	data, n, ok = tableVector(buf, root, 5, 8)
+	data, n, ok = tableVector(buf, root, 5, 8, 24)
 	if ok {
 		a.chunks = make([]chunk, n)
 		for i := 0; i < n; i++ {

@@ -49,6 +49,9 @@ type ActionField struct {
 	Key      string  `json:"key"`
 	Original string  `json:"original"`
 	Value    *string `json:"value"`
+	// Kind 是这一格在 msgpack 里的种类（"string" / "bool"）：界面按它决定用输入框还是勾选框，
+	// 不从值的内容猜（字符串 "true" 与布尔 true 是两回事）。动作表/FSM 的行不带这个字段。
+	Kind string `json:"kind,omitempty"`
 }
 
 // ActionsService 是这一页的服务。
@@ -185,35 +188,16 @@ func deployActionPath(cfg actionConfig) string {
 }
 
 /*
-LoadActions 读动作表，给出要显示的那几条记录。
+LoadCharacterActions 返回当前角色动作表的**全部**记录，顺序照文件。
 
-清单里的**一个 token 有两种判据**：`id_` 认它，或者它引用的任一 `saveMotId01_~12_` 认它（**包含**就算，
-见 recordsMatching）—— 界面上只有一个搜索框，用户不必先声明搜的是哪一种。清单**空** = 全部，顺序照文件。
-
-表里一条都认不出来的 token 跳过而不是报错（那份清单跨角色共用，炎帝的表里没有 954 很正常）；一条都对不上
-也不是错误，界面在表格位置提示。
-*/
-func (s *ActionsService) LoadActions() ([]Action, error) {
-	cfg := s.config()
-	ids := cfg.IDs
-	if len(ids) == 0 {
-		ids = nil // 空清单 = 全部记录
-	}
-	return s.loadActions(cfg, ids)
-}
-
-/*
-LoadCharacterActions 返回当前角色动作表的**全部**记录（不按记录清单过滤）。
-
-清单现在是**界面层的过滤器**（表格自己按 id_ / mot / 名称过滤），加载只跟角色走：
-一张表 35~60 条记录，一次读完在前端筛，比每敲一次搜索就重读整张表便宜得多。
+那个搜索框（记录清单）是**界面层的过滤器**：一张表 35~60 条，一次读完在前端筛，比每敲一次搜索就重读
+整张表便宜得多 —— 所以这里不再有"按 token 过滤"的第二条读取路径。
 */
 func (s *ActionsService) LoadCharacterActions() ([]Action, error) {
-	return s.loadActions(s.config(), nil)
+	return s.loadActions(s.config())
 }
 
-// loadActions 是两条读取路径的实现：tokens 为 nil = 全部记录，否则按 token 匹配（id_ 或 mot 包含）。
-func (s *ActionsService) loadActions(cfg actionConfig, tokens []string) ([]Action, error) {
+func (s *ActionsService) loadActions(cfg actionConfig) ([]Action, error) {
 	original, err := loadActionOriginal(cfg)
 	if err != nil {
 		return nil, err
@@ -224,83 +208,34 @@ func (s *ActionsService) loadActions(cfg actionConfig, tokens []string) ([]Actio
 	}
 	changed := mergeActionEdits(edits, charCode(cfg))
 
-	ids := tokens
-	if len(ids) == 0 {
-		ids = tableIDs(original)
-	}
-
+	ids := tableIDs(original)
 	actions := make([]Action, 0, len(ids))
-	// 同一条记录只上一次：一个 motion 号可能被好几条动作引用，两个 token 也可能撞到同一条。
-	seen := make(map[string]bool, len(ids))
-	for _, token := range ids {
-		for _, record := range recordsMatching(original, token) {
-			idField := record.entry("id_")
-			if idField == nil || seen[idField.str] {
-				continue
-			}
-			seen[idField.str] = true
-			fields, err := actionRowFields(record)
-			if err != nil {
-				return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", idField.str, err)
-			}
-			// 原值照给，改动叠在上面：界面把 Value 填进输入框、把 Original 当灰色占位符。
-			for i := range fields {
-				if value, ok := changed[idField.str][fields[i].Key]; ok {
-					edited := value
-					fields[i].Value = &edited
-				}
-			}
-			actions = append(actions, Action{ID: idField.str, Fields: fields})
+	for _, id := range ids {
+		record := recordByID(original, id)
+		if record == nil {
+			return nil, fmt.Errorf("动作表里 id_ = %q 的记录不见了", id)
 		}
+		fields, err := actionRowFields(record)
+		if err != nil {
+			return nil, fmt.Errorf("动作表里 id_ = %q 的记录: %w", id, err)
+		}
+		// 原值照给，改动叠在上面：界面把 Value 填进输入框、把 Original 当灰色占位符。
+		for i := range fields {
+			if value, ok := changed[id][fields[i].Key]; ok {
+				edited := value
+				fields[i].Value = &edited
+			}
+		}
+		actions = append(actions, Action{ID: id, Fields: fields})
 	}
 	return actions, nil
-}
-
-/*
-recordsMatching 挑出"认这个 token"的记录，按文件里的顺序。
-
-两种判据共用一个 token：`id_` 认它，或者它引用的某个 `saveMotId01_~12_` 认它 —— 判据就是 containsToken
-（**包含**就算，大小写不敏感）。界面上只有那一个搜索框，用户不必先声明搜的是哪一种。
-
-`*` **没有任何特殊含义**：它就是个普通字符，既不当通配符、也不会被剔掉（数据里没有它，所以带 `*` 的
-输入自然搜不到东西）。于是 `3430` 是精确命中（mot 恒为 4 位），`3a` 能搜到 `3a00`（含连续的 `3a`）、
-搜不到 `34a0`（那三个字符是 `3` `4` `a`）。
-*/
-func recordsMatching(root *msgValue, token string) []*msgValue {
-	pattern := strings.ToLower(token)
-	out := make([]*msgValue, 0, 4)
-	for _, entry := range root.entries {
-		record := entry.value
-		if record.format != msgMap {
-			continue
-		}
-		if field := record.entry("id_"); field != nil && containsToken(field.str, pattern) {
-			out = append(out, record)
-			continue
-		}
-		for _, field := range record.entries {
-			if !strings.HasPrefix(field.key.str, "saveMotId") {
-				continue
-			}
-			if containsToken(field.value.scalar(), pattern) {
-				out = append(out, record)
-				break
-			}
-		}
-	}
-	return out
-}
-
-// containsToken 值里含不含这一段（大小写不敏感；pattern 已经折过小写）。
-func containsToken(value, pattern string) bool {
-	return strings.Contains(strings.ToLower(value), pattern)
 }
 
 /*
 tableIDs 是这张表里**全部**记录的 id_，按文件里的顺序。
 
 同一个 id_ 出现两次时只留第一次：界面拿 id 索引一行的值（draft[action.id]），重复的会互相盖，看着就是
-"表里少了一半"。实测 pl1000 那张表 35 条记录、id 一个不重复（TestLoadActionsWithAnEmptyList... 钉着）。
+"表里少了一半"。实测 pl1000 那张表 35 条记录、id 一个不重复。
 */
 func tableIDs(root *msgValue) []string {
 	ids := make([]string, 0, len(root.entries))
@@ -883,15 +818,19 @@ func fsmSharedNames(cfg actionConfig) ([]string, error) {
 		if folder == "" || name == "" || folder == char || seen[key] {
 			continue
 		}
-		if _, ok, err := readOriginal(fsmEntry(folder, name)); err != nil {
+		// 路径/条目名只由 fsmEntryPath 拼：名合法性与兜底路径不再在这里抄第二份。
+		entry, path, err := fsmEntryPath(cfg, key)
+		if err != nil {
+			continue
+		}
+		if _, ok, err := readOriginal(entry); err != nil {
 			return nil, err
 		} else if ok {
 			seen[key] = true
 			out = append(out, key)
 			continue
 		}
-		fallback := filepath.Join(filepath.Dir(cfg.FsmDir), folder, folder+"_"+name+"_fsm_ingame.msg")
-		if _, err := os.Stat(fallback); err == nil {
+		if _, err := os.Stat(path); err == nil {
 			seen[key] = true
 			out = append(out, key)
 		}
@@ -929,7 +868,7 @@ func validFsmPart(part string) bool {
 
 // fsmPath 拼 FSM 的路径。名字由界面给，同样当校验（它也要拼进文件名）。
 func fsmPath(cfg actionConfig, name string) (string, error) {
-	if name == "" || strings.ContainsAny(name, `/\:`) || strings.Contains(name, "..") {
+	if !validFsmPart(name) {
 		return "", fmt.Errorf("FSM 名 %q 不合法", name)
 	}
 	char := charCode(cfg)

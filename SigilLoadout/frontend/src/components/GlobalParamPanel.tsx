@@ -22,11 +22,11 @@ import {loadParamLabels, paramFieldLabel, paramFieldLabelParts} from "@/lib/para
     表格是**点击编辑**（EditableCell：平时是文本、点一下才变输入框），不是给每格铺一个输入框：
     playerabilityuiparameter 那张有 1103 行，平铺输入框会像动作表那样把主线程卡住一秒。
 */
-/** 布尔叶子：原值是 true/false 的那一类。界面用勾选框，不用文本输入。 */
-const isBoolField = (original: string) => original === "true" || original === "false"
+/** 布尔叶子：种类由后端从 msgpack 节点给出（`kind`），不从值的内容猜。界面用勾选框，不用文本输入。 */
+const isBoolField = (field: ActionField) => field.kind === "bool"
 
 /** 这一格显示的值：改过用改动，没改过用原值（与 EditableCell 的 override 同一口径）。 */
-const booleanShown = (field: ActionField) => (field.value ? field.value : field.original)
+const booleanShown = (field: ActionField) => field.value ?? field.original
 
 export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
     table: string
@@ -184,7 +184,7 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
                                       · **不带 `cell-focus`** = 不画焦点线。`relative` 得自己补上 ——
                                         编辑时那个 `<Input>` 是 `absolute inset-0`，没有定位祖先就会跑出格子
                                         （cell-focus 平时顺手提供 position:relative，这里得显式写）。 */}
-                                {isBoolField(field.original) ? (
+                                {isBoolField(field) ? (
                                     <td className="w-full border-b px-2 pt-1 pb-1.5 align-bottom">
                                         <Checkbox
                                             checked={booleanShown(field) === "true"}

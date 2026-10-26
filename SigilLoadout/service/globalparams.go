@@ -257,11 +257,9 @@ func (s *ActionsService) deployGlobalParam(cfg actionConfig, table string, edits
 
 // setGlobalParamValue 把界面上那一格的文本写回节点。
 //
-// 这 16 张表里的叶子**实测全是 msgpack 字符串**（一个数字/布尔都没有），所以写回就是换一个字符串；
-// 换成别的种类的节点会被静默编成一堆 0，所以对不上就报错、不猜。
+// 种类不换：字符串写字符串、布尔只收 true/false；对不上就报错，不猜（写进别的种类会编出一份游戏读不懂
+// 的表，见 globalparams_test 那几条）。
 // 字符串长度由 writeStr 自己处理（原来是 fixstr 装不下就升级成 str8），不需要在这里管。
-// setGlobalParamValue 按原节点自己的种类写值：字符串照抄，布尔只收 true/false。
-// ‼️ 种类不换：把字符串写进整数/布尔节点会编出一份游戏读不懂的表（见 globalparams_test 那条）。
 func setGlobalParamValue(node *msgValue, value string) error {
 	switch node.format {
 	case msgString:
@@ -314,6 +312,13 @@ func flattenGlobalParams(v *msgValue, path string, out *[]ActionField, nodes map
 		if nodes != nil {
 			nodes[path] = v
 		}
-		*out = append(*out, ActionField{Key: path, Original: v.scalar()})
+		kind := ""
+		switch v.format {
+		case msgString:
+			kind = "string"
+		case msgBool:
+			kind = "bool"
+		}
+		*out = append(*out, ActionField{Key: path, Original: v.scalar(), Kind: kind})
 	}
 }

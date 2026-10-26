@@ -36,6 +36,7 @@ import {HiddenMotionList} from "@/components/HiddenMotionList"
 import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group"
 import {charCodeOf} from "@/lib/actionflags"
 import {PLAYER_CODE, type CharaTable} from "@/lib/chara"
+import {parseFilterTokens} from "@/lib/filter"
 import type {Lang} from "@/lib/lang"
 import {buffName, loadBuffs, parseSupportEffects, type BuffInfo} from "@/lib/buffs"
 import type {Messages} from "@/lib/messages"
@@ -44,13 +45,7 @@ import type {Messages} from "@/lib/messages"
  * 记录清单的"实际内容"：与后端 `SetActionIDs` 同一口径 —— 逗号当分隔符、按空白切词、丢掉空项。
  * 比较必须用这个，不能用原串：后端存回来的是规范化形式，原串一比就永远不等。
  */
-const normalizeIds = (value: string) =>
-    value
-        .replaceAll(",", " ")
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .join(" ")
+const normalizeIds = (value: string) => parseFilterTokens(value).join(" ")
 
 /**
  * 角色下拉。这一页的三份数据（动作表 / flags / FSM）**全都按角色走**，所以它是整页的选择，不是某一块的。
@@ -193,7 +188,7 @@ function CharacterPicker({value, codes, names, colors, onSelect, t}: {
  *
  * badge 本身**没有点击事件**：空单元格不显示任何东西。进编辑统一走表的那套入口 ——
  * 双击 / F2 / Enter 都落到 `enterEdit`（与普通格切输入框、选值格展开列表同一个注册表）。
- * 宽度由 `ColumnSpec.width`（256）钉住，超出在这个宽度里换行 —— 与轨表「效果」列同一套做法。
+ * 宽度由 `ColumnSpec.width`（512）钉住，超出在这个宽度里换行 —— 与轨表「效果」列同一套做法。
  */
 function SupportEffectCell({row, nameOf}: {row: ActionRow; nameOf: (hash: string) => string}) {
     const drill = useContext(DrillContext)
@@ -361,9 +356,9 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     /** 哈希 → buff（「附加效果」列里显示名字用，与弹窗同一份数据）。 */
     const buffMap = useMemo(() => new Map(buffs.map((info) => [info.hash, info])), [buffs])
     const buffNameOf = useCallback((hash: string) => buffName(buffMap.get(hash), lang), [buffMap, lang])
-    /** 当前过滤后能看见几行（与表里的过滤同一判据）：全被过滤掉时给一句提示，别只留一个空表头。 */
-    const visibleRowCount = useMemo(
-        () => rows.filter((row) => matchesIdsFilter(row.originals, idsText)).length,
+    /** 当前过滤后能看见的行：由父层过滤一次（表本身不再接 TanStack 的全局过滤）。 */
+    const visibleRows = useMemo(
+        () => rows.filter((row) => matchesIdsFilter(row.originals, idsText)),
         [rows, idsText],
     )
     /** 列规格：只有「附加效果」这一列换成 badge 显示；值本身没变，复制/粘贴仍走原 JSON。 */
@@ -432,8 +427,8 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
         setIdsText(ids ?? "")
         setIdsApplied(ids ?? "")
 
-        // 这一步失败就抛给调用方（上面几份不受影响）。**读全表**：清单过滤在界面层做（见 ActionsTable 的
-        // filterText），换清单不该再重读；换角色才重读这一张（一张表 35~60 条）。
+        // 这一步失败就抛给调用方（上面几份不受影响）。**读全表**：清单过滤在本页 `visibleRows` 做，
+        // 换清单不该再重读；换角色才重读这一张（一张表 35~60 条）。
         const loaded = (await LoadCharacterActions()) ?? []
         setRows(loaded.map(toActionRow))
         setLoaded(true)
@@ -469,8 +464,8 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     }
 
     /**
-     * 把记录清单**存进设置**（工具栏那个输入框）。只写配置，不重读、不换数据：过滤由表格自己按
-     * `filterText` 做（当前角色的表已在内存里）。写进去是为了下次打开/换角色时还能恢复这串。
+     * 把记录清单**存进设置**（工具栏那个输入框）。只写配置，不重读、不换数据：过滤由本页 `visibleRows`
+     * 做（当前角色的表已在内存里）。写进去是为了下次打开/换角色时还能恢复这串。
      */
     const applyIds = async () => {
         if (normalizeIds(idsText) === normalizeIds(idsApplied)) return
@@ -664,7 +659,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                         // 就地显示、不居中也不撑高：一行 14px 的灰字。
                         <div className="pb-1 text-sm text-muted-foreground">{t.actionsEmpty}</div>
                     )}
-                    {loaded && rows.length > 0 && visibleRowCount === 0 && (
+                    {loaded && rows.length > 0 && visibleRows.length === 0 && (
                         <div className="pb-1 text-sm text-muted-foreground">{t.noMatchItems}</div>
                     )}
                     {loaded && rows.length > 0 && (
@@ -692,11 +687,10 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                             busy={busy}
                             // 列宽量好了 → 撤掉上面那个骨架（TableSkeleton）。
                             onReady={handleTableReady}
-                            rows={rows}
+                            rows={visibleRows}
                             keys={keys}
                             t={t}
                             columnOf={columnOf}
-                            filterText={idsText}
                             // 详情弹窗提交要一个"直接写一格"的入口（与格子编辑同一条写出口）。
                             onCommandsReady={(commands) => {
                                 commandsRef.current = commands

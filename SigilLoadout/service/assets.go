@@ -94,7 +94,7 @@ func LoadAssets() error {
 
 /*
 actionNames 是 chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}。只在这边用，不发给界面：
-`LoadActions` 拿它把显示名投影进 `abilityTag_` 那一格（见 actionRowFields）。
+`actionRowFields` 拿它把显示名投影进 `abilityTag_` 那一格（读取由 LoadCharacterActions 触发）。
 
 **每个键都有值**（还没翻的填成键名自己）—— 所以查表就是最终显示名，没有"空串回落"这一步。
 查不到就是这一格空着：那是这份资产缺条目，不是代码要兜的事（覆盖由 assets_test.go 扫随包 36 张表钉着）。

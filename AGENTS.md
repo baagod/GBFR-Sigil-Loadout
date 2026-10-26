@@ -338,11 +338,10 @@
 **每轮** 审查结果交由 `/receiving-code-review` 验证，并执行成立项。必须完整执行一轮审查之后，才继续下一轮。**禁止提前执行后续轮次。**
 
 1. 本文「激进式编码哲学」；
-2. `ponytail-review`；
-3. `thermo-nuclear-code-quality-review`；
-4. `code-review-and-quality`；
-5. `thermo-nuclear-review`；
-6. `ponytail-review` ( 复检 )。
+2. `thermo-nuclear-code-quality-review`；
+3. `code-review-and-quality`；
+4. `thermo-nuclear-review`；
+5. `ponytail-review`。
 
 对于无法判断的执行项（如果有），在最后整体列出，由用户决策。
 

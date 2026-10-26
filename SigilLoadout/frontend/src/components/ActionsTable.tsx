@@ -92,17 +92,12 @@ import {useColumnMeasure} from "@/components/actions-table/useColumnMeasure"
  * 同一份选区上；分三次交接只会让调用方维护三张并行 ref 映射。
  */
 export type TableCommands = {
-    /** 复制当前选区：行剪贴板 + 系统剪贴板 + 那圈虚线，合成一次（与键盘 Ctrl+C 同一条路）。 */
-    copy: () => void
-    /** 工具条「粘贴」：与 Ctrl+V 同一条系统剪贴板路径（读不到时退回本应用上次复制的那片）。 */
-    paste: () => void
     /** 行级命令：添加 / 复制 / 剪切 / 插入 / 删除（与键盘同一条实现）。 */
     rows: RowCommands
     /**
-     * 直接写一格（详情弹窗那类"编辑器在格子外面"的入口用）：`null` = 回到原值，
-     * 与 `Cell` 的提交口径一致。走的是表里唯一的写出口 `write`。
+     * 直接写一格（详情弹窗那类"编辑器在格子外面"的入口用）。走的是表里唯一的写出口 `write`。
      */
-    writeCell: (rowId: string, key: string, value: string | null) => void
+    writeCell: (rowId: string, key: string, value: string) => void
 }
 
 /*
@@ -138,7 +133,7 @@ export type TableCommands = {
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, filterText, loading = false, busy = false, onReady}: {
+export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -165,11 +160,6 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * 不给 = 列 id 就是数据键与表头、显示原值、可编辑。
      */
     columnOf?: (key: string) => ColumnSpec | undefined
-    /**
-     * 记录清单（搜索框那串）：**只过滤当前这份 rows**，不触发后端重读。
-     * 语义见 `model` 的 `filterFn_idsOrName`（id_ / mot / 名称，空白或逗号分隔）。
-     */
-    filterText?: string
     /** **行序能拖**：给了才有行号列右边那条握把列、才接 dnd-kit（动作表的行是记录、没有行序，不传）。 */
     reorder?: (from: number, to: number) => void
     /**
@@ -425,14 +415,10 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
         // 钉住哪几列 / 按什么排 / 每列多宽 / 选了哪一片格：都是**受控状态** —— 值由我们给，
         // 库通过 onChange 把用户触发的改动交回来（v9 的优先级 atoms > state > 库内部状态）。
         // ⚠️ 列宽**没有** onChange：没注册 `columnResizingFeature`，列宽只由测量那一趟写（见 `useColumnMeasure`）。
-        state: {columnPinning: pinning, columnSizing, sorting, cellSelection, globalFilter: filterText ?? ""},
+        state: {columnPinning: pinning, columnSizing, sorting, cellSelection},
         onColumnPinningChange: setPinning,
         onSortingChange: setSorting,
         onCellSelectionChange: setCellSelection,
-        // 全局过滤只跑一遍（每个 token 在整行上找），所以只让 id_ 这一列"参与"，filterFn 自己看整行。
-        globalFilterFn: "idsOrName",
-        getColumnCanGlobalFilter: (column) => column.id === "id_",
-        onGlobalFilterChange: () => undefined,
     })
 
     /*
@@ -554,7 +540,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
      * `tableInstanceRef`/`rowsRef` 是 ref、`branchPick.ids` 由 `useMemo` 按数据给），
      * 所以它内部那段全局监听**只挂一次**。
      */
-    const {copyHint, setCopyHint, copySource, clearCopySource, copySelection, pasteClipboard, edit, clearSelectedCells} = useClipboardHistory({
+    const {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit, clearSelectedCells} = useClipboardHistory({
         write,
         rowsRef,
         tableRef: tableInstanceRef,
@@ -629,18 +615,12 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     })
 
     /**
-     * **把这张表的动作整包交给调用方**（工具条那几个按钮）—— 与键盘同一条实现：
-     * 复制 = 行剪贴板 + 区域复制 + 虚线（`copySelection` 已含后两样）；粘贴 = 与 Ctrl+V 同一条系统剪贴板路径。
-     * 调用方（`AnimationDetail` / `TrackGrid`）存进 ref，点按钮时读最新一份，不需要稳定对象。
+     * **把这张表还给调用方的动作包**（行命令 + 直接写一格）：调用方（`AnimationDetail` / `TrackGrid`）
+     * 存进 ref，用到时读最新一份，不需要稳定对象。
      */
     const tableCommands: TableCommands = {
-        copy: () => {
-            rowCommands.copy()
-            copySelection()
-        },
-        paste: pasteClipboard,
         rows: rowCommands,
-        writeCell: (rowId, key, value) => write(rowId, key, value ?? ""),
+        writeCell: (rowId, key, value) => write(rowId, key, value),
     }
     useEffect(() => {
         onCommandsReady?.(tableCommands)

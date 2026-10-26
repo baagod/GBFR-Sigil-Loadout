@@ -62,17 +62,17 @@ func TestMergeActionTableLeavesTheTableAloneWhenNothingChanged(t *testing.T) {
 }
 
 /*
-投影发生在 `LoadActions` 摊平那一刻（见 actionRowFields）：界面拿到的 `abilityTag_` **原值就是显示名**
+投影发生在 `LoadCharacterActions` 摊平那一刻（见 actionRowFields）：界面拿到的 `abilityTag_` **原值就是显示名**
 —— 显示 / 复制 / 排序因此读同一个值（前端不必再拿一份名字表自己查）。
 
 夹具没有账本，所以 `fieldValue` 读到的就是原值。
 */
-func TestLoadActionsProjectsTheActionNameOntoAbilityTag(t *testing.T) {
+func TestLoadCharacterActionsProjectsTheActionNameOntoAbilityTag(t *testing.T) {
 	service, cfg, _ := actionsFixture(t)
 	sampleActionTable(t, cfg) // 这台机器上没有真样本就跳过
 
 	translated := 0
-	for _, action := range mustLoadActions(t, service) {
+	for _, action := range mustLoadCharacterActions(t, service) {
 		raw := fieldValue(action, actionNameField)
 		want := actionNames[raw]
 		if got := fieldValue(action, abilityTagField); got != want {
