@@ -11,7 +11,10 @@ import {
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
 import type {TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
+import {MotInfo as LoadMotInfo, MotScale as LoadMotScale, ScaleMotRootMotion} from "../../bindings/sigilloadout/service/gameservice"
 import {Button} from "@/components/ui/button"
+import {EditableCell} from "@/components/EditableCell"
+import {CELL_TEXT} from "@/lib/classnames"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
 import {FLAG_KEYS, TrackGrid} from "@/components/TrackGrid"
@@ -28,6 +31,20 @@ import type {Messages} from "@/lib/messages"
  * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
+
+type MotInfoData = {
+    animationName: string
+    hash: number
+    flag: number
+    frameCount: number
+    recordCount: number
+    rootXKeys: number
+    rootX: number
+    rootY: number
+    rootZ: number
+    rootZKeys: number
+    distance: number
+}
 
 /*
 动画详情页：点动作表里的动画号弹出来的那一层。
@@ -55,6 +72,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [infos, setInfos] = useState<TrackInfo[]>([])
     // 数据到位之前不渲染手风琴：否则它先以"全收起"挂载，数据一到才播展开动画——那一下就是看着像卡顿的东西。
     const [loaded, setLoaded] = useState(false)
+    const [motInfo, setMotInfo] = useState<MotInfoData | null>(null)
+    const [motScale, setMotScale] = useState("1")
+    const [motNote, setMotNote] = useState("")
     /*
         ‼️ **flags 就是 `tables` 里的普通轨**（按 `trackKey` 存，一个动画可有多条 flags 子轨）—— 不单独占 state。
         行形状统一（`FlagRow` = `TrackRow`）之后，它没有任何理由与别的轨分开存；分开的代价是每个操作
@@ -148,6 +168,28 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             alive = false
         }
     }, [motion])
+
+    useEffect(() => {
+        if (!motion) return
+        let alive = true
+        setMotInfo(null)
+        setMotNote("")
+        LoadMotInfo(charCode, motion)
+            .then((info) => {
+                if (alive) setMotInfo(info as MotInfoData)
+            })
+            .catch((e) => {
+                if (alive) setMotNote(String(e))
+            })
+        LoadMotScale(charCode, motion)
+            .then((scale) => {
+                if (alive) setMotScale(String(Math.round(scale * 1000) / 1000))
+            })
+            .catch(() => undefined)
+        return () => {
+            alive = false
+        }
+    }, [motion, charCode])
 
     /** 改一格（flags 与普通轨共用）。**清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值。 */
     const editValue = (key: string, index: number, column: string, value: string) => {
@@ -246,6 +288,12 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         setBusy(true)
         setFailure("")
         try {
+            const scale = Number(motScale)
+            if (motScale.trim() !== "" && !Number.isNaN(scale)) {
+                const info = await ScaleMotRootMotion(charCode, motion, scale)
+                setMotInfo(info as MotInfoData)
+                setMotNote("")
+            }
             // 整张表原样交给后端（含行身份 `orig` / `removed`）：由它决定"哪些行进 XML"（假删除的不进）、
             // 并把行身份跟改动一起存进 track_edits.json —— 下次打开照样认得每一行是原版第几行。
             //
@@ -371,7 +419,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const title = `${charCode}_${motion}`
 
     /* 失败条 + 滚动区。按钮排在标题那一行里（见下面的 DialogHeader）。 */
-    const body = (
+    const body = () => (
         <>
             {failure && <p className="text-xs text-destructive">{failure}</p>}
 
@@ -385,8 +433,81 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 {/* 三条轨（flags/effect/attack…）：常开、直接铺开，右侧没有折叠箭头。
                     整块等到数据到位才挂载 —— 见 loaded 的注释：提前挂载会先收起再展开，那一下像卡顿。 */}
                 {loaded && sections}
+                {loaded && motionSection}
             </div>
         </>
+    )
+
+    const animTable = (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 text-sm">
+            {!motInfo ? (
+                <p className="text-sm text-muted-foreground">{motNote}</p>
+            ) : (
+                <>
+                    <table className="w-full table-fixed table-border border-separate border-spacing-0 text-xs">
+                        <colgroup>
+                            <col className="w-1/2" />
+                            <col className="w-1/2" />
+                        </colgroup>
+                        <tbody>
+                            {[
+                                {label: `${t.rootMotion} X`, key: "rootX", value: motInfo.rootX.toFixed(3)},
+                                {label: `${t.rootMotion} Y`, key: "rootY", value: motInfo.rootY.toFixed(3)},
+                                {label: `${t.rootMotion} Z`, key: "rootZ", value: motInfo.rootZ.toFixed(3)},
+                                {label: t.distance, key: "distance", value: motInfo.distance.toFixed(3)},
+                            ].map((row) => (
+                                <tr key={row.key}>
+                                    <td className="border-b px-2 py-1 align-top">
+                                        <span className="block text-sm leading-5 font-medium whitespace-nowrap text-muted-foreground">
+                                            {row.label}
+                                        </span>
+                                        <span className="block font-mono text-[12px] leading-4 whitespace-nowrap text-muted-foreground">
+                                            {row.key}
+                                        </span>
+                                    </td>
+                                    <td className="relative w-full border-b p-0 align-bottom [&>div]:items-end [&>div]:pb-1">
+                                        <div className={`${CELL_TEXT} text-muted-foreground`}>{row.value}</div>
+                                    </td>
+                                </tr>
+                            ))}
+                            <tr>
+                                <td className="border-b px-2 py-1 align-top">
+                                    <span
+                                        className={
+                                            "block text-sm leading-5 font-medium whitespace-nowrap " +
+                                            (motScale !== "1" ? "text-foreground" : "text-muted-foreground")
+                                        }
+                                    >
+                                        {t.scale}
+                                    </span>
+                                    <span className="block font-mono text-[12px] leading-4 whitespace-nowrap text-muted-foreground">
+                                        scale
+                                    </span>
+                                </td>
+                                <EditableCell
+                                    alignBottom
+                                    tdClassName="relative w-full border-b p-0 align-bottom [&>div]:items-end [&>div]:pb-1"
+                                    value={motScale === "1" ? "" : motScale}
+                                    placeholder="1"
+                                    override
+                                    onCommit={(value) => setMotScale(value === "" ? "1" : value)}
+                                />
+                            </tr>
+                        </tbody>
+                    </table>
+                    {motNote && <p className="text-xs text-destructive">{motNote}</p>}
+                </>
+            )}
+        </div>
+    )
+
+    const motionSection = (
+        <Fragment>
+            <div className="sticky top-0 z-[70] bg-popover">
+                <div className="flex w-full items-start py-2 text-left text-sm font-medium">Motion</div>
+            </div>
+            <div className="pt-1 pb-4">{animTable}</div>
+        </Fragment>
     )
 
     /*
@@ -433,7 +554,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                         </div>
                     </div>
                 </DialogHeader>
-                {body}
+                {body()}
             </DialogContent>
         </Dialog>
     )

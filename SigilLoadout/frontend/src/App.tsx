@@ -31,9 +31,10 @@ import {SigilEditorPanel} from "@/components/SigilEditorPanel"
 import {LimitBonusEditorPanel} from "@/components/LimitBonusEditorPanel"
 import {SkillboardPanel} from "@/components/SkillboardPanel"
 import {ActionsPanel} from "@/components/ActionsPanel"
+import {SettingsPanel} from "@/components/SettingsPanel"
 import type {CharaTable} from "@/lib/chara"
 
-type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus" | "skillboard" | "actions"
+type TabKey = "general" | "exclusive" | "sigilEditor" | "limitBonus" | "skillboard" | "actions" | "settings"
 
 /** 外壳唯一的一条失败通道：谁失败都只是把它写进这里，屏幕上只可能显示一条。 */
 type Failure = { kind: "sigil" | "config" | "exclusive" | "save" | "tables"; error?: unknown }
@@ -358,6 +359,7 @@ export default function App() {
                             <TabsTrigger value="limitBonus">{t.tabLimitBonus}</TabsTrigger>
                             <TabsTrigger value="skillboard">{t.tabSkillboard}</TabsTrigger>
                             <TabsTrigger value="actions">{t.tabActions}</TabsTrigger>
+                            <TabsTrigger value="settings">{t.tabSettings}</TabsTrigger>
                         </TabsList>
                         {/*
                         一个连成一体的组（ButtonGroup 削直内侧圆角、去掉内部边框）。size 用 stock 的
@@ -457,6 +459,9 @@ export default function App() {
                 */}
                 <TabsContent value="actions" keepMounted className="min-h-0 flex-1 overflow-hidden">
                     <ActionsPanel t={t} lang={lang} charaNames={charaNames} charaTable={charaTable} />
+                </TabsContent>
+                <TabsContent value="settings" keepMounted className="min-h-0 flex-1 overflow-hidden">
+                    <SettingsPanel t={t} />
                 </TabsContent>
             </Tabs>
         </div>
