@@ -133,10 +133,15 @@ export type TableCommands = {
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
+export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, onReady}: {
     t: ActionsTableMessages
-    /** 要显示的记录（`ActionsPanel` 由 `LoadActions` 摊平而来，见 `model.toActionRow`）。 */
+    /** 要显示的记录（`ActionsPanel` 由 `LoadCharacterActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
+    /**
+     * 保存时要交出的**全部**记录（默认 = `rows`）：过滤只改变显示，不能把被过滤掉的行漏掉 ——
+     * 后端按"没交的行 = 回原值"处理，漏掉就是静默丢改动。
+     */
+    saveRows?: ActionRow[]
     /**
      * 字段顺序（= 表头顺序），与 `rows` 配套（见 `model.columnsOf`）。
      *
@@ -431,7 +436,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
     useEffect(() => {
         onSaveReady?.(async () => {
             await SaveActions(
-                rows.map((row) => ({
+                (saveRows ?? rows).map((row) => ({
                     id: row.id,
                     fields: Object.entries(row.values)
                         .filter(([, value]) => value !== "")
@@ -439,7 +444,7 @@ export function ActionsTable({t, rows: rowsProp, keys: keysProp, onSaveReady, pi
                 })),
             )
         })
-    }, [rows, onSaveReady])
+    }, [rows, saveRows, onSaveReady])
 
     /**
      * 选区解析出来的矩形边界（库**记忆化**过，一次渲染只算一遍）：行号格的选中态与

@@ -688,6 +688,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                             // 列宽量好了 → 撤掉上面那个骨架（TableSkeleton）。
                             onReady={handleTableReady}
                             rows={visibleRows}
+                            saveRows={rows}
                             keys={keys}
                             t={t}
                             columnOf={columnOf}

@@ -157,13 +157,6 @@ func steamLibraries() []string {
 	return libs
 }
 
-// gameDir 是当前生效的游戏目录（带内存缓存，配置改过后 `resetGameData`）。
-func gameDir() (string, error) {
-	gameData.mu.Lock()
-	defer gameData.mu.Unlock()
-	return gameData.dirLocked()
-}
-
 // dirLocked 取当前目录；调用方必须持有 gameData.mu。
 func (s *gameDataSource) dirLocked() (string, error) {
 	if s.dir != "" {

@@ -25,8 +25,8 @@ import {loadParamLabels, paramFieldLabel, paramFieldLabelParts} from "@/lib/para
 /** 布尔叶子：种类由后端从 msgpack 节点给出（`kind`），不从值的内容猜。界面用勾选框，不用文本输入。 */
 const isBoolField = (field: ActionField) => field.kind === "bool"
 
-/** 这一格显示的值：改过用改动，没改过用原值（与 EditableCell 的 override 同一口径）。 */
-const booleanShown = (field: ActionField) => field.value ?? field.original
+/** 这一格显示的值：改过用改动，没改过用原值（空串 = 没改，与后端口径一致）。 */
+const booleanShown = (field: ActionField) => (field.value ? field.value : field.original)
 
 export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
     table: string
