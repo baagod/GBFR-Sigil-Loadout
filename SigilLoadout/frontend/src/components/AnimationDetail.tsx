@@ -33,8 +33,8 @@ import type {Messages} from "@/lib/messages"
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
 
-/** Motion.scale 的提交规则：与数值输入框共用 slotEdit；空 = 默认 1，半成品/非法输入不改旧值。 */
-function commitScale(text: string): string | null {
+/** Motion.scale 的提交规则：与数值输入框共用 slotEdit；空 = 默认 1，半成品/非法输入不改旧值。导出给单测。 */
+export function commitScale(text: string): string | null {
     const edit = slotEdit(text)
     if (edit.kind !== "commit") return null
     if (edit.value === null) return "1"
