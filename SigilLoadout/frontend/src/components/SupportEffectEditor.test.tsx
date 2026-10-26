@@ -61,6 +61,27 @@ describe("附加效果弹窗", () => {
         expect(screen.getAllByText("双发子弹").every((el) => el.getAttribute("data-original") !== "true")).toBe(true);
     });
 
+    /* 默认值 15 只是占位符；输入框允许打 1 → 15 → 155，不能因为“等于默认值”就被清空。 */
+    it("允许输入与默认值相同的数并继续追加", () => {
+        renderEditor(RAW);
+        const input = valueInput("霸体 4039598841 1");
+
+        fireEvent.change(input, { target: { value: "1" } });
+        expect(input.value).toBe("1");
+        fireEvent.change(input, { target: { value: "15" } });
+        expect(input.value).toBe("15");
+        fireEvent.change(input, { target: { value: "155" } });
+        expect(input.value).toBe("155");
+    });
+
+    /* 只输入到“与默认值相同”就关窗：等于没改，不写回。 */
+    it("输入值恰好等于默认值时关窗不写回", () => {
+        const { onSave } = renderEditor(RAW);
+        fireEvent.change(valueInput("霸体 4039598841 1"), { target: { value: "15" } });
+        close();
+        expect(onSave).not.toHaveBeenCalled();
+    });
+
     it("打开不改动：关窗只回调 onClose，不写回", () => {
         const { onSave, onClose } = renderEditor(RAW);
 
@@ -110,14 +131,14 @@ describe("附加效果弹窗", () => {
         expect(saved(onSave)).toEqual([{ hash: "4039598841", values: ["18", "0", "0", "0", "1", "1"] }]);
     });
 
-    it("输成默认值等于没改：输入框回到空、关窗不写回", () => {
+    it("输成默认值等于没改：输入框保留输入值、关窗不写回", () => {
         const raw = JSON.stringify(["1", "1039632913", "7", "8", "0", "0", "1", "1"]);
         const { onSave } = renderEditor(raw, raw, "PL1400");
 
         const input = valueInput("双发子弹 1039632913 1");
         expect(input.value).toBe("");
         fireEvent.change(input, { target: { value: "7" } });
-        expect(input.value).toBe("");
+        expect(input.value).toBe("7");
         close();
         expect(onSave).not.toHaveBeenCalled();
     });

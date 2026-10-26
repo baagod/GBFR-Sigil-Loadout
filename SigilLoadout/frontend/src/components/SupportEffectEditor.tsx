@@ -218,14 +218,13 @@ export function SupportEffectEditor({
     /**
      * 改值只改值，**不代勾选**（勾选是一个明确的动作；改了值但没勾 = 这条不挂）。键入只留整数写法。
      *
-     * ‼️ 输成与默认值一样（原值 / 当前角色默认）就存回空串：等于没改 —— 关窗不会写回单元格，
-     * 再次打开还是灰字占位符。
+     * 输入原样收下，包括与默认值相同的数：输入时拦截会让“默认值 5 → 想打 55”永远打不出来。
+     * 是否真的改了由 `serialize`/`openedRaw` 在关窗时比较，相等就不写回。
      */
     const setValue = (hash: string, slot: number, text: string) => {
         const row = rows.get(hash);
         if (!row) return;
-        const digits = text.replace(/[^\d-]/g, "");
-        const next = digits === baselineOf(hash, slot) ? "" : digits;
+        const next = text.replace(/[^\d-]/g, "");
         const nextRows = new Map(rows);
         nextRows.set(hash, { checked: row.checked, values: row.values.map((old, s) => (s === slot ? next : old)) });
         setRows(nextRows);
