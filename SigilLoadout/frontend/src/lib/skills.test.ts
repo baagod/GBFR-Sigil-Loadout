@@ -3,7 +3,7 @@
     所以这里的一张表比再来一张截图值钱。
 */
 import { describe, expect, it } from "vitest";
-import { HALF_TYPED, NUMBER, slotEdit } from "./numericText";
+import { HALF_TYPED, MAX_VALUE, NUMBER, slotEdit, stepValue } from "./numericText";
 import {
     addressOf,
     anyFilled,
@@ -12,11 +12,9 @@ import {
     isEdit,
     levelsOf,
     matches,
-    MAX_VALUE,
     pad,
     parentState,
     slotLabel,
-    stepValue,
     type ExplainBand,
     type SigilSkill,
     type SkillInfo,

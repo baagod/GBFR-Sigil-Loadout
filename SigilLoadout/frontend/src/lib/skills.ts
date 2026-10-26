@@ -98,21 +98,6 @@ export const withSlot = (values: (number | null)[], i: number, v: number | null)
     return next;
 };
 
-/**
- * 输入框能放的最大值，也就是 numericText 里两个模式编码的上界：小数点前 6 位、后 6 位。
- *
- * 专门写出来是因为步进也必须遵守它。步进是值变化的第三条路（排在输入与手改文件之后），
- * 没有这个钳制时，停在 999999 的框按一下方向键会得到 1000000：七位数，它自己的模式随后
- * 拒绝，于是框里显示着一个按什么键都不会被接受的数字。
- */
-export const MAX_VALUE = 999999;
-
-/** 方向键与滚轮的一步，夹在输入框能放的范围内。 */
-export const stepValue = (value: number, direction: 1 | -1) => {
-    const next = Math.round((value + direction) * 100) / 100;
-    return Math.abs(next) <= MAX_VALUE ? next : value;
-};
-
 /*
     一个因子显示的等级：游戏那些带值的行，加上编辑已指名过的等级，被勾选的排到最前。
 

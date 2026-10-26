@@ -1,8 +1,7 @@
 import { useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { useWheelStep } from "@/hooks/useWheelStep"
-import { slotEdit } from "@/lib/numericText"
-import { stepValue } from "@/lib/skills"
+import { slotEdit, stepValue } from "@/lib/numericText"
 import { cn } from "cn"
 
 /*
