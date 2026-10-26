@@ -130,7 +130,7 @@ function ValueCell({label, value, placeholder, ariaLabel, onChange}: {
             上下与中间的留白都走 8px（`py-2` + `gap-2`），高度由内容算：8 + 16(标签) + 8 + 20(输入) + 8 = 60px。
             不再写死 h-11：写死之后中间那道缝会被 justify-center 分走，上下缝和中间缝就不一样了。
         */
-        <label className="flex w-full cursor-text flex-col justify-center gap-[7px] rounded-md border border-input bg-input/20 px-2 pt-[7px] pb-[7px]">
+        <label className="flex w-full cursor-text flex-col justify-center gap-[7px] px-2 pt-[7px] pb-[7px]">
             <span className="h-3 truncate text-[12px] leading-3 text-muted-foreground">{label}</span>
             <input
                 value={value}
@@ -247,7 +247,7 @@ export function SupportEffectEditor({
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : close())}>
             {/* 宽度：左名字列 + 6 个值格，官方的 448 装不下 6 列。 */}
-            <DialogContent showCloseButton={false} className="flex h-[min(1080px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col gap-4 sm:max-w-none">
+            <DialogContent showCloseButton={false} className="flex h-[min(1080px,calc(100vh-64px))] w-[min(1080px,calc(100vw-40px))] flex-col gap-4 p-5 sm:max-w-none">
                 <DialogHeader className="border-b pb-4">
                     <div className="flex items-center">
                         <DialogTitle className="mr-8 shrink-0 text-base font-medium">{t.supportEffectTitle}</DialogTitle>
@@ -287,7 +287,7 @@ export function SupportEffectEditor({
                         const name = buffName(info, lang);
                         const displayName = name || info.hash;
                         return (
-                            <div key={info.hash} className="flex items-center border-b py-1.5 pl-2 last:border-b-0">
+                            <div key={info.hash} className="flex items-center border-b pl-2 last:border-b-0">
                                 <Checkbox
                                     checked={row.checked}
                                     onCheckedChange={(next) => setChecked(info.hash, next === true)}
