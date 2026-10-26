@@ -51,7 +51,8 @@ describe("设置页 · 游戏目录", () => {
         render(<SettingsPanel t={messages.zh} />)
         await waitFor(() => expect(screen.getByDisplayValue("/saved/relink")).toBeTruthy())
 
-        expect(screen.queryByRole("button", {name: messages.zh.gameDirChoose})).toBeNull()
+        // 页面只剩「自动检测」一个按钮：选目录只能点路径框。
+        expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([messages.zh.gameDirAuto])
         fireEvent.click(screen.getByDisplayValue("/saved/relink"))
         await waitFor(() => expect(PickGameExe).toHaveBeenCalledTimes(1))
     })
