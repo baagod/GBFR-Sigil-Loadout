@@ -1,7 +1,8 @@
 import { useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { useWheelStep } from "@/hooks/useWheelStep"
-import { slotEdit, stepValue } from "@/lib/skills"
+import { slotEdit } from "@/lib/numericText"
+import { stepValue } from "@/lib/skills"
 import { cn } from "cn"
 
 /*
@@ -21,7 +22,7 @@ const SLOT_BASE =
  *
  *  - 编辑期间把**用户敲的那串文本**留在屏幕上。"-" 与 "0." 是通往一个数字路上的状态，受控输入框
  *    没有别的办法显示它们；离开框之后回到"以记录为准"的样子。
- *  - 解析规则只有一份：lib/skills.ts 的 slotEdit（半成品文本、前导零、清空成 null）。
+ *  - 解析规则只有一份：lib/numericText.ts 的 slotEdit（半成品文本、前导零、清空成 null）。
  *  - 清空 = 提交 null。这个 null 在游戏里怎么落地由调用方决定，三页并不一样（见各页的 onCommit）。
  *  - 滚轮步进（useWheelStep）、方向键步进、Esc 放开焦点。
  *

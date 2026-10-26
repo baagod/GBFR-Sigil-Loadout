@@ -3,20 +3,18 @@
     所以这里的一张表比再来一张截图值钱。
 */
 import { describe, expect, it } from "vitest";
+import { HALF_TYPED, NUMBER, slotEdit } from "./numericText";
 import {
     addressOf,
     anyFilled,
     dedupe,
     explainAt,
-    HALF_TYPED,
     isEdit,
     levelsOf,
     matches,
     MAX_VALUE,
-    NUMBER,
     pad,
     parentState,
-    slotEdit,
     slotLabel,
     stepValue,
     type ExplainBand,

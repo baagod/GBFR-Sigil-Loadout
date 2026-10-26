@@ -89,15 +89,8 @@ export function dedupe(records: SigilSkill[]): SigilSkill[] {
 }
 
 /*
-    输入框允许出现的内容：可选的开头负号、数字、最多一个小数点——所以 "-"、"0."、 "-.5"
-    都是可达状态，而第二个负号、第二个小数点、字母与科学计数法永远进不了框。挡住科学计数法
-    是关键：1e999 这类值会被 JSON 变成 null，可视工具再把它存成 0。
-
-    这里的位数是整个输入域的上界：小数点前最多 6 位、后最多 6 位，最大能输入 999999.999999。
-    永远超不过它的数也不可能变成 Infinity——否则粘进来的 400 位数会被提交成 Infinity，
-    JSON 拒绝写这种值，之后每次保存都失败。
-
-    前导零也进不了：00 提交后是 0、框里却渲染不回 00，读者会以为第二个 0 被吃掉了。
+    输入框允许出现的内容、位数上界、前导零规则与“一次按键算什么”都搬去了 lib/numericText.ts：
+    因子编辑 / 专精 / 能力强化 / 附加效果共用同一份解析，不再经本文件转手。
 */
 export const withSlot = (values: (number | null)[], i: number, v: number | null) => {
     const next = values.slice();
@@ -105,11 +98,8 @@ export const withSlot = (values: (number | null)[], i: number, v: number | null)
     return next;
 };
 
-export { HALF_TYPED, NUMBER, slotEdit } from "./numericText";
-export type { SlotEdit } from "./numericText";
-
 /**
- * 输入框能放的最大值，也就是上面两个模式编码的上界：小数点前 6 位、后 6 位。
+ * 输入框能放的最大值，也就是 numericText 里两个模式编码的上界：小数点前 6 位、后 6 位。
  *
  * 专门写出来是因为步进也必须遵守它。步进是值变化的第三条路（排在输入与手改文件之后），
  * 没有这个钳制时，停在 999999 的框按一下方向键会得到 1000000：七位数，它自己的模式随后

@@ -54,15 +54,20 @@ export function SettingsPanel({t}: { t: Messages }) {
             <div className="flex max-w-3xl flex-col gap-2">
                 <label className="text-sm font-medium" htmlFor="game-dir">{t.gameDir}</label>
                 <div className="flex gap-2">
-                    {/* 路径本身可拖选/复制；选择是显式按钮（键盘也能到，不靠点输入框）。 */}
+                    {/* 路径本身可拖选/复制；点击整行路径选取 exe（「选择」按钮已移除），Enter 也能触发。 */}
                     <Input
                         id="game-dir"
                         value={dir}
                         readOnly
                         placeholder={t.gameDirPick}
-                        className="cursor-text"
+                        className="cursor-pointer"
+                        onClick={pick}
+                        onKeyDown={(event) => {
+                            if (event.key !== "Enter") return
+                            event.preventDefault()
+                            void pick()
+                        }}
                     />
-                    <Button variant="outline" onClick={pick}>{t.gameDirChoose}</Button>
                     <Button variant="outline" onClick={detect}>{t.gameDirAuto}</Button>
                 </div>
                 {note && <p className="text-sm text-muted-foreground">{note}</p>}

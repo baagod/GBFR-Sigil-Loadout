@@ -54,7 +54,7 @@ type Baseline = (hash: string, slot: number) => string
 
 /**
  * 两个槽的文本在**数值上**是否相同：0、0.0、00 是同一个值，用于判断"有没有改"。
- * 不是数字的文本一律按不同处理（让 serialize 原样写回去，交给上层报错）。
+ * 不是数字的文本按不同处理；serialize 会把这类值回落成默认值。
  */
 function sameNumber(a: string, b: string): boolean {
     const left = Number(a.trim());
@@ -100,8 +100,8 @@ function rowsOf(buffs: readonly BuffInfo[], raw: string): BuffInfo[] {
 
 /**
  * 行状态 → 这一格的 JSON。数量由勾中的行数算。
- * 空输入框回落顺序：该动作的原值 → 默认占位值（见 `baselineOf`，未知哈希是 0）；单独一个 "-" 按 0 写。
- * 非空值先转成数值，和默认值相等就写默认值（0 与 0.0 不算改），否则写规范化后的数。
+ * 空输入框回落顺序：该动作的原值 → 默认占位值（见 `baselineOf`，未知哈希是 0）；
+ * 非数字文本（含历史遗留的 "-"）也回落默认值；其余按数值与默认值比较（0 与 0.0 不算改）。
  */
 function serialize(
     list: readonly BuffInfo[],
@@ -134,7 +134,7 @@ function serialize(
  *
  * ‼️ 不用 InputGroup 的 block-start 标签模式：那套自带「输入框 pb-3 / 标签 pt-2」和 h-9 的固定高度，
  * 想按像素收紧就得一路 `!` 覆盖，反而把高度算糊涂（踩过：同排格子高矮不一）。这里就是两行：
- * 标签 16px + 输入 20px + 上下留白，固定 44px，所有格子完全等高。
+ * 标签 12px + 输入 13px，高度由内容撑开；不写死格子高度（同排格子自然等高）。
  */
 function ValueCell({label, value, draft, placeholder, ariaLabel, onChange, onBlur}: {
     label: string;
@@ -149,8 +149,8 @@ function ValueCell({label, value, draft, placeholder, ariaLabel, onChange, onBlu
 }) {
     return (
         /*
-            上下与中间的留白都走 8px（`py-2` + `gap-2`），高度由内容算：8 + 16(标签) + 8 + 20(输入) + 8 = 60px。
-            不再写死 h-11：写死之后中间那道缝会被 justify-center 分走，上下缝和中间缝就不一样了。
+            标签行 12px、输入行 13px，中间 7px、上下各 7px；高度由内容算，不写死 h-11：
+            写死之后中间那道缝会被 justify-center 分走，上下缝和中间缝就不一样了。
         */
         <label className="flex w-full cursor-text flex-col justify-center gap-[7px] px-2 pt-[7px] pb-[7px]">
             <span className="h-3 truncate text-[12px] leading-3 text-muted-foreground">{label}</span>

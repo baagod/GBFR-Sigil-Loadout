@@ -46,13 +46,13 @@ describe("设置页 · 游戏目录", () => {
         await waitFor(() => expect(screen.getByDisplayValue("/steam/relink")).toBeTruthy())
     })
 
-    // 路径框是只读的（可选中复制），"选目录"必须是能 Tab 到的按钮，不是点输入框。
-    it("「选择…」按钮走文件选择", async () => {
+    // 路径框可拖选复制；点它（或按 Enter）直接走文件选择，不再有单独的「选择」按钮。
+    it("点击路径框走文件选择，且没有「选择」按钮", async () => {
         render(<SettingsPanel t={messages.zh} />)
         await waitFor(() => expect(screen.getByDisplayValue("/saved/relink")).toBeTruthy())
 
-        fireEvent.click(screen.getByRole("button", {name: messages.zh.gameDirChoose}))
-
+        expect(screen.queryByRole("button", {name: messages.zh.gameDirChoose})).toBeNull()
+        fireEvent.click(screen.getByDisplayValue("/saved/relink"))
         await waitFor(() => expect(PickGameExe).toHaveBeenCalledTimes(1))
     })
 })
