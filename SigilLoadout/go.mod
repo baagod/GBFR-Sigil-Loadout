@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/pierrec/lz4/v4 v4.1.33
-	github.com/wailsapp/wails/v3 v3.0.0-beta.34
+	github.com/wailsapp/wails/v3 v3.0.0
 	golang.org/x/sys v0.48.0
 )
 

@@ -78,6 +78,8 @@ try {
     & pnpm --dir frontend run build
     if ($LASTEXITCODE -ne 0) { throw '前端构建失败。' }
     # 与 build-release.ps1 用同一组 flags，产物除了代码之外没有别的差别。
+    # CGO_ENABLED 显式关掉：PATH 上有 gcc 时 Go 默认开 cgo，产物就和 build-release 的不再同一种。
+    $env:CGO_ENABLED = '0'
     & go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o $exe .
     if ($LASTEXITCODE -ne 0) { throw 'go build 失败。' }
 } finally {

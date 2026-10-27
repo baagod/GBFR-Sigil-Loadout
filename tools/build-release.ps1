@@ -252,6 +252,7 @@ try {
         }
     }
     $savedCgo = $env:CGO_ENABLED
+    $savedPath = $env:PATH
     if ($gccDir) {
         $env:PATH = "$gccDir;$env:PATH"
         $env:CGO_ENABLED = '1'
@@ -265,11 +266,16 @@ try {
     }
     if ($null -eq $savedCgo) { Remove-Item env:CGO_ENABLED -ErrorAction SilentlyContinue }
     else { $env:CGO_ENABLED = $savedCgo }
+    # PATH 也必须还原：上面为 -race 塞进来的 gcc 目录留着，会让下面那条 go build 的 CGO_ENABLED
+    # 默认值从 0 变成 1，产物凭空多出 cgo 依赖 —— 正好与上面那段注释要守的契约相反。
+    $env:PATH = $savedPath
     if ($testExit -ne 0) {
         throw "Tool Go tests failed with exit code $testExit."
     }
     # 用 -buildvcs=false 的理由和 csproj 把 SourceLink 与提交版本排出托管元数据一样：否则 Go 会
     # 把提交 sha 和一个 "modified" 标记盖进去。
+    # CGO_ENABLED 显式关掉：发布产物不该随构建机上装没装 gcc 而变。
+    $env:CGO_ENABLED = '0'
     & go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o SigilLoadout.exe .
     if ($LASTEXITCODE -ne 0) {
         throw "Tool build failed with exit code $LASTEXITCODE."

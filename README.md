@@ -37,8 +37,9 @@
 
 - VS 2022 Build Tools ( 含 C++ 工作负载、MSVC v143、Windows SDK)
 - .NET 8 SDK
-- Go 1.27+
-- Wails v3 CLI ( `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` )
+- Go 1.27.3+ ( Wails v3.0.0 推荐线，含 crypto/x509 修复 )
+- Wails v3 CLI，版本必须与 `SigilLoadout/go.mod` 里的 wails 模块一致（构建脚本会对拍，不一致直接抛）：
+  `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`
 - Node.js 20.19+ 与 pnpm 12.3.4 ( Node ≥25 起不再随附 corepack：`npm i -g pnpm@12.3.4`，或自行 `corepack enable` )
 - pwsh 7
 
