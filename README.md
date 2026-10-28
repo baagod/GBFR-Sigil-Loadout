@@ -27,35 +27,29 @@
 
 ## 致谢 ( Credit )
 
-- 本项目派生自 [GBFR Extra Sigil Slots](https://www.nexusmods.com/granbluefantasyrelink/mods/657) ( 作者 Hiyajomaho-num9 )，经作者许可发布。
+- 本项目派生自 [GBFR Extra Sigil Slots](https://www.nexusmods.com/granbluefantasyrelink/mods/657) ( Hiyajomaho-num9 )，经作者许可发布。
 - 数据解密参考社区工具链 [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools) 。
 
 
 ## 从源码构建
 
-需要 ( `assets/` 数据已入库，无需额外生成 )：
+需要：
 
-- VS 2022 Build Tools ( 含 C++ 工作负载、MSVC v143、Windows SDK)
+- VS 2022 Build Tools ( 含 C++ 工作负载、MSVC v143、Windows SDK )
 - .NET 8 SDK
-- Go 1.27.3+ ( Wails v3.0.0 推荐线，含 crypto/x509 修复 )
-- Wails v3 CLI，版本必须与 `SigilLoadout/go.mod` 里的 wails 模块一致（构建脚本会对拍，不一致直接抛）：
-  `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`
-- Node.js 20.19+ 与 pnpm 12.3.4 ( Node ≥25 起不再随附 corepack：`npm i -g pnpm@12.3.4`，或自行 `corepack enable` )
+- Go 1.27.3+
+- Wails v3 ( `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0` )
+- Node.js 20.19+
+- pnpm
 - pwsh 7
 
-首次构建先在 `SigilLoadout/frontend` 跑一次 `pnpm install` ( 依赖不入库 )，再从仓库根目录运行 ( 产出 `dist/GBFR-Sigil-Loadout-<版本>.zip` )：
+首次构建先在 `SigilLoadout/frontend` 跑一次 `pnpm install`。
+
+从仓库根目录产出 `dist/GBFR-Sigil-Loadout-<版本>.zip`：
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\tools\build-release.ps1
 ```
-
-一键部署：
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 [-Target <path>]
-```
-
-将解压 `dist/GBFR-Sigil-Loadout-<版本>.zip` 到 `C:\Users\<username>\Desktop\Reloaded-II\Mods\` ( `-Target` 可改 )。
 
 **迭代时（改完即看，不动生产包）：**
 
