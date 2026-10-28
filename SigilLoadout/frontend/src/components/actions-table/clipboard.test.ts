@@ -203,3 +203,4 @@ describe("粘贴：铺块规则（floor(选区 / 块)，最小 1 份）", () => 
         expect(written(plan)).toEqual(["r0c0=a", "r0c1=b", "r0c2=c", "r1c0=d", "r1c1=", "r1c2="])
     })
 })
+

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
-    动画详情弹窗的**键盘那条路**（Ctrl+Del 删行 / Ctrl+X 剪切 / Insert 插行）与工具条按钮的同口径。
+    动画详情弹窗的**键盘那条路**（Ctrl+Del 删行 / Ctrl+X 剪切 / Ctrl+Shift+V 插行）与工具条按钮的同口径。
 
     Del 本身不再是"删行"：裸 Del 归基座（清选区里每一格的改动，见 `useTableKeys`），删行统一要 Ctrl+Del。
 
@@ -92,8 +92,18 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
 
     /* 发在 `body` 上：监听挂在 `window`（事件冒泡上去），而目标要是**元素** —— 真机上按键盘时
        目标也永远是个元素（`event.target.closest` 那一条闸门就是这么写的）。 */
-    const press = (key: string, code: string, vk: number, ctrl = false, repeat = false) =>
-        fireEvent.keyDown(document.body, {key, code, windowsVirtualKeyCode: vk, repeat, ...(ctrl ? {ctrlKey: true} : {})})
+    const press = (key: string, code: string, vk: number, ctrl = false, repeat = false, shift = false) =>
+        fireEvent.keyDown(document.body, {
+            key,
+            code,
+            windowsVirtualKeyCode: vk,
+            repeat,
+            ...(ctrl ? {ctrlKey: true} : {}),
+            ...(shift ? {shiftKey: true} : {}),
+        })
+
+    /** Ctrl+Shift+V（插行）。 */
+    const pressInsertRow = () => press("v", "KeyV", 86, true, false, true)
 
     it("按行号选中一行后按 Ctrl+Del：那一行被删掉（假删除，界面上标红留着）", async () => {
         await openAndSelectRow()
@@ -235,11 +245,11 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         expect(rowsOf()[1].textContent?.slice(1)).toBe(rowsOf()[0].textContent?.slice(1))
     })
 
-    /* 物理 Insert 键与工具条「插入行」是同一个命令（用户报：复制后按 Insert 没反应）。 */
-    it("物理 Insert 键：把复制的行插到活动格下方", async () => {
+    /* Ctrl+Shift+V 与工具条「插入行」是同一个命令。 */
+    it("Ctrl+Shift+V：把复制的行插到活动格下方", async () => {
         await openAndSelectRow()
         press("c", "KeyC", 67, true)
-        press("Insert", "Insert", 45)
+        pressInsertRow()
 
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
         expect(rowsOf()[1].textContent?.slice(1)).toBe(rowsOf()[0].textContent?.slice(1))
@@ -278,7 +288,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         cleanup() // 关掉弹层（组件卸载）
 
         await openAndSelectRow() // 重新打开（数据由同一份 mock 给）
-        press("Insert", "Insert", 45)
+        pressInsertRow()
 
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
     })
@@ -298,16 +308,18 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         expect(removedIn(bodies()[0])).toHaveLength(0)
     })
 
-    /* ‼️ 同一回归的另一条入口：回到"本来就有选区"的表（hasSelection 没翻转），Ctrl+X 也要落到它。 */
-    it("回到已经选过的轨表：Ctrl+X 剪的是这张表", async () => {
+    /* ‼️ 同一回归的另一条入口：回到"本来就有选区"的表（hasSelection 没翻转），Ctrl+X 也要落到它。
+       Ctrl+X 现在只是复制（删除挪到粘贴），所以判据是"两张表都没被动过"。 */
+    it("回到已经选过的轨表：Ctrl+X 只复制、不删行", async () => {
         const bodies = await openTwoTrackTables()
         await selectCell(bodies()[0], 0)
         await selectCell(bodies()[1], 0)
         await selectCell(bodies()[0], 1) // 回第一张再点一格（还是"有选区"，不会重新上报）
 
         press("x", "KeyX", 88, true)
+        await new Promise((resolve) => setTimeout(resolve, 30))
 
-        await waitFor(() => expect(removedIn(bodies()[0])).toHaveLength(1))
+        expect(removedIn(bodies()[0])).toHaveLength(0)
         expect(removedIn(bodies()[1])).toHaveLength(0)
     })
 
@@ -360,27 +372,68 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         await selectRow(bodies()[0].querySelectorAll("tr")[0]) // 回到第一张（仍有选区，不触发重新上报）
 
         press("c", "KeyC", 67, true)
-        press("Insert", "Insert", 45)
+        pressInsertRow()
 
         await waitFor(() => expect(bodies()[0].querySelectorAll("tr")).toHaveLength(3))
         // 插进来的行 startTime 是 attack 的值 0（若复制错成 effect，会是 8）。
         expect((bodies()[0].querySelectorAll("tr")[1].querySelectorAll("td")[2] as HTMLElement).textContent).toBe("0")
     })
 
-    it("Ctrl+X 剪切：同样把那一行标成假删除（剪切 = 复制 + 删）", async () => {
-        await openAndSelectRow()
-        press("x", "KeyX", 88, true)
+    /* ‼️ 剪切 = 复制 + **粘贴后**才删（用户的定义）：Ctrl+X 当场不动任何格子，粘完源格回默认值，
+       而且这一下与粘贴**同一步撤销**（Ctrl+Z 一次两处都回来）。
+       ⚠️ 这里让"原值"≠"改动值"（改动 0/1、原值 5/6），否则"回到默认值"在界面上看不出来。 */
+    it("Ctrl+X 剪切：当场不删，粘贴之后源格回默认值；一次 Ctrl+Z 全退回", async () => {
+        vi.mocked(ListTracks).mockResolvedValue([{sub: "0", kind: "attack"}])
+        vi.mocked(ListFsm).mockResolvedValue([])
+        vi.mocked(LoadTrack).mockResolvedValue(track())
+        vi.mocked(LoadTrackOriginal).mockResolvedValue({...track(), rows: [row(5), row(6)]})
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        await waitFor(() => expect(rowsOf()).toHaveLength(2))
 
-        await waitFor(() => expect(removedRows()).toHaveLength(1))
+        const source = rowsOf()[0].querySelectorAll("td")[2] as HTMLElement // 第 1 行 startTime：改动 0 / 原值 5
+        fireEvent.mouseDown(source, {button: 0})
+        fireEvent.mouseUp(source)
+        await waitFor(() => expect(source.className).toContain("cell-active"))
+        expect(source.textContent).toBe("0")
+
+        press("x", "KeyX", 88, true)
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        expect(source.textContent).toBe("0") // 剪切当场不动源格
+
+        const target = rowsOf()[1].querySelectorAll("td")[2] as HTMLElement // 第 2 行 startTime：改动 1 / 原值 6
+        fireEvent.mouseDown(target, {button: 0})
+        fireEvent.mouseUp(target)
+        fireEvent.paste(document.body, {clipboardData: clipboardStub("0")})
+
+        await waitFor(() => expect(target.textContent).toBe("0")) // 粘进来的值
+        expect(source.textContent).toBe("5") // 源格回到**默认值**（原值），与 Del 同一条路
+        expect(rowsOf()).toHaveLength(2) // 行没被删
+
+        press("z", "KeyZ", 90, true)
+        await waitFor(() => expect(source.textContent).toBe("0"))
+        expect(target.textContent).toBe("1")
     })
 
-    it("按住 Ctrl+X 的重复事件不再继续剪（一次按键只剪一次）", async () => {
+    it("按住 Ctrl+X 的重复事件不会删行（剪切不在按键那一步动手）", async () => {
         await openAndSelectRow()
         press("x", "KeyX", 88, true, true)
         await new Promise((resolve) => setTimeout(resolve, 30))
 
         expect(removedRows()).toHaveLength(0)
         expect(rowsOf()).toHaveLength(2)
+    })
+
+    /* 按住 Ctrl+Shift+V 只插一次：重复事件挡在分派前 —— 一次长按能刷出一整排行。 */
+    it("按住 Ctrl+Shift+V 的重复事件不再插行", async () => {
+        await openAndSelectRow()
+        press("c", "KeyC", 67, true) // 行剪贴板
+        pressInsertRow() // 第一下（不 repeat）：插一行
+        await waitFor(() => expect(rowsOf()).toHaveLength(3))
+
+        press("v", "KeyV", 86, true, true, true) // 按住不放的重复事件
+        await new Promise((resolve) => setTimeout(resolve, 30))
+
+        expect(rowsOf()).toHaveLength(3)
     })
 })
 

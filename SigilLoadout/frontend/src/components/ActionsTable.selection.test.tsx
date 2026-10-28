@@ -620,6 +620,88 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         expect(cellAt(container, 0, last).textContent).toBe("甲")
     })
 
+    /*
+        剪切（Ctrl+X）= 复制 + **粘贴后**才删（用户口径）：按键那一步只复制（同一圈虚线、同一份 TSV），
+        粘完把源区改回默认值（与 Del 同一条路），并且与这次粘贴**同一步撤销**。
+    */
+    it("Ctrl+X：显示与复制相同（同一圈虚线），但当即将数据不动", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 1, 2) // 改过的格子
+
+        selectCell(cell)
+        fireEvent.keyDown(document.body, {key: "x", code: "KeyX", windowsVirtualKeyCode: 88, ctrlKey: true})
+
+        expect(hasCopyBounds(container)).toBe(true)
+        expect(cell.textContent).toBe("actionFreeWork0_-改过") // 还没删
+    })
+
+    it("剪切后粘贴：源格回到默认值（显示原值）、行还在；Ctrl+Z 一次两处都退回", async () => {
+        const container = await renderTable()
+        const source = cellAt(container, 1, 2)
+        const target = cellAt(container, 0, 2)
+
+        selectCell(source)
+        fireEvent.keyDown(document.body, {key: "x", code: "KeyX", windowsVirtualKeyCode: 88, ctrlKey: true})
+        selectCell(target)
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-改过")})
+
+        expect(target.textContent).toBe("actionFreeWork0_-改过") // 粘进来的值
+        expect(source.textContent).toBe("actionFreeWork0_-原值") // 源格回默认值 = 显示原值（灰显）
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(2) // 行没被删
+
+        fireEvent.keyDown(cellAt(container, 0, 2), {key: "z", ctrlKey: true})
+        expect(source.textContent).toBe("actionFreeWork0_-改过")
+        expect(target.textContent).toBe("actionFreeWork0_-原值")
+    })
+
+    it("剪切后粘到源区自己身上：重叠处粘进来的值赢（源格不会被清空）", async () => {
+        const container = await renderTable()
+        const cell = cellAt(container, 1, 2)
+
+        selectCell(cell)
+        fireEvent.keyDown(document.body, {key: "x", code: "KeyX", windowsVirtualKeyCode: 88, ctrlKey: true})
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("actionFreeWork0_-改过")})
+
+        expect(cell.textContent).toBe("actionFreeWork0_-改过")
+    })
+
+    it("剪切后粘进来的不是那片内容（期间在别处复制过）：只当普通粘贴，源区不动", async () => {
+        const container = await renderTable()
+        const source = cellAt(container, 1, 2)
+        const target = cellAt(container, 0, 2)
+
+        selectCell(source)
+        fireEvent.keyDown(document.body, {key: "x", code: "KeyX", windowsVirtualKeyCode: 88, ctrlKey: true})
+        selectCell(target)
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("别处")})
+
+        expect(target.textContent).toBe("别处")
+        expect(source.textContent).toBe("actionFreeWork0_-改过") // 这次剪切作废
+    })
+
+    /*
+        剪切粘到只读列：有一格**没落地**（`plan.dropped`）→ 整次当复制，源区一格都不删。
+        丢的那格值没搬过去，删源区就是丢数据（Ctrl+Z 才救得回来）。
+    */
+    it("剪切粘到只读列（这一下没落完整）：整次当复制，源区不动", async () => {
+        setRows([makeRow("1000"), makeRow("1001", {actionFreeWork0_: "甲", actionFreeWork1_: "乙"})])
+        const container = await renderTable()
+        const source0 = cellAt(container, 1, 2) // actionFreeWork0_ = 甲
+        const source1 = cellAt(container, 1, 3) // actionFreeWork1_ = 乙
+
+        fireEvent.mouseDown(source0)
+        fireEvent.mouseEnter(source1)
+        fireEvent.mouseUp(document)
+        fireEvent.keyDown(document.body, {key: "x", code: "KeyX", windowsVirtualKeyCode: 88, ctrlKey: true})
+
+        // 落到 (0,1) 起：第 1 列是 abilityTag_（只读）→ 块里有一格铺不进去。
+        selectCell(cellAt(container, 0, 1))
+        fireEvent.paste(container.firstElementChild!, {clipboardData: clipboardStub("甲\t乙")})
+
+        expect(source0.textContent).toBe("甲")
+        expect(source1.textContent).toBe("乙")
+    })
+
     /* 撤销：**一次粘贴 = 一步**（Ctrl+Z 一下就全退回去）。 */
     it("粘贴后 Ctrl+Z：整次粘贴一步退回", async () => {
         const container = await renderTable()

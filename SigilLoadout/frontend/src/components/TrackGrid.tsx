@@ -81,9 +81,9 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
     /** 改了一格（`null` = 回原值）：草稿归基座，这里收回来更新本层状态（工具条与保存照旧）。 */
     onEdit?: (rowId: string, column: string, value: string | null) => void
     onReorder: (from: number, to: number) => void
-    /** 这张表有没有选区（任意单元格选区）：工具条「复制 / 剪切 / 删除」与键盘快捷键用同一个判据。 */
+    /** 这张表有没有选区（任意单元格选区）：工具条「删除」与键盘快捷键用同一个判据。 */
     onSelectionPresenceChange?: (hasSelection: boolean) => void
-    /** 基座交回来的**动作包**（复制 / 粘贴 / 行级命令）：工具条那几个按钮接它，见 `ActionsTable`。 */
+    /** 基座交回来的**动作包**（行级命令 + 直接写一格）：工具条那几个按钮接它，见 `ActionsTable`。 */
     onCommandsReady?: (commands: TableCommands) => void
     /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void

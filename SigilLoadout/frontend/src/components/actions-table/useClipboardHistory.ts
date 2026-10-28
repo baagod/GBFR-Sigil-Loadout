@@ -120,7 +120,7 @@ export function useClipboardHistory({
     const undoingRef = useRef(false)
     /** **正在粘贴**：这期间不记账，由粘贴那一处把整片当**一步**记下来。 */
     const batchingRef = useRef(false)
-    /** 上一次**复制出去的那片文本**（TSV）。工具条「粘贴」用它 —— 不走系统剪贴板，粘的就是本应用刚复制的那片。 */
+    /** 最后一次**递到系统剪贴板的那片文本**（TSV）。剪切的判据靠它：粘贴文本与它一致 = 粘的就是我们那片。 */
     const cellClipboardRef = useRef("")
 
     /**
@@ -343,7 +343,11 @@ export function useClipboardHistory({
      * 结果基座这条路根本没跑起来，表现就是"复制了却没有虚线、也没法再复制"。
      */
     const copyArea = useCallback(
-        (emit: (text: string) => void) => {
+        /**
+         * @param cut 这次是剪切（Ctrl+X）而不是复制：递出去的东西与虚线**完全一样**，
+         *   只是给复制源打上标记 —— 粘贴时把源区改回默认值（见 `pasteText` 那段）。
+         */
+        (emit: (text: string) => void, cut = false) => {
             /*
                 ⚠️ 这里**必须**把两件事分开（踩过）：
                   · 压根没有单元格选区（比如只选了行）→ **什么都不做**（不写剪贴板、不提示）；
@@ -368,7 +372,7 @@ export function useClipboardHistory({
                 ⚠️ `snapshot` 存的是**复制那一刻的原值**：切窗口回来要拿它跟当前值对，才能发现源区被改过。
                 ⚠️ **按片存**（不是外接矩形）：多片时虚线要每片各画一圈。
             */
-            changeCopySource({areas: plan.areas, snapshot: plan.snapshot})
+            changeCopySource({areas: plan.areas, snapshot: plan.snapshot, cut})
         },
         [changeCopySource, multiAreaCopyText, planCopy, tableRef],
     )
@@ -456,7 +460,20 @@ export function useClipboardHistory({
                 所以这里按**落点**先判一次：粘贴碰到复制源 → 虚线照样撤。
             */
             const source = copySourceRef.current
-            if (source && writes.some((w) => source.snapshot.has(snapshotKey(w.rowId, w.columnId)))) clearCopySource()
+            /*
+                剪切（Ctrl+X）的**延迟删除**：这一记粘贴粘的是不是"剪切那一刻那片文本"。是 → 粘完把源区
+                改回默认值（要清哪几格由 `planCutClears` 算），并与这次粘贴**同一步**撤销；不是 →
+                期间在别处复制过，这次剪切作废，只当普通粘贴。
+
+                ‼️ 还有第三条：**这一下没落完整**（`plan.dropped` > 0 —— 只读列 / 铺出表外）也不删源区。
+                那一格的值根本没搬过去，删了就等于丢数据；宁可整次当复制，让用户自己处理。
+            */
+            const cut = plan.dropped === 0 && !!source?.cut && text === cellClipboardRef.current
+            /*
+                虚线什么时候撤（三条来路在这里统一收口）：剪切 —— 消费或作废都撤；普通复制 —— 只有粘贴
+                碰到源区才撤（连粘别处是常规用法）。
+            */
+            if (source && (source.cut || writes.some((w) => source.snapshot.has(snapshotKey(w.rowId, w.columnId))))) clearCopySource()
             /*
                 整次粘贴 = **一步撤销**（规则③）：`batchingRef` 让这一批 `edit` 各自不记账，
                 下面再把这批整体 push 成一步。被校验挡掉的那几格不在里面。
@@ -465,14 +482,32 @@ export function useClipboardHistory({
                 那种格既没写也没变；若照样 push，用户下一次 Ctrl+Z 会"按了没反应"（白耗一步）。
                 判据直接用 `edit` 的返回值 —— 不在这里复制第二份"归一等价于什么"。
             */
-            const changed: typeof writes = []
+            const step: UndoEntry[] = []
             batchingRef.current = true
             try {
-                for (const w of writes) if (edit(w.rowId, w.columnId, w.value)) changed.push(w)
+                if (cut && source) {
+                    /*
+                        先清源区、再写粘贴区（重叠时**粘进来的值赢**），清的是"没被粘贴计划覆盖"的那几格：
+                        同一个批次里对同一格连写两次的话，第二次的"改前值"读的是 `rowsRef`（下一次渲染才
+                        更新），判重会把真正的写入当成 no-op 吞掉（实测：粘回源区会变成"清空"）。
+                        被粘贴计划点名却最终被校验挡掉的格不清 —— 宁可少删，不丢数据。
+                    */
+                    const overwritten = new Set(plan.writes.map((w) => snapshotKey(w.rowId, w.columnId)))
+                    for (const key of source.snapshot.keys()) {
+                        if (overwritten.has(key)) continue
+                        const {rowId, columnId} = parseSnapshotKey(key)
+                        if (!writable(columnId)) continue
+                        const before = rowsRef.current.find((row) => row.id === rowId)?.values[columnId] ?? ""
+                        if (before === "") continue // 本来就没改动：留在默认值上，不用记
+                        step.push({rowId, columnId, before})
+                        edit(rowId, columnId, "")
+                    }
+                }
+                for (const w of writes) if (edit(w.rowId, w.columnId, w.value)) step.push(w)
             } finally {
                 batchingRef.current = false
             }
-            if (changed.length > 0) undoRef.current.push(changed)
+            if (step.length > 0) undoRef.current.push(step)
             // 粘完把选区扩成刚粘的那一片（Excel 粘完也是这样一片高亮：接着粘 / 复制有落点）。
             tableRef.current.selectCellRange({
                 anchorRowId: modelRows[plan.range.firstRow].id,
@@ -481,7 +516,7 @@ export function useClipboardHistory({
                 focusColumnId: modelRows[plan.range.lastRow].getAllCells()[plan.range.lastCol].column.id,
             })
         },
-        [branchIds, edit, tableRef, writable],
+        [branchIds, clearCopySource, edit, rowsRef, tableRef, writable],
     )
 
     /** 系统粘贴事件（Ctrl+V）：编辑框里的粘贴归浏览器，其余走上面那份。 */
@@ -561,17 +596,17 @@ export function useClipboardHistory({
         }
     }, [handleCopy, handlePaste, verifyCopySource, handleEscape, handleUndo])
 
-    /*
-        `copySelection` 也交出去：调用方那个「复制」按钮要靠它走**同一条路**（否则按钮复制出来的东西
-        没有那圈虚线 —— 用户报的轨表问题就是这个）。Ctrl+C 那条走 `handleCopy`（它拿得到事件对象）。
-
-        ‼️ 引用必须**稳**（`useCallback` 按 `copyArea`）：调用方把它塞进 `TableCommands` 的依赖里
-        （见 `ActionsTable` 的 `tableCommands`）—— 每渲染换个新函数就等于每渲染回调一次调用方。
-    */
-    const copySelection = useCallback(
-        () => copyArea((text) => void navigator.clipboard?.writeText(text).catch(() => {})),
+    /**
+     * **Ctrl+X 剪切**：与复制走**同一条路**（同一份 TSV、同一圈虚线、同一份复制源记录），只是记成
+     * "剪切" —— 真正把源区改回默认值的那一刻挪到粘贴（见 `pasteText` 里那段延迟删除）。
+     *
+     * ‼️ 引用必须**稳**（`useCallback` 按 `copyArea`）：调用方把它塞进键盘那层的依赖里
+     * （见 `ActionsTable` 的 `useTableKeys`）—— 每渲染换个新函数就等于每渲染重挂一次监听。
+     */
+    const cutSelection = useCallback(
+        () => copyArea((text) => void navigator.clipboard?.writeText(text).catch(() => {}), true),
         [copyArea],
     )
 
-    return {copyHint, setCopyHint, copySource, clearCopySource, copySelection, edit, clearSelectedCells}
+    return {copyHint, setCopyHint, copySource, clearCopySource, cutSelection, edit, clearSelectedCells}
 }

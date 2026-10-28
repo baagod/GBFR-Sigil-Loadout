@@ -1,5 +1,5 @@
 /*
-    键盘那一层：方向键 / Enter（编辑）/ Delete / Ctrl+Delete / Insert / Ctrl+C / Ctrl+X。
+    键盘那一层：方向键 / Enter（编辑）/ Delete / Ctrl+Delete / Ctrl+Shift+V（插行）/ Ctrl+C / Ctrl+X。
     监听挂 `document` 捕获阶段（焦点可能在 `<body>`）；处理器只挂一次，读渲染期最新值走 `fresh` 镜像。
 */
 import {useCallback, useEffect, useRef, type RefObject} from "react"
@@ -30,7 +30,7 @@ const ARROW_KEYS: Record<string, CellSelectionDirection | undefined> = {
 /** 修饰键按位组合：`SHIFT` 扩选、`CTRL` 跳边，两者都不按就是走一步。 */
 const SHIFT = 1
 const CTRL = 2
-export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection}: {
+export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutSelection}: {
     tableInstanceRef: RefObject<ArrowTable>
     tableRef: RefObject<HTMLTableElement | null>
     /** 活动格的"进编辑"登记表（见 `EnterEditRegistry`）：Enter 按活动格的键取那一个句柄。 */
@@ -44,16 +44,14 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
     activeCellKey: string
     /** Delete 的落点：清掉选区里每一格的改动（回到默认值）。实现在 `useClipboardHistory`。 */
     clearSelectedCells: () => void
-    /** Insert 的落点：把行剪贴板里的行插到活动格下方（无活动格时它自己落末行）。 */
+    /** Ctrl+Shift+V 的落点：把行剪贴板里的行插到活动格下方（无活动格时它自己落末行）。 */
     insertCopiedRows: () => void
     /** Ctrl+Delete 的落点：删掉选区压到的行（不必整行选中）。 */
     removeRowsInSelection: () => void
     /** Ctrl+C 的落点：选区压到的行进**行剪贴板**（单元格那片由浏览器的 copy 事件负责）。 */
     copyRows?: () => void
-    /** Ctrl+X 的落点：行剪贴板 + 删掉选区行（"假删除"落库那层照旧）。 */
-    cutRows?: () => void
-    /** Ctrl+X 同时把**单元格那片**放上系统剪贴板（与 Ctrl+C 同一条 `copyArea`）。 */
-    copySelection?: () => void
+    /** Ctrl+X 的落点：与复制同一条路，但记成**剪切** —— 粘贴时才把源区改回默认值。 */
+    cutSelection: () => void
 }) {
     /**
      * **渲染期最新值的镜像**：处理器与那两个监听引用恒定（挂一次），事件里读到的是**最新那一拍**。
@@ -61,11 +59,11 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
      * ‼️ 与表里别处（`tableInstanceRef` / `rowsRef` / `clickRowHandleRef`）同一个机制 —— 原来这里是
      * "无依赖 effect + 每渲染重挂"，同一个文件里两套机制并存，读的人得先猜"这个闭包是不是新的"。
      */
-    const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection})
-    fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutRows, copySelection}
+    const fresh = useRef({cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutSelection})
+    fresh.current = {cellSelection, modelRows, sheetColumns, activeCellKey, clearSelectedCells, insertCopiedRows, removeRowsInSelection, copyRows, cutSelection}
 
     /**
-     * 键盘分派：方向键 → **活动格在数据格里走一格**（Excel 手感）；Delete / Insert / Ctrl+Delete / C/X 见下方分支。
+     * 键盘分派：方向键 → **活动格在数据格里走一格**（Excel 手感）；Delete / Ctrl+Shift+V / Ctrl+Delete / C/X 见下方分支。
      *
      * ‼️ 范围天然钳在数据格里：库只按可见列（按钉住重排）与行模型走，**行号列与表头根本不在候选里**
      * —— 所以"不要选到行号列 / 表头"不用自己写判据，到边就停。
@@ -92,16 +90,16 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         const {cellSelection, modelRows, sheetColumns, activeCellKey} = fresh.current
         const direction = ARROW_KEYS[e.key]
         const isEnter = e.key === "Enter" || e.key === "F2"
-        /* Delete 裸键 = 清改动；Ctrl+Delete = 删选区行。Insert 同理只认裸键。 */
+        /* Delete 裸键 = 清改动；Ctrl+Delete = 删选区行。Insert 行只认 Ctrl+Shift+V（见下面那条分派）。 */
         const isDelete = e.key === "Delete" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
         const isRemoveRow = e.key === "Delete" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey
-        const isInsert = e.key === "Insert" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
-        /* Ctrl+C / Ctrl+X：行剪贴板 + 区域复制（落点见下面那两段；只有能改行的表才接，见 ActionsTable）。 */
+        const isInsert = (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "v"
+        /* Ctrl+C / Ctrl+X：行剪贴板 + 区域复制（落点见下面那两段）。 */
         const isCopy = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "c"
         const isCut = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "x"
         if ((!direction && !isEnter && !isDelete && !isInsert && !isRemoveRow && !isCopy && !isCut) || e.defaultPrevented) return
-        /* 按住键产生的重复事件不接"插行 / 删行 / 剪切"：后果不可逆（一次长按能删掉一整段）。 */
-        if (e.repeat && (isInsert || isRemoveRow || isCut)) return
+        /* 按住键产生的重复事件不接"插行 / 删行"：后果不可逆（一次长按能删掉一整段）。 */
+        if (e.repeat && (isInsert || isRemoveRow)) return
         /*
             ‼️ **同一时刻只有"当前那张表"响应用户的按键**。
 
@@ -112,9 +110,10 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         */
         if (!isEventForTable(e, tableRef.current)) return
         // Ctrl/Cmd 只加"跳到边缘"，别的修饰组合（Ctrl+Shift 之类）不放行 —— 免得跟浏览器手势抢键。
+        // 例外：Ctrl+Shift+V（插行）本身就要两个修饰键。
         const mods = (e.shiftKey ? SHIFT : 0) | (e.ctrlKey || e.metaKey ? CTRL : 0)
         const shift = mods === SHIFT
-        if (mods !== 0 && !shift && mods !== CTRL) return
+        if (mods !== 0 && !shift && mods !== CTRL && !isInsert) return
         /*
             ‼️ "活动格是哪一格"从**受控 state** 读，不读 `table.getFocusedCell()`：库那个原子要等下一次
             渲染才跟上（本次事件里还是上一次的位置）—— Ctrl / Shift 两条要按它算落点，读原子就会算错。
@@ -123,7 +122,7 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         if (!anchor) return
 
         /*
-            编辑框 / 选值列表优先：方向键、Enter、Delete、Insert、Ctrl+Delete 都让路。判据要包含列表容器
+            编辑框 / 选值列表优先：方向键、Enter、Delete、Ctrl+Delete、Ctrl+Shift+V 都让路。判据要包含列表容器
             （焦点在弹层里时触发器上的 `data-pick-open` 不在事件路径上）；不能拿 `[role=combobox]` 当判据
             —— 选值格触发器本身就是 combobox，聚焦它属于"就是这一格"。
         */
@@ -135,7 +134,7 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         /* Ctrl+C 还多一类让路：值格自己收下 Ctrl+C（`data-copy-own` = 复制这一格的值，不是整行）。 */
         const ownsCopy = (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [data-copy-own]")
         /*
-            ---- Ctrl+C：行剪贴板（给 Insert 用）----
+            ---- Ctrl+C：行剪贴板（给 Ctrl+Shift+V 插行用）----
             ‼️ **不 preventDefault**：单元格那片要留给浏览器的 copy 事件（`useClipboardHistory` 听它，
             复制区那圈虚线就是那条路画的）。这里只管"行"。
             只有能改行的表（`copyRows` 有值）才接；动作表没有行级命令，Ctrl+C 照旧归 copy 事件。
@@ -146,19 +145,21 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             return
         }
         /*
-            ---- Ctrl+X：剪切 = 复制这片（单元格区域 + 行剪贴板）+ 删掉选区行（"假删除"落库那层照旧）----
-            没有行级命令的表不接（不 preventDefault，交给浏览器默认行为）。
+            ---- Ctrl+X：剪切 = 与复制**同一条路**（行剪贴板 + 单元格区域 + 同一圈虚线），
+                 但记成"剪切" —— 真正把源区改回默认值（等同 Del）挪到**粘贴那一下**，
+                 见 `useClipboardHistory.pasteText`。不 preventDefault 的话浏览器会做一次
+                 "空文本 copy + 清选区"，剪贴板就不是我们那片 TSV 了。----
         */
         if (isCut) {
-            if (ownsCopy || insideEditorOrList || !fresh.current.cutRows) return
+            if (ownsCopy || insideEditorOrList) return
             e.preventDefault()
-            fresh.current.copySelection?.()
-            fresh.current.cutRows()
+            fresh.current.copyRows?.()
+            fresh.current.cutSelection()
             return
         }
         /*
             ---- Ctrl+Delete：删掉**选区压到的行**（不必整行选中）----
-            与 Delete / Insert 同一套闸门；在编辑框里是"删到行首"之类的浏览器行为，不让路会误删表格行。
+            与 Delete / Ctrl+Shift+V 同一套闸门；在编辑框里是"删到行首"之类的浏览器行为，不让路会误删表格行。
         */
         if (isRemoveRow) {
             e.preventDefault()
@@ -166,8 +167,9 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
             return
         }
         /*
-            ---- Insert：把复制的行插到活动格下方（落点与工具条那个「插入行」是同一个命令）----
-            与 Delete 同一套闸门：编辑框里的 Insert 是覆盖输入、列表里是别的东西，都不动表格。
+            ---- Ctrl+Shift+V：把复制的行插到活动格下方（落点与工具条那个「插入行」是同一个命令）----
+            与 Delete 同一套闸门：编辑框里 Ctrl+Shift+V 是"粘贴为纯文本"、列表里是别的东西，都不动表格。
+            物理 Insert 键**不再**插行：这条命令只认 Ctrl+Shift+V。
         */
         if (isInsert) {
             e.preventDefault()

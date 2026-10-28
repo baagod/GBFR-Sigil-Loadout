@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /*
-    行级命令（`useRowCommands`）：添加 / 复制 / 剪切 / 插入 / 删除 —— **基座的那一份实现**。
+    行级命令（`useRowCommands`）：添加 / 复制 / 插入 / 删除 —— **基座的那一份实现**。
 
-    ‼️ 为什么单独立一条：这个模块是动作表与轨表**共用**的行增删改（工具条那几个按钮与 Ctrl+C / Ctrl+X /
+    ‼️ 为什么单独立一条：这个模块是动作表与轨表**共用**的行增删改（工具条那几个按钮与 Ctrl+C /
     Ctrl+Del / Insert 都走它），却一条用例都没有 —— 而它每条命令都有真实分支（插在活动行之后 / 落在行末、
     没选中就什么都不做、跨表插入**按位置**对列（不保存列名；目标不够留空、多出来裁掉）、`children` 必须随行带走
     而 `orig` 必须留空 —— 新行不是原表那一行）。
@@ -35,7 +35,7 @@ const setup = (rows: ActionRow[], selected: number[] = [], active = -1, keys: re
     return {onChange, view}
 }
 
-describe("行级命令（添加 / 复制 / 剪切 / 插入 / 删除）", () => {
+describe("行级命令（添加 / 复制 / 插入 / 删除）", () => {
     /* 行剪贴板是**全应用一份**（跨表/跨弹窗复用），用例之间必须清空，否则互相串。 */
     beforeEach(clearRowClipboard)
 
@@ -64,22 +64,6 @@ describe("行级命令（添加 / 复制 / 剪切 / 插入 / 删除）", () => {
         const [next] = onChange.mock.calls[0]
         expect(next.map((r: ActionRow) => r.id)).toEqual(["0", "1", "newRows1"])
         expect(next[2].values).toEqual({a: "A1", b: ""})
-    })
-
-    it("剪切 = 复制 + 删除：那几行从表里去掉，且还能插回来", () => {
-        const {onChange, view} = setup([row("0", {a: "A0"}), row("1", {a: "A1"}), row("2", {a: "A2"})], [1], 1)
-
-        act(() => view.result.current.cut())
-
-        const [next, deleted] = onChange.mock.calls[0]
-        expect(next.map((r: ActionRow) => r.id)).toEqual(["0", "2"])
-        expect(deleted.map((r: ActionRow) => r.id)).toEqual(["1"])
-
-        // 剪贴板里还有那一行（剪切不是"删掉就算了"）：换一张表还能插回来。
-        const other = setup([row("9")], [], -1)
-        act(() => other.view.result.current.insert())
-        const [inserted] = other.onChange.mock.calls[0]
-        expect(inserted.some((r: ActionRow) => r.values.a === "A1")).toBe(true)
     })
 
     it("插入：**按位置**照搬列值（不保存列名；目标列不够留空、源多出来的裁掉）", () => {
@@ -175,19 +159,12 @@ describe("行级命令（添加 / 复制 / 剪切 / 插入 / 删除）", () => {
         expect(deleted.map((r: ActionRow) => r.id)).toEqual(["0", "2"])
     })
 
-    it("复制/剪切：只选了一格也算那一行（不必整行选中）", () => {
+    it("复制：只选了一格也算那一行（不必整行选中）", () => {
         // 复制：选区压到第 2 行 → 行剪贴板里是第 2 行
         const first = setup([row("0", {a: "A0"}), row("1", {a: "A1"})], [], -1, KEYS, [1])
         act(() => first.view.result.current.copy())
         const second = setup([row("9")], [], -1)
         act(() => second.view.result.current.insert())
         expect(second.onChange.mock.calls[0][0][1].values).toEqual({a: "A1", b: ""})
-
-        // 剪切：选区压到第 1 行 → 复制 + 删掉第 1 行
-        const third = setup([row("0", {a: "A0"}), row("1", {a: "A1"})], [], -1, KEYS, [0])
-        act(() => third.view.result.current.cut())
-        const [next, deleted] = third.onChange.mock.calls[0]
-        expect(next.map((r: ActionRow) => r.id)).toEqual(["1"])
-        expect(deleted.map((r: ActionRow) => r.id)).toEqual(["0"])
     })
 })

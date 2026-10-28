@@ -4,6 +4,7 @@
     抽出来的理由：铺块那条算式是用户拿 Excel 逐条量出来的（`floor(选区/块)`、最小 1 份、越界丢），
     它值得**脱离组件**单独测 —— 放在 `handlePaste` 里时只能靠「渲染一张表再模拟粘贴」间接覆盖。
 */
+
 /**
  * 剪贴板事件用**浏览器原生的**类型，不是 React 那个合成事件。
  *
@@ -75,6 +76,11 @@ type PastePlan = {
     writes: PasteWrite[]
     /** 真正写到的范围（表体下标，含端点）；`null` = 一格都没写（调用方据此不记撤销、不动选区）。 */
     range: {firstRow: number; lastRow: number; firstCol: number; lastCol: number} | null
+    /**
+     * 铺的时候**被丢掉**的格子数（只读列 / 铺出表外）。剪切靠它判断"这一下到底落没落完整"：
+     * 有格子没落地就不删源区 —— 否则"被丢的那一格的值"会连同源格一起没掉（Ctrl+Z 才救得回来）。
+     */
+    dropped: number
 }
 
 /**
@@ -101,21 +107,28 @@ export function planPaste({
     const blockRows = block.length
     // 不用 `Math.max(...block.map(...))`：块大到几万列时，展开的实参列表会把调用栈撑爆（RangeError）。
     const blockCols = block.reduce((max, line) => Math.max(max, line.length), 0)
-    if (blockRows === 0 || blockCols === 0) return {writes: [], range: null}
+    if (blockRows === 0 || blockCols === 0) return {writes: [], range: null, dropped: 0}
 
     // 份数至少 1：选区比块小（比如选一格粘一片）时按一份写，别缩水。
     const copiesDown = Math.max(1, Math.floor(size.rows / blockRows))
     const copiesRight = Math.max(1, Math.floor(size.cols / blockCols))
 
     const writes: PasteWrite[] = []
+    let dropped = 0
     let lastRow = -1
     let lastCol = -1
     for (let r = 0; r < copiesDown * blockRows; r++) {
         const row = rows[start.row + r]
-        if (!row) continue // 铺出表尾之外：丢（规则④）
+        if (!row) {
+            dropped += copiesRight * blockCols // 铺出表尾之外：丢（规则④）
+            continue
+        }
         for (let c = 0; c < copiesRight * blockCols; c++) {
             const cell = row.cells[start.col + c]
-            if (!cell) continue // 只读列 / 越界（规则③④）
+            if (!cell) {
+                dropped++ // 只读列 / 越界（规则③④）
+                continue
+            }
             writes.push({
                 rowId: row.rowId,
                 columnId: cell.columnId,
@@ -128,6 +141,7 @@ export function planPaste({
     }
     return {
         writes,
+        dropped,
         range:
             lastRow < 0
                 ? null

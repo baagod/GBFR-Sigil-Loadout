@@ -1,5 +1,5 @@
 /*
-    行级命令的唯一实现（复制 / 剪切 / 插入 / 添加 / 删除），动作表与轨表共用。
+    行级命令的唯一实现（复制 / 插入 / 添加 / 删除），动作表与轨表共用。
     行剪贴板全应用一份，粘回时**按位置对列**（不保存列名，目标不够留空、多出来裁掉）。
     这里是真删；"假删除"是轨表的保存语义，由调用方在 `onRowsChange` 里按原行身份自己标。
 */
@@ -28,7 +28,6 @@ export function clearRowClipboard(): void {
 export type RowCommands = {
     add: () => void
     copy: () => void
-    cut: () => void
     /** 把行剪贴板里的**全部行**插到活动格所在行之后；没有活动格就插到末行之后。 */
     insert: () => void
     /** 删掉**选区覆盖的那些行**（不必整行选中；`Ctrl+Delete` 与工具条「删除」用）。 */
@@ -38,7 +37,7 @@ export type RowCommands = {
 /**
  * @param rows 当前的行（基座算完的那份）
  * @param keys 列清单（= 目标表的列；插入按**位置**对列，目标不够留空、源多出来的裁掉）
- * @param selectionRowIndexes 选区**压到的行**（含只选了一格的行；复制/剪切/删除都用它）
+ * @param selectionRowIndexes 选区**压到的行**（含只选了一格的行；复制/删除都用它）
  * @param activeRowIndex 活动格所在的行（`-1` = 没有）
  * @param onChange 行数据变了（增/删/插）—— 基座本身是受控的，所以只能把**新的一整份**交回去
  */
@@ -51,7 +50,7 @@ export function useRowCommands({
 }: {
     rows: ActionRow[]
     keys: readonly string[]
-    /** 选区**压到的行**（不必整行选中；按显示顺序、去重升序）—— 复制 / 剪切 / 删除用的就是这些行。 */
+    /** 选区**压到的行**（不必整行选中；按显示顺序、去重升序）—— 复制 / 删除用的就是这些行。 */
     selectionRowIndexes: number[]
     activeRowIndex: number
     onChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
@@ -112,12 +111,6 @@ export function useRowCommands({
         copy: () => {
             if (selectionRowIndexes.length === 0) return
             clipboard.current = selectionRowIndexes.flatMap((index) => (rows[index] ? [snapshotOf(rows[index])] : []))
-        },
-        /** 剪切 = 复制 + 删除（同样只认选区压到的行）。 */
-        cut: () => {
-            if (selectionRowIndexes.length === 0) return
-            clipboard.current = selectionRowIndexes.flatMap((index) => (rows[index] ? [snapshotOf(rows[index])] : []))
-            removeRowsInSelection()
         },
         /**
          * 插入：行剪贴板里的**全部行**（复制了几行就插几行）插到**活动格所在行之后**；

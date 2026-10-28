@@ -61,7 +61,7 @@ const rowsSpan = (geo: GeometryInput, minRow: number, maxRow: number) => {
 /**
  * 选区**压到的行下标**（去重，显示顺序坐标）。
  *
- * 行号高亮、行级命令（复制/剪切/删除）、行号列右缘边框都问"哪些行被选区碰到"——
+ * 行号高亮、行级命令（复制/删除）、行号列右缘边框都问"哪些行被选区碰到"——
  * 以前三处各写一遍 `for (min..max)`，改一处漏两处。算法只留在这里。
  */
 export function rowIndexesInBounds(bounds: readonly Bounds[]): Set<number> {
