@@ -40,7 +40,6 @@ import {messages} from "@/lib/messages"
 
 /** 一条 flags 行：列名与后端 `parseFlagsXML` 的一致（小写开头）。 */
 const flagRow = (index: number) => ({
-    index,
     values: {
         config: "0",
         startTime: "0.000000",

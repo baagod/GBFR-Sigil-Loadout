@@ -232,6 +232,15 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
     const externalOwner = onEdit !== undefined
     const rows = externalOwner ? rowsProp : (edited ?? rowsProp)
     /**
+     * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
+     * 稳定，见下）、读不到最新的 `rows`；走 `write` 的 updater 里读则会踩 React 重跑 updater 那个坑。
+     *
+     * `write` 也读它（而不是闭包 `rowsProp`）：后者每改一格就换一次身份，`edit`/监听的引用跟着变，
+     * `memo` 化的行与格子全部重渲 —— 那正是这套 memo 要避免的事。
+     */
+    const rowsRef = useRef<ActionRow[]>([])
+    rowsRef.current = rows
+    /**
      * **写一格** —— 表里**唯一**的数据出口（编辑 / 粘贴 / 撤销三条路都经它，见 `useClipboardHistory`）。
      *
      * "数据归谁"只在这一处判：给了 `onEdit` 就通知调用方（本地**不留**草稿），否则落到本地草稿上。
@@ -244,17 +253,11 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                 return
             }
             setEdited((prev) =>
-                (prev ?? rowsProp).map((row) => (row.id === rowId ? {...row, values: {...row.values, [columnId]: next}} : row)),
+                (prev ?? rowsRef.current).map((row) => (row.id === rowId ? {...row, values: {...row.values, [columnId]: next}} : row)),
             )
         },
-        [onEdit, rowsProp],
+        [onEdit],
     )
-    /**
-     * `rows` 的**同步镜像**。`edit` 要拿"改之前的值"记撤销栈，而它是个 `useCallback([])`（引用必须
-     * 稳定，见下）、读不到最新的 `rows`；走 `write` 的 updater 里读则会踩 React 重跑 updater 那个坑。
-     */
-    const rowsRef = useRef<ActionRow[]>([])
-    rowsRef.current = rows
     /** 字段顺序（= 表头顺序）：受控，直接来自 prop（见 `model.columnsOf`），本层不自己算也不改。 */
     const keys = keysProp
     /**
@@ -264,13 +267,16 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
      * 也要进 `useClipboardHistory` 的依赖），所以 `useCallback` 只认 `columnOf`。
      */
     const writable = useCallback((key: string) => writableColumn(key, columnOf), [columnOf])
+    /** 列 id → **数据键**：有的列把值挂在别的键下（轨表「帧」列：id `frame`、键 `endTime`）。 */
+    const dataKey = useCallback((columnId: string) => columnOf?.(columnId)?.key ?? columnId, [columnOf])
     /**
      * **分支列（`branchXAtk_`）的清单** = 当前这张表里所有 `id_`（值是"转到哪个动作"），外加搜索框提示。
      * 由数据算、不做常量（id 随角色变）。只喂给 `CellPick`，`ActionRowView` / `CellContent` 那两层不受影响。
      */
     const branchPick = useMemo(
-        () => ({ids: new Set(rows.map((row) => row.id)), searchPlaceholder: t.actionBranchSearch, emptyLabel: t.noMatchItems}),
-        [rows, t],
+        // 清单 = **整张表**的 id_，不是屏幕上筛过的那几行：记录清单是界面过滤器，不该缩小可选的跳转目标。
+        () => ({ids: new Set((saveRows ?? rows).map((row) => row.id)), searchPlaceholder: t.actionBranchSearch, emptyLabel: t.noMatchItems}),
+        [rows, saveRows, t],
     )
     /**
      * 钉住哪几列 —— 库的 pinning state，**由数据给**（前 `initialPinnedCount` 个字段，默认 2；轨表传 0）。
@@ -553,6 +559,7 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
         hasSelection,
         branchIds: branchPick.ids,
         writable,
+        dataKey,
         multiAreaCopyText: t.multiAreaCopy,
     })
 

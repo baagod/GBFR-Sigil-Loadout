@@ -43,6 +43,7 @@ export function useClipboardHistory({
     hasSelection,
     branchIds,
     writable,
+    dataKey,
     multiAreaCopyText,
 }: {
     /**
@@ -68,6 +69,13 @@ export function useClipboardHistory({
      * 往它们上面粘等于写一个**没人认的键**（帧列看的是 `endTime`，粘出来的 `frame` 只会烂在草稿里）。
      */
     writable: (columnId: string) => boolean
+    /**
+     * 列 id → **数据键**（`ColumnSpec.key`；没配就返回列 id 本身）。
+     *
+     * 复制取的是值数据，而值数据挂在数据键下：帧列那张表里列 id 是 `frame`、数据键是 `endTime`，
+     * 直接按列 id 取值只会拿到空串（复制出去缺列，粘回本表还会把目标格清掉）。
+     */
+    dataKey: (columnId: string) => string
     /** 多片跨行又跨列时那句提示（i18n）。 */
     multiAreaCopyText: string
 }) {
@@ -143,6 +151,8 @@ export function useClipboardHistory({
          */
         (rowId: string, columnId: string, value: string | null, normalise = true): boolean => {
             const row = rowsRef.current.find((one) => one.id === rowId)
+            /* 这一格所属的行已经不在了（删行之后撤销那一步）：没有可写的地方，别当成"写成功"。 */
+            if (!row) return false
             const raw = value ?? ""
             /*
                 ‼️ **打成与原值一样 = 没改**：这一格没有"改成与原值相同的值"那一态（与"清空"同一条口径，
@@ -220,6 +230,8 @@ export function useClipboardHistory({
     const handleUndo = useCallback(
         (e: KeyboardEvent) => {
             if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return
+            /* Ctrl+Shift+Z 是**重做**的键位，这一页没有重做：既不能当撤销再退一步，也不该拦下浏览器。 */
+            if (e.shiftKey) return
             if (!isMyEvent(e)) return
             /* 选值格列表里的 Ctrl+Z 归它自己（搜索框的输入历史）。 */
             if ((e.target as Element | null)?.closest?.("[data-slot=combobox-content]")) return
@@ -230,15 +242,23 @@ export function useClipboardHistory({
             */
             const el = document.activeElement as HTMLElement | null
             if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return
-            const step = undoRef.current.pop()
+            let step = undoRef.current.pop()
             if (!step) return
             e.preventDefault()
             undoingRef.current = true
             try {
-                // 倒着写：同一步里同一格被写过两次时，只有"后写的先还原"才回得到原样。
-                for (let i = step.length - 1; i >= 0; i--) {
-                    const {rowId, columnId, before} = step[i]
-                    edit(rowId, columnId, before)
+                /*
+                    ‼️ 行被删掉之后，那一步里记的 rowId 已经无处可写（`edit` 返回 false）——
+                    跳过它继续往前撤，别让一次 Ctrl+Z 看起来"什么都没发生"。
+                */
+                while (step) {
+                    let applied = false
+                    for (let i = step.length - 1; i >= 0; i--) {
+                        const {rowId, columnId, before} = step[i]
+                        if (edit(rowId, columnId, before)) applied = true
+                    }
+                    if (applied) break
+                    step = undoRef.current.pop()
                 }
             } finally {
                 undoingRef.current = false
@@ -305,7 +325,7 @@ export function useClipboardHistory({
                     for (const columnId of columnIds)
                         // ‼️ 复制的是**值数据**（`shownValue` = 改动值优先，只读列取原值），不是显示值也不是纯原值：
                         // 用户口径"复制出去的永远是值本身" —— 格子里翻了人话（`config` 1→触发）也照样复制 1。
-                        snapshot.set(snapshotKey(row.id, columnId), shownValue(row.original, columnId))
+                        snapshot.set(snapshotKey(row.id, columnId), shownValue(row.original, dataKey(columnId)))
                 }
                 areas.push({rowIds, columnIds})
             }
@@ -331,7 +351,7 @@ export function useClipboardHistory({
             }
             return {grid, areas, snapshot}
         },
-        [tableRef],
+        [tableRef, dataKey],
     )
 
     /**

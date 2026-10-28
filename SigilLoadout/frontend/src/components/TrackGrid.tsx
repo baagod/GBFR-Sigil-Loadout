@@ -1,7 +1,7 @@
 import {useMemo} from "react"
 import type {SortingState} from "@tanstack/react-table"
 
-import type {TrackRow, TrackTable as TrackTableData} from "../../bindings/sigilloadout/service/models"
+import type {TrackRow, TrackTable} from "../../bindings/sigilloadout/service/models"
 import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
 import {attackColumnLabel} from "@/lib/attackfields"
 import type {Messages} from "@/lib/messages"
@@ -22,8 +22,13 @@ import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/
       ④ **不钉数据列**（只留行号列与握把列） → `initialPinnedCount={0}`
 */
 
-/** 行身份（后端给，见 Go 侧 `actionrowmarks.go`）：`orig` = 对应原版第几行（新行没有）；`removed` = 假删除。 */
-type Marked = {orig?: number | null; children?: TrackRow["children"]; removed?: boolean}
+/**
+ * 轨表的一行 + 界面侧的行键（键只在界面里用，不往 Go 传：保存时多余的字段由 JSON 忽略）。
+ * 行键在装载时发（见 `AnimationDetail` 的装载 effect），之后不随位置漂。
+ */
+export type KeyedTrackRow = TrackRow & {key: string}
+/** 弹层里每张表：行带键。`TrackTable` 是后端契约（它的行不带键）。 */
+export type KeyedTrackTable = Omit<TrackTable, "rows"> & {rows: KeyedTrackRow[]}
 
 /**
  * 一行的值 → 基座那套 **delta** 形状（与动作表同一口径）：**只装与原值不同的键**。
@@ -40,17 +45,13 @@ const delta = (values: Record<string, string | undefined>, originals: Record<str
 const plain = (values: Record<string, string | undefined> | undefined) =>
     Object.fromEntries(Object.entries(values ?? {}).filter(([, value]) => value !== undefined)) as Record<string, string>
 
-/**
- * 一行 → 基座要的形状。`id` 用**数组下标**：轨表的行没有稳定 id，"位置就是身份"
- * （拖到哪、前后插了多少行都不影响）。
- */
+/** 一行 → 基座要的形状。`id` 用行键（见 `KeyedTrackRow`）。 */
 const toRow = (
-    index: number,
     values: Record<string, string | undefined>,
     original: Record<string, string | undefined> | undefined,
-    row: Marked,
+    row: KeyedTrackRow,
 ): ActionRow => ({
-    id: String(index),
+    id: row.key,
     values: delta(values, original ?? {}),
     originals: plain(original),
     removed: row.removed === true,
@@ -74,7 +75,7 @@ const toRow = (
  */
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
 export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
-    table: TrackTableData | undefined
+    table: KeyedTrackTable | undefined
     t: Messages
     /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
     originals?: TrackRow[]
@@ -94,10 +95,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
         选中/拖动/滚动每一帧都会重跑一趟测量。
     */
     const rowItems = useMemo(
-        () =>
-            (table?.rows ?? []).map((row, index) =>
-                toRow(index, row.values, row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined, row),
-            ),
+        () => (table?.rows ?? []).map((row) => toRow(row.values, row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined, row)),
         [table, originals],
     )
     if (!table) return null

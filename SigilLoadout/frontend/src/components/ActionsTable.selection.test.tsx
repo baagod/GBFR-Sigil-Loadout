@@ -492,6 +492,30 @@ describe("动作表 · 选区与剪贴板（单元格选区 / 复制粘贴 / 撤
         await waitFor(() => expect(edited.textContent).toBe("actionFreeWork0_-改过"))
     })
 
+    /*
+        Ctrl+Shift+Z 是浏览器的**重做**键位，这一页没有重做：它既不能当撤销再退一步，也不该被拦下。
+        判据：做两次改动 → Ctrl+Z 撤掉最后一次 → 再 Ctrl+Shift+Z，第一次那步必须留在原地。
+    */
+    it("Ctrl+Shift+Z：不撤销（不能当成第二次撤销）", async () => {
+        const container = await renderTable()
+        const first = cellAt(container, 0, 2)
+        clickToEdit(first)
+        fireEvent.change(first.querySelector("input")!, {target: {value: "甲"}})
+        fireEvent.blur(first.querySelector("input")!)
+
+        const second = cellAt(container, 1, 2)
+        clickToEdit(second)
+        fireEvent.change(second.querySelector("input")!, {target: {value: "乙"}})
+        fireEvent.blur(second.querySelector("input")!)
+
+        fireEvent.keyDown(document.body, {key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, ctrlKey: true})
+        await waitFor(() => expect(second.textContent).toBe("actionFreeWork0_-改过"))
+
+        fireEvent.keyDown(document.body, {key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, ctrlKey: true, shiftKey: true})
+        await waitFor(() => expect(first.textContent).toBe("甲"))
+        expect(second.textContent).toBe("actionFreeWork0_-改过")
+    })
+
     it("粘贴：不校验列名（粘到别的列上照样写）", async () => {
         const container = await renderTable()
         const clipboard = clipboardStub()

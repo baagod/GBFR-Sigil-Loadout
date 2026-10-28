@@ -41,7 +41,6 @@ import {messages} from "@/lib/messages"
 
 /** 一条轨行：基座要 `values` + 行身份 `orig`（见 TrackGrid 的 `toRow`）。 */
 const row = (index: number) => ({
-    index,
     values: {startTime: `${index}`, endTime: `${index}.5`},
     children: [],
     orig: index,
@@ -114,9 +113,49 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         expect(rowsOf()).toHaveLength(2)
     })
 
+    /*
+        ‼️ 删掉**改过的新行**之后按 Ctrl+Z：那一步的目标行已经没了（`edit` 写不进去），
+        撤销必须跳过它继续往前撤 —— 否则第一次 Ctrl+Z 看起来"什么都没发生"。
+    */
+    it("删掉改过的新行后 Ctrl+Z：一次就撤掉上一笔", async () => {
+        vi.mocked(ListTracks).mockResolvedValue([{sub: "0", kind: "attack"}])
+        vi.mocked(ListFsm).mockResolvedValue([])
+        const added = {values: {startTime: "2", endTime: "2.5"}, children: [], orig: null}
+        vi.mocked(LoadTrack).mockResolvedValue({...track(), rows: [...track().rows, added]})
+        vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        await waitFor(() => expect(rowsOf()).toHaveLength(3))
+
+        const pasteInto = async (rowIndex: number, text: string) => {
+            const cell = rowsOf()[rowIndex].querySelectorAll("td")[2] as HTMLElement // startTime
+            fireEvent.mouseDown(cell, {button: 0})
+            fireEvent.mouseUp(cell)
+            await waitFor(() => expect(cell.className).toContain("cell-active"))
+            fireEvent.paste(document.body, {clipboardData: clipboardStub(text)})
+            await waitFor(() => expect(cell.textContent).toBe(text))
+        }
+        await pasteInto(0, "7") // 第一笔：原表第 1 行
+        await pasteInto(2, "9") // 第二笔：新增行（下一步会被真删）
+
+        const handle = rowsOf()[2].querySelector("td") as HTMLElement
+        fireEvent.mouseDown(handle, {button: 0})
+        fireEvent.mouseUp(handle)
+        await waitFor(() => expect(handle.className).toContain("cell-row-selected"))
+        press("Delete", "Delete", 46, true)
+        await waitFor(() => expect(rowsOf()).toHaveLength(2))
+
+        // 撤销的"归属"判据是选区：删完行先点回一格（真实用户也会这么点），否则这次按键不属于任何表。
+        const target = rowsOf()[0].querySelectorAll("td")[2] as HTMLElement
+        fireEvent.mouseDown(target, {button: 0})
+        fireEvent.mouseUp(target)
+        await waitFor(() => expect(target.className).toContain("cell-active"))
+
+        press("z", "KeyZ", 90, true)
+        await waitFor(() => expect(target.textContent).toBe("0"))
+    })
+
     /* 裸 Del 现在是"清选区里每一格的改动"（基座），不再删行 —— 这条钉住那次口径切换。 */
-    it("裸 Del 不再删行", async () => {
-        await openAndSelectRow()
+    it("裸 Del 不再删行", async () => {        await openAndSelectRow()
         press("Delete", "Delete", 46)
         await new Promise((resolve) => setTimeout(resolve, 30))
 
@@ -184,7 +223,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     it("删除非原表的行：立刻从界面移除，不标成假删除", async () => {
         vi.mocked(ListTracks).mockResolvedValue([{sub: "0", kind: "attack"}])
         vi.mocked(ListFsm).mockResolvedValue([])
-        const added = {index: 2, values: {startTime: "2", endTime: "2.5"}, children: [], orig: null}
+        const added = {values: {startTime: "2", endTime: "2.5"}, children: [], orig: null}
         vi.mocked(LoadTrack).mockResolvedValue({...track(), rows: [...track().rows, added]})
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
         render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)

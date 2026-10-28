@@ -14,7 +14,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 import {SaveActions} from "../../bindings/sigilloadout/service/actionsservice"
 import {ActionsTable} from "@/components/ActionsTable"
 import {columnsOf, toActionRow, type ActionRow} from "@/components/actions-table/model"
-import {KEYS, cellAt, clickToEdit, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
+import {KEYS, cellAt, clickToEdit, makeRow, openPick, pickItems, stubColumnGeometry, t} from "@/components/actions-table/testkit"
 afterEach(cleanup)
 
 function Harness({all, onSave}: {all: ActionRow[]; onSave: (save: () => Promise<void>) => void}) {
@@ -84,5 +84,18 @@ describe("动作表 · 保存范围", () => {
         const [sent] = vi.mocked(SaveActions).mock.calls[0] as [{id: string; fields: {key: string; value: string}[]}[]]
         expect(sent.map((row) => row.id)).toEqual(["1000", "2000"])
         expect(sent[0].fields).toContainEqual({key: "actionFreeWork0_", value: "X"})
+    })
+
+    it("分支列的清单也是全部 id：被清单过滤掉的行照样能选到", async () => {
+        const all = [makeRow("1000"), makeRow("2000")].map(toActionRow)
+        stubColumnGeometry()
+        const keys = [...KEYS, "branchXAtk_"]
+        render(<ActionsTable t={t} rows={[all[0]]} saveRows={all} keys={keys} />)
+        await waitFor(() => expect(document.querySelectorAll("tbody tr")).toHaveLength(1))
+
+        // 可见行只有 1000；分支列（转到哪个动作）的候选必须还包含被过滤掉的 2000。
+        await openPick(cellAt(document as unknown as HTMLElement, 0, keys.indexOf("branchXAtk_")))
+        await waitFor(() => expect(pickItems().length).toBeGreaterThan(0))
+        expect(pickItems().map((el) => el.textContent)).toContain("2000")
     })
 })

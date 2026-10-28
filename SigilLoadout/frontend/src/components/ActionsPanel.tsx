@@ -336,7 +336,12 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
         ‼️ 值是 `-` 的 mot 格**没有对应动作**：不给 `···` 靶子（点不出来，也不加任何提示）——
         判据在 `model.showMotDrill`（纯列级判据，单测不为此拉进整个页面）。
         表头调它时不传 `shown`（列级配色仍按列判断）。
+
+        ‼️ `open` 里那次 `.find` 读的是 `rowsRef`：闭包 `rows` 会让这个 value 每改一格就换身份，
+        把上面那条稳定引用的前提打破（实测就是 12k 格全量重渲）。
     */
+    const rowsRef = useRef(rows)
+    rowsRef.current = rows
     const drillOf = useMemo(
         () => (key: string, shown?: string): {label: string; open: (shown: string, rowId?: string) => void} | undefined => {
             if (key === "supportEffectList_") {
@@ -346,14 +351,14 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                     open: (raw: string, rowId?: string) =>
                         setEffectTarget(
                             rowId
-                                ? {rowId, raw, original: rows.find((row) => row.id === rowId)?.originals["supportEffectList_"] ?? ""}
+                                ? {rowId, raw, original: rowsRef.current.find((row) => row.id === rowId)?.originals["supportEffectList_"] ?? ""}
                                 : null,
                         ),
                 }
             }
             return showMotDrill(key, shown) ? {label: t.generalTracks, open: (motion: string) => setMotTarget({motion, charCode})} : undefined
         },
-        [t.generalTracks, t.supportEffectTitle, charCode, rows],
+        [t.generalTracks, t.supportEffectTitle, charCode],
     )
 
     /**
@@ -534,6 +539,27 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
             showSaveError({title: t.writeFailed, detail: String(e)})
         }
         setBusy(false)
+    }
+
+    /**
+     * 换「全员参数」左栏那张表：**先把当前这张的改动存下去再换**。
+     *
+     * `GlobalParamPanel` 的草稿只在它自己的 state 里，而面板按 `key={gpTable}` 重挂 —— 切表不先落盘，
+     * 那份改动会随卸载一起消失，而且没有任何提示（用户输完直接点另一张表就丢）。
+     * 存失败就不换：留在原表上，让失败对话框说清楚。
+     */
+    const openGlobalParam = async (next: string) => {
+        if (next === gpTable) return
+        if (gpDirty) {
+            try {
+                await gpSaveRef.current?.()
+            } catch (e) {
+                console.error(e)
+                showSaveError({title: t.writeFailed, detail: String(e)})
+                return
+            }
+        }
+        setGpTable(next)
     }
 
     return (
@@ -731,7 +757,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                 >
                     <GlobalParamList
                         selected={gpTable}
-                        onOpen={setGpTable}
+                        onOpen={(next) => void openGlobalParam(next)}
                         onLoaded={(tables) => setGpTable((cur) => cur || tables[0] || "")}
                         // w-max：左栏**按最长的名字自适应宽度**；pr-3：右侧那条竖线离条目底色**拉开 12px**
                         // （用户要求）。条目自己是 w-full，于是底色右边缘正好落在竖线左边 12px 处。

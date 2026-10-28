@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useState} from "react"
+import {Fragment, useEffect, useRef, useState} from "react"
 import {LoadGlobalParam, SaveGlobalParam} from "../../bindings/sigilloadout/service/actionsservice"
 import type {ActionField, ParamLabels} from "../../bindings/sigilloadout/service/models"
 import {LoadConfig} from "../../bindings/sigilloadout/service/loadoutservice"
@@ -40,7 +40,6 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
     const [labels, setLabels] = useState<ParamLabels | null>(null)
     const [dirty, setDirty] = useState(false)
     const [failure, setFailure] = useState("")
-    const [busy, setBusy] = useState(false)
 
     useEffect(() => {
         let alive = true
@@ -97,18 +96,30 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
      * 保存后**不重读**：原值来自解包目录那份只读文件（永远不变），改动就在手里这份里。
      * 真正落盘到 mod 是页面那个「保存」（SaveAndDeploy → Deploy）负责的。
      */
-    const save = async () => {
-        if (busy) return
-        setBusy(true)
-        setFailure("")
-        try {
-            await SaveGlobalParam(table, fields)
-            setDirty(false)
-        } catch (e) {
-            setFailure(String(e))
-        } finally {
-            setBusy(false)
+    /**
+     * 正在跑的那次保存。并发第二次（连点左栏两张表）**等它**而不是静默返回 ——
+     * "说要落盘、其实没落"会让切表时把改动丢掉，那正是 `openGlobalParam` 要防的事。
+     */
+    const savingRef = useRef<Promise<void> | null>(null)
+    const save = (): Promise<void> => {
+        if (savingRef.current) return savingRef.current
+        const run = (async () => {
+            setFailure("")
+            try {
+                await SaveGlobalParam(table, fields)
+                setDirty(false)
+            } catch (e) {
+                setFailure(String(e))
+                // 交出去：页面「保存」与"切表前先落盘"都靠这个拒绝判断停手，别让失败只留在本面板里。
+                throw e
+            }
+        })()
+        savingRef.current = run
+        const done = () => {
+            if (savingRef.current === run) savingRef.current = null
         }
+        run.then(done, done)
+        return run
     }
 
     // 把 dirty 与"保存"交给外面：保存按钮在页面工具条上（用户要求：这块面板里不要标题、也不要保存）。

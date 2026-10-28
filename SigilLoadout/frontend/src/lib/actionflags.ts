@@ -1,9 +1,9 @@
 /*
     角色动作页的纯逻辑：位定义表、掩码判位、角色码。
 
-    行的搬动不在这里：那是 dnd-kit 的 arrayMove 干的（见 AnimationDetail），这一层不再维护「第几行」——
-    行上的 `Index` 只是解析时编的顺序号，写回时后端按**数组顺序**写、根本不看它（见 actionflags.go 的
-    buildFlagsXML），所以界面上直接渲染数组下标就够，重排 / 插入之后什么都不用重编号。
+    行的搬动不在这里：那是 dnd-kit 的 arrayMove 干的（见 AnimationDetail），这一层不维护「第几行」。
+    写回时后端按**数组顺序**写（见 actionflags.go 的 buildFlagsXML）；行的界面身份由装载时发的键负责
+    （见 TrackGrid 的 `KeyedTrackRow`），这一层不参与。
 
     位定义表**只有这一份**（下标即 bit 号，空串 = 还没弄清含义的那一位）：勾选列表按它逐位铺出来、
     「效果」列也按它逐位翻（见 TrackGrid 的 `FlagEffects`）。后端只存数值，掩码翻译是显示那一层的事，

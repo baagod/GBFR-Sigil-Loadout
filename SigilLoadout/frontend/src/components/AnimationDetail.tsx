@@ -10,14 +10,14 @@ import {
     SaveFlags,
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
-import type {MotInfo, TrackInfo, TrackTable, TrackRow} from "../../bindings/sigilloadout/service/models"
+import {TrackRow, TrackTable, type MotInfo, type TrackInfo} from "../../bindings/sigilloadout/service/models"
 import {MotInfo as LoadMotInfo, MotScale as LoadMotScale, ScaleMotRootMotion} from "../../bindings/sigilloadout/service/gameservice"
 import {Button} from "@/components/ui/button"
 import {EditableCell} from "@/components/EditableCell"
 import {CELL_TEXT} from "@/lib/classnames"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
-import {FLAG_KEYS, TrackGrid} from "@/components/TrackGrid"
+import {FLAG_KEYS, TrackGrid, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import {slotEdit} from "@/lib/numericText"
 import type {TableCommands} from "@/components/ActionsTable"
@@ -32,6 +32,14 @@ import type {Messages} from "@/lib/messages"
  * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
+
+/*
+行键：轨表每一行在装载时领一把**不随位置漂**的键，行的 id 就是它。
+
+行 id 用数组下标时，重排 / 删行之后旧下标指向的是别的行 —— 撤销栈与剪切源里记的都是下标，
+"撤回上一格"会把值写进一条不相干的行。键跟着行对象走（重排只是移动、增行由基座给 `newRows…`），
+所以任何结构性操作之后它仍然指回同一行。
+*/
 
 /** Motion.scale 的提交规则：与数值输入框共用 slotEdit；空 = 默认 1，半成品/非法输入不改旧值。导出给单测。 */
 export function commitScale(text: string): string | null {
@@ -79,7 +87,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
 
         `flags` 只是这些格子的视图（派生）；写回去一律走 `setTables`，与别的轨同一条路。
     */
-    const [tables, setTables] = useState<Record<string, TrackTable>>({})
+    const [tables, setTables] = useState<Record<string, KeyedTrackTable>>({})
 
     /**
      * **每张表有没有选区**（任意格子，不要求整行）—— 工具条按钮亮不亮用它。
@@ -103,6 +111,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
      * 保存成功后把这份刷成刚写下去的那份（于是全部回到"没动过"）。
      */
     const [baseline, setBaseline] = useState<{tables: Record<string, TrackTable>} | null>(null)
+    /** 下一把行键（每次装载按顺序发；只在本弹层内递增，不跨组件共享）。 */
+    const nextRowKey = useRef(0)
 
     useEffect(() => {
         // 隐藏 mot 模式：一行都还没展开时没有动画号可载 —— 清单本身不需要这份数据。
@@ -133,19 +143,20 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     Promise.all(flagTracks.map((info) => LoadFlags(motion, info.sub))),
                     Promise.all(flagTracks.map((info) => LoadFlagsOriginal(motion, info.sub))),
                 ])
-                const loaded: Record<string, TrackTable> = {}
+                const keyed = (rows: TrackRow[]): KeyedTrackRow[] => rows.map((row) => ({...row, key: `r${nextRowKey.current++}`}))
+                const loaded: Record<string, KeyedTrackTable> = {}
                 const original: Record<string, TrackTable> = {}
                 flagTracks.forEach((info, i) => {
                     const key = trackKey(info)
                     const columns = [...FLAG_KEYS]
-                    loaded[key] = {sub: info.sub, kind: "flags", columns, rows: flagRead[i] ?? []} as TrackTable
-                    original[key] = {sub: info.sub, kind: "flags", columns, rows: flagPrimal[i] ?? []} as TrackTable
+                    loaded[key] = {...new TrackTable({sub: info.sub, kind: "flags", columns}), rows: keyed(flagRead[i] ?? [])}
+                    original[key] = new TrackTable({sub: info.sub, kind: "flags", columns, rows: flagPrimal[i] ?? []})
                 })
                 let next = 0
                 for (const info of list) {
                     if (info.kind === "flags") continue
                     const key = trackKey(info)
-                    if (read[next]) loaded[key] = read[next]
+                    if (read[next]) loaded[key] = {...read[next], rows: keyed(read[next].rows ?? [])}
                     if (primal[next]) original[key] = primal[next]
                     next++
                 }
@@ -192,15 +203,18 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     }, [motion, charCode])
 
     /** 改一格（flags 与普通轨共用）。**清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值。 */
-    const editValue = (key: string, index: number, column: string, value: string) => {
-        const row = tables[key]?.rows[index]
+    const editValue = (key: string, rowKey: string, column: string, value: string) => {
+        const rows = tables[key]?.rows ?? []
+        const index = rows.findIndex((row) => row.key === rowKey)
+        if (index === -1) return
+        const row = rows[index]
         const orig = isOriginal(row) ? baseline?.tables[key]?.rows[row.orig] : undefined
         const next = value === "" && orig ? (orig.values[column] ?? "") : value
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
-            const rows = table.rows.map((r, i) => (i === index ? {...r, values: {...r.values, [column]: next}} : r))
-            return {...prev, [key]: {...table, rows}}
+            const updated = table.rows.map((r, i) => (i === index ? {...r, values: {...r.values, [column]: next}} : r))
+            return {...prev, [key]: {...table, rows: updated}}
         })
     }
 
@@ -234,8 +248,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             ‼️ **flags 与普通轨走的是同一条路**：行形状统一（都是 `TrackRow`，字段收在 `values`），容器也统一
             （`tables` 按 `trackKey` 存，flags 的每一条子轨各占一格）。
         */
-        const toRow = (row: ActionRow, index: number): TrackRow => ({
-            index,
+        const toRow = (row: ActionRow): KeyedTrackRow => ({
+            // 基座的行 id 就是这一行领到的那把键（新行是 `newRows…`）：原样顺着带走，别再按位置重发。
+            key: row.id,
             values: Object.fromEntries(columns.map((k) => [k, shownValue(row, k)])),
             children: (row.children ?? []) as TrackRow["children"],
             orig: row.orig ?? null,
@@ -248,8 +263,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         })
         const restored = deleted
             .filter((row) => row.orig != null)
-            .map((row, i) => {
-                const back = {...toRow(row, next.length + i), removed: undefined}
+            .map((row) => {
+                const back = {...toRow(row), removed: undefined}
                 /* 已经是假删除的：这次是"解除"；否则标成假删除。 */
                 return row.removed ? back : {...back, removed: true}
             })
@@ -411,9 +426,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                             table={tables[key]}
                             t={t}
                             originals={baseline?.tables[key]?.rows}
-                            onEdit={(rowId, field, value) => editValue(key, Number(rowId), field, value ?? "")}
+                            onEdit={(rowId, field, value) => editValue(key, rowId, field, value ?? "")}
                             onReorder={(from, to) => reorder(key, from, to)}
-                            /* 行 id 就是数组下标（见 `TrackGrid.toRow`），所以直接 `Number` 回下标。 */
                             onSelectionPresenceChange={(has) => {
                                 setHasSelection((prev) => (prev[key] === has ? prev : {...prev, [key]: has}))
                             }}
