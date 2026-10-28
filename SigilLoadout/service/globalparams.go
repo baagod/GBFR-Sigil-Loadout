@@ -146,6 +146,34 @@ func (s *ActionsService) SaveGlobalParam(table string, fields []ActionField) err
 }
 
 /*
+pruneStaleGlobalParamEdits 丢掉"这张表里已经没有这个路径"的改动。
+
+表里的路径由 `flattenGlobalParams` 现算（读与写同一套记法），表换过之后旧路径就不存在了 ——
+留着它每次部署都会停在"表里没有这一格"，而界面提交不到那条路径，用户只能手改 json。
+*/
+func pruneStaleGlobalParamEdits(cfg actionConfig, table string, edits []globalParamEdit) ([]globalParamEdit, error) {
+	root, err := loadGlobalParamOriginal(cfg, table)
+	if err != nil {
+		return nil, err
+	}
+	nodes := map[string]*msgValue{}
+	var rows []ActionField
+	flattenGlobalParams(root, "", &rows, nodes)
+
+	kept := make([]globalParamEdit, 0, len(edits))
+	for _, edit := range edits {
+		if edit.Table != table {
+			kept = append(kept, edit)
+			continue
+		}
+		if _, ok := nodes[edit.Path]; ok {
+			kept = append(kept, edit)
+		}
+	}
+	return kept, nil
+}
+
+/*
 mergeGlobalParam 现读一份**原始**表、把这张表的改动套上去，一次算出：合并后的字节（没有真改动时是 nil）、
 有没有真改动、以及多出来的路径 / 认不出的形状这些错。
 

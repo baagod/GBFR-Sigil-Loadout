@@ -374,9 +374,16 @@ func mergeActionTable(cfg actionConfig, original *msgValue, edits []actionEdit) 
 	for id, fields := range mergeActionEdits(edits, charCode(cfg)) {
 		record := recordByID(original, id)
 		if record == nil {
-			return nil, false, fmt.Errorf("改动里有 id_ = %q，但动作表里没有这条记录", id)
+			// 表里已经没有这条记录（游戏更新删过、或换了随包 data.zip）：这条改动没有对象，跳过继续。
+			// 不删账本里那条 —— 只求"部署别停"，清理留给以后真需要时再做。
+			continue
 		}
 		for key, value := range fields {
+			// `abilityTag_` 是界面侧借来显示动作名的投影，**写不回去**：账本里出现它（手改过 / 旧版本留下的）
+			// 就跳过，别把"撕裂"这种显示名写进真正的技能键。账本那一侧不收它，这里才是最后一道。
+			if key == abilityTagField {
+				continue
+			}
 			node := record.entry(key)
 			if node == nil {
 				return nil, false, fmt.Errorf("改动里有 id_ = %q 的 %s，但记录里没有这一格", id, key)
@@ -537,6 +544,12 @@ func (s *ActionsService) Deploy() error {
 		return err
 	}
 	for _, table := range globalParamTables(globalEdits) {
+		// 全局参数这条路留着"剔掉表里没有的路径"：保存那条路对未知路径是**当场报错**的契约
+		// （见 globalparams_test 的 RejectsUnknownPath），部署这里不能反过来静默跳过同一份数据。
+		globalEdits, err = pruneStaleGlobalParamEdits(cfg, table, globalEdits)
+		if err != nil {
+			return err
+		}
 		globalEdits, err = s.deployGlobalParam(cfg, table, globalEdits)
 		if err != nil {
 			return err

@@ -95,9 +95,14 @@ func encodeMsgpack(v *msgValue) []byte {
 	return buf.Bytes()
 }
 
+// maxMsgDepth 是允许的嵌套层数上限。msgpack 允许任意嵌套，但栈深度跟着输入走：没有这道闸，
+// 一份被别的 mod 改坏（或本身就是恶意构造）的 .msg 能让解析直接把游戏进程的栈打穿。
+const maxMsgDepth = 200
+
 type msgReader struct {
-	buf []byte
-	pos int
+	buf   []byte
+	pos   int
+	depth int
 }
 
 func (r *msgReader) take(n int) ([]byte, error) {
@@ -126,6 +131,11 @@ func (r *msgReader) length(n int) (int, error) {
 }
 
 func (r *msgReader) node() (*msgValue, error) {
+	if r.depth >= maxMsgDepth {
+		return nil, fmt.Errorf("msgpack 嵌套超过 %d 层", maxMsgDepth)
+	}
+	r.depth++
+	defer func() { r.depth-- }()
 	head, err := r.take(1)
 	if err != nil {
 		return nil, err
@@ -247,6 +257,10 @@ func (r *msgReader) strValue(width, n int) (*msgValue, error) {
 }
 
 func (r *msgReader) arrayValue(width, n int) (*msgValue, error) {
+	// 头的长度字段是攻击面：不先拿"剩下多少字节"卡一下，4 字节长度就能让 make 先申请几十 GB。
+	if n > len(r.buf)-r.pos {
+		return nil, fmt.Errorf("msgpack 声明 %d 个数组元素，但只剩 %d 个字节", n, len(r.buf)-r.pos)
+	}
 	v := &msgValue{format: msgArray, width: width, items: make([]*msgValue, 0, n)}
 	for i := 0; i < n; i++ {
 		item, err := r.node()
@@ -259,6 +273,10 @@ func (r *msgReader) arrayValue(width, n int) (*msgValue, error) {
 }
 
 func (r *msgReader) mapValue(width, n int) (*msgValue, error) {
+	// 每个 entry 至少两字节（键 + 值），同一道闸（见 arrayValue 那段）。
+	if n > (len(r.buf)-r.pos)/2 {
+		return nil, fmt.Errorf("msgpack 声明 %d 个映射条目，但只剩 %d 个字节", n, len(r.buf)-r.pos)
+	}
 	v := &msgValue{format: msgMap, width: width, entries: make([]msgEntry, 0, n)}
 	for i := 0; i < n; i++ {
 		key, err := r.node()

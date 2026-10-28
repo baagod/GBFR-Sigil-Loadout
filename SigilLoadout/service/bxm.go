@@ -242,7 +242,8 @@ func encodeBXM(root *bxmNode) ([]byte, error) {
 		if at, ok := offsets[s]; ok {
 			return at, nil
 		}
-		if pool.Len() > bxmAttrNone {
+		// 0xFFFF 是"没有值"的哨兵（见 text()）：偏移正好等于它就会被读成空串，所以到 65535 就该停。
+		if pool.Len() >= bxmAttrNone {
 			return 0, fmt.Errorf("BXM 的字符串区超过了 65535 个字节（偏移是 16 位的），这份轨太大了")
 		}
 		at := uint16(pool.Len())

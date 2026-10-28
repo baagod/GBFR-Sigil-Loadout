@@ -557,3 +557,23 @@ func TestSaveGlobalParamWritesBoolLeaves(t *testing.T) {
 		t.Fatal("布尔节点收下了 \"1\"")
 	}
 }
+
+// 账本里留着表里已经没有的路径时，部署不该永久失败：剔掉继续，并把剔完的账本落盘。
+func TestDeployDropsStaleGlobalParamPaths(t *testing.T) {
+	service, _ := globalParamFixture(t, "guardparam.msg", sampleGuardParam())
+	stale := "旧版本留下来的值"
+	if err := saveGlobalParamEdits([]globalParamEdit{{Table: "guardparam.msg", Path: "GuardParam.已删除的字段", Value: &stale}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Deploy(); err != nil {
+		t.Fatalf("陈旧路径不该让部署失败: %v", err)
+	}
+	edits, err := loadGlobalParamEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 0 {
+		t.Fatalf("陈旧路径没被剔掉：%+v", edits)
+	}
+}

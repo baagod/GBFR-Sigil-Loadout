@@ -69,9 +69,8 @@ func parseFlagsXML(raw []byte) ([]FlagRow, error) {
 
 	seqs := doc.Tracks[0].Seqs
 	rows := make([]FlagRow, 0, len(seqs))
-	for i, s := range seqs {
+	for _, s := range seqs {
 		rows = append(rows, FlagRow{
-			Index: i,
 			Values: map[string]string{
 				"config":    s.Config,
 				"startTime": s.StartTime,

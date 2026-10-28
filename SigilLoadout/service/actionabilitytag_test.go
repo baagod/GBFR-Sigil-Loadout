@@ -62,6 +62,47 @@ func TestMergeActionTableLeavesTheTableAloneWhenNothingChanged(t *testing.T) {
 }
 
 /*
+`abilityTag_` 只借来显示动作名，**写不回去**：账本里出现它（手工改过 / 旧版本留下来的）时合并要跳过 ——
+否则真正的技能键（`AB_PL1000_01` 这种）会被"撕裂"这类显示名覆盖，那条动作在游戏里挂不上技能。
+*/
+func TestAbilityTagFieldIsNeverWrittenBack(t *testing.T) {
+	_, cfg, _ := actionsFixture(t)
+	sampleActionTable(t, cfg)
+	code := charCode(cfg)
+
+	raw, err := os.ReadFile(cfg.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := parseActionTable(raw, actionEntry(code))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := recordByID(original, "6")
+	if record == nil {
+		t.Fatal("夹具里该有 id_ = 6 这条记录")
+	}
+	tag := record.entry(abilityTagField)
+	if tag == nil {
+		t.Fatalf("夹具里 id_ = 6 该有 %s", abilityTagField)
+	}
+	before := tag.str
+	display := "撕裂"
+
+	merged, changed, err := mergeActionTable(cfg, original, []actionEdit{{
+		Char: code, ID: "6", Field: abilityTagField, Value: &display,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed || merged != nil {
+		t.Fatalf("只有 %s 的改动不该算改动（changed=%v，产物 %d 字节）", abilityTagField, changed, len(merged))
+	}
+	if tag.str != before {
+		t.Fatalf("%s 被写成了 %q，应保持 %q", abilityTagField, tag.str, before)
+	}
+}
+/*
 投影发生在 `LoadCharacterActions` 摊平那一刻（见 actionRowFields）：界面拿到的 `abilityTag_` **原值就是显示名**
 —— 显示 / 复制 / 排序因此读同一个值（前端不必再拿一份名字表自己查）。
 

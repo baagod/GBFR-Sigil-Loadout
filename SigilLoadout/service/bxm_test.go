@@ -300,3 +300,96 @@ func firstDifference(a, b []byte) int {
 	}
 	return -1
 }
+
+/*
+随包 `assets/data.zip` 就是一份**离线语料**：16,771 份轨（`.bxm`）+ 822 份 `.msg`（动作表、全局参数、
+FSM）。上面那几条全库验收要仓库外的目录（`GBFR_TRACK_CORPUS` / `GBFR_EXTRACTED`），CI 上一条都没跑；
+这一条只读仓库里已有的资产，CI 就能护住"解→编不再吐回同一棵树"这类回归。
+
+两件事一起钉：BXM 解→编→解 不改树（二进制无损）、树→XML→树 不改树（写回那条路）；
+`.msg` 解→编逐字节相同（没改过的记录原样回去）。
+*/
+func TestPackagedDataCorpusRoundTrips(t *testing.T) {
+	previous := dataAssetPath
+	dataAssetPath = filepath.Join("..", "assets", dataAssetName)
+	t.Cleanup(func() { closeDataAsset(); dataAssetPath = previous })
+
+	reader, err := openDataAsset()
+	if err != nil {
+		t.Skipf("这份构建里没有随包 %s: %v", dataAssetName, err)
+	}
+
+	tracks, messages := 0, 0
+	for _, file := range reader.File {
+		name := filepath.ToSlash(file.Name)
+		switch {
+		case strings.HasPrefix(name, "pl/") && strings.HasSuffix(name, ".bxm"):
+			raw, err := readZipEntry(file)
+			if err != nil {
+				t.Fatalf("%s: 读条目: %v", name, err)
+			}
+			tree, err := decodeBXM(raw)
+			if err != nil {
+				t.Fatalf("%s: 解 BXM: %v", name, err)
+			}
+			encoded, err := encodeBXM(tree)
+			if err != nil {
+				t.Fatalf("%s: 编 BXM: %v", name, err)
+			}
+			again, err := decodeBXM(encoded)
+			if err != nil {
+				t.Fatalf("%s: 回编之后解不开: %v", name, err)
+			}
+			if diff := treeDifference(again, tree, ""); diff != "" {
+				t.Fatalf("%s: 解→编→解 变了树: %s", name, diff)
+			}
+			fromXML, err := parseBXMXML(treeToXML(tree))
+			if err != nil {
+				t.Fatalf("%s: 树→XML 之后解不开: %v", name, err)
+			}
+			if diff := treeDifference(fromXML, tree, ""); diff != "" {
+				t.Fatalf("%s: 树→XML→树 变了: %s", name, diff)
+			}
+			tracks++
+		case strings.HasPrefix(name, "system/") && strings.HasSuffix(name, ".msg"):
+			raw, err := readZipEntry(file)
+			if err != nil {
+				t.Fatalf("%s: 读条目: %v", name, err)
+			}
+			root, err := decodeMsgpack(raw)
+			if err != nil {
+				t.Fatalf("%s: 解 msgpack: %v", name, err)
+			}
+			if got := encodeMsgpack(root); !bytes.Equal(got, raw) {
+				t.Fatalf("%s: 解→编 差了 %d 个字节（共 %d）", name, firstDifference(got, raw), len(raw))
+			}
+			messages++
+		}
+	}
+	// 语料门槛：少得离谱说明这份 data.zip 不完整 —— "一条没测到也算过"正是这条要防的。
+	if tracks < 1000 || messages < 100 {
+		t.Fatalf("随包语料只剩 %d 份轨、%d 份 .msg —— data.zip 不完整", tracks, messages)
+	}
+	t.Logf("随包语料回环：%d 份轨、%d 份 .msg", tracks, messages)
+}
+
+/*
+字符串区的 0xFFFF 是"没有值"的哨兵（见 `text()` 与 `bxmAttrNone`）：偏移正好等于它，那一格解码时
+会被读成空串 —— 值静默消失。所以池子涨到 65535 字节时，再存新串必须报错，而不是写出一个
+"看起来有值、其实等于哨兵"的偏移。
+
+构造：根名 "root"（5 字节）+ 键名 "a"（含结尾 0，2 字节）+ 一个 65527 字符的值（65528 字节）= 正好 65535；
+再加一个新值，它的偏移就会等于哨兵。
+*/
+func TestEncodeBXMRejectsAStringPoolAtTheSentinel(t *testing.T) {
+	fill := strings.Repeat("z", 65527)
+	root := &bxmNode{name: "root", attrs: []bxmAttr{{name: "a", value: fill}}}
+	if _, err := encodeBXM(root); err != nil {
+		t.Fatalf("池子刚好 65535 字节时还该写得出来：%v", err)
+	}
+
+	root.attrs = append(root.attrs, bxmAttr{name: "a", value: "z9"})
+	if _, err := encodeBXM(root); err == nil {
+		t.Fatal("池子到 65535 字节再存新串，应该报错而不是写出哨兵偏移")
+	}
+}

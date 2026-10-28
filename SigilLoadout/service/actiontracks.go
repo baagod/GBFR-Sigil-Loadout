@@ -61,7 +61,6 @@ type TrackTable struct {
 // Orig / Removed 是**界面用的行身份**（见 actionrowmarks.go）：对应原版第几行、是否被"假删除"。
 // 它们只跟着改动存进 track_edits.json，**不进 XML、不进 BXM**（buildTrackXML 只读 Values 与 Children）。
 type TrackRow struct {
-	Index    int               `json:"index"`
 	Values   map[string]string `json:"values"`
 	Children []TrackChild      `json:"children"`
 	Orig     *int              `json:"orig,omitempty"`
@@ -172,7 +171,7 @@ func parseTrackXML(raw []byte) (*TrackTable, error) {
 		if seq.XMLName.Local != "Seq" {
 			return nil, fmt.Errorf("轨里出现 <%s>，只认 <Seq>", seq.XMLName.Local)
 		}
-		row := TrackRow{Index: len(table.Rows), Values: make(map[string]string, len(seq.Attrs))}
+		row := TrackRow{Values: make(map[string]string, len(seq.Attrs))}
 		for _, attr := range seq.Attrs {
 			row.Values[attr.Name.Local] = attr.Value
 			if !columns[attr.Name.Local] {

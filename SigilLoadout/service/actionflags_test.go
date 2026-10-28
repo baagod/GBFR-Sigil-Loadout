@@ -26,11 +26,6 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	if len(rows) != 9 {
 		t.Fatalf("解开 %d 行，want 9", len(rows))
 	}
-	for i, row := range rows {
-		if row.Index != i {
-			t.Fatalf("第 %d 行的 Index 是 %d", i+1, row.Index)
-		}
-	}
 
 	first := rows[0]
 	// 行身份 Orig 是 *int（新增 / 粘贴出来的行是 nil）：拿整个结构去 == 会比**指针地址**，
@@ -40,7 +35,6 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 	}
 	first.Orig = nil
 	want := FlagRow{
-		Index: 0,
 		Values: map[string]string{
 			"config": "1", "startTime": "0.000000", "endTime": "0.016667",
 			"layerFlag": "4294967295", "flag0": "32", "flag1": "0", "sysFlag": "0", "freeArg": "0 0 0 0",
@@ -61,8 +55,8 @@ func TestLoadFlagsParsesTheTrack(t *testing.T) {
 */
 func TestBuildFlagsXMLMatchesTheSourceFormat(t *testing.T) {
 	rows := []FlagRow{
-		{Index: 0, Values: map[string]string{"config": "0", "startTime": "0", "endTime": "1.46667", "layerFlag": "4294967295", "flag0": "4194816", "flag1": "0", "freeArg": "0 0 0 0"}},
-		{Index: 1, Values: map[string]string{"config": "1", "startTime": "0.333333", "endTime": "0.433333", "layerFlag": "4294967295", "flag0": "0", "flag1": "128", "sysFlag": "0", "freeArg": "0 0 0 0"}},
+		{Values: map[string]string{"config": "0", "startTime": "0", "endTime": "1.46667", "layerFlag": "4294967295", "flag0": "4194816", "flag1": "0", "freeArg": "0 0 0 0"}},
+		{Values: map[string]string{"config": "1", "startTime": "0.333333", "endTime": "0.433333", "layerFlag": "4294967295", "flag0": "0", "flag1": "128", "sysFlag": "0", "freeArg": "0 0 0 0"}},
 	}
 	got, err := buildFlagsXML(rows)
 	if err != nil {

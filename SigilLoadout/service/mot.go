@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"sigilloadout/appfiles"
 )
 
 // GameService 只负责游戏目录与归档读取，不碰 mod 的保存。
@@ -112,11 +114,9 @@ func SaveMotToMod(char, motion string, body []byte) error {
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(actionsModDir, "pl", char)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(motModPath(char, motion), body, 0o644)
+	// 与其余 mod 产物同一条写盘口径：整份新字节或保持旧的，别留半份 .mot 让游戏加载坏动画。
+	// 目录也由它建（WriteAtomic 会 MkdirAll），这里不再自己来一遍。
+	return appfiles.WriteAtomic(motModPath(char, motion), body)
 }
 
 // RemoveMotFromMod 删掉 mod 里的覆盖，让游戏回到原始 mot。

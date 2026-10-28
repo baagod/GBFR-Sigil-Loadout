@@ -61,8 +61,7 @@ func TestDeployDropsGlobalParamEqualToOriginal(t *testing.T) {
 }
 
 // 一条改动都没有的动作表同样不该留产物：没改过就不该有 <角色>_action.msg。
-func TestDeployLeavesNoActionTableWhenNothingEdited(t *testing.T) {
-	service, cfg := globalParamFixture(t, "guardparam.msg", sampleGuardParam())
+func TestDeployLeavesNoActionTableWhenNothingEdited(t *testing.T) {	service, cfg := globalParamFixture(t, "guardparam.msg", sampleGuardParam())
 
 	if err := service.Deploy(); err != nil {
 		t.Fatal(err)
@@ -207,5 +206,30 @@ func TestSaveGlobalParamRemovesDeploymentWhenBackToOriginal(t *testing.T) {
 	}
 	if _, err := os.Stat(deployed); !os.IsNotExist(err) {
 		t.Fatalf("与原表一致之后 mod 里不该再留着这份产物（err=%v）", err)
+	}
+}
+
+// 账本里留着动作表已经没有的 id（游戏更新删了记录、或换了随包 data.zip）时，部署不该永久失败：
+// 表里没了 = 这条改动没有对象，跳过继续。账本里那条**不删**，留着不碍事。
+//
+// 夹具用 globalParamFixture（= actionsFixture + 一张全局参数表）：Deploy 会同时走动作表与全局参数
+// 两条路，只搭全局参数那边的路测不到"跳过陈旧 id 之后整条部署仍能走完"。
+func TestDeploySkipsStaleActionEditIDs(t *testing.T) {
+	service, cfg := globalParamFixture(t, "guardparam.msg", sampleGuardParam())
+	code := charCode(cfg)
+	stale := "旧版本留下来的值"
+	if err := saveActionEdits([]actionEdit{{Char: code, ID: "999", Field: "id_", Value: &stale}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Deploy(); err != nil {
+		t.Fatalf("陈旧条目不该让部署失败: %v", err)
+	}
+	edits, err := loadActionEdits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 || edits[0].ID != "999" {
+		t.Fatalf("陈旧条目被动了（预期原样留着）：%+v", edits)
 	}
 }

@@ -173,6 +173,29 @@ func TestMsgpackRoundTripsTheRealActionTable(t *testing.T) {
 	t.Logf("动作表 %d 字节、%d 条记录：解→编完全一致", len(raw), len(root.entries))
 }
 
+// 声明长度只受"文件还剩多少字节"限制：不够就必须报错，而不是先按它 make（4 个字节能要几十 GB）。
+func TestDecodeMsgpackRejectsImpossibleLengths(t *testing.T) {
+	cases := map[string][]byte{
+		"array32 声明 4294967295 个元素": unhex(t, "dd ff ff ff ff"),
+		"map32 声明 4294967295 个条目":   unhex(t, "df ff ff ff ff"),
+		"array16 声明 65535 个元素":      unhex(t, "dc ff ff"),
+	}
+	for name, raw := range cases {
+		if _, err := decodeMsgpack(raw); err == nil {
+			t.Fatalf("%s: 应该报错", name)
+		}
+	}
+}
+
+// 嵌套深度跟着输入走：没有上限的话，一份深嵌套的 .msg 能把栈打穿。
+func TestDecodeMsgpackRejectsDeepNesting(t *testing.T) {
+	raw := bytes.Repeat([]byte{0x91}, maxMsgDepth) // 每个字节一层 fixarray(1)
+	raw = append(raw, 0xc0)                        // 最里层 nil
+	if _, err := decodeMsgpack(raw); err == nil {
+		t.Fatal("超过深度上限应该报错")
+	}
+}
+
 // unhex 把测试里手写的十六进制字节串（带缩进与换行）解成字节。
 func unhex(t *testing.T, text string) []byte {
 	t.Helper()
