@@ -9,12 +9,31 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $modDir = Join-Path $Target 'GBFR.SigilLoadout'
 
-# 1. 取 dist 里最新的那个 zip —— 它就是上一次构建的产物。deploy 不需要知道它叫什么，
-#    包名与目录的唯一持有者因此留在 build-release.ps1。
-$zip = Get-ChildItem -LiteralPath (Join-Path $root 'dist') -Filter '*.zip' -File -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+# 0. 目标目录必须是**已经存在的** Reloaded-II Mods 目录：Expand-Archive 会自己把不存在的目标建出来，
+#    而默认值又是作者机器的桌面布局 —— 不挡它，整包会被种到别处，游戏扫描的目录里还是旧版。
+if (-not (Test-Path -LiteralPath $Target -PathType Container)) {
+    throw "Target '$Target' does not exist. Pass -Target <path to Reloaded-II\Mods>."
+}
+
+# 1. 认**构建清单**，不认"dist 里最新的 zip"：构建失败时 dist 里留着上一次的包，按时间挑会把它
+#    当成刚构建的产物装进去、然后打印成功 —— 用户以为刚修的 bug 已经进游戏了。
+$distRoot = Join-Path $root 'dist'
+$manifestPath = Join-Path $distRoot '.last-build.json'
+if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    throw "dist\.last-build.json 不存在：先跑一次 build-release.ps1（构建失败不会写这份清单）。"
+}
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+# 清单是本地手可编辑的文件：只接受 dist 下的**文件名**，别让 "..\..\x.zip" 把 deploy 引到 dist 外面去。
+if ([string]::IsNullOrWhiteSpace($manifest.zip) -or $manifest.zip -ne [IO.Path]::GetFileName($manifest.zip)) {
+    throw "构建清单里的 zip 名不合法（只该是 dist 下的文件名）：$($manifest.zip)"
+}
+$zip = Get-Item -LiteralPath (Join-Path $distRoot $manifest.zip) -ErrorAction SilentlyContinue
 if (-not $zip) {
-    throw "dist 里没有构建产物。先跑 build-release.ps1。"
+    throw "构建清单指向的包不在 dist 里：$($manifest.zip)"
+}
+$zipHash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash
+if ($zipHash -ne $manifest.sha256) {
+    throw "dist\$($manifest.zip) 的哈希与构建清单不一致（被换过，或构建没跑完）。"
 }
 
 # 2. 游戏必须已关闭：它的 mod DLL 是从 Mods 目录加载的。
@@ -104,5 +123,5 @@ if (-not (Start-SigilLoadout)) {
 }
 
 $toolPid = (Get-Process -Name 'SigilLoadout' | Select-Object -First 1).Id
-Write-Output "Deployed build to: $modDir"
+Write-Output "Deployed $($manifest.version) to: $modDir"
 Write-Output "Deployed SigilLoadout.exe is running (PID $toolPid)."

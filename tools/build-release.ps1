@@ -20,6 +20,12 @@ foreach ($proxyName in @('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')) 
 
 $root = Split-Path -Parent $PSScriptRoot
 
+# 构建清单一开跑就先删：后面不管哪一步失败（版本门禁、编译、测试），dist 里都不该留着"上一次成功"的清单
+# —— deploy 只认这份清单，留着它等于给旧包发一张"刚构建完"的通行证。
+$distRoot = Join-Path $root 'dist'
+$manifestPath = Join-Path $distRoot '.last-build.json'
+Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
+
 # --- 版本号：唯一权威源 -------------------------------------------------------
 # ModConfig.json 是版本号的唯一权威源。原先还有个 -Version 覆盖参数，只在"它正好等于 ModConfig 里
 # 那个值"时才不抛——覆盖不了任何东西，全仓也没有一处传它，去掉。
@@ -35,13 +41,25 @@ if ($frontendPackage.version -ne $Version) {
 # （它只钉依赖），所以版本一致性校验就只剩 ModConfig.json 与 package.json 这一对。
 Write-Output "Release version: $Version (ModConfig.json; package.json agree)."
 
+# CHANGELOG 的首条版本也是手写的第三处：漏改它，包与文件名都对了、发布说明却停在上一个版本。
+$changelogHead = (Select-String -LiteralPath (Join-Path $root 'CHANGELOG.md') -Pattern '^## \[([0-9]+\.[0-9]+\.[0-9]+)\]' |
+    Select-Object -First 1).Matches.Groups[1].Value
+if ($changelogHead -ne $Version) {
+    throw "CHANGELOG.md's first release is $changelogHead but the release is $Version; add or fix the entry."
+}
+
 $nativeProject = Join-Path $root 'GBFR.SigilLoadout.Native\GBFR.SigilLoadout.Native.vcxproj'
 $managedProject = Join-Path $root 'GBFR.SigilLoadout\GBFR.SigilLoadout.csproj'
 $managedOutput = Join-Path $root "GBFR.SigilLoadout\bin\$Configuration"
-$distRoot = Join-Path $root 'dist'
 $packageDir = Join-Path $distRoot 'GBFR.SigilLoadout'
 $zipPath = Join-Path $distRoot "GBFR-Sigil-Loadout-$Version.zip"
 $zipTemp = "$zipPath.tmp"
+
+# --- deploy 闸门回归（先跑：它只依赖 deploy.ps1，放最前面省得坏了还要等整条构建链）-------------
+# deploy.ps1 那三道闸门（缺清单 / 清单里的 zip 名不合法 / 哈希不符）挡的是"把旧包当成刚构建的包装进去"。
+# harness 在临时目录里放一份 deploy.ps1 的空壳仓库，只跑到闸门就停，不碰正在跑的工具与 Mods。
+& pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'tests\DeployGuard\run.ps1')
+if ($LASTEXITCODE -ne 0) { throw "deploy 闸门自检失败（exit $LASTEXITCODE）。" }
 
 # --- 随包数据（assets\）-------------------------------------------------------
 # 下面这些资产都是 gen 的产物、随包发布：这里只保证它们在场，不比对内容。缺的先从 gen\output 拿
@@ -57,6 +75,9 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     'chara.action.zh.json',
     # 专精技能页那两张：缺了 loadSkillboardTables 直接返错，工具启动即挂。
     'skillboard.json', 'skillboard.zh.json',
+    # 运行时必读（缺了工具起不来），所以必须进"在场"清单：bufftable.go 读前两个、paramlabels.go 读第三个。
+    # params.lang.json 尤其要盯 —— 它由人手工维护、生成器不产出，源侧删了/改名了没有第二处会发现。
+    'buff.json', 'buff.lang.json', 'params.lang.json',
     # 全部原始数据（17929 份轨 + 36 份动作表 + 16 份全局参数，条目名就是部署路径）：少了它，除了作者本机
     # （那边有解包目录兜底），别人装上去每个角色的轨与动作表都读不到，全局参数那一页也空着。
     'data.zip')
@@ -396,5 +417,15 @@ if ($packagedConfig) {
 Compress-Archive -LiteralPath $packageDir -DestinationPath $zipTemp -CompressionLevel Optimal
 Move-Item -LiteralPath $zipTemp -Destination $zipPath -Force
 Remove-Item -LiteralPath $packageDir -Recurse -Force
+
+# 构建清单：deploy 靠它认"dist 里这一份是不是刚构建出来的"，而不是按时间挑最新 —— 构建失败时
+# dist 里留着上一次的 zip，按时间挑会把它当新产物装进去。清单在 zip 落位之后才写，写不出就等于没构建成功。
+[ordered]@{
+    version    = $Version
+    zip        = (Get-Item -LiteralPath $zipPath).Name
+    sha256     = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash
+    builtAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+} | ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Write-Output "Manifest: $manifestPath"
 
 Write-Output "ZIP: $zipPath"
