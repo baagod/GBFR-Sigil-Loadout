@@ -41,7 +41,6 @@ export function ActionsTableHead({
     measured: boolean
     /** 行头那几格的宽度，钉住列的 `left` 要从它之后起算。 */
     rowHeadWidth: number
-    /** 表头第二行（字段名）是否显示；自带译名的表关掉。 */
     showFieldNames?: boolean
 }) {
     /** 表头用哪一份"钻取"配色 —— 与格右端那个 `···` 靶子**同一份判据**（见 model.ts 的 DrillContext）。 */

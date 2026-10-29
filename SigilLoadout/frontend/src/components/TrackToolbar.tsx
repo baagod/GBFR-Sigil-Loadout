@@ -100,4 +100,3 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
         </TooltipProvider>
     )
 }
-

@@ -127,7 +127,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
 }
 
 /** 行序严格等于数组顺序（不排序）—— 模块常量：别每次渲染新建一个数组（`keys` 那条约定同理）。 */
-const NO_SORTING: SortingState = []
+export const NO_SORTING: SortingState = []
 
 /**
  * flags 的**值格参数**（只有 `flag0` / `flag1` 有）—— 模块常量：它经 context 下发，
@@ -230,4 +230,5 @@ const flagPickers: Record<string, PickerConfig> = {
     flag0: {multiple: true, names: FLAG0_NAMES},
     flag1: {multiple: true, names: FLAG1_NAMES},
 }
+
 

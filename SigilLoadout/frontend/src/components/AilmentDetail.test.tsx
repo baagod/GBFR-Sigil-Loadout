@@ -7,6 +7,7 @@
     不能从 `render()` 返回的容器查。
 */
 import {afterEach, describe, expect, it, vi} from "vitest"
+import {useState} from "react"
 import {cleanup, fireEvent, render, waitFor} from "@testing-library/react"
 
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -16,8 +17,10 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {AilmentDetail} from "@/components/AilmentDetail"
 import {clickToEdit, stubColumnGeometry} from "@/components/actions-table/testkit"
+import {Dialog, DialogContent} from "@/components/ui/dialog"
 import {messages} from "@/lib/messages"
 import type {KeyedTrackTable} from "@/components/TrackGrid"
+import type {TrackRow} from "../../bindings/sigilloadout/service/models"
 
 afterEach(() => {
     // `stubColumnGeometry` 的契约：装完自己收，别把桩漏给下一个文件。
@@ -41,7 +44,7 @@ const effective = (slot: number): Child => ({
 const slots = (effectiveSlot: number | null): Child[] =>
     Array.from({length: 16}, (_, slot) => (slot === effectiveSlot ? effective(slot) : placeholder(slot)))
 
-const row = (key: string, start: string, end: string, children: Child[]) => ({key, values: {StartTime: start, EndTime: end}, children})
+const row = (key: string, start: string, end: string, children: Child[], orig: number | null = null) => ({key, values: {StartTime: start, EndTime: end}, children, orig})
 
 const track = (rows: ReturnType<typeof row>[]): KeyedTrackTable =>
     ({
@@ -109,14 +112,14 @@ describe("异常状态展开页（基座表）", () => {
         stubColumnGeometry()
         const onEditChild = vi.fn()
         const current = slots(0)
-        const originalRows = [{children: [{tag: "Ailment00", values: {...current[0]!.values, sec: "10.000000"}}]}]
+        const originalRows: TrackRow[] = [{values: {}, children: [{tag: "Ailment00", values: {...current[0]!.values, sec: "10.000000"}}], orig: null}]
         render(
             <AilmentDetail
                 t={t}
                 onClose={() => {}}
                 onEditChild={onEditChild}
-                track={track([{...row("a", "0.000000", "0.100000", current), orig: 0} as never])}
-                originalRows={originalRows as never}
+                track={track([row("a", "0.000000", "0.100000", current, 0)])}
+                originalRows={originalRows}
             />,
         )
         await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
@@ -140,4 +143,36 @@ describe("异常状态展开页（基座表）", () => {
         rerender(<AilmentDetail {...props} track={track([row("a", "0.000000", "0.100000", slots(null))])} />)
         expect(bodyRows()).toHaveLength(4)
     })
+
+    it("嵌套弹层：Esc 只关展开页，外层还在", async () => {
+        stubColumnGeometry()
+        let outerOpen = true
+        const Wrapper = () => {
+            const [outer, setOuter] = useState(true)
+            const [inner, setInner] = useState(true)
+            outerOpen = outer
+            return (
+                <Dialog open={outer} onOpenChange={setOuter}>
+                    <DialogContent>
+                        <span>outer</span>
+                        {inner && (
+                            <AilmentDetail
+                                t={t}
+                                onClose={() => setInner(false)}
+                                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+            )
+        }
+
+        render(<Wrapper />)
+        await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
+        fireEvent.keyDown(document, {key: "Escape"})
+
+        await waitFor(() => expect(byId("td", "sec")).toBeNull())
+        expect(outerOpen).toBe(true)
+    })
 })
+

@@ -102,6 +102,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const [hasSelection, setHasSelection] = useState<Record<string, boolean>>({})
     /** 每张表交回来的**动作包**（复制 / 粘贴 / 行级命令，见 `ActionsTable` 的 `onCommandsReady`）。 */
     const tableCommands = useRef<Record<string, TableCommands | undefined>>({})
+    /** 本层弹窗的 DOM：展开页关掉后把焦点还给这里（Base UI 的 `finalFocus`）。 */
+    const popupRef = useRef<HTMLDivElement | null>(null)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
     /** 打开了哪条 Attack 轨的「异常状态」展开页（null = 没开）。 */
@@ -608,6 +610,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                    （用户截图就是这一版）。所以宽度写成 `min(1080px, 100vw - 2rem)` 自带视口兜底。
                 高度同思路：目标 800，小窗口下 `calc(100vh - 2rem)` 兜底（和宽度同样留 16px 边）。 */}
             <DialogContent
+                ref={popupRef}
                 showCloseButton={false}
                 /**
                  * ⚠️ `initialFocus={() => false}`：弹窗默认会 focus **里面第一个可聚焦元素** ✗ ——
@@ -634,18 +637,14 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     </div>
                 </DialogHeader>
                 {body()}
-                {/* 展开页嵌在这层的 React 树里（仍各自 portal）：Base UI 的弹层栈认得上下层，Esc 只关最上面那层。
-                    关掉后把焦点还给本层弹窗 —— 留在入口按钮上时，Tooltip 会吃掉下一次 Esc。 */}
+                {/* 展开页嵌在这层的 React 树里（仍各自 portal）：Base UI 的弹层栈认得上下层，Esc 只关最上面那层。 */}
                 {ailmentKey && ailmentTrack && (
                     <AilmentDetail
                         track={ailmentTrack}
                         originalRows={ailmentOriginal}
                         t={t}
-                        onClose={() => {
-                            setAilmentKey(null)
-                            /* 焦点回到本层弹窗：留在"异常状态"按钮上时，第二次 Esc 会被 Tooltip 吃掉。 */
-                            requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="dialog"]')?.focus())
-                        }}
+                        onClose={() => setAilmentKey(null)}
+                        finalFocus={() => popupRef.current}
                         onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
                     />
                 )}

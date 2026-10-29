@@ -7,23 +7,25 @@
     折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径）：
     默认显示到最后一个有值的槽（没有值就 1 行），末列箭头展开剩余槽、再收起。
 */
-import {useCallback, useEffect, useMemo, useState, type ReactNode} from "react"
+import {useCallback, useMemo, useState, type ReactNode} from "react"
 import {ChevronsDown, ChevronsUp} from "lucide-react"
-import type {SortingState} from "@tanstack/react-table"
 
 import {ActionsTable} from "@/components/ActionsTable"
 import type {ActionRow, ColumnSpec} from "@/components/actions-table/model"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
-import type {KeyedTrackRow, KeyedTrackTable} from "@/components/TrackGrid"
+import {NO_SORTING, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
 import type {TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
 import type {Messages} from "@/lib/messages"
-
-/** 行序严格等于数组顺序（不排序）。 */
-const NO_SORTING: SortingState = []
 
 /** 占位槽：sec 与 rate 全 0。 */
 const isEffective = (child: {values: Record<string, string>}) =>
     Number(child.values.sec ?? 0) !== 0 || Number(child.values.rate ?? 0) !== 0
+
+/** 折叠时默认显示到最后一个有值的槽（没有值就 1 行）。 */
+const boundaryOf = (children: readonly TrackChild[]) => {
+    const lastEffective = children.reduce((last, child, slot) => (isEffective(child) ? slot : last), -1)
+    return Math.max(1, lastEffective + 1)
+}
 
 /** `Attack` 列的分组标题：`#N` + 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
 const rowTitle = (row: KeyedTrackRow, index: number) => {
@@ -32,67 +34,50 @@ const rowTitle = (row: KeyedTrackRow, index: number) => {
     return start && end ? `#${index + 1}\u00A0\u00A0${start} – ${end}` : `#${index + 1}`
 }
 
-type Child = TrackChild
+/** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（只增不减）。 */
+type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number; children: TrackChild[]}
 
-/** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（= 最后一个有值的槽 + 1）。 */
-type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number; children: Child[]}
-
-export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
+export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
     track: KeyedTrackTable
     /** 游戏原版那几行：清空槽位要回到这里的值（空串会让后端整个不写这个属性）。 */
     originalRows?: readonly TrackRow[]
     t: Messages
     onClose: () => void
+    /** 关掉后焦点交给谁（默认回打开它的按钮）；交给外层弹窗，下一次 Esc 才不会被 Tooltip 吃掉。 */
+    finalFocus?: () => HTMLElement | null
     /** 改一个槽位的一栏（写回 `TrackRow.Children`）；不给 = 只读。 */
     onEditChild?: (rowKey: string, tag: string, column: string, value: string) => void
 }) {
     const childColumns = track.childColumns
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-    /* 折叠边界只增不减：清空最后一个有值槽时，刚编辑的那几行不能当场收起（要收靠箭头）。 */
-    const [boundaryFloor, setBoundaryFloor] = useState<Record<string, number>>({})
+    /* 打开时的边界（只增不减）：之后清空最后一个有值槽，刚编辑的那几行也不能当场收起。 */
+    const [frozenBoundary] = useState<Record<string, number>>(() =>
+        Object.fromEntries(track.rows.map((row) => [row.key, boundaryOf(row.children ?? [])])),
+    )
     const kind = track.kind.charAt(0).toUpperCase() + track.kind.slice(1)
 
     const groups = useMemo<Group[]>(() => {
         return track.rows
             .map((row, index) => {
                 const children = row.children ?? []
-                const lastEffective = children.reduce((last, child, slot) => (isEffective(child) ? slot : last), -1)
-                const computed = Math.max(1, Math.min(lastEffective + 1, children.length))
                 return {
                     row,
                     label: rowTitle(row, index),
-                    boundary: Math.max(computed, boundaryFloor[row.key] ?? 1),
+                    boundary: Math.max(boundaryOf(children), frozenBoundary[row.key] ?? 1),
                     total: children.length,
                     children,
                 }
             })
             .filter((group) => group.total > 0)
-    }, [track, boundaryFloor])
-
-    /* 只增不减：值变多了就把边界抬上去，之后清空也不回退（回退会让刚编辑的行突然消失）。 */
-    useEffect(() => {
-        setBoundaryFloor((prev) => {
-            let changed = false
-            const next = {...prev}
-            for (const group of groups) {
-                const value = Math.max(group.boundary, prev[group.row.key] ?? 1)
-                if (next[group.row.key] !== value) {
-                    next[group.row.key] = value
-                    changed = true
-                }
-            }
-            return changed ? next : prev
-        })
-    }, [groups])
+    }, [track, frozenBoundary])
 
     const columnKeys = useMemo(() => ["parent", "slot", ...childColumns, "toggle"] as const, [childColumns])
 
-    /* 折叠只是少给几行：行 id 稳定（父行键 + 槽位标签），折叠/展开不影响撤销栈与复制源。
-       顺手建 rowId → (组, 子元素) 的索引，两个回调不用再切字符串。 */
+    /* 行 id = 父行键 + 槽位标签，折叠/展开不影响撤销栈与复制源；索引让两个回调 O(1) 反查。 */
     const {rows, rowMeta} = useMemo(() => {
         const list: ActionRow[] = []
-        const meta = new Map<string, {group: Group; child: Child; original?: Child}>()
+        const meta = new Map<string, {group: Group; child: TrackChild; original?: TrackChild}>()
         for (const group of groups) {
             const count = expanded[group.row.key] === true ? group.total : group.boundary
             const originalChildren = group.row.orig != null ? originalRows?.[group.row.orig]?.children : undefined
@@ -118,7 +103,6 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
         const hit = rowMeta.get(rowId)
         if (!onEditChild || !hit) return
         const next = value ?? ""
-        /* 清空 = 回游戏原版值：空串会让后端整个不写这个属性（数据形态就变了）。 */
         const resolved = next === "" ? (hit.original?.values[column] ?? hit.child.values[column] ?? "") : next
         onEditChild(hit.group.row.key, hit.child.tag, column, resolved)
     }, [onEditChild, rowMeta])
@@ -160,9 +144,9 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
             case "type":
                 return {label: t.ailmentColType, readonly: true, width: 104, cell: muted}
             case "sec":
-                return {label: t.ailmentColSec, width: 100, cell: muted}
+                return {label: t.ailmentColSec, width: 100}
             case "rate":
-                return {label: t.ailmentColRate, width: 100, cell: muted}
+                return {label: t.ailmentColRate, width: 100}
             case "maxLv":
                 return {label: t.ailmentColMaxLv, readonly: true, width: 88, cell: muted}
             case "toggle":
@@ -174,9 +158,9 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-            {/* 弹层默认会把焦点丢给第一个可聚焦元素（= 表格第一格），返回 false = 不抢焦点。 */}
             <DialogContent
                 initialFocus={() => false}
+                finalFocus={finalFocus}
                 className="flex max-h-[min(800px,calc(100vh-2rem))] w-[min(1000px,calc(100vw-2rem))] flex-col gap-3 p-5 sm:max-w-none"
             >
                 <DialogHeader className="border-b pb-3">
@@ -187,7 +171,6 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
                 {groups.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t.ailmentEmpty}</p>
                 ) : (
-                    /* `ailment-sheet` 的表格外观（只留下边框、表头左对齐）在 style.css 里。 */
                     <div className="ailment-sheet flex min-h-0 flex-1 flex-col [--cell-editable:var(--popover)]">
                         <ActionsTable
                             t={t}
@@ -195,9 +178,7 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
                             keys={columnKeys}
                             columnOf={columnOf}
                             initialSorting={NO_SORTING}
-                            activeCellRing
                             showFieldNames={false}
-                            shellClassName="border-x-0 border-t-0 bg-transparent"
                             onEdit={editCell}
                         />
                     </div>
@@ -206,6 +187,3 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
         </Dialog>
     )
 }
-
-
-

@@ -66,29 +66,6 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         ).toBeNull()
     })
 
-    it("activeCellRing：活动格多出四条 1px 边（压在格线上），其它层不变", () => {
-        const bounds = [{minRowIndex: 2, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 1}]
-        const plain = buildOverlay({bounds, geo: geo(), activeCell: {rowIndex: 0, columnIndex: 1}, copyAreas: []})
-        const ringed = buildOverlay({
-            bounds,
-            geo: geo(),
-            activeCell: {rowIndex: 0, columnIndex: 1},
-            activeCellRing: true,
-            copyAreas: [],
-        })
-        // 活动格 = 第 0 行第 1 列：left 80 / top 41 / 60×27。
-        expect(ringed.pinned.ring).toHaveLength(plain.pinned.ring.length + 4)
-        expect(ringed.scrolled.ring).toEqual(plain.scrolled.ring)
-        for (const edge of [
-            {left: 80, top: 41, width: 60, height: 1},
-            {left: 80, top: 67, width: 60, height: 1},
-            {left: 80, top: 41, width: 1, height: 27},
-            {left: 139, top: 41, width: 1, height: 27},
-        ]) {
-            expect(ringed.pinned.ring).toContainEqual(edge)
-        }
-    })
-
     it("单格：底色 + 上/右/下三边；第一列的左边由行头指示线充当", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 0}],

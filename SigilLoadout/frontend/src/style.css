@@ -327,8 +327,15 @@ input[aria-hidden="true"][style*="position: fixed"] {
     position: absolute !important;
 }
 
-/* 「异常状态」展开页的表皮：只留横线（左右格线去掉），表头除行号列外左对齐。
-   页面侧不再写基座内部类名；外壳的边框/底色由 `BaseTable` 的 `shellClassName` 入口给。 */
+/* 「异常状态」展开页的表皮：只留横线（左右格线去掉），表头除行号列外左对齐，
+   活动格（`cell-active`）一条 1px 内描边；外壳不画左右/上边框、底色透明。 */
+.ailment-sheet .base-table-shell {
+    border-top-width: 0;
+    border-right-width: 0;
+    border-left-width: 0;
+    background-color: transparent;
+}
+
 .ailment-sheet table th,
 .ailment-sheet table td {
     border-left-width: 0;
@@ -337,4 +344,8 @@ input[aria-hidden="true"][style*="position: fixed"] {
 
 .ailment-sheet table thead th:not(:first-child) {
     text-align: left;
+}
+
+.ailment-sheet td.cell-active {
+    box-shadow: inset 0 0 0 1px var(--cell-select);
 }

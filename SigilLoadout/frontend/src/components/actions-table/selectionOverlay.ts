@@ -249,8 +249,6 @@ export function buildOverlay(input: {
     geo: GeometryInput
     /** 活动格（不填底色）；`null` = 没有。 */
     activeCell: {rowIndex: number; columnIndex: number} | null
-    /** 活动格再描一圈边框（底色本来就挖空）：Excel 那种"当前格"框。 */
-    activeCellRing?: boolean
     /** 复制源区间。 */
     copyAreas: Bounds[]
     /** 复制虚线空档露什么颜色（该格底色）；不传用页面底色（几何单测不关心颜色）。 */
@@ -270,10 +268,6 @@ export function buildOverlay(input: {
           }
         : null
 
-    /* 选区左缘正好是"钉住列右边那一列"时，外扩的 2px 会被冻结列盖掉：左线改画在格内。 */
-    const pinnedRight =
-        geo.pinnedColumnCount > 0 && geo.pinnedColumnCount < geo.columnCount ? geo.columnLefts[geo.pinnedColumnCount]! : null
-
     for (const b of bounds) {
         const fills = fillSegments(b, geo, hole)
         model.pinned.fill.push(...fills.pinned)
@@ -290,26 +284,12 @@ export function buildOverlay(input: {
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
             const ringEdges = firstColumn ? {...edges, left: false} : edges
-            const clampLeft = ringEdges.left && pinnedRight !== null && rect.left === pinnedRight
+            /* 左缘正好是"钉住列右边那一列"：外扩 2px 会被冻结列盖掉，左线改画在格内。用下标判，不比坐标。 */
+            const clampLeft = !pinned && ringEdges.left && b.minColumnIndex === geo.pinnedColumnCount
             ;(pinned ? model.pinned : model.scrolled).ring.push(
                 ...ringLines(rect, ringEdges, RING_WIDTH, clampRight, clampBottom, clampLeft),
             )
         }
-    }
-
-    /*
-        活动格自己的边框（`activeCellRing`）：底色已经挖空，这里只补一圈 **1px** 描边。
-        不向外扩（`ringLines` 那套 3px 是选区外框）：四条线**压在格子自己的格线上**，与表格线重合。
-    */
-    if (input.activeCellRing && activeCell && hole) {
-        const cellEdgeLines = (rect: Rect): Rect[] => [
-            {left: rect.left, top: rect.top, width: rect.width, height: 1},
-            {left: rect.left, top: rect.top + rect.height - 1, width: rect.width, height: 1},
-            {left: rect.left, top: rect.top, width: 1, height: rect.height},
-            {left: rect.left + rect.width - 1, top: rect.top, width: 1, height: rect.height},
-        ]
-        const pinned = geo.pinnedColumnCount > 0 && activeCell.columnIndex < geo.pinnedColumnCount
-        ;(pinned ? model.pinned : model.scrolled).ring.push(...cellEdgeLines(hole))
     }
 
     /*

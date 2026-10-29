@@ -25,7 +25,6 @@ export function BaseTable({
     busy,
     overlay,
     className,
-    shellClassName,
     style,
     children,
 }: {
@@ -41,8 +40,6 @@ export function BaseTable({
     overlay?: ReactNode
     /** 这一份表格自己的类（`table-fixed` / 边框那套 —— 由调用方按状态给）。 */
     className?: string
-    /** 外壳（滚动框）追加的类：改边框/底色从这儿进，页面里别去写 `base-table-shell`。 */
-    shellClassName?: string
     style?: CSSProperties
     children: ReactNode
 }) {
@@ -53,7 +50,6 @@ export function BaseTable({
                 "base-table-shell relative min-h-0 w-full flex-1 overflow-auto border border-input bg-background",
                 offscreen && "is-offscreen absolute top-0 -left-[99999px] w-[1200px]",
                 busy && "is-busy pointer-events-none",
-                shellClassName,
             )}
         >
             <table

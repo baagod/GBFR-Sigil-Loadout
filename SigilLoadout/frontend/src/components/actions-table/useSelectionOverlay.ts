@@ -34,8 +34,6 @@ export function useSelectionOverlay({
     pinnedColumnCount,
     selectionBounds,
     activeCellKey,
-    /** 活动格再描一圈（默认关）。 */
-    activeCellRing = false,
     copySource,
 }: {
     tableRef: RefObject<HTMLTableElement | null>
@@ -52,7 +50,6 @@ export function useSelectionOverlay({
     pinnedColumnCount: number
     selectionBounds: Bounds[]
     activeCellKey: string
-    activeCellRing?: boolean
     copySource: CopySource | null
 }): {
     model: OverlayModel | null
@@ -177,8 +174,8 @@ export function useSelectionOverlay({
     )
 
     const model = useMemo(
-        () => (geometry ? buildOverlay({bounds: selectionBounds, geo: geometry, activeCell: activeCellIndexes, activeCellRing, copyAreas, copyUnderlay}) : null),
-        [geometry, selectionBounds, activeCellIndexes, activeCellRing, copyAreas, copyUnderlay],
+        () => (geometry ? buildOverlay({bounds: selectionBounds, geo: geometry, activeCell: activeCellIndexes, copyAreas, copyUnderlay}) : null),
+        [geometry, selectionBounds, activeCellIndexes, copyAreas, copyUnderlay],
     )
 
     const bodyHeight = geometry ? geometry.rowHeights.reduce((sum, height) => sum + height, 0) : 0
@@ -189,3 +186,4 @@ export function useSelectionOverlay({
         copyAreas,
     }
 }
+
