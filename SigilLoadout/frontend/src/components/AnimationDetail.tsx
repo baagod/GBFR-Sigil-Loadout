@@ -223,22 +223,16 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         })
     }
 
-    /**
-     * 改一个 ailment 槽位的一栏（Attack 行下面的 `<AilmentNN>` 子元素）。
-     * 清空（""）= 回到游戏原版的值：空串会让后端整个不写这个属性，数据形态就变了。
-     */
+    /** 改一个 ailment 槽位的一栏（Attack 行下面的 `<AilmentNN>` 子元素；"清空"由展开页换成原版值）。 */
     const editChild = (key: string, rowKey: string, tag: string, column: string, value: string) => {
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
             const rows = table.rows.map((row) => {
                 if (row.key !== rowKey) return row
-                const baselineChild = baseline?.tables[key]?.rows[row.orig ?? -1]?.children?.find((child) => child.tag === tag)
-                const children = (row.children ?? []).map((child) => {
-                    if (child.tag !== tag) return child
-                    const next = value === "" ? (baselineChild?.values[column] ?? child.values[column] ?? "") : value
-                    return {...child, values: {...child.values, [column]: next}}
-                })
+                const children = (row.children ?? []).map((child) =>
+                    child.tag === tag ? {...child, values: {...child.values, [column]: value}} : child,
+                )
                 return {...row, children}
             })
             return {...prev, [key]: {...table, rows}}

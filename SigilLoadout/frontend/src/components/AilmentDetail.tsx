@@ -92,7 +92,7 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
        顺手建 rowId → (组, 子元素) 的索引，两个回调不用再切字符串。 */
     const {rows, rowMeta} = useMemo(() => {
         const list: ActionRow[] = []
-        const meta = new Map<string, {group: Group; child: Child}>()
+        const meta = new Map<string, {group: Group; child: Child; original?: Child}>()
         for (const group of groups) {
             const count = expanded[group.row.key] === true ? group.total : group.boundary
             const originalChildren = group.row.orig != null ? originalRows?.[group.row.orig]?.children : undefined
@@ -107,7 +107,7 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
                     originals[column] = original?.values[column] ?? values[column]
                 }
                 const id = `${group.row.key}::${child.tag}`
-                meta.set(id, {group, child})
+                meta.set(id, {group, child, original})
                 list.push({id, values, originals})
             }
         }
@@ -117,7 +117,10 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
     const editCell = useCallback((rowId: string, column: string, value: string | null) => {
         const hit = rowMeta.get(rowId)
         if (!onEditChild || !hit) return
-        onEditChild(hit.group.row.key, hit.child.tag, column, value ?? "")
+        const next = value ?? ""
+        /* 清空 = 回游戏原版值：空串会让后端整个不写这个属性（数据形态就变了）。 */
+        const resolved = next === "" ? (hit.original?.values[column] ?? hit.child.values[column] ?? "") : next
+        onEditChild(hit.group.row.key, hit.child.tag, column, resolved)
     }, [onEditChild, rowMeta])
 
     /** 末列箭头：只在"折叠边界那一行"出现；展开后原地变向上。 */

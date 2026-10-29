@@ -105,6 +105,31 @@ describe("异常状态展开页（基座表）", () => {
         expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "sec", "12.5")
     })
 
+    it("清空一栏：onEditChild 收到游戏原版值（空串会让后端删掉属性）", async () => {
+        stubColumnGeometry()
+        const onEditChild = vi.fn()
+        const current = slots(0)
+        const originalRows = [{children: [{tag: "Ailment00", values: {...current[0]!.values, sec: "10.000000"}}]}]
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={() => {}}
+                onEditChild={onEditChild}
+                track={track([{...row("a", "0.000000", "0.100000", current), orig: 0} as never])}
+                originalRows={originalRows as never}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
+
+        const cell = byId("td", "sec") as HTMLElement
+        clickToEdit(cell)
+        const input = cell.querySelector("input") as HTMLInputElement
+        fireEvent.change(input, {target: {value: ""}})
+        fireEvent.blur(input)
+
+        expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "sec", "10.000000")
+    })
+
     it("清空最后的有值槽：已显示的行不收起（折叠边界只增不减）", async () => {
         stubColumnGeometry()
         const props = {t, onClose: () => {}, onEditChild: () => {}}
