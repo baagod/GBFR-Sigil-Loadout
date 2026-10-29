@@ -130,6 +130,18 @@ const zh = {
     // 「附加效果」编辑弹窗：这一格挂了哪几条 buff、每条各自的 6 个值。
     supportEffectTitle: "附加效果",
     supportEffectSearch: "搜索 BUFF ID | 名称",
+    // 「异常状态」展开页：Attack 每行下面的 `<AilmentNN>` 子元素（施加给敌人的 debuff）。
+    ailmentTitle: "异常状态",
+    ailmentEmpty: "这条攻击轨没有异常状态（16 个槽全是占位）",
+    // 子元素列名（DebuffData）：不显示原字段名，四语各一份。
+    ailmentColCategory: "类别",
+    ailmentColType: "类型",
+    ailmentColSec: "持续（秒）",
+    ailmentColRate: "强度",
+    ailmentColMaxLv: "最大等级",
+    ailmentColSlot: "槽位",
+    ailmentExpand: "展开剩余的槽位",
+    ailmentCollapse: "收起",
     // 「子弹类型」（`bulletType_`，与 bulletFreeWorkNN_ 同族）。
     colBulletType: "子弹类型",
     // 冷却消耗时机的小枚举（实测 0/1/2/3，其中 2 = 一次性，如 Seofon 7SB / Tweyen 2CS）。
@@ -325,6 +337,16 @@ export const messages: Record<Lang, Messages> = {
         // The "support effects" editor: which buffs this action attaches, and the six values of each.
         supportEffectTitle: "Support Effects",
         supportEffectSearch: "Search BUFF ID | Name",
+        ailmentTitle: "Ailments",
+        ailmentEmpty: "This attack track has no ailments (all 16 slots are placeholders).",
+        ailmentColCategory: "Category",
+        ailmentColType: "Type",
+        ailmentColSec: "Duration (s)",
+        ailmentColRate: "Weight",
+        ailmentColMaxLv: "Max Level",
+        ailmentColSlot: "Slot",
+        ailmentExpand: "Show remaining slots",
+        ailmentCollapse: "Collapse",
         colBulletType: "Bullet Type",
         // 冷却消耗时机的小枚举（2 = 一次性）。
         colSaveActionType: "Action Type",
@@ -492,6 +514,16 @@ export const messages: Record<Lang, Messages> = {
         // 「追加効果」編集ダイアログ：このアクションが付けるバフと、それぞれの 6 つの値。
         supportEffectTitle: "付加効果",
         supportEffectSearch: "BUFF ID | 名前で検索",
+        ailmentTitle: "状態異常",
+        ailmentEmpty: "この攻撃トラックに状態異常はありません（16 スロットはすべてプレースホルダー）。",
+        ailmentColCategory: "カテゴリ",
+        ailmentColType: "種類",
+        ailmentColSec: "継続（秒）",
+        ailmentColRate: "強度",
+        ailmentColMaxLv: "最大レベル",
+        ailmentColSlot: "スロット",
+        ailmentExpand: "残りのスロットを表示",
+        ailmentCollapse: "折りたたむ",
         colBulletType: "弾種",
         // クールダウンを消費するタイミングの小さな列挙（2 = 一回限り）。
         colSaveActionType: "アクション種類",
@@ -659,6 +691,16 @@ export const messages: Record<Lang, Messages> = {
         // 「추가 효과」편집 대화상자：이 액션이 거는 버프와 각 버프의 값 6개.
         supportEffectTitle: "부가 효과",
         supportEffectSearch: "BUFF ID | 이름 검색",
+        ailmentTitle: "상태 이상",
+        ailmentEmpty: "이 공격 트랙에는 상태 이상이 없습니다(16개 슬롯 모두 자리 표시자).",
+        ailmentColCategory: "분류",
+        ailmentColType: "유형",
+        ailmentColSec: "지속(초)",
+        ailmentColRate: "강도",
+        ailmentColMaxLv: "최대 레벨",
+        ailmentColSlot: "슬롯",
+        ailmentExpand: "나머지 슬롯 표시",
+        ailmentCollapse: "접기",
         colBulletType: "탄 종류",
         // 쿨다운을 소비하는 시점을 정하는 작은 열거형(2 = 1회용).
         colSaveActionType: "액션 종류",

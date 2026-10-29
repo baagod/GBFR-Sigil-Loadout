@@ -1,5 +1,6 @@
 import {Fragment, useEffect, useRef, useState} from "react"
 import {arrayMove} from "@dnd-kit/sortable"
+import {ChevronsRight} from "lucide-react"
 import {
     DeployMissingTracks,
     LoadFlags,
@@ -22,6 +23,7 @@ import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import {slotEdit} from "@/lib/numericText"
 import type {TableCommands} from "@/components/ActionsTable"
 import {TrackToolbar} from "@/components/TrackToolbar"
+import {AilmentDetail} from "@/components/AilmentDetail"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -101,6 +103,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
     const tableCommands = useRef<Record<string, TableCommands | undefined>>({})
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
+    /** 打开了哪条 Attack 轨的「异常状态」展开页（null = 没开）。 */
+    const [ailmentKey, setAilmentKey] = useState<string | null>(null)
     /**
      * 打开弹层时那份**原表**（深拷、之后只读）。
      *
@@ -215,6 +219,25 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             if (!table) return prev
             const updated = table.rows.map((r, i) => (i === index ? {...r, values: {...r.values, [column]: next}} : r))
             return {...prev, [key]: {...table, rows: updated}}
+        })
+    }
+
+    /**
+     * 改一个 ailment 槽位的一栏（Attack 行下面的 `<AilmentNN>` 子元素）。
+     * 和 `editValue` 同一套：值写进本层 state，保存时 `SaveTracks` 交整表、后端按 children 写回 XML。
+     */
+    const editChild = (key: string, rowKey: string, tag: string, column: string, value: string) => {
+        setTables((prev) => {
+            const table = prev[key]
+            if (!table) return prev
+            const rows = table.rows.map((row) => {
+                if (row.key !== rowKey) return row
+                const children = (row.children ?? []).map((child) =>
+                    child.tag === tag ? {...child, values: {...child.values, [column]: value}} : child,
+                )
+                return {...row, children}
+            })
+            return {...prev, [key]: {...table, rows}}
         })
     }
 
@@ -414,6 +437,18 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                                 onInsert={() => tableCommands.current[key]?.rows.insert()}
                                 onRemove={() => tableCommands.current[key]?.rows.removeRowsInSelection()}
                             />
+                            {/* 最右侧的「异常状态」入口（只有 Attack 轨有子元素）。打开的是独立展开页，不动这张表。 */}
+                            {info.kind === "attack" && (
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    className="ml-2 hover:bg-[#262626]!"
+                                    aria-label={t.ailmentTitle}
+                                    onClick={() => setAilmentKey(key)}
+                                >
+                                    <ChevronsRight />
+                                </Button>
+                            )}
                         </div>
                     </div>
                     <div className="pt-1 pb-4">
@@ -445,6 +480,9 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
 
     /** 标题 = `<角色码>_<动画号>`（弹窗标题与调试都用它）。 */
     const title = `${charCode}_${motion}`
+
+    /** 展开页读的是**当前**那张表（编辑后再开就是最新数据）；没开/表不在就是不渲染。 */
+    const ailmentTrack = ailmentKey ? tables[ailmentKey] : undefined
 
     /* 失败条 + 滚动区。按钮排在标题那一行里（见下面的 DialogHeader）。 */
     const body = () => (
@@ -549,6 +587,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         同一个色（表格自己那些行线走 --input，比它亮一档）。
     */
     return (
+        <>
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             {/* 尺寸 1080 × 800（用户给的），**但绝不能超出主窗口**。
                 这里踩过两个坑，别再往回改：
@@ -587,6 +626,18 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                 {body()}
             </DialogContent>
         </Dialog>
+        {/* 展开页与轨迹表并排挂：不塞进上面那层弹窗的内容区，免得两层 Dialog 互相抢焦点/滚动。 */}
+        {ailmentTrack && (
+            <AilmentDetail
+                track={ailmentTrack}
+                t={t}
+                onClose={() => setAilmentKey(null)}
+                onEditChild={(rowKey, tag, column, value) => {
+                    if (ailmentKey) editChild(ailmentKey, rowKey, tag, column, value)
+                }}
+            />
+        )}
+        </>
     )
 }
 

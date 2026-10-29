@@ -32,6 +32,7 @@ export function ActionsTableHead({
     sortable,
     measured,
     rowHeadWidth,
+    hideField,
 }: {
     table: Table<typeof features, ActionRow>
     /** 行序能拖时才画握把列的占位表头（同 `ActionRowView` 的 `sortable`，由 `reorder` 是否存在决定）。 */
@@ -40,6 +41,8 @@ export function ActionsTableHead({
     measured: boolean
     /** 行头那几格的宽度，钉住列的 `left` 要从它之后起算。 */
     rowHeadWidth: number
+    /** 这一列不显示字段名那一行（`ColumnSpec.hideField`）。 */
+    hideField?: (columnId: string) => boolean
 }) {
     /** 表头用哪一份"钻取"配色 —— 与格右端那个 `···` 靶子**同一份判据**（见 model.ts 的 DrillContext）。 */
     const drillOf = useContext(DrillContext)
@@ -108,9 +111,11 @@ export function ActionsTableHead({
                                             <div className={HEAD_LABEL} data-head-line="">
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
                                             </div>
-                                            <div className={HEAD_FIELD} data-head-line="">
-                                                {header.column.id}
-                                            </div>
+                                            {!hideField?.(header.column.id) && (
+                                                <div className={HEAD_FIELD} data-head-line="">
+                                                    {header.column.id}
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </div>

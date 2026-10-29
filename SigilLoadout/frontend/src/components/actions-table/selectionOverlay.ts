@@ -198,23 +198,37 @@ function subtractRect(rect: Rect, hole: Rect | null): Rect[] {
 /**
  * 一个矩形 → 轮廓的四个线矩形（每条边一条，`width` = 线宽）。
  * 左/上边落在 `x-2..x+1`，右/下边落在 `x+w-2..x+w+1`；贴表格右/下边时各收回 1px。
+ * `clampLeft`：选区左缘正好贴**钉住列右边界**时，外扩的 2px 会被冻结列盖住 —— 改成整条落在格内（x..x+3）。
+ * `internalLeft` / `internalRight`：这是选区被冻结列切开后的**内部接缝** —— 横线在那儿不外扩，
+ * 否则两段的上下边框会在接缝处叠成一条更粗的"多出来的边框"。
  */
-export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: boolean, clampBottom: boolean): Rect[] {
+export function ringLines(
+    rect: Rect,
+    edges: Edges,
+    width: number,
+    clampRight: boolean,
+    clampBottom: boolean,
+    clampLeft = false,
+    internalLeft = false,
+    internalRight = false,
+): Rect[] {
     const inset = width - 1
     /*
         ‼️ `clamp*` 不只是把边线往里挪 1px，**线的长度也要减 1**：
         竖线原本画到 `rect.bottom + 1`、横线画到 `rect.right + 1`，最后一行的竖线会超出表格 1px。
         滚动层有 `overflow: hidden` 挡着，但握把段画在钉住层（`overflow: visible`）→ 撑出纵向滚动条（真机复现）。
     */
-    const lineW = rect.width + inset + 1 - (clampRight ? 1 : 0)
+    const lineLeft = internalLeft ? rect.left : clampLeft ? rect.left : rect.left - inset
+    const lineRight = clampRight || internalRight ? rect.left + rect.width : rect.left + rect.width + 1
+    const lineW = lineRight - lineLeft
     const lineH = rect.height + inset + 1 - (clampBottom ? 1 : 0)
     const lines: Rect[] = []
-    if (edges.top) lines.push({left: rect.left - inset, top: rect.top - inset, width: lineW, height: width})
+    if (edges.top) lines.push({left: lineLeft, top: rect.top - inset, width: lineW, height: width})
     if (edges.bottom) {
         const top = rect.top + rect.height - inset - (clampBottom ? 1 : 0)
-        lines.push({left: rect.left - inset, top, width: lineW, height: width})
+        lines.push({left: lineLeft, top, width: lineW, height: width})
     }
-    if (edges.left) lines.push({left: rect.left - inset, top: rect.top - inset, width, height: lineH})
+    if (edges.left) lines.push({left: clampLeft ? rect.left : rect.left - inset, top: rect.top - inset, width, height: lineH})
     if (edges.right) {
         const left = rect.left + rect.width - inset - (clampRight ? 1 : 0)
         lines.push({left, top: rect.top - inset, width, height: lineH})
@@ -246,6 +260,8 @@ export function buildOverlay(input: {
     geo: GeometryInput
     /** 活动格（不填底色）；`null` = 没有。 */
     activeCell: {rowIndex: number; columnIndex: number} | null
+    /** 活动格再描一圈边框（底色本来就挖空）：Excel 那种"当前格"框。 */
+    activeCellRing?: boolean
     /** 复制源区间。 */
     copyAreas: Bounds[]
     /** 复制虚线空档露什么颜色（该格底色）；不传用页面底色（几何单测不关心颜色）。 */
@@ -276,11 +292,44 @@ export function buildOverlay(input: {
             选区含第一列时那条指示线会加宽到 3px 并补上下外扩）。
         */
         const firstColumn = b.minColumnIndex === 0
-        for (const {rect, edges, pinned} of splitByPinned(b, geo, hideRight)) {
+        /* 选区左缘正好是"钉住列右边那一列"时，外扩的 2px 会被冻结列盖掉：左线改画在格内。 */
+        const pinnedRight =
+            geo.pinnedColumnCount > 0 && geo.pinnedColumnCount < geo.columnCount ? geo.columnLefts[geo.pinnedColumnCount]! : null
+        const segments = splitByPinned(b, geo, hideRight)
+        for (const [index, {rect, edges, pinned}] of segments.entries()) {
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
             const clampBottom = edges.bottom && b.maxRowIndex === lastRowIndex
             const ringEdges = firstColumn ? {...edges, left: false} : edges
-            ;(pinned ? model.pinned : model.scrolled).ring.push(...ringLines(rect, ringEdges, RING_WIDTH, clampRight, clampBottom))
+            const clampLeft = ringEdges.left && pinnedRight !== null && rect.left <= pinnedRight
+            /* 两段之间的接缝：横线不外扩，否则上下边框会在接缝处叠出更粗的一条。 */
+            const internalLeft = index > 0
+            const internalRight = index === 0 && segments.length > 1
+            ;(pinned ? model.pinned : model.scrolled).ring.push(
+                ...ringLines(rect, ringEdges, RING_WIDTH, clampRight, clampBottom, clampLeft, internalLeft, internalRight),
+            )
+        }
+    }
+
+    /*
+        活动格自己的边框（`activeCellRing`）：底色已经挖空，这里只补一圈 **1px** 描边。
+        不向外扩（`ringLines` 那套 3px 是选区外框）：四条线**压在格子自己的格线上**，与表格线重合。
+    */
+    if (input.activeCellRing && activeCell && hole) {
+        const cellEdgeLines = (rect: Rect): Rect[] => [
+            {left: rect.left, top: rect.top, width: rect.width, height: 1},
+            {left: rect.left, top: rect.top + rect.height - 1, width: rect.width, height: 1},
+            {left: rect.left, top: rect.top, width: 1, height: rect.height},
+            {left: rect.left + rect.width - 1, top: rect.top, width: 1, height: rect.height},
+        ]
+        const one: Bounds = {
+            minRowIndex: activeCell.rowIndex,
+            maxRowIndex: activeCell.rowIndex,
+            minColumnIndex: activeCell.columnIndex,
+            maxColumnIndex: activeCell.columnIndex,
+        }
+        for (const {rect, pinned} of splitByPinned(one, geo)) {
+            /* splitByPinned 给的是按钉住列切开的同一格（单格 → 一个 rect）；为稳妥仍按它的 rect 画。 */
+            ;(pinned ? model.pinned : model.scrolled).ring.push(...cellEdgeLines(rect))
         }
     }
 

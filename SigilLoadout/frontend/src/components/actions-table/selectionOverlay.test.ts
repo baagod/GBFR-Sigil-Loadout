@@ -66,6 +66,24 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         ).toBeNull()
     })
 
+    it("activeCellRing：活动格多一圈边框，底色仍然挖空", () => {
+        const bounds = [{minRowIndex: 2, maxRowIndex: 2, minColumnIndex: 0, maxColumnIndex: 1}]
+        const plain = buildOverlay({bounds, geo: geo(), activeCell: {rowIndex: 0, columnIndex: 1}, copyAreas: []})
+        const ringed = buildOverlay({
+            bounds,
+            geo: geo(),
+            activeCell: {rowIndex: 0, columnIndex: 1},
+            activeCellRing: true,
+            copyAreas: [],
+        })
+        const ringCount = (m: typeof plain) => m.pinned.ring.length + m.scrolled.ring.length
+        // 底色不变（活动格还是被挖掉）
+        expect(ringed.pinned.fill).toEqual(plain.pinned.fill)
+        expect(ringed.scrolled.fill).toEqual(plain.scrolled.fill)
+        // 多出活动格那四条边
+        expect(ringCount(ringed) - ringCount(plain)).toBeGreaterThanOrEqual(3)
+    })
+
     it("单格：底色 + 上/右/下三边；第一列的左边由行头指示线充当", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 0}],
@@ -106,14 +124,14 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
         expect(model.scrolled.ring).toHaveLength(4)
     })
 
-    it("冻结列之后的第一列（非第一数据列）照常画左边框", () => {
+    it("冻结列之后的第一列（非第一数据列）：左边框画在格内（外扩的 2px 会被冻结列盖住）", () => {
         const model = buildOverlay({
             bounds: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2}],
             geo: geo(),
             activeCell: null,
             copyAreas: [],
         })
-        expect(model.scrolled.ring).toContainEqual({left: 138, top: 39, width: 3, height: 30})
+        expect(model.scrolled.ring).toContainEqual({left: 140, top: 39, width: 3, height: 30})
         expect(model.scrolled.ring).toHaveLength(4)
     })
 
