@@ -206,6 +206,18 @@ describe("附加效果弹窗", () => {
         expect(saved(onSave)).toEqual([{ hash: "1039632913", values: ["2", "45", "0", "0", "1", "1"] }]);
     });
 
+    it("点名字列（名字与哈希那片）也能勾选与取消", () => {
+        renderEditor('["0"]');
+        const name = screen.getAllByText("霸体").find((el) => el.hasAttribute("data-buff-name"))!;
+        const column = screen.getByRole("checkbox", { name: "霸体" });
+
+        fireEvent.click(name);
+        expect(column.getAttribute("aria-checked")).toBe("true");
+
+        fireEvent.click(name);
+        expect(column.getAttribute("aria-checked")).toBe("false");
+    });
+
     it("排序：勾选的置顶，两组内部都是 原 buff → 新加", () => {
         // 原值里只有「双发子弹」；当前值一个都没勾 —— 未选组仍应先列原 buff。
         renderEditor('["0"]', JSON.stringify(["1", "1039632913", "2", "45", "0", "0", "1", "1"]));

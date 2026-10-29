@@ -341,8 +341,12 @@ export function SupportEffectEditor({
                                 />
                                 {/* 名字列：随弹窗宽度按 28% 拉伸，夹在 144~280px 之间。
                                     280 是「DMG Increase Based on SBA Gauge (Vane)」在 14px 下的实测宽度（273）。
-                                    名字列到第一个输入框 32px（列表容器本身没有 gap，这里自己给）。 */}
-                                <div className="ml-3 w-[28%] max-w-[280px] min-w-36 shrink-0">
+                                    名字列到第一个输入框 32px（列表容器本身没有 gap，这里自己给）。
+                                    这一列整块可点（切换勾选）。 */}
+                                <div
+                                    className="ml-3 w-[28%] max-w-[280px] min-w-36 shrink-0"
+                                    onClick={() => setChecked(info.hash, !row.checked)}
+                                >
                                     {/* 英文名比中文长：放不下就折行（最多两行），不截断。 */}
                                     {/* 这个动作**原本就有**的 buff 灰显；其余（新加的、本格之外的）默认白字。 */}
                                     <div
