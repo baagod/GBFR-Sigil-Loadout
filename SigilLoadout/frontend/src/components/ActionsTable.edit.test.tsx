@@ -86,6 +86,9 @@ describe("动作表 · 编辑与保存（进编辑 / Esc / 提交口径 / 占位
         expect(layer.style.userSelect).toBe("text")
         expect(cell.querySelector("input")).toBeNull() // 不进编辑态
         expect(isSelected(cell)).toBe(true)
+        // 双击 = 全选这一格文字（原生双击只选一个词）。
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
+        expect(window.getSelection()?.toString()).toBe(layer.textContent)
 
         /*
             ‼️ 进了态，按下就归"划文字"：**格选区手势让位** —— Ctrl 点在已选中的格上本该是"减选"，

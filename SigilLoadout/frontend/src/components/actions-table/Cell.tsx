@@ -83,6 +83,16 @@ export const CellContent = memo(function CellContent({
                     setSelectable(true)
                     /* `preventScroll`：滚动只归 `useReveal` 那一处，别让 focus 顺手把表滚一格（同 Esc 那条路）。 */
                     textRef.current?.focus({preventScroll: true})
+                    /* 原生双击只选一个词；只读格要的是"全选这一格"（等可选态提交后再选，否则会被原生选择盖掉）。 */
+                    requestAnimationFrame(() => {
+                        const node = textRef.current
+                        if (!node) return
+                        const range = document.createRange()
+                        range.selectNodeContents(node)
+                        const selection = window.getSelection()
+                        selection?.removeAllRanges()
+                        selection?.addRange(range)
+                    })
                 }}
                 onBlur={(e) => {
                     /*

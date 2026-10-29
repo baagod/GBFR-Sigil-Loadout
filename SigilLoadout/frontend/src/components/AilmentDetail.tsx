@@ -136,17 +136,17 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         const muted = "text-muted-foreground"
         switch (key) {
             case "parent":
-                return {label: kind, readonly: true, width: 176, cell: muted}
+                return {label: kind, readonly: true, width: 176}
             case "slot":
-                return {label: t.ailmentColSlot, readonly: true, width: 84, cell: muted}
+                return {label: t.ailmentColSlot, readonly: true, width: 84}
             case "category":
-                return {label: t.ailmentColCategory, readonly: true, width: 104, cell: muted}
+                return {label: t.ailmentColCategory, width: 104, cell: muted}
             case "type":
-                return {label: t.ailmentColType, readonly: true, width: 104, cell: muted}
+                return {label: t.ailmentColType, width: 104, cell: muted}
             case "sec":
-                return {label: t.ailmentColSec, width: 100}
+                return {label: t.ailmentColSec, width: 100, cell: muted}
             case "rate":
-                return {label: t.ailmentColRate, width: 100}
+                return {label: t.ailmentColRate, width: 100, cell: muted}
             case "maxLv":
                 return {label: t.ailmentColMaxLv, readonly: true, width: 88, cell: muted}
             case "toggle":
@@ -161,7 +161,7 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
             <DialogContent
                 initialFocus={() => false}
                 finalFocus={finalFocus}
-                className="flex max-h-[min(800px,calc(100vh-2rem))] w-[min(1000px,calc(100vw-2rem))] flex-col gap-3 p-5 sm:max-w-none"
+                className="ailment-popup flex max-h-[min(800px,calc(100vh-2rem))] w-[min(1000px,calc(100vw-2rem))] flex-col gap-3 p-5 sm:max-w-none"
             >
                 <DialogHeader className="border-b pb-3">
                     <DialogTitle className="text-base font-medium">
@@ -187,3 +187,6 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         </Dialog>
     )
 }
+
+
+

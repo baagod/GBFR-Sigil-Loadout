@@ -246,6 +246,13 @@ table.base-table tbody tr:hover {
     background-color: transparent;
 }
 
+/* 基表底线只由外壳给：最后一行的格不再画下边框。
+   外壳 border-b 1px + 末行 td border-b 1px 相邻会叠成 2px（高度够时尤其明显），
+   去掉末行那条之后，无论表是"刚好放下"还是"滚起来"，底边都恒为 1px。 */
+table.base-table tbody tr:last-child > td {
+    border-bottom-width: 0;
+}
+
 /*
     ============ 提层阶梯（唯一一份） ============
 
@@ -327,8 +334,18 @@ input[aria-hidden="true"][style*="position: fixed"] {
     position: absolute !important;
 }
 
+/* 弹层用纯布局居中：`inset:0 + margin:auto`，不用 `top:50% + translateY(-50%)`。
+   后者在高度为奇数时位移落在半像素，整个弹层被栅格化，里面每条 1px 线都会变成 2px。 */
+.ailment-popup {
+    inset: 0;
+    height: fit-content;
+    margin: auto;
+    translate: none;
+}
+
 /* 「异常状态」展开页的表皮：只留横线（左右格线去掉），表头除行号列外左对齐，
-   活动格（`cell-active`）一条 1px 内描边；外壳不画左右/上边框、底色透明。 */
+   活动格（`cell-active`）一条 1px 内描边；外壳不画左右/上边框、底色透明。
+   底线由外壳的 border-b 给（末行的格边框已被基表规则去掉），恒为 1px。 */
 .ailment-sheet .base-table-shell {
     border-top-width: 0;
     border-right-width: 0;
@@ -349,3 +366,4 @@ input[aria-hidden="true"][style*="position: fixed"] {
 .ailment-sheet td.cell-active {
     box-shadow: inset 0 0 0 1px var(--cell-select);
 }
+
