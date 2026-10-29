@@ -7,7 +7,7 @@
     折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径）：
     默认显示到最后一个有值的槽（没有值就 1 行），末列箭头展开剩余槽、再收起。
 */
-import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useState, type ReactNode} from "react"
 import {ChevronsDown, ChevronsUp} from "lucide-react"
 import type {SortingState} from "@tanstack/react-table"
 
@@ -15,6 +15,7 @@ import {ActionsTable} from "@/components/ActionsTable"
 import type {ActionRow, ColumnSpec} from "@/components/actions-table/model"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import type {KeyedTrackRow, KeyedTrackTable} from "@/components/TrackGrid"
+import type {TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
 import type {Messages} from "@/lib/messages"
 
 /** 行序严格等于数组顺序（不排序）。 */
@@ -31,7 +32,7 @@ const rowTitle = (row: KeyedTrackRow, index: number) => {
     return start && end ? `#${index + 1}\u00A0\u00A0${start} – ${end}` : `#${index + 1}`
 }
 
-type Child = NonNullable<KeyedTrackRow["children"]>[number]
+type Child = TrackChild
 
 /** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（= 最后一个有值的槽 + 1）。 */
 type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number; children: Child[]}
@@ -39,8 +40,8 @@ type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number
 export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
     track: KeyedTrackTable
-    /** 游戏原版那几行的 children：清空要回到这里的值（空串会让后端整个不写这个属性）。 */
-    originalRows?: ReadonlyArray<{children?: Child[]}>
+    /** 游戏原版那几行：清空槽位要回到这里的值（空串会让后端整个不写这个属性）。 */
+    originalRows?: readonly TrackRow[]
     t: Messages
     onClose: () => void
     /** 改一个槽位的一栏（写回 `TrackRow.Children`）；不给 = 只读。 */
@@ -49,24 +50,8 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
     const childColumns = track.childColumns
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
     /* 折叠边界只增不减：清空最后一个有值槽时，刚编辑的那几行不能当场收起（要收靠箭头）。 */
-    const boundaryFloor = useRef<Record<string, number>>({})
+    const [boundaryFloor, setBoundaryFloor] = useState<Record<string, number>>({})
     const kind = track.kind.charAt(0).toUpperCase() + track.kind.slice(1)
-
-    /* 两层 Dialog 各挂一个：Esc 在捕捉阶段先关这一层，别让外层跟着一起关（外层一关，未保存的轨表改动就没了）。 */
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return
-            const target = event.target as HTMLElement | null
-            if (target?.tagName === "INPUT" || target?.closest?.("[data-slot=combobox-content]")) return
-            event.preventDefault()
-            event.stopPropagation()
-            onClose()
-            /* 关掉这层后焦点落回下面那层，不然它收不到第二次 Esc（焦点跑到 body）。 */
-            requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="dialog"]')?.focus())
-        }
-        document.addEventListener("keydown", onKeyDown, true)
-        return () => document.removeEventListener("keydown", onKeyDown, true)
-    }, [onClose])
 
     const groups = useMemo<Group[]>(() => {
         return track.rows
@@ -74,18 +59,32 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
                 const children = row.children ?? []
                 const lastEffective = children.reduce((last, child, slot) => (isEffective(child) ? slot : last), -1)
                 const computed = Math.max(1, Math.min(lastEffective + 1, children.length))
-                const boundary = Math.max(computed, boundaryFloor.current[row.key] ?? 1)
-                boundaryFloor.current[row.key] = boundary
                 return {
                     row,
                     label: rowTitle(row, index),
-                    boundary,
+                    boundary: Math.max(computed, boundaryFloor[row.key] ?? 1),
                     total: children.length,
                     children,
                 }
             })
             .filter((group) => group.total > 0)
-    }, [track])
+    }, [track, boundaryFloor])
+
+    /* 只增不减：值变多了就把边界抬上去，之后清空也不回退（回退会让刚编辑的行突然消失）。 */
+    useEffect(() => {
+        setBoundaryFloor((prev) => {
+            let changed = false
+            const next = {...prev}
+            for (const group of groups) {
+                const value = Math.max(group.boundary, prev[group.row.key] ?? 1)
+                if (next[group.row.key] !== value) {
+                    next[group.row.key] = value
+                    changed = true
+                }
+            }
+            return changed ? next : prev
+        })
+    }, [groups])
 
     const columnKeys = useMemo(() => ["parent", "slot", ...childColumns, "toggle"] as const, [childColumns])
 
@@ -204,4 +203,6 @@ export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
         </Dialog>
     )
 }
+
+
 

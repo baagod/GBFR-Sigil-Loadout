@@ -604,7 +604,6 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         同一个色（表格自己那些行线走 --input，比它亮一档）。
     */
     return (
-        <>
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             {/* 尺寸 1080 × 800（用户给的），**但绝不能超出主窗口**。
                 这里踩过两个坑，别再往回改：
@@ -641,19 +640,23 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     </div>
                 </DialogHeader>
                 {body()}
+                {/* 展开页嵌在这层的 React 树里（仍各自 portal）：Base UI 的弹层栈认得上下层，Esc 只关最上面那层。
+                    关掉后把焦点还给本层弹窗 —— 留在入口按钮上时，Tooltip 会吃掉下一次 Esc。 */}
+                {ailmentKey && ailmentTrack && (
+                    <AilmentDetail
+                        track={ailmentTrack}
+                        originalRows={ailmentOriginal}
+                        t={t}
+                        onClose={() => {
+                            setAilmentKey(null)
+                            /* 焦点回到本层弹窗：留在"异常状态"按钮上时，第二次 Esc 会被 Tooltip 吃掉。 */
+                            requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="dialog"]')?.focus())
+                        }}
+                        onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
+                    />
+                )}
             </DialogContent>
         </Dialog>
-        {/* 展开页与轨迹表并排挂：不塞进上面那层弹窗的内容区，免得两层 Dialog 互相抢焦点/滚动。 */}
-        {ailmentKey && ailmentTrack && (
-            <AilmentDetail
-                track={ailmentTrack}
-                originalRows={ailmentOriginal}
-                t={t}
-                onClose={() => setAilmentKey(null)}
-                onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
-            />
-        )}
-        </>
     )
 }
 

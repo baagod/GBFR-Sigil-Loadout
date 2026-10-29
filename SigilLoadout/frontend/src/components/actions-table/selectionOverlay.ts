@@ -270,6 +270,10 @@ export function buildOverlay(input: {
           }
         : null
 
+    /* 选区左缘正好是"钉住列右边那一列"时，外扩的 2px 会被冻结列盖掉：左线改画在格内。 */
+    const pinnedRight =
+        geo.pinnedColumnCount > 0 && geo.pinnedColumnCount < geo.columnCount ? geo.columnLefts[geo.pinnedColumnCount]! : null
+
     for (const b of bounds) {
         const fills = fillSegments(b, geo, hole)
         model.pinned.fill.push(...fills.pinned)
@@ -281,9 +285,6 @@ export function buildOverlay(input: {
             选区含第一列时那条指示线会加宽到 3px 并补上下外扩）。
         */
         const firstColumn = b.minColumnIndex === 0
-        /* 选区左缘正好是"钉住列右边那一列"时，外扩的 2px 会被冻结列盖掉：左线改画在格内。 */
-        const pinnedRight =
-            geo.pinnedColumnCount > 0 && geo.pinnedColumnCount < geo.columnCount ? geo.columnLefts[geo.pinnedColumnCount]! : null
         const segments = splitByPinned(b, geo, hideRight)
         for (const {rect, edges, pinned} of segments) {
             const clampRight = edges.right && b.maxColumnIndex === lastColumnIndex
