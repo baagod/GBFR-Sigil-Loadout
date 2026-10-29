@@ -19,6 +19,9 @@ import type {Messages} from "@/lib/messages"
     那是"表格 + 行 + 拖拽"，这只是"一排按钮" —— 120 行的图标、Tooltip、禁用态与悬停色不值得和表格挤在一个文件里。
 */
 
+/** 轨标题行右侧图标按钮的悬停色（ghost 自带的那档对比度太低，必须 important 压过它）。 */
+export const TRACK_ICON_BTN = "hover:bg-[#262626]!"
+
 /** 一条轨那排按钮：压在标题行右侧，谁被选中就删谁。 */
 export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
     t: Messages
@@ -50,7 +53,7 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                className="hover:bg-[#262626]!"
+                                className={TRACK_ICON_BTN}
                                 aria-label={t.addRow}
                                 onClick={onAdd}
                             />
@@ -66,7 +69,7 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                className="hover:bg-[#262626]!"
+                                className={TRACK_ICON_BTN}
                                 aria-label={t.insertRow}
                                 onClick={onInsert}
                             />
@@ -82,7 +85,7 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                className="hover:bg-[#262626]!"
+                                className={TRACK_ICON_BTN}
                                 aria-label={t.remove}
                                 disabled={!canRemove}
                                 onClick={onRemove}
@@ -97,3 +100,4 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
         </TooltipProvider>
     )
 }
+

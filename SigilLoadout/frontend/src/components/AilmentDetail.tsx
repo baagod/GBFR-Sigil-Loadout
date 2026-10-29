@@ -1,14 +1,13 @@
 /*
-    「异常状态」展开页：一条 Attack 轨里**每一行**的 `<AilmentNN>` 子元素（施加给敌人的 debuff）。
+    「异常状态」展开页：一条 Attack 轨里每一行的 `<AilmentNN>` 子元素（施加给敌人的 debuff）。
 
-    数据是"每行 16 个固定槽"的嵌套结构（见 docs/action/Attack轨字段含义.md §5），不属于主表列，
-    所以这里把它**摊平成一张表**交给动作表基座 —— 选区和复制/粘贴/剪切全走基座那一套，
-    跨 Attack 搬值就是同表内的普通复制粘贴（不需要系统剪贴板，也不需要"每组一张表"）。
+    数据是每行 16 个固定槽的嵌套结构（见 docs/action/Attack轨字段含义.md §5），不属于主表列，
+    所以摊平进动作表基座，选区和复制/粘贴/剪切直接沿用基座。
 
-    折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径：行由调用方过滤后传入）：
+    折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径）：
     默认显示到最后一个有值的槽（没有值就 1 行），末列箭头展开剩余槽、再收起。
 */
-import {useCallback, useMemo, useState, type ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from "react"
 import {ChevronsDown, ChevronsUp} from "lucide-react"
 import type {SortingState} from "@tanstack/react-table"
 
@@ -18,33 +17,30 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/
 import type {KeyedTrackRow, KeyedTrackTable} from "@/components/TrackGrid"
 import type {Messages} from "@/lib/messages"
 
-/** 行序严格等于数组顺序（不排序）。模块常量：引用得稳，别每次渲染新建。 */
+/** 行序严格等于数组顺序（不排序）。 */
 const NO_SORTING: SortingState = []
-
-/** 允许编辑的子元素列（类别/类型要枚举选择器，先只读；最大等级暂不动）。 */
-const EDITABLE_COLUMNS = new Set(["sec", "rate"])
 
 /** 占位槽：sec 与 rate 全 0。 */
 const isEffective = (child: {values: Record<string, string>}) =>
     Number(child.values.sec ?? 0) !== 0 || Number(child.values.rate ?? 0) !== 0
 
-/**
- * 分组标题（`Attack` 列的格）：`#N` + 时间窗。
- * 时间窗之前是**两个**空格，用不换行空格写死（HTML 会把连续空格折成一个）。
- * 不加 `s` 后缀：`StartTime` / `EndTime` 的语义在轨迹表那边已经讲清楚，这里只抄原值。
- */
+/** `Attack` 列的分组标题：`#N` + 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
 const rowTitle = (row: KeyedTrackRow, index: number) => {
     const start = row.values.StartTime
     const end = row.values.EndTime
     return start && end ? `#${index + 1}\u00A0\u00A0${start} – ${end}` : `#${index + 1}`
 }
 
-/** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（= 最后一个有值的槽 + 1）。 */
-type Group = {key: string; label: string; boundary: number; total: number; children: NonNullable<KeyedTrackRow["children"]>}
+type Child = NonNullable<KeyedTrackRow["children"]>[number]
 
-export function AilmentDetail({track, t, onClose, onEditChild}: {
+/** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（= 最后一个有值的槽 + 1）。 */
+type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number; children: Child[]}
+
+export function AilmentDetail({track, originalRows, t, onClose, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
     track: KeyedTrackTable
+    /** 游戏原版那几行的 children：清空要回到这里的值（空串会让后端整个不写这个属性）。 */
+    originalRows?: ReadonlyArray<{children?: Child[]}>
     t: Messages
     onClose: () => void
     /** 改一个槽位的一栏（写回 `TrackRow.Children`）；不给 = 只读。 */
@@ -52,17 +48,38 @@ export function AilmentDetail({track, t, onClose, onEditChild}: {
 }) {
     const childColumns = track.childColumns
     const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+    /* 折叠边界只增不减：清空最后一个有值槽时，刚编辑的那几行不能当场收起（要收靠箭头）。 */
+    const boundaryFloor = useRef<Record<string, number>>({})
     const kind = track.kind.charAt(0).toUpperCase() + track.kind.slice(1)
+
+    /* 两层 Dialog 各挂一个：Esc 在捕捉阶段先关这一层，别让外层跟着一起关（外层一关，未保存的轨表改动就没了）。 */
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return
+            const target = event.target as HTMLElement | null
+            if (target?.tagName === "INPUT" || target?.closest?.("[data-slot=combobox-content]")) return
+            event.preventDefault()
+            event.stopPropagation()
+            onClose()
+            /* 关掉这层后焦点落回下面那层，不然它收不到第二次 Esc（焦点跑到 body）。 */
+            requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="dialog"]')?.focus())
+        }
+        document.addEventListener("keydown", onKeyDown, true)
+        return () => document.removeEventListener("keydown", onKeyDown, true)
+    }, [onClose])
 
     const groups = useMemo<Group[]>(() => {
         return track.rows
             .map((row, index) => {
                 const children = row.children ?? []
                 const lastEffective = children.reduce((last, child, slot) => (isEffective(child) ? slot : last), -1)
+                const computed = Math.max(1, Math.min(lastEffective + 1, children.length))
+                const boundary = Math.max(computed, boundaryFloor.current[row.key] ?? 1)
+                boundaryFloor.current[row.key] = boundary
                 return {
-                    key: row.key,
+                    row,
                     label: rowTitle(row, index),
-                    boundary: Math.max(1, Math.min(lastEffective + 1, children.length)),
+                    boundary,
                     total: children.length,
                     children,
                 }
@@ -70,47 +87,48 @@ export function AilmentDetail({track, t, onClose, onEditChild}: {
             .filter((group) => group.total > 0)
     }, [track])
 
-    const groupOf = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups])
-
     const columnKeys = useMemo(() => ["parent", "slot", ...childColumns, "toggle"] as const, [childColumns])
 
-    /* 折叠只是**少给几行**：一次把该组前 `boundary`（展开则全部）行摊成 ActionRow。
-       行 id 稳定（父行键 + 槽位标签），所以折叠/展开不影响撤销栈与复制源。 */
-    const rows = useMemo<ActionRow[]>(() => {
-        const out: ActionRow[] = []
+    /* 折叠只是少给几行：行 id 稳定（父行键 + 槽位标签），折叠/展开不影响撤销栈与复制源。
+       顺手建 rowId → (组, 子元素) 的索引，两个回调不用再切字符串。 */
+    const {rows, rowMeta} = useMemo(() => {
+        const list: ActionRow[] = []
+        const meta = new Map<string, {group: Group; child: Child}>()
         for (const group of groups) {
-            const count = expanded[group.key] === true ? group.total : group.boundary
+            const count = expanded[group.row.key] === true ? group.total : group.boundary
+            const originalChildren = group.row.orig != null ? originalRows?.[group.row.orig]?.children : undefined
             for (let slot = 0; slot < count; slot++) {
                 const child = group.children[slot]
+                const original = originalChildren?.find((one) => one.tag === child.tag)
                 const values: Record<string, string> = {slot: child.tag}
                 if (slot === 0) values.parent = group.label
-                for (const column of childColumns) values[column] = child.values[column] ?? ""
-                out.push({id: `${group.key}::${child.tag}`, values, originals: {}})
+                const originals: Record<string, string> = {}
+                for (const column of childColumns) {
+                    values[column] = child.values[column] ?? ""
+                    originals[column] = original?.values[column] ?? values[column]
+                }
+                const id = `${group.row.key}::${child.tag}`
+                meta.set(id, {group, child})
+                list.push({id, values, originals})
             }
         }
-        return out
-    }, [groups, expanded, childColumns])
+        return {rows: list, rowMeta: meta}
+    }, [groups, expanded, childColumns, originalRows])
 
     const editCell = useCallback((rowId: string, column: string, value: string | null) => {
-        if (!onEditChild || !EDITABLE_COLUMNS.has(column)) return
-        const cut = rowId.indexOf("::")
-        if (cut < 0) return
-        const parentKey = rowId.slice(0, cut)
-        const tag = rowId.slice(cut + 2)
-        const next = value ?? ""
-        // 数字格：不合法就丢掉这次输入（表格会重渲染回原值），别把 "abc" 写进 BXM。
-        if (next !== "" && !Number.isFinite(Number(next))) return
-        onEditChild(parentKey, tag, column, next)
-    }, [onEditChild])
+        const hit = rowMeta.get(rowId)
+        if (!onEditChild || !hit) return
+        onEditChild(hit.group.row.key, hit.child.tag, column, value ?? "")
+    }, [onEditChild, rowMeta])
 
     /** 末列箭头：只在"折叠边界那一行"出现；展开后原地变向上。 */
     const toggleCell = useCallback((row: ActionRow): ReactNode => {
-        const cut = row.id.indexOf("::")
-        const group = groupOf.get(row.id.slice(0, cut))
-        if (!group || group.total <= group.boundary) return null
-        const boundaryTag = group.children[group.boundary - 1].tag
-        if (row.id !== `${group.key}::${boundaryTag}`) return null
-        const open = expanded[group.key] === true
+        const hit = rowMeta.get(row.id)
+        if (!hit) return null
+        const {group} = hit
+        if (group.total <= group.boundary) return null
+        if (hit.child.tag !== group.children[group.boundary - 1].tag) return null
+        const open = expanded[group.row.key] === true
         return (
             <button
                 type="button"
@@ -120,43 +138,41 @@ export function AilmentDetail({track, t, onClose, onEditChild}: {
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                     event.stopPropagation()
-                    setExpanded((prev) => ({...prev, [group.key]: !open}))
+                    setExpanded((prev) => ({...prev, [group.row.key]: !open}))
                 }}
             >
                 {open ? <ChevronsUp className="size-4" /> : <ChevronsDown className="size-4" />}
             </button>
         )
-    }, [expanded, groupOf, t])
+    }, [expanded, rowMeta, t])
 
-    const columnOf = useMemo(() => (key: string): ColumnSpec | undefined => {
+    const columnOf = useMemo(() => (key: string): ColumnSpec => {
         const muted = "text-muted-foreground"
-        // hideField：表头第二行不显示原始字段名（这一页的表头全是译名，按用户口径不露字段）。
         switch (key) {
             case "parent":
-                return {label: kind, readonly: true, width: 176, cell: muted, hideField: true}
+                return {label: kind, readonly: true, width: 176, cell: muted}
             case "slot":
-                return {label: t.ailmentColSlot, readonly: true, width: 84, cell: muted, hideField: true}
+                return {label: t.ailmentColSlot, readonly: true, width: 84, cell: muted}
             case "category":
-                return {label: t.ailmentColCategory, readonly: true, width: 104, cell: muted, hideField: true}
+                return {label: t.ailmentColCategory, readonly: true, width: 104, cell: muted}
             case "type":
-                return {label: t.ailmentColType, readonly: true, width: 104, cell: muted, hideField: true}
+                return {label: t.ailmentColType, readonly: true, width: 104, cell: muted}
             case "sec":
-                return {label: t.ailmentColSec, width: 100, cell: muted, hideField: true}
+                return {label: t.ailmentColSec, width: 100, cell: muted}
             case "rate":
-                return {label: t.ailmentColRate, width: 100, cell: muted, hideField: true}
+                return {label: t.ailmentColRate, width: 100, cell: muted}
             case "maxLv":
-                return {label: t.ailmentColMaxLv, readonly: true, width: 88, cell: muted, hideField: true}
+                return {label: t.ailmentColMaxLv, readonly: true, width: 88, cell: muted}
             case "toggle":
-                return {label: " ", readonly: true, width: 40, render: toggleCell, hideField: true}
+                return {label: " ", readonly: true, width: 40, render: toggleCell}
             default:
-                return undefined
+                return {label: key, readonly: true, width: 100, cell: muted}
         }
     }, [kind, t, toggleCell])
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-            {/* initialFocus={() => false}：弹层默认会把焦点丢给第一个可聚焦元素（= 表格第一格），
-                于是刚打开就有一圈焦点框。返回 false = 不抢焦点（与轨迹表弹层同一处理）。 */}
+            {/* 弹层默认会把焦点丢给第一个可聚焦元素（= 表格第一格），返回 false = 不抢焦点。 */}
             <DialogContent
                 initialFocus={() => false}
                 className="flex max-h-[min(800px,calc(100vh-2rem))] w-[min(1000px,calc(100vw-2rem))] flex-col gap-3 p-5 sm:max-w-none"
@@ -169,18 +185,17 @@ export function AilmentDetail({track, t, onClose, onEditChild}: {
                 {groups.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t.ailmentEmpty}</p>
                 ) : (
-                    /* 视觉随上一版：去掉左右（含外框）竖线，只留横线；选区用基座默认（8%）。
-                       背景**透明**：`--cell-editable` 置为透明（数据格），滚动外壳的 bg-background 也去掉 ——
-                       让它直接露出弹层底色，而不是再铺一层 #0a0a0a。 */
-                    <div className="flex min-h-0 flex-1 flex-col [--cell-editable:transparent] [&_.base-table-shell]:border-x-0 [&_.base-table-shell]:border-t-0 [&_.base-table-shell]:bg-transparent [&_td]:border-x-0 [&_th]:border-x-0 [&_th:nth-child(n+2)]:text-left">
+                    /* `ailment-sheet` 的表格外观（只留下边框、表头左对齐）在 style.css 里。 */
+                    <div className="ailment-sheet flex min-h-0 flex-1 flex-col [--cell-editable:var(--popover)]">
                         <ActionsTable
                             t={t}
                             rows={rows}
                             keys={columnKeys}
                             columnOf={columnOf}
                             initialSorting={NO_SORTING}
-                            initialPinnedCount={2}
                             activeCellRing
+                            showFieldNames={false}
+                            shellClassName="border-x-0 border-t-0 bg-transparent"
                             onEdit={editCell}
                         />
                     </div>
@@ -189,6 +204,4 @@ export function AilmentDetail({track, t, onClose, onEditChild}: {
         </Dialog>
     )
 }
-
-
 

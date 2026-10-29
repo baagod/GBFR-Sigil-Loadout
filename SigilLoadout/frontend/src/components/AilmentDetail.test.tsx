@@ -19,7 +19,11 @@ import {clickToEdit, stubColumnGeometry} from "@/components/actions-table/testki
 import {messages} from "@/lib/messages"
 import type {KeyedTrackTable} from "@/components/TrackGrid"
 
-afterEach(cleanup)
+afterEach(() => {
+    // `stubColumnGeometry` 的契约：装完自己收，别把桩漏给下一个文件。
+    vi.restoreAllMocks()
+    cleanup()
+})
 
 const t = messages.zh
 
@@ -99,5 +103,16 @@ describe("异常状态展开页（基座表）", () => {
         fireEvent.blur(input) // 提交在失焦/回车（与动作表同一套）
 
         expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "sec", "12.5")
+    })
+
+    it("清空最后的有值槽：已显示的行不收起（折叠边界只增不减）", async () => {
+        stubColumnGeometry()
+        const props = {t, onClose: () => {}, onEditChild: () => {}}
+        const {rerender} = render(<AilmentDetail {...props} track={track([row("a", "0.000000", "0.100000", slots(3))])} />)
+        await waitFor(() => expect(bodyRows()).toHaveLength(4))
+
+        // 槽 0~3 全清成占位：边界按数据算会缩到 1，但不该把刚编辑的那几行收走。
+        rerender(<AilmentDetail {...props} track={track([row("a", "0.000000", "0.100000", slots(null))])} />)
+        expect(bodyRows()).toHaveLength(4)
     })
 })

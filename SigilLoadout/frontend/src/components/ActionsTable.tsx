@@ -133,7 +133,7 @@ export type TableCommands = {
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, activeCellRing = false, onReady}: {
+export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, activeCellRing = false, showFieldNames = true, shellClassName, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadCharacterActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -210,6 +210,10 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
     busy?: boolean
     /** 活动格再描一圈边框（底色本来就被挖空）：Excel 那种"当前格"框。默认不画。 */
     activeCellRing?: boolean
+    /** 表头是否显示字段名那一行（默认显示；自带译名的表关掉）。 */
+    showFieldNames?: boolean
+    /** 传给 `BaseTable` 外壳（滚动框）的追加类。 */
+    shellClassName?: string
     /** 列宽量好了（= 表格可以显示了）—— 面板据此撤掉骨架（见 `ActionsPanel` 的 `tableLoading`）。 */
     onReady?: () => void
 }) {
@@ -842,6 +846,7 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                 scrollRef={scrollRef}
                 offscreen={hidden}
                 busy={busy}
+                shellClassName={shellClassName}
                 /*
                     量完列宽之后才锁布局：`table-fixed` + 显式总宽 = 每列宽度**完全照着 state 走**
                     （整数，边界落在整像素上）。没量之前保持 `table-auto` —— 那时得让浏览器先按内容
@@ -870,7 +875,7 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                     sortable={reorder !== undefined}
                     measured={measured}
                     rowHeadWidth={rowHeadWidth}
-                    hideField={(columnId) => columnOf?.(columnId)?.hideField === true}
+                    showFieldNames={showFieldNames}
                 />
                 <TableBody>
                     {/*
@@ -939,4 +944,3 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
         </ReorderDnd>
     )
 }
-

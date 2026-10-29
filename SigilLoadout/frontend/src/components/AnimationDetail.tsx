@@ -22,7 +22,8 @@ import {FLAG_KEYS, TrackGrid, type KeyedTrackRow, type KeyedTrackTable} from "@/
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import {slotEdit} from "@/lib/numericText"
 import type {TableCommands} from "@/components/ActionsTable"
-import {TrackToolbar} from "@/components/TrackToolbar"
+import {TrackToolbar, TRACK_ICON_BTN} from "@/components/TrackToolbar"
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
 import {AilmentDetail} from "@/components/AilmentDetail"
 import type {Messages} from "@/lib/messages"
 
@@ -224,7 +225,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
 
     /**
      * 改一个 ailment 槽位的一栏（Attack 行下面的 `<AilmentNN>` 子元素）。
-     * 和 `editValue` 同一套：值写进本层 state，保存时 `SaveTracks` 交整表、后端按 children 写回 XML。
+     * 清空（""）= 回到游戏原版的值：空串会让后端整个不写这个属性，数据形态就变了。
      */
     const editChild = (key: string, rowKey: string, tag: string, column: string, value: string) => {
         setTables((prev) => {
@@ -232,9 +233,12 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             if (!table) return prev
             const rows = table.rows.map((row) => {
                 if (row.key !== rowKey) return row
-                const children = (row.children ?? []).map((child) =>
-                    child.tag === tag ? {...child, values: {...child.values, [column]: value}} : child,
-                )
+                const baselineChild = baseline?.tables[key]?.rows[row.orig ?? -1]?.children?.find((child) => child.tag === tag)
+                const children = (row.children ?? []).map((child) => {
+                    if (child.tag !== tag) return child
+                    const next = value === "" ? (baselineChild?.values[column] ?? child.values[column] ?? "") : value
+                    return {...child, values: {...child.values, [column]: next}}
+                })
                 return {...row, children}
             })
             return {...prev, [key]: {...table, rows}}
@@ -439,15 +443,26 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                             />
                             {/* 最右侧的「异常状态」入口（只有 Attack 轨有子元素）。打开的是独立展开页，不动这张表。 */}
                             {info.kind === "attack" && (
-                                <Button
-                                    size="icon-sm"
-                                    variant="ghost"
-                                    className="ml-2 hover:bg-[#262626]!"
-                                    aria-label={t.ailmentTitle}
-                                    onClick={() => setAilmentKey(key)}
-                                >
-                                    <ChevronsRight />
-                                </Button>
+                                <span className="ml-2 flex">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger
+                                                render={
+                                                    <Button
+                                                        size="icon-sm"
+                                                        variant="ghost"
+                                                        className={TRACK_ICON_BTN}
+                                                        aria-label={t.ailmentTitle}
+                                                        onClick={() => setAilmentKey(key)}
+                                                    />
+                                                }
+                                            >
+                                                <ChevronsRight />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">{t.ailmentTitle}</TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </span>
                             )}
                         </div>
                     </div>
@@ -483,6 +498,8 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
 
     /** 展开页读的是**当前**那张表（编辑后再开就是最新数据）；没开/表不在就是不渲染。 */
     const ailmentTrack = ailmentKey ? tables[ailmentKey] : undefined
+    /** 同样那一条轨的**游戏原版**行：清空槽位时要回到原版的属性值。 */
+    const ailmentOriginal = ailmentKey ? baseline?.tables[ailmentKey]?.rows : undefined
 
     /* 失败条 + 滚动区。按钮排在标题那一行里（见下面的 DialogHeader）。 */
     const body = () => (
@@ -627,14 +644,13 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
             </DialogContent>
         </Dialog>
         {/* 展开页与轨迹表并排挂：不塞进上面那层弹窗的内容区，免得两层 Dialog 互相抢焦点/滚动。 */}
-        {ailmentTrack && (
+        {ailmentKey && ailmentTrack && (
             <AilmentDetail
                 track={ailmentTrack}
+                originalRows={ailmentOriginal}
                 t={t}
                 onClose={() => setAilmentKey(null)}
-                onEditChild={(rowKey, tag, column, value) => {
-                    if (ailmentKey) editChild(ailmentKey, rowKey, tag, column, value)
-                }}
+                onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
             />
         )}
         </>
