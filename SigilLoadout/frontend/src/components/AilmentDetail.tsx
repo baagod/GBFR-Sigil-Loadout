@@ -152,13 +152,13 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
     }, [expanded, rowMeta, t])
 
     /* Attack 要放下 "#N 起 – 止"，其余等宽；总宽 < 表格宽时 `table-fixed` 会把余量均摊。 */
-    const CHILD_WIDTH = 110
+    const CHILD_WIDTH = 121
 
     const columnOf = useMemo(() => (key: string): ColumnSpec => {
         const muted = "text-muted-foreground"
         switch (key) {
             case "parent":
-                return {label: kind, readonly: true, width: 200}
+                return {label: kind, readonly: true, width: 175}
             case "slot":
                 return {label: t.ailmentColSlot, readonly: true, width: CHILD_WIDTH}
             case "category":
@@ -168,7 +168,7 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
             case "sec":
                 return {label: t.ailmentColSec, width: CHILD_WIDTH, cell: muted}
             case "rate":
-                return {label: t.ailmentColRate, width: 140, cell: muted, trailing: (row) => toggleButton(row.id)}
+                return {label: t.ailmentColRate, width: CHILD_WIDTH, cell: muted, trailing: (row) => toggleButton(row.id)}
             case "maxLv":
                 return {label: t.ailmentColMaxLv, readonly: true, width: CHILD_WIDTH, cell: muted}
             default:
@@ -210,6 +210,8 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         </Dialog>
     )
 }
+
+
 
 
 
