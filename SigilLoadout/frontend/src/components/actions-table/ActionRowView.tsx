@@ -45,6 +45,7 @@ const RowCell = memo(function RowCell({
     edit,
     startCellSelection,
     onEnterEdit,
+    trailing,
     children,
 }: {
     cell: Cell<typeof features, ActionRow>
@@ -76,6 +77,8 @@ const RowCell = memo(function RowCell({
     edit: (rowId: string, key: string, value: string | null) => void
     startCellSelection: (cell: Cell<typeof features, ActionRow>, e: ReactMouseEvent) => void
     onEnterEdit: () => void
+    /** 列给的格右自定义靶子（见 `ColumnSpec.trailing`）。 */
+    trailing?: ReactNode
     /** 自定义内容（调用方用 `ColumnSpec.render` 给了就用它，否则渲染 `CellContent`）。 */
     children?: ReactNode
 }) {
@@ -114,6 +117,7 @@ const RowCell = memo(function RowCell({
                     draggedRef={draggedRef}
                     edit={edit}
                     onEnterEdit={onEnterEdit}
+                    trailing={trailing}
                 />
             )}
         </TableCell>
@@ -291,6 +295,7 @@ export const ActionRowView = memo(function ActionRowView({
                         edit={edit}
                         startCellSelection={startCellSelection}
                         onEnterEdit={onEnterEdit}
+                        trailing={columnOf?.(key)?.trailing?.(row.original)}
                     >
                         {/* 列自带渲染（`ColumnSpec.render`，只读列专用）—— 不给就照旧渲染格子内容。 */}
                         {columnOf?.(key)?.render?.(row.original)}

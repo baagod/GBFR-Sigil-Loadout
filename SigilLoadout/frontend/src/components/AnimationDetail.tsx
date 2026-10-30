@@ -600,15 +600,24 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
         同一个色（表格自己那些行线走 --input，比它亮一档）。
     */
     return (
-        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-            {/* 尺寸 1080 × 800（用户给的），**但绝不能超出主窗口**。
+        <>
+            {/* 展开页开着时这一层不响应 Esc：两层的 Esc 各自独立，先关的必须是上层。
+                （展开页关掉后 `ailmentKey` 变 null，下一次 Esc 才轮到这一层。） */}
+            <Dialog
+                open
+                onOpenChange={(next) => {
+                    if (next) return
+                    if (ailmentKey) return // 上层还开着：这一层的 Esc 不响应（见上）
+                    onClose()
+                }}
+            >
+            {/* 尺寸上限 1080 × 1080；离主窗口的边距：左右 20px、上下 32px（视口更小时按边距收）。
                 这里踩过两个坑，别再往回改：
                 1) 基类里那条 `sm:max-w-md`（448px）带变体，无变体的 `max-w-full` 顶不掉它
                    → 必须用**同变体**的 `sm:max-w-none` 把它放掉；
                 2) 反过来，若在调用点写 `sm:max-w-[1080px]`，它在 ≥sm 时**压过** `max-w-full`
                    （媒体查询里的声明更晚生效）→ 窗口只有 900 宽时弹层照样 1080、直接溢出去 ✗
-                   （用户截图就是这一版）。所以宽度写成 `min(1080px, 100vw - 2rem)` 自带视口兜底。
-                高度同思路：目标 800，小窗口下 `calc(100vh - 2rem)` 兜底（和宽度同样留 16px 边）。 */}
+                   （用户截图就是这一版）。所以宽高都写成 `min(1080px, 100vw/vh - 边距)`。 */}
             <DialogContent
                 ref={popupRef}
                 showCloseButton={false}
@@ -619,7 +628,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                  * （这是 Base UI `DialogPopup` 自带的 prop，见 DialogPopup.d.ts:24 ✓）
                  */
                 initialFocus={() => false}
-                className="flex h-[min(800px,calc(100vh-2rem))] w-[min(1080px,calc(100vw-2rem))] flex-col sm:max-w-none"
+                className="flex h-[min(1080px,calc(100vh-64px))] w-[min(1080px,calc(100vw-40px))] flex-col sm:max-w-none"
             >
                 {/* 标题行 = 按钮行：左标题、右「保存 / 取消」，`border-b pb-4` 就是标题下面那条线。
                     行内用 flex 两端对齐（DialogHeader 自己是 flex-col，所以里面再包一层 flex-row）。 */}
@@ -637,19 +646,21 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     </div>
                 </DialogHeader>
                 {body()}
-                {/* 展开页嵌在这层的 React 树里（仍各自 portal）：Base UI 的弹层栈认得上下层，Esc 只关最上面那层。 */}
-                {ailmentKey && ailmentTrack && (
-                    <AilmentDetail
-                        track={ailmentTrack}
-                        originalRows={ailmentOriginal}
-                        t={t}
-                        onClose={() => setAilmentKey(null)}
-                        finalFocus={() => popupRef.current}
-                        onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
-                    />
-                )}
             </DialogContent>
-        </Dialog>
+            </Dialog>
+            {/* 展开页是**另一层默认 Dialog**（不是嵌在上面的 React 树里）：这样它有自己的遮罩层；
+                嵌进去的话 Base UI 当成同一个模态栈，不会再画第二层蒙版。 */}
+            {ailmentKey && ailmentTrack && (
+                <AilmentDetail
+                    track={ailmentTrack}
+                    originalRows={ailmentOriginal}
+                    t={t}
+                    onClose={() => setAilmentKey(null)}
+                    finalFocus={() => popupRef.current}
+                    onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
+                />
+            )}
+        </>
     )
 }
 

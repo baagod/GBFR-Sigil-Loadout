@@ -7,10 +7,11 @@
     折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径）：
     默认显示到最后一个有值的槽（没有值就 1 行），末列箭头展开剩余槽、再收起。
 */
-import {useCallback, useMemo, useState, type ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useState, type ReactNode} from "react"
 import {ChevronsDown, ChevronsUp} from "lucide-react"
 
 import {ActionsTable} from "@/components/ActionsTable"
+import {TRAILING_BTN} from "@/components/actions-table/classes"
 import type {ActionRow, ColumnSpec} from "@/components/actions-table/model"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {NO_SORTING, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
@@ -57,6 +58,21 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
     )
     const kind = track.kind.charAt(0).toUpperCase() + track.kind.slice(1)
 
+    /* 这一层是**独立的默认 Dialog**（不是嵌在上层里），所以 Esc 自己收：挂在 document 捕获阶段，
+       编辑态（输入框里按 Esc）交给基座自己退编辑。 */
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return
+            const target = event.target instanceof HTMLElement ? event.target : null
+            if (target?.closest("input, textarea, [contenteditable='true']")) return
+            event.preventDefault()
+            event.stopPropagation()
+            onClose()
+        }
+        document.addEventListener("keydown", onKeyDown, true)
+        return () => document.removeEventListener("keydown", onKeyDown, true)
+    }, [onClose])
+
     const groups = useMemo<Group[]>(() => {
         return track.rows
             .map((row, index) => {
@@ -72,7 +88,7 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
             .filter((group) => group.total > 0)
     }, [track, frozenBoundary])
 
-    const columnKeys = useMemo(() => ["parent", "slot", ...childColumns, "toggle"] as const, [childColumns])
+    const columnKeys = useMemo(() => ["parent", "slot", ...childColumns] as const, [childColumns])
 
     /* 行 id = 父行键 + 槽位标签，折叠/展开不影响撤销栈与复制源；索引让两个回调 O(1) 反查。 */
     const {rows, rowMeta} = useMemo(() => {
@@ -107,9 +123,9 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         onEditChild(hit.group.row.key, hit.child.tag, column, resolved)
     }, [onEditChild, rowMeta])
 
-    /** 末列箭头：只在"折叠边界那一行"出现；展开后原地变向上。 */
-    const toggleCell = useCallback((row: ActionRow): ReactNode => {
-        const hit = rowMeta.get(row.id)
+    /** 「强度」格右端的箭头：只在"折叠边界那一行"出现在格内；展开后原地变向上。 */
+    const toggleButton = useCallback((rowId: string): ReactNode => {
+        const hit = rowMeta.get(rowId)
         if (!hit) return null
         const {group} = hit
         if (group.total <= group.boundary) return null
@@ -118,10 +134,13 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         return (
             <button
                 type="button"
-                className="flex size-7 cursor-cell items-center justify-center text-muted-foreground hover:text-foreground"
+                className={TRAILING_BTN}
                 aria-label={open ? t.ailmentCollapse : t.ailmentExpand}
                 aria-expanded={open}
-                onMouseDown={(event) => event.stopPropagation()}
+                onMouseDown={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }}
                 onClick={(event) => {
                     event.stopPropagation()
                     setExpanded((prev) => ({...prev, [group.row.key]: !open}))
@@ -132,36 +151,37 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         )
     }, [expanded, rowMeta, t])
 
+    /* Attack 要放下 "#N 起 – 止"，其余等宽；总宽 < 表格宽时 `table-fixed` 会把余量均摊。 */
+    const CHILD_WIDTH = 110
+
     const columnOf = useMemo(() => (key: string): ColumnSpec => {
         const muted = "text-muted-foreground"
         switch (key) {
             case "parent":
-                return {label: kind, readonly: true, width: 176}
+                return {label: kind, readonly: true, width: 200}
             case "slot":
-                return {label: t.ailmentColSlot, readonly: true, width: 84}
+                return {label: t.ailmentColSlot, readonly: true, width: CHILD_WIDTH}
             case "category":
-                return {label: t.ailmentColCategory, width: 104, cell: muted}
+                return {label: t.ailmentColCategory, width: CHILD_WIDTH, cell: muted}
             case "type":
-                return {label: t.ailmentColType, width: 104, cell: muted}
+                return {label: t.ailmentColType, width: CHILD_WIDTH, cell: muted}
             case "sec":
-                return {label: t.ailmentColSec, width: 100, cell: muted}
+                return {label: t.ailmentColSec, width: CHILD_WIDTH, cell: muted}
             case "rate":
-                return {label: t.ailmentColRate, width: 100, cell: muted}
+                return {label: t.ailmentColRate, width: 140, cell: muted, trailing: (row) => toggleButton(row.id)}
             case "maxLv":
-                return {label: t.ailmentColMaxLv, readonly: true, width: 88, cell: muted}
-            case "toggle":
-                return {label: " ", readonly: true, width: 40, render: toggleCell}
+                return {label: t.ailmentColMaxLv, readonly: true, width: CHILD_WIDTH, cell: muted}
             default:
-                return {label: key, readonly: true, width: 100, cell: muted}
+                return {label: key, readonly: true, width: CHILD_WIDTH, cell: muted}
         }
-    }, [kind, t, toggleCell])
+    }, [kind, t, toggleButton])
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent
                 initialFocus={() => false}
                 finalFocus={finalFocus}
-                className="ailment-popup flex max-h-[min(800px,calc(100vh-2rem))] w-[min(1000px,calc(100vw-2rem))] flex-col gap-3 p-5 sm:max-w-none"
+                className="ailment-popup flex max-h-[min(1080px,calc(100vh-64px))] w-[min(1080px,calc(100vw-40px))] flex-col gap-3 p-5 sm:max-w-none"
             >
                 <DialogHeader className="border-b pb-3">
                     <DialogTitle className="text-base font-medium">
@@ -178,6 +198,9 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
                             keys={columnKeys}
                             columnOf={columnOf}
                             initialSorting={NO_SORTING}
+                            /* 不冻结列：表格正好铺满、不会横滚；冻结会让第一列非冻结列的选区左边框
+                               被"避让冻结列"改画到格内，看起来跟其它列的左间距不一致。 */
+                            initialPinnedCount={0}
                             showFieldNames={false}
                             onEdit={editCell}
                         />
@@ -187,6 +210,10 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
         </Dialog>
     )
 }
+
+
+
+
 
 
 

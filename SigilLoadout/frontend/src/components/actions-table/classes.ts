@@ -132,6 +132,13 @@ export const HEAD_HEIGHT = "h-10"
  */
 export const CELL_PADDING = "pl-1 pr-2 py-0.5"
 
+/**
+ * 格右端那个靶子（`···` 详情 / 展开箭头）：**靠格右端**显示，自身左右内边距各 8px（`px-2`）；
+ * `-mr-2` 吃掉格子的右内边距，让图标真正贴到格右缘。想再调只改这一处（基座与各页面共用）。
+ */
+export const TRAILING_BTN =
+    "-mr-2 flex shrink-0 cursor-pointer items-center self-stretch px-2 text-muted-foreground/50 hover:text-foreground"
+
 
 /**
  * **只读格 / 表头**的内边距：左右**对等**。
@@ -230,3 +237,4 @@ export const HEAD_CELL = `sticky top-0 z-20 ${HEAD_HEIGHT} border-r border-b ${H
  * 选区外观（底色/轮廓/活动格）由 overlay 画，这里不再有任何选区类名。
  */
 export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
+

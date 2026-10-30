@@ -6,7 +6,7 @@ import {memo, useCallback, useContext, useRef, useState, type FocusEvent as Reac
 
 import {MoreHorizontal} from "lucide-react"
 import {CellPick} from "./CellPick"
-import {CELL_PADDING, FONT, INPUT_PADDING, READONLY_PADDING} from "./classes"
+import {CELL_PADDING, FONT, INPUT_PADDING, READONLY_PADDING, TRAILING_BTN} from "./classes"
 import {BranchPickContext, DrillContext, PickerOfContext, RevealContext, UNSET, useEnterEditHandler, type BranchPickConfig, type ColumnKind, type DrillSpec, snapshotKey} from "./model"
 import {CELL_CHOICES} from "@/lib/controltypes"
 
@@ -41,6 +41,7 @@ export const CellContent = memo(function CellContent({
     draggedRef,
     edit,
     onEnterEdit,
+    trailing,
 }: {
     rowId: string
     fieldKey: string
@@ -59,6 +60,8 @@ export const CellContent = memo(function CellContent({
     edit: (rowId: string, key: string, value: string | null) => void
     /** 进入编辑态时喊一声（复制源那圈虚线要撤，见 `CopySource` 那段规则②）。 */
     onEnterEdit: () => void
+    /** 列给的格右自定义靶子（见 `ColumnSpec.trailing`；与 `···` 详情靶子同一个槽）。 */
+    trailing?: ReactNode
 }) {
     // 分支列选值格的清单与搜索提示（见 `BranchPickContext`）—— 只读列用不到，但 hook 必须无条件调用。
     const branchPick = useContext(BranchPickContext)
@@ -140,6 +143,7 @@ export const CellContent = memo(function CellContent({
             dragged={draggedRef}
             onEnterEdit={onEnterEdit}
             drill={drillOf(fieldKey, shown)}
+            trailing={trailing}
         />
     )
 })
@@ -199,7 +203,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
                 `truncate` 对裸文字节点不生效，得包一层）。
                 **没有 trailing 时别给 `flex-1`**：那一撑满，父层的 `justify-center` 就没有可居中的
                 余量了（配置列居中的 bug 就是这么来的）；`min-w-0` 仍够长文本压缩出省略号。
-                有 trailing（详情靶子）时才 `flex-1`，把它顶到格右端。 */}
+                有 trailing（详情靶子）时才 `flex-1`：把它顶到格右端（用户口径：图标靠右）。 */}
             <span className={trailing ? "min-w-0 flex-1 truncate" : "min-w-0 truncate"}>{text}</span>
             {trailing}
         </div>
@@ -214,7 +218,7 @@ function CellText({text, padding = CELL_PADDING, muted = false, onDoubleClick, h
  *
  * ⚠️ 只读列**不走这里**（它没有编辑态）：见 `CellContent` 里那一支 —— 双击进的是显示层自己的可选态。
  */
-export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit, drill}: {
+export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged, onEnterEdit, drill, trailing}: {
     /** 这一格所在的行 id（与 `fieldKey` 一起拼出"格键"，登记 Enter 用）。 */
     rowId: string
     /** 这一格的列名（同上）。 */
@@ -236,14 +240,15 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
     dragged: RefObject<boolean>
     /** 有它就在格右端给一个 `···` 靶子：点它开详情，**不选格、不进编辑**（见 `DrillContext`）。 */
     drill?: DrillSpec
+    /** 列给的格右自定义靶子（见 `ColumnSpec.trailing`）：优先于 `···`。 */
+    trailing?: ReactNode
 }) {
     /*
         ‼️ **详情靶子**（`···`）：只吃格右端那十几像素。按下先 `preventDefault` + `stopPropagation`
         —— 这一下**只开详情**：不选格、不起拖（`td` 的 mousedown 会开始选区），也不让焦点落进来
         （焦点一进这格就画上聚焦环）。与握把那格同一个先例。
         ‼️ `shrink-0` 也**别删**：文字那层是 `flex-1 min-w-0`，按钮默认 `shrink: 1` —— 不加就会被压成一条
-        （真机看到的就是那个细条）。内边距按用户口径：右 12px、左 8px、上下**通高**（`self-stretch` 跟行高），
-        于是点击范围是"文字右侧一整块"，虽然看不见方块。
+        （真机看到的就是那个细条）。间距全在 `classes.ts` 的 `TRAILING_BTN`（左右各 8px、上下通高）。
         ⚠️ `cursor-pointer` **别删**（简化布局那次连它一起删了，手光标就没了）；也**不用 `Button variant="ghost"`**（用户口径）：ghost 自带 hover 底色，在这一格里就是多出一块
         按钮面；这里只要"图标自己在悬停时亮起来"。位置也不靠绝对定位 + 补偿内边距 —— 走 `trailing` 槽。
         ⚠️ **不挂 `title`**（用户口径：不要原生悬停提示，表头列名那条同理）—— `aria-label` 留着（读屏要它）。
@@ -258,7 +263,7 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
             onClick={() => drill.open(shown, rowId)}
             aria-label={drill.label}
             data-drill=""
-            className="-mr-2 flex shrink-0 cursor-pointer items-center self-stretch px-2 text-muted-foreground/50 hover:text-foreground"
+            className={TRAILING_BTN}
         >
             <MoreHorizontal className="size-4" />
         </button>
@@ -319,7 +324,7 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
                 onDoubleClick={() => {
                     if (!dragged.current) enterEdit()
                 }}
-                trailing={editing ? undefined : drillTarget}
+                trailing={editing ? undefined : (trailing ?? drillTarget)}
                 hidden={editing}
                 // 编辑中别让它进 Tab 序列（上面已经压着输入框）；显示态可聚焦，Esc 才有地方落焦点。
                 tabIndex={editing ? -1 : 0}
@@ -388,3 +393,8 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
         </>
     )
 }
+
+
+
+
+

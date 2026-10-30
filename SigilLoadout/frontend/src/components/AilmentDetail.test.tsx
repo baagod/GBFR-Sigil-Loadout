@@ -7,7 +7,6 @@
     不能从 `render()` 返回的容器查。
 */
 import {afterEach, describe, expect, it, vi} from "vitest"
-import {useState} from "react"
 import {cleanup, fireEvent, render, waitFor} from "@testing-library/react"
 
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
@@ -17,7 +16,6 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 
 import {AilmentDetail} from "@/components/AilmentDetail"
 import {clickToEdit, stubColumnGeometry} from "@/components/actions-table/testkit"
-import {Dialog, DialogContent} from "@/components/ui/dialog"
 import {messages} from "@/lib/messages"
 import type {KeyedTrackTable} from "@/components/TrackGrid"
 import type {TrackRow} from "../../bindings/sigilloadout/service/models"
@@ -144,35 +142,15 @@ describe("异常状态展开页（基座表）", () => {
         expect(bodyRows()).toHaveLength(4)
     })
 
-    it("嵌套弹层：Esc 只关展开页，外层还在", async () => {
+    it("Esc 关掉这一层（编辑态交给基座输入框，不在这测）", async () => {
         stubColumnGeometry()
-        let outerOpen = true
-        const Wrapper = () => {
-            const [outer, setOuter] = useState(true)
-            const [inner, setInner] = useState(true)
-            outerOpen = outer
-            return (
-                <Dialog open={outer} onOpenChange={setOuter}>
-                    <DialogContent>
-                        <span>outer</span>
-                        {inner && (
-                            <AilmentDetail
-                                t={t}
-                                onClose={() => setInner(false)}
-                                track={track([row("a", "0.000000", "0.100000", slots(0))])}
-                            />
-                        )}
-                    </DialogContent>
-                </Dialog>
-            )
-        }
-
-        render(<Wrapper />)
+        const onClose = vi.fn()
+        render(<AilmentDetail t={t} onClose={onClose} track={track([row("a", "0.000000", "0.100000", slots(0))])} />)
         await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
-        fireEvent.keyDown(document, {key: "Escape"})
 
-        await waitFor(() => expect(byId("td", "sec")).toBeNull())
-        expect(outerOpen).toBe(true)
+        fireEvent.keyDown(document, {key: "Escape"})
+        expect(onClose).toHaveBeenCalledTimes(1)
     })
 })
+
 

@@ -100,10 +100,12 @@ export function useSelectionOverlay({
                 return {
                     kind: head ? "rowhead" : "column",
                     id: th.dataset.colId ?? null,
-                    width: th.offsetWidth,
+                    /* ‼️ 用实测矩形、不是 `offsetWidth`：列宽被 `table-fixed` 均摊后是小数，
+                       取整会让 overlay 与真实格线越差越远（末尾几列能差 0.6px → 活动格左边多出一线）。 */
+                    width: th.getBoundingClientRect().width / layoutScale,
                 }
             })
-            const tableWidth = tableEl.offsetWidth
+            const tableWidth = tableRect.width / layoutScale
             setMetrics((prev) =>
                 prev.headerHeight === headerHeight &&
                 sameRowHeights(prev.rowHeights, rowHeights) &&
