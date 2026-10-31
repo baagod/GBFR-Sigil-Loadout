@@ -92,20 +92,6 @@ describe("异常状态展开页（基座表）", () => {
         await waitFor(() => expect(bodyRows()).toHaveLength(1))
     })
 
-    it("双击展开箭头不进「强度」编辑", async () => {
-        stubColumnGeometry()
-        render(<AilmentDetail t={t} onClose={() => {}} onEditChild={() => {}} track={track([row("a", "0.000000", "0.100000", slots(0))])} />)
-        await waitFor(() => expect(bodyRows()).toHaveLength(1))
-
-        const expand = document.body.querySelector(`button[aria-label="${t.ailmentExpand}"]`) as HTMLElement
-        fireEvent.click(expand)
-        await waitFor(() => expect(bodyRows()).toHaveLength(16))
-
-        const collapse = document.body.querySelector(`button[aria-label="${t.ailmentCollapse}"]`) as HTMLElement
-        fireEvent.doubleClick(collapse)
-        await waitFor(() => expect(byId("td", "rate")!.querySelector("input")).toBeNull())
-    })
-
     it("编辑持续秒数：onEditChild 收到 (父行键, 槽位标签, 列, 新值)", async () => {
         stubColumnGeometry()
         const onEditChild = vi.fn()

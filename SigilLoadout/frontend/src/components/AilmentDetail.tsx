@@ -141,7 +141,6 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
                     event.preventDefault()
                     event.stopPropagation()
                 }}
-                onDoubleClick={(event) => event.stopPropagation()}
                 onClick={(event) => {
                     event.stopPropagation()
                     const next = group.open ? group.collapsed : group.total
