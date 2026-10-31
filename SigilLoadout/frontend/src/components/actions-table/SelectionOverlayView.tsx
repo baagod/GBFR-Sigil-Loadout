@@ -4,10 +4,11 @@
     为什么用 overlay：选区变化只改这一层的若干 div（paint-only），不碰单元格 DOM、不参与表格布局，
     因此不会触发表格重排（真机 trace 目标：Layout 0）。
 
-    三层（与现有提层关系对齐）：
-      · scrolled 层 z-41：普通格之上、冻结列之下（冻结列会盖住滚过去的选区）；
-      · pinned 层 z-52：冻结列之上、吸顶表头行（z-60）之下；横向滚动由 `sticky left-0` 原生跟随；
-      · copy 层 z-53：复制虚线永远压在选区/行头指示线之上，再高就只有吸顶表头。
+    四层（与现有提层关系对齐）：
+      · scrolled 选区层 z-41：普通格之上、冻结列之下（冻结列会盖住滚过去的选区）；
+      · scrolled copy 层 z-42：压在滚动选区上、仍在冻结列之下 —— 复制虚线不能盖住冻结列；
+      · pinned 选区层 z-52：冻结列之上、吸顶表头行（z-60）之下；横向滚动由 `sticky left-0` 原生跟随；
+      · pinned copy 层 z-53：只在冻结列区重画复制虚线，压在钉住选区之上。
 */
 import type {CSSProperties} from "react"
 
@@ -73,7 +74,7 @@ function Layer({model}: {model: LayerModel}) {
     )
 }
 
-/** 复制虚线单独一层：永远压在选区/行头指示线之上。 */
+/** 复制虚线单独一层：滚动区在冻结列之下，冻结区在钉住选区之上。 */
 function CopyLayer({cells}: {cells: CopyCell[]}) {
     return (
         <>
@@ -120,11 +121,12 @@ export function SelectionOverlay({
                 </div>
             </div>
             {/*
-                复制虚线（最高层，z-53）：压在选区轮廓与行头指示边框之上。
+                复制虚线拆两层：滚动区 z-42（在冻结列之下，横滚时被冻结列裁掉），
+                冻结区 z-53（压在钉住选区与冻结列之上）。
                 与上面两层同构：滚动内容一份、`sticky left-0` 的钉住区一份。
             */}
             <div
-                className="pointer-events-none absolute top-0 left-0 z-[53] overflow-hidden"
+                className="pointer-events-none absolute top-0 left-0 z-[42] overflow-hidden"
                 style={{width: `${width}px`, height: `${height}px`}}
                 aria-hidden
             >

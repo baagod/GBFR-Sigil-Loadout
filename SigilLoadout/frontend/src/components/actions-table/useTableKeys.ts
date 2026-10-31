@@ -131,7 +131,7 @@ export function useTableKeys({tableInstanceRef, tableRef, enterEditRegistry, cel
         )
         /* 编辑框 / 选值列表优先：C/X 要各自判断"值格自己收下"，其余表格命令一律让路。 */
         if (!isCopy && !isCut && insideEditorOrList) return
-        /* Ctrl+C 还多一类让路：值格自己收下 Ctrl+C（`data-copy-own` = 复制这一格的值，不是整行）。 */
+        /* Ctrl+C 还多一类让路：弹层里的输入框/内容自己处理（`data-copy-own`），不复制背后的表格。 */
         const ownsCopy = (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], [data-copy-own]")
         /*
             ---- Ctrl+C：行剪贴板（给 Ctrl+Shift+V 插行用）----

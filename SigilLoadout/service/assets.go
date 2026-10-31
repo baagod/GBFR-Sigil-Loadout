@@ -142,6 +142,9 @@ func loadAssetsFrom(dir string) error {
 	if err := loadParamLabels(dir); err != nil {
 		return err
 	}
+	if err := loadStatusTable(dir); err != nil {
+		return err
+	}
 	return loadSkillboardTables(dir)
 }
 

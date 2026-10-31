@@ -74,7 +74,8 @@
 
     /* 层高刻度（页面级）：别的页（专精技能吸顶行）也用 `var(--z-focus)`；写在 `table` 里只有表格
        子树解析得到，别的页会整条 `z-index` 失效、被吸顶行压住。
-       ⚠️ 选区 overlay 两层用内联 `z-41` / `z-52`（见 `SelectionOverlayView.tsx`），与下面那段阶梯对齐。 */
+       ⚠️ 选区 overlay 四层用内联 `z-41` / `z-42` / `z-52` / `z-53`（见 `SelectionOverlayView.tsx`），
+       与下面那段阶梯对齐。 */
     --z-focus:              30;
     --z-pinned:             50;
 }
@@ -246,21 +247,18 @@ table.base-table tbody tr:hover {
     background-color: transparent;
 }
 
-/* 基表底线只由外壳给：最后一行的格不再画下边框。
-   外壳 border-b 1px + 末行 td border-b 1px 相邻会叠成 2px（高度够时尤其明显），
-   去掉末行那条之后，无论表是"刚好放下"还是"滚起来"，底边都恒为 1px。 */
-table.base-table tbody tr:last-child > td {
-    border-bottom-width: 0;
-}
+/* 基表底线由末行格子给（主表的外框照旧由外壳画）；异常状态弹层不要外框，见下面的 `.ailment-sheet`。 */
 
 /*
     ============ 提层阶梯（唯一一份） ============
 
-      焦点环 --z-focus(30)  <  选区 overlay 滚动层 41  <  冻结层 --z-pinned(50)
-                            <  选区 overlay 钉住层 52  <  吸顶表头行 60  <  弹窗分节标题 70
+      焦点环 --z-focus(30)  <  选区 overlay 滚动层 41  <  复制虚线滚动层 42  <  冻结层 --z-pinned(50)
+                            <  选区 overlay 钉住层 52  <  复制虚线冻结层 53  <  吸顶表头行 60
+                            <  弹窗分节标题 70
 
-    · 选区外观由 `SelectionOverlay` 画：滚动层 z-41 在普通格之上、冻结列之下；钉住层 z-52 在冻结列之上、
-      吸顶表头之下。
+    · 选区外观由 `SelectionOverlay` 画：滚动层 z-41 在普通格之上、冻结列之下；复制虚线滚动层 z-42 也在
+      冻结列之下（横滚时复制虚线不能盖住冻结列）；钉住层 z-52 在冻结列之上、吸顶表头之下；复制虚线冻结
+      层 z-53 压在钉住层之上。
     · 冻结区必须压过横滚内容（否则点击被抢）；吸顶表头 60 是**表格内部**最高层；弹窗标题在表之外，
       必须更高，否则表头穿透标题。
     ‼️ `th` 与 `td` 都要覆盖，且必须用 `table td.cell-pinned`（(0,1,2)）—— 只写 `td.cell-pinned` 会与提层
@@ -342,13 +340,10 @@ input[aria-hidden="true"][style*="position: fixed"] {
     translate: none;
 }
 
-/* 「异常状态」展开页的表皮：只留横线（左右格线去掉），表头除行号列外左对齐，
-   活动格（`cell-active`）一条 1px 内描边；外壳不画左右/上边框、底色透明。
-   底线由外壳的 border-b 给（末行的格边框已被基表规则去掉），恒为 1px。 */
+/* 「异常状态」展开页的表皮：**不要外框**，横线全部由格子给；表头除行号列外左对齐，
+   活动格（`cell-active`）一条 1px 内描边，底色透明。 */
 .ailment-sheet .base-table-shell {
-    border-top-width: 0;
-    border-right-width: 0;
-    border-left-width: 0;
+    border-width: 0;
     background-color: transparent;
 }
 

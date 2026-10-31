@@ -15,7 +15,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {AilmentDetail} from "@/components/AilmentDetail"
-import {clickToEdit, stubColumnGeometry} from "@/components/actions-table/testkit"
+import {clickToEdit, clipboardStub, hasCopyBounds, openPick, pickItems, clickItem, stubColumnGeometry} from "@/components/actions-table/testkit"
 import {messages} from "@/lib/messages"
 import type {KeyedTrackTable} from "@/components/TrackGrid"
 import type {TrackRow} from "../../bindings/sigilloadout/service/models"
@@ -73,6 +73,8 @@ describe("异常状态展开页（基座表）", () => {
         // a: 有值在槽 2 → 3 行；b: 全占位 → 1 行
         expect(bodyRows()).toHaveLength(4)
         expect(byId("th", "slot")!.textContent).toContain(t.ailmentColSlot)
+        expect(byId("th", "parent")!.textContent).toContain(t.ailmentColTime)
+        expect(byId("td", "slot")!.textContent).toBe("00")
     })
 
     it("末列箭头展开剩余槽、再点收起", async () => {
@@ -140,6 +142,101 @@ describe("异常状态展开页（基座表）", () => {
         // 槽 0~3 全清成占位：边界按数据算会缩到 1，但不该把刚编辑的那几行收走。
         rerender(<AilmentDetail {...props} track={track([row("a", "0.000000", "0.100000", slots(null))])} />)
         expect(bodyRows()).toHaveLength(4)
+    })
+
+    it("有 statusCatalog 时 [类别]/[类型] 显示译名（值仍是十进制）", async () => {
+        stubColumnGeometry()
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={() => {}}
+                onEditChild={() => {}}
+                statusCatalog={{
+                    categories: [{key: "2027311463", label: "异常", category: ""}],
+                    types: [{key: "4135089318", label: "恐惧", category: "2027311463"}],
+                }}
+                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "type")).not.toBeNull())
+        expect(byId("td", "category")!.textContent).toContain("异常")
+        expect(byId("td", "type")!.textContent).toContain("恐惧")
+    })
+
+    it("[类型] 按类别分组，且不画分割线", async () => {
+        stubColumnGeometry()
+        const onEditChild = vi.fn()
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={() => {}}
+                onEditChild={onEditChild}
+                statusCatalog={{
+                    categories: [
+                        {key: "2027311463", label: "异常", category: ""},
+                        {key: "2631112578", label: "状态", category: ""},
+                    ],
+                    types: [
+                        {key: "4135089318", label: "恐惧", category: "2027311463"},
+                        {key: "3525225941", label: "攻击DOWN", category: "2027311463"},
+                        {key: "3177074653", label: "无", category: "2631112578"},
+                    ],
+                }}
+                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "type")).not.toBeNull())
+        await openPick(byId("td", "type") as HTMLElement)
+        await waitFor(() => expect(pickItems().length).toBe(3))
+
+        const labels = [...document.body.querySelectorAll('[data-slot="combobox-label"]')].map((el) => el.textContent)
+        expect(labels).toEqual(["异常", "状态"])
+        expect(document.body.querySelector('[data-slot="combobox-separator"]')).toBeNull()
+
+        clickItem("无")
+        expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "type", "3177074653")
+    })
+
+    it("选值格区域复制/粘贴：复制的是两列 TSV，粘回去按列写", async () => {
+        stubColumnGeometry()
+        const onEditChild = vi.fn()
+        const statusCatalog = {
+            categories: [{key: "2027311463", label: "异常", category: ""}],
+            types: [{key: "4135089318", label: "恐惧", category: "2027311463"}],
+        }
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={() => {}}
+                onEditChild={onEditChild}
+                statusCatalog={statusCatalog}
+                track={track([row("a", "0.000000", "0.100000", slots(0)), row("b", "0.200000", "0.300000", slots(0))])}
+            />,
+        )
+        const cells = () => document.body.querySelectorAll('td[data-col-id="category"], td[data-col-id="type"]')
+        await waitFor(() => expect(cells()).toHaveLength(4))
+
+        const category0 = document.body.querySelectorAll('td[data-col-id="category"]')[0] as HTMLElement
+        const type0 = document.body.querySelectorAll('td[data-col-id="type"]')[0] as HTMLElement
+        fireEvent.mouseDown(category0)
+        fireEvent.mouseEnter(type0)
+        fireEvent.mouseUp(type0)
+
+        // 焦点在选值格触发器上按 Ctrl+C 不能被这一格吃掉：表格要能接管选区复制。
+        const trigger = type0.querySelector('[tabindex="0"]') as HTMLElement
+        expect(fireEvent.keyDown(trigger, {key: "c", ctrlKey: true})).toBe(true)
+
+        const clipboard = clipboardStub()
+        fireEvent.copy(category0, {clipboardData: clipboard})
+        expect(clipboard.data["text/plain"]).toBe("2027311463\t4135089318")
+        expect(hasCopyBounds(document.body)).toBe(true)
+
+        const category1 = document.body.querySelectorAll('td[data-col-id="category"]')[1] as HTMLElement
+        fireEvent.mouseDown(category1)
+        fireEvent.mouseUp(category1)
+        fireEvent.paste(category1, {clipboardData: clipboardStub("2027311463\t4135089318")})
+        expect(onEditChild).toHaveBeenCalledWith("b", "Ailment00", "category", "2027311463")
+        expect(onEditChild).toHaveBeenCalledWith("b", "Ailment00", "type", "4135089318")
     })
 
     it("Esc 关掉这一层（编辑态交给基座输入框，不在这测）", async () => {

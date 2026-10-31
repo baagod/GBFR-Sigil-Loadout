@@ -11,7 +11,7 @@ import {
     SaveFlags,
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
-import {TrackRow, TrackTable, type MotInfo, type TrackInfo} from "../../bindings/sigilloadout/service/models"
+import {TrackRow, TrackTable, type MotInfo, type StatusCatalog, type TrackInfo} from "../../bindings/sigilloadout/service/models"
 import {MotInfo as LoadMotInfo, MotScale as LoadMotScale, ScaleMotRootMotion} from "../../bindings/sigilloadout/service/gameservice"
 import {Button} from "@/components/ui/button"
 import {EditableCell} from "@/components/EditableCell"
@@ -69,10 +69,12 @@ Attack（判定盒，伤害在这）、Effect（特效调用，火柱在这）�
  * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「轨迹表」的清单里点一个号。
  * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨。
  */
-export function AnimationDetail({motion, charCode, t, onClose}: {
+export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     motion: string
     charCode: string
     t: Messages
+    /** [类别] / [类型] 选值格的选项（当前语言）；没有就退回普通文本格。 */
+    statusCatalog?: StatusCatalog | null
     onClose: () => void
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])
@@ -655,6 +657,7 @@ export function AnimationDetail({motion, charCode, t, onClose}: {
                     track={ailmentTrack}
                     originalRows={ailmentOriginal}
                     t={t}
+                    statusCatalog={statusCatalog}
                     onClose={() => setAilmentKey(null)}
                     finalFocus={() => popupRef.current}
                     onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}

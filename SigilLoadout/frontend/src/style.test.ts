@@ -44,21 +44,26 @@ describe("style.css 的选择器约束（happy-dom 量不到的那部分）", ()
     })
 
     /*
-        ‼️ 护的是"选区两层夹在正确的位置"：滚动层在冻结列之下（横滚时被冻结列盖住），
-        钉住层在冻结列之上、吸顶表头之下。层号写在 `SelectionOverlayView.tsx`（内联 `z-[41]` / `z-[52]`），
-        这里把**关系**钉住：焦点环 < 滚动层 < 冻结层 < 钉住层 < 表头行。
+        ‼️ 护的是"选区/复制虚线夹在正确的位置"：滚动层在冻结列之下（横滚时被冻结列盖住），
+        复制虚线的滚动层也必须低于冻结列（否则虚线会画到冻结列上面）；钉住层和复制虚线冻结层在冻结列之上、
+        吸顶表头之下。层号写在 `SelectionOverlayView.tsx`（内联 `z-[41]` / `z-[42]` / `z-[52]` / `z-[53]`），
+        这里把**关系**钉住：焦点环 < 滚动层 < 复制虚线滚动层 < 冻结层 < 钉住层 < 复制虚线冻结层 < 表头行。
         活动格"不填底色"由 overlay 几何挖洞保证（`selectionOverlay.test.ts` 有单测），不再靠 CSS 规则。
     */
-    it("层高阶梯：焦点环 < overlay 滚动层(41) < 冻结层(50) < overlay 钉住层(52) < 表头(60)", () => {
+    it("层高阶梯：焦点环 < overlay 滚动层(41) < 复制虚线滚动层(42) < 冻结层(50) < overlay 钉住层(52) < 复制虚线冻结层(53) < 表头(60)", () => {
         const z = (name: string) => Number(code.match(new RegExp(`--${name}:\\s*(\\d+)`))?.[1])
         const overlay = readFileSync(new URL("./components/actions-table/SelectionOverlayView.tsx", import.meta.url), "utf8")
         const layers = [...overlay.matchAll(/z-\[(\d+)\]/g)].map((m) => Number(m[1]))
         expect(layers).toContain(41)
+        expect(layers).toContain(42)
         expect(layers).toContain(52)
+        expect(layers).toContain(53)
         expect(z("z-focus")).toBeLessThan(41)
-        expect(41).toBeLessThan(z("z-pinned"))
+        expect(41).toBeLessThan(42)
+        expect(42).toBeLessThan(z("z-pinned"))
         expect(z("z-pinned")).toBeLessThan(52)
-        expect(52).toBeLessThan(60)
+        expect(52).toBeLessThan(53)
+        expect(53).toBeLessThan(60)
     })
 
     /* 活动格（拖选起点）不画焦点环：否则灰环只从选区实线的右/下侧露出来，像多了一圈灰边。 */

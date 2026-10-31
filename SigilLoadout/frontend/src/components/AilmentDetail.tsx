@@ -12,10 +12,11 @@ import {ChevronsDown, ChevronsUp} from "lucide-react"
 
 import {ActionsTable} from "@/components/ActionsTable"
 import {TRAILING_BTN} from "@/components/actions-table/classes"
-import type {ActionRow, ColumnSpec} from "@/components/actions-table/model"
+import type {ActionRow, ColumnSpec, PickerConfig, PickerGroup} from "@/components/actions-table/model"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {NO_SORTING, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
 import type {TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
+import type {StatusCatalog} from "../../bindings/sigilloadout/service/models"
 import type {Messages} from "@/lib/messages"
 
 /** 占位槽：sec 与 rate 全 0。 */
@@ -38,12 +39,14 @@ const rowTitle = (row: KeyedTrackRow, index: number) => {
 /** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（只增不减）。 */
 type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number; children: TrackChild[]}
 
-export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEditChild}: {
+export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, finalFocus, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
     track: KeyedTrackTable
     /** 游戏原版那几行：清空槽位要回到这里的值（空串会让后端整个不写这个属性）。 */
     originalRows?: readonly TrackRow[]
     t: Messages
+    /** 状态下拉（类别/类型）的数据；没有就退回普通文本格。 */
+    statusCatalog?: StatusCatalog | null
     onClose: () => void
     /** 关掉后焦点交给谁（默认回打开它的按钮）；交给外层弹窗，下一次 Esc 才不会被 Tooltip 吃掉。 */
     finalFocus?: () => HTMLElement | null
@@ -100,7 +103,7 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
             for (let slot = 0; slot < count; slot++) {
                 const child = group.children[slot]
                 const original = originalChildren?.find((one) => one.tag === child.tag)
-                const values: Record<string, string> = {slot: child.tag}
+                const values: Record<string, string> = {slot: child.tag.replace(/^Ailment/, "")}
                 if (slot === 0) values.parent = group.label
                 const originals: Record<string, string> = {}
                 for (const column of childColumns) {
@@ -154,11 +157,49 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
     /* Attack 要放下 "#N 起 – 止"，其余等宽；总宽 < 表格宽时 `table-fixed` 会把余量均摊。 */
     const CHILD_WIDTH = 121
 
+    /**
+     * [类别] / [类型] 两个选值格：选项和译名都来自状态表资产（状态页面的 Go 侧已按当前语言取好）。
+     * 值仍是攻击轨里的十进制字符串，提交原样回写；搜索框按译名过滤（见 `CellPick` 的 labels）。
+     */
+    const pickerOf = useMemo<(key: string) => PickerConfig | undefined>(() => {
+        if (!statusCatalog) return () => undefined
+        const categoryLabels = new Map<string, string>(statusCatalog.categories.map((item) => [item.key, item.label]))
+        const typeLabels = new Map<string, string>(statusCatalog.types.map((item) => [item.key, item.label]))
+        const categoryChoices = new Set(categoryLabels.keys())
+        const typeChoices = new Set(typeLabels.keys())
+        /* [类型] 按类别分组：组序照状态表 categories，组内照 types 原序。 */
+        const typeKeysByCategory = new Map<string, string[]>()
+        for (const type of statusCatalog.types) {
+            const list = typeKeysByCategory.get(type.category)
+            if (list) list.push(type.key)
+            else typeKeysByCategory.set(type.category, [type.key])
+        }
+        const typeGroups: PickerGroup[] = []
+        for (const category of statusCatalog.categories) {
+            const items = typeKeysByCategory.get(category.key)
+            if (!items?.length) continue
+            typeGroups.push({label: category.label || category.key, items})
+            typeKeysByCategory.delete(category.key)
+        }
+        for (const [category, items] of typeKeysByCategory) {
+            typeGroups.push({label: category, items})
+        }
+        return (key: string) => {
+            if (key === "category") {
+                return {choices: categoryChoices, labels: categoryLabels, searchPlaceholder: t.ailmentSearchCategory, emptyLabel: t.noMatchItems}
+            }
+            if (key === "type") {
+                return {choices: typeChoices, labels: typeLabels, groups: typeGroups, searchPlaceholder: t.ailmentSearchType, emptyLabel: t.noMatchItems}
+            }
+            return undefined
+        }
+    }, [statusCatalog, t.ailmentSearchCategory, t.ailmentSearchType, t.noMatchItems])
+
     const columnOf = useMemo(() => (key: string): ColumnSpec => {
         const muted = "text-muted-foreground"
         switch (key) {
             case "parent":
-                return {label: kind, readonly: true, width: 175}
+                return {label: t.ailmentColTime, readonly: true, width: 175}
             case "slot":
                 return {label: t.ailmentColSlot, readonly: true, width: CHILD_WIDTH}
             case "category":
@@ -174,7 +215,7 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
             default:
                 return {label: key, readonly: true, width: CHILD_WIDTH, cell: muted}
         }
-    }, [kind, t, toggleButton])
+    }, [t, toggleButton])
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
@@ -202,6 +243,7 @@ export function AilmentDetail({track, originalRows, t, onClose, finalFocus, onEd
                                被"避让冻结列"改画到格内，看起来跟其它列的左间距不一致。 */
                             initialPinnedCount={0}
                             showFieldNames={false}
+                            pickerOf={pickerOf}
                             onEdit={editCell}
                         />
                     </div>

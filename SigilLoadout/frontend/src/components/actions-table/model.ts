@@ -230,6 +230,9 @@ export type BranchPickConfig = {
 
 export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: "", emptyLabel: ""})
 
+/** 单选列表的一组选项：`label` 是组标题，`items` 是组内的值（仍按原值提交）。 */
+export type PickerGroup = {label: string; items: readonly string[]}
+
 /**
  * **值格参数**（哪一列是哪种值格、带不带搜索框、位名表）—— 由**各表自己给**。
  *
@@ -246,6 +249,15 @@ export type PickerConfig = {
     searchPlaceholder?: string
     /** 搜不到结果时的文案（i18n）；不给 = 不显示空态（与官方示例默认行为一致）。 */
     emptyLabel?: string
+    /**
+     * 选项值 → 显示文本。不给 = 原样显示值。
+     *
+     * 单选那档用它：值仍是写回数据的那份（十进制/哈希），列表与触发器显示的是译名；
+     * **搜索框也按译名过滤**（`CellPick` 把它交给 Combobox 的 `itemToStringLabel`）。
+     */
+    labels?: ReadonlyMap<string, string>
+    /** 给了就按组渲染列表（组标题 + 组内项）；不给 = 平铺。 */
+    groups?: readonly PickerGroup[]
 }
 
 /** 不给值格参数时用它（导出是为了让基座在 provider 里当默认值用 —— 常量引用才不会让 memo 失效）。 */

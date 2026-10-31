@@ -7,7 +7,7 @@
 */
 import {memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from "react"
 
-import {LoadCharacterActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy} from "../../bindings/sigilloadout/service/actionsservice"
+import {LoadCharacterActions, Path, ActionIDs, SetActionIDs, SetCharacter, ListCharacters, Deploy, LoadStatusCatalog} from "../../bindings/sigilloadout/service/actionsservice"
 import {Button} from "@/components/ui/button"
 import {
     Combobox,
@@ -39,6 +39,7 @@ import {PLAYER_CODE, type CharaTable} from "@/lib/chara"
 import {parseFilterTokens} from "@/lib/filter"
 import type {Lang} from "@/lib/lang"
 import {buffName, loadBuffs, parseSupportEffects, type BuffInfo} from "@/lib/buffs"
+import type {StatusCatalog} from "../../bindings/sigilloadout/service/models"
 import type {Messages} from "@/lib/messages"
 
 /**
@@ -369,6 +370,11 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     useEffect(() => {
         void loadBuffs().then(setBuffs).catch((e) => console.error(e))
     }, [])
+    /** [类别] / [类型] 选值格的选项；按当前语言取一次（资产不变，换语言才重读）。 */
+    const [statusCatalog, setStatusCatalog] = useState<StatusCatalog | null>(null)
+    useEffect(() => {
+        void LoadStatusCatalog(lang).then(setStatusCatalog).catch((e) => console.error(e))
+    }, [lang])
     /** 这一格正在编辑的当前值 + 原值 + 行 id（null = 没开弹窗）。 */
     const [effectTarget, setEffectTarget] = useState<{rowId: string; raw: string; original: string} | null>(null)
     /** 表的动作包（详情弹窗提交走 `writeCell`，与格子编辑同一条写出口）。 */
@@ -796,6 +802,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                     motion={motTarget.motion}
                     charCode={motTarget.charCode}
                     t={t}
+                    statusCatalog={statusCatalog}
                     onClose={() => setMotTarget(null)}
                 />
             )}

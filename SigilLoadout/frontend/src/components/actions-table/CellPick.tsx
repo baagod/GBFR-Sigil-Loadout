@@ -1,7 +1,7 @@
 import {useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject} from "react"
-import {Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
+import {Combobox, ComboboxCollection, ComboboxContent, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxLabel, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
-import {RevealContext, useEnterEditHandler} from "@/components/actions-table/model"
+import {RevealContext, useEnterEditHandler, type PickerGroup} from "@/components/actions-table/model"
 import {flagHasBit, flagMask} from "@/lib/actionflags"
 /*
     表里的**值格**（唯一一套实现）：格子里是那个值 + 右边一个小箭头，**先选中、再点一下**才在格子下面
@@ -42,6 +42,8 @@ export function CellPick({
     optional,
     searchPlaceholder,
     emptyLabel,
+    labels,
+    groups,
     multiple,
     names,
     onCommit,
@@ -63,6 +65,10 @@ export function CellPick({
     searchPlaceholder?: string
     /** 搜不到结果时的文案（i18n）；不给 = 不显示空态。 */
     emptyLabel?: string
+    /** 值 → 显示文本（译名）；搜索框也按它过滤。 */
+    labels?: ReadonlyMap<string, string>
+    /** 给了就按组渲染列表（`ComboboxGroup` + 组标题）；不给 = 平铺。 */
+    groups?: readonly PickerGroup[]
     /** **多选**（按位开关的掩码）：列表项是**每一位**，勾中的位权相加写回那一格。不给 = 单选。 */
     multiple?: boolean
     /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位，显示成 `bit<号>`）。 */
@@ -98,6 +104,8 @@ export function CellPick({
     )
     /** 项（位权）→ 标签。 */
     const labelOf = useMemo(() => new Map(bits.map(({label, value: item}) => [item, label])), [bits])
+    /** 值 → 显示文本：有 labels 走译名，没有原样显示。 */
+    const displayOf = useCallback((item: string) => labels?.get(item) ?? item, [labels])
     /** 当前值 / 原值的掩码（多选那档用）。 */
     const mask = flagMask(shown)
     const originalMask = flagMask(original ?? "")
@@ -121,6 +129,8 @@ export function CellPick({
      */
     const items = useMemo(() => {
         if (!multiple) {
+            /* 分组时值就是各组拼起来的那一份：顺序由组决定，不再把当前值提到最前。 */
+            if (groups) return groups.flatMap((group) => group.items)
             return [...new Set([shown, original, ...(optional ? [optional] : []), ...(choices ?? [])])].filter(inChoices)
         }
         const all = bits.map(({value: item}) => item)
@@ -129,7 +139,7 @@ export function CellPick({
             ...all.filter((item) => !selected.includes(item) && originalItems.has(item)),
             ...all.filter((item) => !selected.includes(item) && !originalItems.has(item)),
         ]
-    }, [multiple, bits, selected, mask, originalItems, shown, original, choices, optional])
+    }, [multiple, bits, selected, mask, originalItems, shown, original, choices, optional, groups])
 
     /**
      * **展开列表**（= 选值格的"进编辑"）：先跟随可视、再开。**双击**与 Enter 两条路都走它 ——
@@ -148,17 +158,6 @@ export function CellPick({
     /** 登记"这一格的进编辑"（= 展开列表）：与普通格子的 `Cell.enterEdit` 一一对应。 */
     useEnterEditHandler(cellKey, openForEdit)
 
-
-    /**
-     * Ctrl / Cmd+C：**直接复制这一格的值**，不用先划选（与 `EditableCell` 同一套手感）。
-     * 有选区时交给浏览器（那是在复制划中的那段），空值也没什么可拷的。
-     */
-    const onCopyKey = (e: {ctrlKey: boolean; metaKey: boolean; key: string; preventDefault: () => void}) => {
-        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return
-        if (window.getSelection()?.toString() || shown === "") return
-        e.preventDefault()
-        void navigator.clipboard?.writeText(shown).catch(console.error)
-    }
 
     /**
      * ‼️ **上下方向键不许打开列表**（用户口径）：列表只由"点一下 / Enter"打开。
@@ -220,6 +219,28 @@ export function CellPick({
         return () => document.removeEventListener("scroll", onScroll, opts)
     }, [open])
 
+    /** 列表里的一项：原值那一项灰字（单选看"这一项就是原值"、多选看"这一位在原值里就置着"）。 */
+    const renderItem = (item: string) => (
+        /*
+            **原值那一项灰字**：不管改没改过都灰（原值是只读资产里那一份，与格子空着时的占位符同一个值）。
+
+            ‼️ **必须带 `!`**：库里那条高亮规则是
+            `.data-highlighted:text-accent-foreground[data-highlighted]`，特异性 (0,2,0)，
+            高过 `.text-[#a0a0a0]` 的 (0,1,0) —— 不带 `!` 时，指针划过这一项（或键盘走到它上）
+            灰就被高亮色吃掉，看着就是"原值那一项并不灰"（用户报的）。
+            高亮底色是 `--accent`（暗色下 `#272727`，近黑），灰字压在上面可读。
+        */
+        <ComboboxItem
+            key={item}
+            value={item}
+            /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
+               ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
+            className={`py-1! ${(multiple ? originalItems.has(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
+        >
+            {multiple ? labelOf.get(item) : displayOf(item)}
+        </ComboboxItem>
+    )
+
     return (
         /*
             ‼️ 泛型显式给 `<string, boolean>`：`multiple` / `value` / `onValueChange` 三者的类型在 base-ui
@@ -229,7 +250,9 @@ export function CellPick({
         */
         <Combobox<string, boolean>
             multiple={multiple}
-            items={items}
+            items={groups ?? items}
+            /* 搜索框按**显示文本**过滤（有译名时搜中文，不是搜十进制值）。 */
+            itemToStringLabel={displayOf}
             /*
                 ‼️ 不挂搜索框时 `filter={null}` = **列表不随任何东西过滤**（默认会按"选中值"过滤：挑完一项
                 再展开，列表里就只剩那一项 —— 实测 53 → 1）。
@@ -284,10 +307,8 @@ export function CellPick({
                     （见 `ActionsTable` 的 `handleArrowKey` 闸门。）
                 */
                 data-pick-open={open || undefined}
-                // 这一格自己收下 Ctrl/Cmd+C 与 Esc（见 App 里那两条白名单）——别让表格/窗口接走。
-                data-copy-own=""
+                /* Ctrl+C 归表格的单元格选区（虚线也由它画）；这里只留下自己管 Esc。 */
                 data-esc-own=""
-                onKeyDown={onCopyKey}
                 /* ‼️ **双击**才展开列表（与普通格子"双击才进编辑"同一条口径）；拖出去拉过选区不展开。 */
                 onDoubleClick={() => {
                     if (!dragged.current) openForEdit()
@@ -297,7 +318,7 @@ export function CellPick({
                     focusBackRef.current = true
                 }}
             >
-                <span className={`${PICK_TEXT} ${unchanged ? "text-muted-foreground" : ""}`}>{shown}</span>
+                <span className={`${PICK_TEXT} ${unchanged ? "text-muted-foreground" : ""}`}>{displayOf(shown)}</span>
             </ComboboxTrigger>
             <ComboboxContent
                 anchor={cellRef}
@@ -340,27 +361,14 @@ export function CellPick({
                         if (el && open && document.activeElement !== el) el.focus()
                     }}
                 >
-                    {(item: string) => (
-                        /*
-                            **原值那一项灰字**：单选看"这一项就是原值"、多选看"这一位在原值里就置着"——
-                            两者同一个约定：不管改没改过都灰（原值是只读资产里那一份，与格子空着时的占位符同一个值）。
-
-                            ‼️ **必须带 `!`**：库里那条高亮规则是
-                            `.data-highlighted:text-accent-foreground[data-highlighted]`，特异性 (0,2,0)，
-                            高过 `.text-[#a0a0a0]` 的 (0,1,0) —— 不带 `!` 时，指针划过这一项（或键盘走到它上）
-                            灰就被高亮色吃掉，看着就是"原值那一项并不灰"（用户报的）。
-                            高亮底色是 `--accent`（暗色下 `#272727`，近黑），灰字压在上面可读。
-                        */
-                        <ComboboxItem
-                            key={item}
-                            value={item}
-                            /* `py-1!`：项的内边距上下各 4px（库基类 `py-1.5` 是 6px）。
-                               ⚠️ 本版不认小数步进：`py-0.75!` 类名在、**规则不生成**，等于没改。 */
-                            className={`py-1! ${(multiple ? originalItems.has(item) : item === original) ? "text-[#a0a0a0]!" : ""}`}
-                        >
-                            {multiple ? labelOf.get(item) : item}
-                        </ComboboxItem>
-                    )}
+                    {groups
+                        ? (group: PickerGroup) => (
+                            <ComboboxGroup key={group.label} items={group.items}>
+                                <ComboboxLabel>{group.label}</ComboboxLabel>
+                                <ComboboxCollection>{(item: string) => renderItem(item)}</ComboboxCollection>
+                            </ComboboxGroup>
+                        )
+                        : (item: string) => renderItem(item)}
                 </ComboboxList>
             </ComboboxContent>
         </Combobox>
