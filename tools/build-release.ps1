@@ -78,6 +78,8 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     # 运行时必读（缺了工具起不来），所以必须进"在场"清单：bufftable.go 读前两个、paramlabels.go 读第三个。
     # params.lang.json 尤其要盯 —— 它由人手工维护、生成器不产出，源侧删了/改名了没有第二处会发现。
     'buff.json', 'buff.lang.json', 'params.lang.json',
+    # 异常状态页的类别/类型选值格：loadStatusTable 启动即读，缺了工具起不来。
+    'status.json', 'status.lang.json',
     # 全部原始数据（17929 份轨 + 36 份动作表 + 16 份全局参数，条目名就是部署路径）：少了它，除了作者本机
     # （那边有解包目录兜底），别人装上去每个角色的轨与动作表都读不到，全局参数那一页也空着。
     'data.zip')

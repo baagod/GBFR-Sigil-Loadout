@@ -277,7 +277,15 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
      */
     const branchPick = useMemo(
         // 清单 = **整张表**的 id_，不是屏幕上筛过的那几行：记录清单是界面过滤器，不该缩小可选的跳转目标。
-        () => ({ids: new Set((saveRows ?? rows).map((row) => row.id)), searchPlaceholder: t.actionBranchSearch, emptyLabel: t.noMatchItems}),
+        () => {
+            const ids = new Set((saveRows ?? rows).map((row) => row.id))
+            return {
+                ids,
+                options: [...ids].map((value) => ({value})),
+                searchPlaceholder: t.actionBranchSearch,
+                emptyLabel: t.noMatchItems,
+            }
+        },
         [rows, saveRows, t],
     )
     /**
@@ -938,4 +946,3 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
         </ReorderDnd>
     )
 }
-

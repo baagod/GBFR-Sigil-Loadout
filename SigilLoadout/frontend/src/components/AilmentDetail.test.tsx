@@ -15,7 +15,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {AilmentDetail} from "@/components/AilmentDetail"
-import {clickToEdit, clipboardStub, hasCopyBounds, openPick, pickItems, clickItem, stubColumnGeometry} from "@/components/actions-table/testkit"
+import {clickToEdit, clipboardStub, hasCopyBounds, openPick, pickItems, clickItem, isPickOpen, stubColumnGeometry} from "@/components/actions-table/testkit"
 import {messages} from "@/lib/messages"
 import type {KeyedTrackTable} from "@/components/TrackGrid"
 import type {TrackRow} from "../../bindings/sigilloadout/service/models"
@@ -92,6 +92,20 @@ describe("异常状态展开页（基座表）", () => {
         await waitFor(() => expect(bodyRows()).toHaveLength(1))
     })
 
+    it("双击展开箭头不进「强度」编辑", async () => {
+        stubColumnGeometry()
+        render(<AilmentDetail t={t} onClose={() => {}} onEditChild={() => {}} track={track([row("a", "0.000000", "0.100000", slots(0))])} />)
+        await waitFor(() => expect(bodyRows()).toHaveLength(1))
+
+        const expand = document.body.querySelector(`button[aria-label="${t.ailmentExpand}"]`) as HTMLElement
+        fireEvent.click(expand)
+        await waitFor(() => expect(bodyRows()).toHaveLength(16))
+
+        const collapse = document.body.querySelector(`button[aria-label="${t.ailmentCollapse}"]`) as HTMLElement
+        fireEvent.doubleClick(collapse)
+        await waitFor(() => expect(byId("td", "rate")!.querySelector("input")).toBeNull())
+    })
+
     it("编辑持续秒数：onEditChild 收到 (父行键, 槽位标签, 列, 新值)", async () => {
         stubColumnGeometry()
         const onEditChild = vi.fn()
@@ -133,6 +147,33 @@ describe("异常状态展开页（基座表）", () => {
         expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "sec", "10.000000")
     })
 
+    it("清空原值里没有的栏：写到空串，不写回当前值", async () => {
+        stubColumnGeometry()
+        const onEditChild = vi.fn()
+        const current = slots(0)
+        const originalRows: TrackRow[] = [
+            {values: {}, children: [{tag: "Ailment00", values: {category: "2027311463", type: "4135089318", rate: "0.000000"}}], orig: null},
+        ]
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={() => {}}
+                onEditChild={onEditChild}
+                track={track([row("a", "0.000000", "0.100000", current, 0)])}
+                originalRows={originalRows}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
+
+        const cell = byId("td", "sec") as HTMLElement
+        clickToEdit(cell)
+        const input = cell.querySelector("input") as HTMLInputElement
+        fireEvent.change(input, {target: {value: ""}})
+        fireEvent.blur(input)
+
+        expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "sec", "")
+    })
+
     it("清空最后的有值槽：已显示的行不收起（折叠边界只增不减）", async () => {
         stubColumnGeometry()
         const props = {t, onClose: () => {}, onEditChild: () => {}}
@@ -152,8 +193,7 @@ describe("异常状态展开页（基座表）", () => {
                 onClose={() => {}}
                 onEditChild={() => {}}
                 statusCatalog={{
-                    categories: [{key: "2027311463", label: "异常", category: ""}],
-                    types: [{key: "4135089318", label: "恐惧", category: "2027311463"}],
+                    categories: [{key: "2027311463", label: "异常", types: [{key: "4135089318", label: "恐惧"}]}],
                 }}
                 track={track([row("a", "0.000000", "0.100000", slots(0))])}
             />,
@@ -173,13 +213,15 @@ describe("异常状态展开页（基座表）", () => {
                 onEditChild={onEditChild}
                 statusCatalog={{
                     categories: [
-                        {key: "2027311463", label: "异常", category: ""},
-                        {key: "2631112578", label: "状态", category: ""},
-                    ],
-                    types: [
-                        {key: "4135089318", label: "恐惧", category: "2027311463"},
-                        {key: "3525225941", label: "攻击DOWN", category: "2027311463"},
-                        {key: "3177074653", label: "无", category: "2631112578"},
+                        {
+                            key: "2027311463",
+                            label: "异常",
+                            types: [
+                                {key: "4135089318", label: "恐惧"},
+                                {key: "3525225941", label: "攻击DOWN"},
+                            ],
+                        },
+                        {key: "2631112578", label: "状态", types: [{key: "3177074653", label: "无"}]},
                     ],
                 }}
                 track={track([row("a", "0.000000", "0.100000", slots(0))])}
@@ -197,12 +239,55 @@ describe("异常状态展开页（基座表）", () => {
         expect(onEditChild).toHaveBeenCalledWith("a", "Ailment00", "type", "3177074653")
     })
 
+    it("Esc 在展开的类型列表里只收列表，不关弹窗", async () => {
+        stubColumnGeometry()
+        const onClose = vi.fn()
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={onClose}
+                statusCatalog={{
+                    categories: [{key: "2027311463", label: "异常", types: [{key: "4135089318", label: "恐惧"}]}],
+                }}
+                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "type")).not.toBeNull())
+        await openPick(byId("td", "type") as HTMLElement)
+        expect(isPickOpen()).toBe(true)
+
+        fireEvent.keyDown(document, {key: "Escape"})
+        await waitFor(() => expect(isPickOpen()).toBe(false))
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it("选完列表关掉后，Esc 仍能关弹窗（列表关闭动画不算开着）", async () => {
+        stubColumnGeometry()
+        const onClose = vi.fn()
+        render(
+            <AilmentDetail
+                t={t}
+                onClose={onClose}
+                statusCatalog={{
+                    categories: [{key: "2027311463", label: "异常", types: [{key: "4135089318", label: "恐惧"}]}],
+                }}
+                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "type")).not.toBeNull())
+        await openPick(byId("td", "type") as HTMLElement)
+        clickItem("恐惧")
+        await waitFor(() => expect(isPickOpen()).toBe(false))
+
+        fireEvent.keyDown(document, {key: "Escape"})
+        await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
     it("选值格区域复制/粘贴：复制的是两列 TSV，粘回去按列写", async () => {
         stubColumnGeometry()
         const onEditChild = vi.fn()
         const statusCatalog = {
-            categories: [{key: "2027311463", label: "异常", category: ""}],
-            types: [{key: "4135089318", label: "恐惧", category: "2027311463"}],
+            categories: [{key: "2027311463", label: "异常", types: [{key: "4135089318", label: "恐惧"}]}],
         }
         render(
             <AilmentDetail
@@ -210,7 +295,7 @@ describe("异常状态展开页（基座表）", () => {
                 onClose={() => {}}
                 onEditChild={onEditChild}
                 statusCatalog={statusCatalog}
-                track={track([row("a", "0.000000", "0.100000", slots(0)), row("b", "0.200000", "0.300000", slots(0))])}
+                track={track([row("a", "0.000000", "0.100000", slots(0)), row("b", "0.200000", "0.300000", slots(null))])}
             />,
         )
         const cells = () => document.body.querySelectorAll('td[data-col-id="category"], td[data-col-id="type"]')
@@ -249,5 +334,3 @@ describe("异常状态展开页（基座表）", () => {
         expect(onClose).toHaveBeenCalledTimes(1)
     })
 })
-
-

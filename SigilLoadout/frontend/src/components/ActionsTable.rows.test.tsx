@@ -226,9 +226,9 @@ describe("动作表 · 行号列与行选中（点 / Shift / Ctrl / 拖）", () 
 
     /*
         整行选中时**只读列也是选中的**（`id_` / `abilityTag_`）—— 整行选区就是"一条普通的区"，
-        选区外观由 `SelectionOverlay` 统一画；行号格不在列模型里，由 `cell-row-selected` 叠同一份底纹。
+        选区外观由 `SelectionOverlay` 统一画；行号格不在列模型里，靠 `cell-row-selected` 把数字染成选区绿。
     */
-    it("选行时只读的 id_ / abilityTag_ 同样被选中；行号格靠自己的底纹类", async () => {
+    it("选行时只读的 id_ / abilityTag_ 同样被选中；行号格带选中类", async () => {
         const container = await renderTable()
 
         pressHandle(container, 0)

@@ -14,13 +14,15 @@ import {CELL_CHOICES} from "@/lib/controltypes"
  * **内置列策略 → 值格参数**（`text` / `readonly` 不是值格 → `undefined`）。
  *
  * 只服务下面那一处归一，所以留在本文件、不做成 `model` 的公共 API。
- * 分支列的清单给的是**那个稳定的 Set 引用**（`branchPick.ids`）：`CellPick` 里那份重排才挂得住 memo。
+ * 分支列的选项给的是 **`branchPick.options`**（`ActionsTable` 里 `useMemo` 出来的稳定引用）：
+ * `CellPick` 里那份重排才挂得住 memo。
  */
+const CONTROL_OPTIONS = [...CELL_CHOICES].map((value) => ({value}))
 const builtinPick = (kind: ColumnKind, branch: BranchPickConfig) =>
     kind === "branch"
-        ? {choices: branch.ids, optional: UNSET, searchPlaceholder: branch.searchPlaceholder, emptyLabel: branch.emptyLabel}
+        ? {options: branch.options, optional: UNSET, searchPlaceholder: branch.searchPlaceholder, emptyLabel: branch.emptyLabel}
         : kind === "pick"
-          ? {choices: CELL_CHOICES}
+          ? {options: CONTROL_OPTIONS}
           : undefined
 
 /**
@@ -393,8 +395,3 @@ export function Cell({rowId, fieldKey, value, original, shown, onCommit, dragged
         </>
     )
 }
-
-
-
-
-

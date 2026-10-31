@@ -30,6 +30,11 @@ export type KeyedTrackRow = TrackRow & {key: string}
 /** 弹层里每张表：行带键。`TrackTable` 是后端契约（它的行不带键）。 */
 export type KeyedTrackTable = Omit<TrackTable, "rows"> & {rows: KeyedTrackRow[]}
 
+/** 轨种类的名字：跟字段文档、跟游戏里的叫法一致，不翻译。 */
+export function trackLabel(kind: string): string {
+    return kind.charAt(0).toUpperCase() + kind.slice(1)
+}
+
 /**
  * 一行的值 → 基座那套 **delta** 形状（与动作表同一口径）：**只装与原值不同的键**。
  *
@@ -230,5 +235,3 @@ const flagPickers: Record<string, PickerConfig> = {
     flag0: {multiple: true, names: FLAG0_NAMES},
     flag1: {multiple: true, names: FLAG1_NAMES},
 }
-
-

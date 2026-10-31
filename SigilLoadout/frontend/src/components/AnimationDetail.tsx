@@ -18,7 +18,7 @@ import {EditableCell} from "@/components/EditableCell"
 import {CELL_TEXT} from "@/lib/classnames"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
-import {FLAG_KEYS, TrackGrid, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
+import {FLAG_KEYS, TrackGrid, trackLabel, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import {slotEdit} from "@/lib/numericText"
 import type {TableCommands} from "@/components/ActionsTable"
@@ -212,13 +212,13 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     }, [motion, charCode])
 
     /** 改一格（flags 与普通轨共用）。**清空 = 回到原值**：那一格显示回原值（灰），保存写的也是原值。 */
-    const editValue = (key: string, rowKey: string, column: string, value: string) => {
+    const editValue = (key: string, rowKey: string, column: string, value: string | null) => {
         const rows = tables[key]?.rows ?? []
         const index = rows.findIndex((row) => row.key === rowKey)
         if (index === -1) return
         const row = rows[index]
         const orig = isOriginal(row) ? baseline?.tables[key]?.rows[row.orig] : undefined
-        const next = value === "" && orig ? (orig.values[column] ?? "") : value
+        const next = value === null || value === "" ? (orig?.values[column] ?? "") : value
         setTables((prev) => {
             const table = prev[key]
             if (!table) return prev
@@ -474,7 +474,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                             table={tables[key]}
                             t={t}
                             originals={baseline?.tables[key]?.rows}
-                            onEdit={(rowId, field, value) => editValue(key, rowId, field, value ?? "")}
+                            onEdit={(rowId, field, value) => editValue(key, rowId, field, value)}
                             onReorder={(from, to) => reorder(key, from, to)}
                             onSelectionPresenceChange={(has) => {
                                 setHasSelection((prev) => (prev[key] === has ? prev : {...prev, [key]: has}))
@@ -670,9 +670,4 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
 /** 一条轨的 key：子轨号 + 种类（`TrackInfo` 的 `Sub` 与 `Kind`）—— 从数据里派生，别在别处写魔数。 */
 function trackKey(info: {sub: string; kind: string}): string {
     return info.sub + info.kind
-}
-
-/** 轨种类的名字：跟字段文档、跟游戏里的叫法一致，不翻译。 */
-function trackLabel(kind: string): string {
-    return kind.charAt(0).toUpperCase() + kind.slice(1)
 }

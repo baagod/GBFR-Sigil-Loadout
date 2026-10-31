@@ -7,16 +7,15 @@
     折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径）：
     默认显示到最后一个有值的槽（没有值就 1 行），末列箭头展开剩余槽、再收起。
 */
-import {useCallback, useEffect, useMemo, useState, type ReactNode} from "react"
+import {useCallback, useMemo, useState, type ReactNode} from "react"
 import {ChevronsDown, ChevronsUp} from "lucide-react"
 
 import {ActionsTable} from "@/components/ActionsTable"
 import {TRAILING_BTN} from "@/components/actions-table/classes"
-import type {ActionRow, ColumnSpec, PickerConfig, PickerGroup} from "@/components/actions-table/model"
+import type {ActionRow, ColumnSpec, PickerConfig, PickerOption} from "@/components/actions-table/model"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
-import {NO_SORTING, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
-import type {TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
-import type {StatusCatalog} from "../../bindings/sigilloadout/service/models"
+import {NO_SORTING, trackLabel, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
+import type {StatusCatalog, TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
 import type {Messages} from "@/lib/messages"
 
 /** 占位槽：sec 与 rate 全 0。 */
@@ -36,8 +35,17 @@ const rowTitle = (row: KeyedTrackRow, index: number) => {
     return start && end ? `#${index + 1}\u00A0\u00A0${start} – ${end}` : `#${index + 1}`
 }
 
-/** 一组 = 一个 Attack 主表行；`boundary` 是折叠时显示的行数（只增不减）。 */
-type Group = {row: KeyedTrackRow; label: string; boundary: number; total: number; children: TrackChild[]}
+/** 一组 = 一个 Attack 主表行；`count` 是当前显示的行数，另三个字段描述折叠状态。 */
+type Group = {
+    row: KeyedTrackRow
+    label: string
+    children: TrackChild[]
+    total: number
+    collapsed: number
+    count: number
+    open: boolean
+    expandable: boolean
+}
 
 export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, finalFocus, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
@@ -54,51 +62,40 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
     onEditChild?: (rowKey: string, tag: string, column: string, value: string) => void
 }) {
     const childColumns = track.childColumns
-    const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-    /* 打开时的边界（只增不减）：之后清空最后一个有值槽，刚编辑的那几行也不能当场收起。 */
-    const [frozenBoundary] = useState<Record<string, number>>(() =>
+    /* 每组当前显示到第几个槽。初值是打开时的数据边界；展开写 total，收起写回数据边界。 */
+    const [visible, setVisible] = useState<Record<string, number>>(() =>
         Object.fromEntries(track.rows.map((row) => [row.key, boundaryOf(row.children ?? [])])),
     )
-    const kind = track.kind.charAt(0).toUpperCase() + track.kind.slice(1)
-
-    /* 这一层是**独立的默认 Dialog**（不是嵌在上层里），所以 Esc 自己收：挂在 document 捕获阶段，
-       编辑态（输入框里按 Esc）交给基座自己退编辑。 */
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return
-            const target = event.target instanceof HTMLElement ? event.target : null
-            if (target?.closest("input, textarea, [contenteditable='true']")) return
-            event.preventDefault()
-            event.stopPropagation()
-            onClose()
-        }
-        document.addEventListener("keydown", onKeyDown, true)
-        return () => document.removeEventListener("keydown", onKeyDown, true)
-    }, [onClose])
 
     const groups = useMemo<Group[]>(() => {
         return track.rows
             .map((row, index) => {
                 const children = row.children ?? []
+                const total = children.length
+                const collapsed = boundaryOf(children)
+                const count = Math.min(total, Math.max(1, visible[row.key] ?? collapsed))
                 return {
                     row,
                     label: rowTitle(row, index),
-                    boundary: Math.max(boundaryOf(children), frozenBoundary[row.key] ?? 1),
-                    total: children.length,
                     children,
+                    total,
+                    collapsed,
+                    count,
+                    open: count >= total,
+                    expandable: total > collapsed,
                 }
             })
             .filter((group) => group.total > 0)
-    }, [track, frozenBoundary])
+    }, [track, visible])
 
     const columnKeys = useMemo(() => ["parent", "slot", ...childColumns] as const, [childColumns])
 
     /* 行 id = 父行键 + 槽位标签，折叠/展开不影响撤销栈与复制源；索引让两个回调 O(1) 反查。 */
     const {rows, rowMeta} = useMemo(() => {
         const list: ActionRow[] = []
-        const meta = new Map<string, {group: Group; child: TrackChild; original?: TrackChild}>()
+        const meta = new Map<string, {group: Group; child: TrackChild; originals: Record<string, string>}>()
         for (const group of groups) {
-            const count = expanded[group.row.key] === true ? group.total : group.boundary
+            const count = group.count
             const originalChildren = group.row.orig != null ? originalRows?.[group.row.orig]?.children : undefined
             for (let slot = 0; slot < count; slot++) {
                 const child = group.children[slot]
@@ -108,88 +105,76 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
                 const originals: Record<string, string> = {}
                 for (const column of childColumns) {
                     values[column] = child.values[column] ?? ""
-                    originals[column] = original?.values[column] ?? values[column]
+                    originals[column] = original?.values[column] ?? ""
                 }
                 const id = `${group.row.key}::${child.tag}`
-                meta.set(id, {group, child, original})
+                meta.set(id, {group, child, originals})
                 list.push({id, values, originals})
             }
         }
         return {rows: list, rowMeta: meta}
-    }, [groups, expanded, childColumns, originalRows])
+    }, [groups, childColumns, originalRows])
 
     const editCell = useCallback((rowId: string, column: string, value: string | null) => {
         const hit = rowMeta.get(rowId)
         if (!onEditChild || !hit) return
         const next = value ?? ""
-        const resolved = next === "" ? (hit.original?.values[column] ?? hit.child.values[column] ?? "") : next
+        const resolved = next === "" ? (hit.originals[column] ?? "") : next
         onEditChild(hit.group.row.key, hit.child.tag, column, resolved)
     }, [onEditChild, rowMeta])
 
-    /** 「强度」格右端的箭头：只在"折叠边界那一行"出现在格内；展开后原地变向上。 */
+    /** 「强度」格右端的箭头：折叠时在当前末行；展开后留在原地、变向上。 */
     const toggleButton = useCallback((rowId: string): ReactNode => {
         const hit = rowMeta.get(rowId)
         if (!hit) return null
         const {group} = hit
-        if (group.total <= group.boundary) return null
-        if (hit.child.tag !== group.children[group.boundary - 1].tag) return null
-        const open = expanded[group.row.key] === true
+        if (!group.expandable) return null
+        const anchor = group.children[(group.open ? group.collapsed : group.count) - 1]
+        if (hit.child.tag !== anchor.tag) return null
         return (
             <button
                 type="button"
                 className={TRAILING_BTN}
-                aria-label={open ? t.ailmentCollapse : t.ailmentExpand}
-                aria-expanded={open}
+                aria-label={group.open ? t.ailmentCollapse : t.ailmentExpand}
+                aria-expanded={group.open}
                 onMouseDown={(event) => {
                     event.preventDefault()
                     event.stopPropagation()
                 }}
+                onDoubleClick={(event) => event.stopPropagation()}
                 onClick={(event) => {
                     event.stopPropagation()
-                    setExpanded((prev) => ({...prev, [group.row.key]: !open}))
+                    const next = group.open ? group.collapsed : group.total
+                    setVisible((prev) => ({...prev, [group.row.key]: next}))
                 }}
             >
-                {open ? <ChevronsUp className="size-4" /> : <ChevronsDown className="size-4" />}
+                {group.open ? <ChevronsUp className="size-4" /> : <ChevronsDown className="size-4" />}
             </button>
         )
-    }, [expanded, rowMeta, t])
+    }, [rowMeta, t])
 
     /* Attack 要放下 "#N 起 – 止"，其余等宽；总宽 < 表格宽时 `table-fixed` 会把余量均摊。 */
     const CHILD_WIDTH = 121
 
     /**
      * [类别] / [类型] 两个选值格：选项和译名都来自状态表资产（状态页面的 Go 侧已按当前语言取好）。
-     * 值仍是攻击轨里的十进制字符串，提交原样回写；搜索框按译名过滤（见 `CellPick` 的 labels）。
+     * 值仍是攻击轨里的十进制字符串，提交原样回写；搜索框按译名过滤（见 `CellPick` 的 options）。
      */
     const pickerOf = useMemo<(key: string) => PickerConfig | undefined>(() => {
         if (!statusCatalog) return () => undefined
-        const categoryLabels = new Map<string, string>(statusCatalog.categories.map((item) => [item.key, item.label]))
-        const typeLabels = new Map<string, string>(statusCatalog.types.map((item) => [item.key, item.label]))
-        const categoryChoices = new Set(categoryLabels.keys())
-        const typeChoices = new Set(typeLabels.keys())
-        /* [类型] 按类别分组：组序照状态表 categories，组内照 types 原序。 */
-        const typeKeysByCategory = new Map<string, string[]>()
-        for (const type of statusCatalog.types) {
-            const list = typeKeysByCategory.get(type.category)
-            if (list) list.push(type.key)
-            else typeKeysByCategory.set(type.category, [type.key])
-        }
-        const typeGroups: PickerGroup[] = []
-        for (const category of statusCatalog.categories) {
-            const items = typeKeysByCategory.get(category.key)
-            if (!items?.length) continue
-            typeGroups.push({label: category.label || category.key, items})
-            typeKeysByCategory.delete(category.key)
-        }
-        for (const [category, items] of typeKeysByCategory) {
-            typeGroups.push({label: category, items})
-        }
+        const categoryOptions: PickerOption[] = statusCatalog.categories.map((category) => ({
+            value: category.key,
+            label: category.label,
+        }))
+        const typeOptions: PickerOption[] = statusCatalog.categories.flatMap((category) =>
+            category.types.map((type) => ({value: type.key, label: type.label, group: category.label})),
+        )
         return (key: string) => {
             if (key === "category") {
-                return {choices: categoryChoices, labels: categoryLabels, searchPlaceholder: t.ailmentSearchCategory, emptyLabel: t.noMatchItems}
+                return {options: categoryOptions, searchPlaceholder: t.ailmentSearchCategory, emptyLabel: t.noMatchItems}
             }
             if (key === "type") {
-                return {choices: typeChoices, labels: typeLabels, groups: typeGroups, searchPlaceholder: t.ailmentSearchType, emptyLabel: t.noMatchItems}
+                return {options: typeOptions, searchPlaceholder: t.ailmentSearchType, emptyLabel: t.noMatchItems}
             }
             return undefined
         }
@@ -210,15 +195,25 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
                 return {label: t.ailmentColSec, width: CHILD_WIDTH, cell: muted}
             case "rate":
                 return {label: t.ailmentColRate, width: CHILD_WIDTH, cell: muted, trailing: (row) => toggleButton(row.id)}
-            case "maxLv":
-                return {label: t.ailmentColMaxLv, readonly: true, width: CHILD_WIDTH, cell: muted}
             default:
                 return {label: key, readonly: true, width: CHILD_WIDTH, cell: muted}
         }
     }, [t, toggleButton])
 
     return (
-        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+        <Dialog
+            open
+            onOpenChange={(next, details) => {
+                if (next) return
+                /* 只认真正开着的列表：`data-pick-open` 关闭即摘；不要用 `[data-slot=combobox-content]`，
+                   它的关闭动画期间节点还在，会把紧随其后的 Esc 吞掉。 */
+                if (details.reason === "escape-key" && document.querySelector(".ailment-sheet [data-pick-open]")) {
+                    details.cancel()
+                    return
+                }
+                onClose()
+            }}
+        >
             <DialogContent
                 initialFocus={() => false}
                 finalFocus={finalFocus}
@@ -226,7 +221,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
             >
                 <DialogHeader className="border-b pb-3">
                     <DialogTitle className="text-base font-medium">
-                        {`${t.ailmentTitle}\u00A0\u00A0${kind} #${track.sub}`}
+                        {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)} #${track.sub}`}
                     </DialogTitle>
                 </DialogHeader>
                 {groups.length === 0 ? (
@@ -244,6 +239,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
                             initialPinnedCount={0}
                             showFieldNames={false}
                             pickerOf={pickerOf}
+                            /* 槽位是游戏固定结构，不支持插行/删行；行命令因此不注册。 */
                             onEdit={editCell}
                         />
                     </div>
@@ -252,12 +248,3 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
         </Dialog>
     )
 }
-
-
-
-
-
-
-
-
-

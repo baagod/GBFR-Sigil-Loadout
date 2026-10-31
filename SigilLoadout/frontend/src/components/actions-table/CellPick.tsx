@@ -1,7 +1,7 @@
 import {useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject} from "react"
 import {Combobox, ComboboxCollection, ComboboxContent, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxLabel, ComboboxList, ComboboxTrigger} from "@/components/ui/combobox"
 import {PICK_CELL, PICK_MARK, PICK_TEXT} from "@/components/actions-table/classes"
-import {RevealContext, useEnterEditHandler, type PickerGroup} from "@/components/actions-table/model"
+import {RevealContext, useEnterEditHandler, type PickerOption} from "@/components/actions-table/model"
 import {flagHasBit, flagMask} from "@/lib/actionflags"
 /*
     表里的**值格**（唯一一套实现）：格子里是那个值 + 右边一个小箭头，**先选中、再点一下**才在格子下面
@@ -38,12 +38,10 @@ export function CellPick({
     shown,
     original,
     unchanged,
-    choices,
+    options,
     optional,
     searchPlaceholder,
     emptyLabel,
-    labels,
-    groups,
     multiple,
     names,
     onCommit,
@@ -57,18 +55,14 @@ export function CellPick({
     original: string
     /** 这一格**还等于原值**（没动过）→ 灰字，与别的格子同一套。 */
     unchanged: boolean
-    /** **单选**的值清单（`controlTypeHash_` = `CELL_CHOICES`；`branchXAtk_` = 当前表的 `id_` 集合）。 */
-    choices?: ReadonlySet<string>
+    /** **单选**的完整选项（值 + 可选译名 + 可选组标题）；分组时列表顺序由选项顺序决定。 */
+    options?: readonly PickerOption[]
     /** 额外可选项（分支列的 `-1`）；挑中它会照原样提交，不折算成"回到原值"。 */
     optional?: string
     /** 给了就挂搜索框（项多时才需要；`branchXAtk_` 用，53 项那一列不挂）。 */
     searchPlaceholder?: string
     /** 搜不到结果时的文案（i18n）；不给 = 不显示空态。 */
     emptyLabel?: string
-    /** 值 → 显示文本（译名）；搜索框也按它过滤。 */
-    labels?: ReadonlyMap<string, string>
-    /** 给了就按组渲染列表（`ComboboxGroup` + 组标题）；不给 = 平铺。 */
-    groups?: readonly PickerGroup[]
     /** **多选**（按位开关的掩码）：列表项是**每一位**，勾中的位权相加写回那一格。不给 = 单选。 */
     multiple?: boolean
     /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位，显示成 `bit<号>`）。 */
@@ -104,8 +98,13 @@ export function CellPick({
     )
     /** 项（位权）→ 标签。 */
     const labelOf = useMemo(() => new Map(bits.map(({label, value: item}) => [item, label])), [bits])
-    /** 值 → 显示文本：有 labels 走译名，没有原样显示。 */
-    const displayOf = useCallback((item: string) => labels?.get(item) ?? item, [labels])
+    /** 选项值 → 显示文本（只收有译名的项，没给就原样显示）。 */
+    const optionLabels = useMemo(() => {
+        const map = new Map<string, string>()
+        for (const option of options ?? []) if (option.label) map.set(option.value, option.label)
+        return map
+    }, [options])
+    const displayOf = useCallback((item: string) => optionLabels.get(item) ?? item, [optionLabels])
     /** 当前值 / 原值的掩码（多选那档用）。 */
     const mask = flagMask(shown)
     const originalMask = flagMask(original ?? "")
@@ -119,19 +118,31 @@ export function CellPick({
         () => new Set(bits.filter(({bit}) => flagHasBit(originalMask, bit)).map(({value: item}) => item)),
         [bits, originalMask],
     )
+    /** 分组视图：有任一项带 `group` 就按组渲染，组标题取第一项给的名字。 */
+    const groups = useMemo(() => {
+        if (!options?.some((option) => option.group)) return undefined
+        const grouped = new Map<string, string[]>()
+        for (const option of options) {
+            const label = option.group ?? ""
+            const list = grouped.get(label)
+            if (list) list.push(option.value)
+            else grouped.set(label, [option.value])
+        }
+        return [...grouped].map(([label, items]) => ({label, items}))
+    }, [options])
     /** 这个值在清单里吗（不在就是"表外的怪值"，列表里没有任何一项被选中）。 */
-    const inChoices = (item: string) => choices?.has(item) === true || item === optional
+    const inChoices = (item: string) => options?.some((option) => option.value === item) === true || item === optional
     /**
-     * 列表顺序。单选：**当前值 → 原值 → `-1` → 其余**（其余照清单原序）；多选：**勾中的 → 原值就置着的 → 其余**。
+     * 列表顺序。单选：**当前值 → 原值 → `-1` → 其余**（其余照选项原序）。
+     * 多选：**勾中的 → 原值就置着的 → 其余**。
      *
      * `new Set` 一次做完两件事：去重（格子的当前值**就是** `-1` 时，当前值与 `optional` 是同一个值 ——
      * 不去重就出现两个 `-1`）与保序（先出现的排前面）。`-1` 不能沉到最后：分支列上百项，滚到看不见的地方就点不到。
      */
     const items = useMemo(() => {
         if (!multiple) {
-            /* 分组时值就是各组拼起来的那一份：顺序由组决定，不再把当前值提到最前。 */
-            if (groups) return groups.flatMap((group) => group.items)
-            return [...new Set([shown, original, ...(optional ? [optional] : []), ...(choices ?? [])])].filter(inChoices)
+            const choices = options?.map((option) => option.value) ?? []
+            return [...new Set([shown, original, ...(optional ? [optional] : []), ...choices])].filter(inChoices)
         }
         const all = bits.map(({value: item}) => item)
         return [
@@ -139,7 +150,7 @@ export function CellPick({
             ...all.filter((item) => !selected.includes(item) && originalItems.has(item)),
             ...all.filter((item) => !selected.includes(item) && !originalItems.has(item)),
         ]
-    }, [multiple, bits, selected, mask, originalItems, shown, original, choices, optional, groups])
+    }, [multiple, bits, selected, mask, originalItems, shown, original, options, optional])
 
     /**
      * **展开列表**（= 选值格的"进编辑"）：先跟随可视、再开。**双击**与 Enter 两条路都走它 ——
@@ -362,7 +373,7 @@ export function CellPick({
                     }}
                 >
                     {groups
-                        ? (group: PickerGroup) => (
+                        ? (group: {label: string; items: readonly string[]}) => (
                             <ComboboxGroup key={group.label} items={group.items}>
                                 <ComboboxLabel>{group.label}</ComboboxLabel>
                                 <ComboboxCollection>{(item: string) => renderItem(item)}</ComboboxCollection>

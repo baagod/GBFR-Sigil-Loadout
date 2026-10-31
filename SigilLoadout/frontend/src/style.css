@@ -360,4 +360,3 @@ input[aria-hidden="true"][style*="position: fixed"] {
 .ailment-sheet td.cell-active {
     box-shadow: inset 0 0 0 1px var(--cell-select);
 }
-

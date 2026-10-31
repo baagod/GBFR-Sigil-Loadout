@@ -85,8 +85,8 @@ export const HANDLE_CELL = "cell-handle cell-pinned sticky left-0 border-r borde
  * 取主题里比 `--muted` 更深的那档面 `--popover`（用户口径先要 `#2e2e2e`，看过之后要更深一档）。
  * 三处本来就是同一档灰，改要一起改 —— 共用一份即为此。
  *
- * ⚠️ 行号列**选中时**那格由 style.css 的 `.cell-handle.cell-row-selected` 盖成**不透明实色**：
- * 它是 sticky 的，透明会把横向滚过来的列透出来。
+ * 行号列是 sticky，底色始终由这里的 `HEAD_BG` 提供（不透明）；选中时
+ * `.cell-handle.cell-row-selected` 只去掉 `box-shadow` 并把数字染成选区绿，不再另加底色。
  */
 export const HEAD_BG = "bg-popover"
 
@@ -237,4 +237,3 @@ export const HEAD_CELL = `sticky top-0 z-20 ${HEAD_HEIGHT} border-r border-b ${H
  * 选区外观（底色/轮廓/活动格）由 overlay 画，这里不再有任何选区类名。
  */
 export const CELL_BASE = `${ROW_HEIGHT} cell-selectable border-r border-b p-0`
-

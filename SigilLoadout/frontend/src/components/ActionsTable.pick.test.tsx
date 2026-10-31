@@ -544,7 +544,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
                 <tbody>
                     <tr>
                         <td>
-                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged options={[{value: "100"}, {value: "101"}]} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
                         </td>
                     </tr>
                 </tbody>
@@ -569,7 +569,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
                 <tbody>
                     <tr>
                         <td>
-                            <CellPick cellKey="1000\u0000branchXAtk_" shown="100" original={UNSET} unchanged choices={new Set(["100", "101"])} optional="-1" searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                            <CellPick cellKey="1000\u0000branchXAtk_" shown="100" original={UNSET} unchanged options={[{value: "100"}, {value: "101"}]} optional="-1" searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
                         </td>
                     </tr>
                 </tbody>
@@ -591,7 +591,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
                 <tbody>
                     <tr>
                         <td>
-                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged options={[{value: "100"}, {value: "101"}]} optional={UNSET} searchPlaceholder="搜索" onCommit={() => {}} {...openGate} />
                         </td>
                     </tr>
                 </tbody>
@@ -612,7 +612,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
                 <tbody>
                     <tr>
                         <td>
-                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" emptyLabel="无匹配项" onCommit={() => {}} {...openGate} />
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged options={[{value: "100"}, {value: "101"}]} optional={UNSET} searchPlaceholder="搜索" emptyLabel="无匹配项" onCommit={() => {}} {...openGate} />
                         </td>
                     </tr>
                 </tbody>
@@ -635,7 +635,7 @@ describe("动作表 · 分支列（branchXAtk_）", () => {
                 <tbody>
                     <tr>
                         <td>
-                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged choices={new Set(["100", "101"])} optional={UNSET} searchPlaceholder="搜索" emptyLabel="无匹配项" onCommit={onCommit} {...openGate} />
+                            <CellPick cellKey="1000\u0000controlTypeHash_" shown={UNSET} original={UNSET} unchanged options={[{value: "100"}, {value: "101"}]} optional={UNSET} searchPlaceholder="搜索" emptyLabel="无匹配项" onCommit={onCommit} {...openGate} />
                         </td>
                     </tr>
                 </tbody>

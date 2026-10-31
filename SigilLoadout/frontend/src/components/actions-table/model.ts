@@ -222,25 +222,34 @@ export type ColumnSpec = {
 export type BranchPickConfig = {
     /** 清单：当前这张表里所有 `id_`。 */
     ids: ReadonlySet<string>
+    /** 同上清单的选项视图（稳定引用；`CellPick` 直接消费）。 */
+    options: readonly PickerOption[]
     /** 下拉搜索框的提示文案（i18n）。 */
     searchPlaceholder: string
     /** 搜不到任何项时显示的文案（i18n）；空串 = 不显示。 */
     emptyLabel: string
 }
 
-export const BranchPickContext = createContext<BranchPickConfig>({ids: new Set<string>(), searchPlaceholder: "", emptyLabel: ""})
+/** 单选列表的一项：值写回数据，`label` 只用于显示，`group` 给分组标题。 */
+export type PickerOption = {value: string; label?: string; group?: string}
 
-/** 单选列表的一组选项：`label` 是组标题，`items` 是组内的值（仍按原值提交）。 */
-export type PickerGroup = {label: string; items: readonly string[]}
+export const BranchPickContext = createContext<BranchPickConfig>({
+    ids: new Set<string>(),
+    options: [],
+    searchPlaceholder: "",
+    emptyLabel: "",
+})
 
 /**
  * **值格参数**（哪一列是哪种值格、带不带搜索框、位名表）—— 由**各表自己给**。
  *
  * ‼️ 这是"列数据"，不是基座上的开关布尔：基座只有**一套**值格实现（双击展开 / 跟随可视 /
  * 焦点环 / 列表排序 `[当前] → [原值] → [其他]` / Ctrl+C 全是同一份）。它只描述**参数能表达的差别**
- * （多选、位名表、挂不挂搜索框）；单选那份清单仍归列策略（`controlTypeHash_` / `branchXAtk_` 那张内置表）。
+ * （单选选项、多选、位名表、挂不挂搜索框）；内置列策略只是没给这份参数时的默认值。
  */
 export type PickerConfig = {
+    /** 单选的完整选项（值 + 可选译名 + 可选组标题）。不给 = 只用这一列的内置策略；多选那档不用它。 */
+    options?: readonly PickerOption[]
     /** 多选（按位开关；提交时把勾中的位权相加写回那一格）。不给 = 单选。 */
     multiple?: boolean
     /** 多选的位名表：**下标即位号**（空串 = 还没弄清含义的那一位）。 */
@@ -249,15 +258,6 @@ export type PickerConfig = {
     searchPlaceholder?: string
     /** 搜不到结果时的文案（i18n）；不给 = 不显示空态（与官方示例默认行为一致）。 */
     emptyLabel?: string
-    /**
-     * 选项值 → 显示文本。不给 = 原样显示值。
-     *
-     * 单选那档用它：值仍是写回数据的那份（十进制/哈希），列表与触发器显示的是译名；
-     * **搜索框也按译名过滤**（`CellPick` 把它交给 Combobox 的 `itemToStringLabel`）。
-     */
-    labels?: ReadonlyMap<string, string>
-    /** 给了就按组渲染列表（组标题 + 组内项）；不给 = 平铺。 */
-    groups?: readonly PickerGroup[]
 }
 
 /** 不给值格参数时用它（导出是为了让基座在 provider 里当默认值用 —— 常量引用才不会让 memo 失效）。 */
