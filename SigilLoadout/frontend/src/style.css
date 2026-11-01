@@ -247,8 +247,6 @@ table.base-table tbody tr:hover {
     background-color: transparent;
 }
 
-/* 基表底线由末行格子给（主表的外框照旧由外壳画）；异常状态弹层不要外框，见下面的 `.ailment-sheet`。 */
-
 /*
     ============ 提层阶梯（唯一一份） ============
 

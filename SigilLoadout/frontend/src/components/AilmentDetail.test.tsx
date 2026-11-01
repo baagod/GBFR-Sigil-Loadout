@@ -7,7 +7,7 @@
     不能从 `render()` 返回的容器查。
 */
 import {afterEach, describe, expect, it, vi} from "vitest"
-import {cleanup, fireEvent, render, waitFor} from "@testing-library/react"
+import {cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react"
 
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     LoadActions: vi.fn(),
@@ -54,6 +54,14 @@ const track = (rows: ReturnType<typeof row>[]): KeyedTrackTable =>
         rows,
     }) as unknown as KeyedTrackTable
 
+/** 组件要求生产契约齐全；单个用例只关心其中一两项，其余用空桩。 */
+const baseProps = {
+    originalRows: [] as TrackRow[],
+    statusCatalog: {categories: []},
+    onCancel: () => {},
+    onEditChild: () => {},
+}
+
 const bodyRows = () => document.body.querySelectorAll("tbody tr")
 const byId = (tag: string, id: string) => document.body.querySelector(`${tag}[data-col-id="${id}"]`)
 
@@ -61,7 +69,7 @@ describe("异常状态展开页（基座表）", () => {
     it("摊平：各组默认只给到最后一个有值的槽（没有值就 1 行）", async () => {
         stubColumnGeometry()
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={() => {}}
                 onEditChild={() => {}}
@@ -79,7 +87,7 @@ describe("异常状态展开页（基座表）", () => {
 
     it("末列箭头展开剩余槽、再点收起", async () => {
         stubColumnGeometry()
-        render(<AilmentDetail t={t} onClose={() => {}} onEditChild={() => {}} track={track([row("b", "0.900000", "0.950000", slots(null))])} />)
+        render(<AilmentDetail {...baseProps} t={t} onClose={() => {}} onEditChild={() => {}} track={track([row("b", "0.900000", "0.950000", slots(null))])} />)
         await waitFor(() => expect(bodyRows()).toHaveLength(1))
 
         const expand = document.body.querySelector(`button[aria-label="${t.ailmentExpand}"]`) as HTMLElement
@@ -95,7 +103,7 @@ describe("异常状态展开页（基座表）", () => {
     it("编辑持续秒数：onEditChild 收到 (父行键, 槽位标签, 列, 新值)", async () => {
         stubColumnGeometry()
         const onEditChild = vi.fn()
-        render(<AilmentDetail t={t} onClose={() => {}} onEditChild={onEditChild} track={track([row("a", "0.000000", "0.100000", slots(0))])} />)
+        render(<AilmentDetail {...baseProps} t={t} onClose={() => {}} onEditChild={onEditChild} track={track([row("a", "0.000000", "0.100000", slots(0))])} />)
         await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
 
         const cell = byId("td", "sec") as HTMLElement
@@ -114,7 +122,7 @@ describe("异常状态展开页（基座表）", () => {
         const current = slots(0)
         const originalRows: TrackRow[] = [{values: {}, children: [{tag: "Ailment00", values: {...current[0]!.values, sec: "10.000000"}}], orig: null}]
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={() => {}}
                 onEditChild={onEditChild}
@@ -141,7 +149,7 @@ describe("异常状态展开页（基座表）", () => {
             {values: {}, children: [{tag: "Ailment00", values: {category: "2027311463", type: "4135089318", rate: "0.000000"}}], orig: null},
         ]
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={() => {}}
                 onEditChild={onEditChild}
@@ -163,18 +171,18 @@ describe("异常状态展开页（基座表）", () => {
     it("清空最后的有值槽：已显示的行不收起（折叠边界只增不减）", async () => {
         stubColumnGeometry()
         const props = {t, onClose: () => {}, onEditChild: () => {}}
-        const {rerender} = render(<AilmentDetail {...props} track={track([row("a", "0.000000", "0.100000", slots(3))])} />)
+        const {rerender} = render(<AilmentDetail {...baseProps} {...props} track={track([row("a", "0.000000", "0.100000", slots(3))])} />)
         await waitFor(() => expect(bodyRows()).toHaveLength(4))
 
         // 槽 0~3 全清成占位：边界按数据算会缩到 1，但不该把刚编辑的那几行收走。
-        rerender(<AilmentDetail {...props} track={track([row("a", "0.000000", "0.100000", slots(null))])} />)
+        rerender(<AilmentDetail {...baseProps} {...props} track={track([row("a", "0.000000", "0.100000", slots(null))])} />)
         expect(bodyRows()).toHaveLength(4)
     })
 
     it("有 statusCatalog 时 [类别]/[类型] 显示译名（值仍是十进制）", async () => {
         stubColumnGeometry()
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={() => {}}
                 onEditChild={() => {}}
@@ -193,7 +201,7 @@ describe("异常状态展开页（基座表）", () => {
         stubColumnGeometry()
         const onEditChild = vi.fn()
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={() => {}}
                 onEditChild={onEditChild}
@@ -229,7 +237,7 @@ describe("异常状态展开页（基座表）", () => {
         stubColumnGeometry()
         const onClose = vi.fn()
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={onClose}
                 statusCatalog={{
@@ -249,11 +257,12 @@ describe("异常状态展开页（基座表）", () => {
 
     it("选完列表关掉后，Esc 仍能关弹窗（列表关闭动画不算开着）", async () => {
         stubColumnGeometry()
-        const onClose = vi.fn()
+        const onCancel = vi.fn()
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
-                onClose={onClose}
+                onClose={() => {}}
+                onCancel={onCancel}
                 statusCatalog={{
                     categories: [{key: "2027311463", label: "异常", types: [{key: "4135089318", label: "恐惧"}]}],
                 }}
@@ -266,7 +275,7 @@ describe("异常状态展开页（基座表）", () => {
         await waitFor(() => expect(isPickOpen()).toBe(false))
 
         fireEvent.keyDown(document, {key: "Escape"})
-        await waitFor(() => expect(onClose).toHaveBeenCalled())
+        await waitFor(() => expect(onCancel).toHaveBeenCalled())
     })
 
     it("选值格区域复制/粘贴：复制的是两列 TSV，粘回去按列写", async () => {
@@ -276,7 +285,7 @@ describe("异常状态展开页（基座表）", () => {
             categories: [{key: "2027311463", label: "异常", types: [{key: "4135089318", label: "恐惧"}]}],
         }
         render(
-            <AilmentDetail
+            <AilmentDetail {...baseProps}
                 t={t}
                 onClose={() => {}}
                 onEditChild={onEditChild}
@@ -310,13 +319,45 @@ describe("异常状态展开页（基座表）", () => {
         expect(onEditChild).toHaveBeenCalledWith("b", "Ailment00", "type", "4135089318")
     })
 
-    it("Esc 关掉这一层（编辑态交给基座输入框，不在这测）", async () => {
+    it("取消走 onCancel，确定走 onClose", async () => {
         stubColumnGeometry()
         const onClose = vi.fn()
-        render(<AilmentDetail t={t} onClose={onClose} track={track([row("a", "0.000000", "0.100000", slots(0))])} />)
+        const onCancel = vi.fn()
+        render(
+            <AilmentDetail {...baseProps}
+                t={t}
+                onClose={onClose}
+                onCancel={onCancel}
+                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+            />,
+        )
+        await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
+
+        fireEvent.click(screen.getByRole("button", {name: t.cancel}))
+        expect(onCancel).toHaveBeenCalledTimes(1)
+        expect(onClose).not.toHaveBeenCalled()
+
+        fireEvent.click(screen.getByRole("button", {name: t.ok}))
+        expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it("Esc 等同取消：有 onCancel 时不走 onClose", async () => {
+        stubColumnGeometry()
+        const onClose = vi.fn()
+        const onCancel = vi.fn()
+        render(
+            <AilmentDetail {...baseProps}
+                t={t}
+                onClose={onClose}
+                onCancel={onCancel}
+                track={track([row("a", "0.000000", "0.100000", slots(0))])}
+            />,
+        )
         await waitFor(() => expect(byId("td", "sec")).not.toBeNull())
 
         fireEvent.keyDown(document, {key: "Escape"})
-        expect(onClose).toHaveBeenCalledTimes(1)
+        expect(onCancel).toHaveBeenCalledTimes(1)
+        expect(onClose).not.toHaveBeenCalled()
     })
+
 })

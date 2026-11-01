@@ -13,6 +13,7 @@ import {ChevronsDown, ChevronsUp} from "lucide-react"
 import {ActionsTable} from "@/components/ActionsTable"
 import {TRAILING_BTN} from "@/components/actions-table/classes"
 import type {ActionRow, ColumnSpec, PickerConfig, PickerOption} from "@/components/actions-table/model"
+import {Button} from "@/components/ui/button"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {NO_SORTING, trackLabel, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
 import type {StatusCatalog, TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
@@ -47,19 +48,22 @@ type Group = {
     expandable: boolean
 }
 
-export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, finalFocus, onEditChild}: {
+export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, onCancel, finalFocus, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
     track: KeyedTrackTable
     /** 游戏原版那几行：清空槽位要回到这里的值（空串会让后端整个不写这个属性）。 */
-    originalRows?: readonly TrackRow[]
+    originalRows: readonly TrackRow[]
     t: Messages
-    /** 状态下拉（类别/类型）的数据；没有就退回普通文本格。 */
-    statusCatalog?: StatusCatalog | null
+    /** 状态下拉（类别/类型）的数据。 */
+    statusCatalog: StatusCatalog
+    /** 保留这次编辑并关掉。 */
     onClose: () => void
+    /** 丢弃这次编辑并关掉。 */
+    onCancel: () => void
     /** 关掉后焦点交给谁（默认回打开它的按钮）；交给外层弹窗，下一次 Esc 才不会被 Tooltip 吃掉。 */
     finalFocus?: () => HTMLElement | null
-    /** 改一个槽位的一栏（写回 `TrackRow.Children`）；不给 = 只读。 */
-    onEditChild?: (rowKey: string, tag: string, column: string, value: string) => void
+    /** 改一个槽位的一栏（写回 `TrackRow.Children`）。 */
+    onEditChild: (rowKey: string, tag: string, column: string, value: string) => void
 }) {
     const childColumns = track.childColumns
     /* 每组当前显示到第几个槽。初值是打开时的数据边界；展开写 total，收起写回数据边界。 */
@@ -117,7 +121,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
 
     const editCell = useCallback((rowId: string, column: string, value: string | null) => {
         const hit = rowMeta.get(rowId)
-        if (!onEditChild || !hit) return
+        if (!hit) return
         const next = value ?? ""
         const resolved = next === "" ? (hit.originals[column] ?? "") : next
         onEditChild(hit.group.row.key, hit.child.tag, column, resolved)
@@ -160,7 +164,6 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
      * 值仍是攻击轨里的十进制字符串，提交原样回写；搜索框按译名过滤（见 `CellPick` 的 options）。
      */
     const pickerOf = useMemo<(key: string) => PickerConfig | undefined>(() => {
-        if (!statusCatalog) return () => undefined
         const categoryOptions: PickerOption[] = statusCatalog.categories.map((category) => ({
             value: category.key,
             label: category.label,
@@ -210,18 +213,25 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, f
                     details.cancel()
                     return
                 }
-                onClose()
+                onCancel()
             }}
         >
             <DialogContent
                 initialFocus={() => false}
                 finalFocus={finalFocus}
+                showCloseButton={false}
                 className="ailment-popup flex max-h-[min(1080px,calc(100vh-64px))] w-[min(1080px,calc(100vw-40px))] flex-col gap-3 p-5 sm:max-w-none"
             >
-                <DialogHeader className="border-b pb-3">
+                <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b pb-3">
                     <DialogTitle className="text-base font-medium">
                         {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)} #${track.sub}`}
                     </DialogTitle>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={onCancel}>
+                            {t.cancel}
+                        </Button>
+                        <Button onClick={onClose}>{t.ok}</Button>
+                    </div>
                 </DialogHeader>
                 {groups.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t.ailmentEmpty}</p>

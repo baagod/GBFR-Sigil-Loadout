@@ -73,7 +73,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     motion: string
     charCode: string
     t: Messages
-    /** [类别] / [类型] 选值格的选项（当前语言）；没有就退回普通文本格。 */
+    /** [类别] / [类型] 选值格的选项（当前语言）；没有就不显示展开页入口。 */
     statusCatalog?: StatusCatalog | null
     onClose: () => void
 }) {
@@ -110,6 +110,8 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     const [busy, setBusy] = useState(false)
     /** 打开了哪条 Attack 轨的「异常状态」展开页（null = 没开）。 */
     const [ailmentKey, setAilmentKey] = useState<string | null>(null)
+    /** 打开展开页时那张表；取消 = 原样放回，丢弃这次弹层里的所有编辑。 */
+    const ailmentSnapshot = useRef<KeyedTrackTable | null>(null)
     /**
      * 打开弹层时那份**原表**（深拷、之后只读）。
      *
@@ -387,6 +389,23 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
         setBusy(false)
     }
 
+    const openAilment = (key: string) => {
+        ailmentSnapshot.current = tables[key] ?? null
+        setAilmentKey(key)
+    }
+
+    const closeAilment = () => {
+        ailmentSnapshot.current = null
+        setAilmentKey(null)
+    }
+
+    const cancelAilment = () => {
+        const key = ailmentKey
+        const snapshot = ailmentSnapshot.current
+        closeAilment()
+        if (key && snapshot) setTables((prev) => ({...prev, [key]: snapshot}))
+    }
+
     // 数据没到位之前**整个弹层都不挂载**（而不是挂一个很矮的"读取中…"）：
     // 那样的话弹层先以很矮的样子出场，数据一到就跳到 700 多高 —— 那一下既像抖动，
     // 又把它自己的出场动画盖掉了（动画在小盒子上播完了，盒子才变大）。
@@ -440,7 +459,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                                 onRemove={() => tableCommands.current[key]?.rows.removeRowsInSelection()}
                             />
                             {/* 最右侧的「异常状态」入口（只有 Attack 轨有子元素）。打开的是独立展开页，不动这张表。 */}
-                            {info.kind === "attack" && (
+                            {info.kind === "attack" && statusCatalog && (
                                 <span className="ml-2 flex">
                                     <TooltipProvider>
                                         <Tooltip>
@@ -451,7 +470,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                                                         variant="ghost"
                                                         className={TRACK_ICON_BTN}
                                                         aria-label={t.ailmentTitle}
-                                                        onClick={() => setAilmentKey(key)}
+                                                        onClick={() => openAilment(key)}
                                                     />
                                                 }
                                             >
@@ -652,13 +671,14 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
             </Dialog>
             {/* 展开页是**另一层默认 Dialog**（不是嵌在上面的 React 树里）：这样它有自己的遮罩层；
                 嵌进去的话 Base UI 当成同一个模态栈，不会再画第二层蒙版。 */}
-            {ailmentKey && ailmentTrack && (
+            {ailmentKey && ailmentTrack && ailmentOriginal && statusCatalog && (
                 <AilmentDetail
                     track={ailmentTrack}
                     originalRows={ailmentOriginal}
                     t={t}
                     statusCatalog={statusCatalog}
-                    onClose={() => setAilmentKey(null)}
+                    onClose={closeAilment}
+                    onCancel={cancelAilment}
                     finalFocus={() => popupRef.current}
                     onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
                 />
