@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
-    动画详情弹窗里 **flags 的每条子轨各成一段**。
+    动画弹窗里 **flags 的每条子轨各成一段**。
 
     回归的那一版：`ListTracks` 把同一动画的 flags 0 号与 1 号都列了出来，而弹层只读了 0 号 ——
     于是界面上"Flags #1"那一段有标题、没有表（`TrackGrid` 拿不到 table 就返回 null）。

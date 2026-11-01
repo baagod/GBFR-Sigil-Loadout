@@ -100,7 +100,7 @@ const zh = {
     hmRangeSkill: "技能",
     /** 组标题。「技能」那一组直接复用 hmRangeSkill。 */
     hmGroupOther: "其他",
-    // 动画详情页
+    // 动画弹窗
     trackNone: "该动画无轨文件",
     saveFailedText: (detail: string) => `保存失败：${detail}`,
     colConfig: "配置",

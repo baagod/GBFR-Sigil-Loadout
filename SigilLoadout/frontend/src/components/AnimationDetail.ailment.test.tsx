@@ -74,7 +74,7 @@ afterEach(() => {
     cleanup()
 })
 
-describe("动画详情：异常状态展开页", () => {
+describe("动画弹窗：异常弹窗", () => {
     it("取消丢弃本次编辑，重新打开仍是原值", async () => {
         await open()
 

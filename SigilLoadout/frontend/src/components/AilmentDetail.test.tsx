@@ -67,7 +67,7 @@ const byId = (tag: string, id: string) => document.body.querySelector(`${tag}[da
 /** 箭头挂在哪一行的哪一槽（用槽位列认行，行号会随折叠变）。 */
 const slotOf = (button: HTMLElement) => button.closest("tr")?.querySelector('td[data-col-id="slot"]')?.textContent
 
-describe("异常状态展开页（基座表）", () => {
+describe("异常弹窗（基座表）", () => {
     it("摊平：各组默认只给到最后一个有值的槽（没有值就 1 行）", async () => {
         stubColumnGeometry()
         render(
