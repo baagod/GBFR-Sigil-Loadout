@@ -217,7 +217,7 @@ export function ringLines(rect: Rect, edges: Edges, width: number, clampRight: b
         const top = rect.top + rect.height - inset - (clampBottom ? 1 : 0)
         lines.push({left: lineLeft, top, width: lineW, height: width})
     }
-    if (edges.left) lines.push({left: clampLeft ? rect.left : rect.left - inset, top: rect.top - inset, width, height: lineH})
+    if (edges.left) lines.push({left: lineLeft, top: rect.top - inset, width, height: lineH})
     if (edges.right) {
         const left = rect.left + rect.width - inset - (clampRight ? 1 : 0)
         lines.push({left, top: rect.top - inset, width, height: lineH})
