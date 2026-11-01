@@ -510,6 +510,20 @@ export type ActionRow = {
      */
     orig?: number | null
     children?: unknown[]
+    /**
+     * 合并表里**行号显示什么**（「动画弹窗」的多条 Attack 子轨并成一张时用）：`00-1` / `2` / `3`。
+     * 不给就按显示位置从 1 数。
+     */
+    indexLabel?: string
+    /** 合并表里这一行**是一条新子轨的首行**：组间画分隔线（见 style.css 的 `.row-group-start`）。 */
+    groupStart?: boolean
+    /** 合并表里这一行**是一条子轨的末行**：组间分隔线画在它下面（见 style.css 的 `.row-group-end`）。 */
+    groupEnd?: boolean
+    /**
+     * 合并表里的**组键**（一条子轨一个值）：拖动只许落在同组内，跨组直接拒绝。
+     * 普通表不传 —— 整张表算一组。
+     */
+    groupKey?: string
 }
 
 /**

@@ -26,7 +26,21 @@ import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/
  * 轨表的一行 + 界面侧的行键（键只在界面里用，不往 Go 传：保存时多余的字段由 JSON 忽略）。
  * 行键在装载时发（见 `AnimationDetail` 的装载 effect），之后不随位置漂。
  */
-export type KeyedTrackRow = TrackRow & {key: string}
+export type KeyedTrackRow = TrackRow & {
+    key: string
+    /** 合并表（多条子轨并成一张）里**这一行归哪条子轨**（`trackKey` 原样）。 */
+    track?: string
+    /** 行号显示什么：`00-1` / `2` / `3`（同组后面只写组内行号）；不给就按位置从 1 数。 */
+    indexLabel?: string
+    /** 这一行是一条新子轨的首行：组间画分隔线。 */
+    groupStart?: boolean
+    /** 这一行是一条子轨的末行：组间分隔线画在它下面。 */
+    groupEnd?: boolean
+    /** 合并表里这一行的**原版值**：子轨不同，`orig` 指向各自原表里的行，不能拿一张原表按下标查。 */
+    origValues?: Record<string, string | undefined>
+    /** 合并表里这条行属于哪条子轨（拖动只在同组内换序、组间画分隔线）。 */
+    groupKey?: string
+}
 /** 弹层里每张表：行带键。`TrackTable` 是后端契约（它的行不带键）。 */
 export type KeyedTrackTable = Omit<TrackTable, "rows"> & {rows: KeyedTrackRow[]}
 
@@ -69,6 +83,10 @@ const toRow = (
     */
     orig: row.orig ?? null,
     children: row.children ?? [],
+    indexLabel: row.indexLabel,
+    groupStart: row.groupStart,
+    groupEnd: row.groupEnd,
+    groupKey: row.groupKey,
 })
 
 /**
@@ -79,7 +97,7 @@ const toRow = (
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
-export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
+export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange, onActiveRowChange}: {
     table: KeyedTrackTable | undefined
     t: Messages
     /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
@@ -93,6 +111,8 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
     onCommandsReady?: (commands: TableCommands) => void
     /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
+    /** 合并表用：活动行变了（`null` = 没有活动格）。 */
+    onActiveRowChange?: (rowId: string | null) => void
 }) {
     /*
         ‼️ **行的引用要稳**（按数据 `useMemo`，别在 JSX 里现 map）：基座把 `rows` 当"换数据了没有"的
@@ -100,7 +120,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
         选中/拖动/滚动每一帧都会重跑一趟测量。
     */
     const rowItems = useMemo(
-        () => (table?.rows ?? []).map((row) => toRow(row.values, row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined, row)),
+        () => (table?.rows ?? []).map((row) => toRow(row.values, row.origValues ?? (row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined), row)),
         [table, originals],
     )
     if (!table) return null
@@ -127,6 +147,7 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
             onSelectionPresenceChange={onSelectionPresenceChange}
             onCommandsReady={onCommandsReady}
             onRowsChange={onRowsChange}
+            onActiveRowChange={onActiveRowChange}
         />
     )
 }

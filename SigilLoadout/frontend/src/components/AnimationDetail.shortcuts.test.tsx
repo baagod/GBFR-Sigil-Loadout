@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
-    动画详情弹窗的**键盘那条路**（Ctrl+Del 删行 / Ctrl+X 剪切 / Ctrl+Shift+V 插行）与工具条按钮的同口径。
+    动画弹窗的**键盘那条路**（Ctrl+Del 删行 / Ctrl+X 剪切 / Ctrl+Shift+V 插行）与工具条按钮的同口径。
 
     Del 本身不再是"删行"：裸 Del 归基座（清选区里每一格的改动，见 `useTableKeys`），删行统一要 Ctrl+Del。
 
@@ -64,6 +64,10 @@ const rowsOf = () => [...document.querySelectorAll("tbody tr")]
  * 颜色（认颜色的话，改一次配色这条用例就红，而它要守的是"哪一行被假删除了"）。
  */
 const removedRows = () => rowsOf().filter((tr) => tr.className.includes("row-removed"))
+
+/** 一行去掉**行号格**之后的文本。行号现在可能是 `00-1` 这种多字符（合并后的 Attack 表），不能再按"第一个字符"切。 */
+const rowValues = (tr: Element) =>
+    [...tr.querySelectorAll("td")].slice(1).map((td) => td.textContent).join("|")
 
 describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
     afterEach(cleanup)
@@ -281,7 +285,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
 
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
         // 插在活动格那行之后（不是最前也不是最后）：第 2 行是第 1 行的复制（行号那一位不同，其余一样）。
-        expect(rowsOf()[1].textContent?.slice(1)).toBe(rowsOf()[0].textContent?.slice(1))
+        expect(rowValues(rowsOf()[1])).toBe(rowValues(rowsOf()[0]))
     })
 
     /* Ctrl+Shift+V 与工具条「插入行」是同一个命令。 */
@@ -291,7 +295,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         pressInsertRow()
 
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
-        expect(rowsOf()[1].textContent?.slice(1)).toBe(rowsOf()[0].textContent?.slice(1))
+        expect(rowValues(rowsOf()[1])).toBe(rowValues(rowsOf()[0]))
     })
 
     /* ‼️ 跨表：同一个弹窗里的几张轨表**共用一份行剪贴板** —— 从一张表复制，能插到另一张表。 */
@@ -317,7 +321,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
 
         await waitFor(() => expect(bodies()[1].querySelectorAll("tr")).toHaveLength(3))
         expect(bodies()[0].querySelectorAll("tr")).toHaveLength(2)
-        expect(bodies()[1].querySelectorAll("tr")[1].textContent?.slice(1)).toBe(bodies()[0].querySelectorAll("tr")[0].textContent?.slice(1))
+        expect(rowValues(bodies()[1].querySelectorAll("tr")[1])).toBe(rowValues(bodies()[0].querySelectorAll("tr")[0]))
     })
 
     /* ‼️ 跨弹窗：行剪贴板是全应用一份 —— 关掉弹层、再开另一段动画，照样能插入。 */
