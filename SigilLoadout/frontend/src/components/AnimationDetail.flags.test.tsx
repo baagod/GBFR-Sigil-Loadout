@@ -68,7 +68,7 @@ describe("动画详情：flags 每条子轨", () => {
         vi.mocked(ListFsm).mockResolvedValue([])
         vi.mocked(LoadFlags).mockImplementation(async (_motion, sub) => (sub === "1" ? [flagRow(0), flagRow(1)] : [flagRow(0)]))
         vi.mocked(LoadFlagsOriginal).mockImplementation(async (_motion, sub) => (sub === "1" ? [flagRow(0), flagRow(1)] : [flagRow(0)]))
-        render(<AnimationDetail motion="001c" charCode="pl2900" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="001c" charCode="pl2900" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
     }
 
     it("ListTracks 列出 flags 0 号与 1 号时，两段都上屏（#1 不再是一片空白）", async () => {

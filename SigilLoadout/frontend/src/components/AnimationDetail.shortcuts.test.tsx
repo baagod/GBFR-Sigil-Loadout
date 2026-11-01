@@ -77,7 +77,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         vi.mocked(LoadTrack).mockResolvedValue(track())
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
 
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(rowsOf()).toHaveLength(2))
 
         // 按第一行的行号格 = "整行选中"。选中之后基座才会上报 `sel`，键盘那几条才有落点。
@@ -123,7 +123,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         const added = {values: {startTime: "2", endTime: "2.5"}, children: [], orig: null}
         vi.mocked(LoadTrack).mockResolvedValue({...track(), rows: [...track().rows, added]})
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
 
         const pasteInto = async (rowIndex: number, text: string) => {
@@ -201,7 +201,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         vi.mocked(ListFsm).mockResolvedValue([])
         vi.mocked(LoadTrack).mockResolvedValue(track())
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(document.querySelectorAll("[role=dialog] tbody")).toHaveLength(2))
         return () => [...document.querySelectorAll("[role=dialog] tbody")]
     }
@@ -226,7 +226,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         const added = {values: {startTime: "2", endTime: "2.5"}, children: [], orig: null}
         vi.mocked(LoadTrack).mockResolvedValue({...track(), rows: [...track().rows, added]})
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
 
         await selectRow(rowsOf()[2])
@@ -303,7 +303,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         vi.mocked(ListFsm).mockResolvedValue([])
         vi.mocked(LoadTrack).mockResolvedValue(track())
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(document.querySelectorAll("[role=dialog] tbody")).toHaveLength(2))
         const bodies = () => [...document.querySelectorAll("[role=dialog] tbody")]
 
@@ -402,7 +402,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
                 : {...track(), kind: "effect", rows: [row(8), row(9)]}, // startTime 8 / 9
         )
         vi.mocked(LoadTrackOriginal).mockResolvedValue(track())
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(document.querySelectorAll("[role=dialog] tbody")).toHaveLength(2))
         const bodies = () => [...document.querySelectorAll("[role=dialog] tbody")]
 
@@ -426,7 +426,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         vi.mocked(ListFsm).mockResolvedValue([])
         vi.mocked(LoadTrack).mockResolvedValue(track())
         vi.mocked(LoadTrackOriginal).mockResolvedValue({...track(), rows: [row(5), row(6)]})
-        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} onClose={() => {}} />)
+        render(<AnimationDetail motion="3400" charCode="pl1000" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
         await waitFor(() => expect(rowsOf()).toHaveLength(2))
 
         const source = rowsOf()[0].querySelectorAll("td")[2] as HTMLElement // 第 1 行 startTime：改动 0 / 原值 5

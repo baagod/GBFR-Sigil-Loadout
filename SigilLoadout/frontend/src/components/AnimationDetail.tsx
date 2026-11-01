@@ -73,8 +73,8 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     motion: string
     charCode: string
     t: Messages
-    /** [类别] / [类型] 选值格的选项（当前语言）；没有就不显示展开页入口。 */
-    statusCatalog?: StatusCatalog | null
+    /** [类别] / [类型] 选值格的选项（当前语言）；null = 还没取到，不显示展开页入口。 */
+    statusCatalog: StatusCatalog | null
     onClose: () => void
 }) {
     const [infos, setInfos] = useState<TrackInfo[]>([])

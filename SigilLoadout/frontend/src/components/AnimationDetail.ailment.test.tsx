@@ -112,4 +112,14 @@ describe("动画详情：异常状态展开页", () => {
         await waitFor(() => expect(secCell()).not.toBeNull())
         expect(secCell().textContent).toContain("9.000000")
     })
+
+    it("状态表目录未就绪：Attack 轨没有异常状态入口", async () => {
+        vi.mocked(ListTracks).mockResolvedValue([{sub: "0", kind: "attack"}])
+        vi.mocked(LoadTrack).mockResolvedValue(attack("8.000000"))
+        vi.mocked(LoadTrackOriginal).mockResolvedValue(attack("8.000000"))
+        render(<AnimationDetail motion="001c" charCode="pl2900" t={t} statusCatalog={null} onClose={() => {}} />)
+        await screen.findByRole("button", {name: t.saveAnimation})
+        expect(screen.queryByRole("button", {name: t.ailmentTitle})).toBeNull()
+        expect(document.querySelector(".ailment-popup")).toBeNull()
+    })
 })
