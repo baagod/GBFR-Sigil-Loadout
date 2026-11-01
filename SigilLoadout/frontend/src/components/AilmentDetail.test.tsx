@@ -64,6 +64,8 @@ const baseProps = {
 
 const bodyRows = () => document.body.querySelectorAll("tbody tr")
 const byId = (tag: string, id: string) => document.body.querySelector(`${tag}[data-col-id="${id}"]`)
+/** 箭头挂在哪一行的哪一槽（用槽位列认行，行号会随折叠变）。 */
+const slotOf = (button: HTMLElement) => button.closest("tr")?.querySelector('td[data-col-id="slot"]')?.textContent
 
 describe("异常状态展开页（基座表）", () => {
     it("摊平：各组默认只给到最后一个有值的槽（没有值就 1 行）", async () => {
@@ -98,6 +100,46 @@ describe("异常状态展开页（基座表）", () => {
         const collapse = document.body.querySelector(`button[aria-label="${t.ailmentCollapse}"]`) as HTMLElement
         fireEvent.click(collapse)
         await waitFor(() => expect(bodyRows()).toHaveLength(1))
+    })
+
+    /** 槽 3 只改一栏，验证"设置过"的口径与箭头位置（旧口径只看 sec/rate，会把它当没值的槽收起来）。 */
+    const expectSetSlotArrows = async (patch: Record<string, string>) => {
+        stubColumnGeometry()
+        const children = slots(null).map((child, slot) => (slot === 3 ? {tag: child.tag, values: {...child.values, ...patch}} : child))
+        render(<AilmentDetail {...baseProps} t={t} onClose={() => {}} onEditChild={() => {}} track={track([row("a", "0.000000", "0.100000", children)])} />)
+
+        // 折叠态：显示到最后一个设置过的槽 03，↓ 就挂在那一行。
+        await waitFor(() => expect(bodyRows()).toHaveLength(4))
+        const down = document.body.querySelector(`button[aria-label="${t.ailmentExpand}"]`) as HTMLElement
+        expect(slotOf(down)).toBe("03")
+
+        // 展开：全部 16 行，↑ 挂在最末行（槽 15）。
+        fireEvent.click(down)
+        await waitFor(() => expect(bodyRows()).toHaveLength(16))
+        const up = document.body.querySelector(`button[aria-label="${t.ailmentCollapse}"]`) as HTMLElement
+        expect(slotOf(up)).toBe("15")
+
+        // 收起：只收后面没设置过的槽，回到槽 03 那一行。
+        fireEvent.click(up)
+        await waitFor(() => expect(bodyRows()).toHaveLength(4))
+        const again = document.body.querySelector(`button[aria-label="${t.ailmentExpand}"]`) as HTMLElement
+        expect(slotOf(again)).toBe("03")
+    }
+
+    it("只改类型（秒数与强度仍为 0）也算设置过：收起时留在那一行，展开后箭头在最末行", async () => {
+        await expectSetSlotArrows({type: "4135089318"})
+    })
+
+    it("只改类别（秒数与强度仍为 0）也算设置过：收起时留在那一行，展开后箭头在最末行", async () => {
+        await expectSetSlotArrows({category: "4135089318"})
+    })
+
+    it("只填持续秒数（类别/类型/强度仍是默认）也算设置过：收起时留在那一行，展开后箭头在最末行", async () => {
+        await expectSetSlotArrows({sec: "2.500000"})
+    })
+
+    it("只填强度（类别/类型/秒数仍是默认）也算设置过：收起时留在那一行，展开后箭头在最末行", async () => {
+        await expectSetSlotArrows({rate: "2.500000"})
     })
 
     it("编辑持续秒数：onEditChild 收到 (父行键, 槽位标签, 列, 新值)", async () => {

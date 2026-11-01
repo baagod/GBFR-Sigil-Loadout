@@ -5,7 +5,8 @@
     所以摊平进动作表基座，选区和复制/粘贴/剪切直接沿用基座。
 
     折叠 = 只把各组前几行交给基座（与动作表搜索过滤同一个口径）：
-    默认显示到最后一个有值的槽（没有值就 1 行），末列箭头展开剩余槽、再收起。
+    默认显示到最后一个设置过的槽（任意一栏不是占位默认值；一个都没设置就 1 行），
+    末列箭头展开剩余全部槽、再收起后面那些没设置过值的行。
 */
 import {useCallback, useMemo, useState, type ReactNode} from "react"
 import {ChevronsDown, ChevronsUp} from "lucide-react"
@@ -19,14 +20,20 @@ import {NO_SORTING, trackLabel, type KeyedTrackRow, type KeyedTrackTable} from "
 import type {StatusCatalog, TrackChild, TrackRow} from "../../bindings/sigilloadout/service/models"
 import type {Messages} from "@/lib/messages"
 
-/** 占位槽：sec 与 rate 全 0。 */
-const isEffective = (child: {values: Record<string, string>}) =>
-    Number(child.values.sec ?? 0) !== 0 || Number(child.values.rate ?? 0) !== 0
+/** 占位槽的默认值：CategoryNone + 无效果 + 0 秒 / 0 强度（见 docs/action/Attack轨字段含义.md §5）。 */
+const DEFAULT_SLOT = {category: "1739476053", type: "3177074653"}
 
-/** 折叠时默认显示到最后一个有值的槽（没有值就 1 行）。 */
+/** 这一槽是否设置过：任意一栏不是占位默认值就算（改类别/类型、但秒数与强度仍是 0 的也算）。 */
+const isSet = (child: {values: Record<string, string>}) =>
+    child.values.category !== DEFAULT_SLOT.category ||
+    child.values.type !== DEFAULT_SLOT.type ||
+    Number(child.values.sec ?? 0) !== 0 ||
+    Number(child.values.rate ?? 0) !== 0
+
+/** 折叠时默认显示到最后一个设置过的槽（一个都没设置就 1 行）：其后的行全是没设置过值的。 */
 const boundaryOf = (children: readonly TrackChild[]) => {
-    const lastEffective = children.reduce((last, child, slot) => (isEffective(child) ? slot : last), -1)
-    return Math.max(1, lastEffective + 1)
+    const lastSet = children.reduce((last, child, slot) => (isSet(child) ? slot : last), -1)
+    return Math.max(1, lastSet + 1)
 }
 
 /** `Attack` 列的分组标题：`#N` + 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
@@ -97,7 +104,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
     /* 行 id = 父行键 + 槽位标签，折叠/展开不影响撤销栈与复制源；索引让两个回调 O(1) 反查。 */
     const {rows, rowMeta} = useMemo(() => {
         const list: ActionRow[] = []
-        const meta = new Map<string, {group: Group; child: TrackChild; originals: Record<string, string>}>()
+        const meta = new Map<string, {group: Group; child: TrackChild; originals: Record<string, string>; slot: number}>()
         for (const group of groups) {
             const count = group.count
             const originalChildren = group.row.orig != null ? originalRows?.[group.row.orig]?.children : undefined
@@ -112,7 +119,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
                     originals[column] = original?.values[column] ?? ""
                 }
                 const id = `${group.row.key}::${child.tag}`
-                meta.set(id, {group, child, originals})
+                meta.set(id, {group, child, originals, slot})
                 list.push({id, values, originals})
             }
         }
@@ -127,14 +134,14 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
         onEditChild(hit.group.row.key, hit.child.tag, column, resolved)
     }, [onEditChild, rowMeta])
 
-    /** 「强度」格右端的箭头：折叠时在当前末行；展开后留在原地、变向上。 */
+    /** 「强度」格右端的箭头：收起时在最后一个设置过的行，展开后在最末行——它收起的是后面那些没设置过的槽。 */
     const toggleButton = useCallback((rowId: string): ReactNode => {
         const hit = rowMeta.get(rowId)
         if (!hit) return null
-        const {group} = hit
+        const {group, slot} = hit
         if (!group.expandable) return null
-        const anchor = group.children[(group.open ? group.collapsed : group.count) - 1]
-        if (hit.child.tag !== anchor.tag) return null
+        /* 箭头只挂在末行：收起态是最后一个设置过的槽，展开态是最末槽。 */
+        if (slot !== (group.open ? group.total : group.count) - 1) return null
         return (
             <button
                 type="button"
