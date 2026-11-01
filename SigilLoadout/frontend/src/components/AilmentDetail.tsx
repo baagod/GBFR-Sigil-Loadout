@@ -147,6 +147,9 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
                 }}
                 onClick={(event) => {
                     event.stopPropagation()
+                    // 编辑框还开着时行会随折叠卸载：先失焦提交，草稿才不会跟着格一起消失。
+                    const active = document.activeElement
+                    if (active instanceof HTMLInputElement) active.blur()
                     const next = group.open ? group.collapsed : group.total
                     setVisible((prev) => ({...prev, [group.row.key]: next}))
                 }}

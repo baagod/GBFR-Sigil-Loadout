@@ -360,4 +360,27 @@ describe("异常状态展开页（基座表）", () => {
         expect(onClose).not.toHaveBeenCalled()
     })
 
+    it("展开态编辑到一半点收起：草稿先提交，不跟着行一起卸载", async () => {
+        stubColumnGeometry()
+        const onEditChild = vi.fn()
+        render(<AilmentDetail {...baseProps} t={t} onClose={() => {}} onEditChild={onEditChild} track={track([row("b", "0.900000", "0.950000", slots(null))])} />)
+        await waitFor(() => expect(bodyRows()).toHaveLength(1))
+
+        fireEvent.click(document.body.querySelector(`button[aria-label="${t.ailmentExpand}"]`) as HTMLElement)
+        await waitFor(() => expect(bodyRows()).toHaveLength(16))
+
+        const cells = document.body.querySelectorAll('td[data-col-id="sec"]')
+        const cell = cells[cells.length - 1] as HTMLElement
+        clickToEdit(cell)
+        const input = cell.querySelector("input") as HTMLInputElement
+        fireEvent.change(input, {target: {value: "12.5"}})
+
+        // 箭头在 mousedown 里 preventDefault：不点它的 blur 就不会提交，行一收缩这格就没了。
+        const collapse = document.body.querySelector(`button[aria-label="${t.ailmentCollapse}"]`) as HTMLElement
+        fireEvent.mouseDown(collapse)
+        fireEvent.click(collapse)
+
+        await waitFor(() => expect(onEditChild).toHaveBeenCalledWith("b", "Ailment15", "sec", "12.5"))
+    })
+
 })
