@@ -123,18 +123,18 @@ type LimitBonusCharacter struct {
 }
 
 // LimitBonusTable 就是整份 assets/limit_bonus.json（骨架）：**语言无关**，只有 id 与数值。能力名与
-// 效果模板在按语言分开的那几份表里（见 LimitBonusText），角色名在 chara.lang.json 里。
+// 效果模板在同一份 limit_bonus.lang.json 里按语言分开（见 LimitBonusText），角色名在 chara.lang.json 里。
 type LimitBonusTable struct {
 	Characters []LimitBonusCharacter `json:"characters"`
 }
 
-// LimitBonusText 是 assets/limit_bonus.<lang>.json：一门语言的文案，按 id 索引。
+// LimitBonusText 是 assets/limit_bonus.lang.json 里的一门语言：文案，按 id 索引。
 //
 // 两张表刻意**不同构复制骨架**——骨架里重复一份文案、四门语言就是四棵整树；按 id 索引之后，重复的
 // 只是键。缺哪个 id 就是缺：界面照实显示 id，不做回退（见 LoadLimitBonus）。
 //
 // 角色名不在这里：它只有 chara.lang.json 一个来源（顶层按语言分，见 loadoutservice.go 的 CharaNames，
-// 由 App 按当前语言取好传下来）。文件名本身就是语言，所以也没有 language 那一栏。
+// 由 App 按当前语言取好传下来）。
 type LimitBonusText struct {
 	// Bonuses 是能力短名（AB_PL0700_01）→ 能力名。与骨架里那份 bonuses 是同一批条目，所以同名。
 	Bonuses map[string]string `json:"bonuses"`

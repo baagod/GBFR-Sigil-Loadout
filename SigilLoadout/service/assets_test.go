@@ -171,7 +171,7 @@ func TestCharaOrderComesFromTheShippedAsset(t *testing.T) {
 }
 
 /*
-动作名的显示名表（chara.action.zh.json）：**键 = 动作表 `actionName_` 的原样**（一个字不改，括号/冒号
+动作名的显示名表（chara.action.lang.json 的 zh 那一份）：**键 = 动作表 `actionName_` 的原样**（一个字不改，括号/冒号
 后缀都算键的一部分），**每个键都有值**（还没翻的填成键名自己）。
 
 界面那一列**直接查表**（`actionNames[name]`，见 actionRowFields）—— 查不到就是一片空白。所以"随包 36 张表
@@ -179,7 +179,7 @@ func TestCharaOrderComesFromTheShippedAsset(t *testing.T) {
 */
 func TestActionNamesCoverEveryPackagedActionName(t *testing.T) {
 	if len(actionNames) == 0 {
-		t.Fatal("chara.action.zh.json 没装进来")
+		t.Fatal("chara.action.lang.json 没装进来")
 	}
 	previous := dataAssetPath
 	dataAssetPath = filepath.Join("..", "assets", dataAssetName)

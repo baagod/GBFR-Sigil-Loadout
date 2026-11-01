@@ -67,14 +67,13 @@ if ($LASTEXITCODE -ne 0) { throw "deploy 闸门自检失败（exit $LASTEXITCODE
 $assetsDir = Join-Path $root 'SigilLoadout\assets'
 $genDir = Join-Path (Split-Path $root -Parent) 'gen'
 $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.json',
-    'skill_status.json', 'skill.zh.json', 'skill.en.json', 'skill.ja.json', 'skill.ko.json',
-    'limit_bonus.json', 'limit_bonus.zh.json', 'limit_bonus.en.json', 'limit_bonus.ja.json',
-    'limit_bonus.ko.json', 'chara.json',
+    'skill_status.json', 'skill.lang.json',
+    'limit_bonus.json', 'limit_bonus.lang.json', 'chara.json',
     # 动作名 → 名字（动作表 actionName_ 那一列显示它）：由 `gen actionnames` 从 36 张动作表的
-    # actionName_/abilityTag_ 与游戏文本 ability.lang.json 算出来，写进这里。
-    'chara.action.zh.json',
+    # actionName_/abilityTag_ 与游戏文本算出来，写进这里（只有 zh 一门）。
+    'chara.action.lang.json',
     # 专精技能页那两张：缺了 loadSkillboardTables 直接返错，工具启动即挂。
-    'skillboard.json', 'skillboard.zh.json',
+    'skillboard.json', 'skillboard.lang.json',
     # 运行时必读（缺了工具起不来），所以必须进"在场"清单：bufftable.go 读前两个、paramlabels.go 读第三个。
     # params.lang.json 尤其要盯 —— 它由人手工维护、生成器不产出，源侧删了/改名了没有第二处会发现。
     'buff.json', 'buff.lang.json', 'params.lang.json',
@@ -83,9 +82,6 @@ $assets = @('sigils.json', 'sigils.chara.json', 'sigils.lang.json', 'chara.lang.
     # 全部原始数据（17929 份轨 + 36 份动作表 + 16 份全局参数，条目名就是部署路径）：少了它，除了作者本机
     # （那边有解包目录兜底），别人装上去每个角色的轨与动作表都读不到，全局参数那一页也空着。
     'data.zip')
-# ⚠️ `ability.lang.json` **故意不在上面这份清单里**（它不进包、运行时不读它），但它在 `assets\` 下是
-# **生成器的输入**：`gen actionnames` 从它读"技能键 → 中文名"来产出 `chara.action.zh.json`。
-# 别当成死资产删掉 —— 删了 `gen export` 会在 readAbility 那一步直接报错。
 foreach ($name in $assets) {
     $asset = Join-Path $assetsDir $name
     if (Test-Path -LiteralPath $asset) { continue }

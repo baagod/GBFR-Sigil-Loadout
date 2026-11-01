@@ -367,7 +367,7 @@ func TestWireShapeStaysTuples(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := `{"06719232":{"name":"万能药","summary":"一句简介","explain":[[1,"第一段"],[30,"第二段"]]}}`; string(text) != want {
-		t.Fatalf("skill.<lang>.json 的线格式变了:\n got %s\nwant %s", text, want)
+		t.Fatalf("skill.lang.json 的线格式变了:\n got %s\nwant %s", text, want)
 	}
 }
 

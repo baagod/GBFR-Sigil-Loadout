@@ -150,7 +150,7 @@ func TestLoadLimitBonusEditsRejectsAFileWithTheWrongMemberTypes(t *testing.T) {
 }
 
 /*
-资产拆成了三份：语言无关的骨架（limit_bonus.json）、每语言一份按 id 索引的文案（limit_bonus.<lang>.json）、
+资产拆成了三份：语言无关的骨架（limit_bonus.json）、一份按语言分键、按 id 索引的文案（limit_bonus.lang.json）、
 以及角色属性（chara.json）。这里钉的是**跨层假设**，不是数据本身：Key 与参数行的哈希必须是 8 位十六进制
 （mod 只认这个写法）；参数行的 Lv1 默认值是界面空框里的占位符（**允许为 0**，见下面那条注释）；
 **骨架上的每一个 id 在当前语言的文案表里都要有对应的词**（否则一行节点显示的就是一串哈希），
@@ -221,7 +221,7 @@ func TestLimitBonusAssetsAreUsable(t *testing.T) {
 		t.Fatal("no parameter row has a zero Lv1 default; the 'zero is allowed' case is no longer covered by the asset")
 	}
 	if len(limitBonusTexts) != len(assetLangCodes()) {
-		t.Fatalf("limit_bonus.<lang>.json: got %d tables, want %d", len(limitBonusTexts), len(assetLangCodes()))
+		t.Fatalf("limit_bonus.lang.json: got %d tables, want %d", len(limitBonusTexts), len(assetLangCodes()))
 	}
 }
 

@@ -39,13 +39,12 @@ export type LimitBonusCharacter = { id: string; bonuses: Ability[] }
 export type LimitBonusTable = { characters: LimitBonusCharacter[] }
 
 /**
- * assets/limit_bonus.<lang>.json：一门语言的文案，按 id 索引。
+ * assets/limit_bonus.lang.json 里的一门语言：文案，按 id 索引。
  *
  * 两张表刻意不同构复制骨架：骨架里的文案重复一份，四门语言就是四棵整树。**没有回退**——表里缺哪个
  * id，界面就照实显示那个 id 或留白，不拿另一种语言的词冒充。
  *
- * 角色名不在这份表里：它只有 chara.lang.json 一个来源（App 的 charaNames），而文件名本身就是语言，
- * 所以也没有 language 那一栏。
+ * 角色名不在这份表里：它只有 chara.lang.json 一个来源（App 的 charaNames）。
  */
 export type LimitBonusText = {
     /** 能力短名（AB_PL0700_01）→ 能力名。与骨架里那份 bonuses 是同一批条目，所以同名。 */

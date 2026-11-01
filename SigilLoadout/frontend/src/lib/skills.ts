@@ -32,7 +32,7 @@ export const valuesAt = (info: SkillInfo | undefined, level: number) =>
     info?.rows.find((row) => row[0] === level)?.[1];
 
 /**
- * skill.<lang>.json 里的一条：这种语言管这个因子叫什么、它的效果摘要，以及游戏自己按
+ * skill.lang.json 里的一条：这种语言管这个因子叫什么、它的效果摘要，以及游戏自己按
  * 等级分段给出的说明。
  */
 export type SkillText = { name: string; summary: string; explain: ExplainBand[] };

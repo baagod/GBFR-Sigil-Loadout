@@ -45,7 +45,7 @@ const character = (id: string, bonuses: Ability[]): LimitBonusCharacter => ({
     bonuses: bonuses,
 })
 
-// 当前语言的文案表（assets/limit_bonus.<lang>.json 的那两张）：效果模板按参数行的 Key 查。角色名不在
+// 当前语言的文案表（assets/limit_bonus.lang.json 的那两张）：效果模板按参数行的 Key 查。角色名不在
 // 这份表里（它只有 chara.lang.json 一个来源），所以这里也没有。
 const effects = { "0D0BCF24": "冷却时间-{0}%" }
 

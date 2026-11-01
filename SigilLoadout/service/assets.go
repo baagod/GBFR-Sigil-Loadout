@@ -45,15 +45,16 @@ var skillInfo map[string]SkillInfo
 
 // 随包数据一份都不嵌（见 main.go），这几份只在启动时读一次：它们只用来显示，换掉文件要重启才看得见。
 //
-// limitBonusSkeleton 与 charaTable 与语言无关，各读一次；limitBonusTexts 一门语言一份。四门语言都在
-// loadAssetsFrom 里读：缺哪一份就在启动时报出来（宁可直接起不来，也不要在屏幕上静默显示一串 id）。
+// limitBonusSkeleton 与 charaTable 与语言无关；limitBonusTexts 是 limit_bonus.lang.json 里
+// {语言: 文案} 的整份（四门语言都在这一个文件里），启动时一次读入、缺哪门语言当场报错。
 var (
 	limitBonusSkeleton LimitBonusTable
 	charaTable         CharaTable
 	limitBonusTexts    map[string]*LimitBonusText
 )
 
-// 专精技能（「专精类型」，图 1）：骨架一份 + 文案一门语言一份（第一版只有中文）。读法与上面那条链相同。
+// 专精技能（「专精类型」，图 1）：骨架一份 + 文案一份（skillboard.lang.json；专精链目前只有中文，
+// 键就只有 zh）。读法与上面那条链相同。
 var (
 	skillboardSkeleton SkillboardSkeleton
 	skillboardTexts    map[string]*SkillboardText
@@ -93,13 +94,13 @@ func LoadAssets() error {
 }
 
 /*
-actionNames 是 chara.action.zh.json：{动作表 `actionName_` 的值: 显示名}。只在这边用，不发给界面：
+actionNames 是 chara.action.lang.json 里的 zh 那一份：{动作表 `actionName_` 的值: 显示名}。只在这边用，不发给界面：
 `actionRowFields` 拿它把显示名投影进 `abilityTag_` 那一格（读取由 LoadCharacterActions 触发）。
 
 **每个键都有值**（还没翻的填成键名自己）—— 所以查表就是最终显示名，没有"空串回落"这一步。
 查不到就是这一格空着：那是这份资产缺条目，不是代码要兜的事（覆盖由 assets_test.go 扫随包 36 张表钉着）。
 
-⚠️ 目前**只有中文**（四语以后再说）：文件名里的 `zh` 就是这个意思，不是漏了另外三份。
+这份表是生成器**增量**维护的，四门语言只有 zh 有（游戏原文是日文，而唯一的人工翻译只有中文）。
 */
 var actionNames map[string]string
 
@@ -118,17 +119,16 @@ func loadAssetsFrom(dir string) error {
 	}
 	// 与上面那两张"名字表"同一类、同一次读：动作名的显示名（技能键是 AB_*、动作名是日文，两张表并起来
 	// 用，键空间不冲突 —— 动作页那一列的显示见 actionsservice.go 的 ActionNames）。
-	if actionNames, err = readAsset[map[string]string](dir, "chara.action.zh.json"); err != nil {
+	actionLangs, err := readAsset[map[string]map[string]string](dir, "chara.action.lang.json")
+	if err != nil {
 		return err
 	}
+	actionNames = actionLangs[LangZH]
 	if skillInfo, err = readAsset[map[string]SkillInfo](dir, "skill_status.json"); err != nil {
 		return err
 	}
-	skillTables = make(map[string]map[string]SkillText, 4)
-	for _, lang := range assetLangCodes() {
-		if skillTables[lang], err = readAsset[map[string]SkillText](dir, "skill."+lang+".json"); err != nil {
-			return err
-		}
+	if skillTables, err = readAsset[map[string]map[string]SkillText](dir, "skill.lang.json"); err != nil {
+		return err
 	}
 	// 能力强化那条链路的资产（见 limitbonusservice.go）：与上面几张表无关，读法却是同一套，一起在
 	// 启动时读一次（骨架 + 四语言文案 + chara.json）。
@@ -148,13 +148,9 @@ func loadAssetsFrom(dir string) error {
 	return loadSkillboardTables(dir)
 }
 
-// assetLangCodes 是"每语言一份"那几类资产（skill.<lang>.json / limit_bonus.<lang>.json）共同覆盖的
-// 语言，也正是可视工具界面有的那几门（lang.ts 的 LANGS）。名字不直接叫 langs：它说的是**这几份资产**
-// 有哪几门，而不是"这个工具支持哪几门"——后者是 lang.ts 的事。
-//
-// 所有"每语言一份"的资产共用这一份清单：早先能力强化那条链自己又写了一遍逐字相同的列表、外加一句
-// 启动期 slices.Equal 对拍——两条字面量摆在同一个文件里，对拍只可能在有人手改其中之一时红，于是
-// 那层对拍与那份重复清单一起去掉了。真的只有中文的专精链另有 skillboardLangCodes。
+// assetLangCodes 是可视工具界面有的那几门语言（lang.ts 的 LANGS）。文案资产如今都收在一份
+// xx.lang.json 里、按语言分键，所以它不再决定"读几个文件"，而是启动校验"每份文案是否覆盖了
+// 这四门"——status.lang.json 的缺类别/缺类型检查就用它。
 func assetLangCodes() []string {
 	return []string{LangZH, "en", "ja", "ko"}
 }
@@ -176,20 +172,12 @@ func loadLimitBonusTables(dir string) error {
 		return err
 	}
 
-	limitBonusTexts = make(map[string]*LimitBonusText, len(assetLangCodes()))
-	for _, lang := range assetLangCodes() {
-		table, err := readAsset[LimitBonusText](dir, limitBonusTextName(lang))
-		if err != nil {
-			return err
-		}
-		limitBonusTexts[lang] = &table
+	texts, err := readAsset[map[string]*LimitBonusText](dir, "limit_bonus.lang.json")
+	if err != nil {
+		return err
 	}
+	limitBonusTexts = texts
 	return nil
-}
-
-// limitBonusTextName 是某一门语言的文案文件名（limit_bonus.zh.json）。
-func limitBonusTextName(lang string) string {
-	return "limit_bonus." + lang + ".json"
 }
 
 /*
@@ -232,18 +220,10 @@ func loadSkillboardTables(dir string) error {
 	}
 	skillboardSkeleton = skeleton
 
-	skillboardTexts = make(map[string]*SkillboardText, len(skillboardLangCodes()))
-	for _, lang := range skillboardLangCodes() {
-		table, err := readAsset[SkillboardText](dir, "skillboard."+lang+".json")
-		if err != nil {
-			return err
-		}
-		skillboardTexts[lang] = &table
+	texts, err := readAsset[map[string]*SkillboardText](dir, "skillboard.lang.json")
+	if err != nil {
+		return err
 	}
+	skillboardTexts = texts
 	return nil
-}
-
-// skillboardLangCodes 是专精技能资产有那几门语言：第一版只有中文（生成器也只出中文）。
-func skillboardLangCodes() []string {
-	return []string{LangZH}
 }
