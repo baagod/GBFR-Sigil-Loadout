@@ -6,6 +6,7 @@ import {FLAG0_NAMES, FLAG1_NAMES, flagHasBit, flagMask} from "@/lib/actionflags"
 import {attackColumnLabel} from "@/lib/attackfields"
 import type {Messages} from "@/lib/messages"
 import {ActionsTable, type TableCommands} from "@/components/ActionsTable"
+import {TRACK_HANDLE_WIDTH} from "@/components/actions-table/classes"
 import {InfoBadge} from "@/components/InfoBadge"
 import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/components/actions-table/model"
 
@@ -15,11 +16,12 @@ import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/
     ‼️ 行为、样式、选区、拖选、复制粘贴、边框、高亮……**全部来自基座**（`ActionsTable`），
     这里一行都不重复 —— 重复就是"两张表各有一套实现"的老毛病（用户口径：与动作表一个都不准改）。
 
-    与动作表的差异**只有四处**，全部由参数表达：
+    与动作表的差异**只有五处**，全部由参数表达：
       ① 行号列右边多一条**握把列**（拖动排序） → `reorder`
       ② `flag0` / `flag1` 的值格是**多选、不带搜索框** → `pickerOf`
       ③ 假删除行的暗红样式 → 行数据上的 `removed`
       ④ **不钉数据列**（只留行号列与握把列） → `initialPinnedCount={0}`
+      ⑤ 行号带子轨前缀（`00-1`），行号列更宽 → `handleWidth={TRACK_HANDLE_WIDTH}`
 */
 
 /**
@@ -74,7 +76,7 @@ const toRow = (
     removed: row.removed === true,
     /*
         ‼️ **行身份必须随行带走**：基座只原样搬 `orig` / `children`，复制/粘贴/增行都靠它
-        （见 `useRowCommands` 的 `makeRow`）。不写它，`AnimationDetail.applyRowChange` 就读不到 `orig`：
+        （见 `useRowCommands` 的 `makeRow`）。不写它，`AnimationDetail.rowsAfterChange` 就读不到 `orig`：
         假删除的回填会恒为空（删原行直接消失、不标红），而且所有存活行 `orig` 变 null →
         `plain()` 产出 `{}` → `delta` 把每个非空值都当成"改过"（整表发亮、清空回原值也失效）。
         真机症状就是这么来的 —— `markRow` 是唯一来源，别在半路把它丢掉。
@@ -94,11 +96,9 @@ const toRow = (
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
-export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
+export function TrackGrid({table, t, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
     table: KeyedTrackTable | undefined
     t: Messages
-    /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
-    originals?: TrackRow[]
     /** 改了一格（`null` = 回原值）：草稿归基座，这里收回来更新本层状态（工具条与保存照旧）。 */
     onEdit?: (rowId: string, column: string, value: string | null) => void
     onReorder: (from: number, to: number) => void
@@ -115,8 +115,8 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
         选中/拖动/滚动每一帧都会重跑一趟测量。
     */
     const rowItems = useMemo(
-        () => (table?.rows ?? []).map((row) => toRow(row.values, row.origValues ?? (row.orig != null && row.orig >= 0 ? originals?.[row.orig]?.values : undefined), row)),
-        [table, originals],
+        () => (table?.rows ?? []).map((row) => toRow(row.values, row.origValues, row)),
+        [table],
     )
     if (!table) return null
     /*
@@ -135,6 +135,8 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
             pickerOf={isFlags ? flagPickerOf : undefined}
             // 行序严格等于数组顺序：这两张表都没有排序（动作表那档默认按 `id_` 排）。
             initialSorting={NO_SORTING}
+            // 行号列比动作表宽：这里的行号是 `00-1` 这种带子轨前缀的标签。
+            handleWidth={TRACK_HANDLE_WIDTH}
             // **不钉数据列**：这两张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
             initialPinnedCount={0}
             onEdit={onEdit}

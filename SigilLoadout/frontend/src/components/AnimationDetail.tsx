@@ -19,6 +19,7 @@ import {CELL_TEXT} from "@/lib/classnames"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 // 「表格 + 行 + 格子」那一坨（工具条 / 行号握把 / 网格）搬去了 TrackGrid / actions-table。
 import {FLAG_KEYS, TrackGrid, trackLabel, type KeyedTrackRow, type KeyedTrackTable} from "@/components/TrackGrid"
+import {mergeTrackTables, splitMergedRowId, trackKey, type MergedTable} from "@/components/mergedTracks"
 import {shownValue, type ActionRow} from "@/components/actions-table/model"
 import {slotEdit} from "@/lib/numericText"
 import type {TableCommands} from "@/components/ActionsTable"
@@ -35,9 +36,6 @@ import type {Messages} from "@/lib/messages"
  * 生成物给的类型是 `number | null | undefined`，所以这里只认 null/undefined，不必再看负号。
  */
 const isOriginal = (row: {orig?: number | null} | undefined): row is {orig: number} => row?.orig != null
-
-/** 合并后的 Attack 表在这层状态里的键（与 `trackKey(info)` 的「子轨号 + kind」不冲突）。 */
-const MERGED_ATTACK_KEY = "attack:merged"
 
 /*
 行键：轨表每一行在装载时领一把**不随位置漂**的键，行的 id 就是它。
@@ -175,8 +173,8 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                 for (const info of list) {
                     if (info.kind === "flags") continue
                     const key = trackKey(info)
-                    if (read[next]) loaded[key] = {...read[next], rows: keyed(read[next].rows ?? [])}
-                    if (primal[next]) original[key] = primal[next]
+                    loaded[key] = {...read[next], rows: keyed(read[next].rows ?? [])}
+                    original[key] = primal[next]
                     next++
                 }
                 if (!alive) return
@@ -320,12 +318,6 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
         return rows
     }
 
-    const applyRowChange = (key: string) => (next: ActionRow[], deleted: ActionRow[]) =>
-        setTables((prev) => {
-            const table = prev[key]
-            if (!table) return prev
-            return {...prev, [key]: {...table, rows: rowsAfterChange(table.columns ?? [], next, deleted)}}
-        })
     /** 拖握把换行序：写回文件时按数组顺序写，所以换序就是真的改了内容，要记脏。 */
     const reorder = (key: string, from: number, to: number) => {
         setTables((prev) => {
@@ -336,43 +328,13 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     }
 
     /**
-     * **合并后的 Attack 表**：一个动画的多条 Attack 子轨并成一张（「Attack #N」的标题与吸顶全部去掉）。
-     * 行键 = `子轨键::原行键`；编辑 / 重排 / 增删都按这个前缀拆回各条子轨。
+     * **合并后的轨道表**：同一 kind 的多条子轨并成一张（小标题与吸顶全部去掉，一组只剩一个表头）。
+     * 行键 = `子轨键::原行键`；编辑 / 重排 / 增删都按前缀拆回各条子轨。构造是纯函数，见 `mergedTracks`。
      *
      * ‼️ 必须 `useMemo`：基座把 `rows` 的引用当"数据换没换"（列宽、row model 都按它重建），
      * 每次渲染新建数组会让它每一帧重跑一趟测量。
      */
-    const attackMerge = useMemo(() => {
-        const list = infos.filter((info) => info.kind === "attack")
-        if (list.length === 0) return null
-        // 列 = 各子轨列的并集（实测同一动画的 Attack 子轨列一致；不一致时并集也不丢列）。
-        const columns: string[] = []
-        for (const info of list) {
-            for (const column of tables[trackKey(info)]?.columns ?? []) {
-                if (!columns.includes(column)) columns.push(column)
-            }
-        }
-        const rows: KeyedTrackRow[] = list.flatMap((info) => {
-            const track = trackKey(info)
-            const group = info.sub.padStart(2, "0")
-            return (tables[track]?.rows ?? []).map((row, index) => ({
-                ...row,
-                key: `${track}::${row.key}`,
-                track,
-                groupKey: track,
-                // 组首行写 `00-1`（子轨号 + 组内行号），同组后面只写 `2`、`3`。
-                indexLabel: index === 0 ? `${group}-${index + 1}` : String(index + 1),
-                origValues: row.orig != null && row.orig >= 0 ? baseline?.tables[track]?.rows[row.orig]?.values : undefined,
-            }))
-        })
-        // 只有"后面还有别的子轨"才画线：最后一条子轨的末行不画，表底不多一条。
-        rows.forEach((row, index) => {
-            row.groupEnd = index < rows.length - 1 && rows[index + 1]?.track !== row.track
-        })
-        const first = tables[trackKey(list[0])]
-        if (!first) return null
-        return {list, key: MERGED_ATTACK_KEY, table: {...first, columns, rows}}
-    }, [infos, tables, baseline])
+    const mergedTables = useMemo(() => mergeTrackTables(infos, tables, baseline), [infos, tables, baseline])
 
     /**
      * 异常弹窗读的是**合并后的整张 Attack 表**：所有子轨的所有行，每行 16 个异常槽。
@@ -384,27 +346,21 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
      * Hook 顺序就变了（React 直接报 `Rendered more hooks than during the previous render`）。
      */
     const ailmentPopup = useMemo(() => {
-        if (!attackMerge) return null
+        const attack = mergedTables.get("attack")
+        if (!attack) return null
         const offsets = new Map<string, number>()
         const originals: TrackRow[] = []
-        for (const info of attackMerge.list) {
+        for (const info of attack.list) {
             const track = trackKey(info)
             offsets.set(track, originals.length)
             originals.push(...(baseline?.tables[track]?.rows ?? []))
         }
-        const rows = attackMerge.table.rows.map((row) => ({
+        const rows = attack.table.rows.map((row) => ({
             ...row,
             orig: row.orig != null && row.orig >= 0 && row.track ? (offsets.get(row.track) ?? 0) + row.orig : null,
         }))
-        // 标题里不写子轨号（整组都在这张表里）；行号沿用合并表的 `00-1` 标签。
-        return {table: {...attackMerge.table, sub: "", rows}, originals}
-    }, [attackMerge, baseline])
-
-    /** 合并表的行 id = `子轨键::该子轨的行键`。 */
-    const splitMergedRowId = (id: string): [string, string] | null => {
-        const at = id.indexOf("::")
-        return at === -1 ? null : [id.slice(0, at), id.slice(at + 2)]
-    }
+        return {table: {...attack.table, rows}, originals}
+    }, [mergedTables, baseline])
 
     /** 合并表改一格：拆回那条子轨的 `editValue`。 */
     const editMerged = (rowId: string, column: string, value: string | null) => {
@@ -416,8 +372,8 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
      * 合并表拖行：**只允许在同一组里换序**（跨组拖等于把一行挪进另一条子轨的文件，不是用户要的）。
      * 组内位置换成那条子轨自己的下标，再交给 `reorder`。
      */
-    const reorderMerged = (from: number, to: number) => {
-        const rows = attackMerge?.table.rows ?? []
+    const reorderMerged = (merged: MergedTable, from: number, to: number) => {
+        const rows = merged.table.rows
         const moving = rows[from]
         const landing = rows[to]
         if (!moving?.track || moving.track !== landing?.track) return
@@ -427,10 +383,10 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
 
     /**
      * 合并表增 / 删 / 插：基座交回整份新行 + 被删的行。新行没有子轨前缀（基座给的是 `newRows…`）：
-     * 跟着**前一行**所属子轨走；插在最前面就跟后一行；都没有就落到第一条 Attack 子轨。
+     * 跟着**前一行**所属子轨走；前面没有行（空表）就落到该 kind 的第一条子轨。
      */
-    const applyMergedRowChange = (next: ActionRow[], deleted: ActionRow[]) => {
-        const list = attackMerge?.list ?? []
+    const applyMergedRowChange = (merged: MergedTable, next: ActionRow[], deleted: ActionRow[]) => {
+        const list = merged.list
         if (list.length === 0) return
         const fallback = trackKey(list[0])
         const byTrack: Record<string, ActionRow[]> = {}
@@ -528,7 +484,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     /** 打开异常弹窗：把**全部 Attack 子轨**的快照存起来，取消时整组恢复。 */
     const openAilment = () => {
         const snapshot: Record<string, KeyedTrackTable> = {}
-        for (const info of attackMerge?.list ?? []) {
+        for (const info of mergedTables.get("attack")?.list ?? []) {
             const track = trackKey(info)
             const table = tables[track]
             if (table) snapshot[track] = table
@@ -555,34 +511,40 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     if (!loaded && !failure) return null
 
     /*
-    三条轨（flags / effect / attack …）：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
+    一种 kind 一张表（`mergedTables` 每项就是一组）：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
     */
-    // Attack 的多条子轨已经并成一张表：只在本组**第一条** Attack 轨的位置渲染它。
-    const firstAttackKey = attackMerge ? trackKey(attackMerge.list[0]) : null
     const sections = (
         <>
-        {infos.map((info) => {
-            if (info.kind === "attack") {
-                if (!attackMerge || trackKey(info) !== firstAttackKey) return null
+            {[...mergedTables.values()].map((merged) => {
+                const kind = merged.list[0].kind
                 return (
-                    <Fragment key={attackMerge.key}>
-                        {/* 一组 Attack 只剩这一个吸顶标题与一套工具条；「Attack #N」的标题与吸顶都去掉了。 */}
+                    <Fragment key={kind}>
+                        {/*
+                            一组（同一 kind 的全部子轨）只剩这一个吸顶标题与一套工具条；「#N」的标题与吸顶都去掉了。
+
+                            ‼️ 标题必须是滚动容器的**直接子元素**（`Fragment` 不生成节点）：包进分区里的话，
+                            sticky 只在自己父元素的范围内吸顶，分区一结束标题就被顶着往上走、露出半截字。
+                            ‼️ `z-[70]` 必须高过表格里最高那层（表头整行是 60）：同层里 DOM 靠后的画在上面，
+                            而表格排在本标题之后 —— 写 60 就会让表头穿透标题（真机见过）。
+                            ⚠️ 底色用 `bg-popover`（= 弹层自己的 #171717）：`bg-background`（#0a0a0a）会在弹层里
+                            显出一条比周围更深的色带。
+                        */}
                         <div className="sticky top-0 z-[70] bg-popover">
                             <div className="flex w-full items-start py-2 text-left text-sm font-medium">
                                 <span className="flex w-full items-baseline gap-1.5">
-                                    <span>{trackLabel("attack")}</span>
+                                    <span>{trackLabel(kind)}</span>
                                 </span>
                             </div>
                             <div className="absolute inset-y-0 right-0 flex items-center">
                                 <TrackToolbar
                                     t={t}
-                                    canRemove={hasSelection[attackMerge.key] === true}
-                                    onAdd={() => tableCommands.current[attackMerge.key]?.rows.add()}
-                                    onInsert={() => tableCommands.current[attackMerge.key]?.rows.insert()}
-                                    onRemove={() => tableCommands.current[attackMerge.key]?.rows.removeRowsInSelection()}
+                                    canRemove={hasSelection[kind] === true}
+                                    onAdd={() => tableCommands.current[kind]?.rows.add()}
+                                    onInsert={() => tableCommands.current[kind]?.rows.insert()}
+                                    onRemove={() => tableCommands.current[kind]?.rows.removeRowsInSelection()}
                                 />
-                                {/* 「异常状态」入口：一个动画的**所有 Attack 行**都进同一张弹窗。 */}
-                                {statusCatalog && (
+                                {/* 「异常状态」入口：只有 Attack 组有；一个动画的**所有 Attack 行**都进同一张弹窗。 */}
+                                {kind === "attack" && statusCatalog && (
                                     <span className="ml-2 flex">
                                         <TooltipProvider>
                                             <Tooltip>
@@ -608,88 +570,22 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                         </div>
                         <div className="pt-1 pb-4">
                             <TrackGrid
-                                table={attackMerge.table}
+                                table={merged.table}
                                 t={t}
                                 onEdit={editMerged}
-                                onReorder={reorderMerged}
+                                onReorder={(from, to) => reorderMerged(merged, from, to)}
                                 onSelectionPresenceChange={(has) => {
-                                    setHasSelection((prev) => (prev[attackMerge.key] === has ? prev : {...prev, [attackMerge.key]: has}))
+                                    setHasSelection((prev) => (prev[kind] === has ? prev : {...prev, [kind]: has}))
                                 }}
                                 onCommandsReady={(commands) => {
-                                    tableCommands.current[attackMerge.key] = commands
+                                    tableCommands.current[kind] = commands
                                 }}
-                                onRowsChange={applyMergedRowChange}
+                                onRowsChange={(next, deleted) => applyMergedRowChange(merged, next, deleted)}
                             />
                         </div>
                     </Fragment>
                 )
-            }
-            const key = trackKey(info)
-            // ⚠️ 标题**不能包在分区那个 div 里**：sticky 只在自己父元素的范围内吸顶 —— 包进去的话，
-            // 分区一结束标题就被自己的分区顶着往上走，上半截被滚动容器上沿切掉，露出一行半截字 ✗。
-            // 提出来做**滚动容器的直接子元素**（Fragment 不生成节点），标题就永远钉在顶部；下一个标题
-            // 上来时靠"同 z-index、DOM 在后"盖住它 ✓（各平台的分节列表就是这么做的）。
-            return (
-                <Fragment key={key}>
-                    {/* 标题与工具条包在**同一个 sticky 容器**里：工具条是绝对定位叠上去的，不参与这行排版，
-                        所以只钉标题会把按钮留在地上。
-                        ‼️ z-[70] **必须高过表格里最高那一层** —— 表头整行是 60（冻结列 50、焦点框 30）。
-                        这里原来跟表头一样写 60：同层里**谁在 DOM 后面谁画在上面**，而表格排在本标题之后，
-                        于是滚动时表头把标题穿透（用户截图）。标题是"表之外"的一层，单独立高一级。
-                        ⚠️ 分区之间**不画分隔线**（原来这里是 `not-last:border-b`）：用户要求全去掉。 */}
-                    {/* 吸顶的轨标题：底色用 **bg-popover**（= 弹层自己的 #171717），不是 bg-background
-                        (#0a0a0a) —— 后者会在 dialog 里显出一条比周围更深的色带（用户要求移除 #0a0a0a）。 */}
-                    <div className="sticky top-0 z-[70] bg-popover">
-                        <div className="flex w-full items-start py-2 text-left text-sm font-medium">
-                            <span className="flex w-full items-baseline gap-1.5">
-                                <span>{trackLabel(info.kind)}</span>
-                                {info.sub !== "0" && (
-                                    <span className="text-xs text-muted-foreground">{`#${info.sub}`}</span>
-                                )}
-                            </span>
-                        </div>
-                        {/* 工具条容器：`right-0` = **贴紧表格右侧**（这一层的宽度就是内容区，右边留着的
-                            那点空隙是容器的 pr-2 与滚动条预留位，都在它外面）。
-                            以前写的是 right-10：那是"让开折叠箭头"的（40px = 箭头 16 + 基类 mr-1.5 + 间隙），
-                            而分区早就常开、没有箭头了 —— 那 40px 就一直空着。
-                            `inset-y-0 + items-center`：让按钮组在**这一行的高度里**居中，与标题文字同一中心线
-                            （实测两者的中心都落在这行的 18px 处）。以前写死 `top-2 h-4`：那是按"8px 内边距 +
-                            16px 高"算的，而这行高 36、中心在 18 —— 按钮组一直比标题高 2px ✗。
-                            绝对定位不参与排版，所以它多高都不会把这行撑高。 */}
-                        <div className="absolute inset-y-0 right-0 flex items-center">
-                            <TrackToolbar
-                                t={t}
-                                canRemove={hasSelection[key] === true}
-                                onAdd={() => tableCommands.current[key]?.rows.add()}
-                                onInsert={() => tableCommands.current[key]?.rows.insert()}
-                                onRemove={() => tableCommands.current[key]?.rows.removeRowsInSelection()}
-                            />
-                        </div>
-                    </div>
-                    <div className="pt-1 pb-4">
-                        {/*
-                            ‼️ **一块表，一张网格**：flags 与普通轨的行形状、容器、路径全统一之后，渲染也只剩这一处 ——
-                            差别（列说明、值格参数）由 `TrackGrid` 按 `table.kind` 自己分辨，调用方不必再分。
-                            两张表都从 `tables[key]` 取数据，编辑走同一个 `editValue`。
-                        */}
-                        <TrackGrid
-                            table={tables[key]}
-                            t={t}
-                            originals={baseline?.tables[key]?.rows}
-                            onEdit={(rowId, field, value) => editValue(key, rowId, field, value)}
-                            onReorder={(from, to) => reorder(key, from, to)}
-                            onSelectionPresenceChange={(has) => {
-                                setHasSelection((prev) => (prev[key] === has ? prev : {...prev, [key]: has}))
-                            }}
-                            onCommandsReady={(commands) => {
-                                tableCommands.current[key] = commands
-                            }}
-                            onRowsChange={applyRowChange(key)}
-                        />
-                    </div>
-                </Fragment>
-            )
-        })}
+            })}
         </>
     )
 
@@ -866,9 +762,4 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
             )}
         </>
     )
-}
-
-/** 一条轨的 key：子轨号 + 种类（`TrackInfo` 的 `Sub` 与 `Kind`）—— 从数据里派生，别在别处写魔数。 */
-function trackKey(info: {sub: string; kind: string}): string {
-    return info.sub + info.kind
 }

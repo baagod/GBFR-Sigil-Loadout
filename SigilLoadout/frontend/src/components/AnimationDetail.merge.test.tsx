@@ -79,15 +79,16 @@ const values = new Map([
     ["1", "0.200000"],
 ])
 
-/** 装一个动画弹窗；`build` 造每条 Attack 子轨的行。 */
+/** 装一个动画弹窗；`build` 造每条 Attack 子轨的行，`baselineBuild` 造原表（默认与现表相同）。 */
 const mount = async (
     build: (sub: string) => TrackTable,
     statusCatalog: {categories: never[]} | null = null,
+    baselineBuild: (sub: string) => TrackTable = build,
 ) => {
     stubColumnGeometry()
     vi.mocked(ListTracks).mockResolvedValue(infos)
     vi.mocked(LoadTrack).mockImplementation(async (_motion: string, sub: string) => build(sub))
-    vi.mocked(LoadTrackOriginal).mockImplementation(async (_motion: string, sub: string) => build(sub))
+    vi.mocked(LoadTrackOriginal).mockImplementation(async (_motion: string, sub: string) => baselineBuild(sub))
     vi.mocked(SaveTracks).mockResolvedValue(undefined)
     vi.mocked(DeployMissingTracks).mockResolvedValue(undefined)
     render(<AnimationDetail motion="001c" charCode="pl2900" t={t} statusCatalog={statusCatalog} onClose={() => {}} />)
@@ -209,6 +210,61 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         const bySub = handedTracks()
         expect(bySub.get("0")?.rows[0].children?.[0].values.sec).toBe("0.000000")
         expect(bySub.get("1")?.rows[0].children?.[0].values.sec).toBe("5.000000")
+    })
+
+    it("合并表里每行带自己子轨的原值：改过的格子亮字，清空后回到原值并变灰", async () => {
+        // 现表与原表不同：合并表若不按行带各自子轨的原值，所有格子都会被当成"改过"（亮字）。
+        const original = (sub: string) => track(sub, values.get(sub)!)
+        await mount(
+            (sub) => {
+                const table = original(sub)
+                table.rows[0].values.StartTime = "0.900000"
+                return table
+            },
+            null,
+            original,
+        )
+        const cell = cellOf("01-1", "StartTime")!
+        // 改过 → 亮字（不是灰色的原值占位）。
+        expect(cell.textContent).toContain("0.900000")
+        expect(cell.querySelector(".text-muted-foreground")).toBeNull()
+
+        clickToEdit(cell)
+        const input = cell.querySelector("input") as HTMLInputElement
+        fireEvent.change(input, {target: {value: ""}})
+        fireEvent.blur(input)
+        // 清空 = 回原值：显示这条子轨自己的原值，并退回灰字（"没改过"）。
+        await waitFor(() => expect(cell.textContent).toContain("0.200000"))
+        expect(cell.querySelector(".text-muted-foreground")).not.toBeNull()
+    })
+
+    it("合并表里加一行：新行没有子轨前缀，跟着上一行落到同一条子轨", async () => {
+        await open()
+
+        // 末行属于第二条子轨；「添加」插在末行之后，新行只能靠"跟上一行"判断归属。
+        fireEvent.click(screen.getByRole("button", {name: t.addRow}))
+        fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
+        await waitFor(() => expect(SaveTracks).toHaveBeenCalled())
+
+        const bySub = handedTracks()
+        expect(bySub.get("0")?.rows).toHaveLength(1)
+        expect(bySub.get("1")?.rows).toHaveLength(2)
+    })
+
+    it("同 kind 子轨的列不一致时取并集：后一条子轨独有的列也留在表里", async () => {
+        await mount(
+            (sub) =>
+                new TrackTable({
+                    sub,
+                    kind: "attack",
+                    columns: sub === "1" ? ["StartTime", "EndTime", "Power"] : ["StartTime", "EndTime"],
+                    childColumns: ["category", "type", "sec", "rate"],
+                    rows: [{values: {StartTime: "0.100000"}, orig: 0}],
+                }),
+        )
+
+        const table = screen.getByText("00-1").closest("table") as HTMLTableElement
+        expect(within(table).getByText("Power")).toBeTruthy()
     })
 
     it("取消：整组子轨的编辑一起退回，不只第一条子轨", async () => {

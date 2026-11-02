@@ -240,8 +240,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
             >
                 <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b pb-3">
                     <DialogTitle className="text-base font-medium">
-                        {/* `sub` 为空 = 合并后的整组（标题里不写子轨号）。 */}
-                        {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)}${track.sub ? ` #${track.sub}` : ""}`}
+                        {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)}`}
                     </DialogTitle>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={onCancel}>

@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 /*
-    动画弹窗里 **flags 的每条子轨各成一段**。
+    动画弹窗里 **flags 的多条子轨并成一张表**（与 Attack / Effect 同一套合并）。
 
     回归的那一版：`ListTracks` 把同一动画的 flags 0 号与 1 号都列了出来，而弹层只读了 0 号 ——
-    于是界面上"Flags #1"那一段有标题、没有表（`TrackGrid` 拿不到 table 就返回 null）。
+    于是界面上 "Flags #1" 那一段有标题、没有表（`TrackGrid` 拿不到 table 就返回 null）。
     实测 001c 就是这种数据：0 号 1 行、1 号 2 行。
 
     ⚠️ 不测 flags 的位含义与编辑手势（分别归 lib/actionflags 与 useRowCommands），
-    只测"有几条子轨就读几条、每条的行都上屏"。
+    只测"有几条子轨就读几条、所有子轨的行都上屏"。
 */
 import {describe, expect, it, vi, afterEach} from "vitest"
 import {cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react"
@@ -57,7 +57,7 @@ const flagRow = (index: number) => ({
 /* 弹层挂在 document.body 上（base-ui 的 portal），所以问 document。 */
 const rowsOf = () => [...document.querySelectorAll("tbody tr")]
 
-describe("动画详情：flags 每条子轨", () => {
+describe("动画详情：flags 子轨合并成一张表", () => {
     afterEach(cleanup)
 
     const open001c = async () => {
@@ -71,12 +71,15 @@ describe("动画详情：flags 每条子轨", () => {
         render(<AnimationDetail motion="001c" charCode="pl2900" t={messages.zh} statusCatalog={null} onClose={() => {}} />)
     }
 
-    it("ListTracks 列出 flags 0 号与 1 号时，两段都上屏（#1 不再是一片空白）", async () => {
+    it("ListTracks 列出 flags 0 号与 1 号时，两组并成一张表（#1 不再是一片空白）", async () => {
         await open001c()
 
-        // 0 号 1 行 + 1 号 2 行 = 3 行；标题也在（`Flags#1` 没有空格，与渲染拼出来的文本一致）。
+        // 0 号 1 行 + 1 号 2 行 = 3 行；两组共用**一个**「Flags」标题，行号带子轨前缀。
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
-        expect(document.body.textContent).toContain("Flags#1")
+        expect(document.body.textContent).toContain("Flags")
+        expect(document.body.textContent).not.toContain("Flags#1")
+        expect(document.body.textContent).toContain("00-1")
+        expect(document.body.textContent).toContain("01-1")
         // 两条子轨的读取各按自己的子轨号发出去（不是只读 0 号）。
         expect(vi.mocked(LoadFlags).mock.calls.map(([, sub]) => sub)).toEqual(["0", "1"])
         expect(vi.mocked(LoadFlagsOriginal).mock.calls.map(([, sub]) => sub)).toEqual(["0", "1"])

@@ -112,7 +112,7 @@ describe("动画详情：键盘（Del / Ctrl+X / Ctrl+V）", () => {
         await openAndSelectRow()
         press("Delete", "Delete", 46, true)
 
-        /* 基座只真删；"原行不部署、标红留着"是这一层的保存语义（见 AnimationDetail 的 applyRowChange）。 */
+        /* 基座只真删；"原行不部署、标红留着"是这一层的保存语义（见 AnimationDetail 的 rowsAfterChange）。 */
         await waitFor(() => expect(removedRows()).toHaveLength(1))
         expect(rowsOf()).toHaveLength(2)
     })
