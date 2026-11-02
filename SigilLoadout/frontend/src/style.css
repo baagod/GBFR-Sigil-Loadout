@@ -56,7 +56,7 @@
     --accent-foreground:    oklch(0.985 0 0);
     --destructive:          #ff6568;
     --border:               oklch(1 0 0 / 10%);
-    --input:                #404040;
+    --input:                #2e2e2e;
     --ring:                 oklch(0.556 0 0);
 
     /* 选区那套色（轮廓 / 复制虚线 / 行号列选中文字 / 底色基色）—— 改一处即可。 */
@@ -264,10 +264,10 @@ table td.cell-pinned, table th.cell-pinned {
     z-index: var(--z-pinned);
 }
 
-/* 钉住的数据列**必须不透明**：横滚时它们得挡住底下滚过来的列（格子本身已不设底色）。
-   行号 / 握把列另由 `HEAD_BG` 给底色，所以这里排除 `.cell-handle`。
-   颜色取页面底色即可 —— 钉住列只出现在页面级的大表上（动画弹窗的轨表不 pin 列）。 */
-table td.cell-pinned:not(.cell-handle) {
+/* 数据格底色统一 `--background`：钉住的列必须不透明（横滚时挡住底下滚过来的列），普通数据格也一起刷，
+   表格才有一块整面、和表头/行头的 `HEAD_BG` 分得开。表头与行头另给底色，所以排除 `.cell-handle`。
+   用 `:where()` 把这条压成 0 特异性 —— 假删除、子轨交替这些"更具体的状态"才能盖过它。 */
+table tbody :where(td:not(.cell-handle)) {
     background-color: var(--background);
 }
 
@@ -306,15 +306,14 @@ table tr.row-removed > td.cell-handle {
    不再改 `<td>` 的 border 宽度：那会动表格布局，也不随覆盖层一起横滚跟随。 */
 
 /*
-    **只有轨表**按子轨交替：第 2、4… 条子轨的数据格换成 `--muted`。
-    行头（行号列 / 握把列）**不参与**，始终用自己那层的 `HEAD_BG`。其余行格子透明（透出弹层/表底色 = 默认色）。
-    `row-subtrack-alt` 只由 `mergedTracks` 产生，所以这条选择器碰不到动作表等其它表。
+    **只有轨表**按子轨交替：第 2、4… 条子轨的数据格换成 `--popover`（第一组保持默认的 `--background`）。
+    行头（行号列 / 握把列）**不参与**，始终用自己那层的 `HEAD_BG`。
+    `row-subtrack-alt` 只由 `mergedTracks` 产生（按"第几条子轨"的奇偶），所以这条选择器碰不到动作表等其它表。
     ⚠️ 刷在格子上而不是 `<tr>`：行上的背景会被行头、钉住列这些不透明格盖住，只有格子自己涂才稳。
-    ‼️ 别用 `--input`：那正好是网格线的颜色，格线在色带里消失、像被合并成一整块。
     纯背景色、不叠半透明层、不加边框，因此不改布局与选区覆盖层的几何。
 */
 .row-subtrack-alt > td:not(.cell-handle) {
-    background-color: var(--muted);
+    background-color: var(--popover);
 }
 
 /* 「专精技能」页的两级吸顶（角色行 + 专精类型名）。两个 sticky 元素必须是滚动容器的直接子/孙元素，
