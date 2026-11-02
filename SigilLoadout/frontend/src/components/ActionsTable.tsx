@@ -133,7 +133,7 @@ export type TableCommands = {
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, showFieldNames = true, onReady}: {
+export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, showFieldNames = true, handleWidth = HANDLE_WIDTH, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadCharacterActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -210,6 +210,8 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
     busy?: boolean
     /** 表头是否显示字段名那一行（默认显示；自带译名的表关掉）。 */
     showFieldNames?: boolean
+    /** 行号列宽度（默认 `HANDLE_WIDTH`；动画弹窗的轨表传更宽的值，行号带子轨前缀）。 */
+    handleWidth?: number
     /** 列宽量好了（= 表格可以显示了）—— 面板据此撤掉骨架（见 `ActionsPanel` 的 `tableLoading`）。 */
     onReady?: () => void
 }) {
@@ -469,11 +471,11 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
     const selectionBounds = table.getCellSelectionBounds()
 
     /**
-     * **行头总宽**：行号列 `HANDLE_WIDTH`，行序能拖的表再加握把列 `GRIP_WIDTH`。
+     * **行头总宽**：行号列 `handleWidth`（默认 `HANDLE_WIDTH`），行序能拖的表再加握把列 `GRIP_WIDTH`。
      *
      * 它是"行头之后从哪儿开始"的**唯一**出处：表格总宽、表头、钉住列的 `left`（表头与表体）全用这一个数。
      */
-    const rowHeadWidth = HANDLE_WIDTH + (reorder !== undefined ? GRIP_WIDTH : 0)
+    const rowHeadWidth = handleWidth + (reorder !== undefined ? GRIP_WIDTH : 0)
 
     /**
      * 显示顺序的行（= 渲染顺序）。取**一次**给下面几处共用：
@@ -877,6 +879,7 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                     sortable={reorder !== undefined}
                     measured={measured}
                     rowHeadWidth={rowHeadWidth}
+                    handleWidth={handleWidth}
                     showFieldNames={showFieldNames}
                 />
                 <TableBody>
@@ -913,6 +916,7 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                                 groupEnd={row.original.groupEnd === true}
                                 measured={measured}
                                 rowHeadWidth={rowHeadWidth}
+                                handleWidth={handleWidth}
                                 draggedRef={draggedRef}
                                 /** 活动格只有一行有：只给那一行真值，其余行恒 `null` —— 否则活动格一变，
                                     138 行的 memo 全部失配（真机实测：首次拖选那一下多花 91ms）。 */

@@ -14,7 +14,6 @@ import {
     GRIP_WIDTH,
     HANDLE_CURSOR,
     HANDLE_INNER,
-    HANDLE_WIDTH,
     PINNED_CELL,
     READ_ONLY_BG,
     handleCellClass,
@@ -141,6 +140,7 @@ export const ActionRowView = memo(function ActionRowView({
     groupEnd,
     measured,
     rowHeadWidth,
+    handleWidth,
     draggedRef,
     activeCellKey,
     scrollActiveIntoView,
@@ -167,8 +167,10 @@ export const ActionRowView = memo(function ActionRowView({
     rowSelected: boolean
     /** 列宽量好了没有 —— 没量之前不写 width / left，让表格按内容自己排一遍。 */
     measured: boolean
-    /** **行头那几格的总宽**（行号列 40，能拖的表再加握把列 32）—— 钉住列的 `left` 从它之后起算。 */
+    /** **行头那几格的总宽**（行号列 `handleWidth`，能拖的表再加握把列 32）—— 钉住列的 `left` 从它之后起算。 */
     rowHeadWidth: number
+    /** 行号列宽度（动画弹窗的轨表传更宽的值，行号带子轨前缀）。 */
+    handleWidth: number
     /** 这一次按下之后鼠标有没有真的挪过（`draggedRef`）：挪过 = 拉选区，不进编辑。 */
     draggedRef: RefObject<boolean>
     /**
@@ -232,7 +234,7 @@ export const ActionRowView = memo(function ActionRowView({
             */}
             <TableCell
                 className={handleCellClass(rowSelected)}
-                style={{width: HANDLE_WIDTH, cursor: HANDLE_CURSOR}}
+                style={{width: handleWidth, cursor: HANDLE_CURSOR}}
                 onMouseDown={(e) => {
                     dragRowRef.current = row.id
                     clickRowHandle(row, e)
@@ -252,7 +254,7 @@ export const ActionRowView = memo(function ActionRowView({
                     className={`${handleCellClass(rowSelected)} touch-none cursor-grab active:cursor-grabbing ${
                         drag.isDragging ? "opacity-40" : ""
                     }`}
-                    style={{width: GRIP_WIDTH, left: HANDLE_WIDTH, cursor: "grab"}}
+                    style={{width: GRIP_WIDTH, left: handleWidth, cursor: "grab"}}
                 >
                     <div className={`${HANDLE_INNER} leading-none text-muted-foreground/60`}>⠿</div>
                 </TableCell>

@@ -12,7 +12,7 @@ vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
 }))
 
 import {ActionsTable} from "@/components/ActionsTable"
-import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT} from "@/components/actions-table/classes"
+import {HANDLE_WIDTH, PINNED_CELL, READONLY_PADDING, ROW_HEIGHT, TRACK_HANDLE_WIDTH} from "@/components/actions-table/classes"
 import {DrillContext, showMotDrill} from "@/components/actions-table/model"
 
 import {KEYS, cellAt, tableProps, useTableHarness, makeRow, stubColumnGeometry, t} from "@/components/actions-table/testkit"
@@ -41,6 +41,16 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         // 角色必须显式挂在 DOM 上：overlay 的几何靠它区分行号列/握把列，不再靠"第几个非数据列"。
         expect(handle.getAttribute("data-head")).toBe("handle")
         expect(handle.style.width).toBe(`${HANDLE_WIDTH}px`)
+    })
+
+    it("行号列宽度可以按表覆盖：轨表传更宽的值，动作表仍用默认", async () => {
+        const {container} = render(
+            <ActionsTable t={t} {...tableProps([makeRow("1000")])} handleWidth={TRACK_HANDLE_WIDTH} />,
+        )
+        await waitFor(() => expect(container.querySelectorAll("th")).toHaveLength(KEYS.length + 1))
+        expect((container.querySelector("thead th") as HTMLElement).style.width).toBe(`${TRACK_HANDLE_WIDTH}px`)
+        // 表体那一格跟着同一个数（钉住列的 left 也从它之后起算）。
+        expect((container.querySelector("tbody td") as HTMLElement).style.width).toBe(`${TRACK_HANDLE_WIDTH}px`)
     })
 
     /*

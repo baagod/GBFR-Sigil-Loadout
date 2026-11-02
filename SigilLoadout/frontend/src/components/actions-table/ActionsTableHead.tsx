@@ -17,7 +17,6 @@ import {
     HEAD_BG,
     HANDLE_HEAD_CURSOR,
     HANDLE_HEAD_INNER,
-    HANDLE_WIDTH,
     HEAD_CELL,
     HEAD_DRILL,
     HEAD_FIELD,
@@ -32,6 +31,7 @@ export function ActionsTableHead({
     sortable,
     measured,
     rowHeadWidth,
+    handleWidth,
     showFieldNames = true,
 }: {
     table: Table<typeof features, ActionRow>
@@ -41,6 +41,8 @@ export function ActionsTableHead({
     measured: boolean
     /** 行头那几格的宽度，钉住列的 `left` 要从它之后起算。 */
     rowHeadWidth: number
+    /** 行号列宽度（动画弹窗的轨表传更宽的值，行号带子轨前缀）。 */
+    handleWidth: number
     showFieldNames?: boolean
 }) {
     /** 表头用哪一份"钻取"配色 —— 与格右端那个 `···` 靶子**同一份判据**（见 model.ts 的 DrillContext）。 */
@@ -58,12 +60,12 @@ export function ActionsTableHead({
                     {/*
                         行号列 —— **不属于列模型**（见 HANDLE_WIDTH 那段）。
                         不给 `data-col-id`：量自然宽度那一趟按这个属性挑列，带上它就会被量成一个数据列。
-                        宽度恒为 HANDLE_WIDTH（`table-fixed` 之后表宽也已把它算进去）。
+                        宽度由调用方给（`table-fixed` 之后表宽也已把它算进去）。
                     */}
                     <TableHead
                         data-head="handle"
                         className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0 font-medium`}
-                        style={{width: HANDLE_WIDTH}}
+                        style={{width: handleWidth}}
                     >
                         <div className={HANDLE_HEAD_INNER}>#</div>
                     </TableHead>
@@ -77,7 +79,7 @@ export function ActionsTableHead({
                             aria-hidden
                             data-head="grip"
                             className={`${HANDLE_CELL} ${HEAD_HEIGHT} ${HEAD_BG} top-0`}
-                            style={{width: GRIP_WIDTH, left: HANDLE_WIDTH}}
+                            style={{width: GRIP_WIDTH, left: handleWidth}}
                         />
                     )}
                     {headerGroup.headers.map((header) => {

@@ -53,6 +53,12 @@ export const PINNED_COUNT = 2
 export const HANDLE_WIDTH = 40
 
 /**
+ * 动画弹窗里**轨表**的行号列宽：行号带子轨前缀（`00-1`），比动作表宽一点。
+ * 动作表仍是 `HANDLE_WIDTH`（那里的行号是纯数字）。
+ */
+export const TRACK_HANDLE_WIDTH = 52
+
+/**
  * **拖动握把那一列**的宽度（只有行序能拖的表才有这一列）。表头与表体各占一格：`table-fixed` 的列宽
  * 只认表头那格，塞进行号格里时表体写下的宽度不算数。
  *
