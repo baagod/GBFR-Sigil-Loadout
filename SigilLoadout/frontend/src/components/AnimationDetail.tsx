@@ -691,8 +691,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
 
         标题那一行同时是**按钮行**（用户要求：取消与保存都挪到上面）—— 左标题、右按钮，底下不再有按钮排。
         关这层靠 Esc 或那两个按钮（DialogContent 没开自己的 X）。
-        行下面那条线（用户要求）把标题与表格分开，用的是全站默认的 --border —— 与主窗口页签下那条
-        同一个色（表格自己那些行线走 --input，比它亮一档）。
+        行下面那条线把标题与表格分开，走自绘线色（`app-line`），与表格格线同一个色。
     */
     return (
         <>
@@ -727,7 +726,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
             >
                 {/* 标题行 = 按钮行：左标题、右「保存 / 取消」，`border-b pb-4` 就是标题下面那条线。
                     行内用 flex 两端对齐（DialogHeader 自己是 flex-col，所以里面再包一层 flex-row）。 */}
-                <DialogHeader className="border-b pb-4">
+                <DialogHeader className="border-b app-line pb-4">
                     <div className="flex items-center justify-between gap-4">
                         {/* 16px / 500，字体跟全站一致（不再单独用等宽 —— 它会让数字的字形跟别处不一样）。 */}
                         <DialogTitle className="text-base font-medium">{title}</DialogTitle>

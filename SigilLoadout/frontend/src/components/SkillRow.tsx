@@ -182,7 +182,7 @@ function LevelRow({
                 onPointerLeave={() => ctx.leave(id)}
                 render={
                     <div
-                        className={`flex items-center gap-2 border-b last:border-b-0 ${
+                        className={`flex items-center gap-2 border-b app-line last:border-b-0 ${
                             nested ? "pl-9" : ""
                         }`}
                     />
@@ -283,7 +283,7 @@ export function SkillRow({
                                 if (ctx.isControl(e)) return;
                                 ctx.toggleOpen(row.key);
                             }}
-                            className="flex h-11 items-center gap-2 border-b"
+                            className="flex h-11 items-center gap-2 border-b app-line"
                         />
                     }
                 >

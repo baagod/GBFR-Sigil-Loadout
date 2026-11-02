@@ -345,7 +345,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
     // 文案由调用点给（`lineOf(row)`）——文案是按类型哈希索引、行文案在数组里按下标取的，
     // 所以在类型那一层把下标算好传下来，这一层不必知道顺序。
     const effectRow = (row: SkillRow, description: string, tier: string, path: string) => (
-        <AccordionItem key={row.key} value={path} className="border-b last:border-b-0">
+        <AccordionItem key={row.key} value={path} className="border-b app-line last:border-b-0">
             <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
                 {descriptionRow(row, description, "♦".repeat(row.diamonds), tier)}
             </AccordionTrigger>
@@ -440,7 +440,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                               是同一个（44px 全被不透明底色盖住），所以不需要再套一层包装去
                                               补 padding 露出的那一段。
                                           */}
-                                          <div className="skillboard-type flex h-11 items-center border-b text-base font-medium text-foreground">
+                                          <div className="skillboard-type flex h-11 items-center border-b app-line text-base font-medium text-foreground">
                                               {typeText?.name}
                                           </div>
                                           <Accordion
@@ -453,7 +453,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                               }}
                                           >
                                               {typeRows.map((entry, i) => (
-                                                  <AccordionItem key={entry.row.key} value={entry.path} className="border-b">
+                                                  <AccordionItem key={entry.row.key} value={entry.path} className="border-b app-line">
                                                       <AccordionTrigger className="w-full items-center gap-0 rounded-none border-0 py-0 hover:no-underline focus-visible:ring-0">
                                                           {descriptionRow(entry.row, lineOf(entry.row), diamonds(i), "", true)}
                                                       </AccordionTrigger>
@@ -511,7 +511,7 @@ function SkillboardPanelBase({ lang, charaNames, charaTable }: {
                                     type="button"
                                     aria-expanded={characterOpen}
                                     onClick={() => toggleCharacter(character.id)}
-                                    className={`${characterOpen ? "skillboard-row " : isLastCharacter ? "" : "border-b "}flex h-11 w-full items-center gap-2 px-0 text-left`}
+                                    className={`${characterOpen ? "skillboard-row " : isLastCharacter ? "" : "border-b app-line "}flex h-11 w-full items-center gap-2 px-0 text-left`}
                                 >
                                     {/*
                                         select-text 不能省：这一行的按钮是 `<button>`，而浏览器默认

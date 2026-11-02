@@ -247,7 +247,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
                 showCloseButton={false}
                 className="ailment-popup flex max-h-[min(1080px,calc(100vh-64px))] w-[min(1080px,calc(100vw-40px))] flex-col gap-3 p-5 sm:max-w-none"
             >
-                <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b pb-3">
+                <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b app-line pb-3">
                     <DialogTitle className="text-base font-medium">
                         {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)}`}
                     </DialogTitle>

@@ -46,7 +46,7 @@ export function ExclusivePanel({
                     */
                     <div
                         key={e.player}
-                        className="grid h-11 w-full grid-cols-[142px_1fr_1fr_1fr] items-center gap-x-2 border-b text-sm last:border-b-0"
+                        className="grid h-11 w-full grid-cols-[142px_1fr_1fr_1fr] items-center gap-x-2 border-b app-line text-sm last:border-b-0"
                     >
                         <span
                             className="truncate font-medium"

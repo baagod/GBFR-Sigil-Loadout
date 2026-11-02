@@ -55,7 +55,7 @@ export function PanelFailureDialog({
                     对齐内容的圆角、`border-t` 画分隔线、`bg-muted/50` 给一条比弹层亮一档的底。
                     加在调用点而不是改 `ui/alert-dialog.tsx`（那个文件要跟上游保持一致）。
                 */}
-                <AlertDialogFooter className="-mx-6 -mb-6 rounded-b-xl border-t bg-muted/50 p-6">
+                <AlertDialogFooter className="-mx-6 -mb-6 rounded-b-xl border-t app-line bg-muted/50 p-6">
                     {cancelLabel !== undefined && <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>}
                     <AlertDialogAction onClick={() => onOpenChange(false)}>{okLabel}</AlertDialogAction>
                 </AlertDialogFooter>

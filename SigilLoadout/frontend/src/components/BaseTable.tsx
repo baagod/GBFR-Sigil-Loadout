@@ -47,7 +47,7 @@ export function BaseTable({
         <div
             ref={scrollRef}
             className={cn(
-                "base-table-shell relative min-h-0 w-full flex-1 overflow-auto border border-input",
+                "base-table-shell app-line relative min-h-0 w-full flex-1 overflow-auto border",
                 offscreen && "is-offscreen absolute top-0 -left-[99999px] w-[1200px]",
                 busy && "is-busy pointer-events-none",
             )}

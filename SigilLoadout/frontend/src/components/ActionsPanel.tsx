@@ -387,12 +387,15 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
         () => rows.filter((row) => matchesIdsFilter(row.originals, idsText)),
         [rows, idsText],
     )
-    /** 列规格：只有「附加效果」这一列换成 badge 显示；值本身没变，复制/粘贴仍走原 JSON。 */
+    /** 列规格：只有「附加效果」这一列换成 badge 显示；值本身没变，复制/粘贴仍走原 JSON。
+        `id_` 是定长记录号，格子里居中更好扫。 */
     const columnOf = useMemo(
         () => (key: string): ColumnSpec | undefined =>
             key === "supportEffectList_"
                 ? {render: (row: ActionRow) => <SupportEffectCell row={row} nameOf={buffNameOf} />, width: 512}
-                : undefined,
+                : key === "id_"
+                    ? {cell: "[&>div]:justify-center"}
+                    : undefined,
         [buffNameOf],
     )
 
@@ -767,7 +770,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                         onLoaded={(tables) => setGpTable((cur) => cur || tables[0] || "")}
                         // w-max：左栏**按最长的名字自适应宽度**；pr-3：右侧那条竖线离条目底色**拉开 12px**
                         // （用户要求）。条目自己是 w-full，于是底色右边缘正好落在竖线左边 12px 处。
-                        className="w-max shrink-0 border-r pr-3"
+                        className="w-max shrink-0 border-r app-line pr-3"
                     />
                     {gpTable !== "" && (
                         <GlobalParamPanel

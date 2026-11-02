@@ -333,7 +333,7 @@ function SigilEditorPanelBase({ lang }: { lang: Lang }) {
     // 所以窗口更窄时列是被滚动条推到视野外，而不是被裁掉。
     return (
         <div className="flex h-full min-h-0 min-w-[888px] flex-col page-padding">
-            <div className="flex shrink-0 items-center gap-2 border-b pb-4">
+            <div className="flex shrink-0 items-center gap-2 border-b app-line pb-4">
                 {/* 一个编辑计数会把两件不同的事，开着的有哪些、记录一共有几条，混进一个分数里。
                     下面的列表就是整个总目录，浏览它就是搜索它；输入经过防抖（useDebounced）才到列表，
                     这是两百行列表不会每次敲键都重建的原因。*/}

@@ -114,7 +114,7 @@ function AbilityRow({
     const edited = ability.params.some((param) => shownValue(param, edits.get(param.key)) !== null);
 
     return (
-        <div className={`${COLUMNS} h-11 border-b pl-8 last:border-b-0`}>
+        <div className={`${COLUMNS} h-11 border-b app-line pl-8 last:border-b-0`}>
             {/* 能力名用默认前景色：层级交给字号与缩进，不靠颜色。 */}
             {/*
                 名字这一格是定位容器：圆点用 absolute 摆在缩进槽里（-left-4.5、8px 的点 → 与名字
@@ -224,7 +224,7 @@ function CharacterGroup({
             Fragment 是因为角色行与展开的能力要并列返回（原先靠那层 border-b 的包装凑成一个根）。
         */
         <>
-            <div className="flex h-11 items-center gap-2 border-b" onClick={() => setOpen((prev) => !prev)}>
+            <div className="flex h-11 items-center gap-2 border-b app-line" onClick={() => setOpen((prev) => !prev)}>
                 {/*
                     属性色直接上在名字上（不再单画一条竖线——那会花）：颜色由游戏六属性决定，而它已经
                     按角色算好写在 chara.json 里，取一个 PL 码就拿到了；缺那一条时名字继承默认前景色。

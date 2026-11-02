@@ -56,7 +56,10 @@
     --accent-foreground:    oklch(0.985 0 0);
     --destructive:          #ff6568;
     --border:               oklch(1 0 0 / 10%);
-    --input:                #2e2e2e;
+    --input:                #404040;
+    /* 自绘 1px 线的颜色（表格外框/格线/表头、面板里的行分隔线）。基础组件的边框另用
+       `--input` / `--border`，改这里不会波及它们。 */
+    --table-line:           #323335;
     --ring:                 oklch(0.556 0 0);
 
     /* 选区那套色（轮廓 / 复制虚线 / 行号列选中文字 / 底色基色）—— 改一处即可。 */
@@ -140,14 +143,20 @@
     @apply px-5 pt-4 pb-6;
 }
 
-/* 表格外框 / 格线 / 表头颜色只写这一处：统一 `--input`（`--border` 太淡）。
+/* 表格外框 / 格线 / 表头颜色只写这一处：`--table-line`（表单控件的 `--input` 是另一档）。
    ⚠️ `& *` 同权重吃掉了表内所有单独的边框色，要给某格上色得用更精确的选择器。 */
 @utility table-border {
-    border-color: var(--input);
+    border-color: var(--table-line);
 
     & * {
-        border-color: var(--input);
+        border-color: var(--table-line);
     }
+}
+
+/* 自绘的 1px 分隔线（面板行线、标题下划线、表格外框）。
+   ⚠️ 只加在 app 组件上；`components/ui` 里的边框色由 `--border` / `--input` 决定，别碰。 */
+@utility app-line {
+    border-color: var(--table-line);
 }
 
 /* ⚠️ 角色动作页三张表**永久不做悬停反馈**：不要再往 td/tr 挂 `hover:` 底色或悬停叠加层。

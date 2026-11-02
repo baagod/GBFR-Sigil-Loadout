@@ -60,7 +60,7 @@ export function FsmPanel({charCode, t}: {charCode: string; t: Messages}) {
     return (
         <div className="flex min-h-0 min-w-0 flex-1 gap-4">
             {/* 左栏：条目长相照 combobox（同 GlobalParamList）。名字不翻译 —— 它就是游戏里的文件名。 */}
-            <div className="min-h-0 w-max shrink-0 overflow-y-auto overflow-x-hidden border-r pr-3">
+            <div className="min-h-0 w-max shrink-0 overflow-y-auto overflow-x-hidden border-r app-line pr-3">
                 {failure && <p className="p-2 text-xs text-destructive">{failure}</p>}
                 <div className={sideListRows}>
                     {names.map((name) => {

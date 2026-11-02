@@ -294,7 +294,7 @@ export function SupportEffectEditor({
         <Dialog open onOpenChange={(next) => (next ? undefined : close())}>
             {/* 宽度：左名字列 + 6 个值格，官方的 448 装不下 6 列。 */}
             <DialogContent showCloseButton={false} className="flex h-[min(1080px,calc(100vh-64px))] w-[min(1080px,calc(100vw-40px))] flex-col gap-4 p-5 sm:max-w-none">
-                <DialogHeader className="border-b pb-4">
+                <DialogHeader className="border-b app-line pb-4">
                     <div className="flex items-center">
                         <DialogTitle className="mr-8 shrink-0 text-base font-medium">{t.supportEffectTitle}</DialogTitle>
                         <InputGroup className="mr-4 flex-1">
@@ -333,7 +333,7 @@ export function SupportEffectEditor({
                         const name = buffName(info, lang);
                         const displayName = name || info.hash;
                         return (
-                            <div key={info.hash} className="flex items-center border-b pl-2">
+                            <div key={info.hash} className="flex items-center border-b app-line pl-2">
                                 <Checkbox
                                     checked={row.checked}
                                     onCheckedChange={(next) => setChecked(info.hash, next === true)}
