@@ -20,7 +20,7 @@ import type {Messages} from "@/lib/messages"
 */
 
 /** 轨标题行右侧图标按钮的悬停色（ghost 自带的那档对比度太低，必须 important 压过它）。 */
-export const TRACK_ICON_BTN = "hover:bg-[#262626]!"
+export const TRACK_ICON_BTN = "hover:bg-muted!"
 
 /** 一条轨那排按钮：压在标题行右侧，谁被选中就删谁。 */
 export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
@@ -37,8 +37,8 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
         // ghost 变体自带的 `dark:hover:bg-muted/50`（半透明 #272727 叠在弹层底色 --popover #171717 上）
         // 只有 1.09 的对比度，几乎看不见（实测）；而 Tailwind 同一层里按规则顺序定胜负、变体那些类排在
         // 调用点的类**之后**，不加 important 的 `hover:bg-[…]` 根本压不过它。
-        // 用 #262626（与主题 --secondary/--muted 的 #272727 只差 1/255，即 shadcn 的 neutral-800）：
-        // 对比度 1.185，够"被指到"又比 secondary 的实心底轻。方向也要对：深色下**变亮**才醒目。
+        // 用主题的 `--muted`（#272727）当悬停色：对比度约 1.19，够"被指到"又比实心 secondary 底轻。
+        // 方向也要对：深色下**变亮**才醒目。
         // 图标代替文字：文案同时用作 aria-label 与**悬停提示**（用项目现成的 Tooltip 组件，不用原生
         // title —— 那种用户明确不要）。**不给 svg 写 size 类**：Button 基类的
         // `[&_svg:not([class*='size-'])]:size-4` 会把图标钉在 16px，换 size 档也不会跟着变大。

@@ -67,9 +67,7 @@
     --cell-fill-overlay:    color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent);
     --cell-fill-solid:      color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
 
-    /* 格底色（`classes.ts` 的 `EDITABLE_BG` / `.row-removed` 用）。必须挂 :root：
-       选区 overlay 在 table **外面**，写 table 里它取不到 → 复制虚线空档会解析成透明（真机踩过）。 */
-    --cell-editable: #1a1a1a;
+    /* 假删除行的底色（唯一还给格子上底色的状态，见 `.row-removed`）。 */
     --cell-removed:  #542526;
 
     /* 层高刻度（页面级）：别的页（专精技能吸顶行）也用 `var(--z-focus)`；写在 `table` 里只有表格
@@ -266,6 +264,13 @@ table td.cell-pinned, table th.cell-pinned {
     z-index: var(--z-pinned);
 }
 
+/* 钉住的数据列**必须不透明**：横滚时它们得挡住底下滚过来的列（格子本身已不设底色）。
+   行号 / 握把列另由 `HEAD_BG` 给底色，所以这里排除 `.cell-handle`。
+   颜色取页面底色即可 —— 钉住列只出现在页面级的大表上（动画弹窗的轨表不 pin 列）。 */
+table td.cell-pinned:not(.cell-handle) {
+    background-color: var(--background);
+}
+
 /* **假删除**（轨表："这一行不写进游戏"）。状态只由行上的 `.row-removed` 标记一次。
    ‼️ 底色刷在**格子上**而不是 `<tr>`：`TableRow` 的 `hover:bg-*` 特异性会顶掉行底色。
    数据格带 `:not(.cell-pinned)`（冻结列保持不透明）；`:where()` 把行标记特异性压成 0，
@@ -299,6 +304,18 @@ table tr.row-removed > td.cell-handle {
 
 /* 行号列右缘那条 2px 边框已挪到选区覆盖层（`selectionOverlay` 的 `rowHead`）——
    不再改 `<td>` 的 border 宽度：那会动表格布局，也不随覆盖层一起横滚跟随。 */
+
+/*
+    **只有轨表**按子轨交替：第 2、4… 条子轨的数据格换成 `--muted`（#272727），其余格子透明
+    （透出弹层/表底色 = 默认色）。
+    行号 / 握把列**不参与**交替（它们保持自己那层的底色，见 `HEAD_BG`）。
+    ⚠️ 刷在格子上而不是 `<tr>`：行上的背景会被行号、钉住列这些不透明格盖住，只有格子自己涂才稳。
+    ‼️ 别用 `--input`（#404040）：那正好是网格线的颜色，格线在色带里消失、像被合并成一整块。
+    纯背景色、不叠半透明层、不加边框，因此不改布局与选区覆盖层的几何。
+*/
+.row-subtrack-alt > td:not(.cell-handle) {
+    background-color: var(--muted);
+}
 
 /* 「专精技能」页的两级吸顶（角色行 + 专精类型名）。两个 sticky 元素必须是滚动容器的直接子/孙元素，
    否则滚动祖先会变成角色面板、滚到下一个角色就跟着走。
@@ -342,7 +359,6 @@ input[aria-hidden="true"][style*="position: fixed"] {
    活动格（`cell-active`）一条 1px 内描边，底色透明。 */
 .ailment-sheet .base-table-shell {
     border-width: 0;
-    background-color: transparent;
 }
 
 .ailment-sheet table th, .ailment-sheet table td {

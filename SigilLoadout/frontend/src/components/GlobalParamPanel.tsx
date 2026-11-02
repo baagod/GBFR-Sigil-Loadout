@@ -190,7 +190,7 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
                                     布尔值换成勾选框 —— 表格里点一下就是"改这一格"，没有输入法/非法文本的问题。
 
                                     ⚠️ 字符串那一格的两处不同（用户要求，只这张表这样）：
-                                      · 底色**透明**（别处可编辑格是写死的 #1a1a1a，见 TrackGrid / ActionsPanel）；
+                                      · 格子上本来就不刷底色（所有数据格都透明），这里也不再补；
                                       · **不带 `cell-focus`** = 不画焦点线。`relative` 得自己补上 ——
                                         编辑时那个 `<Input>` 是 `absolute inset-0`，没有定位祖先就会跑出格子
                                         （cell-focus 平时顺手提供 position:relative，这里得显式写）。 */}

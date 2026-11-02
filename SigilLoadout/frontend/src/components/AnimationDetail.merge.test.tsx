@@ -167,6 +167,14 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         expect(rowOf("01")).toBeDefined()
     })
 
+    it("轨表按子轨交替：第 2 条子轨的数据格垫交替底色，第 1 条不垫", async () => {
+        await open()
+
+        // 只有轨表有这套（见 `.row-subtrack-alt > td:not(.cell-handle)`）：第 2、4… 条子轨换底色。
+        expect(rowOf("00")!.classList.contains("row-subtrack-alt")).toBe(false)
+        expect(rowOf("01")!.classList.contains("row-subtrack-alt")).toBe(true)
+    })
+
     it("编辑第二组的一格：只落到第二条子轨，保存时两条子轨各自带着自己的值", async () => {
         await open()
 

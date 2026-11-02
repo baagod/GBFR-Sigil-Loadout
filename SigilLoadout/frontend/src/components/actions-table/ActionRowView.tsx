@@ -10,12 +10,10 @@ import {CellContent} from "./Cell"
 import {useSortable} from "@dnd-kit/sortable"
 import {
     CELL_BASE,
-    EDITABLE_BG,
     GRIP_WIDTH,
     HANDLE_CURSOR,
     HANDLE_INNER,
     PINNED_CELL,
-    READ_ONLY_BG,
     handleCellClass,
 } from "./classes"
 import {columnKind, features, writableColumn, type ActionRow, type ColumnKind, type ColumnSpec, snapshotKey} from "./model"
@@ -214,7 +212,12 @@ export const ActionRowView = memo(function ActionRowView({
             }}
             className={
                 // 假删除：只挂一个标记类，暗红怎么刷、为什么不刷在行上 —— 见 style.css 的 `.row-removed`。
-                removed ? "row-removed" : drag.isDragging ? "relative z-10 opacity-50" : undefined
+                // 轨表：第 2、4… 条子轨整行换交替底色（`.row-subtrack-alt > td`，行号/握把列除外）。
+                removed
+                    ? "row-removed"
+                    : [drag.isDragging ? "relative z-10 opacity-50" : "", row.original.subtrackAlt ? "row-subtrack-alt" : ""]
+                          .filter(Boolean)
+                          .join(" ") || undefined
             }
         >
             {/*
@@ -256,12 +259,10 @@ export const ActionRowView = memo(function ActionRowView({
                 const pinned = cell.column.getIsPinned()
                 const kind = columnKind(key)
                 /*
-                    两件事分开（别合成一个布尔）：
-                      · `readonlyTint` —— 内置只读的那几列（`id_`：引用键；`actionName_` / `abilityTag_`：动作名的原文与显示名，都不该改）：整列看起来"不上色"。底色跟它走；
-                      · `notWritable`   —— 上面那种 + 调用方标了 `readonly` 的列（轨表的 `config` / 帧列：显示翻译过，
-                        一旦可编辑就会把"触发"写回数据）。它决定能不能编辑、要不要焦点环。
+                    `notWritable` —— 内置只读的那几列（`id_`：引用键；`actionName_` / `abilityTag_`：动作名的原文与显示名）
+                    加上调用方标了 `readonly` 的列（轨表的 `config` / 帧列：显示翻译过，一旦可编辑就会把"触发"写回数据）。
+                    它决定能不能编辑、要不要焦点环。
                 */
-                const readonlyTint = kind === "readonly"
                 const notWritable = !writableColumn(key, columnOf)
                 /* 列自带的格类（见 `ColumnSpec.cell`：对齐那类"只改长相"的东西放这里，不必穿 prop）。 */
                 const columnCellClass = columnOf?.(key)?.cell ?? ""
@@ -280,7 +281,7 @@ export const ActionRowView = memo(function ActionRowView({
                         original={row.original.originals[key] ?? ""}
                         shown={shown}
                         /* 选区外观全部由 overlay 画；这里只剩列底色、焦点与活动格标记。 */
-                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${readonlyTint ? READ_ONLY_BG : EDITABLE_BG} ${notWritable ? "" : "cell-focus"} ${isActiveCell ? "cell-active" : ""} ${columnCellClass}`}
+                        className={`${CELL_BASE} ${pinned ? PINNED_CELL : "relative"} ${notWritable ? "" : "cell-focus"} ${isActiveCell ? "cell-active" : ""} ${columnCellClass}`}
                         width={measured ? cell.column.getSize() : null}
                         rowHeadWidth={rowHeadWidth}
                         /*

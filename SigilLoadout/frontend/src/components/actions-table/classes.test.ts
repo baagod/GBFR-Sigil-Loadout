@@ -7,18 +7,18 @@ import {cellUnderlayColor} from "./classes"
     是本轮反复返工的地方，值得单独钉住（不依赖 DOM/happy-dom）。
 */
 describe("cellUnderlayColor（复制虚线空档的垫底色）", () => {
-    it("按该格自己的底色取值：可编辑 / 只读 / 假删除", () => {
-        expect(cellUnderlayColor(false, false, false)).toBe("var(--cell-editable)")
-        expect(cellUnderlayColor(true, false, false)).toBe("var(--background)")
+    it("格子本身不设底色：空档透明；假删除仍用暗红", () => {
+        expect(cellUnderlayColor(false, false, false)).toBe("transparent")
+        expect(cellUnderlayColor(true, false, false)).toBe("transparent")
         expect(cellUnderlayColor(false, true, false)).toBe("var(--cell-removed)")
     })
 
     it("落在选区里时再叠一层选区填充色（否则空档比周围深，看着像黑线）", () => {
         expect(cellUnderlayColor(false, false, true)).toBe(
-            "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--cell-editable))",
+            "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)",
         )
         expect(cellUnderlayColor(true, false, true)).toBe(
-            "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background))",
+            "color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)",
         )
     })
 

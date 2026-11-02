@@ -260,7 +260,7 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
                 {groups.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t.ailmentEmpty}</p>
                 ) : (
-                    <div className="ailment-sheet flex min-h-0 flex-1 flex-col [--cell-editable:var(--popover)]">
+                    <div className="ailment-sheet flex min-h-0 flex-1 flex-col">
                         <ActionsTable
                             t={t}
                             rows={rows}

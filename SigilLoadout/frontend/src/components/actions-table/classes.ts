@@ -6,18 +6,13 @@
 */
 import {CELL_TEXT} from "@/lib/classnames"
 
-/** 只读格的底色：与页面同色（= 看起来"不上色"）。**必须是不透明的** —— 钉住的列要挡住滚过来的列。 */
-export const READ_ONLY_BG = "bg-background"
-/** 可编辑格的底色：比页面亮一档，一眼看出"这一格能改"。 */
-export const EDITABLE_BG = "bg-[var(--cell-editable)]"
-
 /**
- * 复制虚线空档要垫的“该格底色”（overlay 挂在 table 外面，拿不到行上的类，只能按同一套判据取色）。
- * 格子在当前选区里时再叠一层选区填充色（否则空档比周围深，看着像黑色底线）。
- * ‼️ 与上面的 `READ_ONLY_BG` / `EDITABLE_BG`、以及 `.row-removed` 必须同一口径 —— 改底色记得一起改。
+ * 复制虚线空档要垫的“该格底色”（overlay 挂在 table 外面，拿不到行/格的底色）。
+ * 格子**不设底色**，所以空档也透明；落在选区里时叠一层选区填充。
+ * ‼️ 与 `.row-removed`（唯一还刷格底色的状态）保持同一口径。
  */
-export const cellUnderlayColor = (readonlyTint: boolean, removed: boolean, selected: boolean) => {
-    const base = removed ? "var(--cell-removed)" : readonlyTint ? "var(--background)" : "var(--cell-editable)"
+export const cellUnderlayColor = (_readonlyTint: boolean, removed: boolean, selected: boolean) => {
+    const base = removed ? "var(--cell-removed)" : "transparent"
     return selected ? `color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), ${base})` : base
 }
 

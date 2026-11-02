@@ -520,6 +520,11 @@ export type ActionRow = {
      * 普通表不传 —— 整张表算同一个分组（拖动不受限）。
      */
     groupKey?: string
+    /**
+     * 轨表里**这条子轨要不要垫交替底色**（第 2、4… 条子轨给 `true`）：
+     * 长表滚动时能看出"这一段属于另一条子轨"。只刷数据格，行号/握把列不参与（见 `style.css`）。
+     */
+    subtrackAlt?: boolean
 }
 
 /**
