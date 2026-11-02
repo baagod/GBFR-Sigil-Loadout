@@ -174,12 +174,12 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
 
     /*
         七列宽度写死合计 820（= 弹层内容宽，行号 40 + 数据 780），`table-fixed` 不再摊余量：
-        时间列要放下「00  0.200000 – 0.200000」（DOM 实测约 170px + 内边距 8），槽位只有两位数字。
+        时间列要放下「00  0.200000 – 0.200000」（DOM 实测约 170px + 内边距），槽位只有两位数字。
         余量给类别/类型（译名长），持续/强度放得下 `10.000000` + 展开箭头即可。
     */
-    const PARENT_WIDTH = 192
+    const PARENT_WIDTH = 176
     const SLOT_WIDTH = 40
-    const CHILD_WIDTH = 150
+    const CHILD_WIDTH = 158
     const NUM_WIDTH = 124
     const RATE_WIDTH = 124
 
@@ -212,7 +212,8 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
             case "parent":
                 return {label: t.ailmentColTime, readonly: true, width: PARENT_WIDTH}
             case "slot":
-                return {label: t.ailmentColSlot, readonly: true, width: SLOT_WIDTH}
+                /* 格子内容层是 flex，光给 td 加 `text-center` 不够；还要让 flex 行本身居中。 */
+                return {label: t.ailmentColSlot, readonly: true, width: SLOT_WIDTH, cell: "text-center [&>div]:justify-center"}
             case "category":
                 return {label: t.ailmentColCategory, width: CHILD_WIDTH, cell: muted}
             case "type":

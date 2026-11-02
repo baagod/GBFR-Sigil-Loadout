@@ -140,7 +140,7 @@
     @apply px-5 pt-4 pb-6;
 }
 
-/* 表格外框 / 格线 / 表头颜色只写这一处：统一 `--input`（深色下 #404040；`--border` 太淡）。
+/* 表格外框 / 格线 / 表头颜色只写这一处：统一 `--input`（`--border` 太淡）。
    ⚠️ `& *` 同权重吃掉了表内所有单独的边框色，要给某格上色得用更精确的选择器。 */
 @utility table-border {
     border-color: var(--input);
@@ -306,11 +306,11 @@ table tr.row-removed > td.cell-handle {
    不再改 `<td>` 的 border 宽度：那会动表格布局，也不随覆盖层一起横滚跟随。 */
 
 /*
-    **只有轨表**按子轨交替：第 2、4… 条子轨的数据格换成 `--muted`（#272727），其余格子透明
-    （透出弹层/表底色 = 默认色）。
-    行号 / 握把列**不参与**交替（它们保持自己那层的底色，见 `HEAD_BG`）。
-    ⚠️ 刷在格子上而不是 `<tr>`：行上的背景会被行号、钉住列这些不透明格盖住，只有格子自己涂才稳。
-    ‼️ 别用 `--input`（#404040）：那正好是网格线的颜色，格线在色带里消失、像被合并成一整块。
+    **只有轨表**按子轨交替：第 2、4… 条子轨的数据格换成 `--muted`。
+    行头（行号列 / 握把列）**不参与**，始终用自己那层的 `HEAD_BG`。其余行格子透明（透出弹层/表底色 = 默认色）。
+    `row-subtrack-alt` 只由 `mergedTracks` 产生，所以这条选择器碰不到动作表等其它表。
+    ⚠️ 刷在格子上而不是 `<tr>`：行上的背景会被行头、钉住列这些不透明格盖住，只有格子自己涂才稳。
+    ‼️ 别用 `--input`：那正好是网格线的颜色，格线在色带里消失、像被合并成一整块。
     纯背景色、不叠半透明层、不加边框，因此不改布局与选区覆盖层的几何。
 */
 .row-subtrack-alt > td:not(.cell-handle) {
@@ -355,7 +355,8 @@ input[aria-hidden="true"][style*="position: fixed"] {
     translate: none;
 }
 
-/* 「异常状态」展开页的表皮：**不要外框**，横线全部由格子给；表头除行号列外左对齐，
+/* 「异常状态」展开页的表皮：**不要外框**，横线全部由格子给；
+   表头除行号列与槽位列外左对齐（槽位是两位数字，整列居中才不歪）；
    活动格（`cell-active`）一条 1px 内描边，底色透明。 */
 .ailment-sheet .base-table-shell {
     border-width: 0;
@@ -366,7 +367,7 @@ input[aria-hidden="true"][style*="position: fixed"] {
     border-right-width: 0;
 }
 
-.ailment-sheet table thead th:not(:first-child) {
+.ailment-sheet table thead th:not(:first-child):not([data-col-id="slot"]) {
     text-align: left;
 }
 
