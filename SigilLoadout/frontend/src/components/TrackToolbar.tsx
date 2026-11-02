@@ -34,10 +34,10 @@ export function TrackToolbar({t, canRemove, onAdd, onInsert, onRemove}: {
     return (
         // ghost：这排按钮贴在标题行右侧，本体不画底、只靠悬停那一下给反馈（底色留给标题行自己）。
         // ⚠️ 悬停色**必须带 important**（Tailwind v4 的写法是**后缀** `!`，不是前缀）：
-        // ghost 变体自带的 `dark:hover:bg-muted/50`（半透明 #272727 叠在弹层底色 --popover #171717 上）
+        // ghost 变体自带的 `dark:hover:bg-muted/50`（半透明 muted 叠在弹层底色上）
         // 只有 1.09 的对比度，几乎看不见（实测）；而 Tailwind 同一层里按规则顺序定胜负、变体那些类排在
         // 调用点的类**之后**，不加 important 的 `hover:bg-[…]` 根本压不过它。
-        // 用主题的 `--muted`（#272727）当悬停色：对比度约 1.19，够"被指到"又比实心 secondary 底轻。
+        // 用主题的 `--muted` 当悬停色：对比度约 1.19，够"被指到"又比实心 secondary 底轻。
         // 方向也要对：深色下**变亮**才醒目。
         // 图标代替文字：文案同时用作 aria-label 与**悬停提示**（用项目现成的 Tooltip 组件，不用原生
         // title —— 那种用户明确不要）。**不给 svg 写 size 类**：Button 基类的

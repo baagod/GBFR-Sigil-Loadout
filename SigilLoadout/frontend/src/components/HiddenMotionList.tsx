@@ -62,7 +62,6 @@ export function HiddenMotionList({t, charCode, filterText, onOpen}: {
             {groups.map((group) =>
                 group.items.length === 0 ? null : (
                     <div key={group.key}>
-                        {/* 组标题：14px / #a0a0a0 / 500 —— 与下面那些号（字重默认）拉开一档。 */}
                         <div className="px-2 py-2 text-sm font-medium text-[#a0a0a0]">{group.label}</div>
                         <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-x-1 pb-2">
                             {group.items.map((item) => (

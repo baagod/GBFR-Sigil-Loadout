@@ -83,7 +83,7 @@ export const HANDLE_CELL = "cell-handle cell-pinned sticky left-0 border-r borde
 /**
  * **表头与行号列**的底色 —— 三处共用一份：数据列表头、行号列表头、行号列的表体格。
  *
- * 取主题里比 `--muted` 更深的那档面 `--popover`（用户口径先要 `#2e2e2e`，看过之后要更深一档）。
+ * 取主题里比 `--muted` 更深的那档面 `--popover`。
  * 三处本来就是同一档灰，改要一起改 —— 共用一份即为此。
  *
  * 行号列是 sticky，底色始终由这里的 `HEAD_BG` 提供（不透明）；选中时

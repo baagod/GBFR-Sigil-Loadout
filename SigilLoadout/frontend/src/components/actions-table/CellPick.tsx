@@ -111,7 +111,7 @@ export function CellPick({
     /** 勾中的那几位（项的值 = 位权）。 */
     const selected = useMemo(() => bits.filter(({bit}) => flagHasBit(mask, bit)).map(({value: item}) => item), [bits, mask])
     /**
-     * **原值里就置着的那些项**（列表里给 `#a0a0a0` 的那批）：勾是"现在在不在"、灰是"原来在不在"，两件事分开看。
+     * **原值里就置着的那些项**（列表里灰掉的那批）：勾是"现在在不在"、灰是"原来在不在"，两件事分开看。
      * 直接算成集合 —— 判"这一项灰不灰"因此是一次 `has`，不需要"项 → 位号"的反查表。
      */
     const originalItems = useMemo(
