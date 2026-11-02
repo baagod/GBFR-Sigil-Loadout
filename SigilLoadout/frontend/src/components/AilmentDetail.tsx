@@ -36,7 +36,7 @@ const boundaryOf = (children: readonly TrackChild[]) => {
     return Math.max(1, lastSet + 1)
 }
 
-/** `Attack` 列的分组标题：行号（合并表用它的 `00-1` 标签）+ 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
+/** `Attack` 列的分组标题：行号（轨表用它的子轨号 `00`）+ 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
 const rowTitle = (row: KeyedTrackRow, index: number) => {
     const start = row.values.StartTime
     const end = row.values.EndTime
@@ -172,8 +172,16 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
         )
     }, [rowMeta, t])
 
-    /* Attack 要放下 "#N 起 – 止"，其余等宽；总宽 < 表格宽时 `table-fixed` 会把余量均摊。 */
-    const CHILD_WIDTH = 121
+    /*
+        七列宽度写死合计 820（= 弹层内容宽，行号 40 + 数据 780），`table-fixed` 不再摊余量：
+        时间列要放下「00  0.200000 – 0.200000」（DOM 实测约 170px + 内边距 8），槽位只有两位数字。
+        余量给类别/类型（译名长），持续/强度放得下 `10.000000` + 展开箭头即可。
+    */
+    const PARENT_WIDTH = 192
+    const SLOT_WIDTH = 40
+    const CHILD_WIDTH = 150
+    const NUM_WIDTH = 124
+    const RATE_WIDTH = 124
 
     /**
      * [类别] / [类型] 两个选值格：选项和译名都来自状态表资产（状态页面的 Go 侧已按当前语言取好）。
@@ -202,17 +210,17 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
         const muted = "text-muted-foreground"
         switch (key) {
             case "parent":
-                return {label: t.ailmentColTime, readonly: true, width: 175}
+                return {label: t.ailmentColTime, readonly: true, width: PARENT_WIDTH}
             case "slot":
-                return {label: t.ailmentColSlot, readonly: true, width: CHILD_WIDTH}
+                return {label: t.ailmentColSlot, readonly: true, width: SLOT_WIDTH}
             case "category":
                 return {label: t.ailmentColCategory, width: CHILD_WIDTH, cell: muted}
             case "type":
                 return {label: t.ailmentColType, width: CHILD_WIDTH, cell: muted}
             case "sec":
-                return {label: t.ailmentColSec, width: CHILD_WIDTH, cell: muted}
+                return {label: t.ailmentColSec, width: NUM_WIDTH, cell: muted}
             case "rate":
-                return {label: t.ailmentColRate, width: CHILD_WIDTH, cell: muted, trailing: (row) => toggleButton(row.id)}
+                return {label: t.ailmentColRate, width: RATE_WIDTH, cell: muted, trailing: (row) => toggleButton(row.id)}
             default:
                 return {label: key, readonly: true, width: CHILD_WIDTH, cell: muted}
         }

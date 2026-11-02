@@ -78,8 +78,8 @@ describe("动画详情：flags 子轨合并成一张表", () => {
         await waitFor(() => expect(rowsOf()).toHaveLength(3))
         expect(document.body.textContent).toContain("Flags")
         expect(document.body.textContent).not.toContain("Flags#1")
-        expect(document.body.textContent).toContain("00-1")
-        expect(document.body.textContent).toContain("01-1")
+        // 行号只写子轨号：0 号首行 `00`，1 号首行 `01`（子轨内接着写 2、3…）。
+        expect(rowsOf().map((row) => row.querySelector("td > div")?.textContent?.trim())).toEqual(["00", "01", "2"])
         // 两条子轨的读取各按自己的子轨号发出去（不是只读 0 号）。
         expect(vi.mocked(LoadFlags).mock.calls.map(([, sub]) => sub)).toEqual(["0", "1"])
         expect(vi.mocked(LoadFlagsOriginal).mock.calls.map(([, sub]) => sub)).toEqual(["0", "1"])

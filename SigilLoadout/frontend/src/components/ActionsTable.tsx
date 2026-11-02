@@ -911,9 +911,8 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                                 row={row}
                                 rowSelected={rowSelected || rowTouched}
                                 /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）；
-                                    合并表给的是 `00-1` 这种带子轨前缀的标签。 */
+                                    轨表给的是 `00` 这种带子轨号的行号标签。 */
                                 rowNumber={row.original.indexLabel ?? rowIndex + 1}
-                                groupEnd={row.original.groupEnd === true}
                                 measured={measured}
                                 rowHeadWidth={rowHeadWidth}
                                 handleWidth={handleWidth}

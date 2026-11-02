@@ -275,13 +275,13 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
         const line = {id: "1000", values: {}, originals: {id_: "1000", saveMotId01_: "3400"}}
         const open = vi.fn()
         const {container} = render(
-            <DrillContext.Provider value={(key, shown) => (showMotDrill(key, shown) ? {label: "通用轨", open} : undefined)}>
+            <DrillContext.Provider value={(key, shown) => (showMotDrill(key, shown) ? {label: "动画表", open} : undefined)}>
                 <ActionsTable t={t} rows={[line]} keys={["id_", "saveMotId01_"]} />
             </DrillContext.Provider>,
         )
         await waitFor(() => expect(container.querySelectorAll("tbody tr")).toHaveLength(1))
         const target = container.querySelector("button[data-drill]")
-        expect(target?.getAttribute("aria-label")).toBe("通用轨")
+        expect(target?.getAttribute("aria-label")).toBe("动画表")
         expect(target?.getAttribute("title")).toBeNull()
 
         fireEvent.click(target!)
@@ -293,7 +293,7 @@ describe("动作表 · 渲染与列（headerCell / 列宽 / 占位符 / 只读 /
     it("详情靶子：值为 `-` 的格不渲染靶子", async () => {
         const line = {id: "1000", values: {}, originals: {id_: "1000", saveMotId01_: "-"}}
         const {container} = render(
-            <DrillContext.Provider value={(key, shown) => (showMotDrill(key, shown) ? {label: "通用轨", open: () => undefined} : undefined)}>
+            <DrillContext.Provider value={(key, shown) => (showMotDrill(key, shown) ? {label: "动画表", open: () => undefined} : undefined)}>
                 <ActionsTable t={t} rows={[line]} keys={["id_", "saveMotId01_"]} />
             </DrillContext.Provider>,
         )

@@ -7,10 +7,10 @@
     末行 `<tr>` 也不再是 `tr:last-child`，`style.css` 里 `cell-focus` 的末行回收规则随之失配。
     结构由 `ActionsTable.reorder.test.tsx` 守着。
 
-    ‼️ 合并表（多条子轨并成一张）的拖动**限制在本组内**：
-    · 视觉：位移按"本组各行的上下边界"夹住 —— 拖到组首/组尾就推不动（类似行首行末）；
-    · 落点：collision 只在同组行里挑 —— 即使光标越过组界，也只会落到本组最后一行。
-    分组依据是行上的 `groupKey`（见 `ActionRow.groupKey`）。
+    ‼️ 轨表（多条子轨并成一张）的拖动**限制在同一子轨内**：
+    · 视觉：位移按"本子轨各行的上下边界"夹住 —— 拖到子轨首行/末行就推不动（类似行首行末）；
+    · 落点：collision 只在同一子轨的行里挑 —— 即使光标越过子轨边界，也只会落到本子轨最后一行。
+    分组依据是行上的 `groupKey`（子轨键，见 `ActionRow.groupKey`）。
 */
 import {useCallback, useMemo, useRef, type ReactNode} from "react"
 import {DndContext, PointerSensor, closestCenter, useSensor, useSensors, type CollisionDetection, type Modifier} from "@dnd-kit/core"
@@ -18,8 +18,8 @@ import {restrictToVerticalAxis} from "@dnd-kit/modifiers"
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable"
 
 /**
- * 拖动行在本组里能上下移动多少。
- * `row` 是**起拖那一刻**拖动行的矩形，`bounds` 是本组所有行的视口矩形并集；没有分组时原样返回。
+ * 拖动行在本子轨里能上下移动多少。
+ * `row` 是**起拖那一刻**拖动行的矩形，`bounds` 是本子轨所有行的视口矩形并集；没有分组时原样返回。
  */
 export function clampDragToGroupY(
     y: number,
@@ -42,10 +42,10 @@ export function ReorderDnd({reorder, rows, bound, children}: {
     bound?: Modifier
     children: ReactNode
 }) {
-    /** 这一行属于哪一组（合并表才有；普通表 undefined = 整张表一组）。 */
+    /** 这一行属于哪条子轨（轨表才有；普通表 undefined = 整张表一个分组）。 */
     const groupOf = useCallback((id: string) => rows.find((row) => row.id === id)?.original?.groupKey, [rows])
 
-    /** 起拖那一刻本组的上下边界。拖动期间行本身在动，所以按起拖时的几何算才稳。 */
+    /** 起拖那一刻本子轨的上下边界。拖动期间行本身在动，所以按起拖时的几何算才稳。 */
     const groupBounds = useRef<{top: number; bottom: number} | null>(null)
     const captureGroupBounds = (activeId: string) => {
         const group = groupOf(activeId)
@@ -62,7 +62,7 @@ export function ReorderDnd({reorder, rows, bound, children}: {
                 : {top: Math.min(...rects.map((rect) => rect.top)), bottom: Math.max(...rects.map((rect) => rect.bottom))}
     }
 
-    /** 落点只在同组行里挑：越界也不会被判成"移到别的子轨去"。 */
+    /** 落点只在同一子轨的行里挑：越界也不会被判成"移到别的子轨去"。 */
     const collisionDetection = useCallback<CollisionDetection>(
         (args) => {
             const group = groupOf(String(args.active.id))
@@ -73,7 +73,7 @@ export function ReorderDnd({reorder, rows, bound, children}: {
         [groupOf],
     )
 
-    /** 位移再夹一次本组上下界（外层的 `bound` 夹的是"表格可视框"，两者不冲突）。 */
+    /** 位移再夹一次本子轨上下界（外层的 `bound` 夹的是"表格可视框"，两者不冲突）。 */
     const clampGroup = useCallback<Modifier>(({transform, activeNodeRect}) => {
         const bounds = groupBounds.current
         if (!bounds || !activeNodeRect) return transform

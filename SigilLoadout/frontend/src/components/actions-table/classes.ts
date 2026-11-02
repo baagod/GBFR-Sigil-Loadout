@@ -53,8 +53,8 @@ export const PINNED_COUNT = 2
 export const HANDLE_WIDTH = 40
 
 /**
- * 动画弹窗里**轨表**的行号列宽：行号带子轨前缀（`00-1`），比动作表宽一点。
- * 动作表仍是 `HANDLE_WIDTH`（那里的行号是纯数字）。
+ * 动画弹窗里**轨表**的行号列宽：动画弹窗一屏行数多，行号与握把挨太近会挤，比动作表宽一档。
+ * 动作表仍是 `HANDLE_WIDTH`。
  */
 export const TRACK_HANDLE_WIDTH = 52
 

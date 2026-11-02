@@ -316,7 +316,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
     /** 一次提交还没回来：防抖 + Enter 同时触发时别叠两发。 */
     const applyingIdsRef = useRef(false)
 
-    // 下方那块地方归谁：顶栏那个 ToggleGroup 在「动作表 / 通用轨 / 全员参数 / FSM」四块之间单选切换
+    // 下方那块地方归谁：顶栏那个 ToggleGroup 在「动作表 / 动画表 / 全员参数 / FSM」四块之间单选切换
     //（**默认动作表**，即 "actions"）。
     // 四块都留在 DOM 里（没在看的那块压成 h-0 + overflow-hidden），切回来时 ids 输入框的内容
     // 与滚动位置都还在 —— display:none 会把 scrollTop 清掉，所以不用它。
@@ -624,10 +624,10 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                             <Search />
                         </InputGroupAddon>
                     </InputGroup>
-                    {/* 四块地方（动作表 / 通用轨 / 全员参数 / FSM）的切换：**单一选中态**的 ToggleGroup。
+                    {/* 四块地方（动作表 / 动画表 / 全员参数 / FSM）的切换：**单一选中态**的 ToggleGroup。
                         原来是两个"开关式"按钮，各有一个毛病：
-                          · 「通用轨 / 动作表」那个按钮，文字写的是**点一下会去的那一块**（目标），不是当前
-                            看着的那一块 ✗ —— 看着动作表时它写着「通用轨」。
+                          · 「动画表 / 动作表」那个按钮，文字写的是**点一下会去的那一块**（目标），不是当前
+                            看着的那一块 ✗ —— 看着动作表时它写着「动画表」。
                           · 「全员参数」那个要靠 beforeGlobals 记住"进去之前看的是哪块" ✗。
                         单选之后两个毛病一起没了：四个标签就是四块自己的名字，选中态就是 section 本身。
                         `multiple={false}` 必须**显式**给（Base UI 的 ToggleGroup 默认是多选）；`value` 是数组，
@@ -663,7 +663,7 @@ function ActionsPanelBase({t, lang, charaNames, charaTable}: {
                     切回来时 ids 输入框的内容与滚动位置都还在。
                     ⚠️ 压成 h-0 的那块**仍占一个 flex gap**（外层是 gap-4），所以要 -mt-4 把这 16px 抵掉，
                     否则顶栏与表格之间会多出一段空白。四块都写：谁在下面时它都是那一侧的邻居。
-                    「通用轨」= 有轨、但动作表里任何记录的 saveMotId01_~12_ 都没提到的号（见后端
+                    「动画表」= 有轨、但动作表里任何记录的 saveMotId01_~12_ 都没提到的号（见后端
                     ListHiddenMotions）；在清单里点一行就弹出那个号的轨表。 */}
                 <div
                     className={`flex min-h-0 flex-col ${

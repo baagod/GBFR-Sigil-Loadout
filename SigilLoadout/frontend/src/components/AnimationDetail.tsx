@@ -67,7 +67,7 @@ Attack（判定盒，伤害在这）、Effect（特效调用，火柱在这）�
 /**
  * 动画弹窗。
  *
- * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「轨迹表」的清单里点一个号。
+ * 唯一的入口是"某个动画号的轨"：从动作记录的 saveMotIdNN_ 格点进来，或从工具栏「动画表」的清单里点一个号。
  * 「隐藏 mot 清单」本身不在这里（搬去了 HiddenMotionList），这个弹层只负责一个号的四条轨。
  */
 export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
@@ -275,7 +275,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
      * ‼️ **再删一次假删除行 = 解除假删除**（用户口径）：它本来就在原表里、只是被标成不部署；
      * 再按一次删除/ Ctrl+Del 就把它放回原位（`removed` 清掉），保存时重新部署。
      */
-    /** 基座交回来的整行 → 轨表的行（假删除也在这一层做）：单轨表与合并表共用。 */
+    /** 基座交回来的整行 → 轨表的行（假删除也在这一层做）：单子轨与多子轨的轨表共用。 */
     const rowsAfterChange = (columns: readonly string[], next: ActionRow[], deleted: ActionRow[]): KeyedTrackRow[] => {
         /*
             ‼️ **flags 与普通轨走的是同一条路**：行形状统一（都是 `TrackRow`，字段收在 `values`），容器也统一
@@ -328,7 +328,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     }
 
     /**
-     * **合并后的轨道表**：同一 kind 的多条子轨并成一张（小标题与吸顶全部去掉，一组只剩一个表头）。
+     * **轨表**：同一 kind 的多条子轨并成一张（小标题与吸顶全部去掉，一个 kind 只剩一个表头）。
      * 行键 = `子轨键::原行键`；编辑 / 重排 / 增删都按前缀拆回各条子轨。构造是纯函数，见 `mergedTracks`。
      *
      * ‼️ 必须 `useMemo`：基座把 `rows` 的引用当"数据换没换"（列宽、row model 都按它重建），
@@ -362,15 +362,15 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
         return {table: {...attack.table, rows}, originals}
     }, [mergedTables, baseline])
 
-    /** 合并表改一格：拆回那条子轨的 `editValue`。 */
+    /** 轨表改一格：拆回那条子轨的 `editValue`。 */
     const editMerged = (rowId: string, column: string, value: string | null) => {
         const parts = splitMergedRowId(rowId)
         if (parts) editValue(parts[0], parts[1], column, value)
     }
 
     /**
-     * 合并表拖行：**只允许在同一组里换序**（跨组拖等于把一行挪进另一条子轨的文件，不是用户要的）。
-     * 组内位置换成那条子轨自己的下标，再交给 `reorder`。
+     * 轨表拖行：**只允许在同一子轨内换序**（跨子轨拖等于把一行挪进另一条子轨的文件，不是用户要的）。
+     * 子轨内位置换成那条子轨自己的下标，再交给 `reorder`。
      */
     const reorderMerged = (merged: MergedTable, from: number, to: number) => {
         const rows = merged.table.rows
@@ -382,7 +382,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     }
 
     /**
-     * 合并表增 / 删 / 插：基座交回整份新行 + 被删的行。新行没有子轨前缀（基座给的是 `newRows…`）：
+     * 轨表增 / 删 / 插：基座交回整份新行 + 被删的行。新行没有子轨前缀（基座给的是 `newRows…`）：
      * 跟着**前一行**所属子轨走；前面没有行（空表）就落到该 kind 的第一条子轨。
      */
     const applyMergedRowChange = (merged: MergedTable, next: ActionRow[], deleted: ActionRow[]) => {
@@ -511,7 +511,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     if (!loaded && !failure) return null
 
     /*
-    一种 kind 一张表（`mergedTables` 每项就是一组）：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
+    一种 kind 一张表（`mergedTables` 每项就是一张轨表）：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
     */
     const sections = (
         <>
@@ -520,7 +520,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                 return (
                     <Fragment key={kind}>
                         {/*
-                            一组（同一 kind 的全部子轨）只剩这一个吸顶标题与一套工具条；「#N」的标题与吸顶都去掉了。
+                            一个 kind（它的全部子轨）只剩这一个吸顶标题与一套工具条；「#N」的标题与吸顶都去掉了。
 
                             ‼️ 标题必须是滚动容器的**直接子元素**（`Fragment` 不生成节点）：包进分区里的话，
                             sticky 只在自己父元素的范围内吸顶，分区一结束标题就被顶着往上走、露出半截字。

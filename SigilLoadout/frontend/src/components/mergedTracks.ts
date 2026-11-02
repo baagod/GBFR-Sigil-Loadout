@@ -6,18 +6,17 @@ export function trackKey(info: {sub: string; kind: string}): string {
     return info.sub + info.kind
 }
 
-/** 一组"整组合并表"：同一 kind 的多条子轨并成一张（表头只留一个，状态里直接用 `kind` 当键）。 */
+/** 轨表：同一 kind 的多条子轨并成一张（表头只留一个，状态里直接用 `kind` 当键）。 */
 export type MergedTable = {list: TrackInfo[]; table: KeyedTrackTable}
 
-/** 合并表的行 id = `子轨键::该子轨的行键`。 */
+/** 轨表的行 id = `子轨键::该子轨的行键`。 */
 export function splitMergedRowId(id: string): [string, string] | null {
     const at = id.indexOf("::")
     return at === -1 ? null : [id.slice(0, at), id.slice(at + 2)]
 }
 
 /**
- * 把同一动画的各条子轨按 `kind` 并成一张表：行键带子轨前缀，组首行号写 `00-1`（同组后面只写 `2`、`3`），
- * `groupEnd` 标出组间分隔线（最后一组的末行不画）。
+ * 把同一动画的各条子轨按 `kind` 并成一张表：行键带子轨前缀，子轨首行只写子轨号 `00`（子轨内接着写 `2`、`3`，首行不用再标 1）。
  *
  * ‼️ 纯函数、每次返回新对象：调用方必须 `useMemo` —— 基座把 `rows` 的引用当"数据换没换"，
  * 每次渲染新建数组会让它每一帧重跑一趟列宽测量。
@@ -46,14 +45,10 @@ export function mergeTrackTables(
                 key: `${track}::${row.key}`,
                 track,
                 groupKey: track,
-                indexLabel: index === 0 ? `${group}-${index + 1}` : String(index + 1),
+                indexLabel: index === 0 ? group : String(index + 1),
                 origValues:
                     row.orig != null && row.orig >= 0 ? baseline?.tables[track]?.rows[row.orig]?.values : undefined,
             }))
-        })
-        // 只有"后面还有别的子轨"才画线：最后一组的末行不画，表底不多一条。
-        rows.forEach((row, index) => {
-            row.groupEnd = index < rows.length - 1 && rows[index + 1]?.track !== row.track
         })
         byKind.set(kind, {list, table: {...first, columns, rows}})
     }

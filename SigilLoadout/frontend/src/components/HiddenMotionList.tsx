@@ -6,7 +6,7 @@ import {parseFilterTokens} from "@/lib/filter"
 import type {Messages} from "@/lib/messages"
 
 /**
- * 「通用轨」清单：这个角色**有轨、但动作表里没有任何记录提到**的那些 motion 号。
+ * 「动画表」清单：这个角色**有轨、但动作表里没有任何记录提到**的那些 motion 号。
  *
  * 这批号在动作表里翻不到（引擎从别的 motion 内部链过去，或按通用语义取用），所以只能在这里给入口 ——
  * 点一行就打开那个号的轨表弹层（和双击 saveMotIdNN_ 格是同一个弹层）。

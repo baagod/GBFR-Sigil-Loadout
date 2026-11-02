@@ -234,7 +234,7 @@ tbody tr {
        而基表格子都有不透明底色 → 这层 hover 一个像素也看不见，却让"指针换一行"变成整行重绘
        （行宽 9369px）。实测：20 行拖选 `>16ms` 帧 47 → 24；滚轮滚动中位帧 **25ms → 4.2ms**。
 
-    ⚠️ 只动基表（动作表 / 轨迹表）。全局参数表保留 CV 与 shadcn 默认 hover（那张表每行只有两格、看得见）。
+    ⚠️ 只动基表（动作表 / 动画表）。全局参数表保留 CV 与 shadcn 默认 hover（那张表每行只有两格、看得见）。
 */
 table.base-table tbody tr {
     content-visibility:     visible;
@@ -272,27 +272,6 @@ table td.cell-pinned, table th.cell-pinned {
    行号/握把格交给下面那条更具体的规则（选中时也保持假删除底色）。 */
 :where(.row-removed) > td:not(.cell-pinned) {
     background-color: var(--cell-removed);
-}
-
-/* 合并表的**组间分隔线**：一组子轨 = 行号带 `00-` / `01-` 前缀的那几行。
-   ‼️ 不能只给上一行的 `border-bottom` 上色：横向底边与竖向 `border-right` 在拐角处相接，放大看会在
-   每个单元格连接处切出一小截斜口。改成每格在底部盖一条 1px 伪元素，左右各外扩 1px 把与邻格共享的
-   竖向边框也盖住，线才是连续的。这里同样**不给 `td` 新增 border**：伪元素不参与布局，行高/格子矩形
-   不变，选区 overlay 的几何（按实测边框盒算，见 docs/单元格选区方案.md 第一节）不受影响。 */
-table tbody tr.row-group-end > td {
-    border-bottom-color: transparent;
-}
-
-/* ‼️ 画在 `::before` 上（`::after` 归聚焦环用，见上面的 `@utility cell-focus`）。 */
-table tbody tr.row-group-end > td::before {
-    content: "";
-    position: absolute;
-    right: -1px;
-    bottom: -1px;
-    left: -1px;
-    height: 1px;
-    background-color: #0069a8;
-    pointer-events: none;
 }
 
 /*

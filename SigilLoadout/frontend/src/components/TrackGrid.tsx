@@ -21,7 +21,7 @@ import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/
       ② `flag0` / `flag1` 的值格是**多选、不带搜索框** → `pickerOf`
       ③ 假删除行的暗红样式 → 行数据上的 `removed`
       ④ **不钉数据列**（只留行号列与握把列） → `initialPinnedCount={0}`
-      ⑤ 行号带子轨前缀（`00-1`），行号列更宽 → `handleWidth={TRACK_HANDLE_WIDTH}`
+      ⑤ 行号带子轨号（`00`），行号列更宽 → `handleWidth={TRACK_HANDLE_WIDTH}`
 */
 
 /**
@@ -30,15 +30,13 @@ import {shownValue, type ActionRow, type ColumnSpec, type PickerConfig} from "@/
  */
 export type KeyedTrackRow = TrackRow & {
     key: string
-    /** 合并表（多条子轨并成一张）里**这一行归哪条子轨**（`trackKey` 原样）。 */
+    /** 轨表里**这一行归哪条子轨**（`trackKey` 原样）。 */
     track?: string
-    /** 行号显示什么：`00-1` / `2` / `3`（同组后面只写组内行号）；不给就按位置从 1 数。 */
+    /** 行号显示什么：`00` / `2` / `3`（子轨首行只写子轨号，子轨内接着写行号）；不给就按位置从 1 数。 */
     indexLabel?: string
-    /** 这一行是一条子轨的末行：组间分隔线画在它下面。 */
-    groupEnd?: boolean
-    /** 合并表里这一行的**原版值**：子轨不同，`orig` 指向各自原表里的行，不能拿一张原表按下标查。 */
+    /** 轨表里这一行的**原版值**：子轨不同，`orig` 指向各自原表里的行，不能拿一张原表按下标查。 */
     origValues?: Record<string, string | undefined>
-    /** 合并表里这条行属于哪条子轨（拖动只在同组内换序、组间画分隔线）。 */
+    /** 轨表里这行属于哪条子轨（拖动只在同一子轨内换序）。 */
     groupKey?: string
 }
 /** 弹层里每张表：行带键。`TrackTable` 是后端契约（它的行不带键）。 */
@@ -84,7 +82,6 @@ const toRow = (
     orig: row.orig ?? null,
     children: row.children ?? [],
     indexLabel: row.indexLabel,
-    groupEnd: row.groupEnd,
     groupKey: row.groupKey,
 })
 
@@ -95,7 +92,7 @@ const toRow = (
  * （`initialSorting`、`initialPinnedCount` 与七个回调的接线）全在这一处写一次。
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
-/** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
+/** 普通轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
 export function TrackGrid({table, t, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
     table: KeyedTrackTable | undefined
     t: Messages
@@ -135,7 +132,7 @@ export function TrackGrid({table, t, onEdit, onReorder, onSelectionPresenceChang
             pickerOf={isFlags ? flagPickerOf : undefined}
             // 行序严格等于数组顺序：这两张表都没有排序（动作表那档默认按 `id_` 排）。
             initialSorting={NO_SORTING}
-            // 行号列比动作表宽：这里的行号是 `00-1` 这种带子轨前缀的标签。
+            // 行号列比动作表宽：动画弹窗一屏行数多，行号与握把挨太近会挤。
             handleWidth={TRACK_HANDLE_WIDTH}
             // **不钉数据列**：这两张表已经有行号列与握把列两条固定列，再冻前两列等于把半张表钉死。
             initialPinnedCount={0}
@@ -234,7 +231,7 @@ const columnOf = (t: Messages) => (key: string): ColumnSpec | undefined => {
 }
 
 /**
- * Attack 轨的**columnSpec**：只把表头换成译名（`lib/attackfields.ts` 那张映射），别的口径与通用轨一样
+ * Attack 轨的**columnSpec**：只把表头换成译名（`lib/attackfields.ts` 那张映射），别的口径与普通轨一样
  * （可编辑、列宽、选区都不特殊）。认不出的列名返回 undefined —— 表头退回字段名，不编名字。
  *
  * 其余轨（effect / speed）没有这一层：列名就是字段名，原样上屏。

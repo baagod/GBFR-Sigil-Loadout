@@ -83,7 +83,7 @@ const zh = {
      * 两个按钮的文案必须分得开 —— 重装 mod 之后在弹层里按下去，别处的改动不会回来。
      */
     saveAnimation: "保存动画",
-    generalTracks: "轨迹表",
+    generalTracks: "动画表",
     /** 手风琴第二个条目的标题：下面那块地方放动作表。 */
     actionsSection: "动作表",
     /** 多重选定区域跨行又跨列时不能复制（Excel / WPS 同一条规矩，见 ActionsTable 的 planCopy）。 */
@@ -96,7 +96,7 @@ const zh = {
     fsmSection: "FSM",
     /** FSM 清单里共享层（pl_base/...）后面那个小标签。 */
     sharedLayer: "共享",
-    /** 「通用轨」清单：分组标题。「技能」= 有 attack 轨、或 flags 置了「调用 FSM 技能」的那组。 */
+    /** 「动画表」清单：分组标题。「技能」= 有 attack 轨、或 flags 置了「调用 FSM 技能」的那组。 */
     hmRangeSkill: "技能",
     /** 组标题。「技能」那一组直接复用 hmRangeSkill。 */
     hmGroupOther: "其他",
@@ -301,7 +301,7 @@ export const messages: Record<Lang, Messages> = {
         addRow: "Add",
         saveAndDeploy: "Save",
         saveAnimation: "Save animation",
-        generalTracks: "Track table",
+        generalTracks: "Animation table",
         actionsSection: "Action table",
         multiAreaCopy: "Select cells in the same row or column.",
         multiAreaCopyTitle: "Can't copy the selected areas",
@@ -480,7 +480,7 @@ export const messages: Record<Lang, Messages> = {
         addRow: "追加",
         saveAndDeploy: "保存",
         saveAnimation: "アニメーションを保存",
-        generalTracks: "トラック表",
+        generalTracks: "アニメーション表",
         actionsSection: "アクション表",
         multiAreaCopy: "同じ行または同じ列のセルを選んでください。",
         multiAreaCopyTitle: "選択範囲をコピーできません",
@@ -659,7 +659,7 @@ export const messages: Record<Lang, Messages> = {
         addRow: "추가",
         saveAndDeploy: "저장",
         saveAnimation: "애니메이션 저장",
-        generalTracks: "트랙 표",
+        generalTracks: "애니메이션 표",
         actionsSection: "액션 표",
         multiAreaCopy: "같은 행이나 같은 열의 셀을 선택하세요.",
         multiAreaCopyTitle: "선택한 영역을 복사할 수 없습니다",

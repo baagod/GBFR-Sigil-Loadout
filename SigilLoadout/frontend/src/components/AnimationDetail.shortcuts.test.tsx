@@ -65,7 +65,7 @@ const rowsOf = () => [...document.querySelectorAll("tbody tr")]
  */
 const removedRows = () => rowsOf().filter((tr) => tr.className.includes("row-removed"))
 
-/** 一行去掉**行号格**之后的文本。行号现在可能是 `00-1` 这种多字符（合并后的 Attack 表），不能再按"第一个字符"切。 */
+/** 一行去掉**行号格**之后的文本。行号可能是 `00` 这种多字符（合并后的子轨表），不能再按"第一个字符"切。 */
 const rowValues = (tr: Element) =>
     [...tr.querySelectorAll("td")].slice(1).map((td) => td.textContent).join("|")
 

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
     动画弹窗里多条 Attack 子轨并成**一张**表：不再有「Attack #N」的标题与吸顶；
-    行号列在每组首行写 `00-1` / `01-1`（子轨号补两位 + 组内行号），组间一条分隔线；
+    行号列在每条子轨首行只写子轨号 `00` / `01`（子轨内接着写 2、3…，所以首行不用再标 1）；
     编辑按行前缀路由回该行所属的那条子轨，保存时各子轨仍是自己的表。
 */
 import {afterEach, describe, expect, it, vi} from "vitest"
@@ -97,11 +97,16 @@ const mount = async (
 
 const open = () => mount((sub) => track(sub, values.get(sub)!))
 
-/** 合并表那一行里的某一格（`#` 列没有 `data-col-id`，只认数据列）。 */
-const cellOf = (rowLabel: string, column: string) => {
-    const row = screen.getByText(rowLabel).closest("tr")
-    return row?.querySelector(`td[data-col-id="${column}"]`) as HTMLElement | undefined
-}
+/** 轨表某一行的行号格文字（`#` 列没有 `data-col-id`，且子轨号会与槽位值撞字符串，只认行号格）。 */
+const headLabel = (row: Element) => row.querySelector("td > div")?.textContent?.trim()
+
+/** 按行号标签找行（`00` = 该子轨首行，`2` = 子轨内第 2 行）。 */
+const rowOf = (rowLabel: string) =>
+    [...document.querySelectorAll("tbody tr")].find((row) => headLabel(row) === rowLabel) as HTMLElement | undefined
+
+/** 轨表那一行里的某一格（`#` 列不算数据列）。 */
+const cellOf = (rowLabel: string, column: string) =>
+    rowOf(rowLabel)?.querySelector(`td[data-col-id="${column}"]`) as HTMLElement | undefined
 
 /** 打开统一异常弹窗：两条 Attack 子轨各带一个异常槽（原值可按子轨区分）。返回最上层的那个弹层。 */
 const openAilmentsFor = async (sec: (sub: string) => string) => {
@@ -113,9 +118,17 @@ const openAilmentsFor = async (sec: (sub: string) => string) => {
 
 const openAilments = () => openAilmentsFor(() => "0.000000")
 
+/** 异常弹窗里每一行的行号标签（`时间` 列 = 子轨号 + 时间窗，取第一个词）。 */
+const popupLabels = (popup: HTMLElement) =>
+    [...popup.querySelectorAll("tbody tr")].map(
+        (row) => (row.querySelector('td[data-col-id="parent"]')?.textContent ?? "").trim().split(/\s+/)[0],
+    )
+
 /** 在异常弹窗里把某一行（按行号标签认）的 `sec` 格改成 value。 */
-const editSec = (popup: HTMLElement, rowLabel: RegExp, value: string) => {
-    const row = within(popup).getByText(rowLabel).closest("tr") as HTMLElement
+const editSec = (popup: HTMLElement, rowLabel: string, value: string) => {
+    const row = [...popup.querySelectorAll("tbody tr")].find(
+        (tr) => (tr.querySelector('td[data-col-id="parent"]')?.textContent ?? "").trim().split(/\s+/)[0] === rowLabel,
+    ) as HTMLElement
     const cell = row.querySelector('td[data-col-id="sec"]') as HTMLElement
     clickToEdit(cell)
     const input = cell.querySelector("input") as HTMLInputElement
@@ -142,25 +155,22 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         expect(screen.queryByText("#1")).toBeNull()
         expect(screen.queryByText("#0")).toBeNull()
 
-        const table = screen.getByText("00-1").closest("table") as HTMLTableElement
+        const table = rowOf("00")!.closest("table") as HTMLTableElement
         expect(table.querySelectorAll("tbody tr")).toHaveLength(2)
-        expect(table.contains(screen.getByText("01-1"))).toBe(true)
+        expect(table.contains(rowOf("01")!)).toBe(true)
     })
 
-    it("行号 `00-1` / `01-1`；组间线只画在上一组末行（`row-group-end`），下一组首行不重复画", async () => {
+    it("行号 `00` / `01` 标出每条子轨的首行", async () => {
         await open()
 
-        expect(screen.getByText("00-1")).not.toBeNull()
-        expect(screen.getByText("01-1")).not.toBeNull()
-        // 线画在"后面还有别的子轨"的那一行下面；最后一条子轨的末行不画。
-        expect(screen.getByText("00-1").closest("tr")?.className).toContain("row-group-end")
-        expect(screen.getByText("01-1").closest("tr")?.className).not.toContain("row-group-end")
+        expect(rowOf("00")).toBeDefined()
+        expect(rowOf("01")).toBeDefined()
     })
 
     it("编辑第二组的一格：只落到第二条子轨，保存时两条子轨各自带着自己的值", async () => {
         await open()
 
-        const cell = cellOf("01-1", "StartTime")!
+        const cell = cellOf("01", "StartTime")!
         clickToEdit(cell)
         const input = cell.querySelector("input") as HTMLInputElement
         fireEvent.change(input, {target: {value: "0.900000"}})
@@ -176,16 +186,15 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         expect(bySub.get("1")?.rows[0].values.StartTime).toBe("0.900000")
     })
 
-    it("异常弹窗：所有 Attack 行在同一个弹窗里，行号沿用 `00-1`，编辑写回对应子轨", async () => {
+    it("异常弹窗：所有 Attack 行在同一个弹窗里，行号沿用子轨号，编辑写回对应子轨", async () => {
         const popup = await openAilments()
 
-        // 两条子轨的行都在这一张弹窗里，行号沿用合并表的 `00-1` / `01-1`。
-        expect(within(popup).getByText(/00-1/)).toBeTruthy()
-        expect(within(popup).getByText(/01-1/)).toBeTruthy()
+        // 两条子轨的行都在这一张弹窗里，行号沿用轨表的 `00` / `01`。
+        expect(popupLabels(popup)).toEqual(["00", "01"])
         // 标题写整组、不带子轨号（`异常状态  Attack`，没有 `#0` / `#1`）。
         expect(within(popup).getByRole("heading", {name: /^异常状态\s+Attack$/})).toBeTruthy()
 
-        editSec(popup, /01-1/, "12.5")
+        editSec(popup, "01", "12.5")
         fireEvent.click(within(popup).getByRole("button", {name: t.ok}))
         fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
         await waitFor(() => expect(SaveTracks).toHaveBeenCalled())
@@ -197,11 +206,11 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
     })
 
     it("清空第二组的一格：回到**那条子轨**自己的原值（原表按子轨拼接后取）", async () => {
-        // 两条子轨的原值不同：拼接偏移算错时，第二组会读到第一组的值（0）。
+        // 两条子轨的原值不同：拼接偏移算错时，第二条子轨会读到第一条的值（0）。
         const popup = await openAilmentsFor((sub) => (sub === "1" ? "5.000000" : "0.000000"))
 
-        editSec(popup, /01-1/, "9.000000")
-        editSec(popup, /01-1/, "")
+        editSec(popup, "01", "9.000000")
+        editSec(popup, "01", "")
 
         fireEvent.click(within(popup).getByRole("button", {name: t.ok}))
         fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
@@ -212,8 +221,8 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         expect(bySub.get("1")?.rows[0].children?.[0].values.sec).toBe("5.000000")
     })
 
-    it("合并表里每行带自己子轨的原值：改过的格子亮字，清空后回到原值并变灰", async () => {
-        // 现表与原表不同：合并表若不按行带各自子轨的原值，所有格子都会被当成"改过"（亮字）。
+    it("轨表里每行带自己子轨的原值：改过的格子亮字，清空后回到原值并变灰", async () => {
+        // 现表与原表不同：轨表若不按行带各自子轨的原值，所有格子都会被当成"改过"（亮字）。
         const original = (sub: string) => track(sub, values.get(sub)!)
         await mount(
             (sub) => {
@@ -224,7 +233,7 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
             null,
             original,
         )
-        const cell = cellOf("01-1", "StartTime")!
+        const cell = cellOf("01", "StartTime")!
         // 改过 → 亮字（不是灰色的原值占位）。
         expect(cell.textContent).toContain("0.900000")
         expect(cell.querySelector(".text-muted-foreground")).toBeNull()
@@ -238,7 +247,7 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         expect(cell.querySelector(".text-muted-foreground")).not.toBeNull()
     })
 
-    it("合并表里加一行：新行没有子轨前缀，跟着上一行落到同一条子轨", async () => {
+    it("轨表里加一行：新行没有子轨前缀，跟着上一行落到同一条子轨", async () => {
         await open()
 
         // 末行属于第二条子轨；「添加」插在末行之后，新行只能靠"跟上一行"判断归属。
@@ -263,14 +272,14 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
                 }),
         )
 
-        const table = screen.getByText("00-1").closest("table") as HTMLTableElement
+        const table = rowOf("00")!.closest("table") as HTMLTableElement
         expect(within(table).getByText("Power")).toBeTruthy()
     })
 
     it("取消：整组子轨的编辑一起退回，不只第一条子轨", async () => {
         const popup = await openAilments()
 
-        editSec(popup, /01-1/, "12.5")
+        editSec(popup, "01", "12.5")
         fireEvent.click(within(popup).getByRole("button", {name: t.cancel}))
         fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
         await waitFor(() => expect(SaveTracks).toHaveBeenCalled())

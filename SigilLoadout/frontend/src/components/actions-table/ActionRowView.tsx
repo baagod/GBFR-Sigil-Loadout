@@ -137,7 +137,6 @@ export const ActionRowView = memo(function ActionRowView({
     row,
     rowSelected,
     rowNumber,
-    groupEnd,
     measured,
     rowHeadWidth,
     handleWidth,
@@ -154,12 +153,9 @@ export const ActionRowView = memo(function ActionRowView({
 }: {
     row: Row<typeof features, ActionRow>
     /**
-     * 行号列里显示什么（从 1 数起）。合并表传 `00-1` 这种字符串：前两位是子轨号、后一位是组内行号，
-     * 同组后面的行只写组内行号。
+     * 行号列里显示什么（从 1 数起）。轨表传 `00` 这种字符串：它是子轨号，同一子轨后面的行接着写 `2`、`3`。
      */
     rowNumber: number | string
-    /** 合并表里这一行是**一条子轨的末行**：组间分隔线画在它下面（见 style.css 的 `.row-group-end`）。 */
-    groupEnd?: boolean
     /**
      * 行号 / 握把列要不要高亮：**整行选中**，或**选区压到本行**（Excel 口径：选了格子行号也亮）。
      * 数据格的底色 / 轮廓仍由 `SelectionOverlay` 统一画。
@@ -217,15 +213,8 @@ export const ActionRowView = memo(function ActionRowView({
                 transition: drag.transition,
             }}
             className={
-                [
-                    // 假删除：只挂一个标记类，暗红怎么刷、为什么不刷在行上 —— 见 style.css 的 `.row-removed`。
-                    removed ? "row-removed" : drag.isDragging ? "relative z-10 opacity-50" : "",
-                    // 组间分隔线画在本行下面（一条子轨的末行）。用类而不是 `:has(+ …)`：拖选改类时
-                    // `:has()` 会让每行都参与失效重算，真机拖选会卡。
-                    groupEnd ? "row-group-end" : "",
-                ]
-                    .filter(Boolean)
-                    .join(" ") || undefined
+                // 假删除：只挂一个标记类，暗红怎么刷、为什么不刷在行上 —— 见 style.css 的 `.row-removed`。
+                removed ? "row-removed" : drag.isDragging ? "relative z-10 opacity-50" : undefined
             }
         >
             {/*
