@@ -46,7 +46,7 @@ export function mergeTrackTables(
                 track,
                 groupKey: track,
                 // 子轨交替底色：相邻子轨一深一浅（只刷数据格，行号/握把列不参与）。
-                subtrackAlt: trackIndex % 2 === 1,
+                subtrackAlt: trackIndex % 2 === 0,
                 indexLabel: index === 0 ? group : String(index + 1),
                 origValues:
                     row.orig != null && row.orig >= 0 ? baseline?.tables[track]?.rows[row.orig]?.values : undefined,
