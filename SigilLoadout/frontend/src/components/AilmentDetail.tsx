@@ -36,11 +36,12 @@ const boundaryOf = (children: readonly TrackChild[]) => {
     return Math.max(1, lastSet + 1)
 }
 
-/** `Attack` 列的分组标题：`#N` + 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
+/** `Attack` 列的分组标题：行号（合并表用它的 `00-1` 标签）+ 时间窗（两个不换行空格，HTML 会折叠普通连续空格）。 */
 const rowTitle = (row: KeyedTrackRow, index: number) => {
     const start = row.values.StartTime
     const end = row.values.EndTime
-    return start && end ? `#${index + 1}\u00A0\u00A0${start} – ${end}` : `#${index + 1}`
+    const label = row.indexLabel ?? `#${index + 1}`
+    return start && end ? `${label}\u00A0\u00A0${start} – ${end}` : label
 }
 
 /** 一组 = 一个 Attack 主表行；`count` 是当前显示的行数，另三个字段描述折叠状态。 */
@@ -58,7 +59,12 @@ type Group = {
 export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, onCancel, finalFocus, onEditChild}: {
     /** 这一条 Attack 轨（行带界面键；子元素跟着行走）。 */
     track: KeyedTrackTable
-    /** 游戏原版那几行：清空槽位要回到这里的值（空串会让后端整个不写这个属性）。 */
+    /**
+     * 游戏原版那几行：清空槽位要回到这里的值（空串会让后端整个不写这个属性）。
+     *
+     * 按行上的 `orig` 下标取。合并后的整组弹窗传的是**各子轨原表拼接起来的数组**，
+     * 那边的 `orig` 已经换算成拼接后的下标（见 `AnimationDetail` 的 `ailmentPopup`）。
+     */
     originalRows: readonly TrackRow[]
     t: Messages
     /** 状态下拉（类别/类型）的数据。 */
@@ -234,7 +240,8 @@ export function AilmentDetail({track, originalRows, t, statusCatalog, onClose, o
             >
                 <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b pb-3">
                     <DialogTitle className="text-base font-medium">
-                        {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)} #${track.sub}`}
+                        {/* `sub` 为空 = 合并后的整组（标题里不写子轨号）。 */}
+                        {`${t.ailmentTitle}\u00A0\u00A0${trackLabel(track.kind)}${track.sub ? ` #${track.sub}` : ""}`}
                     </DialogTitle>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={onCancel}>

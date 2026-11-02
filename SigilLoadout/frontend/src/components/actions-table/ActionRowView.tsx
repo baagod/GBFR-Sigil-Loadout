@@ -138,7 +138,6 @@ export const ActionRowView = memo(function ActionRowView({
     row,
     rowSelected,
     rowNumber,
-    groupStart,
     groupEnd,
     measured,
     rowHeadWidth,
@@ -159,8 +158,6 @@ export const ActionRowView = memo(function ActionRowView({
      * 同组后面的行只写组内行号。
      */
     rowNumber: number | string
-    /** 合并表里这一行是**一条新子轨的首行**：组间画分隔线（见 style.css 的 `.row-group-start`）。 */
-    groupStart?: boolean
     /** 合并表里这一行是**一条子轨的末行**：组间分隔线画在它下面（见 style.css 的 `.row-group-end`）。 */
     groupEnd?: boolean
     /**
@@ -221,8 +218,6 @@ export const ActionRowView = memo(function ActionRowView({
                 [
                     // 假删除：只挂一个标记类，暗红怎么刷、为什么不刷在行上 —— 见 style.css 的 `.row-removed`。
                     removed ? "row-removed" : drag.isDragging ? "relative z-10 opacity-50" : "",
-                    // 合并表的组间分隔线（一条新子轨的首行）。
-                    groupStart ? "row-group-start" : "",
                     // 组间分隔线画在本行下面（一条子轨的末行）。用类而不是 `:has(+ …)`：拖选改类时
                     // `:has()` 会让每行都参与失效重算，真机拖选会卡。
                     groupEnd ? "row-group-end" : "",

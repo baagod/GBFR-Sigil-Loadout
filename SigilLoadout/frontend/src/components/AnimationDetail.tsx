@@ -111,17 +111,14 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     const popupRef = useRef<HTMLDivElement | null>(null)
     const [failure, setFailure] = useState("")
     const [busy, setBusy] = useState(false)
-    /** 打开了哪条 Attack 轨的「异常状态」展开页（null = 没开）。 */
-    const [ailmentKey, setAilmentKey] = useState<string | null>(null)
-    /** 打开展开页时那张表；取消 = 原样放回，丢弃这次弹层里的所有编辑。 */
-    const ailmentSnapshot = useRef<KeyedTrackTable | null>(null)
+    /** 打开了「异常弹窗」（false = 没开）。 */
+    const [ailmentOpen, setAilmentOpen] = useState(false)
     /**
-     * 合并后的 Attack 表里**当前活动行**（`子轨键::行键`）：异常入口按它决定作用在哪条子轨。
+     * 打开异常弹窗时**全部 Attack 子轨**的表：取消 = 原样放回，丢弃这次弹层里的所有编辑。
      *
-     * ‼️ 用 ref 而不是 state：活动行随拖选每跨一行就会变，`setState` 会把整个弹窗（几百行的表）
-     * 重渲一遍 —— 真机上拖选明显卡顿。入口只在**点击那一刻**读它，不需要触发渲染。
+     * 存整组而不是单轨：弹窗里同时列出所有子轨的行，取消要一次全部退回。
      */
-    const attackRowId = useRef<string | null>(null)
+    const ailmentSnapshot = useRef<Record<string, KeyedTrackTable> | null>(null)
     /**
      * 打开弹层时那份**原表**（深拷、之后只读）。
      *
@@ -142,7 +139,6 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
         // 否则它们会跟着新号一起被交出去（保存时写错号）。
         setLoaded(false)
         setHasSelection({})
-        attackRowId.current = null
         let alive = true
 
         void (async () => {
@@ -366,7 +362,6 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                 groupKey: track,
                 // 组首行写 `00-1`（子轨号 + 组内行号），同组后面只写 `2`、`3`。
                 indexLabel: index === 0 ? `${group}-${index + 1}` : String(index + 1),
-                groupStart: index === 0,
                 origValues: row.orig != null && row.orig >= 0 ? baseline?.tables[track]?.rows[row.orig]?.values : undefined,
             }))
         })
@@ -378,6 +373,32 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
         if (!first) return null
         return {list, key: MERGED_ATTACK_KEY, table: {...first, columns, rows}}
     }, [infos, tables, baseline])
+
+    /**
+     * 异常弹窗读的是**合并后的整张 Attack 表**：所有子轨的所有行，每行 16 个异常槽。
+     *
+     * 行键已经带 `子轨键::` 前缀（编辑按前缀拆回去）；`orig` 要换成"拼接后的原表"下标 ——
+     * `AilmentDetail` 用它找这一行的游戏原版子元素（清空一个槽时回落原值）。
+     *
+     * ⚠️ 这个 `useMemo` 必须在下面 `!loaded` 早退**之前**：早退那一帧不执行它、下一帧执行，
+     * Hook 顺序就变了（React 直接报 `Rendered more hooks than during the previous render`）。
+     */
+    const ailmentPopup = useMemo(() => {
+        if (!attackMerge) return null
+        const offsets = new Map<string, number>()
+        const originals: TrackRow[] = []
+        for (const info of attackMerge.list) {
+            const track = trackKey(info)
+            offsets.set(track, originals.length)
+            originals.push(...(baseline?.tables[track]?.rows ?? []))
+        }
+        const rows = attackMerge.table.rows.map((row) => ({
+            ...row,
+            orig: row.orig != null && row.orig >= 0 && row.track ? (offsets.get(row.track) ?? 0) + row.orig : null,
+        }))
+        // 标题里不写子轨号（整组都在这张表里）；行号沿用合并表的 `00-1` 标签。
+        return {table: {...attackMerge.table, sub: "", rows}, originals}
+    }, [attackMerge, baseline])
 
     /** 合并表的行 id = `子轨键::该子轨的行键`。 */
     const splitMergedRowId = (id: string): [string, string] | null => {
@@ -504,21 +525,27 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
         setBusy(false)
     }
 
-    const openAilment = (key: string) => {
-        ailmentSnapshot.current = tables[key] ?? null
-        setAilmentKey(key)
+    /** 打开异常弹窗：把**全部 Attack 子轨**的快照存起来，取消时整组恢复。 */
+    const openAilment = () => {
+        const snapshot: Record<string, KeyedTrackTable> = {}
+        for (const info of attackMerge?.list ?? []) {
+            const track = trackKey(info)
+            const table = tables[track]
+            if (table) snapshot[track] = table
+        }
+        ailmentSnapshot.current = snapshot
+        setAilmentOpen(true)
     }
 
     const closeAilment = () => {
         ailmentSnapshot.current = null
-        setAilmentKey(null)
+        setAilmentOpen(false)
     }
 
     const cancelAilment = () => {
-        const key = ailmentKey
         const snapshot = ailmentSnapshot.current
         closeAilment()
-        if (key && snapshot) setTables((prev) => ({...prev, [key]: snapshot}))
+        if (snapshot) setTables((prev) => ({...prev, ...snapshot}))
     }
 
     // 数据没到位之前**整个弹层都不挂载**（而不是挂一个很矮的"读取中…"）：
@@ -527,28 +554,16 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     // 读取失败时照常挂载，错误显示在弹层里。
     if (!loaded && !failure) return null
 
-    /**
-     * 「异常状态」入口作用在哪条 Attack 子轨：**点击那一刻**活动行所属的子轨；没有活动行就用第一条。
-     *
-     * 不在渲染期算：活动行存在 ref 里（拖选每跨一行都会变），渲染期读它会让"点了才生效"的入口
-     * 在别的行上看起来可点 —— 反正只有点击时才需要这个答案。
-     */
-    const ailmentTargetNow = () => {
-        const track = attackRowId.current ? splitMergedRowId(attackRowId.current)?.[0] : undefined
-        if (track && tables[track]) return track
-        const first = attackMerge?.list[0]
-        return first ? trackKey(first) : null
-    }
-
     /*
     三条轨（flags / effect / attack …）：**不用手风琴包** —— 常开、直接铺开，右侧没有折叠箭头。
     */
+    // Attack 的多条子轨已经并成一张表：只在本组**第一条** Attack 轨的位置渲染它。
+    const firstAttackKey = attackMerge ? trackKey(attackMerge.list[0]) : null
     const sections = (
         <>
-        {infos.map((info, index) => {
-            // Attack 的多条子轨已经并成一张表：只在本组**第一条** Attack 轨的位置渲染它，其余跳过。
+        {infos.map((info) => {
             if (info.kind === "attack") {
-                if (index !== infos.findIndex((one) => one.kind === "attack") || !attackMerge) return null
+                if (!attackMerge || trackKey(info) !== firstAttackKey) return null
                 return (
                     <Fragment key={attackMerge.key}>
                         {/* 一组 Attack 只剩这一个吸顶标题与一套工具条；「Attack #N」的标题与吸顶都去掉了。 */}
@@ -566,7 +581,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                                     onInsert={() => tableCommands.current[attackMerge.key]?.rows.insert()}
                                     onRemove={() => tableCommands.current[attackMerge.key]?.rows.removeRowsInSelection()}
                                 />
-                                {/* 「异常状态」入口：打开的是**当前活动行所属子轨**的展开页（没有活动行就用第一条）。 */}
+                                {/* 「异常状态」入口：一个动画的**所有 Attack 行**都进同一张弹窗。 */}
                                 {statusCatalog && (
                                     <span className="ml-2 flex">
                                         <TooltipProvider>
@@ -578,10 +593,7 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                                                             variant="ghost"
                                                             className={TRACK_ICON_BTN}
                                                             aria-label={t.ailmentTitle}
-                                                            onClick={() => {
-                                                                const target = ailmentTargetNow()
-                                                                if (target) openAilment(target)
-                                                            }}
+                                                            onClick={openAilment}
                                                         />
                                                     }
                                                 >
@@ -602,9 +614,6 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
                                 onReorder={reorderMerged}
                                 onSelectionPresenceChange={(has) => {
                                     setHasSelection((prev) => (prev[attackMerge.key] === has ? prev : {...prev, [attackMerge.key]: has}))
-                                }}
-                                onActiveRowChange={(rowId) => {
-                                    attackRowId.current = rowId
                                 }}
                                 onCommandsReady={(commands) => {
                                     tableCommands.current[attackMerge.key] = commands
@@ -686,11 +695,6 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
 
     /** 标题 = `<角色码>_<动画号>`（弹窗标题与调试都用它）。 */
     const title = `${charCode}_${motion}`
-
-    /** 展开页读的是**当前**那张表（编辑后再开就是最新数据）；没开/表不在就是不渲染。 */
-    const ailmentTrack = ailmentKey ? tables[ailmentKey] : undefined
-    /** 同样那一条轨的**游戏原版**行：清空槽位时要回到原版的属性值。 */
-    const ailmentOriginal = ailmentKey ? baseline?.tables[ailmentKey]?.rows : undefined
 
     /* 失败条 + 滚动区。按钮排在标题那一行里（见下面的 DialogHeader）。 */
     const body = () => (
@@ -797,12 +801,12 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
     return (
         <>
             {/* 展开页开着时这一层不响应 Esc：两层的 Esc 各自独立，先关的必须是上层。
-                （展开页关掉后 `ailmentKey` 变 null，下一次 Esc 才轮到这一层。） */}
+                （展开页关掉后 `ailmentOpen` 变 false，下一次 Esc 才轮到这一层。） */}
             <Dialog
                 open
                 onOpenChange={(next) => {
                     if (next) return
-                    if (ailmentKey) return // 上层还开着：这一层的 Esc 不响应（见上）
+                    if (ailmentOpen) return // 上层还开着：这一层的 Esc 不响应（见上）
                     onClose()
                 }}
             >
@@ -845,16 +849,19 @@ export function AnimationDetail({motion, charCode, t, statusCatalog, onClose}: {
             </Dialog>
             {/* 展开页是**另一层默认 Dialog**（不是嵌在上面的 React 树里）：这样它有自己的遮罩层；
                 嵌进去的话 Base UI 当成同一个模态栈，不会再画第二层蒙版。 */}
-            {ailmentKey && ailmentTrack && ailmentOriginal && statusCatalog && (
+            {ailmentOpen && ailmentPopup && statusCatalog && (
                 <AilmentDetail
-                    track={ailmentTrack}
-                    originalRows={ailmentOriginal}
+                    track={ailmentPopup.table}
+                    originalRows={ailmentPopup.originals}
                     t={t}
                     statusCatalog={statusCatalog}
                     onClose={closeAilment}
                     onCancel={cancelAilment}
                     finalFocus={() => popupRef.current}
-                    onEditChild={(rowKey, tag, column, value) => editChild(ailmentKey, rowKey, tag, column, value)}
+                    onEditChild={(rowKey, tag, column, value) => {
+                        const parts = splitMergedRowId(rowKey)
+                        if (parts) editChild(parts[0], parts[1], tag, column, value)
+                    }}
                 />
             )}
         </>

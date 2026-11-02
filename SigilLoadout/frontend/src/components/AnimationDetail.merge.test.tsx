@@ -5,7 +5,7 @@
     编辑按行前缀路由回该行所属的那条子轨，保存时各子轨仍是自己的表。
 */
 import {afterEach, describe, expect, it, vi} from "vitest"
-import {cleanup, fireEvent, render, screen, waitFor} from "@testing-library/react"
+import {cleanup, fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 
 vi.mock("../../bindings/sigilloadout/service/actionsservice", () => ({
     DeployMissingTracks: vi.fn(),
@@ -32,7 +32,7 @@ import {
     SaveTracks,
 } from "../../bindings/sigilloadout/service/actionsservice"
 import {AnimationDetail} from "@/components/AnimationDetail"
-import {clickToEdit} from "@/components/actions-table/testkit"
+import {clickToEdit, stubColumnGeometry} from "@/components/actions-table/testkit"
 import {messages} from "@/lib/messages"
 import {TrackTable} from "../../bindings/sigilloadout/service/models"
 
@@ -48,6 +48,27 @@ const track = (sub: string, start: string) =>
         rows: [{values: {StartTime: start, EndTime: "1.000000"}, orig: 0}],
     })
 
+/** 带一个异常槽的子轨：统一异常弹窗按整组行列出（这里每轨一行、16 槽里只给 1 个，折叠态 1 行）。 */
+const withAilment = (sub: string, start: string, sec = "0.000000") =>
+    new TrackTable({
+        sub,
+        kind: "attack",
+        columns: ["StartTime", "EndTime"],
+        childColumns: ["category", "type", "sec", "rate"],
+        rows: [
+            {
+                values: {StartTime: start, EndTime: "1.000000"},
+                orig: 0,
+                children: [
+                    {
+                        tag: "Ailment00",
+                        values: {category: "1739476053", type: "3177074653", sec, rate: "0.000000"},
+                    },
+                ],
+            },
+        ],
+    })
+
 const infos = [
     {sub: "0", kind: "attack"},
     {sub: "1", kind: "attack"},
@@ -58,20 +79,53 @@ const values = new Map([
     ["1", "0.200000"],
 ])
 
-const open = async () => {
+/** 装一个动画弹窗；`build` 造每条 Attack 子轨的行。 */
+const mount = async (
+    build: (sub: string) => TrackTable,
+    statusCatalog: {categories: never[]} | null = null,
+) => {
+    stubColumnGeometry()
     vi.mocked(ListTracks).mockResolvedValue(infos)
-    vi.mocked(LoadTrack).mockImplementation(async (_motion: string, sub: string) => track(sub, values.get(sub)!))
-    vi.mocked(LoadTrackOriginal).mockImplementation(async (_motion: string, sub: string) => track(sub, values.get(sub)!))
+    vi.mocked(LoadTrack).mockImplementation(async (_motion: string, sub: string) => build(sub))
+    vi.mocked(LoadTrackOriginal).mockImplementation(async (_motion: string, sub: string) => build(sub))
     vi.mocked(SaveTracks).mockResolvedValue(undefined)
     vi.mocked(DeployMissingTracks).mockResolvedValue(undefined)
-    render(<AnimationDetail motion="001c" charCode="pl2900" t={t} statusCatalog={null} onClose={() => {}} />)
+    render(<AnimationDetail motion="001c" charCode="pl2900" t={t} statusCatalog={statusCatalog} onClose={() => {}} />)
     await screen.findByRole("button", {name: t.saveAnimation})
 }
+
+const open = () => mount((sub) => track(sub, values.get(sub)!))
 
 /** 合并表那一行里的某一格（`#` 列没有 `data-col-id`，只认数据列）。 */
 const cellOf = (rowLabel: string, column: string) => {
     const row = screen.getByText(rowLabel).closest("tr")
     return row?.querySelector(`td[data-col-id="${column}"]`) as HTMLElement | undefined
+}
+
+/** 打开统一异常弹窗：两条 Attack 子轨各带一个异常槽（原值可按子轨区分）。返回最上层的那个弹层。 */
+const openAilmentsFor = async (sec: (sub: string) => string) => {
+    await mount((sub) => withAilment(sub, values.get(sub)!, sec(sub)), {categories: []})
+    fireEvent.click(screen.getByRole("button", {name: t.ailmentTitle}))
+    const dialogs = await screen.findAllByRole("dialog")
+    return dialogs[dialogs.length - 1]!
+}
+
+const openAilments = () => openAilmentsFor(() => "0.000000")
+
+/** 在异常弹窗里把某一行（按行号标签认）的 `sec` 格改成 value。 */
+const editSec = (popup: HTMLElement, rowLabel: RegExp, value: string) => {
+    const row = within(popup).getByText(rowLabel).closest("tr") as HTMLElement
+    const cell = row.querySelector('td[data-col-id="sec"]') as HTMLElement
+    clickToEdit(cell)
+    const input = cell.querySelector("input") as HTMLInputElement
+    fireEvent.change(input, {target: {value}})
+    fireEvent.blur(input)
+}
+
+/** 保存时交出去的每张表，按子轨号索引。 */
+const handedTracks = () => {
+    const handed = vi.mocked(SaveTracks).mock.calls[0][1] as TrackTable[]
+    return new Map(handed.map((table) => [table.sub, table]))
 }
 
 afterEach(() => {
@@ -92,14 +146,14 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         expect(table.contains(screen.getByText("01-1"))).toBe(true)
     })
 
-    it("行号：组首行 `00-1`，同组后续行只写 `2`；第二组首行 `01-1` 也是组首行", async () => {
+    it("行号 `00-1` / `01-1`；组间线只画在上一组末行（`row-group-end`），下一组首行不重复画", async () => {
         await open()
 
         expect(screen.getByText("00-1")).not.toBeNull()
         expect(screen.getByText("01-1")).not.toBeNull()
-        // 每条子轨的第一行都算组首行；第一条下面的表首行由 CSS 的 `:not(:first-child)` 排除，不画重复线。
-        expect(screen.getByText("00-1").closest("tr")?.className).toContain("row-group-start")
-        expect(screen.getByText("01-1").closest("tr")?.className).toContain("row-group-start")
+        // 线画在"后面还有别的子轨"的那一行下面；最后一条子轨的末行不画。
+        expect(screen.getByText("00-1").closest("tr")?.className).toContain("row-group-end")
+        expect(screen.getByText("01-1").closest("tr")?.className).not.toContain("row-group-end")
     })
 
     it("编辑第二组的一格：只落到第二条子轨，保存时两条子轨各自带着自己的值", async () => {
@@ -119,5 +173,54 @@ describe("动画弹窗：Attack 子轨合并成一张表", () => {
         const bySub = new Map(handed.map((table) => [table.sub, table]))
         expect(bySub.get("0")?.rows[0].values.StartTime).toBe("0.100000")
         expect(bySub.get("1")?.rows[0].values.StartTime).toBe("0.900000")
+    })
+
+    it("异常弹窗：所有 Attack 行在同一个弹窗里，行号沿用 `00-1`，编辑写回对应子轨", async () => {
+        const popup = await openAilments()
+
+        // 两条子轨的行都在这一张弹窗里，行号沿用合并表的 `00-1` / `01-1`。
+        expect(within(popup).getByText(/00-1/)).toBeTruthy()
+        expect(within(popup).getByText(/01-1/)).toBeTruthy()
+        // 标题写整组、不带子轨号（`异常状态  Attack`，没有 `#0` / `#1`）。
+        expect(within(popup).getByRole("heading", {name: /^异常状态\s+Attack$/})).toBeTruthy()
+
+        editSec(popup, /01-1/, "12.5")
+        fireEvent.click(within(popup).getByRole("button", {name: t.ok}))
+        fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
+        await waitFor(() => expect(SaveTracks).toHaveBeenCalled())
+
+        const bySub = handedTracks()
+        // 第一条子轨原样；第二条子轨只有那一格变了 —— 说明统一弹窗按行前缀拆回了正确的表。
+        expect(bySub.get("0")?.rows[0].children?.[0].values.sec).toBe("0.000000")
+        expect(bySub.get("1")?.rows[0].children?.[0].values.sec).toBe("12.5")
+    })
+
+    it("清空第二组的一格：回到**那条子轨**自己的原值（原表按子轨拼接后取）", async () => {
+        // 两条子轨的原值不同：拼接偏移算错时，第二组会读到第一组的值（0）。
+        const popup = await openAilmentsFor((sub) => (sub === "1" ? "5.000000" : "0.000000"))
+
+        editSec(popup, /01-1/, "9.000000")
+        editSec(popup, /01-1/, "")
+
+        fireEvent.click(within(popup).getByRole("button", {name: t.ok}))
+        fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
+        await waitFor(() => expect(SaveTracks).toHaveBeenCalled())
+
+        const bySub = handedTracks()
+        expect(bySub.get("0")?.rows[0].children?.[0].values.sec).toBe("0.000000")
+        expect(bySub.get("1")?.rows[0].children?.[0].values.sec).toBe("5.000000")
+    })
+
+    it("取消：整组子轨的编辑一起退回，不只第一条子轨", async () => {
+        const popup = await openAilments()
+
+        editSec(popup, /01-1/, "12.5")
+        fireEvent.click(within(popup).getByRole("button", {name: t.cancel}))
+        fireEvent.click(screen.getByRole("button", {name: t.saveAnimation}))
+        await waitFor(() => expect(SaveTracks).toHaveBeenCalled())
+
+        const bySub = handedTracks()
+        expect(bySub.get("0")?.rows[0].children?.[0].values.sec).toBe("0.000000")
+        expect(bySub.get("1")?.rows[0].children?.[0].values.sec).toBe("0.000000")
     })
 })

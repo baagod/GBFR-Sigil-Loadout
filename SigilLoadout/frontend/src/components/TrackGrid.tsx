@@ -32,8 +32,6 @@ export type KeyedTrackRow = TrackRow & {
     track?: string
     /** 行号显示什么：`00-1` / `2` / `3`（同组后面只写组内行号）；不给就按位置从 1 数。 */
     indexLabel?: string
-    /** 这一行是一条新子轨的首行：组间画分隔线。 */
-    groupStart?: boolean
     /** 这一行是一条子轨的末行：组间分隔线画在它下面。 */
     groupEnd?: boolean
     /** 合并表里这一行的**原版值**：子轨不同，`orig` 指向各自原表里的行，不能拿一张原表按下标查。 */
@@ -84,7 +82,6 @@ const toRow = (
     orig: row.orig ?? null,
     children: row.children ?? [],
     indexLabel: row.indexLabel,
-    groupStart: row.groupStart,
     groupEnd: row.groupEnd,
     groupKey: row.groupKey,
 })
@@ -97,7 +94,7 @@ const toRow = (
  * 行值与行身份的换算留在上面的 `toRow`（`TrackRow` 与 flags 的行都是同一个形状了）。
  */
 /** 通用轨：列名就是键（后端 `LoadTrack` 给的形状），列序 = 后端给的序。 */
-export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange, onActiveRowChange}: {
+export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPresenceChange, onCommandsReady, onRowsChange}: {
     table: KeyedTrackTable | undefined
     t: Messages
     /** 原表那些行（后端 `LoadTrackOriginal`）：清空输入框时显示的灰字就是它。 */
@@ -111,8 +108,6 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
     onCommandsReady?: (commands: TableCommands) => void
     /** 行数据变了（增/删/插）：新版一整份 + 被删掉的那几行 —— 落库与假删除由调用方决定。 */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
-    /** 合并表用：活动行变了（`null` = 没有活动格）。 */
-    onActiveRowChange?: (rowId: string | null) => void
 }) {
     /*
         ‼️ **行的引用要稳**（按数据 `useMemo`，别在 JSX 里现 map）：基座把 `rows` 当"换数据了没有"的
@@ -147,7 +142,6 @@ export function TrackGrid({table, t, originals, onEdit, onReorder, onSelectionPr
             onSelectionPresenceChange={onSelectionPresenceChange}
             onCommandsReady={onCommandsReady}
             onRowsChange={onRowsChange}
-            onActiveRowChange={onActiveRowChange}
         />
     )
 }

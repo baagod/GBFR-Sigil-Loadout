@@ -133,7 +133,7 @@ export type TableCommands = {
  * ⚠️ 两个 prop 是**初始值**：父组件换角色时用 `key` 把整张表重新挂载（要清的还有 pinning /
  * 量出来的 left / 每格草稿 / 撤销栈 / 选区 —— 逐个同步迟早漏一个）。
  */
-export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, onActiveRowChange, columnOf, loading = false, busy = false, showFieldNames = true, onReady}: {
+export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSaveReady, pickerOf, reorder, initialPinnedCount = PINNED_COUNT, initialSorting, onEdit, onSelectionPresenceChange, onCommandsReady, onRowsChange, columnOf, loading = false, busy = false, showFieldNames = true, onReady}: {
     t: ActionsTableMessages
     /** 要显示的记录（`ActionsPanel` 由 `LoadCharacterActions` 摊平而来，见 `model.toActionRow`）。 */
     rows: ActionRow[]
@@ -201,11 +201,6 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
      * 把本来有原身份的行加回去标红）。
      */
     onRowsChange?: (rows: ActionRow[], deleted: ActionRow[]) => void
-    /**
-     * **活动行变了**（合并表用）：交回行 id（`null` = 没有活动格）。合并表据此知道工具条 / 异常入口
-     * 该作用在哪条子轨上，不必再让调用方另记一份"当前行"。
-     */
-    onActiveRowChange?: (rowId: string | null) => void
     /**
      * **这一份数据已经作废**（换角色 / 改清单那一段）：表格立刻**消失**（整块离屏），
      * 由 `ActionsPanel` 那个**独立**的骨架视图顶上 —— 列宽没量好之前也一样不显示（见下面那个容器）。
@@ -584,13 +579,6 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
     /* 活动行在 `rows` 里的**下标**（基座的行 id 不一定是下标 —— 动作表那边是记录号，所以查一次）。 */
     const activeRowIndex = activeRowId === null ? -1 : modelRows.findIndex((row) => row.id === activeRowId)
 
-    /* 活动行变了要报出去（合并表按它决定工具条 / 异常入口作用在哪条子轨）：只在 id 真的变了才报。 */
-    const onActiveRowChangeRef = useRef(onActiveRowChange)
-    onActiveRowChangeRef.current = onActiveRowChange
-    useEffect(() => {
-        onActiveRowChangeRef.current?.(activeRowId)
-    }, [activeRowId])
-
     /* 选区 overlay：量高度、算矩形都在这个 hook 里（纯几何在 selectionOverlay.ts；外壳/宿主归 BaseTable）。 */
     const overlay = useSelectionOverlay({
         tableRef,
@@ -922,8 +910,6 @@ export function ActionsTable({t, rows: rowsProp, saveRows, keys: keysProp, onSav
                                 /** 行号：**显示顺序里的位置**（默认按 `id_` 升序，所以它不恒等于数据下标）；
                                     合并表给的是 `00-1` 这种带子轨前缀的标签。 */
                                 rowNumber={row.original.indexLabel ?? rowIndex + 1}
-                                /** 合并表里一条新子轨的首行：组间画分隔线。 */
-                                groupStart={row.original.groupStart === true}
                                 groupEnd={row.original.groupEnd === true}
                                 measured={measured}
                                 rowHeadWidth={rowHeadWidth}
