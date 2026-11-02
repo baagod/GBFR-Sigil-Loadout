@@ -1,0 +1,341 @@
+/*
+    本项目对主题的覆盖 + 全部自绘样式。
+
+    ‼️ `style.css` 是 shadcn CLI 的托管文件：必须是上游生成物的**逐字节副本**，CLI（`init` / 主题同步）
+    会整文件覆盖它。所以这里**不能**用 Tailwind 指令（`@theme` / `@utility` / `@layer` / `@apply`），
+    本文件由 `main.tsx` 在 `style.css` 之后当作普通样式表加载；需要 Tailwind 的地方改成普通选择器与原始属性。
+
+    **单主题（只有深色）**：`index.html` 的 `<html>` 恒带 `class="dark"`，应用没有主题切换 ——
+    所以只保留一份深色值在 `:root`（写在 `.dark` 之后、同权重后写赢），并用 `color-scheme: dark`
+    让原生控件（滚动条/输入框）也是深色。以后要加浅色主题再拆 `:root` / `.dark`。
+*/
+
+:root {
+    color-scheme:           dark;
+
+    --radius:               0.625rem;
+    --background:           #0a0a0a;
+    --foreground:           #f9f9f9;
+    --popover:              #171717;
+    --popover-foreground:   oklch(0.985 0 0);
+    --primary:              oklch(0.922 0 0);
+    --primary-foreground:   oklch(0.205 0 0);
+    --secondary:            #272727;
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted:                #272727;
+    --muted-foreground:     oklch(0.708 0 0);
+    --accent:               #272727;
+    --accent-foreground:    oklch(0.985 0 0);
+    --destructive:          #ff6568;
+    --border:               oklch(1 0 0 / 10%);
+    --input:                #404040;
+    /* 自绘 1px 线的颜色（表格外框/格线/表头、面板里的行分隔线）。基础组件的边框另用
+       `--input` / `--border`，改这里不会波及它们。 */
+    --table-line:           #323335;
+    --ring:                 oklch(0.556 0 0);
+
+    /* 选区那套色（轮廓 / 复制虚线 / 行号列选中文字 / 底色基色）—— 改一处即可。 */
+    --cell-select:          #007a55;
+    --cell-fill:            color-mix(in oklab, var(--cell-select) 50%, #8a8a8a);
+    --cell-fill-alpha:      8%;
+    /* 由基色派生的两层：半透明叠色（区外露底色）/ 行号列需要的实色。 */
+    --cell-fill-overlay:    color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent);
+    --cell-fill-solid:      color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
+
+    /* 假删除行的底色（唯一还给格子上底色的状态，见 `.row-removed`）。 */
+    --cell-removed:  #542526;
+
+    /* 层高刻度（页面级）：别的页（专精技能吸顶行）也用 `var(--z-focus)`；写在 `table` 里只有表格
+       子树解析得到，别的页会整条 `z-index` 失效、被吸顶行压住。
+       ⚠️ 选区 overlay 四层用内联 `z-41` / `z-42` / `z-52` / `z-53`（见 `SelectionOverlayView.tsx`），
+       与下面那段阶梯对齐。 */
+    --z-focus:              30;
+    --z-pinned:             50;
+}
+
+/* cursor：文字默认是 I 形光标。整棵树收回箭头，只给输入框显式要回 I 形。
+   （`body` 的 bg/text 由 `style.css` 的 `@layer base` 给。） */
+body {
+    cursor: default;
+}
+
+input, textarea {
+    cursor: text;
+}
+
+/* 外壳钉在窗口上，只有列表滚动：否则 tooltip 短暂撑大可滚动区域会冒出窗口滚动条。 */
+html, body {
+    overflow: hidden;
+}
+
+/* 因子编辑页的行：勾选框（shadcn 原样组件）只需这两处额外样式，作用域由 `.skill-rows` 限定。
+   用 class 不用 data-slot：行的点击处理会把带 data-slot 的祖先当控件，挂在列表上会吞掉行点击。 */
+/* 行会在勾选后移位；组件自带的过渡会拖到移位之后才填色，看起来像闪一下。 */
+.skill-rows [data-slot="checkbox"] {
+    transition: none;
+}
+
+/* focus ring 向外长 2px，会被容器边缘切掉：行左边留了 2px 给它。 */
+.skill-rows [data-slot="checkbox"]:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+
+/* 半选：盒子用选中态填充；横杠由行自己画（base-ui 只给 data-indeterminate）。 */
+.skill-rows [data-slot="checkbox"][data-indeterminate] {
+    background-color: var(--primary);
+    border-color:     var(--primary);
+    color:            var(--primary-foreground);
+}
+
+.skill-rows [data-slot="checkbox"][data-indeterminate] [data-slot="checkbox-indicator"] > svg {
+    display: none;
+}
+
+/* 窗口失活时伪类失效、DOM 焦点还在：App 给该元素挂 data-focus-hold，这里补齐聚焦指示。 */
+[data-slot="input-group"]:has([data-focus-hold]) {
+    border-color: var(--ring);
+    box-shadow:   0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
+}
+
+/* 数值框没有聚焦底色（深色下那条 focus:bg 被 dark:bg-transparent 压掉了），所以也不需要
+   data-focus-hold 规则；哪天补回聚焦底色，记得同时补那条。 */
+
+/* 四个页签共用的页面内边距 ( 左右=20 上=16 下=24) */
+.page-padding {
+    padding: 16px 20px 24px;
+}
+
+/* 表格外框 / 格线 / 表头颜色只写这一处：`--table-line`（表单控件的 `--input` 是另一档）。
+   ⚠️ `*` 同权重吃掉了表内所有单独的边框色，要给某格上色得用更精确的选择器。 */
+.table-border,
+.table-border * {
+    border-color: var(--table-line);
+}
+
+/* 自绘的 1px 分隔线（面板行线、标题下划线、表格外框）。
+   ⚠️ 只加在 app 组件上；`components/ui` 里的边框色由 `--border` / `--input` 决定，别碰。 */
+.app-line {
+    border-color: var(--table-line);
+}
+
+/* ⚠️ 角色动作页三张表**永久不做悬停反馈**：不要再往 td/tr 挂 `hover:` 底色或悬停叠加层。
+   （行/格背景色只有一份，占了会顶掉假删除的红与选中层；要两全就得多一层伪元素，不值得。） */
+
+/* 选值格箭头由 `ComboboxTrigger` 自带；弹层保持组件默认光标（别再整层设 crosshair）。 */
+
+/* 选值格弹层**不带动画**：弹层自带的 fade/zoom 会与"展开瞬间第一项被高亮"叠成闪一下。
+   只覆盖这一层，`ui/combobox` 基类不动。 */
+.cell-pick-list {
+    animation:  none !important;
+    transition: none !important;
+}
+
+/*
+    聚焦 / 编辑中格子的那圈线：画在 `::after` 上（`::before` 归选区框），从格子外沿往里 2px。
+    用伪元素 `inset: -1px` 正好盖住"格子 + 一圈 1px 格线"；末列/末行没有格线，右/下各收回 1px，
+    否则会越过表格边缘、撑出滚动条。
+
+    ‼️ 两种出现情形必须写在同一条规则里（环本身 + 末行/末列收回是同一件事的两半）：
+      · `:focus-within`：焦点在这一格；
+      · `:has(.cell-pick-mark[data-popup-open])`：选值格列表开着（焦点在 portal 里，`focus-within` 不成立）。
+    ⚠️ 聚焦环必须排在冻结层之下（`--z-focus` < `--z-pinned`），否则聚焦时内容会画到吸顶列上面。
+*/
+.cell-focus {
+    position: relative;
+}
+
+.cell-focus:is(:focus-within, :has(.cell-pick-mark[data-popup-open])) {
+    z-index: var(--z-focus);
+}
+
+.cell-focus:is(:focus-within, :has(.cell-pick-mark[data-popup-open]))::after {
+    content:        "";
+    position:       absolute;
+    inset:          -1px;
+    border:         2px solid var(--ring);
+    pointer-events: none;
+}
+
+/* 末列 / 末行没有格线：`inset: -1px` 会越过表格边缘 1px（末行那 1px 还会撑出滚动条）。 */
+.cell-focus:is(:focus-within, :has(.cell-pick-mark[data-popup-open])):last-child::after {
+    right: 0;
+}
+
+tr:last-child > .cell-focus:is(:focus-within, :has(.cell-pick-mark[data-popup-open]))::after {
+    bottom: 0;
+}
+
+/*
+    活动格（拖选起点）不画焦点环：mousedown 会把焦点落到起点格，灰环与选区实线重叠，
+    只在右/下两侧露出来，看着像"多了一圈灰边"（真机反馈）。选区外观已不挂在格子上，
+    这一条只负责把 `.cell-active` 那格的焦点环收掉。
+    ⚠️ 必须带 `.cell-focus` 提高特异性，压过上面 `:is(:focus-within, :has(...))` 那条。
+*/
+td.cell-active.cell-focus:focus-within::after {
+    content: none;
+}
+
+/* 拖拽划过一片时别把文字选蓝；十字光标是表格通用语（xlsx 同款）。 */
+.cell-selectable {
+    cursor:      cell;
+    user-select: none;
+}
+
+/* 拖选性能：屏幕外的行不参与重算（全局参数表用）。⚠️ 基表不用（见下一条，实测它反而是拖选/悬停卡顿主因）。 */
+tbody tr {
+    content-visibility:     auto;
+    /* 27px = 实测行高（h-6 的 24 + 上下格线），写错会让滚动条长度乱跳。 */
+    contain-intrinsic-size: auto 27px;
+}
+
+/*
+    ============ 基表行：两条"别让浏览器每次指针移动重算整表"的硬约束 ============
+
+    1. **不要 `content-visibility`**：它把每行变成 display-lock，指针每移动一格都要在"锁定/解锁"树上
+       做命中测试（`LayoutView::HitTest`）与 PrePaint。主角表（138 × 88 = 12,144 格）实测：
+       带 CV → HitTest 570ms（单次最大 106ms）/ PrePaint 584ms；关掉 → 77ms / 134ms；只悬停不按下
+       也从 22 个 >100ms 长帧降到 1 个。
+
+    2. **不要 hover 底色 / 颜色过渡**：shadcn `TableRow` 自带 `transition-colors hover:bg-muted/50`，
+       而基表格子都有不透明底色 → 这层 hover 一个像素也看不见，却让"指针换一行"变成整行重绘
+       （行宽 9369px）。实测：20 行拖选 `>16ms` 帧 47 → 24；滚轮滚动中位帧 **25ms → 4.2ms**。
+
+    ⚠️ 只动基表（动作表 / 动画表）。全局参数表保留 CV 与 shadcn 默认 hover（那张表每行只有两格、看得见）。
+*/
+table.base-table tbody tr {
+    content-visibility:     visible;
+    contain-intrinsic-size: none;
+    transition:             none;
+    background-color:       transparent;
+}
+
+table.base-table tbody tr:hover {
+    background-color: transparent;
+}
+
+/*
+    ============ 提层阶梯（唯一一份） ============
+
+      焦点环 --z-focus(30)  <  选区 overlay 滚动层 41  <  复制虚线滚动层 42  <  冻结层 --z-pinned(50)
+                            <  选区 overlay 钉住层 52  <  复制虚线冻结层 53  <  吸顶表头行 60
+                            <  弹窗分节标题 70
+
+    · 选区外观由 `SelectionOverlay` 画：滚动层 z-41 在普通格之上、冻结列之下；复制虚线滚动层 z-42 也在
+      冻结列之下（横滚时复制虚线不能盖住冻结列）；钉住层 z-52 在冻结列之上、吸顶表头之下；复制虚线冻结
+      层 z-53 压在钉住层之上。
+    · 冻结区必须压过横滚内容（否则点击被抢）；吸顶表头 60 是**表格内部**最高层；弹窗标题在表之外，
+      必须更高，否则表头穿透标题。
+    ‼️ `th` 与 `td` 都要覆盖，且必须用 `table td.cell-pinned`（(0,1,2)）—— 只写 `td.cell-pinned` 会与提层
+      规则同权重、靠源序决定胜负，表头冻结格会掉到 20 被横滚内容盖住。
+*/
+table td.cell-pinned, table th.cell-pinned {
+    z-index: var(--z-pinned);
+}
+
+/* 数据格底色统一 `--background`：钉住的列必须不透明（横滚时挡住底下滚过来的列），普通数据格也一起刷，
+   表格才有一块整面、和表头/行头的 `HEAD_BG` 分得开。表头与行头另给底色，所以排除 `.cell-handle`。
+   用 `:where()` 把这条压成 0 特异性 —— 假删除、子轨交替这些"更具体的状态"才能盖过它。 */
+table tbody :where(td:not(.cell-handle)) {
+    background-color: var(--background);
+}
+
+/* **假删除**（轨表："这一行不写进游戏"）。状态只由行上的 `.row-removed` 标记一次。
+   ‼️ 底色刷在**格子上**而不是 `<tr>`：`TableRow` 的 `hover:bg-*` 特异性会顶掉行底色。
+   数据格带 `:not(.cell-pinned)`（冻结列保持不透明）；`:where()` 把行标记特异性压成 0，
+   行号/握把格交给下面那条更具体的规则（选中时也保持假删除底色）。 */
+:where(.row-removed) > td:not(.cell-pinned) {
+    background-color: var(--cell-removed);
+}
+
+/*
+    行号 / 握把那两格单独再压一次：它们同时带 `.cell-handle` 与 `.cell-pinned`，
+    而 `.cell-handle.cell-row-selected`（(0,2,1)）比上面 `:where()` 那条高 —— 不压的话假删除行
+    点一下（整行选中 / 选区压到）这两格就退回选中底色。
+    `color` 一起改：否则选中态那行绿字留在暗红底上（实测对比度 2.34:1），行号几乎看不清。
+*/
+table tr.row-removed > td.cell-handle {
+    background-color: var(--cell-removed);
+    color:            var(--foreground);
+}
+
+/*
+    基表外壳（滚动框）的样式已归 `BaseTable` 的 utility 类（`.base-table-shell`）—— 不再用
+    `div:has(> table.base-table)` 反选。外壳 = `table.parentElement`：`useColumnMeasure` / `useReveal` /
+    行拖夹取 / 方向键跳边都这么读它。
+*/
+
+/* 行号列是 sticky，必须不透明：选中时**不加底色**（保留表头同款 `HEAD_BG`），只把数字染成选区绿。 */
+.cell-handle.cell-row-selected {
+    box-shadow:       none;
+    color:            var(--cell-select);
+}
+
+/* 行号列右缘那条 2px 边框已挪到选区覆盖层（`selectionOverlay` 的 `rowHead`）——
+    不再改 `<td>` 的 border 宽度：那会动表格布局，也不随覆盖层一起横滚跟随。 */
+
+/*
+    **只有轨表**按子轨交替：第 2、4… 条子轨的数据格换成 `--popover`（第一组保持默认的 `--background`）。
+    行头（行号列 / 握把列）**不参与**，始终用自己那层的 `HEAD_BG`。
+    `row-subtrack-alt` 只由 `mergedTracks` 产生（按"第几条子轨"的奇偶），所以这条选择器碰不到动作表等其它表。
+    ⚠️ 刷在格子上而不是 `<tr>`：行上的背景会被行头、钉住列这些不透明格盖住，只有格子自己涂才稳。
+    纯背景色、不叠半透明层、不加边框，因此不改布局与选区覆盖层的几何。
+*/
+.row-subtrack-alt > td:not(.cell-handle) {
+    background-color: var(--popover);
+}
+
+/* 「专精技能」页的两级吸顶（角色行 + 专精类型名）。两个 sticky 元素必须是滚动容器的直接子/孙元素，
+   否则滚动祖先会变成角色面板、滚到下一个角色就跟着走。
+   `top: 0` 不能写 -1（吸顶瞬间会跳 1px）；类型名 `top: 39px` 与 JSX 的 `-mt-[5px]` 成对
+   （44 − 5 = 39，改一处必须改另一处）。层级：角色行 > 类型名。 */
+.skillboard-row {
+    position:         sticky;
+    top:              0;
+    z-index:          var(--z-focus); /* 高于类型名那一级：角色名永远压在类型名之上 */
+    background-color: var(--background);
+}
+
+.skillboard-type {
+    position:         sticky;
+    top:              39px;
+    z-index:          20;
+    background-color: var(--background);
+    border-top:       0;
+}
+
+/* base-ui 给 Checkbox / Combobox 挂的隐藏 `<input>` 是行内 `position: fixed`：可滚动容器里每个都
+   各成一个图层（本页 435 个 → 367 层），拖选时每帧重建图层树（Layerize 1345ms）。`absolute` 同样
+   脱离文档流、同样被裁，但不带 fixed 的合成理由（实测拖选 2647 → 1294ms）。
+   ⚠️ 只匹配"行内写了 position: fixed"的隐藏输入，别扩大。 */
+input[aria-hidden="true"][style*="position: fixed"] {
+    position: absolute !important;
+}
+
+/* 弹层用纯布局居中：`inset:0 + margin:auto`，不用 `top:50% + translateY(-50%)`。
+   后者在高度为奇数时位移落在半像素，整个弹层被栅格化，里面每条 1px 线都会变成 2px。 */
+.ailment-popup {
+    inset: 0;
+    height: fit-content;
+    margin: auto;
+    translate: none;
+}
+
+/* 「异常状态」展开页的表皮：**不要外框**，横线全部由格子给；
+   表头除行号列与槽位列外左对齐（槽位是两位数字，整列居中才不歪）；
+   活动格（`cell-active`）一条 1px 内描边，底色透明。 */
+.ailment-sheet .base-table-shell {
+    border-width: 0;
+}
+
+.ailment-sheet table th, .ailment-sheet table td {
+    border-left-width: 0;
+    border-right-width: 0;
+}
+
+.ailment-sheet table thead th:not(:first-child):not([data-col-id="slot"]) {
+    text-align: left;
+}
+
+.ailment-sheet td.cell-active {
+    box-shadow: inset 0 0 0 1px var(--cell-select);
+}

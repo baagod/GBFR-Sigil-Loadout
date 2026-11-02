@@ -1,15 +1,20 @@
 /*
-    `style.css` 里几条**选择器级**的硬约束。
+    `style.css`（及它 import 的 `theme.css` / `base.css`）里几条**选择器级**的硬约束。
 
     为什么单独一个文件、还跑在默认（node）环境：组件测试跑 happy-dom，而它**不加载 `style.css`** ——
     "表头冻住了没有""那条线压没压住"这类**布局事实在单测里量不到**，只能把前提钉在样式表的文本上。
     （node 环境下 `import.meta.url` 才是 `file://`，happy-dom 下不是，`readFileSync` 会直接报错。）
+
+    样式表已分层：`style.css` 是 shadcn CLI 托管的逐字节副本（会被整文件覆盖），规则在 `base.css`。
+    断言不分层，两份拼起来看 —— 护的是"这条约束存在且没被删"。
 */
 import {readFileSync} from "node:fs"
 
 import {describe, expect, it} from "vitest"
 
-const css = readFileSync(new URL("./style.css", import.meta.url), "utf8")
+const css = ["./style.css", "./base.css"]
+    .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
+    .join("\n")
 
 /**
  * 去掉注释再匹配。

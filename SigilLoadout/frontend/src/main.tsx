@@ -1,5 +1,7 @@
 import { createRoot } from "react-dom/client"
 import "./style.css"
+/* 本项目对 `style.css`（shadcn CLI 托管、可整文件覆盖）的覆盖 + 全部自绘样式。 */
+import "./base.css"
 import App from "./App"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 
