@@ -32,6 +32,7 @@ $ErrorActionPreference = 'Stop'
 # 它也不碰 GBFR\data（工具部署出来的那些数据），所以不会动你已有的改动。
 
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'wails-bindings.ps1')
 $toolDir = Join-Path $root 'SigilLoadout'
 $modDir = Join-Path $Target 'GBFR.SigilLoadout'
 $exe = Join-Path $modDir 'SigilLoadout.exe'
@@ -57,20 +58,9 @@ try {
     if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw '找不到 pnpm。先装 pnpm 并 pnpm install，见 README 的「从源码构建」。' }
     if (-not (Test-Path 'frontend\node_modules')) { throw '前端依赖没装：先在 SigilLoadout\frontend 跑 pnpm install，见 README 的「从源码构建」。' }
     # bindings 是 git 忽略的生成物（frontend/bindings），改过 Go 服务的方法签名必须重新生成，否则
-    # 前端还按旧参数个数调用（运行期报 `expects N arguments, got M`）。build-release 那一步一直有，
-    # 快速部署以前没有；没装 wails3 时跳过并明说，别把快速迭代卡死。
-    if (Get-Command wails3 -ErrorAction SilentlyContinue) {
-        # 生成的 bindings 必须和运行期 wails 模块同版本：CLI 旧一版会生成旧形状的绑定。
-        $moduleVersion = ((& go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3 2>&1) -join "`n").Trim()
-        $cliVersion = ((& wails3 version 2>&1) -join "`n").Trim()
-        if ($cliVersion -ne $moduleVersion) {
-            throw "wails3 版本 $cliVersion 与 go.mod 的 $moduleVersion 不一致；先升级 CLI。"
-        }
-        & wails3 generate bindings ./...
-        if ($LASTEXITCODE -ne 0) { throw 'Wails bindings 生成失败。' }
-    } else {
-        Write-Output '  （没找到 wails3，跳过 bindings 生成；改过 Go 服务签名时请先跑 build-release 或手动生成）'
-    }
+    # 前端还按旧参数个数调用（运行期报 `expects N arguments, got M`）。版本对拍与生成都在
+    # wails-bindings.ps1（与 build-release 共用一份）；没装 wails3 时跳过并明说，别把快速迭代卡死。
+    Sync-WailsBindings -ToolDir $toolDir -AllowMissingCli
     if (-not $NoTypecheck) {
         & pnpm --dir frontend run typecheck
         if ($LASTEXITCODE -ne 0) { throw '前端 typecheck 没过。' }

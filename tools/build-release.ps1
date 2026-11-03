@@ -19,6 +19,7 @@ foreach ($proxyName in @('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')) 
 }
 
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'wails-bindings.ps1')
 
 # 构建清单一开跑就先删：后面不管哪一步失败（版本门禁、编译、测试），dist 里都不该留着"上一次成功"的清单
 # —— deploy 只认这份清单，留着它等于给旧包发一张"刚构建完"的通行证。
@@ -214,17 +215,9 @@ try {
     if (-not (Test-Path (Join-Path $toolDir 'frontend\node_modules'))) {
         throw '前端依赖没装：先在 SigilLoadout\frontend 跑 pnpm install，见 README 的「从源码构建」。'
     }
-    # bindings 是 git 忽略的生成产物；前端构建前重新生成。
-    # 生成的 bindings 必须和运行期 wails 模块同版本：CLI 旧一版会生成旧形状的绑定。
-    $moduleVersion = ((& go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3 2>&1) -join "`n").Trim()
-    $cliVersion = ((& wails3 version 2>&1) -join "`n").Trim()
-    if ($cliVersion -ne $moduleVersion) {
-        throw "wails3 版本 $cliVersion 与 go.mod 的 $moduleVersion 不一致；先升级 CLI。"
-    }
-    & wails3 generate bindings ./...
-    if ($LASTEXITCODE -ne 0) {
-        throw "Wails bindings generation failed with exit code $LASTEXITCODE."
-    }
+    # bindings 是 git 忽略的生成产物；前端构建前重新生成。版本对拍与生成都在 wails-bindings.ps1，
+    # 快速部署走同一个门禁，避免两处脚本各写一份、慢慢漂移。
+    Sync-WailsBindings -ToolDir $toolDir
     # vite 只抹掉类型，后面的步骤都不会发现类型错误：所以先跑编译器。测试也是一道门禁——带着
     # 红的测试集发出去的就是没检查过的版本。
     & pnpm --dir (Join-Path $toolDir 'frontend') run typecheck

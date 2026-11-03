@@ -38,7 +38,7 @@
 - VS 2022 Build Tools ( 含 C++ 工作负载、MSVC v143、Windows SDK )
 - .NET 8 SDK
 - Go 1.27.3+
-- Wails v3 ( `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0` )
+- Wails v3 ( `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0` )
 - Node.js 20.19+
 - pnpm
 - pwsh 7
