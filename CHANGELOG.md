@@ -26,9 +26,6 @@
 - 状态表目录（`status.lang.json` 的类别/类型）改为运行时必传契约，补齐目录未就绪时的入口用例；
   发布资产清单与生成器说明同步。
 
-### 升级
-
-直接覆盖 Mod 目录即可；`ModId`、配置目录与现有用户数据不变（旧的 `xx.<lang>.json` 已并入 `xx.lang.json`）。
 
 ## [0.10.2] - 2026-10-29
 
@@ -51,9 +48,6 @@
   （缺清单、zip 名不合法、哈希不符都拒绝）；新增 `tests/DeployGuard`（5 种坏输入），放在构建链最前面跑。
 - 移除 `openwiki/` 生成索引；README 更新。
 
-### 升级
-
-直接覆盖 Mod 目录即可；`ModId`、配置目录与现有用户数据不变。
 
 ## [0.10.1] - 2026-10-28
 
@@ -73,10 +67,3 @@
 
 - Wails 升级到 v3.0.0 正式版（Go 模块、CLI、前端 runtime 同版本）。
 - 删除不再使用的行级「剪切」命令与 `copySelection` 出口；前端 383 条用例通过。
-
-### 升级
-
-直接覆盖 Mod 目录即可；`ModId`、配置目录与现有用户数据不变。
-
-[0.10.2]: https://github.com/baagod/GBFR-Sigil-Loadout/releases/tag/v0.10.2
-[0.10.1]: https://github.com/baagod/GBFR-Sigil-Loadout/releases/tag/v0.10.1
