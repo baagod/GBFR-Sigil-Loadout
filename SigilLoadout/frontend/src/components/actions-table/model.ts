@@ -143,7 +143,7 @@ export const columnKind = (key: string): ColumnKind =>
  *
  *   · 粘贴：不许写的列整列当"没有这一格"（写进去的是一个**没人认的键**：帧列看的是 `endTime`，
  *     粘出来的 `frame` 只会烂在草稿里）；
- *   · 每一格的底色（`ActionRowView` 的 `readonlyTint` / `notWritable`）；
+ *   · 要不要挂焦点环（`ActionRowView` 的 `notWritable`）；
  *   · 要不要挂焦点环（进不进编辑）。
  *
  * ‼️ 以前这三处各判一遍（内置只读列还曾被漏掉一处）—— 同一个事实写三遍，迟早对不上。
@@ -521,7 +521,7 @@ export type ActionRow = {
      */
     groupKey?: string
     /**
-     * 轨表里**这条子轨要不要垫交替底色**（第 2、4… 条子轨给 `true`）：
+     * 轨表里**这条子轨要不要垫交替底色**（第 1、3… 条子轨给 `true`）：
      * 长表滚动时能看出"这一段属于另一条子轨"。只刷数据格，行号/握把列不参与（见 `style.css`）。
      */
     subtrackAlt?: boolean

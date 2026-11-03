@@ -212,7 +212,7 @@ export const ActionRowView = memo(function ActionRowView({
             }}
             className={
                 // 假删除：只挂一个标记类，暗红怎么刷、为什么不刷在行上 —— 见 style.css 的 `.row-removed`。
-                // 轨表：第 2、4… 条子轨整行换交替底色（`.row-subtrack-alt > td`，行号/握把列除外）。
+                // 轨表：第 1、3… 条子轨整行换交替底色（`.row-subtrack-alt > td`，行号/握把列除外）。
                 removed
                     ? "row-removed"
                     : [drag.isDragging ? "relative z-10 opacity-50" : "", row.original.subtrackAlt ? "row-subtrack-alt" : ""]

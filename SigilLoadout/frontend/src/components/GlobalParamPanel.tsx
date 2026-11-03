@@ -152,7 +152,7 @@ export function GlobalParamPanel({table, onDirtyChange, onSaveReady}: {
             {/* scrollbar-gutter-stable：1103 行那张表一定会滚，不预留沟槽的话它一出现整块内容就横向重排。 */}
             <div className="min-h-0 flex-1 overflow-auto pr-2 scrollbar-gutter-stable">
                 {/* 表**不套外框**，只剩下每一行下面那条线（与 mot 窗口里的 FSM 表同一套，用户要求）；
-                    格线颜色仍走全站那一个来路（table-border → --input），不自己定一套。
+                    格线颜色仍走全站那一个来路（table-border → --table-line），不自己定一套。
                     最后一行也画下边框（用户要求）：表到哪里结束由滚动条告诉，不靠"少一条线"。 */}
                 <table className="w-full table-border border-separate border-spacing-0 text-xs">
                     <tbody>

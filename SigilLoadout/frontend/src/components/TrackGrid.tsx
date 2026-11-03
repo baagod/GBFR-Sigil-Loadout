@@ -38,7 +38,7 @@ export type KeyedTrackRow = TrackRow & {
     origValues?: Record<string, string | undefined>
     /** 轨表里这行属于哪条子轨（拖动只在同一子轨内换序）。 */
     groupKey?: string
-    /** 这条子轨要不要垫交替底色（第 2、4… 条子轨为 `true`，只刷数据格）。 */
+    /** 这条子轨要不要垫交替底色（第 1、3… 条子轨为 `true`，只刷数据格）。 */
     subtrackAlt?: boolean
 }
 /** 弹层里每张表：行带键。`TrackTable` 是后端契约（它的行不带键）。 */

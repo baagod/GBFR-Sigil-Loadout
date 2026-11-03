@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest"
 
 import {buildOverlay, geometryFromHeaderCells, ringLines, type GeometryInput} from "./selectionOverlay"
+import {copyUnderlayAt} from "./useSelectionOverlay"
 
 const geo = (over: Partial<GeometryInput> = {}): GeometryInput => ({
     columnLefts: [40, 80, 140, 200],
@@ -238,10 +239,10 @@ describe("selectionOverlay（选区 → 像素几何）", () => {
             geo: geo(),
             activeCell: null,
             copyAreas: [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 2, maxColumnIndex: 2}],
-            copyUnderlay: () => "var(--cell-editable)",
+            copyUnderlay: () => "var(--cell-removed)",
         })
         expect(model.scrolled.copy).toEqual([
-            {left: 140, top: 41, width: 60, height: 27, edges: {top: true, right: true, bottom: true, left: true}, underlay: "var(--cell-editable)"},
+            {left: 140, top: 41, width: 60, height: 27, edges: {top: true, right: true, bottom: true, left: true}, underlay: "var(--cell-removed)"},
         ])
     })
 
@@ -361,5 +362,23 @@ describe("geometryFromHeaderCells（渲染实测宽度 → 几何）", () => {
         expect(
             geometryFromHeaderCells({cells, sheetColumns: ["a"], headerHeight: 41, rowHeights: [27], pinnedColumnCount: 0, rowCount: 1}),
         ).toBeNull()
+    })
+})
+
+describe("copyUnderlayAt（复制源空档垫底色的接线）", () => {
+    const rows = [
+        {id: "a", original: {removed: false}},
+        {id: "b", original: {removed: true}},
+    ]
+
+    it("假删除行垫暗红，普通行与越界行透明", () => {
+        expect(copyUnderlayAt(rows, [], 1, 0)).toBe("var(--cell-removed)")
+        expect(copyUnderlayAt(rows, [], 0, 0)).toBe("transparent")
+        expect(copyUnderlayAt(rows, [], 9, 0)).toBe("transparent")
+    })
+
+    it("落在选区里再叠一层选区填充", () => {
+        const bounds = [{minRowIndex: 0, maxRowIndex: 0, minColumnIndex: 0, maxColumnIndex: 1}]
+        expect(copyUnderlayAt(rows, bounds, 0, 1)).toBe("color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent)")
     })
 })

@@ -38,9 +38,8 @@
     --cell-select:          #007a55;
     --cell-fill:            color-mix(in oklab, var(--cell-select) 50%, #8a8a8a);
     --cell-fill-alpha:      8%;
-    /* 由基色派生的两层：半透明叠色（区外露底色）/ 行号列需要的实色。 */
+    /* 由基色派生的半透明叠色（区外露底色）。 */
     --cell-fill-overlay:    color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), transparent);
-    --cell-fill-solid:      color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), var(--background));
 
     /* 假删除行的底色（唯一还给格子上底色的状态，见 `.row-removed`）。 */
     --cell-removed:  #542526;

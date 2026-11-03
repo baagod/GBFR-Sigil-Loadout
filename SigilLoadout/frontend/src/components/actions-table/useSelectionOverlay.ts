@@ -8,11 +8,22 @@ import {useCallback, useLayoutEffect, useMemo, useState} from "react"
 import type {RefObject} from "react"
 
 import {cellUnderlayColor} from "./classes"
-import {columnKind, parseSnapshotKey, type CopySource} from "./model"
+import {parseSnapshotKey, type CopySource} from "./model"
 import {geometryFromHeaderCells, buildOverlay, type Bounds, type HeaderCellMetric, type OverlayModel} from "./selectionOverlay"
 
 /** 只需要行 id 与“是否假删除”，避免把 TanStack 的 Row 泛型带进来。 */
 type RowLike = {id: string; original: {removed?: boolean}}
+
+/**
+    复制虚线空档要垫的底色：假删除行用 `--cell-removed`、普通行透明；该格落在选区里时再叠一层选区填充。
+    抽成纯函数是为了让"行 → 底色"这条接线能单测（hook 只负责把当前行与选区递进来）。
+*/
+export function copyUnderlayAt(rows: readonly RowLike[], bounds: readonly Bounds[], rowIndex: number, columnIndex: number): string {
+    const selected = bounds.some(
+        (b) => rowIndex >= b.minRowIndex && rowIndex <= b.maxRowIndex && columnIndex >= b.minColumnIndex && columnIndex <= b.maxColumnIndex,
+    )
+    return cellUnderlayColor(rows[rowIndex]?.original.removed === true, selected)
+}
 
 type ActiveCellIndexes = {rowIndex: number; columnIndex: number}
 
@@ -165,14 +176,8 @@ export function useSelectionOverlay({
     )
 
     const copyUnderlay = useCallback(
-        (rowIndex: number, columnIndex: number) => {
-            const columnId = sheetColumns[columnIndex]!
-            const selected = selectionBounds.some(
-                (b) => rowIndex >= b.minRowIndex && rowIndex <= b.maxRowIndex && columnIndex >= b.minColumnIndex && columnIndex <= b.maxColumnIndex,
-            )
-            return cellUnderlayColor(columnKind(columnId) === "readonly", rows[rowIndex]?.original.removed === true, selected)
-        },
-        [sheetColumns, rows, selectionBounds],
+        (rowIndex: number, columnIndex: number) => copyUnderlayAt(rows, selectionBounds, rowIndex, columnIndex),
+        [rows, selectionBounds],
     )
 
     const model = useMemo(

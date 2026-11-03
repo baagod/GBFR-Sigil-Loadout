@@ -8,10 +8,10 @@ import {CELL_TEXT} from "@/lib/classnames"
 
 /**
  * 复制虚线空档要垫的“该格底色”（overlay 挂在 table 外面，拿不到行/格的底色）。
- * 格子**不设底色**，所以空档也透明；落在选区里时叠一层选区填充。
- * ‼️ 与 `.row-removed`（唯一还刷格底色的状态）保持同一口径。
+ * 格子默认不设底色，所以空档透明；落在选区里时叠一层选区填充。
+ * ‼️ 与 `.row-removed` 保持同一口径；格子底色的另一个来源是轨表的 `.row-subtrack-alt`（行级状态，与本函数无关）。
  */
-export const cellUnderlayColor = (_readonlyTint: boolean, removed: boolean, selected: boolean) => {
+export const cellUnderlayColor = (removed: boolean, selected: boolean) => {
     const base = removed ? "var(--cell-removed)" : "transparent"
     return selected ? `color-mix(in srgb, var(--cell-fill) var(--cell-fill-alpha), ${base})` : base
 }
