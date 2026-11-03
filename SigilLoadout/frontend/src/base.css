@@ -106,8 +106,7 @@ html, body {
 
 /* 表格外框 / 格线 / 表头颜色只写这一处：`--table-line`（表单控件的 `--input` 是另一档）。
    ⚠️ `*` 同权重吃掉了表内所有单独的边框色，要给某格上色得用更精确的选择器。 */
-.table-border,
-.table-border * {
+.table-border, .table-border * {
     border-color: var(--table-line);
 }
 
